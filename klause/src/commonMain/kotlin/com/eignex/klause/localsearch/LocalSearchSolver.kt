@@ -92,7 +92,7 @@ class LocalSearchSolver(
 
         /** Select this strategy for the original compiled source, including continuous products. */
         fun source(compiled: CompiledSchema): SourceStrategy =
-            SourceStrategy(compiled.problem, FiniteEngine.LOCAL_SEARCH, compiled)
+            SourceStrategy(compiled.sourceBinding.originalProblem, FiniteEngine.LOCAL_SEARCH, compiled)
 
         /** Compile once and select this strategy for the resulting original source. */
         fun source(schema: VariableSchema): SourceStrategy = source(schema.compile())

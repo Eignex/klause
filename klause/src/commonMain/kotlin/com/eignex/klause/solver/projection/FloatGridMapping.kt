@@ -18,7 +18,13 @@ internal class FloatGridColumn(
     val coordinate: GridCoordinate,
     val origin: BigFraction,
     val step: BigFraction,
+    val primary: FloatGridColumn? = null,
 ) {
+    fun selector(): FloatGridColumn = primary ?: this
+
+    fun privateCoordinates(): List<GridCoordinate> = primary?.let { listOf(it.coordinate, coordinate) }
+        ?: listOf(coordinate)
+
     fun value(index: Long): BigFraction? = if (coordinate.contains(index)) {
         origin + step * BigFraction.ofLong(index)
     } else null
@@ -64,13 +70,15 @@ internal class FloatGridMapping(
     private val bySource = capturedColumns.associateBy { it.source.index }
 
     init {
-        require(target.semantics === source.semantics && target.numBoolVars == source.numBoolVars)
-        require(target.numIntVars == source.numIntVars + capturedColumns.size)
+        require(target.semantics === source.semantics && target.numBoolVars >= source.numBoolVars)
+        val privateCoordinates = capturedColumns.flatMap { it.privateCoordinates() }
+        require(target.numIntVars == source.numIntVars + privateCoordinates.size)
         require(target.numRealVars + capturedColumns.size == source.numRealVars)
         require(this.retainedReals.size == source.numRealVars)
         require(origins.size == target.numFactors && origins.all { it in source.factors.indices })
         require(bySource.size == capturedColumns.size)
-        require(capturedColumns.map { it.coordinate.variable }.distinct().size == capturedColumns.size)
+        require(privateCoordinates.map { it.variable }.toSet() ==
+            (source.numIntVars until target.numIntVars).toSet())
         require(capturedColumns.all {
             it.source.index in 0 until source.numRealVars &&
                 it.coordinate.variable in source.numIntVars until target.numIntVars &&

@@ -79,6 +79,10 @@ the shared exact affine or quadratic entry point. It supports bounded integer
 sources, continuous products and open real coordinates, with exact objective values,
 direction-aware bounds, attainment and incomplete results. `optimizeOpen` exposes
 the existing native `OpenTheoryExecution` for finite and supported open-integer linear sources.
+Compiled helper objectives retain exact original-coordinate pairings independently
+of their finite native units. The exact `optimize` interface consumes that pairing;
+`optimizeOpen` explicitly declines coefficients without a lossless linear mapping.
+The caller's objective sense applies once to the helper's already captured sign.
 It uses the same route selection as satisfaction, including finite execution after
 source-safe bound closure. Typed finite optimization retains assumptions, supplied
 heuristic starting points and interruption causes. Its values retain native minimization
@@ -432,8 +436,8 @@ invocation restrictions and [evidence admission](solver/evidence.md) retain thei
 ## Identities at mapping boundaries
 
 `SourceBoolId`, `SourceIntId` and `SourceRealId` name separate source namespaces.
-`CompiledSchema.sourceId`/`sourceRealId` expose those locations; a bucketed float has no
-continuous source location. `VarRemap` owns its primitive tables and returns typed source
+`CompiledSchema.sourceId`/`sourceRealId` expose original locations, including real
+locations for floats with a private compatibility bucket. `VarRemap` owns its primitive tables and returns typed source
 locations or null for an absent target. Internal symmetry refinement borrows its owner's
 mutable tables through an explicit workspace view, confined to that synchronous operation.
 

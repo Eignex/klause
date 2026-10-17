@@ -27,6 +27,7 @@ internal data class FloatGridVariable(
     val source: SourceRealId,
     val buckets: Int? = null,
     val auxiliary: Boolean = false,
+    val absentPin: FloatGridAbsentPin? = null,
 )
 
 internal class FloatGridRequest(val source: Problem, variables: List<FloatGridVariable>, val owner: Any = Any()) {
@@ -81,8 +82,11 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
             )
         }
     }
-    val columns = prepareFloatGridColumns(source, requested, policy, stop)
+    val primaryColumns = prepareFloatGridColumns(source, requested, policy, stop)
         ?: return FloatGridPreparation.Declined(if (stop()) FloatGridDecline.RESOURCE else FloatGridDecline.GEOMETRY)
+    val optional = prepareFloatGridAbsentPins(source, requested, primaryColumns, stop)
+        ?: return FloatGridPreparation.Declined(if (stop()) FloatGridDecline.RESOURCE else FloatGridDecline.GEOMETRY)
+    val columns = optional.columns
     val bySource = columns.associateBy { it.source.index }
     val retained = IntArray(source.numRealVars) { -1 }
     val lower = ArrayList<Double>()
@@ -105,7 +109,9 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
         val output = if (factor.variables.reals.none { selected[it] }) {
             listOf(if (factor.variables.reals.isEmpty()) factor else factor.remap(rename))
         } else {
-            lowerFloatGridFactor(factor, bySource, policy, stop)
+            val pin = optional.pinRows[id]
+            (if (pin == null) lowerFloatGridFactor(factor, bySource, policy, stop)
+            else lowerGridPin(factor, pin.first, pin.second))
                 ?: return FloatGridPreparation.Declined(
                     if (stop()) FloatGridDecline.RESOURCE else FloatGridDecline.SCALING, id,
                 )
@@ -117,15 +123,18 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
             origins += id
         }
     }
-    val domains = Array(source.numIntVars + columns.size) { id ->
+    factors.addAll(optional.factors)
+    origins.addAll(optional.origins)
+    val privateCoordinates = columns.flatMap { it.privateCoordinates() }.associateBy { it.variable }
+    val domains = Array(source.numIntVars + privateCoordinates.size) { id ->
         stop.charge(1)
         if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
         if (id < source.numIntVars) source.declaredIntDomains.finiteDomain(id)
-        else IntDomain(0L, columns[id - source.numIntVars].coordinate.buckets - 1L, source.settings.storage)
+        else IntDomain(0L, privateCoordinates.getValue(id).buckets - 1L, source.settings.storage)
     }
     if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
     val target = Problem(
-        source.numBoolVars, domains.size, domains, factors.toTypedArray(),
+        optional.booleans, domains.size, domains, factors.toTypedArray(),
         impliedFactorMask = source.impliedFactorMask?.let { mask -> BooleanArray(origins.size) { mask[origins[it]] } },
         hasSymmetryBreaking = source.hasSymmetryBreaking,
         numRealVars = lower.size, realLower = lower.toDoubleArray(), realUpper = upper.toDoubleArray(),

@@ -104,7 +104,7 @@ class SchemaSemanticsTest {
     }
 
     @Test
-    fun `continuous schema policy should decline a component requiring a grid`() {
+    fun `continuous schema policy should retain strict source rows`() {
         val source = SchemaDef<SchemaEntry>(
             mapOf(
                 "x" to FloatSpec(0.0, 1.0),
@@ -112,11 +112,11 @@ class SchemaSemanticsTest {
             ),
         )
 
-        val error = assertFailsWith<IllegalArgumentException> {
-            source.compile(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous))
-        }
+        val compiled = source.compile(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous))
 
-        assertTrue("cannot use a grid component" in error.message.orEmpty())
+        assertEquals(1, compiled.problem.numRealVars)
+        assertEquals(0, compiled.problem.numIntVars)
+        assertFalse(compiled.floatRepresentations.getValue("x").approximate)
     }
 
     @Test

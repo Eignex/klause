@@ -9,6 +9,7 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.reifyRealLinear
 import com.eignex.klause.model.AllDifferent
 import com.eignex.klause.model.AllDifferentOpt
 import com.eignex.klause.model.And
@@ -57,8 +58,6 @@ import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
-import kotlin.math.ceil
-import kotlin.math.floor
 import com.eignex.klause.factor.circuit.Circuit as CircuitFactor
 import com.eignex.klause.factor.global.AllDifferent as AllDifferentFactor
 import com.eignex.klause.factor.global.GlobalCardinality as GccFactor
@@ -204,92 +203,26 @@ internal fun Lowering.expandTable(t: TableConstraint): BoolExpr {
     }
 }
 
-/**
- * Lower a [FloatLinearConstraint] by bucketing each referenced float variable using its declared
- * `FloatSpec.buckets` and emitting a scaled-integer [Linear] factor — what the engines solve over.
- *
- * Scaling math (per float var `v` with interval `[lo, hi]` and `N` buckets, step
- * `step = (hi - lo) / (N - 1)`): substitute `v = lo + b · step` and rearrange to
- * `Σ (c_v · step_v) · b_v ⟨op⟩ bound − Σ c_v · lo_v`, then multiply by `SCALE` and
- * quantize to integer coefficients. Discretisation error is ~1/SCALE per term.
- */
-internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
-    val n = c.varNames.size
-    if (n == 0) {
-        val holds = when (c.op) {
-            IntCmpOp.LE -> 0.0 <= c.bound
-            IntCmpOp.LT -> 0.0 < c.bound
-            IntCmpOp.GE -> 0.0 >= c.bound
-            IntCmpOp.GT -> 0.0 > c.bound
-            IntCmpOp.EQ -> 0.0 == c.bound
-            IntCmpOp.NE -> 0.0 != c.bound
-        }
-        require(holds) { "Constraint reduces to a constant-false float comparison (${c.op} against ${c.bound})" }
-        return
-    }
-    val realOp = when (c.op) {
-        IntCmpOp.LE,
-        IntCmpOp.LT,
-        -> LinearOp.LE
-
-        IntCmpOp.GE,
-        IntCmpOp.GT,
-        -> LinearOp.GE
-
-        IntCmpOp.EQ -> LinearOp.EQ
-
-        IntCmpOp.NE -> LinearOp.NE
-    }
-    if (c.op != IntCmpOp.LT && c.op != IntCmpOp.GT && c.op != IntCmpOp.NE &&
-        c.varNames.all { it in realVarIdByName }
-    ) {
-        val realVars = IntArray(n) { realVarIdByName.getValue(c.varNames[it]) }
-        factors += Linear(EmptyIntArray, EmptyDoubleArray, realVars, c.coeffs.copyOf(), realOp, c.bound)
-        return
-    }
-    val scale = floatLinearScale
-    var scaledBound = c.bound
-    val scaledCoeffs = LongArray(n)
-    val intVarIds = IntArray(n)
-    for (i in 0 until n) {
-        val name = c.varNames[i]
-        val fid = floatVarIdByName.getValue(name)
-        val interval = floatMetaIntervals[fid]
-        val buckets = floatMetaBuckets[fid]
-        val step = if (buckets > 1) (interval.hi - interval.lo) / (buckets - 1) else 0.0
-        scaledCoeffs[i] = floatLinearLong(c.coeffs[i] * step * scale)
-        intVarIds[i] = floatMetaIntVarIds[fid]
-        scaledBound -= c.coeffs[i] * interval.lo
-    }
-    // The scaled sum is integer-valued, so for a real bound B (= scaledBound * scale) a strict
-    // `< B` is exactly `≤ ceil(B) − 1` and `> B` is `≥ floor(B) + 1`. Using ceil/floor (rather than
-    // truncate-then-±1) is correct when B is non-integral and for either sign. Non-strict ops
-    // keep the truncated bound.
-    val scaledReal = scaledBound * scale
-    val integralBound = floatLinearLong(when (c.op) {
-        IntCmpOp.LT -> ceil(scaledReal)
-        IntCmpOp.GT -> floor(scaledReal)
-        else -> scaledReal
-    })
-    val loweredBound = when (c.op) {
-        IntCmpOp.LT -> {
-            require(integralBound > Long.MIN_VALUE) { "Schema float-linear strict bound exceeds Long" }
-            integralBound - 1
-        }
-        IntCmpOp.GT -> {
-            require(integralBound < Long.MAX_VALUE) { "Schema float-linear strict bound exceeds Long" }
-            integralBound + 1
-        }
-        else -> integralBound
-    }
-    factors += Linear(scaledCoeffs, intVarIds, realOp, loweredBound)
+internal fun Lowering.assertFloatLinear(constraint: FloatLinearConstraint) {
+    val variables = IntArray(constraint.varNames.size) { realVarIdByName.getValue(constraint.varNames[it]) }
+    val (operation, strict) = floatComparison(constraint.op)
+    factors += Linear(EmptyIntArray, EmptyDoubleArray, variables, constraint.coeffs.copyOf(),
+        operation, constraint.bound, strict)
 }
 
-private fun floatLinearLong(value: Double): Long {
-    require(value.isFinite() && value >= Long.MIN_VALUE.toDouble() && value < -Long.MIN_VALUE.toDouble()) {
-        "Schema float-linear value exceeds Long"
-    }
-    return value.toLong()
+internal fun Lowering.reifyFloatLinear(constraint: FloatLinearConstraint): Int {
+    val variables = IntArray(constraint.varNames.size) { realVarIdByName.getValue(constraint.varNames[it]) }
+    val (operation, strict) = floatComparison(constraint.op)
+    return reifyRealLinear(constraint.coeffs.copyOf(), variables, operation, constraint.bound, strict)
+}
+
+private fun floatComparison(operation: IntCmpOp): Pair<LinearOp, Boolean> = when (operation) {
+    IntCmpOp.LE -> LinearOp.LE to false
+    IntCmpOp.LT -> LinearOp.LE to true
+    IntCmpOp.GE -> LinearOp.GE to false
+    IntCmpOp.GT -> LinearOp.GE to true
+    IntCmpOp.EQ -> LinearOp.EQ to false
+    IntCmpOp.NE -> LinearOp.NE to false
 }
 
 internal fun Lowering.assertAllDifferent(terms: List<IntExpr>) {

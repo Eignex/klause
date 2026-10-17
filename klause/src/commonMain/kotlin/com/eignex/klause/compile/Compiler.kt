@@ -1,7 +1,6 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
-import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -16,10 +15,12 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.CnfLowering
-import com.eignex.klause.lowering.FloatRepresentation
 import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.SetLayout
+import com.eignex.klause.lowering.reifyRealLinear
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
@@ -78,11 +79,12 @@ import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.util.FloatInterval
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.projection.FloatGridAbsentPin
+import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.skema.SchemaDef
-import kotlin.math.roundToInt
 
 internal class Compiler(config: KlauseConfig, overrides: SemanticOverrides) {
     private val semantics = schemaSemantics(overrides)
@@ -102,7 +104,6 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
     val pinAbsentOptVars = checkNotNull(semantics.effective.pinAbsentOptionalValues)
     private val grid = semantics.effective.floats as? FloatSemantics.Grid
     val floatBuckets = grid?.buckets ?: DEFAULT_FLOAT_BUCKETS
-    val floatLinearScale = (grid?.linearScale ?: DEFAULT_FLOAT_SCALE).toDouble()
 
     override val factors get() = problemBuilder.factors
     val boolVarIdByName get() = problemBuilder.boolVarIdByName
@@ -115,17 +116,9 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
     internal val divModOperands = HashMap<IntExpr, Int>()
     val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
 
-    // Schema-layer float bookkeeping. `floatDecoders` records bucket parameters per float-var
-    // name (so the schema can decode `sample.intValue(id)` back to a Double). `floatMetaIntervals` /
-    // `floatMetaIntVarIds` / `floatMetaBuckets` are the parallel per-float-var arrays the
-    // float-linear lowering reads to build the scaled-integer factor.
     val floatDecoders = mutableMapOf<String, FloatSpec>()
-    val floatMetaIntervals = mutableListOf<FloatInterval>()
-    val floatMetaIntVarIds = IntArrayList()
-    val floatMetaBuckets = IntArrayList()
-    val floatVarIdByName = mutableMapOf<String, Int>() // float-id (metadata index) by name
-
-    var floatRepresentations: Map<String, FloatRepresentation> = emptyMap()
+    val auxiliaryReals = HashSet<Int>()
+    val floatAbsentPins = HashMap<Int, FloatGridAbsentPin>()
     val realVarIdByName get() = problemBuilder.realVarIdByName
 
     /**
@@ -153,7 +146,8 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
 
     fun newIntVar(domain: IntDomain): Int = problemBuilder.newInt(domain)
 
-    fun newRealVar(lower: Double, upper: Double, name: String? = null): Int = problemBuilder.newReal(lower, upper, name)
+    fun newRealVar(lower: Double, upper: Double, name: String? = null): Int =
+        problemBuilder.newReal(lower, upper, name).also { if (name == null) auxiliaryReals += it }
 
     fun continuousProduct(a: Int, b: Int, result: Int) = problemBuilder.continuousProduct(a, b, result)
 
@@ -211,13 +205,7 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
 
         is ContinuousRealEquality -> error("Continuous equality requires a top-level constraint")
 
-        is FloatLinearConstraint -> {
-            // A float-linear implication cannot be lowered without a reified float-linear factor.
-            error(
-                "FloatLinearConstraint at non-top-level position is not yet supported; " +
-                    "ReifiedFloatLinear factor still TODO.",
-            )
-        }
+        is FloatLinearConstraint -> reifyFloatLinear(expr)
 
         is AtMost -> reifyCardinality(expr.children, 0, expr.k)
 
@@ -441,11 +429,6 @@ fun VariableSchema.compile(
 // engine itself stays free of any SchemaDef / schema-shape dependency.
 
 private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
-    floatRepresentations = schemaFloatRepresentations(def)
-    require(semantics.effective.floats != FloatSemantics.Continuous ||
-        floatRepresentations.values.none { it.approximate }) {
-        "continuous schema float semantics cannot use a grid component"
-    }
     for ((name, entry) in def.entries) {
         when (entry) {
             is BoolSpec -> bindBoolName(name, newBoolVar())
@@ -483,21 +466,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
             is FloatSpec -> {
                 val buckets = entry.buckets ?: floatBuckets
                 floatDecoders[name] = entry.copy(buckets = buckets)
-                if (!floatRepresentations.getValue(name).approximate) {
-                    // LP-only continuous column: a real variable the simplex resolves, no
-                    // bucketing. `decode` reads it from `Sample.reals`; float-linear lowers to a real row.
-                    newRealVar(entry.min, entry.max, name)
-                } else {
-                    // Bucketed inline so `Problem.factors` stays pure int+bool; the parallel floatMeta*
-                    // arrays record the bucket params the float-linear lowering reads.
-                    val intId = newIntVar(IntDomain(0L, (buckets - 1).toLong()))
-                    bindIntName(name, intId)
-                    val fid = floatMetaIntervals.size
-                    floatVarIdByName[name] = fid
-                    floatMetaIntervals += FloatInterval(entry.min, entry.max)
-                    floatMetaIntVarIds.add(intId)
-                    floatMetaBuckets.add(buckets)
-                }
+                newRealVar(entry.min, entry.max, name)
             }
 
             is NamedConstraint -> {}
@@ -514,8 +483,15 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     // The compiler builds a plain base-baked `Problem`; the SAC / failed-literal probing tiers, resolved
     // from the presolve config, run in the presolve lane via [RootBaker] (kernel → presolve would
     // cycle). The presolve pipeline reads the same config through [BakeConfig.from].
+    val source = buildProblem()
+    val namedReals = realVarIdByName.toMap()
+    val specsById = namedReals.entries.associate { (name, id) -> id to floatDecoders.getValue(name) }
+    val binding = CompiledSourceBinding(source, intVarIdByName, namedReals,
+        (0 until source.numRealVars).map { id ->
+            FloatGridVariable(SourceRealId(id), specsById[id]?.buckets, id in auxiliaryReals, floatAbsentPins[id])
+        }, schemaFloatRepresentations(def))
     return CompiledSchema(
-        problem = buildProblem(),
+        problem = source,
         boolVarIdByName = boolVarIdByName.toMap(),
         intVarIdByName = intVarIdByName.toMap(),
         nominalIndicators = nominalIndicators.mapValues { it.value.toMap() },
@@ -523,13 +499,13 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
         setLayouts = setLayouts.toMap(),
         setNominalLabels = setLabelOrder.toMap(),
         realVarIdByName = realVarIdByName.toMap(),
-        floatRepresentations = floatRepresentations,
+        sourceBinding = binding,
     )
 }
 
 /**
  * Emit `¬present → value = default` for each optional variable identified by [PresenceSpec].
- * Defaults are zero clamped to the integer domain, the float bucket nearest clamped real zero,
+ * Defaults are zero clamped to the declared integer or real domain,
  * false for Booleans, and the first nominal label. Each default lies in its value domain, so
  * the pin cannot force presence.
  */
@@ -539,15 +515,18 @@ private fun Lowering.emitOptVarPins(def: SchemaDef<SchemaEntry>) {
         val base = entry.valueName
         val absent = Not(BoolRef(name))
         when {
-            // Float branch must precede the int branch: float base vars also live in
-            // intVarIdByName (backed by a [0, buckets-1] int var), but their canonical
-            // default is a *bucket index*, not `0.coerceIn(min, max)` in bucket space.
             floatDecoders.containsKey(base) -> {
                 val spec = floatDecoders.getValue(base)
                 val default = 0.0.coerceIn(spec.min, spec.max)
-                val bucket = ((default - spec.min) / spec.scale).roundToInt()
-                    .coerceIn(0, checkNotNull(spec.buckets) - 1)
-                assertExpr(Implies(absent, IntCompare(IntRef(base), IntCmpOp.EQ, IntLit(bucket))))
+                val id = realVarIdByName.getValue(base)
+                val first = factors.size
+                val equality = reifyRealLinear(doubleArrayOf(1.0), intArrayOf(id), LinearOp.EQ, default)
+                factors += Clause(intArrayOf(Lit.make(boolVarIdByName.getValue(name), true), equality))
+                val rows = (first until factors.size).filter {
+                    factors[it] is com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+                }
+                floatAbsentPins[id] = FloatGridAbsentPin(SourceBoolId(boolVarIdByName.getValue(name)),
+                    checkNotNull(BigFraction.ofDouble(default)), rows)
             }
 
             intVarIdByName.containsKey(base) -> {

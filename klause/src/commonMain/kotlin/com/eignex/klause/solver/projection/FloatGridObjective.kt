@@ -37,9 +37,9 @@ internal fun FloatGridMapping.projectObjective(
     if (objective.boolWeightValues.size > source.numBoolVars ||
         objective.intCoefficientValues.size > source.numIntVars ||
         objective.realCoefficientValues.size > source.numRealVars ||
-        objective.boolWeightValues.size.toLong() + target.numIntVars > Int.MAX_VALUE
+        target.numBoolVars.toLong() + target.numIntVars > Int.MAX_VALUE
     ) return null
-    val booleans = objective.boolWeightValues.size
+    val booleans = target.numBoolVars
     val coefficients = Array(booleans + target.numIntVars) { BigFraction.ZERO }
     var offset = BigFraction.ofLong(objective.constant)
     for (id in objective.boolWeightValues.indices) {

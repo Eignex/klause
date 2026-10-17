@@ -5,11 +5,15 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.GridProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.SourceSemantics
@@ -33,6 +37,83 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class FloatGridProjectionTest {
+    @Test
+    fun `an unrepresentable absent carrier should decline without changing the original source`() {
+        val source = Problem(2, 0, emptyArray<IntDomain>(), arrayOf(
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, Double.MIN_VALUE),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve())
+        val variable = FloatGridVariable(SourceRealId(0), absentPin = FloatGridAbsentPin(SourceBoolId(0),
+            assertNotNull(BigFraction.ofDouble(Double.MIN_VALUE)), listOf(0)))
+
+        val result = prepareFloatGrid(FloatGridRequest(source, listOf(variable)), Cancellation.Never)
+
+        assertEquals(FloatGridDecline.GEOMETRY, assertIs<FloatGridPreparation.Declined>(result).cause)
+        assertEquals(1, source.numRealVars)
+        assertEquals(0, source.numIntVars)
+        assertEquals(-1.0, source.realLower.single())
+        assertEquals(1.0, source.realUpper.single())
+    }
+
+    @Test
+    fun `an optional absent value between grid points should not add a present point`() {
+        for (buckets in listOf(1, 2, 7)) {
+            val source = Problem(3, 0, emptyArray<IntDomain>(), arrayOf(
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 0.0),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+                semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(buckets, 1000)).resolve())
+            val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
+                listOf(FloatGridVariable(SourceRealId(0), absentPin = FloatGridAbsentPin(SourceBoolId(0),
+                    BigFraction.ZERO, listOf(0, 1))))), Cancellation.Never))
+
+            val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { native ->
+                assertNotNull(prepared.mapping.reconstruct(prepared.problem, native, Cancellation.Never))
+            }.toList()
+
+            assertEquals(buckets, prepared.mapping.columns().single().selector().coordinate.buckets)
+            assertEquals(listOf(BigFraction.ZERO), points.filter { !it.boolValue(0) }.map { it.exactReals?.single() })
+            val present = points.filter { it.boolValue(0) }.map { it.exactReals?.single() }.toSet()
+            val step = if (buckets == 1) BigFraction.ZERO
+                else BigFraction.ofLong(2) * BigFraction.ofLong(buckets - 1L).reciprocal()
+            assertEquals((0 until buckets).map {
+                BigFraction.ofLong(-1) + step * BigFraction.ofLong(it.toLong())
+            }.toSet(), present)
+        }
+    }
+
+    @Test
+    fun `optional products and objectives should use the same absent source value`() {
+        val source = Problem(3, 0, emptyArray<IntDomain>(), arrayOf(
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, 0.0),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.GE, 0.0),
+            Clause(intArrayOf(Lit.make(0, false))),
+            Clause(intArrayOf(Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(2, true))),
+            ContinuousProduct(0, 0, 1),
+        ), numRealVars = 2, realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
+            listOf(FloatGridVariable(SourceRealId(0), absentPin = FloatGridAbsentPin(SourceBoolId(0),
+                BigFraction.ZERO, listOf(0, 1))), FloatGridVariable(SourceRealId(1)))), Cancellation.Never))
+        val native = BacktrackSolver(prepared.problem.bake()).enumerate().first()
+        val objective = LinearObjective(constant = 7, realCoefficients = doubleArrayOf(3.0, 5.0))
+
+        val sample = assertNotNull(prepared.mapping.reconstruct(prepared.problem, native, Cancellation.Never))
+        val projected = assertNotNull(prepared.mapping.projectObjective(objective, Cancellation.Never))
+
+        assertEquals(listOf(BigFraction.ZERO, BigFraction.ZERO), sample.exactReals)
+        assertEquals(BigFraction.ofLong(7), projected.sourceValue(projected.native.evaluateLong(native), false))
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sample))
+    }
+
     @Test
     fun `cached geometry should bind a fresh owner without retaining an earlier invocation stop`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
