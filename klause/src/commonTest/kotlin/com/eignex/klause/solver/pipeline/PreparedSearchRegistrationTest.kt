@@ -440,7 +440,7 @@ class PreparedSearchRegistrationTest {
             intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
             factors = arrayOf(
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 0),
-                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 0),
             ),
         )
         val plan = source.componentPlan()

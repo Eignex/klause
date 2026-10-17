@@ -364,11 +364,19 @@ class QfLiraSolverTest {
 
     @Test
     fun `prepared source should open an undecided sibling after a conflicting Boolean prefix`() {
-        val source = partialModel()
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            ),
+        )
         val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
         prepared.open().use { first ->
             val session = SearchSession(listOf(first))
             assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
             assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
         }
 
@@ -948,7 +956,7 @@ class QfLiraSolverTest {
         intBounds = openBounds(),
         factors = arrayOf(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
         ),
     )
 

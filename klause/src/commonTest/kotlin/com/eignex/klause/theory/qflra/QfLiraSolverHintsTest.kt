@@ -782,7 +782,7 @@ class QfLiraSolverHintsTest {
         intBounds = openBounds(),
         factors = arrayOf(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
         ),
     )
 
