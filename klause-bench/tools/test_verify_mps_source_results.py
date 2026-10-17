@@ -52,6 +52,64 @@ class MpsGroundTest(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'violates exact original source'):
             self.check('v x=1.0000001 z=0', '1.0000001', exact=True)
 
+    def test_ground_checks_do_not_require_per_row_expression_walks_or_objective_fallbacks(self):
+        with mock.patch.object(verifier, 'mps_point', side_effect=AssertionError('per-row walk forbidden')), \
+             mock.patch.object(verifier, 'mps_objective_matches', side_effect=AssertionError('legacy fallback forbidden')):
+            self.assertTrue(self.check()['exactFeasible'])
+            self.assertTrue(self.check('v x=1.0000001 z=0', '1.0000001')['toleranceAccepted'])
+            with self.assertRaisesRegex(AssertionError, 'exceeds original source tolerance'):
+                self.check('v x=1.000001 z=0', '1.000001')
+
+    def test_hoisted_ground_evaluation_agrees_with_pointwise_evaluation_on_existing_fixtures(self):
+        fixtures = (
+            ('original-decimal-cancellation', 'v I=1 X=1', '1'),
+            ('bounded-decimal-constant', 'v I=0 X=1/10', '1/8'),
+            ('indicator-disabled', 'v I=0 X=0', '0'),
+            ('zero-row-disabled', 'v I=0', '0'),
+            ('primal-point-max', 'v I=0 X=1', '13'),
+            ('wide-bounded-mixed', 'v I=1 X=1', '1'),
+            ('continuous-decimal', 'v X=1/3', '1/30'))
+        for name, witness, reported in fixtures:
+            source = (self.fixture_root / (name + '.mps')).read_text()
+            for tolerance in (False, True):
+                with self.subTest(name=name, tolerance=tolerance):
+                    rows, objective, variables, maximize = verifier.mps(source, tolerance=tolerance, ground_source=True)
+                    values = verifier.mps_values(witness, variables)
+                    substitutions = verifier.mps_substitutions(variables, values)
+                    expected = all(z3.is_true(verifier.mps_point(row, variables, values)) for row in rows)
+                    actual = z3.is_true(verifier.mps_apply_point(z3.And(*rows), substitutions))
+                    expected_objective = verifier.mps_point(objective, variables, values)
+                    actual_objective = verifier.mps_apply_point(objective, substitutions)
+                    self.assertEqual(expected, actual)
+                    self.assertTrue(z3.is_true(z3.simplify(expected_objective == actual_objective)))
+                    checked = self.check(witness, reported, exact=not tolerance, source=source, maximize=maximize)
+                    self.assertTrue(checked['exactFeasible'])
+
+    def test_native_grounding_preserves_range_infinity_and_cancellation_boundaries(self):
+        sources = (
+            ('ROWS\n N cost\n E row\nCOLUMNS\n x cost 0 row 100000000\n'
+             ' x row -99999999\nRHS\n r row 0\nBOUNDS\n FR b x\nENDATA\n', ('v x=0', 'v x=1')),
+            ('ROWS\n N cost\n L row\nCOLUMNS\n x cost 0 row 1\nRHS\n r row 1e20\n'
+             'RANGES\n r row 1\nBOUNDS\n FR b x\nENDATA\n', ('v x=0', 'v x=99999999999999999999')),
+            ('ROWS\n N cost\n E row\nCOLUMNS\n x cost 0 row 1\nRHS\n r row 1\n'
+             'BOUNDS\n FR b x\nENDATA\n', ('v x=1.0000001', 'v x=1.00000010000002')))
+        for source, witnesses in sources:
+            for witness in witnesses:
+                for tolerance in (False, True):
+                    with self.subTest(witness=witness, tolerance=tolerance):
+                        rows, _, variables, _ = verifier.mps(source, tolerance=tolerance, ground_source=True)
+                        values = verifier.mps_values(witness, variables)
+                        expected = all(z3.is_true(verifier.mps_point(row, variables, values)) for row in rows)
+                        actual = z3.is_true(verifier.mps_apply_point(z3.And(*rows),
+                                                                  verifier.mps_substitutions(variables, values)))
+                        self.assertEqual(expected, actual)
+
+    def test_ground_constant_objectives_need_no_source_variables_or_rows(self):
+        source = 'ROWS\n N cost\nCOLUMNS\nRHS\n r cost -0.125\nENDATA\n'
+        with mock.patch.object(verifier, 'mps_point', side_effect=AssertionError('per-row walk forbidden')):
+            result = self.check('v ', '1/8', exact=True, source=source)
+        self.assertTrue(result['exactFeasible'])
+
     def test_missing_extra_duplicate_nonfinite_and_fractional_integer_coordinates_are_rejected(self):
         for witness in ('v x=1', 'v x=1 z=0 extra=0', 'v x=1 z=0 x=1',
                         'v x=NaN z=0', 'v x=Infinity z=0', 'v x=1/0 z=0'):

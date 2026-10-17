@@ -1157,7 +1157,10 @@ MPS runs opt in with `param=source-validation=true` under policy
 Python MPS parser and exact rational substitution in `verify_source_results.py`.
 It checks the literal final stdout point against every original row, bound,
 indicator and integrality declaration, and recomputes the original objective and
-sense. Default runs permit original MPS absolute/relative tolerances of `1e-7`;
+sense. Complete exact typed point substitutions are prepared once; native exact
+substitution and simplification evaluate the row/bound conjunction and objective.
+Nominal ground checks omit unused magnitude trees; tolerance checks retain every
+separate source term. Default runs permit original MPS absolute/relative tolerances of `1e-7`;
 `exact=true` requires zero slack. Tolerance magnitudes retain separate original
 terms, including cancellation. Text bounds at or beyond magnitude `1e20` are open
 for columns and each row side, including derived range endpoints; affine objective

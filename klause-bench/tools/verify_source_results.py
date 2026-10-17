@@ -240,13 +240,14 @@ def mps(text, tolerance=False, absolute_tolerance=fractions.Fraction('1e-7'),
         terms_by_row[row] = [rational(value) * variables[column] for column, value in summed.items()]
     activities = {row: z3.Sum(terms) for row, terms in terms_by_row.items()}
     magnitude_terms = ({row: [rational(value) * variables[column] for column, value in entries]
-                        for row, entries in coefficients.items()} if ground_source else terms_by_row)
+                        for row, entries in coefficients.items()} if ground_source and tolerance else terms_by_row)
     for row, kind in rows.items():
         if kind == "N":
             continue
         activity, bound = activities.get(row, z3.RealVal(0)), rational(rhs.get(row, "0"))
         span = fractions.Fraction(ranges[row].replace('D', 'E')) if row in ranges else None
-        magnitude = z3.Sum([z3.Abs(term) for term in magnitude_terms.get(row, [])])
+        magnitude = (0 if ground_source and not tolerance else
+                     z3.Sum([z3.Abs(term) for term in magnitude_terms.get(row, [])]))
         assertions = []
         def above(side):
             if ground_source and abs(fractions.Fraction(str(z3.simplify(side)))) >= 10 ** 20:
@@ -309,6 +310,15 @@ def mps_point(expression, variables, values):
     return z3.simplify(z3.substitute(expression, *substitutions))
 
 
+def mps_substitutions(variables, values):
+    return [(variable, z3.IntVal(values[name].numerator) if z3.is_int(variable) else rational(values[name]))
+            for name, variable in variables.items()]
+
+
+def mps_apply_point(expression, substitutions):
+    return z3.simplify(z3.substitute(expression, *substitutions))
+
+
 def mps_objective_matches(objective, variables, values, reported, exact_mode, exact_objective, witness):
     candidates = [mps_point(objective, variables, values)]
     if not exact_mode and '/' not in witness:
@@ -357,8 +367,8 @@ def check_mps_ground(text, record, raw_output, exact):
     rows, objective, variables, maximize = mps(text, ground_source=True)
     assert record.get('maximize') is maximize, 'objective orientation differs from source'
     values = mps_values(record['finalWitness'], variables)
+    substitutions = mps_substitutions(variables, values)
     reported = record.get('exactObjective')
-    exact_objective = reported is not None
     if reported is None:
         reported = record.get('objective')
     outputs = [line[2:].strip() for line in raw_output.splitlines() if line.startswith('o ')]
@@ -366,15 +376,15 @@ def check_mps_ground(text, record, raw_output, exact):
         raise ValueError('missing MPS objective custody')
     assert fractions.Fraction(str(reported)) == fractions.Fraction(outputs[-1]), \
         'retained objective differs from stdout'
-    assert mps_objective_matches(-objective if maximize else objective, variables, values,
-                                 reported, True, exact_objective, record['finalWitness']), \
+    point_objective = mps_apply_point(-objective if maximize else objective, substitutions)
+    assert z3.is_true(z3.simplify(point_objective == rational(reported))), \
         'point objective differs from reported objective'
-    exact_feasible = all(z3.is_true(mps_point(row, variables, values)) for row in rows)
+    exact_feasible = z3.is_true(mps_apply_point(z3.And(*rows), substitutions))
     if exact:
         assert exact_feasible, 'MPS point violates exact original source'
     elif not exact_feasible:
         tolerance_rows, _, _, _ = mps(text, tolerance=True, ground_source=True)
-        assert all(z3.is_true(mps_point(row, variables, values)) for row in tolerance_rows), \
+        assert z3.is_true(mps_apply_point(z3.And(*tolerance_rows), substitutions)), \
             'MPS point exceeds original source tolerance'
     return {'exactFeasible': exact_feasible, 'toleranceAccepted': not exact and not exact_feasible,
             'sourceTolerance': {'absolute': '0' if exact else '1/10000000',
