@@ -1309,8 +1309,8 @@ python3 klause-bench/tools/verify_source_results.py /path/to/cases.json \
   --output /path/to/source-checks.json
 ```
 
-`bench.profile.SourceRecordCheck` runs this verifier on saved records through an
-AWS lab profile without rerunning the solver. Pass `bundle=<https URL>` and
+`bench.profile.SourceRecordCheck` runs this verifier on saved records through a
+lab analysis profile without rerunning the solver. Pass `bundle=<https URL>` and
 `sha256=<compressed SHA-256>` for a gzip JSON object containing `cases` (the case
 array) and `sources` (original source SHA-256 keys with base64 original bytes).
 For small saved-record bundles, `input64=<base64 gzip bytes>` replaces `bundle`;
@@ -1332,6 +1332,8 @@ With `catalog=true`, missing sources are resolved through the maintained corpus
 catalog on the analysis host and must match each record's original model hash.
 This permits record-only bundles for fetched collections without redistributing
 their inputs. Resolved suite/name identities are retained in `catalog-sources.json`.
+It first creates a private environment with `python3 -m venv`. If creation fails,
+it attempts the Linux `python3-venv` bootstrap through `sudo apt-get` and retries.
 It checks bundle/source identities, provisions the pinned checker dependencies,
 and retains checker logs, versions and a checked prefix on failure under `$OUT`.
 Original unknown records retain their no-claim outcome; reference agreement does
@@ -1423,7 +1425,7 @@ only a completed independent check; an undecided floor uses `boundCheck=unknown`
 Floor telemetry and floor checking do not establish an optimum without a matching witness.
 Errors are recorded per case and make the command exit unsuccessfully. The checker
 supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
-Pass `checker=boolean` to the saved-record `SourceRecordCheck` AWS profile to run
+Pass `checker=boolean` to the saved-record `SourceRecordCheck` lab profile to run
 this checker against the same hash-pinned `cases`/`sources` bundle. Its retained
 source checks, runtime/package versions, checker hashes and process log distinguish
 verified witnesses/objectives, independently checked proofs and unknown proof queries.
