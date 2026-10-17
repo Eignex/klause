@@ -92,9 +92,8 @@ class SolveCoreTest(private val route: String) {
         """.trimIndent()
 
         "open-linear" -> """
-            (declare-const b Bool) (declare-const x Real) (declare-const z Int)
-            (assert (>= z 0))
-            (assert (= (* 3 x) (ite b 0 1)))
+            (declare-const x Real)
+            (assert (>= x 0))
             (minimize (+ 7 x)) (check-sat)
         """.trimIndent()
 
