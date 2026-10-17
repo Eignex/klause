@@ -1022,6 +1022,7 @@ private fun executePortfolio(
         preparedPlan = request.preparedPlan,
         cancellation = request.cancellation,
         numericalCompletion = request.executionOptions.numericalCompletion,
+        collectMirUse = request.executionOptions.collectMirUse,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
                 invocation.heuristicHints(

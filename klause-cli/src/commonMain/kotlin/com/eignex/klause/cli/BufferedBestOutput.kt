@@ -132,8 +132,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         // is what makes a source-lane reduction impossible to observe from a run.
         printStatPairs(commentPrefix, presolveStatPairs(stats))
         // The search block is unconditional counters, so it is worth printing only for an engine that
-        // ran; the LP block reports nothing unless the LP did work, so it gates itself and must not sit
-        // behind the backend check — a run that records no backend can still have solved relaxations.
+        // ran. LP routing work and diagnostic collection can be observed without a search backend.
         if (stats.run.backend.isNotEmpty()) {
             printStatPairs(commentPrefix, searchStatPairs(stats).filter { (k, _) -> keepStat(k) })
             printStatPairs(commentPrefix, caStatPairs(stats))

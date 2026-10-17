@@ -1,11 +1,14 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.CoreGuidedStats
@@ -35,10 +38,49 @@ import com.eignex.klause.util.parseBigInt
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class CliStatsTest {
+
+    @Test
+    fun `CLI statistics should retain bounded MIR observations from finite execution`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 3) }, arrayOf(
+            Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3),
+        ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1, -1))
+        val common = CommonOptions().apply {
+            engine = "mixed"
+            parallel = 1
+            randomSeed = 3
+            statistics = true
+        }
+        val solvable = sourceSolvable(problem, objective, false, common, { "" }, { "" })
+        var observed: SolveStats? = null
+        val output = object : OutputProtocol by MpsOutput() {
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                observed = stats
+            }
+        }
+
+        SolveCore.solve(solvable, common, output)
+        val stats = assertNotNull(observed)
+        val pairs = lpStatPairs(stats).toMap()
+
+        val diagnostic = assertNotNull(stats.lp.mirUse)
+        assertEquals(diagnostic.encoded, pairs["lpMirUse"])
+        assertTrue(pairs["lpMirUseStatus"] in listOf("complete", "incomplete"))
+        assertTrue(diagnostic.encoded.length <= 65536)
+    }
+
+    @Test
+    fun `absent MIR observations should be reported as uncollected`() {
+        val pairs = lpStatPairs(SolveStats.EMPTY).toMap()
+
+        assertEquals("uncollected", pairs["lpMirUseStatus"])
+        assertEquals(null, pairs["lpMirUse"])
+    }
 
     @Test
     fun `complete traversal Boolean progress should stay absent until observed`() {

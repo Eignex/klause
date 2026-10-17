@@ -27,6 +27,7 @@ import com.eignex.klause.lp.cut.FlowCoverSeparator
 import com.eignex.klause.lp.cut.GccSeparator
 import com.eignex.klause.lp.cut.ImpliedBoundSeparator
 import com.eignex.klause.lp.cut.KnapsackCoverSeparator
+import com.eignex.klause.lp.cut.MirUseObservation
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
@@ -111,6 +112,10 @@ internal class LpEngine(
 ) : AutoCloseable {
     init { projections?.requireSource(problem) }
 
+    private val mirUseOwner = sink.mirUseBudget?.owner(
+        params0.randomSeed, params0.lpConfig?.emphasis?.ordinal ?: -1,
+        problem.numBoolVars, problem.numIntVars, problem.numRealVars, problem.factors.size,
+    )
     private var closed = false
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
@@ -998,6 +1003,12 @@ internal class LpEngine(
         lpRelaxer = buildRelaxer(params.lpPlan, deferred = true)
         yield(Unit)
         lpRelaxer?.preparation()?.forEach { yield(Unit) }
+        mirUseOwner?.configure(
+            (if (params.lpPlan.cuts) 1L else 0L) or
+                (if (params.lpPlan.rootCutHarvest) 2L else 0L) or
+                (if (params.lpPlan.gomoryEnabled) 4L else 0L) or
+                (if (params.lpPlan.mirEnabled) 8L else 0L),
+        )
         lpSeparators = if (params.lpPlan.cuts || params.lpPlan.circuit) {
             buildList {
                 if (params.lpPlan.cuts) {
@@ -1005,7 +1016,7 @@ internal class LpEngine(
                     add(GccSeparator())
                     add(KnapsackCoverSeparator())
                     add(CliqueCutSeparator())
-                    add(AggregationMirSeparator())
+                    add(AggregationMirSeparator(mirUseOwner?.let(::MirUseObservation)))
                     if (params.lpPlan.impliedBoundCuts) add(ImpliedBoundSeparator())
                     if (params.lpPlan.flowCoverCuts) add(FlowCoverSeparator())
                     val coef = constructionLongArray(problem.numIntVars) {

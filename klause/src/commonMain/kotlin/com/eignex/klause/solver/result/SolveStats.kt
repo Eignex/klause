@@ -131,7 +131,11 @@ internal fun SolveStats.withPresolve(presolve: PresolveStats?): SolveStats {
  * Single-threaded with no internal locking: a backend fanning out across threads keeps one sink per
  * worker and merges the snapshots.
  */
-internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRoute.NODE) {
+internal class SolveStatsSink(
+    var backend: String,
+    lpProbeRoute: LpRoute = LpRoute.NODE,
+    internal val mirUseBudget: MirUseBudget? = null,
+) {
     val search: SearchStatsSink = SearchStatsSink()
     val ca: ConflictAnalysisStatsSink = ConflictAnalysisStatsSink()
     val lp: LpStatsSink = LpStatsSink(lpProbeRoute)

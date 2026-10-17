@@ -79,7 +79,9 @@ internal object SolveCore {
         val openCores = common.parallel ?: 1
         val sourceControls = rawSolvable.sourceInvocation?.let { invocation ->
             SourceExecutionRequest(
-                invocation, policy, ExecutionOptions.parse(common.engineParams),
+                invocation, policy, ExecutionOptions.parse(
+                    if (common.statistics) common.engineParams + "__statistics=true" else common.engineParams,
+                ),
                 finiteRequest = { shape ->
                     finiteRequest(
                         shape, common, engine, openCores, config, solutionSetSensitive,
@@ -457,7 +459,9 @@ internal object SolveCore {
             solutionSetSensitive = solutionSetSensitive,
             presolveBudget = presolveBudget,
             cores = cores,
-            executionOptions = ExecutionOptions.parse(common.engineParams).let {
+            executionOptions = ExecutionOptions.parse(
+                if (common.statistics) common.engineParams + "__statistics=true" else common.engineParams,
+            ).let {
                 if (numericalCompletion) it.withNumericalCompletion() else it
             },
             randomSeed = common.randomSeed,

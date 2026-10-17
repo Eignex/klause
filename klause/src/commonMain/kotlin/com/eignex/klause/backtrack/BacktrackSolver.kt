@@ -29,6 +29,7 @@ import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.MirUseBudget
 import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -59,6 +60,7 @@ class BacktrackSolver internal constructor(
     override val problem: BakedProblem,
     internal val lpSolveContext: LpSolveContext,
     private val nativeProjection: PropagationProblem? = null,
+    internal val mirUseBudget: MirUseBudget? = null,
 ) : Solver<BacktrackParams>,
     Optimizer<BacktrackParams>,
     ResumableOptimizer<BacktrackParams>,
@@ -69,6 +71,9 @@ class BacktrackSolver internal constructor(
 
     internal constructor(problem: BakedProblem, nativeProjection: PropagationProblem) :
         this(problem, LpSolveContext.Production, nativeProjection)
+
+    internal constructor(problem: BakedProblem, nativeProjection: PropagationProblem?, mirUseBudget: MirUseBudget?) :
+        this(problem, LpSolveContext.Production, nativeProjection, mirUseBudget)
 
     internal fun propagationProjection(nativeSat: Boolean, model: BakedProblem = problem): PropagationProblem =
         if (nativeSat && nativeProjection?.isNativeSatEligible == true && nativeProjection.problem === model) {

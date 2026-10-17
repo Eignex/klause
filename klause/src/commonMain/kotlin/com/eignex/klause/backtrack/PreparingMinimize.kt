@@ -3,9 +3,9 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.propagation.PropagationPreparation
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -34,7 +34,7 @@ internal class PreparingMinimize(
     private var retainedPropagationNanos = 0L
     private val propagationWork: Long get() = preparation?.work ?: retainedWork
     private val propagationNanos: Long get() = preparation?.propagationNanos ?: retainedPropagationNanos
-    private val sink = SolveStatsSink(backend = "backtrack").also {
+    private val sink = SolveStatsSink(backend = "backtrack", mirUseBudget = solver.mirUseBudget).also {
         it.start()
         it.search.propagationWork = { propagationWork }
         it.search.rootPropagationWork = { propagationWork }
