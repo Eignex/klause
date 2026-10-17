@@ -53,6 +53,10 @@ bytes and SHA-256, declaration-order rational variables/rows/objective, toleranc
 engine and limits. Fractions use integer or `numerator/denominator` strings.
 The profile retains input/runtime/build identities, original bytes, every checked
 source point, original objective value and separate native/source conclusions.
+Optional `nodeLimit` supplies the finite invocation's shared decision/move allowance;
+`work` retains its arithmetic meaning. `openBoundProof=false` declines only optional
+bound closure. Measurements retain these controls, original/working coordinate
+counts and the actual scheduled worker labels and segments.
 `cases.json` can be replayed by `SourceRecordCheck` against those original bytes.
 Source replay installs the Python venv package on Linux; macOS lab hosts use their
 existing `python3` venv support. Checker dependencies remain isolated in the job's

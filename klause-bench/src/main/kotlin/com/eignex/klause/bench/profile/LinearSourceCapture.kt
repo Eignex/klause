@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
@@ -109,6 +110,7 @@ object LinearSourceCapture {
                 engine,
                 maximize = input.maximize,
                 cancellation = stop,
+                boundCancellation = if (input.openBoundProof) Cancellation.Never else Cancellation { true },
             )
             )
             val points = ArrayList<LinearSourceWitness>()
@@ -119,7 +121,8 @@ object LinearSourceCapture {
                         presolveBudget = null, cores = input.cores,
                         executionOptions = ExecutionOptions.parse(emptyList()),
                         randomSeed = input.seed, defaultArms = 1, lpConfig = LpConfig.AUTO,
-                        zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                        zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+                        nodeBudget = input.nodeLimit?.let(::NodeBudget),
                         solveBudgetMillis = input.timeoutMs, allSolutions = false, solutionCap = null,
                         deadlineExceeded = { stop() }, onEvent = null, onPortfolioEvent = null,
                     )
@@ -148,6 +151,21 @@ object LinearSourceCapture {
                 put("cores", input.cores)
                 put("seed", input.seed)
                 put("work", input.work)
+                put("nodeLimit", input.nodeLimit)
+                put("openBoundProof", input.openBoundProof)
+                put("sourceIntegerCount", invocation.preparedPlan?.sourceIntCount)
+                put("sourceRealCount", invocation.preparedPlan?.sourceRealCount)
+                put("workingIntegerCount", invocation.preparedPlan?.model?.numIntVars)
+                put("workingRealCount", invocation.preparedPlan?.model?.numRealVars)
+                put("scheduledArms", buildJsonArray {
+                    for (arm in stats?.portfolio?.arms.orEmpty()) add(buildJsonObject {
+                        put("label", arm.label)
+                        put("segments", arm.segments)
+                        put("work", arm.work)
+                        put("faults", arm.faults)
+                        put("failures", arm.failures)
+                    })
+                })
                 put("timeoutMs", input.timeoutMs)
                 put("sourceSha256", input.sourceSha256)
                 put("executionKind", SourceSetup.executionKind(invocation).name)
@@ -193,10 +211,12 @@ private data class LinearCaptureInput(
     val cores: Int = 1,
     val seed: Long = 17,
     val work: Long = Long.MAX_VALUE,
+    val nodeLimit: Long? = null,
+    val openBoundProof: Boolean = true,
     val timeoutMs: Long = 5000,
 ) {
     fun source(): LinearSourceProblem {
-        require(cores > 0 && work >= 0 && timeoutMs > 0)
+        require(cores > 0 && work >= 0 && timeoutMs > 0 && (nodeLimit == null || nodeLimit >= 0))
         fun tolerance(text: String): SemanticRational {
             return text.fraction()
         }
