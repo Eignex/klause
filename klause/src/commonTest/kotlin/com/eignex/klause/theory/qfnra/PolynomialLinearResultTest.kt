@@ -6,7 +6,7 @@ import com.eignex.klause.ir.PolynomialRelation
 import kotlin.test.Test
 import kotlin.test.assertNull
 
-class PolynomialLinearRegionTest {
+class PolynomialLinearResultTest {
     @Test
     fun `linear decision declines an affine disequality`() {
         val work = QfNraWork(QfNraParams())

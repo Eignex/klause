@@ -695,7 +695,7 @@ class PolynomialBooleanRegionsTest {
             assertEquals(33, witness.realCount)
             assertEquals(65, witness.boolCount)
             assertEquals(truth, witness.boolValue(0))
-            assertTrue(result.stats.liftedCells > 0)
+            assertEquals(0L, result.stats.liftedCells)
         }
     }
 

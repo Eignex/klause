@@ -687,7 +687,7 @@ need no remaining inequality. A coordinate is selected only when these pairs do 
 increase the active constraint count; every completed step removes one coordinate
 from that conjunction. All work and suspension checkpoints use the same query owner.
 
-If the entire reduced conjunction is affine, `PolynomialLinearRegion` can decide
+If the entire reduced conjunction is affine, `decidePolynomialLinearRegion` can decide
 it through the reusable exact feasibility primitive in `simplex.exact`. It checks
 constant predicates, retains strict sides and equalities, and declines nonconstant
 disequalities. Active coordinates have a private source-ID map; original query counts

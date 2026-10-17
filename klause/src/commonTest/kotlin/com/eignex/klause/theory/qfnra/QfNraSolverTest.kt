@@ -736,12 +736,9 @@ class QfNraSolverTest {
 
     @Test
     fun `caller interruption after lifting should publish no witness`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
-            """
-            (declare-const x Real)
-            (assert (and (> x 1) (< x 2)))
-            (check-sat)
-            """.trimIndent(),
+            "$declarations (assert (= (* x0 x0) 2))",
         )
         val completed = assertIs<QfNraResult.Satisfiable>(
             solveQfNra(source.formula, source.boolCount, source.realCount),
