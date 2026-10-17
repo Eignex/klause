@@ -18,8 +18,11 @@ class CliModeOpenTheoryTest {
             "(declare-const x Real) (assert (= (* x x) 2))",
             "(declare-const x Int) (assert (= (* x x) 2))",
             "(declare-const x Real) (assert (= (sin x) 0))",
-        ).map { ".smt2" to it } + (".mps" to
-            "NAME T\nROWS\n N COST\n G LOWER\nCOLUMNS\n X COST 1 LOWER 1\nRHS\n RHS1 LOWER 1\nENDATA\n")
+        ).map { ".smt2" to it } + (".mps" to (
+            "NAME T\nROWS\n N COST\n G LOWER\nCOLUMNS\n" +
+                " MARKER 'MARKER' 'INTORG'\n X COST 1 LOWER 1\n MARKER 'MARKER' 'INTEND'\n" +
+                "RHS\n RHS1 LOWER 1\nENDATA\n"
+            ))
         for ((extension, source) in sources) {
             val smt = File.createTempFile("clifixedcores", extension).apply {
                 writeText(source)
