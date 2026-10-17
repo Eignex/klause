@@ -432,7 +432,9 @@ the original objective and direction. Optional `nodeLimit=N` supplies one shared
 decision/move ledger. Captures retain the native optimization verdict, minimized
 exact incumbent value and interruption cause separately from the rendered SMT point.
 The SMT replay checks points and objectives; global optimum, ray and refutation
-claims require separate original-source checking.
+claims require separate original-source checking. Optimization captures retain each
+encoder verdict and a per-source comparison, including UNKNOWN differences caused
+by admission or bounded work; verdict equality supplies no proof verification.
 The original source bytes remain the checking authority. Constant nonzero integer
 `div`/`mod` are checked with their original Euclidean SMT semantics; variable and zero
 divisors decline independent checking. Each input also interrupts
