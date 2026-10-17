@@ -550,6 +550,19 @@ returned witnesses against the original XML with the source checker.
 Check failed, unsupported and missing cases before interpreting comparisons.
 Lab agreement and regression confirmation remain recorded-result evidence;
 [independent source validation](#source-validation) defines stronger checks.
+`bench.profile.CliRecordingCapture` records one installed CLI child through a
+profile entry point on the selected host. Pass exactly
+`suite=ID problem=NAME sha256=HEX timeout=MS seed=N`; the timeout is between 1 and
+60000 milliseconds. It resolves and verifies the original SMT source, uses default
+solver selection with statistics, a 3 GiB heap, Serial GC and one active processor,
+and records the complete child JVM from startup. It retains source bytes, arguments,
+installed distribution/runtime hashes, streams, exit, a bounded process watchdog,
+JFR settings and recording hashes, actual child JVM identity and sampled summaries
+under `$OUT`. Inherited JVM profiling options are replaced for the child. Build
+`:klause-cli:installJvmDist` before invoking this entry point. Source checking is
+separate; the capture supplies no independent source validation or proof. Profiled
+timings include instrumentation and cannot replace ordinary solve comparisons.
+
 `profileCli` requires AWS execution and explicit `parallel: 1`; its instrumented
 timing stays separate from ordinary comparisons.
 Its whole-CLI phase tables attribute visible stack frames to shared source
