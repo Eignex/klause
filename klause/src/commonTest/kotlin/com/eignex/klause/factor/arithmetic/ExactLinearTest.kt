@@ -16,11 +16,11 @@ import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -30,8 +30,8 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.random.Random
 import kotlin.test.Test
-import kotlin.test.assertFalse
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -57,23 +57,22 @@ class ExactLinearTest {
 
     @Test
     fun `reified word endpoint comparisons should enforce either truth direction exactly`() {
-        for (relation in listOf(LinearOp.LE, LinearOp.GE)) {
-            for (bound in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
-                for (value in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
-                    for (strict in listOf(false, true)) {
-                        for (indicator in listOf(false, true)) {
-                            val row = ExactLinear.of(IntArray(2) { Term.ofIntVar(it) },
-                                List(2) { BigFraction.ONE }, relation, BigFraction.ofLong(bound), strict, activator = 0)
-                            val state = PropagationState(Problem(1, 2,
-                                Array(2) { IntDomain(value, value) }, arrayOf(row)), Assumptions.None)
-                            state.pinBool(0, indicator)
-                            val holds = (relation == LinearOp.GE) == (value == Long.MAX_VALUE)
+        val comparisons = listOf(LinearOp.LE to Long.MIN_VALUE, LinearOp.LE to Long.MAX_VALUE,
+            LinearOp.GE to Long.MIN_VALUE, LinearOp.GE to Long.MAX_VALUE)
+        val truthDirections = listOf(false to false, false to true, true to false, true to true)
+        for ((relation, bound) in comparisons) {
+            for (value in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
+                for ((strict, indicator) in truthDirections) {
+                    val row = ExactLinear.of(IntArray(2) { Term.ofIntVar(it) },
+                        List(2) { BigFraction.ONE }, relation, BigFraction.ofLong(bound), strict, activator = 0)
+                    val state = PropagationState(Problem(1, 2,
+                        Array(2) { IntDomain(value, value) }, arrayOf(row)), Assumptions.None)
+                    state.pinBool(0, indicator)
+                    val holds = (relation == LinearOp.GE) == (value == Long.MAX_VALUE)
 
-                            val consistent = state.factorAt(0).propagate(state, 0)
+                    val consistent = state.factorAt(0).propagate(state, 0)
 
-                            assertEquals(holds == indicator, consistent, "$relation $bound $value $strict $indicator")
-                        }
-                    }
+                    assertEquals(holds == indicator, consistent, "$relation $bound $value $strict $indicator")
                 }
             }
         }
