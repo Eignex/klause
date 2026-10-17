@@ -45,8 +45,11 @@ def digest(value):
 def file_identity(path):
     if path.is_symlink() or not path.is_file():
         raise ValueError('Input is absent or linked')
+    checksum = hashlib.sha256()
     with path.open('rb') as stream:
-        return {'size': path.stat().st_size, 'sha256': hashlib.file_digest(stream, 'sha256').hexdigest()}
+        while chunk := stream.read(1024 * 1024):
+            checksum.update(chunk)
+    return {'size': path.stat().st_size, 'sha256': checksum.hexdigest()}
 
 
 def load_json(path):
@@ -130,7 +133,7 @@ def authenticate_archive(manifest, archive_path, selected, scratch):
     return paths
 
 
-def source_specification(value):
+def source_specification(value, *, allow_empty_packages=False):
     if not isinstance(value, dict) or type(value.get('schema')) is not int or value['schema'] != 1:
         raise ValueError('Unsupported source declaration schema')
     sources = value.get('sources')
@@ -144,7 +147,7 @@ def source_specification(value):
             raise ValueError('Source identity is invalid or duplicated')
         ids.add(source['id'])
         packages = source.get('packages')
-        if not isinstance(packages, list) or not packages or \
+        if not isinstance(packages, list) or not packages and not allow_empty_packages or \
                 any(not isinstance(package, str) or '/' in package or
                     (package and any(not part for part in package.split('.'))) for package in packages) or \
                 len(set(packages)) != len(packages):
