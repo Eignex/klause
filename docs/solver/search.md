@@ -962,3 +962,9 @@ whose mandatory arithmetic peer installs a complete enforcing encoding. The
 finite adapter still rejects interrupted fixpoints, and every arithmetic check
 must succeed before the shared leaf is accepted. This policy belongs to that
 registration; standalone finite projections retain their original check obligations.
+
+Exact integer source rows select compact signed-word propagation when their cleared
+coefficients and bound fit, including both directions of reification. Activity
+overflow retains the compact kernel's exact feasibility check and conservative
+pruning; wider constants select arbitrary-precision propagation. This projection
+choice preserves the original exact row and source witness checks.

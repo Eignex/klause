@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.bool.internals.reifiedDegree
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Term
@@ -23,14 +24,23 @@ import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 import kotlin.math.ceil
 
-internal fun ExactLinear.propagationView(): Propagator = when {
-    variables.reals.isNotEmpty() -> NoPropagator
-    activator != LinearRow.ALWAYS -> WideReifiedLinearPropagator(
-        activator, variables.boolVars, intVars, Array(size) { constants.exactCoeff(it) },
-        IntArray(size) { Term.intVar(ref(it)) }, relation, constants.exactBound,
-    )
-    else -> WideLinearPropagator(intVars, IntArray(size) { Term.intVar(ref(it)) },
-        Array(size) { constants.exactCoeff(it) }, relation, constants.exactBound)
+internal fun ExactLinear.propagationView(): Propagator {
+    if (variables.reals.isNotEmpty()) return NoPropagator
+    val vars = IntArray(size) { Term.intVar(ref(it)) }
+    val integer = constants as? IntegerConstants
+    return when {
+        integer != null && activator == LinearRow.ALWAYS ->
+            LinearPropagator(variables.boolVars, intVars, integer.coeffs, vars, relation, integer.bound)
+        integer != null -> ReifiedLinearPropagator(
+            activator, variables.boolVars, intVars, integer.coeffs, vars, relation, integer.bound,
+        )
+        activator != LinearRow.ALWAYS -> WideReifiedLinearPropagator(
+            activator, variables.boolVars, intVars, Array(size) { constants.exactCoeff(it) },
+            vars, relation, constants.exactBound,
+        )
+        else -> WideLinearPropagator(intVars, vars, Array(size) { constants.exactCoeff(it) },
+            relation, constants.exactBound)
+    }
 }
 
 internal fun LinearIndicator.propagationView(): Propagator = if (variables.reals.isNotEmpty()) NoPropagator else
