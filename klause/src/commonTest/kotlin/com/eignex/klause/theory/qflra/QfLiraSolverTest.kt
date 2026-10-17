@@ -626,7 +626,7 @@ class QfLiraSolverTest {
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
                 assertNull(session.boolValue(1))
-                val witness = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(1)).model
+                val witness = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars)).model
                     .valueOf<ExactLiraAssignment>(component))
                 assertEquals(BIG_ZERO, witness.intValue(0))
             }
