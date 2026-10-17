@@ -43,7 +43,8 @@ class OpenExactNeighborhoodTest {
 
         val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
         val coordinates = assertNotNull(point.exactReals)
-        assertEquals(maxOf(coordinates[0], coordinates[1]), coordinates[2])
+        val maximum = if (coordinates[0] > coordinates[1]) coordinates[0] else coordinates[1]
+        assertEquals(maximum, coordinates[2])
     }
 
     @Test

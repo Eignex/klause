@@ -112,7 +112,8 @@ internal class OpenExactNeighborhood(
             ) {
                 verifyRealCoordinates(model, sample, params.timeout or params.cancellation or cancellation)
             } else {
-                verifyOpenWitness(model, sample, params.timeout or params.cancellation or cancellation, witnessProjections)
+                verifyOpenWitness(model, sample,
+                    params.timeout or params.cancellation or cancellation, witnessProjections)
             }
         } catch (_: CancellationException) {
             return ExactNeighborhoodResult.Undecided
