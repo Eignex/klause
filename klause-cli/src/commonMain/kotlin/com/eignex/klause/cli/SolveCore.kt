@@ -4,9 +4,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.portfolio.ArmFault
-import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
@@ -27,10 +25,10 @@ import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
 import com.eignex.klause.solver.pipeline.SourceExecutionKind
+import com.eignex.klause.solver.pipeline.SourceExecutionPolicy
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
-import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.pipeline.solve
@@ -68,11 +66,8 @@ internal object SolveCore {
         // the one transformed problem. The pipeline drops solution-set-altering passes (symmetry
         // breaking, value precedence) for a pure-LS engine unless `--presolve` is explicit;
         // solutions are reconstructed at render time.
-        val base = common.presolve?.let { PresolveConfig.parse(it) } ?: common.config.presolveConfig()
-        // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only: the
-        // orders differ in what they fold first, never in what the problem means.
-        val pivotPlan = affinePivotOrderParam(common)?.let { base.withAffinePivotOrder(it) } ?: base
-        val config = presolveEffortParams(common.engineParams, pivotPlan)
+        val policy = executionPolicy(common, common.presolve != null)
+        val config = common.presolve?.let { PresolveConfig.parse(it) } ?: common.config.presolveConfig()
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
@@ -92,11 +87,11 @@ internal object SolveCore {
                     kind in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.LINEAR)
             }
             SourceExecutionRequest(
-                invocation, ExecutionOptions.parse(options),
+                invocation, policy, ExecutionOptions.parse(options),
                 finiteRequest = { shape ->
                     finiteRequest(
                         shape, common, engine, openCores, config, solutionSetSensitive,
-                        presolveCancel, presolveBudget, deadlineCancel, deadline, common.nodeBudget,
+                        presolveCancel, presolveBudget, deadlineCancel, deadline, common.nodeBudget, policy,
                         rawSolvable.numericalCompletion, rawSolvable.toleranceCheck,
                     )
                 },
@@ -148,10 +143,9 @@ internal object SolveCore {
             // the heuristic and per-solver selector --params are rejected; an unannotated model has
             // no heuristic to preserve, so its one run accepts them (see runBacktrack).
             FiniteEngine.FIXED -> {
-                rejectParallel(engine, cores, alt = null)
                 runBacktrack(
                     rawSolvable, common, output, config, solutionSetSensitive, presolveCancel, presolveBudget,
-                    cancel, deadline, nodeBudget,
+                    cancel, deadline, nodeBudget, policy,
                 )
             }
 
@@ -162,7 +156,7 @@ internal object SolveCore {
             FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
                 runPortfolio(
                     rawSolvable, common, output, cores, engine, config, solutionSetSensitive, presolveCancel,
-                    presolveBudget, cancel, nodeBudget,
+                    presolveBudget, cancel, nodeBudget, policy,
                 )
         }
     }
@@ -174,13 +168,6 @@ internal object SolveCore {
      */
     private fun budgetSpent(common: CommonOptions, backendTimedOut: Boolean): Boolean =
         backendTimedOut || common.deadlineAtMs?.let { nowMillis() >= it } == true
-
-    /** Reject `-p N>1` for a single-core engine; [alt], when given, is the parallel engine to suggest. */
-    private fun rejectParallel(engine: FiniteEngine, cores: Int, alt: FiniteEngine?) {
-        if (cores <= 1) return
-        val hint = alt?.let { "; use '${it.id}' for a parallel pool" } ?: " (FD track); drop -p"
-        usageError("engine '${engine.id}' is single-core$hint")
-    }
 
     /**
      * Consumes `node-limit` as a shared [NodeBudget] and removes it from [CommonOptions.engineParams].
@@ -251,12 +238,13 @@ internal object SolveCore {
         cancel: Cancellation,
         deadline: Long?,
         nodeBudget: NodeBudget?,
+        policy: SourceExecutionPolicy,
     ) {
         executeFinite(
             finiteRequest(
-                solvable.finiteShape, common, FiniteEngine.FIXED, 1, presolveConfig,
+                solvable.finiteShape, common, FiniteEngine.FIXED, common.parallel ?: 1, presolveConfig,
                 solutionSetSensitive, presolveCancellation, presolveBudget, cancel, deadline, nodeBudget,
-                solvable.numericalCompletion, solvable.toleranceCheck,
+                policy, solvable.numericalCompletion, solvable.toleranceCheck,
             ),
             solvable,
             common,
@@ -411,25 +399,6 @@ internal object SolveCore {
     private fun spanText(problem: Problem): String =
         domainSpan(problem).let { if (it == Long.MAX_VALUE) "unbounded" else it.toString() }
 
-    /**
-     * The `affine-pivot-order` param, or `null` to keep the configured default. This is a *presolve*
-     * knob sharing the `--param` namespace the engines validate, so it is consumed out of
-     * [CommonOptions.engineParams] here — otherwise every engine's unknown-key check would reject it.
-     */
-    private fun affinePivotOrderParam(common: CommonOptions): AffinePivotOrder? {
-        val prefix = "$AFFINE_PIVOT_ORDER_KEY="
-        val idx = common.engineParams.indexOfFirst { it.startsWith(prefix) }
-        if (idx < 0) return null
-        val id = common.engineParams.removeAt(idx).removePrefix(prefix)
-        return AffinePivotOrder.entries.firstOrNull { it.name.equals(id, ignoreCase = true) }
-            ?: usageError(
-                "engine param `$AFFINE_PIVOT_ORDER_KEY` expects " +
-                    AffinePivotOrder.entries.joinToString("|") { it.name.lowercase() } + ", got `$id`",
-            )
-    }
-
-    private const val AFFINE_PIVOT_ORDER_KEY = "affine-pivot-order"
-
     private fun factorHistogram(problem: Problem): Map<String, Int> =
         problem.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()
 
@@ -445,16 +414,31 @@ internal object SolveCore {
         presolveBudget: PresolveBudget?,
         cancel: Cancellation,
         nodeBudget: NodeBudget?,
+        policy: SourceExecutionPolicy,
     ) {
         executeFinite(
             finiteRequest(
                 solvable.finiteShape, common, engine, cores, presolveConfig,
                 solutionSetSensitive, presolveCancellation, presolveBudget, cancel, null, nodeBudget,
-                solvable.numericalCompletion, solvable.toleranceCheck,
+                policy, solvable.numericalCompletion, solvable.toleranceCheck,
             ),
             solvable,
             common,
             output,
+        )
+    }
+
+    private fun executionPolicy(common: CommonOptions, explicitPresolve: Boolean): SourceExecutionPolicy {
+        fun ceiling(value: String?): LpConfig? = value?.let {
+            runCatching { LpConfig.parse(it) }.getOrElse { failure -> usageError("--lp: ${failure.message}") }
+        }
+        val arms = cliProp(CliKnobs.portfolioArms)?.let { value ->
+            value.toIntOrNull()?.takeIf { it > 0 }
+                ?: usageError("portfolio arm default expects a positive integer")
+        }
+        return SourceExecutionPolicy(
+            ceiling(common.lp), ceiling(defaultLp()), arms,
+            common.lpPricing.takeIf { common.lpPricingExplicit }, explicitPresolve,
         )
     }
 
@@ -470,44 +454,26 @@ internal object SolveCore {
         cancel: Cancellation,
         deadline: Long?,
         nodeBudget: NodeBudget?,
+        policy: SourceExecutionPolicy,
         numericalCompletion: Boolean = false,
         toleranceCheck: ((Sample) -> Boolean)? = null,
     ): FiniteSolveRequest {
         val fixed = engine == FiniteEngine.FIXED
-        if (fixed) rejectParallel(engine, cores, FiniteEngine.BACKTRACK)
-        val askedLp = (common.lp ?: if (fixed) null else defaultLp())?.let {
-            runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
-        }
-        if (fixed && askedLp != null && askedLp.emphasis != LpEmphasis.OFF) {
-            usageError("--lp: `-e fixed` solves by propagation alone; only `off` applies here")
-        }
-        val configuredArms = if (fixed) null else cliProp(CliKnobs.portfolioArms)?.toIntOrNull()
-        val engineParams = if (configuredArms != null &&
-            common.engineParams.none { it.substringBefore('=') in listOf("arms", "ls", "bt") }
-        ) {
-            common.engineParams + "arms=$configuredArms"
-        } else {
-            common.engineParams
-        }
-        return FiniteSolveRequest(
+        return policy.finiteRequest(
             shape = shape,
             engine = engine,
             presolveConfig = presolveConfig,
-            explicitPresolveConfig = common.presolve != null,
             solutionSetSensitive = solutionSetSensitive,
             presolveBudget = presolveBudget,
             cores = cores,
-            executionOptions = ExecutionOptions.parse(engineParams).let {
+            executionOptions = ExecutionOptions.parse(common.engineParams).let {
                 if (numericalCompletion) it.withNumericalCompletion() else it
             },
             randomSeed = common.randomSeed,
-            defaultArms = if (fixed) 1 else configuredArms ?: autoArms(cores),
-            lpConfig = if (fixed) LpConfig.OFF else askedLp ?: LpConfig.AGGRESSIVE,
-            zeroObjectivePricing = common.lpPricing,
             cancellation = cancel,
             presolveCancellation = presolveCancellation,
             nodeBudget = nodeBudget,
-            solveBudgetMillis = if (fixed) common.timeLimitMs else null,
+            solveBudgetMillis = common.timeLimitMs,
             allSolutions = common.allSolutions,
             solutionCap = common.solutionCap,
             deadlineExceeded = { fixed && deadline != null && nowMillis() > deadline },

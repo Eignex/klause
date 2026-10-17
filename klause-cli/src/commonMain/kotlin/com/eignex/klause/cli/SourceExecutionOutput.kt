@@ -44,7 +44,7 @@ internal fun solveCapturedSource(
     }
     if (kind == SourceExecutionKind.LINEAR && EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
         val request = (invocation.route as SourceProblemRoute.OpenTheory).request.withPresolve(
-            presolveConfig, cancellation = presolveCancellation, budget = presolveBudget,
+            controls.presolveConfig ?: presolveConfig, cancellation = presolveCancellation, budget = presolveBudget,
         )
         val mark = TimeSource.Monotonic.markNow()
         val prepared = OpenTheoryPipeline.prepare(request)
