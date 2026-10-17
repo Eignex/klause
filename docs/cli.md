@@ -136,6 +136,13 @@ retains `best-found` status.
 [Portfolio admission](solver/portfolio.md) owns acceptance;
 [source values](model.md#published-assignments-and-objectives) own exact payloads.
 
+Frontend solve paths retain a `PreparedSourceInvocation`. `SourceRendering` carries
+only finite, exact arithmetic or original linear coordinate renderers, plus an
+admission interruption. It holds no concrete theory request. `SolveCore` binds the
+common execution controls; output adapters consume `SourceExecutionResult` from
+`SourceSetup.execute` without selecting another solver or parsing native limits.
+Pipeline telemetry derives from the retained library invocation.
+
 The internal `linearSourceSolvable` adapter accepts an attached `LinearSourceProblem`
 and a renderer of checked `LinearSourceWitness` values. It captures one invocation;
 `SolveCore` supplies the existing finite request factory or selected arithmetic
@@ -149,8 +156,8 @@ A rendering veto cannot establish an optimum marker.
 `OutputProtocol.onLinearSourceResult` receives the full retained native result beside
 its immutable original-unit qualification. Renderers must use that qualification
 for source bounds and terminal claims; a native working objective can have a different
-scale or private column. This adapter is available for frontend integration; MPS
-format registration still uses its existing adapter. Numerical strategy interpretation
+scale or private column. MPS format registration uses this original-coordinate
+adapter. Numerical strategy interpretation
 and parallel execution retain their current library limitations.
 
 ## Flags

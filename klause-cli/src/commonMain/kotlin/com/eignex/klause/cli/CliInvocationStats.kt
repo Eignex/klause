@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.SourceExecutionKind
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.result.SearchStats
@@ -33,64 +34,43 @@ internal fun CommonOptions.resetInvocationStatistics() {
     frontendRouting = null
 }
 
-internal fun cliInvocationStats(common: CommonOptions, pipeline: SolvablePipeline): CliInvocationStats =
-    CliInvocationStats(
+internal fun cliInvocationStats(common: CommonOptions, rendering: SourceRendering): CliInvocationStats {
+    val kind = (rendering as? SourceRendering.ExactSource)?.let { SourceSetup.executionKind(it.invocation) }
+    return CliInvocationStats(
         common.loadElapsedMs,
         common.frontendRouting,
-        when (pipeline) {
-            is SolvablePipeline.LinearSource -> "linear-source"
+        when (rendering) {
+            is SourceRendering.LinearSource -> "linear-source"
 
-            is SolvablePipeline.NativeSource -> pipeline.nativePipelineName()
+            is SourceRendering.ExactSource -> rendering.nativePipelineName(requireNotNull(kind))
 
-            SolvablePipeline.FiniteCp -> "finite-cp"
+            SourceRendering.FiniteCp -> "finite-cp"
 
-            is SolvablePipeline.NumericalLinear -> "numerical-mip"
-
-            is SolvablePipeline.OpenTheory -> "open-theory"
-
-            is SolvablePipeline.PolynomialTheory -> "polynomial-theory"
-
-            is SolvablePipeline.NonlinearIntegerTheory -> "nonlinear-integer-theory"
-
-            is SolvablePipeline.QuadraticTheory -> when (pipeline.request) {
-                is QuadraticRequest.Polynomial -> "quadratic-polynomial"
-                is QuadraticRequest.Integer -> "quadratic-integer"
-            }
-
-            is SolvablePipeline.ExactTheorySatisfaction -> pipeline.pipelineName
-
-            is SolvablePipeline.Interrupted -> "interrupted"
-
-            is SolvablePipeline.OpenLocalSearch -> "open-local-search"
-
-            SolvablePipeline.Refuted -> "refuted"
+            is SourceRendering.Interrupted -> "interrupted"
         },
-        when (pipeline) {
-            is SolvablePipeline.NativeSource -> when {
-                SourceSetup.executionKind(pipeline.invocation) == SourceExecutionKind.FUNCTIONS -> "transcendental"
+        when (rendering) {
+            is SourceRendering.ExactSource -> when {
+                kind == SourceExecutionKind.LINEAR ->
+                    (rendering.invocation.route as SourceProblemRoute.OpenTheory)
+                        .request.route.name.lowercase()
 
-                pipeline.invocation.operation == ExecutionOperation.OPTIMIZE -> "quadratic_optimization"
+                kind in setOf(
+                    SourceExecutionKind.HEURISTIC, SourceExecutionKind.REFUTED, SourceExecutionKind.NUMERICAL,
+                ) -> null
 
-                SourceSetup.executionKind(
-                    pipeline.invocation,
-                ) == SourceExecutionKind.NONLINEAR_INTEGER -> "incomplete_nia"
+                kind == SourceExecutionKind.FUNCTIONS -> "transcendental"
+
+                rendering.invocation.operation == ExecutionOperation.OPTIMIZE -> "quadratic_optimization"
+
+                kind == SourceExecutionKind.NONLINEAR_INTEGER -> "incomplete_nia"
 
                 else -> "exact_nra"
             }
 
-            is SolvablePipeline.OpenTheory -> pipeline.request.route.name.lowercase()
-
-            is SolvablePipeline.PolynomialTheory -> "exact_nra"
-
-            is SolvablePipeline.NonlinearIntegerTheory -> "incomplete_nia"
-
-            is SolvablePipeline.QuadraticTheory -> "quadratic_optimization"
-
-            is SolvablePipeline.ExactTheorySatisfaction -> pipeline.declaredTheoryRoute
-
             else -> null
         },
     )
+}
 
 private fun nativeCpStatPairs(search: SearchStats): List<Pair<String, String>> {
     // Default search snapshots contain zeros without any native fixpoint measurement.
@@ -107,8 +87,11 @@ private fun nativeCpStatPairs(search: SearchStats): List<Pair<String, String>> {
 
 private const val NANOS_PER_MS = 1_000_000L
 
-private fun SolvablePipeline.NativeSource.nativePipelineName(): String {
-    val kind = SourceSetup.executionKind(invocation)
+private fun SourceRendering.ExactSource.nativePipelineName(kind: SourceExecutionKind): String {
+    if (kind == SourceExecutionKind.LINEAR) return "open-theory"
+    if (kind == SourceExecutionKind.HEURISTIC) return "open-local-search"
+    if (kind == SourceExecutionKind.REFUTED) return "refuted"
+    if (kind == SourceExecutionKind.NUMERICAL) return "numerical-mip"
     if (invocation.operation == ExecutionOperation.OPTIMIZE && kind != SourceExecutionKind.FUNCTIONS) {
         return if (kind == SourceExecutionKind.NONLINEAR_INTEGER) "quadratic-integer" else "quadratic-polynomial"
     }

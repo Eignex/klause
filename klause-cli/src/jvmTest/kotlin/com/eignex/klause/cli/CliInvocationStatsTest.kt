@@ -1,7 +1,6 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SearchStats
@@ -15,15 +14,15 @@ import kotlin.test.assertFalse
 class CliInvocationStatsTest {
     @Test
     fun `unmeasured frontend phases and backend should remain absent`() {
-        val pairs = cliInvocationStats(CommonOptions(), SolvablePipeline.Refuted).pairs(SolveStats.EMPTY).toMap()
+        val pairs = cliInvocationStats(CommonOptions(), SourceRendering.FiniteCp).pairs(SolveStats.EMPTY).toMap()
 
-        assertEquals(mapOf("solvePipeline" to "refuted"), pairs)
+        assertEquals(mapOf("solvePipeline" to "finite-cp"), pairs)
     }
 
     @Test
     fun `interrupted source admission should report load without routing or a solve backend`() {
         val common = CommonOptions().apply { loadElapsedMs = 7L }
-        val pipeline = SolvablePipeline.Interrupted(TerminationReason.Timeout)
+        val pipeline = SourceRendering.Interrupted(TerminationReason.Timeout)
 
         val pairs = cliInvocationStats(common, pipeline).pairs(SolveStats.EMPTY).toMap()
 
@@ -36,10 +35,10 @@ class CliInvocationStatsTest {
             loadElapsedMs = 7L
             logRoute(SourceProblemRoute.Refuted, 0L)
         }
-        val first = cliInvocationStats(common, SolvablePipeline.Refuted)
+        val first = cliInvocationStats(common, SourceRendering.FiniteCp)
 
         common.resetInvocationStatistics()
-        val second = cliInvocationStats(common, SolvablePipeline.FiniteCp)
+        val second = cliInvocationStats(common, SourceRendering.FiniteCp)
 
         assertEquals("7", first.pairs(SolveStats.EMPTY).toMap()["frontendLoadMs"])
         assertEquals("0", first.pairs(SolveStats.EMPTY).toMap()["frontendRoutingMs"])
@@ -58,7 +57,8 @@ class CliInvocationStatsTest {
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
-        val pipeline = SolvablePipeline.OpenTheory(OpenTheoryRequest(model)) { "" }
+        val common = CommonOptions().apply { engine = "cp" }
+        val pipeline = sourceSolvable(model, null, false, common, { "" }, { "" }).rendering
 
         val pairs = cliInvocationStats(CommonOptions(), pipeline)
             .pairs(SolveStats(run = RunStats(backend = "mixed"))).toMap()
@@ -69,13 +69,19 @@ class CliInvocationStatsTest {
     }
 
     @Test
-    fun `open local search should not acquire a declared complete theory`() {
-        val model = Problem(0, 0, emptyArray(), emptyList())
-        val pipeline = SolvablePipeline.OpenLocalSearch(model, { "" })
+    fun `heuristic execution should retain the source theory separately from its backend`() {
+        val model = Problem(0, 0, emptyArray(), emptyList(), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val common = CommonOptions().apply { engine = "ls" }
+        val pipeline = sourceSolvable(model, null, false, common, { "" }, { "" }).rendering
 
-        val pairs = cliInvocationStats(CommonOptions(), pipeline).pairs(SolveStats.EMPTY).toMap()
+        val pairs = cliInvocationStats(CommonOptions(), pipeline)
+            .pairs(SolveStats(run = RunStats(backend = "local-search"))).toMap()
 
-        assertEquals(mapOf("solvePipeline" to "open-local-search"), pairs)
+        assertEquals("open-theory", pairs["solvePipeline"])
+        assertEquals("exact_lra", pairs["declaredTheoryRoute"])
+        assertEquals("local-search", pairs["reportedBackend"])
     }
 
     @Test
@@ -85,7 +91,7 @@ class CliInvocationStatsTest {
             search = SearchStats(propagations = SumResult(13.0)),
         )
 
-        val pairs = cliInvocationStats(CommonOptions(), SolvablePipeline.FiniteCp).pairs(stats).toMap()
+        val pairs = cliInvocationStats(CommonOptions(), SourceRendering.FiniteCp).pairs(stats).toMap()
 
         assertFalse(pairs.keys.any { it.startsWith("nativeCp") })
     }
@@ -101,7 +107,7 @@ class CliInvocationStatsTest {
             ),
         )
 
-        val pairs = cliInvocationStats(CommonOptions(), SolvablePipeline.FiniteCp).pairs(stats).toMap()
+        val pairs = cliInvocationStats(CommonOptions(), SourceRendering.FiniteCp).pairs(stats).toMap()
 
         assertEquals("17", pairs["nativeCpPropagationWork"])
         assertEquals("5", pairs["nativeCpRootPropagationWork"])

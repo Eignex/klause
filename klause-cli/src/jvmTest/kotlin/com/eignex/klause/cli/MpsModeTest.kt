@@ -151,7 +151,7 @@ class MpsModeTest {
             semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance())
         }
         val loaded = MpsMode.newSession().load(input.absolutePath, common)
-        val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+        val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
         val source = assertIs<LinearSourceProblem>(invocation.source.originalSource)
         val tenth = BigFraction.ofLong(10).reciprocal()
 
@@ -172,7 +172,7 @@ class MpsModeTest {
         val loaded = session.load(input.absolutePath, common)
         val output = session.output(common)
 
-        val pipeline = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline)
+        val pipeline = assertIs<SourceRendering.LinearSource>(loaded.rendering)
         val source = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
         val point = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ofLong(2))))
 
@@ -205,7 +205,7 @@ class MpsModeTest {
 
         val text = capture { session.output(common).onComplete(Verdict.UNSATISFIABLE) }
 
-        val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+        val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
         assertEquals(SourceExecutionKind.REFUTED, SourceSetup.executionKind(invocation))
         assertTrue("s UNSATISFIABLE" in text.lines(), text)
         assertTrue("MPS source scope=effective declaration defaults" in text, text)
@@ -225,7 +225,7 @@ class MpsModeTest {
         val value = BigFraction.ofLong(3).reciprocal()
         val output = session.output(common)
 
-        val pipeline = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline)
+        val pipeline = assertIs<SourceRendering.LinearSource>(loaded.rendering)
         val source = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
         val point = assertNotNull(source.checkMpsWitness(listOf(value)))
 
@@ -257,7 +257,7 @@ class MpsModeTest {
         for ((policy, accepted) in policies) {
             val common = CommonOptions().apply { semanticOverrides = SemanticOverrides(feasibilityTolerance = policy) }
             val loaded = MpsMode.newSession().load(source.absolutePath, common)
-            val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+            val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
             val original = assertIs<LinearSourceProblem>(invocation.source.originalSource)
             val point = BigFraction.ofLong(199) * BigFraction.ofLong(2).reciprocal()
 
@@ -282,7 +282,7 @@ class MpsModeTest {
         }
         val session = MpsMode.newSession()
         val loaded = session.load(source.absolutePath, common)
-        val pipeline = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline)
+        val pipeline = assertIs<SourceRendering.LinearSource>(loaded.rendering)
         val original = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
         val value = BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()
         val point = assertNotNull(original.checkMpsWitness(listOf(value)))
@@ -314,7 +314,7 @@ class MpsModeTest {
         }
 
         val loaded = MpsMode.newSession().load(source.absolutePath, common)
-        val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+        val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
         val original = assertIs<LinearSourceProblem>(invocation.source.originalSource)
 
         assertEquals(SourceTolerance(), original.semantics.effective.feasibilityTolerance)
@@ -349,7 +349,7 @@ class MpsModeTest {
         val loaded = MpsMode.newSession().load(source.absolutePath, common)
         common.semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance())
 
-        val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+        val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
         val original = assertIs<LinearSourceProblem>(invocation.source.originalSource)
 
         assertNotNull(original.checkMpsWitness(listOf(BigFraction.ofLong(2).reciprocal())))
@@ -370,7 +370,7 @@ class MpsModeTest {
             val common = CommonOptions().apply { semanticOverrides = SemanticOverrides(feasibilityTolerance = policy) }
             val session = MpsMode.newSession()
             val loaded = session.load(source.absolutePath, common)
-            val pipeline = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline)
+            val pipeline = assertIs<SourceRendering.LinearSource>(loaded.rendering)
             val original = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
             val point = original.checkMpsWitness(listOf(BigFraction.ofLong(3), value))
             val output = session.output(common)
@@ -410,7 +410,7 @@ class MpsModeTest {
         for (exact in listOf(false, true)) {
             val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
 
-            val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+            val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
             val original = assertIs<LinearSourceProblem>(invocation.source.originalSource)
             assertNull(original.variables[1].upper)
             assertEquals(2L, invocation.finiteShape().problem.intBounds.upper(1))
@@ -429,7 +429,7 @@ class MpsModeTest {
         for (exact in listOf(false, true)) {
             val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
 
-            val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+            val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
             val original = assertNotNull(assertIs<LinearSourceProblem>(invocation.source.originalSource).objective)
             assertEquals(ObjectiveSense.MAXIMIZE, original.sense)
             assertEquals(SemanticRational.ONE, original.terms.single().coefficient)
@@ -472,7 +472,7 @@ class MpsModeTest {
             }
 
             val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
-            val pipeline = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline)
+            val pipeline = assertIs<SourceRendering.LinearSource>(loaded.rendering)
             val original = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
             val backing = pipeline.invocation.finiteShape().problem
             val point = assertNotNull(original.checkMpsWitness(
@@ -532,7 +532,7 @@ class MpsModeTest {
                 assertEquals(0, runCli(arrayOf("-s", "-p", "1", *flags, source.absolutePath)))
             }
 
-            val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+            val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
             assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
             assertTrue("s UNKNOWN" in text.lines(), text)
             assertTrue("c solvePipeline=linear-source" in text.lines(), text)
@@ -577,7 +577,7 @@ class MpsModeTest {
                 assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
             }
 
-            val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+            val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
             assertEquals(SourceExecutionKind.FINITE, SourceSetup.executionKind(invocation))
             assertTrue("s OPTIMUM FOUND" in text.lines(), text)
             assertTrue("o 0" in text.lines(), text)
@@ -607,7 +607,7 @@ class MpsModeTest {
                 )
             }
 
-            val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+            val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
             assertEquals(SourceExecutionKind.FINITE, SourceSetup.executionKind(invocation))
             assertTrue("s SATISFIABLE" in text.lines(), text)
             assertEquals(0.0, text.lines().single { it.startsWith("v ") }.substringAfter("X=").toDouble())
@@ -654,7 +654,7 @@ class MpsModeTest {
 
         val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--exact", source.absolutePath))) }
 
-        val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+        val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
         assertEquals(SourceExecutionKind.FINITE, SourceSetup.executionKind(invocation))
         assertEquals(SourceTolerance(), invocation.source.semantics.effective.feasibilityTolerance)
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
@@ -762,7 +762,7 @@ class MpsModeTest {
         for (exact in listOf(false, true)) {
             val solvable = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
 
-            val invocation = assertIs<SolvablePipeline.LinearSource>(solvable.pipeline).invocation
+            val invocation = assertIs<SourceRendering.LinearSource>(solvable.rendering).invocation
             assertEquals(SourceExecutionKind.FINITE, SourceSetup.executionKind(invocation))
             assertEquals(1, invocation.finiteShape().problem.numIntVars)
             assertEquals(exact, checkNotNull(invocation.source.semantics.effective.feasibilityTolerance).isExact)
@@ -965,7 +965,7 @@ class MpsModeTest {
 
             val solvable = MpsMode.newSession().load(mps.absolutePath, CommonOptions())
 
-            val invocation = assertIs<SolvablePipeline.LinearSource>(solvable.pipeline).invocation
+            val invocation = assertIs<SourceRendering.LinearSource>(solvable.rendering).invocation
             val original = assertIs<LinearSourceProblem>(invocation.source.originalSource)
             assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
             assertEquals(sense == "MAX", assertNotNull(original.objective).sense == ObjectiveSense.MAXIMIZE)
@@ -1021,7 +1021,7 @@ class MpsModeTest {
             deleteOnExit()
         }
         val solvable = MpsMode.newSession().load(mps.absolutePath, CommonOptions())
-        val invocation = assertIs<SolvablePipeline.LinearSource>(solvable.pipeline).invocation
+        val invocation = assertIs<SourceRendering.LinearSource>(solvable.rendering).invocation
         val source = assertIs<LinearSourceProblem>(invocation.source.originalSource)
 
         assertNotNull(source.checkMpsWitness(listOf(assertNotNull(BigFraction.ofDouble(0.1)))))
@@ -1042,7 +1042,7 @@ class MpsModeTest {
 
         val solvable = MpsMode.newSession().load(mps.absolutePath, CommonOptions().apply { exact = true })
 
-        val invocation = assertIs<SolvablePipeline.LinearSource>(solvable.pipeline).invocation
+        val invocation = assertIs<SourceRendering.LinearSource>(solvable.rendering).invocation
         assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
         assertEquals(SourceTolerance(), invocation.source.semantics.effective.feasibilityTolerance)
     }
@@ -1059,7 +1059,7 @@ class MpsModeTest {
         }
         val session = MpsMode.newSession()
         val solvable = session.load(mps.absolutePath, CommonOptions())
-        val pipeline = assertIs<SolvablePipeline.LinearSource>(solvable.pipeline)
+        val pipeline = assertIs<SourceRendering.LinearSource>(solvable.rendering)
         val source = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
         val point = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE)))
         val rendered = pipeline.render(point)
@@ -1088,7 +1088,7 @@ class MpsModeTest {
         }
         val session = MpsMode.newSession()
         val solvable = session.load(mps.absolutePath, CommonOptions())
-        val pipeline = assertIs<SolvablePipeline.LinearSource>(solvable.pipeline)
+        val pipeline = assertIs<SourceRendering.LinearSource>(solvable.rendering)
         val source = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
         val point = source.checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ZERO))
         val output = session.output(CommonOptions())
@@ -1330,15 +1330,15 @@ class MpsModeTest {
             }
         }
         val session = MpsMode.newSession()
-        val original = assertIs<SolvablePipeline.LinearSource>(
-            session.load(files[0].absolutePath, CommonOptions()).pipeline,
+        val original = assertIs<SourceRendering.LinearSource>(
+            session.load(files[0].absolutePath, CommonOptions()).rendering,
         )
         val output = session.output(CommonOptions())
         val source = assertIs<LinearSourceProblem>(original.invocation.source.originalSource)
         val point = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE)))
         val rendered = original.render(point)
-        val next = assertIs<SolvablePipeline.LinearSource>(
-            session.load(files[1].absolutePath, CommonOptions()).pipeline,
+        val next = assertIs<SourceRendering.LinearSource>(
+            session.load(files[1].absolutePath, CommonOptions()).rendering,
         )
         val later = assertIs<LinearSourceProblem>(next.invocation.source.originalSource)
         next.render(assertNotNull(later.checkMpsWitness(point.values)))
@@ -1362,7 +1362,7 @@ class MpsModeTest {
             val common = CommonOptions().apply { this.exact = exact }
             val session = MpsMode.newSession()
             val solvable = session.load(mps.absolutePath, common)
-            val pipeline = assertIs<SolvablePipeline.LinearSource>(solvable.pipeline)
+            val pipeline = assertIs<SourceRendering.LinearSource>(solvable.rendering)
             val source = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
             val value = if (exact) BigFraction.ONE else assertNotNull(BigFraction.ofDouble(1.00000001))
             val point = assertNotNull(source.checkMpsWitness(listOf(value)))
