@@ -420,7 +420,7 @@ class QfNraSolverTest {
     }
 
     @Test
-    fun `matrix allowance stops should never supply a refutation`() {
+    fun `total equality sections can refute without matrix allocation`() {
         val source = SmtLibPolynomial.parse(
             """
             (declare-const x Real)
@@ -428,6 +428,19 @@ class QfNraSolverTest {
             (assert (and (= (* x y) 1) (= (+ x y) 0)))
             (check-sat)
             """.trimIndent(),
+        )
+        val params = QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0))
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount, params)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `matrix allowance stops should never supply a refutation`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1))",
         )
         val params = QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0))
 
