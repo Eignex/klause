@@ -127,17 +127,20 @@ object SourceRecordCheck {
             return
         }
         val log = out.resolve("checker-install.log")
-        fun execute(file: File, command: List<String>) {
+        fun execute(file: File, command: List<String>, required: Boolean = true): Int {
             val process = ProcessBuilder(command).redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(file)).start()
-            check(process.waitFor() == 0) { "${command.first()} failed; see ${file.path}" }
-        }
-        if (System.getProperty("os.name").startsWith("Linux", ignoreCase = true)) {
-            execute(log, listOf("sudo", "apt-get", "update", "-qq"))
-            execute(log, listOf("sudo", "apt-get", "install", "-yq", "python3-venv"))
+            val exit = process.waitFor()
+            check(!required || exit == 0) { "${command.first()} failed; see ${file.path}" }
+            return exit
         }
         val environment = out.resolve("checker-environment")
-        execute(log, listOf("python3", "-m", "venv", environment.absolutePath))
+        val venvCommand = listOf("python3", "-m", "venv", environment.absolutePath)
+        if (execute(log, venvCommand, required = false) != 0) {
+            execute(log, listOf("sudo", "apt-get", "update", "-qq"))
+            execute(log, listOf("sudo", "apt-get", "install", "-yq", "python3-venv"))
+            execute(log, venvCommand)
+        }
         val python = environment.resolve("bin/python").absolutePath
         val tools = root.resolve("klause-bench/tools")
         execute(log, listOf(python, "-m", "pip", "install", "-r",
