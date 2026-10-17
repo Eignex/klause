@@ -312,32 +312,31 @@ internal class Frac128Ops : FracOps<Frac128> {
         val nb = magOf(b.nHi, b.nLo)
         val negA = a.nHi < 0L
         val negB = (b.nHi < 0L) xor negateB
-        val p1 = U128(0uL, 0uL)
-        val p2 = U128(0uL, 0uL)
-        val d = U128(0uL, 0uL)
-        if (!mulU(na, db, p1) || !mulU(nb, da, p2) || !mulU(da, db, d)) return latch()
+        if (!mulU(na, db, na) || !mulU(nb, da, nb) || !mulU(da, db, da)) return latch()
         val negOut: Boolean
         val mag: U128
         if (negA == negB) {
-            val newLo = p1.lo + p2.lo
-            val carryLo = if (newLo < p1.lo) 1uL else 0uL
-            val hiSum = p1.hi + p2.hi
-            val ov1 = hiSum < p1.hi
+            val newLo = na.lo + nb.lo
+            val carryLo = if (newLo < na.lo) 1uL else 0uL
+            val hiSum = na.hi + nb.hi
+            val ov1 = hiSum < na.hi
             val newHi = hiSum + carryLo
             val ov2 = newHi < hiSum
             if (ov1 || ov2) return latch()
             negOut = negA
-            mag = U128(newHi, newLo)
-        } else if (cmpU(p1, p2) >= 0) {
-            subU(p1, p2)
+            na.hi = newHi
+            na.lo = newLo
+            mag = na
+        } else if (cmpU(na, nb) >= 0) {
+            subU(na, nb)
             negOut = negA
-            mag = p1
+            mag = na
         } else {
-            subU(p2, p1)
+            subU(nb, na)
             negOut = negB
-            mag = p2
+            mag = nb
         }
-        return normalized(negOut, mag, d) ?: latch()
+        return normalized(negOut, mag, da) ?: latch()
     }
 
     override fun times(a: Frac128, b: Frac128): Frac128 {
