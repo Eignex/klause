@@ -223,11 +223,14 @@ class QfLiraSolverHintsTest {
         )
         for (defaultOpening in listOf(false, true)) {
             var charged = 0L
+            val stats = SmtStatsSink()
             val stop = object : Cancellation {
                 override fun isCancelled(): Boolean = false
                 override fun workMeter(): WorkMeter = WorkMeter { charged += it }
             }
             ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
                 val hints = assertNotNull(component.partialPointHints(stop, defaultOpening)).second
                 val registrationWork = charged
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
@@ -245,6 +248,101 @@ class QfLiraSolverHintsTest {
                 assertEquals(if (defaultOpening) null else true, hints.preferredBool(0))
                 assertEquals(!defaultOpening, component.partialPointHintAvailable())
                 assertEquals(registrationWork, charged)
+                val observed = stats.snapshot()
+                assertEquals(if (defaultOpening) 1L else 0L, observed.defaultGraphHintReleases)
+                assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_UNCOVERED"))
+                assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_DECLINED"))
+            }
+        }
+    }
+
+    @Test
+    fun `default real cache observations should distinguish uncovered variables from declined groups`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        for (defaultOpening in listOf(false, true)) {
+            for (complete in listOf(false, true)) {
+                var charged = 0L
+                val stop = object : Cancellation {
+                    override fun isCancelled(): Boolean = false
+                    override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                }
+                val stats = SmtStatsSink()
+                ExactLiraSearchComponent(model).use { component ->
+                    component.observeWith(stats)
+                    if (complete) component.observeCompleteTraversal()
+                    val hints = assertNotNull(component.partialPointHints(stop, defaultOpening)).second
+                    assertNull(hints.preferredBool(0))
+                    val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    assertTrue(component.partialPointHintAvailable())
+                    val beforeConsultation = charged
+
+                    assertNull(hints.preferredBool(0))
+                    assertNull(hints.preferredBool(1))
+                    assertNull(hints.preferredBool(-1))
+                    assertNull(hints.preferredBool(2))
+                    component.releasePartialPointHints()
+                    assertNull(hints.preferredBool(0))
+
+                    assertEquals(beforeConsultation, charged)
+                    val observed = stats.snapshot()
+                    assertEquals(0L, observed.defaultGraphHintReleases)
+                    val stages = observed.completeSearchStages
+                    assertEquals(if (complete) 6L else null, stages?.get("POINT_HINT_CONSULTED"))
+                    assertEquals(if (complete) 2L else null, stages?.get("POINT_HINT_UNAVAILABLE"))
+                    assertEquals(if (complete) 4L else null, stages?.get("POINT_HINT_NO_PREFERENCE"))
+                    assertNull(stages?.get("POINT_HINT_PREFERRED"))
+                    val classified = if (complete && defaultOpening) 1L else null
+                    assertEquals(classified, stages?.get("POINT_HINT_DEFAULT_UNCOVERED"))
+                    assertEquals(classified, stages?.get("POINT_HINT_DEFAULT_DECLINED"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `preferred real polarities should remain outside the null preference census`() {
+        for ((op, bound, expected) in listOf(Triple(LinearOp.LE, 0.0, true), Triple(LinearOp.GE, 1.0, false))) {
+            val model = Problem(
+                numBoolVars = 1,
+                intBounds = openBounds(0),
+                numRealVars = 2,
+                realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(0.0, 0.0),
+                factors = arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 0.0),
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                        intArrayOf(0), doubleArrayOf(1.0), op, bound),
+                ),
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertEquals(expected, hints.preferredBool(0))
+
+                val stages = stats.snapshot().completeSearchStages
+                assertEquals(1L, stages?.get("POINT_HINT_PREFERRED"))
+                assertNull(stages?.get("POINT_HINT_NO_PREFERENCE"))
+                assertNull(stages?.get("POINT_HINT_DEFAULT_UNCOVERED"))
+                assertNull(stages?.get("POINT_HINT_DEFAULT_DECLINED"))
             }
         }
     }
@@ -888,6 +986,7 @@ class QfLiraSolverHintsTest {
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertEquals(false, hints.preferredBool(0))
+                assertNull(hints.preferredBool(1))
                 assertEquals(
                     if (complete) (0 until 2).count { session.boolValue(it) == null } else null,
                     stats.snapshot().completeSearchMinUnassignedBooleans,
@@ -909,6 +1008,9 @@ class QfLiraSolverHintsTest {
                 assertEquals(complete, observed.completeSearchStages != null)
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_UNAVAILABLE"))
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_PREFERRED"))
+                assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_NO_PREFERENCE"))
+                assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_UNCOVERED"))
+                assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_DECLINED"))
                 assertEquals(complete, (observed.completeSearchStages?.get("POINT_HINT_LP_CAPTURE") ?: 0L) > 0L)
             }
         }

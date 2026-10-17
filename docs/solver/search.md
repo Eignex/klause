@@ -850,6 +850,10 @@ and registration declines; they establish no source witness. Complete-caller
 `POINT_HINT_*` stages distinguish successful graph/LP capture and consultations that
 find no live point, no preference for the chosen Boolean, or a preferred polarity.
 They exclude private-query captures and do not explain an unavailable point.
+The [default real cache census](../theories/linear-real.md#state-and-resources)
+separates uncovered entries from declined activator groups using that consultation's
+existing cache lookup. Its owner qualification does not imply a complete Boolean
+assignment; the fixed counter updates retain diagnostic overhead.
 These observations add no scan, numerical query,
 allowance or result authority and do not explain an UNKNOWN verdict by themselves.
 

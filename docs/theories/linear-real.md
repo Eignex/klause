@@ -208,6 +208,16 @@ reuse completed branch outcomes without additional checks, polls or charges. The
 measure neither elapsed cost nor witness validity, and a completed table can contain
 only declined preferences.
 
+For observed complete-traversal owners, live default consultations with real
+coordinates distinguish an uncovered cache entry (`POINT_HINT_DEFAULT_UNCOVERED`)
+from a covered activator group that declined (`POINT_HINT_DEFAULT_DECLINED`).
+The split reads the existing lookup result after graph suppression and availability
+checks; explicit providers, integer-only openings and invalid indices remain outside
+it. A declined group does not retain its particular comparison failure. The two fixed
+stage counters add diagnostic map updates, with no additional scan, arithmetic,
+poll, charge or allowance. Their owner label does not imply a complete Boolean
+assignment, and their counts establish neither cost nor witness validity.
+
 Complete-traversal observations retain the hint producer's registration result when
 registration precedes traversal reporting. They distinguish unsupported numeric
 shape, dimension or activated-row entry limits, invalid activators, absent activated

@@ -389,12 +389,19 @@ class ExactLiraSearchComponent private constructor(
                 releasePartialPointHints()
                 null
             } else {
-                val preference = when (pointHintValues?.getOrNull(variable)) {
+                val cached = pointHintValues?.getOrNull(variable)
+                val preference = when (cached) {
                     TRUE -> true
                     FALSE -> false
                     else -> null
                 }
                 observeCompleteStage(if (preference == null) "POINT_HINT_NO_PREFERENCE" else "POINT_HINT_PREFERRED")
+                if (preference == null && defaultOpening && model.numRealVars > 0) {
+                    when (cached) {
+                        UNASSIGNED -> observeCompleteStage("POINT_HINT_DEFAULT_UNCOVERED")
+                        DECLINED_HINT -> observeCompleteStage("POINT_HINT_DEFAULT_DECLINED")
+                    }
+                }
                 preference
             }
         }
