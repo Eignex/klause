@@ -354,3 +354,7 @@ execution. They retain exact original coordinate rendering, objective direction 
 native result payloads. The mode does not construct their concrete pipeline requests.
 The admission representation split remains separate from this shared execution binding;
 see [source setup](../api.md#source-setup) and [resource allowances](../solver/resources.md).
+
+Finite optimization incumbents stream each original objective with its complete
+SMT model. Terminal metadata does not repeat an already published incumbent, so
+source stream checking can verify every objective against its own coordinates.

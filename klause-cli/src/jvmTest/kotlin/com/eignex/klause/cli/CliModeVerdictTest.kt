@@ -210,7 +210,7 @@ class CliModeVerdictTest {
                 }
             }
 
-            assertEquals("; objective=$objective\nsat\n; optimizationStatus=optimal\n(model)\n", out)
+            assertEquals("; objective=$objective\nsat\n(model)\nsat\n; optimizationStatus=optimal\n", out)
         }
     }
 
@@ -270,7 +270,7 @@ class CliModeVerdictTest {
                 }
             }
 
-            assertEquals("; objective=7\nsat\n; optimizationStatus=best-found\n(model)\n", out)
+            assertEquals("; objective=7\nsat\n(model)\nsat\n; optimizationStatus=best-found\n", out)
         }
     }
 

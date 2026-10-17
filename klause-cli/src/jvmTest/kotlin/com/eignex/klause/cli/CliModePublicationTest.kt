@@ -470,6 +470,23 @@ class CliModePublicationTest {
     }
 
     @Test
+    fun `finite SMT improvements should each stream a complete model before completion`() {
+        val output = SmtLibOutput()
+        val first = "(\n  (define-fun i () Int 0)\n)"
+        val second = "(\n  (define-fun i () Int 1)\n)"
+
+        val progress = capture {
+            output.begin(optimize = true, maximize = true)
+            output.onSolution(first, 7L)
+            output.onSolution(second, 9L)
+        }
+        val terminal = capture { output.onComplete(Verdict.OPTIMAL) }
+
+        assertEquals("; objective=7\nsat\n$first\n; objective=9\nsat\n$second\n", progress)
+        assertEquals("sat\n; optimizationStatus=optimal\n", terminal)
+    }
+
+    @Test
     fun `arithmetic SMT witnesses should stream before terminal proof status`() {
         val output = SmtLibOutput()
         val publication = ArithmeticPublication(output)
