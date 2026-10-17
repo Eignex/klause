@@ -56,7 +56,9 @@ internal object CompilationStudyContainerProbe {
             command(out, "docker-version", prefix + listOf("version", "--format", "{{json .Server}}"))
             command(out, "image-list", prefix + listOf("image", "ls", "--quiet", "--no-trunc"))
             val listed = File(out, "image-list.stdout").readLines().filter { it.isNotBlank() }
-            require(listed.size <= MAX_IMAGES && listed.all(IMAGE_ID::matches)) { "Image inventory exceeds bounds or lacks full IDs" }
+            require(listed.size <= MAX_IMAGES && listed.all(IMAGE_ID::matches)) {
+                "Image inventory exceeds bounds or lacks full IDs"
+            }
             val images = listed.distinct()
             var selectedArchitecture: String? = null
             var selectedOs: String? = null
@@ -117,7 +119,9 @@ internal object CompilationStudyContainerProbe {
 
     fun guestArguments(image: String, nonce: File, cid: File): List<String> {
         require(IMAGE_ID.matches(image))
-        require(listOf(nonce, cid).all { it.isAbsolute && it.path.none { c -> c == ',' || c.isWhitespace() || c.isISOControl() } })
+        require(listOf(nonce, cid).all {
+            it.isAbsolute && it.path.none { c -> c == ',' || c.isWhitespace() || c.isISOControl() }
+        })
         return listOf("run", "--pull", "never", "--cidfile", cid.path, "--network", "none", "--read-only",
             "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--memory", "256m", "--pids-limit", "64",
             "--cpus", "1", "--cpuset-cpus", "0", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m",
@@ -135,7 +139,9 @@ internal object CompilationStudyContainerProbe {
             val lines = File(out, "guest-probe.stdout").readLines()
             check(lines.firstOrNull() == nonce.readText().trimEnd() &&
                 "probe-os=Linux" in lines && "probe-cpus=0" in lines &&
-                lines.any { it.trim() == "java.specification.version = 25" }) { "Guest capability or owned mount differs" }
+                lines.any { it.trim() == "java.specification.version = 25" }) {
+                "Guest capability or owned mount differs"
+            }
         }
         val cleanup = runCatching {
             if (cid.exists()) {
@@ -172,16 +178,21 @@ internal object CompilationStudyContainerProbe {
         val stderr = File(out, "$name.stderr")
         val builder = ProcessBuilder(arguments).redirectOutput(stdout).redirectError(stderr)
         builder.environment().keys.removeAll {
-            it.startsWith("DOCKER_") || it in setOf("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy")
+            it.startsWith("DOCKER_") || it in setOf(
+                "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy")
         }
         val process = builder.start()
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(COMMAND_SECONDS)
         try {
             while (!process.waitFor(POLL_MILLIS, TimeUnit.MILLISECONDS)) {
-                check(stdout.length() <= MAX_OUTPUT_BYTES && stderr.length() <= MAX_OUTPUT_BYTES) { "Probe output exceeds bounds" }
+                check(stdout.length() <= MAX_OUTPUT_BYTES && stderr.length() <= MAX_OUTPUT_BYTES) {
+                    "Probe output exceeds bounds"
+                }
                 check(System.nanoTime() < deadline) { "Probe command timed out" }
             }
-            check(stdout.length() <= MAX_OUTPUT_BYTES && stderr.length() <= MAX_OUTPUT_BYTES) { "Probe output exceeds bounds" }
+            check(stdout.length() <= MAX_OUTPUT_BYTES && stderr.length() <= MAX_OUTPUT_BYTES) {
+                "Probe output exceeds bounds"
+            }
             check(process.exitValue() == 0) { "Probe command failed: $name" }
         } finally {
             if (process.isAlive) CompilationStudyBuilds.kill(process)

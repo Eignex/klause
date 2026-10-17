@@ -28,7 +28,8 @@ class CompilationStudyContainerProbeTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["latest", "example:25", "example@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    @ValueSource(strings = ["latest", "example:25",
+        "example@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "sha256:abc", "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"])
     fun `guest images require full installed content IDs`(image: String) {
         assertFailsWith<IllegalArgumentException> {
@@ -54,7 +55,8 @@ class CompilationStudyContainerProbeTest {
         assertEquals("0", arguments[arguments.indexOf("--cpuset-cpus") + 1])
         assertTrue("--read-only" in arguments)
         assertEquals(1, arguments.count { it == "--mount" })
-        assertEquals("type=bind,src=/owned/nonce,dst=/probe-nonce,readonly", arguments[arguments.indexOf("--mount") + 1])
+        assertEquals("type=bind,src=/owned/nonce,dst=/probe-nonce,readonly",
+            arguments[arguments.indexOf("--mount") + 1])
         assertEquals("/owned/cid", arguments[arguments.indexOf("--cidfile") + 1])
         assertTrue(image in arguments)
     }
