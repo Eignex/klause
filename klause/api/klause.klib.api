@@ -5297,6 +5297,8 @@ final class <#A: kotlin/Any?> com.eignex.klause.solver.pipeline/ExecutionOption 
             final fun <get-clauseShareLen>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Int> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.clauseShareLen.<get-clauseShareLen>|<get-clauseShareLen>(){}[0]
         final val coolingRate // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.coolingRate|{}coolingRate[0]
             final fun <get-coolingRate>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Double> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.coolingRate.<get-coolingRate>|<get-coolingRate>(){}[0]
+        final val dryRunPresolve // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.dryRunPresolve|{}dryRunPresolve[0]
+            final fun <get-dryRunPresolve>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Boolean> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.dryRunPresolve.<get-dryRunPresolve>|<get-dryRunPresolve>(){}[0]
         final val dryRunSolver // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.dryRunSolver|{}dryRunSolver[0]
             final fun <get-dryRunSolver>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Boolean> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.dryRunSolver.<get-dryRunSolver>|<get-dryRunSolver>(){}[0]
         final val emaRestart // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.emaRestart|{}emaRestart[0]
@@ -14279,6 +14281,8 @@ final class com.eignex.klause.solver.pipeline/SourceExecutionRequest { // com.ei
         final fun <get-policy>(): com.eignex.klause.solver.pipeline/SourceExecutionPolicy // com.eignex.klause.solver.pipeline/SourceExecutionRequest.policy.<get-policy>|<get-policy>(){}[0]
     final val polynomial // com.eignex.klause.solver.pipeline/SourceExecutionRequest.polynomial|{}polynomial[0]
         final fun <get-polynomial>(): com.eignex.klause.solver.pipeline/PolynomialTheoryParams // com.eignex.klause.solver.pipeline/SourceExecutionRequest.polynomial.<get-polynomial>|<get-polynomial>(){}[0]
+    final val prepareOnly // com.eignex.klause.solver.pipeline/SourceExecutionRequest.prepareOnly|{}prepareOnly[0]
+        final fun <get-prepareOnly>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceExecutionRequest.prepareOnly.<get-prepareOnly>|<get-prepareOnly>(){}[0]
     final val presolveBudget // com.eignex.klause.solver.pipeline/SourceExecutionRequest.presolveBudget|{}presolveBudget[0]
         final fun <get-presolveBudget>(): com.eignex.klause.presolve/PresolveBudget? // com.eignex.klause.solver.pipeline/SourceExecutionRequest.presolveBudget.<get-presolveBudget>|<get-presolveBudget>(){}[0]
     final val presolveCancellation // com.eignex.klause.solver.pipeline/SourceExecutionRequest.presolveCancellation|{}presolveCancellation[0]
@@ -17313,6 +17317,15 @@ sealed class com.eignex.klause.solver.pipeline/SourceExecutionResult : com.eigne
     final class Polynomial : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Polynomial|null[0]
         final val result // com.eignex.klause.solver.pipeline/SourceExecutionResult.Polynomial.result|{}result[0]
             final fun <get-result>(): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/SourceExecutionResult.Polynomial.result.<get-result>|<get-result>(){}[0]
+    }
+
+    final class Prepared : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Prepared|null[0]
+        final val elapsed // com.eignex.klause.solver.pipeline/SourceExecutionResult.Prepared.elapsed|{}elapsed[0]
+            final fun <get-elapsed>(): kotlin.time/Duration // com.eignex.klause.solver.pipeline/SourceExecutionResult.Prepared.elapsed.<get-elapsed>|<get-elapsed>(){}[0]
+        final val originalProblem // com.eignex.klause.solver.pipeline/SourceExecutionResult.Prepared.originalProblem|{}originalProblem[0]
+            final fun <get-originalProblem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceExecutionResult.Prepared.originalProblem.<get-originalProblem>|<get-originalProblem>(){}[0]
+        final val result // com.eignex.klause.solver.pipeline/SourceExecutionResult.Prepared.result|{}result[0]
+            final fun <get-result>(): com.eignex.klause.solver.pipeline/OpenPreparation // com.eignex.klause.solver.pipeline/SourceExecutionResult.Prepared.result.<get-result>|<get-result>(){}[0]
     }
 
     final class Quadratic : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Quadratic|null[0]
