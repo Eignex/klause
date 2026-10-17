@@ -8,6 +8,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.OpenIntBounds
+import com.eignex.klause.lp.cut.CutContext
+import com.eignex.klause.lp.cut.CutSeparator
+import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.LpCertificationPolicy
@@ -23,6 +26,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -95,6 +99,123 @@ class LpEngineTest {
             LpParams(lpPlan = plan, solveBudgetMillis = 4L),
             sink,
         )
+    }
+
+    @Test
+    fun `root and node separation should charge their containing token and LP owner once`() {
+        for (root in listOf(true, false)) {
+            val problem = boundedProblem()
+            val sink = SolveStatsSink(backend = "separation-work")
+            var charged = 0L
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+            val session = PropagationSession(problem)
+            if (!root) session.pinInt(0, 1L)
+            var calls = 0
+            LpEngine(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
+                LpParams(lpPlan = LpPlan(bounding = true, cuts = true), solveBudgetMillis = 1_000L),
+                sink,
+            ).use { engine ->
+                val separator = object : CutSeparator {
+                    override fun separate(ctx: CutContext): List<Cut> {
+                        calls++
+                        val callerBefore = charged
+                        val totalBefore = engine.totalSolveWork()
+                        val nodeBefore = engine.pendingNodeSolveWork()
+                        val overheadBefore = sink.snapshot().lp.overheadOps.sum
+
+                        assertTrue(ctx.spendSeparationWork(7L))
+
+                        assertEquals(7L, charged - callerBefore)
+                        assertEquals(7L, engine.totalSolveWork() - totalBefore)
+                        assertEquals(if (root) 0L else 7L, engine.pendingNodeSolveWork() - nodeBefore)
+                        assertEquals(7.0, sink.snapshot().lp.overheadOps.sum - overheadBefore)
+                        return emptyList()
+                    }
+                }
+                val relaxer = assertNotNull(engine.lpRelaxer)
+                if (root) {
+                    engine.harvestRootCuts(relaxer, session, listOf(separator), false, false, token)
+                } else {
+                    engine.lpSeparators = listOf(separator)
+                    engine.lpBoundAndFix(relaxer, session, 10.0, sink, -1, true, token, cutsAllowed = true)
+                }
+            }
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun `root and node separation should stop later families without pruning or learning inactivity`() {
+        for (root in listOf(true, false)) {
+            val problem = boundedProblem()
+            val sink = SolveStatsSink(backend = "separation-stop")
+            var stopped = false
+            val token = Cancellation { stopped }
+            val session = PropagationSession(problem)
+            if (!root) session.pinInt(0, 1L)
+            var calls = 0
+            LpEngine(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
+                LpParams(lpPlan = LpPlan(bounding = true, cuts = true), solveBudgetMillis = 1_000L),
+                sink,
+            ).use { engine ->
+                val first = object : CutSeparator {
+                    override fun separate(ctx: CutContext): List<Cut> {
+                        calls++
+                        assertTrue(ctx.spendSeparationWork(7L))
+                        stopped = true
+                        assertFalse(ctx.spendSeparationWork())
+                        return emptyList()
+                    }
+                }
+                val second = object : CutSeparator {
+                    override fun separate(ctx: CutContext): List<Cut> = error("separation continued after stop")
+                }
+                val separators = listOf(first, second)
+                val relaxer = assertNotNull(engine.lpRelaxer)
+                if (root) {
+                    assertTrue(engine.harvestRootCuts(relaxer, session, separators, false, false, token).isEmpty())
+                } else {
+                    engine.lpSeparators = separators
+                    engine.lpSeparatorGate = LpSeparatorGate(2, warmup = 0, window = 1, reprobeBase = Int.MAX_VALUE)
+
+                    val outcome = engine.lpBoundAndFix(
+                        relaxer, session, 10.0, sink, -1, true, token, cutsAllowed = true,
+                    )
+
+                    assertFalse(outcome.prune)
+                    assertEquals(null, outcome.explanation)
+                    assertTrue(engine.lpSeparatorGate.shouldRun(0))
+                }
+            }
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun `separation should not renew an exhausted LP allowance`() {
+        for (root in listOf(true, false)) {
+            var charged = 0L
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+            budgetedEngine(SolveStatsSink(backend = "separation-exhausted")).use { engine ->
+                engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 20_000L))
+
+                val allowed = engine.separationWork(token, root)(1L)
+
+                assertFalse(allowed)
+                assertEquals(0L, charged)
+                assertEquals(20_000L, engine.totalSolveWork())
+            }
+        }
     }
 
     @Test

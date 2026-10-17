@@ -24,7 +24,18 @@ internal class CutContext(
     /** Per-structural-column LP primal value (`FloatLpResult.primal`); the point to separate. */
     val primal: DoubleArray,
     val session: PropagationSession,
+    private val separationWork: ((Long) -> Boolean)? = null,
 ) {
+    var separationStopped: Boolean = false
+        private set
+
+    fun spendSeparationWork(units: Long = 1L): Boolean {
+        if (separationStopped) return false
+        val allowed = separationWork?.invoke(units) ?: true
+        if (!allowed) separationStopped = true
+        return allowed
+    }
+
     /** The LP primal value of structural column [col] (0 outside the primal vector, e.g. an unmapped column). */
     fun primalOf(col: Int): Double = if (col in primal.indices) primal[col] else 0.0
 

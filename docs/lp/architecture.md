@@ -137,9 +137,27 @@ real-coordinate and wider rows decline this projection. Every source coordinate
 needs an LP column and a declared lower bound for the global rounding shift;
 invented finite endpoints cannot justify it. Flips, shifts, aggregation and
 unshifting use checked word arithmetic and decline overflowing combinations.
-The existing 48-row and 16-cut caps and root/node scheduling remain authoritative.
+Ordinary `Linear`, pseudo-Boolean and cardinality rows retain source factor order.
+Their row threshold is checked after each factor: an equality or cardinality range
+starting at 47 rows can retain both directions and end at 49. All ordinary single
+rows and then ordinary pairs receive cut opportunities before exact rows. If fewer
+than 48 ordinary rows and 16 cuts remain, a second source scan fills only the unused
+row slots with compact `ExactLinear` directions, stopping at 48 including within an
+equality. Exact singles, ordinary/exact pairs and exact/exact pairs follow in that
+order within the same 16-cut cap. A full ordinary prefix skips the exact scan.
 Equivalent rows with different positive scales can yield different half cuts;
 this projection does not rescale source rows or change objective units.
+
+MIR factor and term visits, normalization, aggregation and storage reservations
+spend the containing root or node token and LP effort ledger. The shared internal
+cut context latches refusal for the separation round. Only completed rows and cuts
+enter its local prefix; an interrupted combination cannot publish. The root caller
+retains previously pooled cuts on interruption, and the node caller withholds further
+application, certification and pruning from the interrupted round. Interrupted MIR
+work does not train the node separator's productivity gate. Ordinary opportunity
+order is preserved only while the containing owner remains live; its work also
+spends the allowance. [Resource accounting](../solver/resources.md) defines these
+charges and stop boundaries. Round, depth, pool and query limits are unchanged.
 
 Cut scheduling follows active LP bounding, the requested cost tier and the
 relaxation size guard, including ordinary linear models without global factors.

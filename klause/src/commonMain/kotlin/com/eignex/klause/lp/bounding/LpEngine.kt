@@ -488,6 +488,21 @@ internal class LpEngine(
         sink.lp.observeOverhead(ops)
     }
 
+    internal fun separationWork(cancellation: Cancellation, root: Boolean): (Long) -> Boolean = { units ->
+        if (cancellation() || lpWorkAllowanceSpent()) {
+            false
+        } else {
+            cancellation.charge(units)
+            if (root) {
+                chargeWork(units)
+                sink.lp.observeOverhead(units)
+            } else {
+                noteNodeOverhead(units)
+            }
+            !cancellation() && !lpWorkAllowanceSpent()
+        }
+    }
+
     private fun saturatingAdd(a: Long, b: Long): Long = if (b > 0L && a > Long.MAX_VALUE - b) Long.MAX_VALUE else a + b
 
     /**

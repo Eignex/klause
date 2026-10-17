@@ -93,6 +93,157 @@ class AggregationMirSeparatorTest {
     }
 
     @Test
+    fun `early exact rows should preserve a later ordinary pair cut`() {
+        for (exactRows in listOf(0, 48)) {
+            val factors = List<Factor>(exactRows) {
+                ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ofLong(2)),
+                    LinearOp.LE, BigFraction.ofLong(2))
+            } + listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            )
+            val p = Problem(0, 2, Array(2) { IntDomain(0, 1) }, factors.toTypedArray())
+            val obj = LinearObjective(intCoefficients = longArrayOf(-1, -1))
+
+            val (cuts, rel) = separate(p, obj, doubleArrayOf(0.5, 0.5)) ?: error("LP context required")
+
+            assertTrue(cuts.any { cut -> cut.rhs == 0L && cut.cols.size == 1 &&
+                rel.colVarId[cut.cols[0]] == 0 && cut.coeffs[0] == 1L })
+            assertCutsValid(p, cuts, rel)
+        }
+    }
+
+    @Test
+    fun `exact single row cuts should not starve an ordinary pair`() {
+        val factors = List<Factor>(16) {
+            ExactLinear.of(intArrayOf(Term.ofIntVar(2)), listOf(BigFraction.ofLong(2)),
+                LinearOp.LE, BigFraction.ONE)
+        } + listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+        )
+        val p = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors.toTypedArray())
+        val obj = LinearObjective(intCoefficients = longArrayOf(-1, -1, -1))
+
+        val (cuts, rel) = separate(p, obj, doubleArrayOf(0.5, 0.5, 0.5)) ?: error("LP context required")
+
+        assertTrue(cuts.isNotEmpty())
+        assertEquals(1, cuts.first().cols.size)
+        assertEquals(0, rel.colVarId[cuts.first().cols[0]])
+        assertEquals(1L, cuts.first().coeffs[0])
+        assertEquals(0L, cuts.first().rhs)
+        assertCutsValid(p, cuts, rel)
+    }
+
+    @Test
+    fun `a final ordinary equality should retain its second direction past the row threshold`() {
+        val factors = List<Factor>(47) { Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 2) } +
+            Linear(intArrayOf(2, 1), intArrayOf(1, 2), LinearOp.EQ, 1)
+        val p = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors.toTypedArray())
+        val obj = LinearObjective(intCoefficients = longArrayOf(-1, -1, -1))
+
+        val (cuts, rel) = separate(p, obj, doubleArrayOf(0.5, 0.5, 0.0)) ?: error("LP context required")
+
+        assertTrue(cuts.any { cut -> cut.cols.size == 2 &&
+            cut.cols.map { rel.colVarId[it] }.toSet() == setOf(1, 2) &&
+            cut.coeffs.all { it == -1L } && cut.rhs == -1L })
+        assertCutsValid(p, cuts, rel)
+    }
+
+    @Test
+    fun `an exact equality should not add a second direction beyond remaining capacity`() {
+        val factors = List<Factor>(47) { Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 2) } +
+            ExactLinear.of(intArrayOf(Term.ofIntVar(1), Term.ofIntVar(2)),
+                listOf(BigFraction.ofLong(2), BigFraction.ONE), LinearOp.EQ, BigFraction.ONE)
+        val p = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors.toTypedArray())
+        val obj = LinearObjective(intCoefficients = longArrayOf(-1, -1, -1))
+
+        val (cuts, rel) = separate(p, obj, doubleArrayOf(0.5, 0.5, 0.0)) ?: error("LP context required")
+
+        assertEquals(1, cuts.size)
+        assertEquals(listOf(1L), cuts.single().coeffs.toList())
+        assertEquals(0L, cuts.single().rhs)
+        assertCutsValid(p, cuts, rel)
+    }
+
+    @Test
+    fun `a final cardinality should retain its second direction past the row threshold`() {
+        val factors = List<Factor>(47) { Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 2) } +
+            Cardinality(intArrayOf(Lit.make(0, true), Lit.make(0, true), Lit.make(1, true)), 1, 1)
+        val p = Problem(2, 1, arrayOf(IntDomain(0, 1)), factors.toTypedArray())
+        val obj = LinearObjective(intCoefficients = longArrayOf(-1), boolWeights = longArrayOf(-1, -1))
+
+        val (cuts, rel) = separate(p, obj, doubleArrayOf(0.5, 0.0)) ?: error("LP context required")
+
+        assertTrue(cuts.any { cut -> cut.cols.size == 2 && cut.cols.all { rel.colIsBool[it] } &&
+            cut.coeffs.all { it == -1L } && cut.rhs == -1L })
+    }
+
+    @Test
+    fun `unfinished normalization and aggregation should not publish a cut`() {
+        for (limit in listOf(120L, 200L)) {
+            val p = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                arrayOf<Factor>(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3)))
+            val session = PropagationSession(p.withFactors(emptyArray()))
+            val rel = CpToLpRelaxation(session.problem,
+                LinearObjective(intCoefficients = longArrayOf(-1, -1))).build(session)
+            var work = 0L
+            val ctx = CutContext(p, rel, doubleArrayOf(0.75, 0.75), session) { units ->
+                work += units
+                work <= limit
+            }
+
+            val cuts = AggregationMirSeparator().separate(ctx)
+
+            assertTrue(cuts.isEmpty())
+            assertTrue(ctx.separationStopped)
+        }
+    }
+
+    @Test
+    fun `interrupted exact work should retain only completed ordinary cuts`() {
+        val p = Problem(0, 50, Array(50) { IntDomain(0, 1) }, arrayOf<Factor>(
+            Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 1),
+            ExactLinear.of(IntArray(50) { Term.ofIntVar(it) }, List(50) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ofLong(50)),
+        ))
+        val session = PropagationSession(p.withFactors(emptyArray()))
+        val rel = CpToLpRelaxation(session.problem,
+            LinearObjective(intCoefficients = LongArray(50) { -1L })).build(session)
+        var work = 0L
+        val ctx = CutContext(p, rel, DoubleArray(rel.model.n) { 0.5 }, session) { units ->
+            work += units
+            work <= 500L
+        }
+
+        val cuts = AggregationMirSeparator().separate(ctx)
+
+        assertTrue(ctx.separationStopped)
+        assertEquals(1, cuts.size)
+        assertEquals(0, rel.colVarId[cuts.single().cols.single()])
+        assertEquals(listOf(1L), cuts.single().coeffs.toList())
+        assertEquals(0L, cuts.single().rhs)
+    }
+
+    @Test
+    fun `a stopped separation should not renew its work carrier`() {
+        val p = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf<Factor>(Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 1)))
+        val session = PropagationSession(p.withFactors(emptyArray()))
+        val rel = CpToLpRelaxation(session.problem, LinearObjective(intCoefficients = longArrayOf(-1))).build(session)
+        var calls = 0
+        val ctx = CutContext(p, rel, doubleArrayOf(0.5), session) { calls++; false }
+
+        val first = AggregationMirSeparator().separate(ctx)
+        val second = AggregationMirSeparator().separate(ctx)
+
+        assertTrue(first.isEmpty())
+        assertTrue(second.isEmpty())
+        assertEquals(1, calls)
+        assertTrue(ctx.separationStopped)
+    }
+
+    @Test
     fun `single row half cut should separate and stay valid`() {
         // 2x + 2y <= 3: the LP reaches x + y = 1.5 while every integer point has x + y <= 1.
         val p = Problem(

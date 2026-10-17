@@ -166,6 +166,21 @@ Root primal queries retain the remaining cumulative root/native LP allowance;
 adaptive node limits do not select their primal points. Each completed attempt
 charges that allowance before a fallback can open another solver.
 Relative counters and saturating additions prevent a large allowance from wrapping.
+Aggregation MIR uses the existing root preparation token or node operation token
+through its internal cut context. Each factor, term, candidate combination and
+aggregation table slot charges logical work; map operations also charge one unit.
+Array and list capacity is reserved before allocation, including growth and copying;
+map growth reserves the new storage and old table scan. These normalized charges
+include ordinary separation work and the additional exact-row scan. They are cost
+proxies, rather than counts of individual hash probes or machine instructions.
+The token's meter receives each charge once, alongside the containing LP effort
+ledger and overhead statistics. Node work also advances the current node LP total;
+root work stays in the cumulative LP total. No separation allowance is renewed.
+A refused reservation can retain its charge without allocating, and latches a stop
+in the context. Only completed local rows or cuts survive; callers retain previous
+root pool cuts or return a node with no further deduction on interruption. See
+[LP cut ordering](../lp/architecture.md#consumers-explanations-and-cuts).
+
 Retained finite optimization behind a finite external cutoff converts the slice's remaining work to an optional
 node-LP operation cap, subtracting fractional LP work already charged. The adapter
 supplies native units to the model-facing LP owner, which takes the smaller of that

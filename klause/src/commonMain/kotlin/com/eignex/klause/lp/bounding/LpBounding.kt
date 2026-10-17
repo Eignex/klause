@@ -562,17 +562,24 @@ internal fun LpEngine.sparseSafePrune(
         val localCuts = ArrayList<SourceCut>()
         var rounds = 0
         while (rounds++ < SEARCH_CUT_ROUNDS && !cancellation()) {
-            val ctx = CutContext(problem, boundRel, boundRes.primal, session)
+            val ctx = CutContext(
+                problem, boundRel, boundRes.primal, session,
+                separationWork(cancellation, root = false),
+            )
             // Per-separator gating: skip a family the gate has disabled for being unproductive, and
             // credit each family it does run with whether it produced a violated cut this round.
             val fresh = ArrayList<Cut>()
             for (i in lpSeparators.indices) {
+                if (cancellation() || lpWorkAllowanceSpent() || ctx.separationStopped) break
                 if (!lpSeparatorGate.shouldRun(i)) continue
                 val produced = lpSeparators[i].separate(ctx)
-                lpSeparatorGate.record(i, produced.isNotEmpty())
+                if (!ctx.separationStopped) lpSeparatorGate.record(i, produced.isNotEmpty())
                 fresh.addAll(produced)
             }
             sink.lp.observeCutAccounting(fresh.size, 0, 0)
+            if (cancellation() || lpWorkAllowanceSpent() || ctx.separationStopped) {
+                return LpNodeOutcome(false, null)
+            }
             if (fresh.isEmpty()) break
             recordSearchCuts(fresh, boundRes.primal, boundRel, session)
             for (c in fresh) if (!c.global) {
@@ -1407,9 +1414,18 @@ internal fun LpEngine.harvestRootCuts(
                 relaxation.sourceMap?.withCpBounds(relaxation.model, session)?.let(pool::remap)
                 pool.observe(result.primal)
                 resultObserved = true
-                val ctx = CutContext(problem, relaxation, result.primal, session)
+                val ctx = CutContext(
+                    problem, relaxation, result.primal, session,
+                    separationWork(cancellation, root = true),
+                )
                 // Keep only cuts justified beyond the root box; open source sides can have invented endpoints.
-                val structural = separators.flatMap { it.separate(ctx) }
+                val separated = ArrayList<Cut>()
+                for (separator in separators) {
+                    if (cancellation() || lpWorkAllowanceSpent() || ctx.separationStopped) break
+                    separated.addAll(separator.separate(ctx))
+                }
+                if (cancellation() || lpWorkAllowanceSpent() || ctx.separationStopped) return pool.cuts()
+                val structural = separated
                     .mapNotNull {
                         when {
                             it.provenance != null || it.tableau != null -> SharedCut.fromCut(
