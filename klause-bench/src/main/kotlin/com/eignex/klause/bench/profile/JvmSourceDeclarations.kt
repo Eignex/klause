@@ -183,7 +183,7 @@ internal object JvmSourceDeclarations {
     }
 
     @Suppress("LongMethod", "TooGenericExceptionCaught")
-    private fun inspect(sources: List<SourceSyntaxInput>, out: File): JsonObject {
+    internal fun inspect(sources: List<SourceSyntaxInput>, out: File): JsonObject {
         val report = File(out, "source-declarations.jsonl.gz")
         check(!report.exists())
         val digest = MessageDigest.getInstance("SHA-256")
@@ -256,7 +256,7 @@ internal object JvmSourceDeclarations {
             val originalHash = digest.digest()
             uncompressedHash = HexFormat.of().formatHex(originalHash)
             check(verifiedBytes == bytes && originalHash.contentEquals(roundTrip.digest()))
-        } catch (failure: Exception) {
+        } catch (failure: Throwable) {
             if (report.isFile && !report.renameTo(File(out, "source-declarations.partial.jsonl.gz"))) {
                 failure.addSuppressed(IllegalStateException("Cannot retain source declaration partial report"))
             }

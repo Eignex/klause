@@ -4,13 +4,52 @@ import com.eignex.klause.bench.metric.sha256
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class JvmSourceDeclarationsTest {
+    private lateinit var parser: JvmSourceDeclarationParser
+
+    @BeforeAll
+    fun prepareParser() {
+        parser = JvmSourceDeclarationParser()
+        parser.inspect("Warm.kt", "fun warm() = 1") { }
+    }
+
+    @AfterAll
+    fun closeParser() {
+        parser.close()
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["exception", "error"])
+    fun `failed source traversal retains a partial report`(variant: String, @TempDir out: File) {
+        val failure = if (variant == "error") AssertionError("source traversal failed")
+            else IllegalStateException("source traversal failed")
+        val sources = object : AbstractList<SourceSyntaxInput>() {
+            override val size = 1
+            override fun get(index: Int): SourceSyntaxInput = throw failure
+        }
+
+        val actual = assertFailsWith<Throwable> { JvmSourceDeclarations.inspect(sources, out) }
+
+        assertSame(failure, actual)
+        assertTrue(File(out, "source-declarations.partial.jsonl.gz").isFile)
+        assertFalse(File(out, "source-declarations.jsonl.gz").exists())
+    }
+
     @Test
     fun `request retains the complete immutable source specification identity`() {
         val arguments = arrayOf("declarations=https://example.test/sources.json",
