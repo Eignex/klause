@@ -35,9 +35,8 @@ authority under the original file's declaration defaults.
 
 MPS defaults to `SourceTolerance(absolute=1/10000000, relative=1/10000000)`.
 Each component can be replaced independently, including zero. Zero tolerance requires
-exact source correspondence; inexact hybrid projections are rebuilt from source rows.
-The compatibility `toExactSourceProblem` entry defaults to zero;
-its explicit overrides and internal exact-row fallback retain their resolved policy.
+exact source checks and certificates. The compatibility `toExactSourceProblem` entry
+defaults to zero; explicit overrides retain their resolved policy.
 Source representation and the permitted feasibility slack are separate properties.
 
 The CLI loader captures shared typed caller overrides in one [linear source snapshot](#source-correspondence).
@@ -62,8 +61,9 @@ delegates original-unit point checks and tolerance qualification to the shared
 validator and evidence mechanisms used by source setup.
 `LinearSourceProblem.checkMpsWitness` exposes that same point checker for a captured
 MPS source, returning no witness when the candidate is rejected or checking stops.
-Compatibility compilation captures this source before constructing a working view;
-an exact-row fallback reuses that snapshot and its effective policy.
+Each compatibility compilation captures this source once and delegates to the shared
+linear lowerer once. `toProblem` preserves the captured policy and
+`toExactSourceProblem` requests exact rows; neither entry retries another compiler.
 
 MPS lowering returns an engine-neutral `Problem` with its source columns, numbers
 and effective semantics retained for validation. The model-facing LP layer assembles
@@ -72,25 +72,24 @@ engine matrices, shifted columns, slack columns or engine-specific premise recor
 
 The MPS parser retains decimal source metadata, integer markers, bounds and
 objective sense. The lowered LP may restate continuous coefficients in binary64.
-An unconditional equality defining a free continuous column as an integral affine
-sum of bounded source integers gives that column a finite integer representation
-when the resulting rows and objective retain their source numbers. The proof uses
-exact source coefficients and bounds; fractional definitions and inexact integer
-lowerings remain continuous. Source column names, witness values and objective
-units are preserved.
-`sourceExact` records exact source correspondence; `toleranceDifference` identifies
-a lowering difference relevant to tolerance publication. Rounded or oversized
-pure-integer rows are rebuilt from source decimals; oversized objectives can use
-an auxiliary defining row. Integer values and lower-bound shifts keep exact
-authority beyond `2^53`.
+The shared lowerer proves integral affine definitions from unconditional equalities
+over bounded integer coordinates. Such continuous declarations receive finite integer
+backings, including chains of proved definitions. Fractional and guarded definitions
+remain continuous. Original declaration kinds and order remain distinct from working
+coordinate kinds and private auxiliaries. Source column names, checked witness values
+and objective units are preserved across that mapping.
+`sourceExact` records representation correspondence. A working approximation does not
+replace the original numbers used for tolerance validation. Integer rows and bounds
+retain exact authority beyond `2^53`; oversized objectives can use an auxiliary
+defining row.
 
-`MpsModel.toProblem` retains original decimal rows for mixed sources whose binary64
-hybrid projection differs from the source. Indicated rows also retain their native
-source implication. These representations do not select an engine or transfer
-bounded integer choices to arithmetic search. The default purely continuous hybrid
-projection retains its explicit tolerance correspondence.
+`MpsModel.toProblem` uses the same shared linear working view as source setup. Mixed
+sources and indicated rows retain exact comparisons and their source implication;
+purely continuous numerical projections retain explicit correspondence to the source.
+The format owns no row encoding, affine-definition inference or alternate model builder.
+Explicit signed-zero bound literals are restored only on zero-valued bounds in the
+fresh compatibility view, preserving the rational bound and its captured feasibility policy.
 
-A hybrid lowering refusal retains the exact source adapter for numerical admission.
 An infeasible constant row remains an explicit contradiction for the solver.
 Numerical admission checks original decimal rows even when the default continuous
 working projection retains tolerance semantics. A nonzero source term that cannot
@@ -107,7 +106,7 @@ privately. Finite integer checks and numerical row emission read that same sourc
 implication. Numerical rows enabled by a finite pin retain both equality premises,
 so retraction removes their authority.
 The compatibility exact entry delegates canonical-source compilation to the shared
-linear lowering. Integer-only objectives use an exact positive multiplier when
+linear lowering. Objectives over integer backings use an exact positive multiplier when
 their working coefficients fit signed words; other objectives use an auxiliary
 equality retaining original coefficients and constant. The multiplier need not be
 a power of ten. Rendered objectives undo it exactly. The returned column mapping omits this auxiliary and
