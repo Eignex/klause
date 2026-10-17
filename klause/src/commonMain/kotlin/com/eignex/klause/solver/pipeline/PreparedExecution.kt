@@ -24,12 +24,11 @@ internal sealed interface PreparedExecution {
     class Polynomial(val completion: SharedPolynomialModel) : Factor {
         override val model: Problem get() = completion.source
     }
-    class NonlinearInteger(
-        val source: NonlinearIntegerProblem,
-        val projection: FactorPolynomialProjection? = null,
-    ) : PreparedExecution
+    class NonlinearInteger(val source: NonlinearIntegerProblem, val projection: FactorPolynomialProjection? = null) :
+        PreparedExecution
     class Transcendental(val source: TranscendentalProblem) : PreparedExecution
     class Numerical(val source: LinearSourceProblem, override val model: Problem) : Factor
+    class NumericalWorking(override val model: Problem) : Factor
     class Declined(val model: Problem, val reason: PreparedPlanDecline, val retained: Factor? = null) :
         PreparedExecution {
         init {
@@ -43,6 +42,7 @@ internal val PreparedExecution.model: Problem? get() = when (this) {
     is PreparedExecution.Polynomial -> completion.source
     is PreparedExecution.Declined -> model
     is PreparedExecution.Numerical -> model
+    is PreparedExecution.NumericalWorking -> model
     is PreparedExecution.NonlinearInteger -> projection?.model
     is PreparedExecution.Transcendental -> null
 }
@@ -53,7 +53,7 @@ internal val PreparedExecution.finiteLinear: PreparedExecution.FiniteLinear? get
     is PreparedExecution.FiniteLinear -> this
     is PreparedExecution.Declined -> retained as? PreparedExecution.FiniteLinear
     is PreparedExecution.Polynomial, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
-    is PreparedExecution.Numerical -> null
+    is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
 }
 
 internal val PreparedExecution.polynomial: PreparedExecution.Polynomial? get() = when (this) {
@@ -65,7 +65,7 @@ internal val PreparedExecution.polynomial: PreparedExecution.Polynomial? get() =
     is PreparedExecution.Transcendental,
     -> null
 
-    is PreparedExecution.Numerical -> null
+    is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
 }
 
 internal val PreparedExecution.kind: PreparedExecutionKind get() = when (this) {
@@ -73,7 +73,7 @@ internal val PreparedExecution.kind: PreparedExecutionKind get() = when (this) {
     is PreparedExecution.Polynomial -> PreparedExecutionKind.POLYNOMIAL
     is PreparedExecution.NonlinearInteger -> PreparedExecutionKind.NONLINEAR_INTEGER
     is PreparedExecution.Transcendental -> PreparedExecutionKind.TRANSCENDENTAL
-    is PreparedExecution.Numerical -> PreparedExecutionKind.NUMERICAL
+    is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> PreparedExecutionKind.NUMERICAL
     is PreparedExecution.Declined -> PreparedExecutionKind.DECLINED
 }
 
@@ -86,7 +86,7 @@ internal val PreparedExecution.decline: PreparedPlanDecline? get() = when (this)
 
     is PreparedExecution.Polynomial, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
 
-    is PreparedExecution.Numerical -> null
+    is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
 }
 
 internal class PreparedSourceStructure(
@@ -119,19 +119,29 @@ internal class PreparedSourceStructure(
         when (execution) {
             is PreparedExecution.NonlinearInteger -> {
                 val projection = execution.projection
-                if (projection == null) require(originalSource === execution.source)
-                else {
+                if (projection == null) {
+                    require(originalSource === execution.source)
+                } else {
                     require(originalSource === projection.original && execution.source === projection.formula)
                     require(factorProjections === projection.projections)
-                    require(sourceBoolCount == projection.model.numBoolVars &&
-                        sourceIntCount == projection.model.numIntVars &&
-                        sourceRealCount == projection.model.numRealVars)
-                    require(this.integerCoordinates == execution.source.integerCoordinates &&
-                        this.realCoordinates == execution.source.realCoordinates)
+                    require(
+                        sourceBoolCount == projection.model.numBoolVars &&
+                            sourceIntCount == projection.model.numIntVars &&
+                            sourceRealCount == projection.model.numRealVars,
+                    )
+                    require(
+                        this.integerCoordinates == execution.source.integerCoordinates &&
+                            this.realCoordinates == execution.source.realCoordinates,
+                    )
                 }
             }
+
             is PreparedExecution.Transcendental -> require(originalSource === execution.source)
+
             is PreparedExecution.Numerical -> require(originalSource === execution.source)
+
+            is PreparedExecution.NumericalWorking -> require(originalSource === execution.model)
+
             else -> Unit
         }
     }
@@ -199,19 +209,22 @@ internal fun legacyPreparedExecution(
     )
 
     PreparedExecutionKind.TRANSCENDENTAL -> PreparedExecution.Transcendental(originalSource as TranscendentalProblem)
+
     PreparedExecutionKind.NUMERICAL -> PreparedExecution.Numerical(
-        originalSource as LinearSourceProblem, requireNotNull(model),
+        originalSource as LinearSourceProblem,
+        requireNotNull(model),
     )
+
     PreparedExecutionKind.DECLINED -> if (decline == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE &&
         polynomialModel != null
     ) {
         PreparedExecution.Polynomial(polynomialModel)
     } else {
         PreparedExecution.Declined(
-        requireNotNull(model),
-        requireNotNull(decline),
-        polynomialModel?.let { PreparedExecution.Polynomial(it) }
-            ?: componentPlan?.let { PreparedExecution.FiniteLinear(requireNotNull(model), it) },
-    )
+            requireNotNull(model),
+            requireNotNull(decline),
+            polynomialModel?.let { PreparedExecution.Polynomial(it) }
+                ?: componentPlan?.let { PreparedExecution.FiniteLinear(requireNotNull(model), it) },
+        )
     }
 }

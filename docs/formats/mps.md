@@ -209,7 +209,11 @@ numerical leaf completion when presolve fixes their discrete coordinates; it can
 materialize exact-theory neighborhood workers. Open integer declarations retain their missing sides and use numerical
 LP relaxations with exhaustive integer splits; no finite window changes source scope.
 Explicit `--exact` changes source correspondence and certificate requirements without
-selecting arithmetic theory or theory portfolio workers.
+selecting arithmetic theory. Open numerical FIXED uses one retained traversal;
+BACKTRACK and MIXED use private numerical workers through the shared portfolio
+harness. Its lanes, seeds, cancellation, node ledger and native quotas follow the
+same invocation controls. The canonical original-source plan remains distinct from
+the workers' private coordinate plan and any private zero feasibility objective.
 
 The numerical source traversal retains exact original rows and objective direction.
 Each fractional integer endpoint splits at its floor into both exhaustive alternatives.
@@ -228,8 +232,9 @@ adjacent exhaustive alternatives. No inactive region is clamped away. Bounds use
 only rows whose original guards are established in that branch; source witnesses
 still check every enabled original row. Recession capture requires fixed integer
 guards. Other unsupported guarded relations explicitly decline. Supported finite
-indicator models retain their numerical completion. LS and ALNS requests
-withhold numerical bounds and terminal claims and can publish checked witnesses only.
+indicator models retain their numerical completion. Open numerical fallback has
+no heuristic or adaptive worker, so LS and ALNS return Unsupported before worker
+construction. Finite numerical LS and ALNS retain checked witness completion.
 
 Every open candidate is checked against original rows, bounds, indicators and
 integrality before publication. Its objective is recomputed from original numbers,

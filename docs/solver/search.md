@@ -884,6 +884,16 @@ rejects a factory whose `NoPropagator` result disagrees with its declared inert 
 An unsupported role refuses construction. Alternative deductions must remain sound
 for the original factor, including watcher subscriptions and explanations.
 
+Exact integer source rows select compact signed-word propagation when their cleared
+constants fit and the sum of coefficient magnitudes is at most `Long.MAX_VALUE`.
+That guard keeps activity and residual checks within signed 128 bits over full
+signed-word domains. Reified comparisons at either signed-word endpoint retain
+arbitrary-precision propagation so range sentinels and complemented thresholds
+cannot settle them incorrectly. Other activity overflow retains the compact
+kernel's exact feasibility check and conservative pruning; wider constants retain
+arbitrary-precision propagation. The original exact row and source witness checks
+remain authoritative.
+
 Packed SAT propagation requires built-in selected clause descriptors. Replaced
 clause deduction uses the general CP lane so native propagation cannot bypass it;
 unchanged delegated descriptors retain native eligibility. Built-in mechanisms

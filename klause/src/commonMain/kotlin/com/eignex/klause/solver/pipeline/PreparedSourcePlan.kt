@@ -271,8 +271,12 @@ class PreparedSourcePlan private constructor(
 
     internal fun bindLinearSource(plan: PreparedSourcePlan): PreparedSourcePlan {
         val source = originalSource as? LinearSourceProblem ?: return plan
-        return plan.withLinearSource(source, preparation.integerCoordinates, preparation.realCoordinates,
-            workingLinearObjective)
+        return plan.withLinearSource(
+            source,
+            preparation.integerCoordinates,
+            preparation.realCoordinates,
+            workingLinearObjective,
+        )
     }
 
     /** Bind an immutable linear objective without reselecting source ownership. */
@@ -330,13 +334,13 @@ class PreparedSourcePlan private constructor(
             is PreparedExecution.Declined -> when (val retained = selected.retained) {
                 is PreparedExecution.Polynomial -> id
                 is PreparedExecution.FiniteLinear -> retained.ownership.cpIntVars.indexOf(id).takeIf { it >= 0 }
-                is PreparedExecution.Numerical -> null
+                is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
                 null -> null
             }
 
             is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
 
-            is PreparedExecution.Numerical -> null
+            is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
         }
     }
 
@@ -361,16 +365,22 @@ class PreparedSourcePlan private constructor(
     /** Typed canonical location of an original coordinate, including proved integral real backings. */
     fun workingCoordinate(source: SourceCoordinate): SourceCoordinate = when (source.kind) {
         SourceCoordinate.Kind.Boolean -> SourceCoordinate(source.kind, booleanCoordinate(source.id))
+
         SourceCoordinate.Kind.Integer -> SourceCoordinate(
             if (originalSource is NonlinearIntegerProblem) SourceCoordinate.Kind.Real else source.kind,
             integerCoordinate(source.id),
         )
+
         SourceCoordinate.Kind.Real -> {
             require(source.id in 0 until sourceRealCount)
             val reference = preparation.realCoordinates[source.id]
-            if (originalSource !is LinearSourceProblem) SourceCoordinate(source.kind, reference)
-            else if (Term.isInt(reference)) SourceCoordinate(SourceCoordinate.Kind.Integer, Term.intVar(reference))
-            else SourceCoordinate(source.kind, Term.realVar(reference))
+            if (originalSource !is LinearSourceProblem) {
+                SourceCoordinate(source.kind, reference)
+            } else if (Term.isInt(reference)) {
+                SourceCoordinate(SourceCoordinate.Kind.Integer, Term.intVar(reference))
+            } else {
+                SourceCoordinate(source.kind, Term.realVar(reference))
+            }
         }
     }
 
@@ -710,9 +720,8 @@ fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = Prepare
     realCoordinates = realCoordinates,
 )
 
-internal fun PreparedSourcePlan.retainingLinearSource(binding: PreparedSourcePlan): PreparedSourcePlan {
-    return binding.bindLinearSource(this)
-}
+internal fun PreparedSourcePlan.retainingLinearSource(binding: PreparedSourcePlan): PreparedSourcePlan =
+    binding.bindLinearSource(this)
 
 internal fun PreparedSourcePlan.linearWorkingPlan(): PreparedSourcePlan {
     if (originalSource !is LinearSourceProblem) return this
@@ -741,3 +750,23 @@ internal fun nonlinearIntegerExecutionContract(): ComponentExecutionContract = C
         ),
     ),
 )
+
+internal fun PreparedSourcePlan.numericalWorkingPlan(
+    model: Problem,
+    objective: LinearObjective,
+    maximize: Boolean,
+): PreparedSourcePlan {
+    val numerical = requireNotNull(execution as? PreparedExecution.Numerical)
+    require(numerical.model === model && originalSource === numerical.source) {
+        "numerical working model differs from its original source plan"
+    }
+    require(workingLinearObjective == null || workingLinearObjective === objective) {
+        "numerical working objective differs from its captured source objective"
+    }
+    require(this.maximize == maximize) { "numerical working direction differs from its captured source objective" }
+    return PreparedSourcePlan(
+        model, PreparedExecution.NumericalWorking(model), components,
+        model.numBoolVars, model.numIntVars, model.numRealVars,
+        objective, maximize, operations = operationKinds, factorProjections = factorProjections,
+    )
+}

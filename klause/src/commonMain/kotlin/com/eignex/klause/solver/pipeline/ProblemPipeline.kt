@@ -130,7 +130,11 @@ fun Problem.pipelineRoute(
     routeLinearToTheory: Boolean = false,
     onLpStats: (LpStats) -> Unit,
 ): SourceProblemRoute = sharedPipelineRoute(
-    objective, maximize, boundCancellation, boundCancellation, onLpStats = onLpStats,
+    objective,
+    maximize,
+    boundCancellation,
+    boundCancellation,
+    onLpStats = onLpStats,
 )
 
 /**
@@ -147,7 +151,12 @@ fun Problem.pipelineRoute(
     routeLinearToTheory: Boolean = false,
     onLpStats: ((LpStats) -> Unit)? = null,
 ): SourceProblemRoute = sharedPipelineRoute(
-    objective, maximize, boundCancellation, boundCancellation, providers, onLpStats,
+    objective,
+    maximize,
+    boundCancellation,
+    boundCancellation,
+    providers,
+    onLpStats,
 )
 
 /**
@@ -170,7 +179,12 @@ fun Problem.pipelineRoute(
         ?: FactorProjectionProviders.Default,
     onLpStats: ((LpStats) -> Unit)? = null,
 ): SourceProblemRoute = sharedPipelineRoute(
-    objective, maximize, boundCancellation, preparationCancellation, providers, onLpStats,
+    objective,
+    maximize,
+    boundCancellation,
+    preparationCancellation,
+    providers,
+    onLpStats,
 )
 
 private fun Problem.sharedPipelineRoute(
@@ -192,8 +206,11 @@ private fun Problem.sharedPipelineRoute(
         preparationCancellation,
         boundCancellation,
     )
-    return if (onLpStats == null) SourceSetup.prepare(request).route
-    else SourceSetup.prepare(request, onLpStats).route
+    return if (onLpStats == null) {
+        SourceSetup.prepare(request).route
+    } else {
+        SourceSetup.prepare(request, onLpStats).route
+    }
 }
 
 internal fun Problem.pipelineRoute(
@@ -236,8 +253,15 @@ private fun Problem.pipelineRouteObserved(
     val selection = projectionCapture ?: providers.prepare(this)
     if (!routeLinearToTheory && nativeFiniteSource(selection, preparationCancellation)) {
         onLpStats?.invoke(LpStatsSink(LpRoute.STANDALONE).snapshot())
-        val prepared = prepareExecutionPlan(this, objective, maximize, true, providers, selection,
-            preparationCancellation)
+        val prepared = prepareExecutionPlan(
+            this,
+            objective,
+            maximize,
+            true,
+            providers,
+            selection,
+            preparationCancellation,
+        )
         return if (prepared.decline == PreparedPlanDecline.RESOURCE) {
             SourceProblemRoute.UnsupportedOpen(null, this, prepared)
         } else {
@@ -273,9 +297,11 @@ private fun Problem.pipelineRouteObserved(
     val preparationStop = if (stopped) Cancellation { true } or preparationCancellation else preparationCancellation
     val nativeFiniteAfterBounds = !routeLinearToTheory &&
         routed.nativeFiniteSource(projections, preparationStop)
-    val finiteCompletion = nativeFiniteAfterBounds || (finiteIntegerRanges &&
+    val finiteCompletion = nativeFiniteAfterBounds || (
+        finiteIntegerRanges &&
         objective?.realCoefficientValues?.any { it != 0.0 } != true &&
-        routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections))
+        routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
+    )
     val arithmeticStop = if (routed.requiresPolynomialCompletion(projections, preferFinite = finiteCompletion)) {
         polynomialCancellation
     } else {
@@ -309,7 +335,7 @@ private fun Problem.pipelineRouteObserved(
             NativeSourceExecution.IntegerPolynomial(NonlinearIntegerTheoryRequest(execution.source, arithmetic)),
         )
 
-        is PreparedExecution.Transcendental, is PreparedExecution.Numerical ->
+        is PreparedExecution.Transcendental, is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking ->
             error("factor source requires polynomial execution")
     }
     val arithmeticRoute = arithmeticExecution.ownership.theoryPipeline

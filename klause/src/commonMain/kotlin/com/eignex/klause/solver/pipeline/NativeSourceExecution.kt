@@ -21,8 +21,12 @@ internal fun prepareFactorQuadratic(
     } else {
         when (val result = source.closeOpenBounds(request.boundCancellation or stop)) {
             // A typed quadratic result requires its producing engine's completion certificate.
-            OpenPresolveResult.Refuted -> if (request.requiresQuadraticCompletion) source
-                else return SourceProblemRoute.Refuted
+            OpenPresolveResult.Refuted -> if (request.requiresQuadraticCompletion) {
+                source
+            } else {
+                return SourceProblemRoute.Refuted
+            }
+
             is OpenPresolveResult.Tightened -> result.spec
         }
     }
@@ -39,9 +43,11 @@ internal fun prepareFactorQuadratic(
     if (stop()) return SourceProblemRoute.NativeFormula(null)
     val native = when (val execution = plan.execution) {
         is PreparedExecution.Polynomial -> NativeSourceExecution.Polynomial(plan.polynomialRequest())
+
         is PreparedExecution.NonlinearInteger -> NativeSourceExecution.IntegerPolynomial(
             NonlinearIntegerTheoryRequest(execution.source, plan),
         )
+
         else -> null
     }
     if (native == null) {
@@ -97,14 +103,8 @@ internal fun executeNativeSource(
             SourceExecutionResult.Numerical(
                 invocation,
                 publication.execute {
-                native.request.solve(
-                    controls,
-                    complete = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                    onIncumbent = { sample, value ->
-                        publication.accepted(sample, com.eignex.klause.solver.evidence.SourceValue.Rational(value))
-                    },
-                )
-            }
+                    native.request.solve(controls, engine, request.cores, native.preparedPlan, publication)
+                },
             )
         }
 

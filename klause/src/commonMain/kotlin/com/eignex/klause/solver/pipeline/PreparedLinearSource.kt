@@ -43,9 +43,11 @@ internal fun prepareLinearSource(
         val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
         if (finite is SourceProblemRoute.Finite && finite.problem.requiresExactObjectiveRoute(objective, stop)) {
             SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(native, view.numericalPlan(objective)))
-        } else finite ?: SourceProblemRoute.NativeFormula(
+        } else {
+            finite ?: SourceProblemRoute.NativeFormula(
             NativeSourceExecution.Numerical(native, view.numericalPlan(objective)),
         )
+        }
     } else {
         SourceProblemRoute.NativeFormula(
             NativeSourceExecution.Numerical(native, view.numericalPlan(objective)),
@@ -65,18 +67,18 @@ private fun PreparedLinearSource.bind(route: SourceProblemRoute): SourceProblemR
             val original = route.request
             SourceProblemRoute.OpenTheory(
                 OpenTheoryRequest(
-                original.model, original.objective, original.maximize, original.componentPlan,
-                original.presolveConfig, original.solutionSetSensitive, original.presolveCancellation,
-                original.presolveBudget, bound(original.preparedPlan), original.linearContext,
-            )
+                    original.model, original.objective, original.maximize, original.componentPlan,
+                    original.presolveConfig, original.solutionSetSensitive, original.presolveCancellation,
+                    original.presolveBudget, bound(original.preparedPlan), original.linearContext,
+                ),
             )
         }
 
         is SourceProblemRoute.PolynomialTheory -> route.copy(
             request = PolynomialTheoryRequest(
-            route.request.problem,
-            bound(route.preparedPlan),
-        )
+                route.request.problem,
+                bound(route.preparedPlan),
+            ),
         )
 
         is SourceProblemRoute.UnsupportedOpen -> route.copy(preparedPlan = bound(route.preparedPlan))
@@ -97,21 +99,22 @@ private fun LinearSourceView.numericalPlan(objective: LinearObjective?): Prepare
         ),
     )
     val heuristic = ComponentStrategySupport(
-        ProcedureCompleteness.WITNESS_SEARCH,
-        setOf(ExecutionClaimAuthority.WITNESS),
+        ProcedureCompleteness.UNAVAILABLE,
+        emptySet(),
+        listOf(ExecutionDecline(ExecutionDeclineCause.HEURISTIC_PROJECTION, "linear-numerical")),
     )
     return PreparedSourcePlan(
         source,
         PreparedExecution.Numerical(source, model),
         listOf(
             ExecutionComponentDescriptor(
-            "linear-numerical",
-            ComponentResponsibility.COMPLETION,
-            model.factors.indices.toList(),
-            (0 until model.numIntVars).toList(),
-            (0 until model.numRealVars).toList(),
-            execution = ComponentExecutionContract(complete, heuristic),
-        )
+                "linear-numerical",
+                ComponentResponsibility.COMPLETION,
+                model.factors.indices.toList(),
+                (0 until model.numIntVars).toList(),
+                (0 until model.numRealVars).toList(),
+                execution = ComponentExecutionContract(complete, heuristic),
+            ),
         ),
         0,
         model.numIntVars,

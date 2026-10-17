@@ -3,6 +3,13 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.ir.LinearSourceObjective
+import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceTerm
+import com.eignex.klause.ir.LinearSourceVariable
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -313,4 +320,52 @@ class NumericalLinearRequestTest {
         assertNull(result.terminal)
         assertEquals(TerminationReason.BudgetExhausted, result.reason)
     }
+
+    @Test
+    fun `a numerical mixed pool should retain original maximization bounds`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("i", true, upper = SemanticRational.ofLong(2))),
+            emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)), sense = ObjectiveSense.MAXIMIZE),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+            maximize = true,
+        ))
+
+        val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(
+            SourceExecutionRequest(invocation, ExecutionOptions()),
+        ))
+
+        val optimum = assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), optimum.value)
+        assertEquals(BigFraction.ofLong(2), assertNotNull(result.linearSource?.incumbent).objective)
+        assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+        assertSame(source, result.invocation.preparedPlan?.originalSource)
+    }
+
+
+    @Test
+    fun `legacy witness only execution should retain exact decimal source values`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0\n" +
+                " M1 'MARKER' 'INTEND'\n X COST 0.1 R 0.2\nRHS\n RHS R 0.2\n" +
+                "BOUNDS\n FR B I\n FR B X\nENDATA\n",
+        ).toExactSourceProblem()
+        val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
+
+        val result = request.solve(complete = false)
+
+        val point = assertNotNull(result.incumbent)
+        val original = compiled.sourceWitness(compiled.columns.map { column ->
+            if (column.real) assertNotNull(point.exactReals)[column.id]
+            else BigFraction.ofLong(point.intValue(column.id))
+        })
+        assertEquals(BigFraction.ofLong(10).reciprocal(), original.objective)
+        assertEquals(original.objective * BigFraction.ofLong(compiled.objectiveScale), result.value)
+        assertTrue(original.exact)
+        assertNull(result.terminal)
+        assertNull(result.bound)
+    }
+
 }

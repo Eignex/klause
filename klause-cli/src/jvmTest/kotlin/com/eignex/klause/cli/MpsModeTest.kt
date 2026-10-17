@@ -973,7 +973,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `open continuous incumbents should report the source objective without an optimum claim`() {
+    fun `open numerical local search should decline before publishing a source point`() {
         val mps = File.createTempFile("mpsopenincumbent", ".mps").apply {
             writeText(
                 "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n" +
@@ -1000,14 +1000,9 @@ class MpsModeTest {
             )
         }
 
-        val values = text.lines().single { it.startsWith("v ") }.removePrefix("v ").split(' ')
-            .associate { coordinate -> coordinate.split('=').let { it[0] to it[1].toDouble() } }
-        val integer = values.getValue("I")
-        val real = values.getValue("X")
-        val objective = text.lines().last { it.startsWith("o ") }.removePrefix("o ").toDouble()
-        assertTrue(integer >= 3.0 && integer % 1.0 == 0.0 && real >= integer, text)
-        assertEquals(real * 0.5, objective)
-        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertTrue("s UNKNOWN" in text.lines(), text)
+        assertFalse(text.lines().any { it.startsWith("v ") }, text)
+        assertFalse(text.lines().any { it.startsWith("o ") }, text)
         assertFalse("s OPTIMUM FOUND" in text.lines(), text)
     }
 
@@ -1235,7 +1230,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `heuristic engines should retain decimal incumbent strength`() {
+    fun `unavailable open numerical heuristics should not publish decimal incumbents`() {
         val mps = File.createTempFile("mpssourceheuristic", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0\n" +
@@ -1257,8 +1252,9 @@ class MpsModeTest {
                 )
             }
 
-            assertTrue("s SATISFIABLE" in text.lines(), text)
-            assertTrue("o 0.1" in text.lines(), text)
+            assertTrue("s UNKNOWN" in text.lines(), text)
+            assertFalse(text.lines().any { it.startsWith("v ") }, text)
+            assertFalse(text.lines().any { it.startsWith("o ") }, text)
             assertFalse("s OPTIMUM FOUND" in text.lines(), text)
         }
     }

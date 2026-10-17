@@ -2,6 +2,8 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.bool.internals.reifiedDegree
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Term
@@ -23,14 +25,40 @@ import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 import kotlin.math.ceil
 
-internal fun ExactLinear.propagationView(): Propagator = when {
-    variables.reals.isNotEmpty() -> NoPropagator
-    activator != LinearRow.ALWAYS -> WideReifiedLinearPropagator(
-        activator, variables.boolVars, intVars, Array(size) { constants.exactCoeff(it) },
-        IntArray(size) { Term.intVar(ref(it)) }, relation, constants.exactBound,
-    )
-    else -> WideLinearPropagator(intVars, IntArray(size) { Term.intVar(ref(it)) },
-        Array(size) { constants.exactCoeff(it) }, relation, constants.exactBound)
+internal fun ExactLinear.propagationView(): Propagator {
+    if (variables.reals.isNotEmpty()) return NoPropagator
+    val vars = IntArray(size) { Term.intVar(ref(it)) }
+    val integer = (constants as? IntegerConstants)?.takeIf {
+        it.permitsCompactPropagation(activator != LinearRow.ALWAYS)
+    }
+    return when {
+        integer != null && activator == LinearRow.ALWAYS ->
+            LinearPropagator(variables.boolVars, intVars, integer.coeffs, vars, relation, integer.bound)
+        integer != null -> ReifiedLinearPropagator(
+            activator, variables.boolVars, intVars, integer.coeffs, vars, relation, integer.bound,
+        )
+        activator != LinearRow.ALWAYS -> WideReifiedLinearPropagator(
+            activator, variables.boolVars, intVars, Array(size) { constants.exactCoeff(it) },
+            vars, relation, constants.exactBound,
+        )
+        else -> WideLinearPropagator(intVars, vars, Array(size) { constants.exactCoeff(it) },
+            relation, constants.exactBound)
+    }
+}
+
+private fun IntegerConstants.permitsCompactPropagation(reified: Boolean): Boolean {
+    // Endpoint complements can escape Long, and a widened interval cannot certify either endpoint.
+    if (reified && (bound == Long.MIN_VALUE || bound == Long.MAX_VALUE)) return false
+    // This coefficient budget keeps activity and residuals inside signed 128 bits even on full Long domains.
+    var remaining = Long.MAX_VALUE
+    for (index in 0 until coefficients.size) {
+        val coefficient = coeff(index)
+        if (coefficient == Long.MIN_VALUE) return false
+        val magnitude = if (coefficient < 0L) -coefficient else coefficient
+        if (magnitude > remaining) return false
+        remaining -= magnitude
+    }
+    return true
 }
 
 internal fun LinearIndicator.propagationView(): Propagator = if (variables.reals.isNotEmpty()) NoPropagator else
@@ -49,9 +77,15 @@ internal fun LinearIndicator.propagationView(): Propagator = if (variables.reals
         }
     }
 
-internal fun ExactLinear.scoringView(): Invariant = if (variables.reals.isEmpty()) {
-    ExactLinearInvariant(constants, IntArray(size) { Term.intVar(ref(it)) }, relation, activator)
-} else ExactLinearScore(this)
+internal fun ExactLinear.scoringView(domains: Array<IntDomain>? = null): Invariant {
+    if (variables.reals.isNotEmpty()) return ExactLinearScore(this)
+    val vars = IntArray(size) { Term.intVar(ref(it)) }
+    val integer = constants as? IntegerConstants
+    return if (integer != null && domains != null && !needsExactSum(integer, vars, domains)) {
+        if (activator == LinearRow.ALWAYS) LinearInvariant(integer.coeffs, vars, relation, integer.bound)
+        else ReifiedLinearInvariant(activator, integer.coeffs, vars, relation, integer.bound)
+    } else ExactLinearInvariant(constants, vars, relation, activator)
+}
 
 internal fun LinearIndicator.scoringView(): Invariant = ExactLinearScore(row, indicator, whenOne)
 

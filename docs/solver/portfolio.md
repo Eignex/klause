@@ -202,6 +202,16 @@ diagnostic and numerical-execution configuration. Exact MPS invocations supply n
 tolerance callback; a floating completion cannot acquire exact witness or proof
 authority through sharing.
 
+Open numerical fallback admits complete numerical workers for BACKTRACK and MIXED.
+Each retained worker owns its mutable numerical traversal and uses the captured
+working-model proof context. Its full typed terminal and bounds pass the existing
+runtime invocation and source-evidence checks before the pool can finish. FIXED
+retains the direct traversal. No worker can fall back to an arithmetic theory or
+materialize a finite domain for an open numerical declaration. Original source
+rows, coordinates and objective qualification stay on the canonical source plan;
+a private working plan binds only the numerical worker's scope and objective.
+Unavailable LS and ALNS requests return Unsupported before allocating a worker.
+
 Workers that need arithmetic completion share the same source scope and require
 that check before publishing a witness. A neighbourhood refutation or failed
 candidate check cannot establish global infeasibility. Complete workers retain

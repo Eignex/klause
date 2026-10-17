@@ -484,6 +484,7 @@ internal class ExactLinearInvariant(
 internal fun needsExactSum(constants: IntegralConstants, vars: IntArray, domains: Array<IntDomain>): Boolean {
     if (constants !is IntegerConstants) return true
     var total = abs(constants.bound.toDouble())
+    if (total >= EXACT_SUM_LIMIT) return true
     for (i in vars.indices) {
         val d = domains[vars[i]]
         val reach = maxOf(abs(d.min.toDouble()), abs(d.max.toDouble()))
