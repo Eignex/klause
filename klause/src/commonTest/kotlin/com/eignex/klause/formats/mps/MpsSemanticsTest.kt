@@ -315,12 +315,14 @@ class MpsSemanticsTest {
 
         for ((policy, accepted) in cases) {
             val compiled = source.toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = policy))
-            assertEquals(accepted, compiled.withinTolerance(LongArray(0), doubleArrayOf(99.5)), "$policy")
+            val values = listOf(assertNotNull(BigFraction.ofDouble(99.5)))
             assertEquals(policy, compiled.semantics.effective.feasibilityTolerance)
             if (accepted) {
-                val witness = compiled.sourceWitness(listOf(BigFraction.of(bigIntOf(199), bigIntOf(2))))
-                assertFalse(witness.exact)
+                val witness = compiled.sourceWitness(values)
+                assertFalse(witness.exact, "$policy")
                 assertEquals("199/20", witness.objective.toString())
+            } else {
+                assertFailsWith<MpsLoweringException>("$policy") { compiled.sourceWitness(values) }
             }
         }
     }
@@ -346,7 +348,8 @@ class MpsSemanticsTest {
 
         assertTrue(compiled.sourceExact)
         assertFalse(witness.exact)
-        assertTrue(compiled.withinTolerance(LongArray(0), doubleArrayOf(value.toDouble())))
+        assertFalse(compiled.sourceWitness(listOf(assertNotNull(BigFraction.ofDouble(value.toDouble())))).exact)
+        assertTrue(compiled.withinTolerance(longArrayOf(1), DoubleArray(0)))
     }
 
     @Test
