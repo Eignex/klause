@@ -511,11 +511,10 @@ class CliModePublicationTest {
             writeText("(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (minimize x)")
             deleteOnExit()
         }
-        val pipeline = assertIs<SolvablePipeline.NativeSource>(
-            SmtLibMode.newSession().load(source.absolutePath, CommonOptions().apply { engine = "cp" }).pipeline,
-        )
+        val solvable = SmtLibMode.newSession().load(source.absolutePath, CommonOptions().apply { engine = "cp" })
+        val pipeline = assertIs<SolvablePipeline.PolynomialTheory>(solvable.pipeline)
         val execution = assertIs<SourceExecutionResult.Quadratic>(
-            SourceSetup.execute(SourceExecutionRequest(pipeline.invocation)),
+            SourceSetup.execute(SourceExecutionRequest(assertNotNull(solvable.sourceInvocation))),
         )
         val result = execution.result.result
         val point = assertIs<QuadraticOptimizationResult.Optimal>(result).incumbent
