@@ -89,18 +89,20 @@ internal object MiniZincMode : CliMode {
             }
             val start = TimeSource.Monotonic.markNow()
             var lpStats = LpStats()
-            val invocation = program.prepareSourceExecution(
-                SourceSetupRequest(
-                    program.sourceAttachment(),
-                    operation,
-                    common.resolvedEngine(),
-                    objective = sourceObjective,
-                    maximize = maximize,
-                    cancellation = common.routingPreparationCancellation(),
-                    boundCancellation = common.routingCancellation(),
-                ),
-                onLpStats = { lpStats = it },
-            )
+            val invocation = common.routingPreparationCancellation().use { stop ->
+                program.prepareSourceExecution(
+                    SourceSetupRequest(
+                        program.sourceAttachment(),
+                        operation,
+                        common.resolvedEngine(),
+                        objective = sourceObjective,
+                        maximize = maximize,
+                        cancellation = stop,
+                        boundCancellation = common.routingCancellation(),
+                    ),
+                    onLpStats = { lpStats = it },
+                )
+            }
             val elapsed = start.elapsedNow().inWholeMilliseconds
             common.logRoute(invocation.route, elapsed)
             floatApproximation = invocation.floatProjection != null

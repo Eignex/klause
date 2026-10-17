@@ -31,6 +31,7 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.time.Duration.Companion.milliseconds
 
 /*
@@ -55,11 +56,22 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
 }
 
 // Required admission observes the containing stop while retaining the shared routing work ledger.
-internal fun CommonOptions.routingPreparationCancellation(): Cancellation {
-    val meter = routingCancellation().workMeter()
-    return object : Cancellation {
-        override fun isCancelled(): Boolean = deadlineAtMs?.let { nowMillis() >= it } == true
-        override fun workMeter() = meter
+internal fun CommonOptions.routingPreparationCancellation(): RoutingPreparationScope = RoutingPreparationScope(
+    { deadlineAtMs?.let { nowMillis() >= it } == true },
+    routingCancellation().workMeter(),
+)
+
+internal class RoutingPreparationScope(
+    private val stopped: () -> Boolean,
+    private var meter: WorkMeter?,
+) : Cancellation, AutoCloseable {
+    override fun isCancelled(): Boolean = stopped()
+
+    override fun workMeter(): WorkMeter? = meter
+
+    override fun close() {
+        // Retained source invocations keep the containing stop, not the preparation ledger.
+        meter = null
     }
 }
 

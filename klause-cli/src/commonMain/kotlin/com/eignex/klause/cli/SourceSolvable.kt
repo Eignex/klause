@@ -41,22 +41,24 @@ internal fun sourceSolvable(
     }
     val start = TimeSource.Monotonic.markNow()
     var lpStats = LpStats()
-    val invocation = SourceSetup.prepare(
-        SourceSetupRequest(
-            if (definedVars.isEmpty() && boolFolds.isEmpty()) {
-                SourceAttachment(problem, definitionHints, searchHints)
-            } else {
-                SourceAttachment(problem, definedVars, boolFolds, definitionHints, searchHints)
-            },
-            operation,
-            common.resolvedEngine(),
-            objective = if (maximize) minimizedObjective?.negated() else minimizedObjective,
-            maximize = maximize,
-            cancellation = common.routingPreparationCancellation(),
-            boundCancellation = common.routingCancellation(),
-        ),
-        onLpStats = { lpStats = it },
-    )
+    val invocation = common.routingPreparationCancellation().use { stop ->
+        SourceSetup.prepare(
+            SourceSetupRequest(
+                if (definedVars.isEmpty() && boolFolds.isEmpty()) {
+                    SourceAttachment(problem, definitionHints, searchHints)
+                } else {
+                    SourceAttachment(problem, definedVars, boolFolds, definitionHints, searchHints)
+                },
+                operation,
+                common.resolvedEngine(),
+                objective = if (maximize) minimizedObjective?.negated() else minimizedObjective,
+                maximize = maximize,
+                cancellation = stop,
+                boundCancellation = common.routingCancellation(),
+            ),
+            onLpStats = { lpStats = it },
+        )
+    }
     val elapsed = start.elapsedNow().inWholeMilliseconds
     common.logRoute(invocation.route, elapsed)
     return preparedSourceSolvable(
@@ -79,34 +81,35 @@ internal fun attachedSourceSolvable(
     renderFinite: (Sample) -> String = { error("source requires its exact coordinate renderer") },
 ): Solvable {
     val start = TimeSource.Monotonic.markNow()
-    val stop = common.routingPreparationCancellation()
-    val request = if (quadraticObjective != null) {
-        SourceSetupRequest(
-            source,
-            common.resolvedEngine(),
-            quadraticObjective,
-            sense,
-            cancellation = stop,
-            boundCancellation = common.routingCancellation(),
-        )
-    } else {
-        val operation = when {
-            objective != null || source.embeddedObjectiveSense != null -> ExecutionOperation.OPTIMIZE
-            common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
-            else -> ExecutionOperation.SATISFY
-        }
-        SourceSetupRequest(
-            source,
-            operation,
-            common.resolvedEngine(),
-            objective = objective,
-            maximize = sense == ObjectiveSense.MAXIMIZE,
-            cancellation = stop,
-            boundCancellation = common.routingCancellation(),
-        )
-    }
     var lpStats = LpStats()
-    val invocation = SourceSetup.prepare(request) { lpStats = it }
+    val invocation = common.routingPreparationCancellation().use { stop ->
+        val request = if (quadraticObjective != null) {
+            SourceSetupRequest(
+                source,
+                common.resolvedEngine(),
+                quadraticObjective,
+                sense,
+                cancellation = stop,
+                boundCancellation = common.routingCancellation(),
+            )
+        } else {
+            val operation = when {
+                objective != null || source.embeddedObjectiveSense != null -> ExecutionOperation.OPTIMIZE
+                common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
+                else -> ExecutionOperation.SATISFY
+            }
+            SourceSetupRequest(
+                source,
+                operation,
+                common.resolvedEngine(),
+                objective = objective,
+                maximize = sense == ObjectiveSense.MAXIMIZE,
+                cancellation = stop,
+                boundCancellation = common.routingCancellation(),
+            )
+        }
+        SourceSetup.prepare(request) { lpStats = it }
+    }
     val elapsed = start.elapsedNow().inWholeMilliseconds
     common.logRoute(invocation.route, elapsed)
     if (invocation.route is SourceProblemRoute.Finite) {
@@ -143,14 +146,16 @@ internal fun linearSourceSolvable(
         common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
         else -> ExecutionOperation.SATISFY
     }
-    val request = SourceSetupRequest(
-        source, operation, common.resolvedEngine(),
-        maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
-        cancellation = common.routingPreparationCancellation(),
-        boundCancellation = common.routingCancellation(),
-    )
     var lpStats = LpStats()
-    val invocation = SourceSetup.prepare(request, onLpStats = { lpStats = it })
+    val invocation = common.routingPreparationCancellation().use { stop ->
+        val request = SourceSetupRequest(
+            source, operation, common.resolvedEngine(),
+            maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
+            cancellation = stop,
+            boundCancellation = common.routingCancellation(),
+        )
+        SourceSetup.prepare(request, onLpStats = { lpStats = it })
+    }
     val elapsed = start.elapsedNow().inWholeMilliseconds
     common.logRoute(invocation.route, elapsed)
     return Solvable(

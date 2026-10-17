@@ -111,7 +111,11 @@ preparation token for initial admission, admission after partial bound closure a
 finite ownership selection. Legacy single-token overloads apply that token to both
 scopes. CLI required admission retains the shared routing meter while observing
 only the containing stop; required work remains charged after the optional slice
-ends. Optional probe exhaustion neither erases complete linear admission nor
+ends. Its preparation scope releases that meter when source setup completes,
+declines or throws. Retained source invocations keep the live containing stop;
+later native work uses its invocation and worker resources rather than the completed
+routing ledger. Library-supplied invocation meters retain their lifetime through
+execution. Optional probe exhaustion neither erases complete linear admission nor
 turns an uncovered source into a supported fragment.
 
 ## Phase allowance and telemetry
