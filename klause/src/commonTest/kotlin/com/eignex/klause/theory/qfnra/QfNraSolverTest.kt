@@ -20,6 +20,49 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `acyclic graphs reconstruct reverse coordinate dependencies`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val equations = (1..8).joinToString(" ") { "(assert (= x$it (+ (* x0 x${it + 1}) 1)))" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations $equations (assert (= (+ x9 1) 2)) " +
+                "(assert (>= x0 1)) (assert (<= x0 1)) (assert (> x1 0))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        for (id in 1..8) {
+            val product = algebraic.multiply(witness.realValue(0), witness.realValue(id + 1))
+            assertEquals(0, algebraic.compare(witness.realValue(id),
+                algebraic.add(product, algebraic.rational(BigFraction.ONE))))
+        }
+        assertEquals(BigFraction.ONE, witness.realValue(9).rational)
+    }
+
+    @Test
+    fun `cyclic graph candidates remain enforced constraints`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= x1 (* x0 x2))) (assert (= x2 (+ (* x0 x1) 1)))",
+        )
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(), PolynomialCondition())
+        var cyclic = 0
+        query.graphPlanObserver = { cyclic = maxOf(cyclic, it.cyclicCoordinates) }
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(2, cyclic)
+        assertEquals(0, algebraic.compare(witness.realValue(1),
+            algebraic.multiply(witness.realValue(0), witness.realValue(2))))
+        assertEquals(0, algebraic.compare(witness.realValue(2),
+            algebraic.add(algebraic.multiply(witness.realValue(0), witness.realValue(1)),
+                algebraic.rational(BigFraction.ONE))))
+    }
+
+    @Test
     fun `shared triangular graphs reconstruct within the native allowance`() {
         val declarations = (0..64).joinToString(" ") { "(declare-const x$it Real)" }
         val equations = (2..64).joinToString(" ") { "(assert (= x$it (+ x${it - 1} 1)))" }

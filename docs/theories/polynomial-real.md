@@ -748,6 +748,17 @@ and evaluates each wave from smaller coordinates to larger ones. A single candid
 uses the ordinary graph-pivot policy. Interrupted or refused closure publishes no
 partial reduced region.
 
+Without a multi-coordinate triangular wave, reduction selects constant-coefficient
+graph candidates by fill, coefficient size and coordinate preference. Each equation
+and defined coordinate has at most one selected definition. Iterative strongly
+connected component analysis excludes cyclic definitions from the bulk plan; their
+equations remain constraints. The acyclic remainder supplies a dependency order
+for the same private substitution cache and exact reconstruction, independent of
+coordinate numbering. A plan with fewer than two acyclic definitions uses ordinary
+single-pivot reduction. A default-null plan observer can retain candidate, cyclic
+and selected-coordinate metadata after planning. Its observations certify neither
+completed substitution nor a verdict.
+
 Projection records a permutation of all original coordinates and any further total graph
 sections. Dependencies in those sections occupy earlier lifting levels. Prefix literal checks
 use those levels rather than source coordinate IDs. Fixed coordinates retain their

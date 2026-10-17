@@ -2768,6 +2768,11 @@ separate from the number of equations. Coordinate-occurrence histograms distingu
 shared definitions from independent leaves. These counts are read after stopping
 and do not select pivots or establish eliminability of a whole family. Direct gate
 inspection reports the same metadata on its separately normalized input atoms.
+`lastGraphPlan` reports the latest completed graph plan's candidate, cyclic and
+selected-coordinate counts and whether it used triangular ordering. Cyclic
+definitions remain in the residual constraints. A retained plan does not establish
+that substitution completed; reduced-region and projection observations report
+later phases separately.
 
 ### Table profiling
 

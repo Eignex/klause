@@ -49,6 +49,7 @@ internal class PolynomialAffineReduction private constructor(
             realCount: Int,
             arithmetic: PolynomialArithmetic,
             onFamily: ((List<PolynomialAtom>) -> Unit)? = null,
+            onPlan: ((PolynomialGraphPlan) -> Unit)? = null,
             onGraph: (() -> Unit)? = null,
         ): Iterator<PolynomialAffineReduction?> = sequence {
             var current = region.atoms.map { (index, truth) ->
@@ -69,9 +70,13 @@ internal class PolynomialAffineReduction private constructor(
                 }
                 onFamily?.invoke(current)
                 val triangular = triangularGraphSections(current, arithmetic)
-                if (triangular.size > 1) {
-                    val removed = triangular.map { arithmetic.step(); it.atom }.toSet()
-                    val substitution = PolynomialGraphSubstitution(triangular, arithmetic)
+                val plan = if (triangular.size > 1) PolynomialGraphPlan(triangular, triangular.size, 0, true)
+                else acyclicGraphPlan(current, arithmetic)
+                onPlan?.invoke(plan)
+                val graphs = plan.definitions
+                if (graphs.size > 1) {
+                    val removed = graphs.map { arithmetic.step(); it.atom }.toSet()
+                    val substitution = PolynomialGraphSubstitution(graphs, arithmetic)
                     val rewritten = ArrayList<PolynomialAtom>()
                     for ((index, atom) in current.withIndex()) {
                         arithmetic.step()
@@ -86,7 +91,7 @@ internal class PolynomialAffineReduction private constructor(
                         rewritten.add(PolynomialAtom(polynomial, atom.relation))
                         yield(null)
                     }
-                    for (graph in triangular) {
+                    for (graph in graphs) {
                         arithmetic.step()
                         fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
                         onGraph?.invoke()

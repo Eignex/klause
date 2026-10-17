@@ -277,7 +277,7 @@ internal object PolynomialPhaseProfile {
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
                 nativeWork, charges - preparationCharges, preparationCharges, stop,
                 observation.subresultants(), observation.division(), observation.projection(),
-                observation.reducedRegion(), observation.graphFamily())
+                observation.reducedRegion(), observation.graphFamily(), observation.graphPlan())
         }
     }
 }
@@ -348,7 +348,7 @@ private class ObservedPipelineQuery(
 
     fun snapshot(): PipelineQueryPhase = PipelineQueryPhase(summarize(),
         arithmetic.subresultants(), arithmetic.division(), arithmetic.projection(), arithmetic.reducedRegion(),
-        arithmetic.graphFamily())
+        arithmetic.graphFamily(), arithmetic.graphPlan())
 }
 
 private class ArithmeticObservation(arithmetic: Any, query: Any) {
@@ -367,6 +367,7 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
     private var requiredEquation = false
     private var reducedAtoms: List<Any>? = null
     private var graphAtoms: List<Any>? = null
+    private var plan: Any? = null
 
     init {
         val subresultants: (Any, Any, Int, Int?) -> Unit = { a, b, coordinate, minor ->
@@ -394,6 +395,8 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
         query.javaClass.getMethod("setReducedRegionObserver", Function1::class.java).invoke(query, reducedRegion)
         val graphFamily: (List<Any>) -> Unit = { graphAtoms = it }
         query.javaClass.getMethod("setGraphFamilyObserver", Function1::class.java).invoke(query, graphFamily)
+        val graphPlan: (Any) -> Unit = { plan = it }
+        query.javaClass.getMethod("setGraphPlanObserver", Function1::class.java).invoke(query, graphPlan)
     }
 
     fun subresultants(): PhaseSubresultants? {
@@ -459,6 +462,14 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
     private fun termCount(value: Any): Int = (terms.invoke(value) as List<*>).size
 
     fun graphFamily(): PhaseGraphFamily? = graphAtoms?.let(::graphFamilyShape)
+
+    fun graphPlan(): PhaseGraphPlan? {
+        val value = plan ?: return null
+        return PhaseGraphPlan(value.javaClass.getMethod("getTriangular").invoke(value) as Boolean,
+            value.javaClass.getMethod("getCandidates").invoke(value) as Int,
+            value.javaClass.getMethod("getCyclicCoordinates").invoke(value) as Int,
+            (value.javaClass.getMethod("getDefinitions").invoke(value) as List<*>).size)
+    }
 
     fun reducedRegion(): PhaseReducedRegion? {
         val atoms = reducedAtoms ?: return null
@@ -572,6 +583,7 @@ internal data class PhaseTrace(
     val lastProjection: PhaseProjection? = null,
     val lastReducedRegion: PhaseReducedRegion? = null,
     val lastGraphFamily: PhaseGraphFamily? = null,
+    val lastGraphPlan: PhaseGraphPlan? = null,
 )
 
 @Serializable
@@ -648,6 +660,7 @@ internal data class PipelineQueryPhase(
     val lastProjection: PhaseProjection?,
     val lastReducedRegion: PhaseReducedRegion?,
     val lastGraphFamily: PhaseGraphFamily?,
+    val lastGraphPlan: PhaseGraphPlan?,
 )
 
 @Serializable
@@ -673,4 +686,12 @@ internal data class PhaseGraphFamily(
     val triangularGraphEquations: Int,
     val triangularGraphCoordinates: Int,
     val coordinateOccurrenceHistogram: Map<Int, Int>,
+)
+
+@Serializable
+internal data class PhaseGraphPlan(
+    val triangular: Boolean,
+    val candidates: Int,
+    val cyclicCoordinates: Int,
+    val selectedCoordinates: Int,
 )
