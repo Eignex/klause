@@ -354,8 +354,16 @@ class ExactLiraSearchComponent private constructor(
                 observePointHintAdmission("POINT_HINT_ROW_STOPPED")
                 return null
             }
-            if (prepared.row.activator == LinearRow.ALWAYS) continue
-            if (prepared.row.activator !in bools.indices) {
+            val variable = if (prepared.row.activator == LinearRow.ALWAYS) {
+                if (prepared.guardLiteral < 0) continue
+                stop.charge(1L)
+                if (stop()) {
+                    observePointHintAdmission("POINT_HINT_ROW_STOPPED")
+                    return null
+                }
+                Lit.variable(prepared.guardLiteral)
+            } else prepared.row.activator
+            if (variable !in bools.indices) {
                 observePointHintAdmission("POINT_HINT_ACTIVATOR_DECLINED")
                 return null
             }
@@ -365,7 +373,7 @@ class ExactLiraSearchComponent private constructor(
                 return null
             }
             rows += prepared
-            variables += prepared.row.activator
+            variables += variable
         }
         stop.charge(rows.size.toLong() + variables.size + 1L)
         if (stop()) {
@@ -389,10 +397,19 @@ class ExactLiraSearchComponent private constructor(
                 releasePartialPointHints()
                 null
             } else {
-                val preference = when (pointHintValues?.getOrNull(variable)) {
+                val encoded = pointHintValues?.getOrNull(variable)
+                val preference = when (encoded?.and(POINT_HINT_VALUE_MASK)) {
                     TRUE -> true
                     FALSE -> false
                     else -> null
+                }
+                if (encoded != null && encoded >= 0 && (encoded and POINT_HINT_GUARDED) != 0) {
+                    val stage = when {
+                        preference == null -> "POINT_HINT_GUARDED_DECLINED"
+                        (encoded and POINT_HINT_PRIMITIVE) == 0 -> "POINT_HINT_GUARDED_PREFERRED"
+                        else -> "POINT_HINT_GUARDED_PRIMITIVE_AGREED"
+                    }
+                    observeCompleteStage(stage)
                 }
                 observeCompleteStage(if (preference == null) "POINT_HINT_NO_PREFERENCE" else "POINT_HINT_PREFERRED")
                 preference
@@ -432,22 +449,34 @@ class ExactLiraSearchComponent private constructor(
         for (prepared in rows) {
             operationStop.charge(1)
             if (operationStop() || pointHintStop()) return
-            val variable = prepared.row.activator
-            if (values[variable] == DECLINED_HINT) continue
-            val comparison = if (prepared.disjunction) null else prepared.form.hintComparison(
+            val guard = prepared.guardLiteral
+            if (guard >= 0) {
+                operationStop.charge(1L)
+                if (operationStop() || pointHintStop()) return
+            }
+            val variable = if (guard >= 0) Lit.variable(guard) else prepared.row.activator
+            val current = values[variable]
+            val flags = (if (current == UNASSIGNED) 0 else current and POINT_HINT_MEMBER_MASK) or
+                (if (guard >= 0) POINT_HINT_GUARDED else POINT_HINT_PRIMITIVE)
+            if (current != UNASSIGNED && (current and POINT_HINT_VALUE_MASK) == DECLINED_HINT) {
+                values[variable] = DECLINED_HINT or flags
+                continue
+            }
+            val comparison = if (prepared.disjunction && guard < 0) null else prepared.form.hintComparison(
                 { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
                 ::hintScalar, ::hintPreflight,
             )
-            val preference = comparison?.let { hintTruth(it, point) }
+            val truth = comparison?.let { hintTruth(it, point) }
+            val preference = if (guard >= 0) truth?.let { it == Lit.isPositive(guard) } else truth
             if (preference == null) {
-                values[variable] = DECLINED_HINT
+                values[variable] = DECLINED_HINT or flags
                 continue
             }
             val value = if (preference) TRUE else FALSE
-            if (values[variable] != UNASSIGNED && values[variable] != value) {
-                values[variable] = DECLINED_HINT
+            if (current != UNASSIGNED && (current and POINT_HINT_VALUE_MASK) != value) {
+                values[variable] = DECLINED_HINT or flags
             } else {
-                values[variable] = value
+                values[variable] = value or flags
             }
         }
         if (operationStop() || pointHintStop()) return
@@ -1775,7 +1804,11 @@ private fun LinearForm?.guardedEqualityLiteral(rowIndex: Int, booleanVariables: 
 }
 
 private const val UNASSIGNED = -1
-private const val DECLINED_HINT = -2
+private const val DECLINED_HINT = 2
+private const val POINT_HINT_VALUE_MASK = 3
+private const val POINT_HINT_GUARDED = 4
+private const val POINT_HINT_PRIMITIVE = 8
+private const val POINT_HINT_MEMBER_MASK = 12
 private const val MAX_POINT_HINT_ENTRIES = 65_536
 private const val MAX_POINT_HINT_BITS = 4096
 private const val FALSE = 0

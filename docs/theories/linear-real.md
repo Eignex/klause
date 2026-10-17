@@ -65,6 +65,25 @@ raw incidence progress and private ledger debit. Unobserved fields remain absent
 An interrupted prefix supplies no semantic preference and is not a full literal count.
 These guesses only order exhaustive Boolean splits; they supply no values, facts,
 conflicts or source verdict.
+
+Qualified guarded real equalities also contribute to their signed source Boolean's
+preference group, using the same captured exact point. A satisfied equality prefers
+its active guard polarity; a failed equality prefers the other polarity. Every
+activated primitive and guarded member for that Boolean must agree. Both satisfied
+choice arms, neither satisfied arm, unsupported evaluation or disagreement decline
+the group rather than overriding an existing primitive preference. This changes only
+the polarity of an already selected Boolean; source-order selection and the existing
+source-clause adapter remain unchanged.
+
+Guarded rows join the producer during its existing registration visit, with each row
+and term charged against the same entry limit. Guard membership/evaluation work uses
+the current tokens and scalar policy. Truth, decline and primitive/guard provenance
+share the existing per-Boolean integer slot, adding no table, index or point buffer.
+Callback observations distinguish a live guard-only preference, primitive/guard
+agreement and a declined group containing a guard. They do not establish a changed
+polarity, source feasibility or recovery. An unavailable or stale point supplies no
+guard preference, and complete registration/capture remains transactional.
+
 With the default null `openHintFlips` allowance, one linear completion owner can use
 direct primitive preferences from its existing completed point, including for
 integer-only sources. Integer columns retain their complete integrality and source

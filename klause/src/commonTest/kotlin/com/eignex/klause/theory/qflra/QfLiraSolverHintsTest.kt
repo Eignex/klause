@@ -48,6 +48,202 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `guarded point preferences should follow the signed source condition without fixing it`() {
+        for (positive in listOf(false, true)) {
+            for (result in listOf(0.0, 1.0)) {
+                val model = Problem(
+                    numBoolVars = 2,
+                    intBounds = openBounds(0),
+                    numRealVars = 3,
+                    realLower = doubleArrayOf(0.0, 1.0, result),
+                    realUpper = doubleArrayOf(0.0, 1.0, result),
+                    factors = arrayOf(RealChoice(Lit.make(0, positive), 2, 0, 1)),
+                )
+                val stats = SmtStatsSink()
+                ExactLiraSearchComponent(model).use { component ->
+                    component.observeWith(stats)
+                    val registered = assertNotNull(component.partialPointHints(Cancellation.Never,
+                        defaultOpening = true))
+                    component.observeCompleteTraversal()
+                    val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+
+                    val preference = registered.second.preferredBool(0)
+
+                    assertContentEquals(intArrayOf(0), registered.first)
+                    assertEquals(if (result == 0.0) positive else !positive, preference)
+                    assertNull(session.boolValue(0))
+                    assertNull(session.boolValue(1))
+                    assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_GUARDED_PREFERRED"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `guarded and primitive point members should agree without opposite overrides`() {
+        for (guardFirst in listOf(false, true)) {
+            for (result in listOf(0.0, 1.0)) {
+                val choice = RealChoice(0, 2, 0, 1)
+                val primitive = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0)
+                val model = Problem(
+                    numBoolVars = 1,
+                    intBounds = openBounds(0),
+                    numRealVars = 3,
+                    realLower = doubleArrayOf(0.0, 1.0, result),
+                    realUpper = doubleArrayOf(0.0, 1.0, result),
+                    factors = if (guardFirst) arrayOf(choice, primitive) else arrayOf(primitive, choice),
+                )
+                val stats = SmtStatsSink()
+                ExactLiraSearchComponent(model).use { component ->
+                    component.observeWith(stats)
+                    val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                    component.observeCompleteTraversal()
+                    val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+
+                    val preference = hints.preferredBool(0)
+
+                    assertEquals(if (result == 0.0) true else null, preference)
+                    val stage = if (result == 0.0) "POINT_HINT_GUARDED_PRIMITIVE_AGREED"
+                    else "POINT_HINT_GUARDED_DECLINED"
+                    assertEquals(1L, stats.snapshot().completeSearchStages?.get(stage))
+                    assertNull(session.boolValue(0))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `every guarded choice sharing a source Boolean should agree on its point preference`() {
+        for (first in listOf(0.0, 1.0)) {
+            for (second in listOf(0.0, 1.0)) {
+                val model = Problem(
+                    numBoolVars = 1,
+                    intBounds = openBounds(0),
+                    numRealVars = 4,
+                    realLower = doubleArrayOf(0.0, 1.0, first, second),
+                    realUpper = doubleArrayOf(0.0, 1.0, first, second),
+                    factors = arrayOf(RealChoice(0, 2, 0, 1), RealChoice(0, 3, 0, 1)),
+                )
+                ExactLiraSearchComponent(model).use { component ->
+                    val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                    val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+
+                    val preference = hints.preferredBool(0)
+
+                    assertEquals(if (first == second) first == 0.0 else null, preference)
+                    assertNull(session.boolValue(0))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `guarded preferences should decline a point satisfying both or neither choice arm`() {
+        for ((other, result) in listOf(0.0 to 0.0, 1.0 to 2.0)) {
+            val model = Problem(
+                numBoolVars = 1,
+                intBounds = openBounds(0),
+                numRealVars = 3,
+                realLower = doubleArrayOf(0.0, other, result),
+                realUpper = doubleArrayOf(0.0, other, result),
+                factors = arrayOf(RealChoice(0, 2, 0, 1)),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertNull(hints.preferredBool(0))
+
+                assertTrue(component.partialPointHintAvailable())
+                assertNull(session.boolValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `guarded preferences should remain unavailable after retraction until a fresh point is captured`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 1.0, 0.0),
+            factors = arrayOf(RealChoice(0, 2, 0, 1)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            session.popTo(0)
+
+            assertNull(hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertEquals(true, hints.preferredBool(0))
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `guarded preferences should withhold a cancelled captured point`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 1.0, 0.0),
+            factors = arrayOf(RealChoice(0, 2, 0, 1)),
+        )
+        var stopped = false
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation { stopped })).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(0))
+
+            stopped = true
+
+            assertNull(hints.preferredBool(0))
+            assertEquals(false, component.partialPointHintAvailable())
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `guarded hint groups should retain entry refusal without partial publication`() {
+        for (booleans in listOf(65_527, 65_528)) {
+            val model = Problem(
+                numBoolVars = booleans,
+                intBounds = openBounds(0),
+                numRealVars = 3,
+                realLower = doubleArrayOf(0.0, 1.0, 0.0),
+                realUpper = doubleArrayOf(0.0, 1.0, 0.0),
+                factors = arrayOf(RealChoice(0, 2, 0, 1)),
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+
+                val hints = component.partialPointHints(Cancellation.Never)
+                component.observeCompleteTraversal()
+
+                val admitted = booleans == 65_527
+                assertEquals(admitted, hints != null)
+                val stage = if (admitted) "POINT_HINT_REGISTERED" else "POINT_HINT_ENTRIES_DECLINED"
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get(stage))
+                assertEquals(false, component.partialPointHintAvailable())
+            }
+        }
+    }
+
+    @Test
     fun `hint admission should retain registration results until complete traversal is observed`() {
         val variants = listOf(
             Triple(2, "POINT_HINT_REGISTERED", 4L),
