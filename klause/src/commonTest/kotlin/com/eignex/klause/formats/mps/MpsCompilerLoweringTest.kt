@@ -1,10 +1,11 @@
 package com.eignex.klause.formats.mps
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
@@ -18,7 +19,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MpsCompilerLoweringTest {
-    private fun lower(vars: List<MpsVar>, row: MpsConstraint): Linear {
+    private fun lower(vars: List<MpsVar>, row: MpsConstraint): LinearRow {
         val compiled = MpsModel(
             "m",
             ObjectiveSense.MINIMIZE,
@@ -26,7 +27,7 @@ class MpsCompilerLoweringTest {
             vars,
             listOf(row),
         ).toProblem()
-        return compiled.model.factors.single() as Linear
+        return compiled.model.factors.flatMap { it.linearRows }.single { it.size == row.indices.size }
     }
 
     private fun boundsOf(v: MpsVar): Pair<Long, Long> {
@@ -49,9 +50,9 @@ class MpsCompilerLoweringTest {
     fun `a fractional row should lower onto the least common denominator of its decimals`() {
         val row = lower(twoFinite, MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(0.5, 0.125), null, 1.0))
 
-        val constants = assertNotNull(row.integerConstants)
-        assertEquals(listOf(500L, 125L), row.vars.indices.map { constants.coeff(it) })
-        assertEquals(1000L, constants.bound)
+        val constants = row.constants as IntegralConstants
+        assertEquals(listOf("4", "1"), (0 until row.size).map { constants.exactCoeff(it).toString() })
+        assertEquals("8", constants.exactBound.toString())
     }
 
     @Test
@@ -60,12 +61,12 @@ class MpsCompilerLoweringTest {
             "ROWS\n E C\nCOLUMNS\n X C 0.9\n M0 'MARKER' 'INTORG'\n Y C 1\n" +
                 " M1 'MARKER' 'INTEND'\nRHS\n R C 54\nBOUNDS\n UP B X 100\n UI B Y 10\nENDATA",
         ).toProblem()
-        val row = compiled.model.factors.single() as Linear
+        val row = compiled.model.factors.flatMap { it.linearRows }.single { it.size == 2 }
 
-        val constants = assertNotNull(row.realConstants)
-        assertEquals(9.0, constants.realCoefficients.at(0))
-        assertEquals(10.0, constants.intCoefficients.at(0))
-        assertEquals(540.0, constants.bound)
+        val constants = row.constants as IntegralConstants
+        assertEquals(mapOf(Term.ofRealVar(0) to "9", Term.ofIntVar(0) to "10"),
+            (0 until row.size).associate { row.ref(it) to constants.exactCoeff(it).toString() })
+        assertEquals("540", constants.exactBound.toString())
     }
 
     @Test
@@ -75,9 +76,10 @@ class MpsCompilerLoweringTest {
             MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(1e15, 0.25), null, 1e15),
         )
 
-        val constants = assertNotNull(row.integerConstants)
-        assertEquals(listOf(4_000_000_000_000_000L, 1L), row.vars.indices.map { constants.coeff(it) })
-        assertEquals(4_000_000_000_000_000L, constants.bound)
+        val constants = row.constants as IntegralConstants
+        assertEquals(listOf("4000000000000000", "1"),
+            (0 until row.size).map { constants.exactCoeff(it).toString() })
+        assertEquals("4000000000000000", constants.exactBound.toString())
     }
 
     @Test
@@ -87,11 +89,11 @@ class MpsCompilerLoweringTest {
                 " M2 'MARKER' 'INTEND'\nRHS\n RHS R 1\nBOUNDS\n UP BND X 1\n UP BND Y 1\nENDATA",
         ).toProblem()
 
-        val row = compiled.model.factors.single() as Linear
-        val constants = assertNotNull(row.integerConstants)
-        val coefficients = row.vars.indices.map { constants.coeff(it) }
-        assertEquals(listOf(100_000_000_000_000_000L, 12_345_678_901_234_567L), coefficients)
-        assertEquals(100_000_000_000_000_000L, constants.bound)
+        val row = compiled.model.factors.flatMap { it.linearRows }.single { it.size == 2 }
+        val constants = row.constants as IntegralConstants
+        val coefficients = (0 until row.size).map { constants.exactCoeff(it).toString() }
+        assertEquals(listOf("100000000000000000", "12345678901234567"), coefficients)
+        assertEquals("100000000000000000", constants.exactBound.toString())
         assertTrue(compiled.sourceExact, compiled.sourceDifference)
     }
 
@@ -102,10 +104,11 @@ class MpsCompilerLoweringTest {
                 "RHS\n RHS R 1e18\nBOUNDS\n UP BND X 1\n UP BND Y 1\nENDATA",
         ).toProblem()
 
-        val constants = assertNotNull((compiled.model.factors.single() as Linear).wideConstants)
-        val coefficients = (0 until constants.coefficients.size).map { constants.coefficients.at(it).toString() }
+        val row = compiled.model.factors.flatMap { it.linearRows }.single { it.size == 2 }
+        val constants = row.constants as IntegralConstants
+        val coefficients = (0 until row.size).map { constants.exactCoeff(it).toString() }
         assertEquals(listOf("1000000000000000000000", "1"), coefficients)
-        assertEquals("1000000000000000000000", constants.bound.toString())
+        assertEquals("1000000000000000000000", constants.exactBound.toString())
         assertTrue(compiled.sourceExact, compiled.sourceDifference)
     }
 
@@ -185,7 +188,7 @@ class MpsCompilerLoweringTest {
         assertEquals((-0.0).toRawBits(),
             source.sourceNumbers().variableBounds.single().second?.double?.toRawBits())
         assertEquals((-0.0).toRawBits(), source.sourceNumbers().objectiveConstant.double.toRawBits())
-        assertEquals((-0.0).toRawBits(), compiled.model.realUpper.single().toRawBits())
+        assertEquals((-0.0).toRawBits(), compiled.model.realUpper[compiled.columns.single().id].toRawBits())
         assertEquals(BigFraction.ZERO, compiled.sourceWitness(listOf(BigFraction.ZERO)).objective)
         assertFalse(compiled.withinTolerance(LongArray(0), doubleArrayOf(1.0)))
     }
@@ -218,7 +221,9 @@ class MpsCompilerLoweringTest {
 
         val compiled = source.toProblem()
 
-        val row = compiled.model.factors.single().linearRows.single()
+        val row = compiled.model.factors.flatMap { it.linearRows }.single {
+            (it.constants as IntegralConstants).exactBound.toString() == "4"
+        }
         val constants = row.constants as IntegralConstants
         assertEquals("1", constants.exactCoeff(0).toString())
         assertEquals("4", constants.exactBound.toString())
@@ -237,9 +242,20 @@ class MpsCompilerLoweringTest {
 
         val compiled = parsed.copy(name = "edited").toProblem()
 
-        assertEquals(7.0, assertNotNull(compiled.objective).realCoefficients.single())
-        val row = compiled.model.factors.single() as Linear
-        assertEquals(9.0, assertNotNull(row.realConstants).realCoefficients.at(0))
+        val objective = assertNotNull(compiled.objective)
+        val auxiliary = objective.realCoefficients.indices.single { objective.realCoefficients[it] != 0.0 }
+        assertEquals(1.0, objective.realCoefficients[auxiliary])
+        val rows = compiled.model.factors.flatMap { it.linearRows }
+        val row = rows.single { it.relation == LinearOp.LE }
+        val comparison = row.constants as RealConstants
+        assertEquals(9.0, comparison.realCoefficients.at(0))
+        assertEquals(5.0, comparison.bound)
+        val definition = rows.single { it.relation == LinearOp.EQ }
+        val constants = definition.constants as RealConstants
+        assertEquals(mapOf(Term.ofRealVar(compiled.columns.single().id) to 7.0,
+            Term.ofRealVar(auxiliary) to -1.0),
+            (0 until definition.size).associate { definition.ref(it) to constants.realCoefficients.at(it) })
+        assertEquals(0.0, constants.bound)
         assertEquals(BigFraction.ofLong(7) * BigFraction.ofLong(2).reciprocal(),
             compiled.sourceWitness(listOf(BigFraction.ofLong(2).reciprocal())).objective)
         assertFailsWith<MpsLoweringException> {
