@@ -26,6 +26,16 @@ internal class PolynomialFormula private constructor(
     val atoms: List<PolynomialAtom>,
     val booleanVariables: List<Int>,
 ) {
+    fun projectionPolynomials(arithmetic: PolynomialArithmetic): List<Polynomial> {
+        val relevant = if (booleanVariables.isEmpty()) null else polynomialProjectionAtoms(nodes, root, atoms.size, arithmetic)
+        val result = ArrayList<Polynomial>()
+        for ((index, atom) in atoms.withIndex()) {
+            arithmetic.step()
+            if (relevant == null || relevant[index]) result.add(atom.polynomial)
+        }
+        return result
+    }
+
     fun refuteBooleans(
         arithmetic: PolynomialArithmetic,
         maximumAtoms: Int,

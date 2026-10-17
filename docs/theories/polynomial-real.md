@@ -597,7 +597,8 @@ These aggregate events identify
 execution stages, not the private cause of a failed proposal or an inner cost clock.
 
 Complete Collins projection followed by exact lifting partitions the real space
-into sign-invariant cells when probing supplies no witness. Refutation requires
+into cells invariant for the retained numeric signs when probing supplies no witness.
+Source Boolean feasibility is invariant on each cell. Refutation requires
 exhaustion of the relevant cells and Boolean alternatives; unsuccessful repairs
 supply no refutation authority. Both witness paths retain the final stop check.
 
@@ -608,6 +609,28 @@ constructs a complete Collins projection family for rational multivariate
 polynomials. It reads the [exact polynomial kernel](../arithmetic/polynomial.md)
 and owns selection of projection operations and declared variable order.
 The theory does not materialize finite CP domains or depend on the linear engines.
+
+After the unchanged optional probe, formulas with Boolean source variables derive
+entailed Boolean-variable facts by unit propagation without decisions. Numeric
+predicates remain opaque. Conflicting closure retains the original boundary family;
+it supplies no separate refutation. The bounded optional Boolean refuter keeps its
+original admission, work sequence and branch traversal.
+
+Only those Boolean leaves are substituted in a private structural evaluation of
+the normalized formula. A compound gate's required truth is not a replacement for
+its constraint. Constant folding removes irrelevant subtrees, and projection keeps
+every numeric atom reachable through the residual formula. For each numeric
+valuation, source satisfaction is equivalent to satisfaction after the entailed
+Boolean substitutions. The retained signs therefore determine Boolean feasibility,
+even when an omitted atom's sign varies within a cell.
+
+This preparation retains the original formula, all original numeric and Boolean
+coordinate counts, fixed values and complete source checks. Reduced structure does
+not reopen optional admission or renew its work prefix. Unit propagation, folding,
+boundary collection, projection and lifting share the containing native arithmetic
+and cancellation scope. Interruption exposes no partial boundary family. A private
+counter observes completed atom removals; invocation aggregation saturates and
+unvisited preparation remains absent. Aggregate counts do not identify a root query.
 
 The returned family owns its level buffers. Input list mutation and mutation of a
 returned list do not change captured families. Immutable kernel polynomials may be
@@ -646,15 +669,17 @@ sector, so every declared dimension receives a coordinate.
 
 At a prefix, only original atoms whose variables are all assigned have definite
 truth. Higher atoms and every Boolean variable remain unknown. A three-valued false
-formula prunes that base cell because those lower signs are invariant throughout
-the cell. No prefix supplies a satisfying result. At a complete sample, exact
+formula prunes that base cell: the entailed Boolean substitutions preserve source
+satisfaction, and retained lower signs are invariant throughout the cell. Omitted
+signs cannot change the residual formula's Boolean feasibility. No prefix supplies
+a satisfying result. At a complete sample, exact
 algebraic evaluation decides every atom and iterative Boolean search preserves
 reference correlation. Unused Boolean IDs receive false. The complete assignment
 is checked against the normalized source formula before capture.
 
 Full Collins projection and exhaustive section/sector traversal provide a
-sign-invariant decomposition, including degree loss and nullification. A satisfying
-result requires a complete exact witness; an unsatisfiable result requires exhaustion
-of every unpruned cell and its Boolean alternatives. Root indices in returned
+sign-invariant decomposition of the retained boundaries, including degree loss and
+nullification. A satisfying result requires a complete exact witness; an unsatisfiable
+result requires exhaustion of every unpruned cell and its Boolean alternatives. Root indices in returned
 `AlgebraicReal` values identify their rational defining polynomial's distinct roots,
 not the position in a specialized lifting family.

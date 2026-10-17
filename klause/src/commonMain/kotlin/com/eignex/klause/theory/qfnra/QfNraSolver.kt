@@ -37,6 +37,7 @@ internal data class QfNraStats(
     val dyadicBases: Long? = null,
     val coupledWorkDeclines: Long? = null,
     val dyadicPreExtractionDeclines: Long? = null,
+    val booleanProjectionAtomsPruned: Long? = null,
 )
 
 internal enum class QfNraReason { Interrupted, WorkLimit, ResourceLimit }
@@ -118,9 +119,9 @@ internal class QfNraQuery(
                 return@sequence
             }
             yield(null)
-            val polynomials = normalized.atoms.map {
-                arithmetic.step()
-                it.polynomial
+            val polynomials = normalized.projectionPolynomials(arithmetic)
+            if (normalized.booleanVariables.isNotEmpty()) {
+                work.booleanProjectionAtomsPruned = normalized.atoms.size.toLong() - polynomials.size
             }
             val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic)
             var projection: PolynomialProjection? = null
@@ -154,6 +155,7 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     var dyadicAttempts: Long = 0
     var dyadicBases: Long = 0
     var dyadicPreExtraction = false
+    var booleanProjectionAtomsPruned: Long? = null
     private var coupledWorkDeclines: Long = 0
     private var dyadicPreExtractionDeclines: Long = 0
     private var spent: Long = 0
@@ -211,7 +213,7 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
         }
     }
     fun snapshot(): QfNraStats = QfNraStats(projectedPolynomials, liftedCells, spent,
-        dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines)
+        dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines, booleanProjectionAtomsPruned)
 }
 
 private const val MAX_WITNESS_WORK = 65_536L

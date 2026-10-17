@@ -152,6 +152,8 @@ internal class PolynomialTheoryInvocation(
         else sum(left.coupledWorkDeclines ?: 0, right.coupledWorkDeclines ?: 0),
         if (left.dyadicPreExtractionDeclines == null && right.dyadicPreExtractionDeclines == null) null
         else sum(left.dyadicPreExtractionDeclines ?: 0, right.dyadicPreExtractionDeclines ?: 0),
+        if (left.booleanProjectionAtomsPruned == null && right.booleanProjectionAtomsPruned == null) null
+        else sum(left.booleanProjectionAtomsPruned ?: 0, right.booleanProjectionAtomsPruned ?: 0),
     )
 
     private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
