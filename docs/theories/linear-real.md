@@ -27,6 +27,24 @@ those assertions through their decision scope, checks the residual system and
 contributes exact source coordinates at a complete check. Disequalities require
 an applicable direction and remain part of the source check.
 
+For an unconditional two-row disjunction of a signed Boolean literal and a real
+equality with coefficients `1, -1` and bound zero, a false Boolean side entails the
+equality before the other source Booleans are assigned. Complete preparation records
+the active signed guard on the existing numeric row and adds its variable to the
+arithmetic dependency set. Assertion names only that entailed row through the existing
+row-address namespace and implies its positive atom under the actual source Boolean
+antecedent. The shared queue delivers the assertion before numerical work resumes.
+An already false row atom conflicts under the same source reason. Naming, explanation
+or resource refusal leaves the check undecided; neither a missing name nor interruption
+authorizes a fact or a source refutation. The containing operation token pays for
+guard preparation, dependencies and implication work without renewing its allowance.
+
+Ordinary late disjunction registration and full source checking remain required.
+Late registration reuses an earlier row name; it does not eagerly name every alternative
+or alias a source Boolean. Row facts, numerical assertions and their antecedents follow
+the existing retract/restart scopes, while immutable names retain their session meaning.
+The guarded-row metadata supplies no point-reuse or residual-proof eligibility.
+
 For a source containing integer or real coordinates, the exact-linear component can
 reuse the exact source-coordinate prefix of an existing completed LP witness, or
 the point from its existing feasible difference check,

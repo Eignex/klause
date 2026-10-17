@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntegerConstants
@@ -16,6 +17,7 @@ import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -29,15 +31,49 @@ import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverConflictTest {
+    @Test
+    fun `guarded real equalities should conflict before unrelated Booleans are assigned`() {
+        for (positive in listOf(false, true)) {
+            for (shared in listOf(false, true)) {
+                val fixed = if (positive) 1.0 else 0.0
+                val model = Problem(
+                    numBoolVars = 2,
+                    intBounds = openBounds(0),
+                    numRealVars = 3,
+                    realLower = doubleArrayOf(0.0, 1.0, fixed),
+                    realUpper = doubleArrayOf(0.0, 1.0, fixed),
+                    factors = arrayOf(RealChoice(0, 2, 0, 1)),
+                )
+                val component = if (shared) {
+                    val fragment = assertNotNull(model.componentPlan().encodedTheoryFragment(model))
+                    assertNotNull(prepareExactLiraSource(fragment, Cancellation.Never)).open()
+                } else ExactLiraSearchComponent(model)
+                component.use {
+                    val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+
+                    val conflict = assertIs<ComponentResult.Conflict>(
+                        session.push(SearchDecision.Bool(Lit.make(0, positive))),
+                    )
+
+                    assertNotNull(conflict.explanation)
+                    assertNull(session.boolValue(1))
+                }
+            }
+        }
+    }
+
     @Test
     fun `a false source clause should conflict despite feasible real bounds`() {
         val model = Problem(

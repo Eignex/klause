@@ -37,6 +37,14 @@ coordinates component callbacks, conflicts and complete checks.
 [SearchTrail](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchTrail.kt)
 owns decisions, Boolean values, reasons and publishers, integer facts, undo levels and
 pending assertion delivery.
+
+An arithmetic component can imply an entailed guarded source row using its existing
+registered row atom and the active signed source Boolean as antecedent. The component
+returns to the shared fixpoint before numerical solving while that assertion awaits
+delivery. The registered name remains stable across scopes; the assertion and its
+reason retract with their trail facts. [Linear real arithmetic](../theories/linear-real.md)
+defines the admitted guard shape and retains late complete disjunction checking.
+
 [SearchLearning](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 owns shared clauses, attachment and propagation cursors, unit reawakening, reduction and
 telemetry. Watched-clause literal and signature indexes use primitive integer keys;

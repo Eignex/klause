@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -19,17 +20,21 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExecutionControlAdapter
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchStopCause
+import com.eignex.klause.solver.search.SearchTheoryAtom
+import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -39,6 +44,230 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverBranchingTest {
+    @Test
+    fun `guarded source choices should restore sibling rows and reuse their late names`() {
+        for (first in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(0),
+                numRealVars = 3,
+                realLower = doubleArrayOf(0.0, 1.0, 0.0),
+                realUpper = doubleArrayOf(0.0, 1.0, 1.0),
+                factors = arrayOf(RealChoice(0, 2, 0, 1)),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2, maxAtoms = 4))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, first))))
+                session.popTo(0)
+                assertIs<ComponentResult.Consistent>(session.restart())
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, !first))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+                val result = assertIs<SearchResult.Satisfied>(session.solve(2))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+                assertEquals(if (first) BigFraction.ONE else BigFraction.ZERO, assignment.reals[2])
+            }
+        }
+    }
+
+    @Test
+    fun `guarded row implications should await delivery under their signed source reason`() {
+        for (positive in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(0),
+                numRealVars = 3,
+                realLower = doubleArrayOf(0.0, 1.0, 0.0),
+                realUpper = doubleArrayOf(0.0, 1.0, 1.0),
+                factors = arrayOf(RealChoice(0, 2, 0, 1)),
+            )
+            val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+            var atom: SearchTheoryAtom? = null
+            var observedReason: SearchExplanation? = null
+            var checks = 0
+            val context = object : SearchContext by session {
+                override fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision) =
+                    session.registerAtom(positive, negative).also { atom = it }
+                override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                    observedReason = explanation
+                    return session.imply(literal, explanation)
+                }
+                override fun consumeCheck(): Boolean {
+                    checks++
+                    return true
+                }
+            }
+            ExactLiraSearchComponent(model).use { component ->
+                assertIs<ComponentResult.Consistent>(component.initialize(context))
+                assertIs<ComponentResult.Consistent>(component.propagate(context))
+                val guard = SearchDecision.Bool(Lit.make(0, positive))
+                assertIs<ComponentResult.Consistent>(session.push(guard))
+                assertIs<ComponentResult.Consistent>(component.assert(guard, context))
+                val before = checks
+
+                assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+                val named = assertNotNull(atom)
+                assertEquals(before, checks)
+                assertEquals(setOf(guard.literal xor 1, named.positive.literal),
+                    assertNotNull(observedReason).literals.toSet())
+                assertNull(session.boolValue(1))
+                assertIs<ComponentResult.Consistent>(component.assert(SearchDecision.Theory(named.positive), context))
+                assertIs<ComponentResult.Consistent>(component.propagate(context))
+                assertEquals(before + 1, checks)
+            }
+        }
+    }
+
+    @Test
+    fun `a guarded row should preserve a conflict with its already false target`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 1.0, 1.0),
+            factors = arrayOf(RealChoice(0, 2, 0, 1)),
+        )
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        var atom: SearchTheoryAtom? = null
+        val context = object : SearchContext by session {
+            override fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision) =
+                session.registerAtom(positive, negative).also { atom = it }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val guard = SearchDecision.Bool(Lit.make(0, true))
+            assertIs<ComponentResult.Consistent>(session.push(guard))
+            assertIs<ComponentResult.Consistent>(component.assert(guard, context))
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            val named = assertNotNull(atom)
+            session.popTo(0)
+            component.retract(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(named.negative)))
+            assertIs<ComponentResult.Consistent>(component.assert(SearchDecision.Theory(named.negative), context))
+            assertIs<ComponentResult.Consistent>(session.push(guard))
+            assertIs<ComponentResult.Consistent>(component.assert(guard, context))
+
+            val conflict = assertIs<ComponentResult.Conflict>(component.propagate(context))
+
+            assertEquals(setOf(guard.literal xor 1, named.positive.literal),
+                assertNotNull(conflict.explanation).literals.toSet())
+            assertNull(session.boolValue(1))
+        }
+    }
+
+    @Test
+    fun `guarded equality naming refusal should retain an undecided partial source`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 1.0, 1.0),
+            factors = arrayOf(RealChoice(0, 2, 0, 1)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2, maxAtoms = 0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertNull(session.boolValue(1))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `stopping after a guarded implication should withhold numerical completion`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 1.0, 1.0),
+            factors = arrayOf(RealChoice(0, 2, 0, 1)),
+        )
+        var stopped = false
+        var checks = 0
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        val context = object : SearchContext by session {
+            override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                val result = session.imply(literal, explanation)
+                stopped = true
+                return result
+            }
+            override fun consumeCheck(): Boolean {
+                checks++
+                return true
+            }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            component.useSolveStop(Cancellation { stopped })
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val guard = SearchDecision.Bool(Lit.make(0, true))
+            assertIs<ComponentResult.Consistent>(session.push(guard))
+            assertIs<ComponentResult.Consistent>(component.assert(guard, context))
+            val before = checks
+
+            assertIs<ComponentResult.Indeterminate>(component.propagate(context))
+
+            assertEquals(true, stopped)
+            assertEquals(before, checks)
+            assertIs<ComponentCheck.Indeterminate>(component.check(context))
+        }
+    }
+
+    @Test
+    fun `guarded row naming should retain a spent operation allowance without publishing a fact`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 1.0, 1.0),
+            factors = arrayOf(RealChoice(0, 2, 0, 1)),
+        )
+        var spent = false
+        var charged = 0L
+        var implications = 0
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        val context = object : SearchContext by session {
+            override fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision) =
+                session.registerAtom(positive, negative).also { spent = true }
+            override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                implications++
+                return session.imply(literal, explanation)
+            }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            component.useOperationAllowance { parent ->
+                object : Cancellation {
+                    override fun isCancelled(): Boolean = parent() || spent
+                    override fun workMeter(): WorkMeter = WorkMeter { units ->
+                        charged += units
+                        parent.charge(units)
+                    }
+                }
+            }
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val guard = SearchDecision.Bool(Lit.make(0, true))
+            assertIs<ComponentResult.Consistent>(session.push(guard))
+            assertIs<ComponentResult.Consistent>(component.assert(guard, context))
+            val before = charged
+
+            assertIs<ComponentResult.Indeterminate>(component.propagate(context))
+
+            assertTrue(spent)
+            assertTrue(charged > before)
+            assertTrue(component.operationBudgetExhausted)
+            assertEquals(0, implications)
+            assertTrue(!context.cancelled())
+        }
+    }
+
     @Test
     fun `an alternate context should supply native operation controls without session casts`() {
         val model = Problem(

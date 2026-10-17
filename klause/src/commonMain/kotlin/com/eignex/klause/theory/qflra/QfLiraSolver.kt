@@ -1038,8 +1038,10 @@ class ExactLiraSearchComponent private constructor(
         } && values.contentEquals(bools) && canCaptureCompletionSource() && !operationStop()
     }
 
-    private fun assertSource(context: SearchContext): Boolean {
-        if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
+    private fun assertSource(context: SearchContext): ComponentResult {
+        if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) {
+            return ComponentResult.Indeterminate
+        }
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
@@ -1047,6 +1049,28 @@ class ExactLiraSearchComponent private constructor(
             if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
             val address = prepared.address
             val asserted = node.rowAssertions[address]
+            val guard = prepared.guardLiteral
+            if (guard >= 0 && (asserted?.payload as? NamedDisjunctDecision)?.holds != true &&
+                bools[Lit.variable(guard)] != UNASSIGNED &&
+                (bools[Lit.variable(guard)] == TRUE) == Lit.isPositive(guard)
+            ) {
+                operationStop.charge(16L)
+                if (operationStop()) return ComponentResult.Indeterminate
+                val disjunct = registerDisjunct(prepared.row, context, address)
+                    ?: return ComponentResult.Indeterminate
+                if (operationStop()) return ComponentResult.Indeterminate
+                val reason = context.explainAtoms(
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(guard)),
+                    SearchDecision.Theory(disjunct.holds),
+                ) ?: return ComponentResult.Indeterminate
+                if (operationStop()) return ComponentResult.Indeterminate
+                val implied = context.imply(disjunct.holds.literal, reason)
+                if (operationStop()) return ComponentResult.Indeterminate
+                if (implied !is ComponentResult.Consistent) return implied
+                impliedDisjunct = true
+                observeCompleteStage("GUARDED_ROW_IMPLIED")
+                return ComponentResult.Consistent
+            }
             if (prepared.disjunction && asserted == null) continue
             val truth = node.rowTruth(address, prepared.row, bools) ?: continue
             val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
@@ -1058,22 +1082,22 @@ class ExactLiraSearchComponent private constructor(
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
-                if (!system.assertComparison(comparison, null, premise)) return false
+                if (!system.assertComparison(comparison, null, premise)) return ComponentResult.Indeterminate
                 sourceAssertionLevels[index] = context.decisionLevel
             }
         }
         for (atom in node.sourceBranches) {
-            val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
-            if (!system.assertAtom(atom, premise)) return false
+            val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return ComponentResult.Indeterminate)
+            if (!system.assertAtom(atom, premise)) return ComponentResult.Indeterminate
         }
         when (assertPublishedBounds(context)) {
-            is LpBoundBatchResult.Declined -> return false
-            is LpBoundBatchResult.Conflict -> return true
+            is LpBoundBatchResult.Declined -> return ComponentResult.Indeterminate
+            is LpBoundBatchResult.Conflict -> return ComponentResult.Consistent
             is LpBoundBatchResult.Applied -> Unit
         }
-        if (!assertDisequalities(disequalities)) return false
+        if (!assertDisequalities(disequalities)) return ComponentResult.Indeterminate
         nodesByLevel.put(context.decisionLevel, node)
-        return true
+        return ComponentResult.Consistent
     }
 
     private fun assertDisequalities(
@@ -1233,9 +1257,9 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         val asserted = assertSource(context)
-        if (!asserted || operationStop()) {
-            return ComponentResult.Indeterminate
-        }
+        if (operationStop()) return ComponentResult.Indeterminate
+        if (asserted !is ComponentResult.Consistent) return asserted
+        if (impliedDisjunct) return ComponentResult.Consistent
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
@@ -1621,21 +1645,27 @@ private class PreparedExactLiraSource(
 
 private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
     val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    val arithmeticRows = ArrayList<LinearRow>()
+    val arithmeticVariables = LinkedHashSet<Int>()
     val preparedRows = model.factors.flatMapIndexed { factorIndex, factor ->
         factor.linearRows.mapIndexed { index, row ->
+            val guard = factor.linearForm.guardedEqualityLiteral(index, model.numBoolVars)
+            val booleans = row.booleanVariables().toIntArray()
+            if ((0 until row.size).any { !Term.isBool(row.ref(it)) }) {
+                arithmeticRows += row
+                for (variable in booleans) arithmeticVariables += variable
+                if (guard >= 0) arithmeticVariables += Lit.variable(guard)
+            }
             PreparedSourceRow(
                 RowAddress(factorIndex, index),
                 row,
                 exactForms[factorIndex][index],
-                row.booleanVariables().toIntArray(),
+                booleans,
                 factor.linearForm is LinearForm.Disjunction,
+                guard,
             )
         }
     }
-    val arithmeticRows = model.factors.flatMap { it.linearRows }.filter { row ->
-        (0 until row.size).any { !Term.isBool(row.ref(it)) }
-    }
-    val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
     return PreparedExactLiraSource(
         model, exactForms, preparedRows, arithmeticRows, arithmeticVariables, validated = false,
     )
@@ -1658,8 +1688,6 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
         val form = factor.linearForm
         if (form !is LinearForm.Conjunction && form !is LinearForm.Disjunction) return null
         val forms = ArrayList<ExactRowForm>()
-        var sourceBooleanGuard = false
-        var realChoiceEquality = false
         for ((rowIndex, row) in factor.linearRows.withIndex()) {
             if (!charge(1)) return null
             when (val constants = row.constants) {
@@ -1690,25 +1718,15 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
             if (!charge(4L * row.size + 4L)) return null
             val exact = row.exactForm(model.numRealVars)
             if (stop()) return null
-            if (form is LinearForm.Disjunction && form.rows.size == 2 &&
-                row.activator == LinearRow.ALWAYS && !row.strict
-            ) {
-                val constants = row.constants
-                if (row.size == 1 && Term.isBool(row.ref(0)) && row.relation == LinearOp.GE &&
-                    Lit.variable(Term.lit(row.ref(0))) in 0 until model.numBoolVars &&
-                    constants is IntegralConstants && constants.exactCoeff(0) == BIG_ONE &&
-                    constants.exactBound == BIG_ONE
-                ) sourceBooleanGuard = true
-                if (row.size == 2 && row.relation == LinearOp.EQ && constants is RealConstants &&
-                    Term.isReal(row.ref(0)) && Term.isReal(row.ref(1)) &&
-                    constants.intCoefficients.size == 0 && constants.realCoefficients.size == 2 &&
-                    constants.bound == 0.0 && constants.realCoefficients.at(0) == 1.0 &&
-                    constants.realCoefficients.at(1) == -1.0
-                ) realChoiceEquality = true
+            if (form is LinearForm.Disjunction && form.rows.size == 2 && !charge(8L)) return null
+            val guard = form.guardedEqualityLiteral(rowIndex, model.numBoolVars)
+            if (guard >= 0) {
+                guardedChoiceClauses++
             }
             forms += exact
             preparedRows += PreparedSourceRow(
                 RowAddress(factorIndex, rowIndex), row, exact, booleans.toIntArray(), form is LinearForm.Disjunction,
+                guard,
             )
             if (arithmetic) {
                 arithmeticRows += row
@@ -1716,11 +1734,14 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
                     if (!charge(1)) return null
                     arithmeticVariables += variable
                 }
+                if (guard >= 0) {
+                    if (!charge(1)) return null
+                    arithmeticVariables += Lit.variable(guard)
+                }
             }
         }
         if (!charge(forms.size.toLong() + 1L)) return null
         exactForms += forms.toList()
-        if (sourceBooleanGuard && realChoiceEquality) guardedChoiceClauses++
     }
     val copies = exactForms.size.toLong() + preparedRows.size + arithmeticRows.size + arithmeticVariables.size + 1L
     if (!charge(copies)) return null
@@ -1729,6 +1750,28 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
         validated = true, guardedChoiceClauses = guardedChoiceClauses,
     )
     return source.takeUnless { stop() }
+}
+
+private fun LinearForm?.guardedEqualityLiteral(rowIndex: Int, booleanVariables: Int): Int {
+    val rows = (this as? LinearForm.Disjunction)?.rows ?: return -1
+    if (rows.size != 2) return -1
+    val equality = rows[rowIndex]
+    val guard = rows[rowIndex xor 1]
+    if (guard.activator != LinearRow.ALWAYS || guard.strict || guard.size != 1 ||
+        !Term.isBool(guard.ref(0)) || guard.relation != LinearOp.GE
+    ) return -1
+    val literal = Term.lit(guard.ref(0))
+    if (Lit.variable(literal) !in 0 until booleanVariables) return -1
+    val guardConstants = guard.constants as? IntegralConstants ?: return -1
+    if (guardConstants.exactCoeff(0) != BIG_ONE || guardConstants.exactBound != BIG_ONE) return -1
+    val constants = equality.constants as? RealConstants ?: return -1
+    if (equality.activator != LinearRow.ALWAYS || equality.strict || equality.size != 2 ||
+        equality.relation != LinearOp.EQ || !Term.isReal(equality.ref(0)) || !Term.isReal(equality.ref(1)) ||
+        constants.intCoefficients.size != 0 || constants.realCoefficients.size != 2 ||
+        constants.bound != 0.0 || constants.realCoefficients.at(0) != 1.0 ||
+        constants.realCoefficients.at(1) != -1.0
+    ) return -1
+    return Lit.negate(literal)
 }
 
 private const val UNASSIGNED = -1
@@ -2255,6 +2298,7 @@ private class PreparedSourceRow(
     val form: ExactRowForm,
     val booleans: IntArray,
     val disjunction: Boolean,
+    val guardLiteral: Int = -1,
 )
 
 private data class SearchNode(
