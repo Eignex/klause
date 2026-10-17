@@ -9,7 +9,7 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.util.Cancellation
 
-internal class BoundSourceExecutionControls(
+internal class SourceExecutionControls(
     val theory: TheoryParams,
     val polynomial: PolynomialTheoryParams,
     val nonlinearInteger: NonlinearIntegerTheoryParams?,
@@ -30,7 +30,7 @@ internal fun bindSourceExecutionControls(
     presolveConfig: PresolveConfig?,
     presolveCancellation: Cancellation,
     presolveBudget: PresolveBudget?,
-): BoundSourceExecutionControls {
+): SourceExecutionControls {
     val reader = options.reader()
     val limit = reader.defaulted(ExecutionOption.nodeLimit, nodeBudget?.limit)
     if (nodeBudget != null && limit != nodeBudget.limit) {
@@ -62,8 +62,8 @@ internal fun bindSourceExecutionControls(
         }
     }
     if (kind == SourceExecutionKind.FINITE || kind == SourceExecutionKind.REFUTED) {
-        if (kind == SourceExecutionKind.REFUTED) options.validateKnown()
-        return BoundSourceExecutionControls(
+        options.validateKnown()
+        return SourceExecutionControls(
             TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation),
             PolynomialTheoryParams(), null, null, finite, budget,
         )
@@ -113,7 +113,9 @@ internal fun bindSourceExecutionControls(
             maximumWork = reader.defaulted(ExecutionOption.nraWorkLimit,
                 if (kind == SourceExecutionKind.FUNCTIONS) functionDefaults.maximumWork else defaults.maximumWork),
             maximumDenseCoefficients = dense?.toInt(),
-            maximumMatrixCells = reader.defaulted(ExecutionOption.nraMatrixCells, defaults.maximumMatrixCells),
+            maximumMatrixCells = reader.defaulted(ExecutionOption.nraMatrixCells,
+                if (kind == SourceExecutionKind.FUNCTIONS) functionDefaults.maximumMatrixCells
+                else defaults.maximumMatrixCells),
             timeout = timeout, cancellation = cancellation, strategy = strategy,
         )
     }
@@ -132,7 +134,7 @@ internal fun bindSourceExecutionControls(
         strategy = strategy, nodeBudget = budget,
     ) else null
     reader.finish("source ${kind.name.lowercase()}", "common strategy controls and the selected family's native limits")
-    return BoundSourceExecutionControls(theory, polynomial, integer, functions, finite, budget)
+    return SourceExecutionControls(theory, polynomial, integer, functions, finite, budget)
 }
 
 private fun FiniteSolveRequest.withSourceControls(
@@ -143,6 +145,9 @@ private fun FiniteSolveRequest.withSourceControls(
 ): FiniteSolveRequest {
     require(sourceControls == null) { "native finite controls must use the typed source execution constructor" }
     require(nodeBudget == null || nodeBudget === budget) { "finite factory supplied a different node allowance" }
+    require(executionOptions.reader().defaulted(ExecutionOption.nodeLimit, budget?.limit) == budget?.limit) {
+        "finite factory supplied a conflicting node-limit"
+    }
     return FiniteSolveRequest(
         shape, engine, presolveConfig, explicitPresolveConfig, solutionSetSensitive,
         cancellation = cancellation or stop, presolveCancellation = presolveCancellation or stop,

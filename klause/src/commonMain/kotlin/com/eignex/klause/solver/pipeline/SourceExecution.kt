@@ -108,7 +108,7 @@ class SourceExecutionRequest private constructor(
 
     private constructor(
         invocation: PreparedSourceInvocation,
-        controls: BoundSourceExecutionControls,
+        controls: SourceExecutionControls,
         cores: Int,
         presolveConfig: PresolveConfig?,
         presolveCancellation: Cancellation,
