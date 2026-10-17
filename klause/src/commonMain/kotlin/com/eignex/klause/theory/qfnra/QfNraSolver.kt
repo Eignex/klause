@@ -150,18 +150,31 @@ internal class QfNraQuery(
                         work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                         continue
                     }
-                    val nonzero = ArrayList<Polynomial>()
-                    val polynomials = region.atoms.map { (index, truth) ->
+                    val reducing = PolynomialAffineReduction.prepare(normalized, region, realCount, arithmetic)
+                    var reduction: PolynomialAffineReduction? = null
+                    while (reduction == null) {
+                        reduction = reducing.next()
+                        if (reduction == null) yield(null)
+                    }
+                    val activeFormula = if (reduction.eliminatedCount == 0) normalized
+                    else PolynomialFormula.conjunction(reduction.atoms, arithmetic)
+                    val activeRegion = if (reduction.eliminatedCount == 0) region
+                    else PolynomialBooleanRegion(activeFormula.atoms.indices.associateWith {
                         arithmetic.step()
-                        val atom = normalized.atoms[index]
+                        true
+                    }, region.bools)
+                    val nonzero = ArrayList<Polynomial>()
+                    val polynomials = activeRegion.atoms.map { (index, truth) ->
+                        arithmetic.step()
+                        val atom = activeFormula.atoms[index]
                         if (atom.holds(0) != truth) {
                             nonzero.add(atom.polynomial)
                         }
                         atom.polynomial
                     }
-                    val equations = region.atoms.mapNotNull { (index, truth) ->
+                    val equations = activeRegion.atoms.mapNotNull { (index, truth) ->
                         arithmetic.step()
-                        val atom = normalized.atoms[index]
+                        val atom = activeFormula.atoms[index]
                         if ((atom.relation == PolynomialRelation.EQ && truth) ||
                             (atom.relation == PolynomialRelation.NE && !truth)
                         ) atom.polynomial else null
@@ -185,11 +198,15 @@ internal class QfNraQuery(
                     work.projectedPolynomials += minOf(projection.polynomialCount,
                         Long.MAX_VALUE - work.projectedPolynomials)
                     yield(null)
-                    val assignment = searchCells(normalized, region, projection, boolCount,
+                    val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
                         arithmetic, algebraic, work, fixed)
                     if (assignment != null) {
+                        val checked = if (reduction.eliminatedCount == 0) assignment else {
+                            val point = reduction.reconstruct(assignment, arithmetic, algebraic)
+                            checkRegionSample(normalized, region, point, boolCount, arithmetic, algebraic)
+                        }
                         arithmetic.step()
-                        yield(QfNraResult.Satisfiable(assignment, work.snapshot()))
+                        yield(QfNraResult.Satisfiable(checked, work.snapshot()))
                         return@sequence
                     }
                 } catch (stop: PolynomialResourceLimit) {

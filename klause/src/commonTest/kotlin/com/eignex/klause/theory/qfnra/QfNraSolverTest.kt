@@ -19,6 +19,136 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `affine elimination preserves strictness at coincident endpoints`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        for ((relation, feasible) in listOf(">=" to true, ">" to false)) {
+            val source = SmtLibPolynomial.parse("$declarations (assert ($relation x0 1)) (assert (<= x0 1))")
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+            if (feasible) {
+                val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+                assertEquals(0, algebraic.compare(witness.realValue(0), algebraic.rational(BigFraction.ONE)))
+                assertEquals(33, witness.realCount)
+            } else assertIs<QfNraResult.Unsatisfiable>(result)
+        }
+    }
+
+    @Test
+    fun `affine elimination reconstructs one sided polynomial fibers in reverse order`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        for ((relation, direction) in listOf(">" to 1, "<" to -1)) {
+            val boundary = if (direction > 0) "(* x1 x1)" else "(- (* x1 x1))"
+            val source = SmtLibPolynomial.parse(
+                "$declarations (assert ($relation x0 $boundary)) (assert (> x1 0))",
+            )
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+            val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+            val square = algebraic.power(witness.realValue(1), 2)
+            val bound = if (direction > 0) square else algebraic.negate(square)
+            assertTrue(algebraic.compare(witness.realValue(0), bound) * direction > 0)
+            assertTrue(algebraic.sign(witness.realValue(1)) > 0)
+            assertEquals(33, witness.realCount)
+        }
+    }
+
+    @Test
+    fun `affine elimination refutes a strict inequality cycle without matrices`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (> x0 x1) (> x1 x2) (>= x2 x0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `affine elimination retains variable coefficient zero fibers and required equations`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= x0 0) (= x1 1) (>= (* x0 x1) 0) (> x2 x1)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(0, algebraic.sign(witness.realValue(0)))
+        assertEquals(0, algebraic.compare(witness.realValue(1), algebraic.rational(BigFraction.ONE)))
+        assertTrue(algebraic.compare(witness.realValue(2), witness.realValue(1)) > 0)
+        assertEquals(33, witness.realCount)
+    }
+
+    @Test
+    fun `affine elimination preserves a disequality on a remaining coordinate`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (not (= x0 0)) (> x1 x0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(algebraic.sign(witness.realValue(0)) != 0)
+        assertTrue(algebraic.compare(witness.realValue(1), witness.realValue(0)) > 0)
+        assertEquals(33, witness.realCount)
+    }
+
+    @Test
+    fun `affine elimination reconstructs coincident irrational endpoints exactly`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (* x1 x1) 2) (> x1 0) (>= x0 x1) (<= x0 x1)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(0, algebraic.signAt(RationalPolynomial.of(-2, 0, 1), witness.realValue(0)))
+        assertEquals(0, algebraic.compare(witness.realValue(0), witness.realValue(1)))
+        assertTrue(algebraic.sign(witness.realValue(0)) > 0)
+        assertEquals(33, witness.realCount)
+    }
+
+    @Test
+    fun `affine elimination reconstructs a strict interval between irrational endpoints`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (* x1 x1) 2) (> x1 0) (= (* x2 x2) 3) (> x2 0) " +
+                "(> x0 x1) (< x0 x2)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(algebraic.compare(witness.realValue(0), witness.realValue(1)) > 0)
+        assertTrue(algebraic.compare(witness.realValue(0), witness.realValue(2)) < 0)
+        assertEquals(33, witness.realCount)
+    }
+
+    @Test
+    fun `affine elimination retains Boolean pins and negated numeric requirements`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) (assert (= x1 0)) " +
+                "(assert (or (and b (not (<= x0 x1))) (and (not b) (<= x0 x1))))",
+        )
+        for (truth in listOf(true, false, true)) {
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+                condition = PolynomialCondition(bools = mapOf(0 to truth)))
+
+            val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+            assertEquals(truth, witness.boolValue(0))
+            assertEquals(truth, algebraic.compare(witness.realValue(0), witness.realValue(1)) > 0)
+            assertEquals(33, witness.realCount)
+        }
+    }
+
+    @Test
     fun `factored weak boundaries retain either zero coordinate fiber`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         for (fixed in 0..1) {

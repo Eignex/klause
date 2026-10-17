@@ -170,6 +170,18 @@ internal class PolynomialFormula private constructor(
         const val FALSE: Int = 0
         const val TRUE: Int = 1
 
+        fun conjunction(atoms: List<PolynomialAtom>, arithmetic: PolynomialArithmetic): PolynomialFormula {
+            val nodes = ArrayList<FormulaNode>()
+            val children = IntArray(atoms.size) { index ->
+                arithmetic.step()
+                nodes.add(FormulaNode.Atom(index))
+                index
+            }
+            arithmetic.step()
+            nodes.add(FormulaNode.Junction(children, true))
+            return PolynomialFormula(nodes, nodes.lastIndex, atoms.toList(), emptyList())
+        }
+
         fun normalize(
             formula: PolynomialRealFormula,
             arithmetic: PolynomialArithmetic,

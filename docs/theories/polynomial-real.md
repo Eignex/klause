@@ -669,6 +669,27 @@ available. Ordinary levels use Collins projection. The component reads the
 projection operations and coordinate order.
 The theory does not materialize finite CP domains or depend on the linear engines.
 
+Each complete Boolean region first applies exact affine inequality elimination.
+A coordinate qualifies only when every occurrence is a pure linear monomial with a
+nonzero rational coefficient in an inequality. Occurrences in equalities,
+disequalities, powers or variable coefficients retain that coordinate for CAD.
+For every lower/upper bound pair, elimination requires the upper polynomial minus
+the lower polynomial to be nonnegative, strictly positive when either bound is strict. One-sided fibres
+need no remaining inequality. A coordinate is selected only when these pairs do not
+increase the active constraint count; every completed step removes one coordinate
+from that conjunction. All work and suspension checkpoints use the same query owner.
+
+CAD receives the equivalent reduced conjunction with the original real count and
+the region's source Boolean assignment. After a reduced witness, stored fibres are
+reconstructed in reverse order. Exact algebraic maxima/minima determine the interval;
+coincident weak endpoints retain their exact value, and nonempty open intervals use
+certified rational interior samples, including one-sided unbounded intervals.
+Every original coordinate remains in the reconstructed assignment. The original
+normalized formula receives the ordinary full source check before publication.
+Incomplete elimination or reconstruction cannot publish a partial witness or
+establish exhaustion. The optional probe runs once on its original scope before
+these complete transformations; no reduced conjunction re-enters its admission.
+
 Boundary canonicalization separates a polynomial's common monomial into its distinct
 coordinate factors and the remaining primitive polynomial, then removes duplicate
 boundaries. Sign invariance of those factors preserves the original product's sign,
@@ -725,7 +746,7 @@ their coordinate dependencies at earlier lifting levels.
 
 #### Required root sections
 
-A selected source predicate whose truth excludes zero proves its whole polynomial
+A selected region predicate whose truth excludes zero proves its whole polynomial
 nonzero. Total graph substitutions preserve that premise. Whenever the original
 or rewritten polynomial is one monomial, every coordinate in it is nonzero. For
 example, `z != 0` and `z = x*y` prove both `x != 0` and `y != 0`; a sum supplies
