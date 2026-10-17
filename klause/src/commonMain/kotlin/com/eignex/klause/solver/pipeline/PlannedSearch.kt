@@ -14,7 +14,11 @@ import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SharedClauseSelection
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.Cancellation
@@ -103,14 +107,26 @@ internal class PreparedSearchComponents(
             ?: ExecutionComponentDescriptor("boolean", ComponentResponsibility.BOOLEAN, emptyList(),
                 emptyList(), emptyList())
         selected += PreparedSearchRegistration(spec, boolean) {
-            listOf(ClauseSearchComponent(clauses)) + if (cardinalities.isEmpty()) emptyList()
+            val peer = ClauseSearchComponent(clauses)
+            if (clauses.isNotEmpty() && plan.factorProjections.providers.encoder === BuiltInEncoderProvider &&
+                (plan.theoryPipeline == ProblemPipeline.EXACT_LRA || plan.theoryPipeline == ProblemPipeline.EXACT_LIRA)
+            ) {
+                peer.retainSource(spec, PlannedSharedClauseSelection(spec, plan))
+            }
+            listOf(peer) + if (cardinalities.isEmpty()) emptyList()
             else listOf(CardinalitySearchComponent(cardinalities))
         }
         plan.theoryComponentFactory(fragment) { exactSource }?.let { factory ->
             val descriptor = descriptors.firstOrNull { it.responsibility == ComponentResponsibility.COMPLETION }
                 ?: ExecutionComponentDescriptor("arithmetic", ComponentResponsibility.COMPLETION,
                     emptyList(), emptyList(), emptyList())
-            selected += PreparedSearchRegistration(spec, descriptor, factory)
+            selected += PreparedSearchRegistration(spec, descriptor) { controls ->
+                factory(controls).also { components ->
+                    for (component in components) {
+                        if (component is ExactLiraSearchComponent) component.retainClauseSource(spec, fragment)
+                    }
+                }
+            }
         }
         selected.toList()
     }
@@ -144,4 +160,14 @@ internal class PreparedSearchComponents(
         theorySolveStop: Cancellation? = null,
         openHintFlips: Long? = null,
     ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips)
+}
+
+private class PlannedSharedClauseSelection(
+    private val source: Problem,
+    private val plan: ComponentPlan,
+) : SharedClauseSelection {
+    override fun contains(index: Int): Boolean = plan.factorOwner(index) == FactorOwner.SHARED
+    override fun encoded(index: Int): Boolean = plan.factorProjections.problem === source &&
+        plan.factorProjections.providers.encoder === BuiltInEncoderProvider &&
+        plan.factorProjections.capturedEncoder(index, EncodingTarget.LINEAR)?.enforcesSource == true
 }

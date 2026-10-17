@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
@@ -12,16 +13,21 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.CpIntId
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.BooleanSearchResult
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBoolValue
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
@@ -34,6 +40,104 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PlannedSearchTest {
+
+    @Test
+    fun `numeric projection should retain original rows and a strict full source witness`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0, 2)),
+                ExactLinear.of(
+                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE, strict = true,
+                ),
+                Clause(intArrayOf(1, 3)),
+                ExactLinear.of(
+                    intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.GE, BigFraction.ZERO, strict = true,
+                ),
+            ),
+        )
+
+        source.componentPlan().search(source, emptyMap()).use { search ->
+            val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            assertEquals(2, theory.sharedClauseSourceCount)
+            assertEquals(listOf(0, 2), (0 until 2).map(theory::sharedClauseSourceAt))
+            assertEquals(listOf(1, 3), (0 until theory.numericSourceRowCount).map(theory::numericSourceFactorAt))
+            assertEquals(listOf(0, 0), (0 until theory.numericSourceRowCount).map(theory::numericSourceRowAt))
+
+            val result = assertIs<SearchResult.Satisfied>(search.session.solve(2))
+
+            val x = assertNotNull(result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
+            val y = assertNotNull(result.model.valueOf(SearchExactRealValue(SourceRealId(1))))
+            assertTrue(x > BigFraction.ZERO)
+            assertTrue(x + y < BigFraction.ONE)
+            assertTrue(result.model.valueOf<Boolean>(SearchBoolValue(0)) != result.model.valueOf(SearchBoolValue(1)))
+        }
+    }
+
+    @Test
+    fun `projected source clauses should still reject falsified Boolean decisions`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0, 2)),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.LE, 2.0),
+            ),
+        )
+        source.componentPlan().search(source, emptyMap()).use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            assertEquals(1, assertIs<ExactLiraSearchComponent>(search.theory).numericSourceRowCount)
+            assertIs<ComponentResult.Consistent>(search.session.push(SearchDecision.Bool(1)))
+
+            assertIs<ComponentResult.Conflict>(search.session.push(SearchDecision.Bool(3)))
+        }
+    }
+
+    @Test
+    fun `projected numeric assertions should survive sibling scopes and restart`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0, 2)),
+                ReifiedRealLinear(
+                    0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 1.0,
+                ),
+                Clause(intArrayOf(1, 3)),
+            ),
+        )
+        source.componentPlan().search(source, emptyMap()).use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+            val retained = theory.numericSourceRowCount
+            assertEquals(2, theory.sharedClauseSourceCount)
+            assertIs<ComponentResult.Consistent>(search.session.push(SearchDecision.Bool(0)))
+            assertIs<ComponentCheck.Feasible>(search.session.check())
+            search.session.popTo(0)
+            assertIs<ComponentResult.Consistent>(search.session.push(SearchDecision.Bool(1)))
+            assertIs<ComponentCheck.Feasible>(search.session.check())
+
+            assertIs<ComponentResult.Consistent>(search.session.restart())
+            assertIs<SearchResult.Satisfied>(search.session.solve(2))
+            assertEquals(retained, theory.numericSourceRowCount)
+            assertTrue((0 until retained).all { theory.numericSourceFactorAt(it) == 1 })
+        }
+    }
+
 
     @Test
     fun `planned pure real search should use the shared Boolean engine`() {

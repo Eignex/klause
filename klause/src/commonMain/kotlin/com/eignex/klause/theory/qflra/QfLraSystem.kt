@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactComparison
+import com.eignex.klause.lp.ExactOrderedTerms
 import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.bounding.LpPropagator
@@ -30,6 +31,12 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
+
+internal interface QfLraSourceRows {
+    val size: Int
+    fun factorAt(index: Int): Int
+    fun rowAt(index: Int): Int
+}
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -135,6 +142,7 @@ internal class LiveQfLraSystem(
     rowForms: List<List<ExactRowForm>> = source.factors.map { factor ->
         factor.linearRows.map { it.exactForm(source.numRealVars) }
     },
+    numericRows: QfLraSourceRows? = null,
 ) {
     private val columns = source.numRealVars + source.numIntVars
     private val sourceColumns = source.exactLpSourceColumns()
@@ -147,19 +155,15 @@ internal class LiveQfLraSystem(
     private val canonicalTerms = HashMap<Map<Int, BigFraction>, Map<Int, BigFraction>>()
     private val initialTerms = HashSet<SmtTermKey>()
     private val preparedTerms = buildMap {
-        for ((factorIndex, forms) in rowForms.withIndex()) {
-            val factor = source.factors[factorIndex]
-            val rows = factor.linearRows
-            for ((rowIndex, form) in forms.withIndex()) {
-                val comparison = form.comparison(true) { false }
-                val keys = SmtRowKeys(comparison.terms)
-                put(comparison.ordered, keys)
-                val row = rows[rowIndex]
-                if (factor.linearForm !is LinearForm.Disjunction && row.activator == LinearRow.ALWAYS &&
-                    (0 until row.size).none { Term.isBool(row.ref(it)) }
-                ) {
-                    initialTerms += keys.positive
+        if (numericRows == null) {
+            for ((factorIndex, forms) in rowForms.withIndex()) {
+                for (rowIndex in forms.indices) {
+                    prepareTerms(this, rowForms, factorIndex, rowIndex)
                 }
+            }
+        } else {
+            for (index in 0 until numericRows.size) {
+                prepareTerms(this, rowForms, numericRows.factorAt(index), numericRows.rowAt(index))
             }
         }
     }
@@ -169,6 +173,24 @@ internal class LiveQfLraSystem(
     private val terms = normalized.filterKeys { it in initialTerms }.values
         .map { it.term.coefficients }.filter { it.size != 1 }.distinct()
     private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
+
+    private fun prepareTerms(
+        target: MutableMap<ExactOrderedTerms, SmtRowKeys>,
+        rowForms: List<List<ExactRowForm>>,
+        factorIndex: Int,
+        rowIndex: Int,
+    ) {
+        val factor = source.factors[factorIndex]
+        val comparison = rowForms[factorIndex][rowIndex].comparison(true) { false }
+        val keys = SmtRowKeys(comparison.terms)
+        target[comparison.ordered] = keys
+        val row = factor.linearRows[rowIndex]
+        if (factor.linearForm !is LinearForm.Disjunction && row.activator == LinearRow.ALWAYS &&
+            (0 until row.size).none { Term.isBool(row.ref(it)) }
+        ) {
+            initialTerms += keys.positive
+        }
+    }
 
     fun install(): Boolean {
         val structural = sourceColumns.map { column ->

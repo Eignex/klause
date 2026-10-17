@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
@@ -53,6 +54,7 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.search.AssembledSearchModel
+import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
@@ -82,6 +84,7 @@ import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.snapshotValues
+import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.encodingSourceRealCount
 import com.eignex.klause.theory.linearTheoryModel
@@ -267,7 +270,86 @@ class ExactLiraSearchComponent private constructor(
         )
     }
     private val lp: LpPropagator by lpDelegate
-    private val system by lazy { LiveQfLraSystem(model, lp, exactForms) }
+    private var clauseSource: Problem? = null
+    private var clausePeer: ClauseSearchComponent? = null
+    private var numericSourceRows: PeerNumericRows? = null
+    private val system by lazy { LiveQfLraSystem(model, lp, exactForms, numericSourceRows) }
+
+    internal val numericSourceRowCount: Int get() = numericSourceRows?.size ?: preparedRows.size
+    internal val sharedClauseSourceCount: Int get() = numericSourceRows?.sourceCount ?: 0
+    internal fun sharedClauseSourceAt(index: Int): Int = checkNotNull(numericSourceRows).sourceAt(index)
+    internal fun numericSourceFactorAt(index: Int): Int =
+        numericSourceRows?.factorAt(index) ?: preparedRows[index].address.factor
+    internal fun numericSourceRowAt(index: Int): Int =
+        numericSourceRows?.rowAt(index) ?: preparedRows[index].address.row
+
+    internal fun retainClauseSource(source: Problem, fragment: Problem) {
+        check(context == null && clauseSource == null)
+        if (fragment === model && source.numBoolVars == model.numBoolVars) clauseSource = source
+    }
+
+    internal fun bindClausePeer(peer: ClauseSearchComponent): Boolean {
+        check(context == null)
+        if (clauseSource == null || clauseSource !== peer.sharedSource || clausePeer != null) return false
+        clausePeer = peer
+        return true
+    }
+
+    private fun prepareNumericSourceRows(): PeerNumericRows? {
+        val peer = clausePeer ?: return null
+        val source = clauseSource ?: return null
+        operationStop.charge(SHARED_CLAUSE_FIXED_CELLS)
+        if (operationStop() || !peer.matchesSource(operationStop)) return null
+        var sources = 0L
+        for (index in source.factors.indices) {
+            operationStop.charge(1)
+            if (operationStop()) return null
+            val clause = source.factors[index] as? Clause ?: continue
+            if (peer.ownsSourceClause(index, clause, operationStop)) sources++
+        }
+        if (sources == 0L || !sharedClauseProjectionFits(sources, 0)) return null
+        var retained = 0L
+        for (index in preparedRows.indices) {
+            val omitted = omitPeerRow(preparedRows[index], source, peer)
+            if (operationStop()) return null
+            if (!omitted) retained++
+        }
+        if (retained == preparedRows.size.toLong() || !sharedClauseProjectionFits(sources, retained)) return null
+        operationStop.charge(sources + retained)
+        if (operationStop()) return null
+        val sourceIndices = IntArray(sources.toInt())
+        val rowIndices = IntArray(retained.toInt())
+        var nextSource = 0
+        for (index in source.factors.indices) {
+            operationStop.charge(1)
+            if (operationStop()) return null
+            val clause = source.factors[index] as? Clause ?: continue
+            val owned = peer.ownsSourceClause(index, clause, operationStop)
+            if (operationStop()) return null
+            if (owned) sourceIndices[nextSource++] = index
+        }
+        var nextRow = 0
+        for (index in preparedRows.indices) {
+            val omitted = omitPeerRow(preparedRows[index], source, peer)
+            if (operationStop()) return null
+            if (!omitted) rowIndices[nextRow++] = index
+        }
+        val prepared = PeerNumericRows(sourceIndices, rowIndices, preparedRows)
+        return prepared.takeUnless { operationStop() }
+    }
+
+    private fun omitPeerRow(prepared: PreparedSourceRow, source: Problem, peer: ClauseSearchComponent): Boolean {
+        operationStop.charge(1)
+        if (operationStop()) return false
+        val factor = model.factors[prepared.address.factor] as? EncodedTheoryFactor ?: return false
+        val clause = factor.source as? Clause ?: return false
+        val form = factor.linearForm as? LinearForm.Conjunction ?: return false
+        if (prepared.address.row != 0 || form.rows.size != 1 || form.rows[0] !== clause ||
+            prepared.row !== clause || clause.activator != LinearRow.ALWAYS ||
+            !peer.ownsSourceClause(factor.attribution.sourceFactorIndex, clause, operationStop)
+        ) return false
+        return factor.attribution.unconditionedBooleanSource(source.numBoolVars, operationStop)
+    }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -514,6 +596,9 @@ class ExactLiraSearchComponent private constructor(
         pollContextStop = solveStop != null && solveStop !== contextStop
         beginOperation()
         return try {
+            val numeric = prepareNumericSourceRows()
+            if (operationStop()) return ComponentResult.Indeterminate
+            numericSourceRows = numeric
             graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
             if (graphFirst) smtStats?.observeRealGraphOpening()
@@ -659,7 +744,13 @@ class ExactLiraSearchComponent private constructor(
     override fun close() {
         floatCandidate = null
         releasePartialPointHints()
-        closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
+        try {
+            closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
+        } finally {
+            numericSourceRows = null
+            clausePeer = null
+            clauseSource = null
+        }
     }
 
     private fun registerDisjunction(index: Int, context: SearchContext): List<DisjunctAtom>? {
@@ -1043,7 +1134,9 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Indeterminate
         }
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
-        for ((index, prepared) in preparedRows.withIndex()) {
+        for (cursor in 0 until numericSourceRowCount) {
+            val index = numericSourceRows?.indexAt(cursor) ?: cursor
+            val prepared = preparedRows[index]
             if (impliedDisjunct) {
                 operationStop.charge(1L)
                 if (operationStop()) return ComponentResult.Indeterminate
@@ -2295,6 +2388,26 @@ private data class IntegerLinearBranch(
 
 private data class RowAddress(val factor: Int, val row: Int) : Comparable<RowAddress> {
     override fun compareTo(other: RowAddress): Int = compareValuesBy(this, other, RowAddress::factor, RowAddress::row)
+}
+
+private const val SHARED_CLAUSE_FIXED_CELLS = 128L
+private const val MAX_SHARED_CLAUSE_CELLS = 65_536L
+
+internal fun sharedClauseProjectionFits(sources: Long, rows: Long): Boolean =
+    sources >= 0 && rows >= 0 && sources <= MAX_SHARED_CLAUSE_CELLS - SHARED_CLAUSE_FIXED_CELLS &&
+        rows <= MAX_SHARED_CLAUSE_CELLS - SHARED_CLAUSE_FIXED_CELLS - sources
+
+private class PeerNumericRows(
+    private val sourceIndices: IntArray,
+    private val rowIndices: IntArray,
+    private val rows: List<PreparedSourceRow>,
+) : QfLraSourceRows {
+    val sourceCount: Int get() = sourceIndices.size
+    fun sourceAt(index: Int): Int = sourceIndices[index]
+    override val size: Int get() = rowIndices.size
+    fun indexAt(index: Int): Int = rowIndices[index]
+    override fun factorAt(index: Int): Int = rows[rowIndices[index]].address.factor
+    override fun rowAt(index: Int): Int = rows[rowIndices[index]].address.row
 }
 
 private class PreparedSourceRow(

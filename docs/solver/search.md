@@ -970,3 +970,23 @@ whose mandatory arithmetic peer installs a complete enforcing encoding. The
 finite adapter still rejects interrupted fixpoints, and every arithmetic check
 must succeed before the shared leaf is accepted. This policy belongs to that
 registration; standalone finite projections retain their original check obligations.
+
+## Shared clause enforcement and numeric views
+
+A planned opening can associate its Boolean clause peer with the identical canonical
+source and captured factor selections. After all registration factories have opened,
+the installed component set binds that actual peer to its arithmetic participant.
+A descriptor, prepared factory or source factor index alone grants no enforcement
+authority. Reordered registrations retain coverage only when both actual components
+belong to the same opening and source Boolean namespace. Direct arithmetic callers
+and registrations missing their peer retain whole-source numeric enforcement.
+
+The arithmetic participant validates that the peer received the exact original
+clause literal containers and that the captured built-in encoder installed the
+original single clause row without conditions or private definitions. Custom
+encoders, generated relations, nested attribution and uncertain correspondence
+retain numeric enforcement. No user selector is invoked to reconstruct ownership.
+The immutable numeric view retains original global row indices; the complete source,
+coordinate counts, factor/row addresses and full-source checks remain authoritative.
+See [linear real arithmetic](../theories/linear-real.md) for its consumers and
+[resources](resources.md) for construction and lifetime accounting.

@@ -1,7 +1,15 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
+
+internal interface SharedClauseSelection {
+    fun contains(index: Int): Boolean
+    fun encoded(index: Int): Boolean
+}
 
 /**
  * Boolean clauses hosted by the shared session rather than by a frontend-specific search loop.
@@ -16,6 +24,51 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
     ClauseWatchHost {
     private val store = WatchedClauseStore()
     private val sourceClauses = clauses.map(Clause::literals)
+    internal var sharedSource: Problem? = null
+        private set
+    private var sourceSelection: SharedClauseSelection? = null
+
+    internal fun retainSource(
+        source: Problem,
+        selection: SharedClauseSelection,
+    ) {
+        check(sharedSource == null)
+        sharedSource = source
+        sourceSelection = selection
+    }
+
+    internal fun matchesSource(stop: Cancellation): Boolean {
+        val source = sharedSource ?: return false
+        val selected = sourceSelection ?: return false
+        var matched = 0
+        for (index in source.factors.indices) {
+            stop.charge(1)
+            if (stop()) return false
+            if (!selected.contains(index)) continue
+            val clause = source.factors[index] as? Clause ?: return false
+            stop.charge(4)
+            if (stop() || !selected.encoded(index)) {
+                return false
+            }
+            if (matched >= sourceClauses.size || sourceClauses[matched] !== clause.literals) return false
+            for (literal in clause.literals) {
+                stop.charge(1)
+                if (stop() || Lit.variable(literal) !in 0 until source.numBoolVars) return false
+            }
+            matched++
+        }
+        return matched == sourceClauses.size
+    }
+
+    internal fun ownsSourceClause(index: Int, clause: Clause, stop: Cancellation): Boolean {
+        stop.charge(1)
+        if (stop()) return false
+        val source = sharedSource ?: return false
+        if (index !in source.factors.indices || source.factors[index] !== clause ||
+            sourceSelection?.contains(index) != true
+        ) return false
+        return true
+    }
 
     /** Literals whose falsification has not been propagated through the watch index yet. */
     private val pending = IntArrayList()

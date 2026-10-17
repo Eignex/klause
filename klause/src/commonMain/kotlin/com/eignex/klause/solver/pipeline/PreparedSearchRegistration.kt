@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchCandidateHints
@@ -194,6 +195,18 @@ internal class PreparedSearchRegistrations(
                 }
                 components + SourceCoordinateAgreementComponent(participants, { session.model() }, supported)
             } else components
+            for (index in installed.indices) {
+                val component = installed[index]
+                if (component !is ExactLiraSearchComponent) continue
+                for (peerIndex in installed.indices) {
+                    val peer = installed[peerIndex]
+                    if (peer is ClauseSearchComponent && peer.sharedSource === source &&
+                        component.bindClausePeer(peer)
+                    ) {
+                        break
+                    }
+                }
+            }
             session = SearchComponentSet(installed, proposals = opening.branchProposals()).session(
                 maxChecks, cancellation, learnedDb, SearchAtomRegistry(boolCount),
             )

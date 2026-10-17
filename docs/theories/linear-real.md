@@ -232,3 +232,27 @@ defines `supportsExactLra`.
 shares the linear checking machinery without integer branching for a pure-real source.
 [QfLraSystem](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/QfLraSystem.kt)
 owns model-facing linear assertions; the pipeline names this route `EXACT_LRA`.
+
+## Peer-enforced numeric assertion view
+
+An exact linear component in a planned shared session can omit redundant numeric
+assertion work for a source clause enforced by its actual registered Boolean peer.
+Omission requires the captured built-in linear encoder, one encoding layer, exact
+source factor and clause row identity, and unconditioned Boolean-only attribution.
+Generated Boolean relations from other encodings, CP-owned factors and custom
+providers remain in the numeric path. Standalone components and prepared factory
+openings without that same peer retain all source rows.
+
+Only numeric source assertion iteration and live-system row-key preparation use
+the view. It stores retained original global row indices and indexes the full
+assertion-level array by those indices. Full exact row forms, prepared metadata,
+source bounds, graph preparation, hint admission, disjunction names, reductions,
+coordinate agreement, complete source proofs and strict witness checks retain the
+whole source and original factor/row addresses. Retraction and restart clear the
+full assertion state through their ordinary scopes.
+
+This view preserves full preparation and exact conversion. A satisfied Boolean-only
+comparison already contributes no LP row; omission supplies no claim about numeric
+dimension or solving benefit. [Shared search](../solver/search.md#shared-clause-enforcement-and-numeric-views)
+owns actual peer binding, and [resources](../solver/resources.md#shared-clause-projection-storage)
+owns construction and cancellation.

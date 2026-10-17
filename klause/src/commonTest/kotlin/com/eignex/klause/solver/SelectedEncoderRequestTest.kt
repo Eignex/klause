@@ -1,19 +1,25 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingAffineExpression
+import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.LinearEncodingFormula
+import com.eignex.klause.theory.TheoryRealId
 import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
@@ -22,6 +28,7 @@ import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -29,6 +36,34 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SelectedEncoderRequestTest {
+
+    @Test
+    fun `Boolean source projection should refuse conditions private definitions and numeric roles`() {
+        val booleans = listOf(SourceBoolId(0))
+        val direct = EncodingAttribution(0, booleans, emptyList(), emptyList())
+        assertTrue(direct.unconditionedBooleanSource(2, Cancellation.Never))
+        for (attribution in listOf(
+            EncodingAttribution(0, booleans, listOf(SourceIntId(0)), emptyList()),
+            EncodingAttribution(0, booleans, emptyList(), listOf(SourceRealId(0))),
+            EncodingAttribution(0, listOf(SourceBoolId(2)), emptyList(), emptyList()),
+            EncodingAttribution(0, booleans, emptyList(), emptyList(),
+                integerEmbeddings = mapOf(SourceIntId(0) to TheoryRealId(0))),
+            EncodingAttribution(0, booleans, emptyList(), emptyList(),
+                realEmbeddings = mapOf(SourceRealId(0) to TheoryRealId(0))),
+            EncodingAttribution(0, booleans, emptyList(), emptyList(), auxiliaries = listOf(TheoryRealId(0))),
+            EncodingAttribution(0, booleans, emptyList(), emptyList(),
+                integerConditions = mapOf(SourceIntId(0) to bigIntOf(0))),
+            EncodingAttribution(0, booleans, emptyList(), emptyList(),
+                booleanConditions = mapOf(SourceBoolId(0) to true)),
+            EncodingAttribution(0, booleans, emptyList(), emptyList(),
+                affineAuxiliaries = listOf(EncodingAffineExpression(emptyList()))),
+            EncodingAttribution(0, booleans, emptyList(), emptyList(),
+                linearGuards = listOf(LinearEncodingFormula.Relation(Clause(intArrayOf(0)).linearForm))),
+        )) {
+            assertFalse(attribution.unconditionedBooleanSource(2, Cancellation.Never))
+        }
+    }
+
     @Test
     fun `an ineligible selected scope should not install any supported prefix`() {
         for (support in listOf(EncoderSupport.UNSUPPORTED, EncoderSupport.RELAXATION_ONLY)) {

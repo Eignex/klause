@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearForm
@@ -63,6 +64,33 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
+
+    @Test
+    fun `standalone direct and prepared components should retain full clause enforcement`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0, 2)),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        for (component in listOf(ExactLiraSearchComponent(source), prepared.open())) {
+            component.use {
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(0, component.sharedClauseSourceCount)
+                assertEquals(2, component.numericSourceRowCount)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(3)))
+            }
+        }
+    }
+
     @Test
     fun `LP cancellation should retain its parent meter and distinct session stop`() {
         var stopped = false

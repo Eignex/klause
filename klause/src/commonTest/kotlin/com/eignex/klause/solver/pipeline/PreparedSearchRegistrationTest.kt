@@ -5,12 +5,17 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.RealChoice
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
@@ -36,8 +41,15 @@ import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SharedClauseSelection
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.EncodedTheoryFactor
+import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncodingAttribution
+import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
+import com.eignex.klause.theory.qflra.sharedClauseProjectionFits
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -53,6 +65,378 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PreparedSearchRegistrationTest {
+
+    @Test
+    fun `cancellation while omitting the last numeric row should not publish or overfill an empty view`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(Clause(intArrayOf(0))),
+        )
+        val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
+        for (limit in listOf(154L, 164L, 165L)) {
+            var charged = 0L
+            val meter = WorkMeter { charged += it }
+            prepared.open().use { search ->
+                val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+                theory.useOperationAllowance { parent ->
+                    object : Cancellation {
+                        override fun isCancelled() = parent() || charged >= limit
+                        override fun workMeter() = meter
+                    }
+                }
+
+                assertIs<ComponentResult.Indeterminate>(search.session.initialize())
+
+                assertTrue(charged >= limit)
+                assertEquals(0, theory.sharedClauseSourceCount)
+                assertEquals(1, theory.numericSourceRowCount)
+            }
+        }
+    }
+
+    @Test
+    fun `a registered clause peer should support an empty numeric view through close`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(Clause(intArrayOf(0))),
+        )
+        val search = source.componentPlan().search(source, emptyMap())
+        val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+        search.use {
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            assertEquals(1, theory.sharedClauseSourceCount)
+            assertEquals(0, theory.numericSourceRowCount)
+            assertIs<SearchResult.Satisfied>(search.session.solve(1))
+        }
+
+        assertEquals(0, theory.sharedClauseSourceCount)
+    }
+
+
+    @Test
+    fun `a peer associated with another source identity should not authorize omission`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0)),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        val other = Problem(
+            numBoolVars = 1,
+            intBounds = source.intBounds,
+            numRealVars = 1,
+            realLower = source.realLower,
+            realUpper = source.realUpper,
+            factors = source.factors,
+        )
+        val otherPlan = other.componentPlan()
+        val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
+        val registrations = prepared.registrations.map { registration ->
+            if (registration.descriptor.responsibility != ComponentResponsibility.BOOLEAN) registration
+            else PreparedSearchRegistration(source, registration.descriptor) {
+                val peer = ClauseSearchComponent(listOf(source.factors[0] as Clause))
+                peer.retainSource(other, object : SharedClauseSelection {
+                    override fun contains(index: Int): Boolean = otherPlan.factorOwner(index) == FactorOwner.SHARED
+                    override fun encoded(index: Int): Boolean =
+                        otherPlan.factorProjections.providers.encoder === BuiltInEncoderProvider &&
+                            otherPlan.factorProjections.capturedEncoder(index, EncodingTarget.LINEAR)
+                                ?.enforcesSource == true
+                })
+                listOf(peer)
+            }
+        }
+
+        PreparedSearchRegistrations(source, registrations).open(
+            Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null,
+        ).use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+            assertEquals(0, theory.sharedClauseSourceCount)
+            assertEquals(2, theory.numericSourceRowCount)
+            assertIs<SearchResult.Satisfied>(search.session.solve(1))
+        }
+    }
+
+
+    @Test
+    fun `an equal replacement clause peer should not authorize numeric omission`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0, 2)),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        val plan = source.componentPlan()
+        val prepared = PreparedSearchComponents(plan, source, emptyMap())
+        val registrations = prepared.registrations.map { registration ->
+            if (registration.descriptor.responsibility != ComponentResponsibility.BOOLEAN) registration
+            else PreparedSearchRegistration(source, registration.descriptor) {
+                val peer = ClauseSearchComponent(listOf(Clause(intArrayOf(0, 2))))
+                peer.retainSource(source, object : SharedClauseSelection {
+                    override fun contains(index: Int): Boolean = plan.factorOwner(index) == FactorOwner.SHARED
+                    override fun encoded(index: Int): Boolean =
+                        plan.factorProjections.providers.encoder === BuiltInEncoderProvider &&
+                            plan.factorProjections.capturedEncoder(index, EncodingTarget.LINEAR)?.enforcesSource == true
+                })
+                listOf(peer)
+            }
+        }
+
+        PreparedSearchRegistrations(source, registrations).open(
+            Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null,
+        ).use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+            assertEquals(0, theory.sharedClauseSourceCount)
+            assertEquals(2, theory.numericSourceRowCount)
+            assertIs<SearchResult.Satisfied>(search.session.solve(2))
+        }
+    }
+
+    @Test
+    fun `custom propagation should retain the clause numeric relation`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0)),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        val projections = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor is Clause) null else FactorProjectionProviders.Default.propagation.select(factor)
+        }).prepare(source)
+
+        source.componentPlan(projections).search(source, emptyMap()).use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+            assertEquals(0, theory.sharedClauseSourceCount)
+            assertEquals(2, theory.numericSourceRowCount)
+            assertIs<SearchResult.Satisfied>(search.session.solve(1))
+        }
+    }
+
+    @Test
+    fun `generated choice Boolean rows should retain their numeric addresses`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 0.0, 1.0),
+            realUpper = doubleArrayOf(0.0, 0.0, 1.0),
+            factors = arrayOf(Clause(intArrayOf(0, 2)), RealChoice(0, 0, 1, 2)),
+        )
+        val plan = source.componentPlan()
+        val fragment = kotlin.test.assertNotNull(plan.encodedTheoryFragment(source))
+        val expected = fragment.factors.sumOf { it.linearRows.size } - 1
+        assertTrue(fragment.factors.any { factor ->
+            factor is EncodedTheoryFactor && factor.source is RealChoice && factor.linearRows.any { row ->
+                (0 until row.size).all { Term.isBool(row.ref(it)) }
+            }
+        })
+
+        plan.search(source, emptyMap()).use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+            assertEquals(1, theory.sharedClauseSourceCount)
+            assertEquals(expected, theory.numericSourceRowCount)
+            assertTrue((0 until expected).all { theory.numericSourceFactorAt(it) > 0 })
+            assertIs<SearchResult.Satisfied>(search.session.solve(2))
+        }
+    }
+
+    @Test
+    fun `nested or rebound encoded clauses should retain their numeric relation`() {
+        for (conditioned in listOf(false, true)) {
+            val clause = Clause(intArrayOf(0))
+            val attribution = EncodingAttribution(
+                0, listOf(SourceBoolId(0)), emptyList(), emptyList(),
+                booleanConditions = if (conditioned) mapOf(SourceBoolId(0) to true) else emptyMap(),
+            )
+            val rebound = EncodedTheoryFactor(clause, clause.linearForm, attribution)
+            val source = Problem(
+                numBoolVars = 1,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(1.0),
+                factors = arrayOf<Factor>(
+                    clause, rebound,
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+                ),
+            )
+
+            source.componentPlan().search(source, emptyMap()).use { search ->
+                assertIs<ComponentResult.Consistent>(search.session.initialize())
+                val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+                assertEquals(1, theory.sharedClauseSourceCount)
+                assertEquals(2, theory.numericSourceRowCount)
+                assertEquals(listOf(1, 2), (0 until 2).map(theory::numericSourceFactorAt))
+                assertIs<SearchResult.Satisfied>(search.session.solve(1))
+            }
+        }
+    }
+
+
+    @Test
+    fun `a captured custom encoder with builtin propagation should keep all numeric rows`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0)),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        var selections = 0
+        val projections = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            selections++
+            BuiltInEncoderProvider.select(factor, target)
+        }).prepare(source)
+        val plan = source.componentPlan(projections)
+        val before = selections
+
+        plan.search(source, emptyMap()).use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+            assertEquals(0, theory.sharedClauseSourceCount)
+            assertEquals(2, theory.numericSourceRowCount)
+            assertIs<ComponentResult.Conflict>(search.session.push(SearchDecision.Bool(1)))
+        }
+        assertEquals(before, selections)
+    }
+
+    @Test
+    fun `recomposed theory registrations without their actual clause peer should keep full enforcement`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0, 2)),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
+        val registrations = prepared.registrations.filter {
+            it.descriptor.responsibility == ComponentResponsibility.COMPLETION
+        }
+
+        PreparedSearchRegistrations(source, registrations).open(
+            Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null,
+        ).use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+            assertEquals(0, theory.sharedClauseSourceCount)
+            assertEquals(2, theory.numericSourceRowCount)
+            assertIs<ComponentResult.Consistent>(search.session.push(SearchDecision.Bool(1)))
+            assertIs<ComponentResult.Conflict>(search.session.push(SearchDecision.Bool(3)))
+        }
+    }
+
+    @Test
+    fun `reordered actual registrations should retain their own clause peer coverage`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0)),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
+
+        PreparedSearchRegistrations(source, prepared.registrations.reversed()).open(
+            Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null,
+        ).use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+            assertEquals(1, theory.sharedClauseSourceCount)
+            assertEquals(1, theory.numericSourceRowCount)
+            assertIs<SearchResult.Satisfied>(search.session.solve(1))
+        }
+    }
+
+    @Test
+    fun `projection construction should spend the actual native operation allowance before publishing`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(0)),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
+        for (limit in listOf(0L, 136L, 155L, 159L, 170L, 171L)) {
+            var charged = 0L
+            var entered = 0
+            val meter = WorkMeter { charged += it }
+            prepared.open().use { search ->
+                val theory = assertIs<ExactLiraSearchComponent>(search.theory)
+                theory.useOperationAllowance { parent ->
+                    entered++
+                    object : Cancellation {
+                        override fun isCancelled() = parent() || charged >= limit
+                        override fun workMeter() = meter
+                    }
+                }
+
+                assertIs<ComponentResult.Indeterminate>(search.session.initialize())
+
+                assertEquals(1, entered)
+                assertTrue(charged >= limit)
+                assertEquals(0, theory.sharedClauseSourceCount)
+                assertEquals(2, theory.numericSourceRowCount)
+            }
+        }
+    }
+
+    @Test
+    fun `projection representation limits should refuse overflow and preserve the fixed cells`() {
+        for ((sources, rows, fits) in listOf(
+            Triple(1L, 65_407L, true),
+            Triple(1L, 65_408L, false),
+            Triple(Long.MAX_VALUE, 1L, false),
+            Triple(1L, Long.MAX_VALUE, false),
+            Triple(-1L, 0L, false),
+        )) {
+            assertEquals(fits, sharedClauseProjectionFits(sources, rows))
+        }
+    }
+
     @Test
     fun `factory openings without a default component should keep preparation absent and unobserved`() {
         for (integerCount in listOf(0, 1)) {

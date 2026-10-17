@@ -529,3 +529,30 @@ and deadline to original-unit publication checking before workers begin; supplyi
 those controls through a deferred factory does not leave checking outside its scope.
 Native numerical execution retains its existing theory-work
 currency and cleanup owner, including when an original-unit callback fails.
+
+## Shared clause projection storage
+
+A planned opening binds only immutable source selection and actual component
+identities. The exact linear component validates and constructs its optional
+numeric view immediately after beginning its first initialized operation, inside
+the existing cleanup scope and before graph or live-system installation. Every
+source, row, attribution and literal inspection charges that operation token;
+construction never substitutes the earlier opening token for the native allowance.
+
+The only additional variable buffers are sorted source clause indices `S` and
+retained original global numeric row indices `K`. Construction first counts them
+with overflow-safe arithmetic, then requires `S + K + 128 <= 65536` conservative
+cells and prepays their initialization and fill storage. The fixed 128-cell reserve
+covers binding fields, the immutable selection descriptor, the view object, array
+headers and fixed traversal temporaries; it does not describe total heap use.
+Full prepared source data, exact conversions and hint caches retain their ordinary
+accounting. No factor mask, copied attribution getter or per-row view object is
+created. Zero eligibility or zero omissions leaves the full path in place.
+
+Cancellation before publication discards partial buffers, keeps all spent work
+charged and stops initialization through its existing operation cleanup. A
+representation or ownership refusal retains full numeric enforcement under the
+same containing allowance. A published view belongs to that immutable component
+set through retraction and restart; queries and retained slices do not rebuild it
+or renew its native allowance. See [shared search](search.md#shared-clause-enforcement-and-numeric-views)
+and [linear real arithmetic](../theories/linear-real.md#peer-enforced-numeric-assertion-view).

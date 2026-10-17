@@ -4,6 +4,7 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.Cancellation
 import kotlin.jvm.JvmInline
 
 /** A real coordinate in a private theory projection, distinct from a source declaration. */
@@ -40,6 +41,19 @@ class EncodingAttribution internal constructor(
     private val boolPins = booleanConditions.toMap()
     private val affineDefinitions = affineAuxiliaries.toList()
     private val guardDefinitions = linearGuards.toList()
+
+    internal fun unconditionedBooleanSource(boolCount: Int, stop: Cancellation): Boolean {
+        stop.charge(10)
+        if (stop() || intIds.isNotEmpty() || realIds.isNotEmpty() || intMap.isNotEmpty() ||
+            realMap.isNotEmpty() || auxiliaryIds.isNotEmpty() || intPins.isNotEmpty() ||
+            boolPins.isNotEmpty() || affineDefinitions.isNotEmpty() || guardDefinitions.isNotEmpty()
+        ) return false
+        for (index in boolIds.indices) {
+            stop.charge(1)
+            if (stop() || boolIds[index].index !in 0 until boolCount) return false
+        }
+        return true
+    }
 
     /** Private affine reconstruction definitions, expanded into source coordinates before solving. */
     val affineAuxiliaries: List<EncodingAffineExpression> get() = affineDefinitions.toList()
