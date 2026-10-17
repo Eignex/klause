@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -42,6 +43,49 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheorySolverTest {
+
+    @Test
+    fun `a spent node allowance should stop open traversal before a decision`() {
+        val openUpper = Bits(1).also { it.set(0) }
+        val model = Problem(1, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            emptyArray())
+        val budget = NodeBudget(0)
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
+            .solve(TheoryParams(nodeBudget = budget))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(0L, budget.spent)
+        assertEquals(0L, result.stats.openTheory.openBoolDecisions)
+    }
+
+    @Test
+    fun `the same node allowance should span separate open feasibility rounds`() {
+        val openUpper = Bits(1).also { it.set(0) }
+        val model = Problem(1, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            emptyArray())
+        val budget = NodeBudget(1)
+        val params = TheoryParams(nodeBudget = budget)
+        val engine = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
+
+        assertIs<OpenTheoryResult.Sat>(engine.solve(params))
+        val second = engine.solve(params)
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(second).reason)
+        assertEquals(1L, budget.spent)
+    }
+
+    @Test
+    fun `an exhausted node allowance should retain a root open witness`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val budget = NodeBudget(0)
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.EXACT_LRA).solve(TheoryParams(nodeBudget = budget))
+
+        assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals(0L, budget.spent)
+    }
 
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
 
