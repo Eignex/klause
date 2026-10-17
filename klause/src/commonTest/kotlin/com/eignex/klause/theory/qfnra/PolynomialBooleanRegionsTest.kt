@@ -16,6 +16,96 @@ import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
     @Test
+    fun `containing work exhaustion withholds a completed equality conflict`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= x0 (+ x1 x2)) (= x0 (+ x1 x2 1))))",
+        )
+        val completed = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, 0, 33))
+
+        val result = solveQfNra(source.formula, 0, 33,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+
+        assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
+    }
+
+    @Test
+    fun `conditional equality sections reconstruct all original coordinates after a refuted region`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (or (and (not b) (= x0 x1) (= x0 (+ x1 1)))
+                        (and b (= x0 (* x1 x1)) (= (* x1 x1) 2))))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(witness.boolValue(0))
+        assertEquals(33, witness.realCount)
+        assertEquals(BigFraction.ofLong(2), witness.realValue(0).rational)
+        for (variable in 2..32) assertEquals(BigFraction.ZERO, witness.realValue(variable).rational)
+        assertEquals(2L, result.stats.booleanTheoryRegions)
+        assertEquals(2L, result.stats.equationalSections)
+    }
+
+    @Test
+    fun `negated disequalities select exact zero sections within their region`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (not (distinct x0 (* x1 x1))) (= (* x1 x1) 2)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.ofLong(2), witness.realValue(0).rational)
+        assertEquals(1L, result.stats.equationalSections)
+    }
+
+    @Test
+    fun `required zero products retain their singular coordinate sections`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= x0 0) (= (* x0 (+ (* x1 x1) (* x2 x2) (- 1))) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        for (variable in 0..32) assertEquals(BigFraction.ZERO, witness.realValue(variable).rational)
+        assertEquals(1L, result.stats.equationalSections)
+    }
+
+    @Test
+    fun `Boolean pin retraction rebuilds conditional equality sections`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (and (=> b (= x0 (* x1 x1)))
+                         (=> (not b) (= x0 (+ (* x1 x1) 1))) (= (* x1 x1) 2)))
+            """.trimIndent(),
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+
+        service.invocation(QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0))).use { invocation ->
+            for (pin in listOf(false, true, false)) {
+                val result = invocation.check(PolynomialCondition(bools = mapOf(0 to pin)))
+
+                val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+                assertEquals(pin, witness.boolValue(0))
+                assertEquals(BigFraction.ofLong(if (pin) 2L else 3L), witness.realValue(0).rational)
+            }
+        }
+    }
+
+    @Test
     fun `constant numeric truth excludes impossible Boolean alternatives before regions`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

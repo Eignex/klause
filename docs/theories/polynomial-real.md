@@ -659,16 +659,36 @@ polynomials. It reads the [exact polynomial kernel](../arithmetic/polynomial.md)
 and owns selection of projection operations and declared variable order.
 The theory does not materialize finite CP domains or depend on the linear engines.
 
+Within a Boolean region, a true equality or false disequality requires its whole
+polynomial to vanish. These premises permit total graph sections: a coordinate
+occurring in exactly one pure linear monomial with a nonzero rational coefficient
+is solved as a polynomial in the remaining coordinates. Every region boundary and
+remaining required equation is substituted before further elimination. A nonzero
+constant required equation refutes that region. Products remain whole equations;
+no factor acquires a zero or nonzero premise. Variable coefficients and nonlinear
+coordinate occurrences retain complete ordinary projection.
+
+Projection records a permutation of all original coordinates and the total graph
+sections. Graph dependencies occupy earlier lifting levels. Prefix literal checks
+use those levels rather than source coordinate IDs. Fixed coordinates retain their
+source values; graph coordinates are reconstructed by exact evaluation at the
+selected earlier coordinates. Every original declaration remains in the complete
+assignment and final source check. Section premises belong only to their Boolean
+region and conditioned query. Completed section observations accumulate under the
+same native owner, including sections preceding a later representation refusal;
+they measure completed transformations, not accepted models or region refutations.
+
 The returned family owns its level buffers. Input list mutation and mutation of a
 returned list do not change captured families. Immutable kernel polynomials may be
 shared. One caller-supplied arithmetic context spans construction; interruption and
 kernel resource stops propagate without publishing a partial family.
 
-Variable IDs define ascending lifting order. Construction eliminates variables in
-descending order and stores one polynomial family per declared ID, containing only
-polynomials whose main variable is that ID. Lower-variable polynomials carry through
-elimination. An absent dimension retains an empty family. The univariate family is
-the last projection level.
+Construction eliminates total graph coordinates when available, otherwise the
+highest remaining source coordinate. It stores one polynomial family per lifting
+level, containing boundaries involving that level's coordinate after later levels
+have been removed. Lower-level polynomials carry through elimination. An absent
+dimension retains an empty family. The univariate family occupies the first
+lifting level. Without equality sections, this is ascending source-ID lifting.
 
 For each eliminated top-variable family, the projection contains all coefficient
 polynomials, every principal subresultant coefficient of each nonconstant reductum
@@ -686,7 +706,7 @@ reducta rather than relying on a nonvanishing discriminant or leading coefficien
 
 ### Lifting and truth
 
-Traversal uses an iterative stack in ascending variable order. Each projection
+Traversal uses an iterative stack in ascending projection-level order. Each projection
 polynomial specializes at the exact earlier coordinates. Identically-zero
 specializations add no roots; nonzero constants also add none. Kernel isolation
 supplies every distinct real root, and exact comparison sorts and deduplicates the
