@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.result
 
 import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.stream.lock
 
 /**
  * Bounded observations of aggregation MIR in one sequential finite portfolio invocation.
@@ -24,9 +25,12 @@ class MirUseDiagnostics internal constructor(
 
 internal fun mergeMirUse(first: MirUseDiagnostics?, second: MirUseDiagnostics?): MirUseDiagnostics? = when {
     first == null -> second
+
     second == null || first === second -> first
+
     first.invocationId == second.invocationId && first.encoded == second.encoded &&
         !second.foreignObservationsDiscarded -> first
+
     else -> MirUseDiagnostics(first.invocationId, first.encoded, false, first.retainedScalars, true)
 }
 
@@ -46,9 +50,10 @@ internal class MirUseBudget private constructor(val invocationId: Long) {
     private var refusedOwners = 0L
     private var incomplete = false
     private var finished: MirUseDiagnostics? = null
+    private var discarded = false
 
     fun owner(seed: Long?, emphasis: Int, bools: Int, ints: Int, reals: Int, factors: Int): MirUseOwner? {
-        if (finished != null) return null
+        if (discarded || finished != null) return null
         if (owners == MAX_OWNERS || !fits(OWNER_WORDS)) {
             refusedOwners = increment(refusedOwners)
             incomplete = true
@@ -79,7 +84,7 @@ internal class MirUseBudget private constructor(val invocationId: Long) {
         2L * (21L * (used + count) + ENCODING_OVERHEAD) + ENCODING_OVERHEAD <= MAX_BYTES
 
     fun reserve(owner: MirUseOwner, size: Long, cut: Boolean): Int? {
-        if (!owner.snapshotActive || finished != null) return null
+        if (!owner.snapshotActive || discarded || finished != null) return null
         val index = if (cut) 21 else 20
         val limit = if (cut) MAX_CUTS else MAX_ROWS
         if (read(owner, index) >= limit || size > Int.MAX_VALUE || size < 0L || !fits(size.toInt())) {
@@ -114,8 +119,14 @@ internal class MirUseBudget private constructor(val invocationId: Long) {
         incomplete = true
     }
 
+    fun discard() {
+        words = null
+        discarded = true
+    }
+
     fun finish(): MirUseDiagnostics {
         finished?.let { return it }
+        check(!discarded) { "MIR observations were discarded" }
         val buffer = words ?: LongArray(GLOBAL_WORDS)
         buffer[0] = 1L
         buffer[1] = invocationId
@@ -161,11 +172,7 @@ internal class MirUseBudget private constructor(val invocationId: Long) {
     }
 }
 
-internal class MirUseOwner(
-    private val budget: MirUseBudget,
-    val offset: Int,
-    val id: Int,
-) {
+internal class MirUseOwner(private val budget: MirUseBudget, val offset: Int, val id: Int) {
     var snapshotActive: Boolean = false
         private set
 
@@ -184,9 +191,13 @@ internal class MirUseOwner(
         }
     }
 
-    fun sourceEpoch(epoch: Long) { if (snapshotActive) budget.set(this, 31, epoch) }
+    fun sourceEpoch(epoch: Long) {
+        if (snapshotActive) budget.set(this, 31, epoch)
+    }
 
-    fun end() { snapshotActive = false }
+    fun end() {
+        snapshotActive = false
+    }
     fun count(field: Int) = budget.note(this, field)
     fun omit(field: Int) = budget.omitted(this, field)
     fun reserve(size: Long, cut: Boolean = false): Int? = budget.reserve(this, size, cut)
