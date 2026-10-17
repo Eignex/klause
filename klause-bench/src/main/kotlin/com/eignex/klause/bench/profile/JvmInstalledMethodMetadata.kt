@@ -128,7 +128,7 @@ internal object JvmInstalledMethodMetadata {
     }
 
     @Suppress("LongMethod")
-    private fun inventory(out: File, distribution: File, original: JsonObject) {
+    internal fun inventory(out: File, distribution: File, original: JsonObject) {
         val jars = original.keys.filter { it.endsWith(".jar") }.sorted()
         require(jars.isNotEmpty())
         val saved = File(out, "private-installed-jars").apply { check(mkdirs()) }

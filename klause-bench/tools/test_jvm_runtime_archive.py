@@ -1,5 +1,6 @@
 import hashlib
 import io
+import json
 from pathlib import Path
 import tarfile
 import tempfile
@@ -124,6 +125,105 @@ class JvmRuntimeArchiveTest(unittest.TestCase):
                 runtime.prepare_runtime({'provenance': {'runtime': {}}}, archive, 'a' * 64, destination, {})
 
             self.assertFalse(destination.exists())
+
+    def test_complete_saved_capture_authenticates_every_member_before_all_original_jars_are_staged(self):
+        distribution = {'lib/first.jar': hashlib.sha256(b'first').hexdigest(),
+                        'lib/second.jar': hashlib.sha256(b'second').hexdigest(),
+                        'bin/cli': hashlib.sha256(b'launcher').hexdigest()}
+        manifest = {'provenance': {'distribution': distribution}}
+        match = {'matchesOriginal': True, 'expected': distribution, 'actual': distribution}
+        files = {'captured-original-manifest.json': json.dumps(manifest).encode(),
+                 'completion.json': json.dumps({'completed': True, 'requestedSourceHead': 'a' * 40,
+                    'allInstalledDistributionBytesMatchedBeforeInspection': True}).encode(),
+                 'control-distribution-match.json': json.dumps(match).encode(),
+                 'candidate-distribution-match.json': json.dumps(match).encode(),
+                 'private-installed-jars/lib/first.jar': b'first',
+                 'private-installed-jars/lib/second.jar': b'second', 'unselected.txt': b'unselected'}
+        with tempfile.TemporaryDirectory() as directory:
+            archive, destination = Path(directory) / 'saved.tar.gz', Path(directory) / 'distribution'
+            with tarfile.open(archive, 'w:gz') as stream:
+                for name, raw in files.items():
+                    member = tarfile.TarInfo(name)
+                    member.size = len(raw)
+                    stream.addfile(member, io.BytesIO(raw))
+            expected = {name: {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+                        for name, raw in files.items()}
+            capture = {'schema': 1, 'archiveBytes': archive.stat().st_size,
+                       'archiveSha256': runtime.digest(archive), 'files': expected}
+            report = {}
+
+            runtime.prepare_saved_distribution(manifest, capture, archive, runtime.digest(archive),
+                expected['captured-original-manifest.json']['sha256'], 'a' * 40, destination, report)
+
+            self.assertTrue(report['completed'])
+            self.assertEqual(expected, report['verifiedCaptureMembers'])
+            self.assertEqual({'lib/first.jar': b'first', 'lib/second.jar': b'second'},
+                {path.relative_to(destination).as_posix(): path.read_bytes()
+                 for path in destination.rglob('*') if path.is_file()})
+
+    def test_invalid_saved_capture_never_exposes_a_staged_jar_prefix(self):
+        variants = ['archive', 'missing', 'extra', 'changed', 'duplicate', 'link', 'unsafe',
+                    'jar-identity', 'extra-jar', 'source', 'completion', 'original-distribution',
+                    'control', 'candidate', 'control-map', 'candidate-map',
+                    'MAX_ARCHIVE_BYTES', 'MAX_EXPANDED_BYTES', 'MAX_MEMBERS', 'MAX_FILE_BYTES']
+        for variant in variants:
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                distribution = {'lib/first.jar': hashlib.sha256(b'first').hexdigest()}
+                if variant == 'jar-identity':
+                    distribution['lib/first.jar'] = 'b' * 64
+                manifest = {'provenance': {'distribution': distribution}}
+                match = {'matchesOriginal': True, 'expected': distribution, 'actual': distribution}
+                completion = {'completed': variant != 'completion', 'requestedSourceHead': 'a' * 40,
+                              'allInstalledDistributionBytesMatchedBeforeInspection': variant != 'original-distribution'}
+                if variant == 'source':
+                    completion['requestedSourceHead'] = 'b' * 40
+                files = {'captured-original-manifest.json': json.dumps(manifest).encode(),
+                         'completion.json': json.dumps(completion).encode(),
+                         'control-distribution-match.json': json.dumps(match).encode(),
+                         'candidate-distribution-match.json': json.dumps(match).encode(),
+                         'private-installed-jars/lib/first.jar': b'first', 'unselected.txt': b'unselected'}
+                if variant in ('control', 'candidate'):
+                    files[variant + '-distribution-match.json'] = json.dumps(dict(match, matchesOriginal=False)).encode()
+                if variant in ('control-map', 'candidate-map'):
+                    files[variant.split('-')[0] + '-distribution-match.json'] = json.dumps(
+                        dict(match, actual={'lib/first.jar': 'b' * 64})).encode()
+                if variant == 'extra-jar':
+                    files['private-installed-jars/lib/extra.jar'] = b'extra'
+                expected = {name: {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+                            for name, raw in files.items()}
+                entries = list(files.items())
+                if variant == 'missing':
+                    entries = entries[:-1]
+                elif variant in ('extra', 'duplicate', 'link', 'unsafe'):
+                    name = {'extra': 'extra.txt', 'duplicate': 'unselected.txt',
+                            'link': 'linked', 'unsafe': '../outside'}[variant]
+                    entries.append((name, b'x'))
+                elif variant == 'changed':
+                    entries[-1] = ('unselected.txt', b'UNSELECTED')
+                archive, destination = Path(directory) / 'saved.tar.gz', Path(directory) / 'distribution'
+                with tarfile.open(archive, 'w:gz') as stream:
+                    for name, raw in entries:
+                        member = tarfile.TarInfo(name)
+                        if variant == 'link' and name == 'linked':
+                            member.type, member.linkname = tarfile.SYMTYPE, 'unselected.txt'
+                            stream.addfile(member)
+                        else:
+                            member.size = len(raw)
+                            stream.addfile(member, io.BytesIO(raw))
+                archive_hash = runtime.digest(archive)
+                capture = {'schema': 1, 'archiveBytes': archive.stat().st_size,
+                           'archiveSha256': archive_hash, 'files': expected}
+                report = {}
+                bound = variant if variant.startswith('MAX_') else 'MAX_MEMBERS'
+                limit = 0 if variant.startswith('MAX_') else runtime.MAX_MEMBERS
+
+                with patch.object(runtime, bound, limit), self.assertRaises(ValueError):
+                    runtime.prepare_saved_distribution(manifest, capture, archive,
+                        'c' * 64 if variant == 'archive' else archive_hash,
+                        expected['captured-original-manifest.json']['sha256'], 'a' * 40, destination, report)
+
+                self.assertFalse(report['completed'])
+                self.assertFalse(destination.exists())
 
 
 if __name__ == '__main__':

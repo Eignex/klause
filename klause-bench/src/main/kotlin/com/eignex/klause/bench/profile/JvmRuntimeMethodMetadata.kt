@@ -204,7 +204,7 @@ internal object JvmRuntimeMethodMetadata {
         check(errors == 0) { "Runtime class metadata errors remain in the complete inventory" }
     }
 
-    private fun download(address: String, output: File, maximum: Long, expected: String) {
+    internal fun download(address: String, output: File, maximum: Long, expected: String) {
         require(address.length <= 4096)
         val uri = URI(address)
         require(
@@ -231,7 +231,7 @@ internal object JvmRuntimeMethodMetadata {
         require(digest(output) == expected) { "Runtime metadata input hash mismatch" }
     }
 
-    private fun digest(file: File): String {
+    internal fun digest(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { source ->
             val buffer = ByteArray(64 * 1024)

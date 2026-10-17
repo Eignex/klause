@@ -2402,6 +2402,23 @@ Limits are eight archives totalling 2 GiB compressed, 16 GiB expanded per archiv
 10,000 source member queries and a 64 MiB complete report. A limit decline is
 negative, and never permits a smaller successful subset or a raised bound.
 
+`bench.profile.JvmSavedInstalledMethodMetadata` accepts `head=`, `manifest=`,
+`manifest-sha256=`, `capture-manifest=`, `capture-manifest-sha256=`, `archive=` and
+`archive-sha256=`. The two manifests are pinned HTTPS inputs; `archive` is an
+absolute, unlinked local path to an unchanged complete original capture archive.
+The reader authenticates that whole archive and every declared member before
+staging all original saved JARs. The captured original manifest, successful
+completion and both complete distribution-match reports must agree with the
+requested source and distribution. Missing, changed, extra, linked, duplicate,
+unsafe or over-limit inputs decline without class inspection. Only the complete
+original JAR set is staged; no original CLI is rebuilt or executed, JAR path is
+renamed, or failed rebuild guard is relabeled as successful. The existing JAR
+inventory retains every class entry and its metadata. Original input/JAR binaries
+remain private. Input limits are 256 MiB compressed, 1 GiB expanded, 20,000 archive
+members, 512 MiB per member and 2 MiB per provenance JSON document. JAR/class and
+report bounds remain those of the installed-JAR reader. Use the supported lab
+route for the profiling worker and remove owned input staging after preservation.
+
 The installed-JAR and runtime-image class readers retain every source-debug
 extension as opaque `sourceDebugExtensionContentsBase64`, in the same attribute
 order as `sourceDebugExtensionIdentities`. Empty payloads remain distinct from
