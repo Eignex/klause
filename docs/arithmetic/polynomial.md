@@ -88,6 +88,14 @@ retain a nonminimal defining polynomial; metadata still selects its exact root.
 Refinement creates another value with the same root identity. Values survive
 arithmetic context disposal and do not retain mutable isolation workspaces.
 
+Each rational polynomial arithmetic context retains up to two completed Sturm
+sequences for refinement, keyed by immutable defining-polynomial reference identity.
+Repeated bisection and alternating boundary refinement reuse those exact sequences;
+midpoint evaluation and open-interval root counts remain unchanged. Lookup and
+completed capture debit the current arithmetic token. Interrupted construction
+installs no entry. These private entries retain neither intervals nor source
+verdicts, and separate contexts construct their own sequences under their own limits.
+
 Comparison uses exact gcd/common-root tests and interval separation. Polynomial
 sign evaluation first detects zero with gcd, then refines exact rational interval
 enclosures until a nonzero sign is certified. Equal values with different defining

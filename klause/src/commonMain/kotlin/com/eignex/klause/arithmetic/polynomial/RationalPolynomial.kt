@@ -29,6 +29,10 @@ internal data class RationalInterval(val lower: BigFraction, val upper: BigFract
 internal data class SquareFreeFactor(val polynomial: RationalPolynomial, val multiplicity: Int)
 
 internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic = PolynomialArithmetic()) {
+    private class RefinementSequence(val polynomial: RationalPolynomial, val sequence: List<RationalPolynomial>)
+    private var currentRefinement: RefinementSequence? = null
+    private var previousRefinement: RefinementSequence? = null
+
     fun add(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial = RationalPolynomial(
         List(arithmetic.denseSize(maxOf(left.degree, right.degree))) {
             arithmetic.step()
@@ -229,6 +233,17 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         val midpoint = (interval.lower + interval.upper) * BigFraction.ofLong(2).reciprocal()
         if (evaluate(polynomial, midpoint).isZero) return RationalInterval(midpoint, midpoint)
         val left = RationalInterval(interval.lower, midpoint)
-        return if (countOpen(sturm(polynomial), left) == 1) left else RationalInterval(midpoint, interval.upper)
+        return if (countOpen(refinementSequence(polynomial), left) == 1) left else RationalInterval(midpoint, interval.upper)
+    }
+
+    private fun refinementSequence(polynomial: RationalPolynomial): List<RationalPolynomial> {
+        arithmetic.step()
+        currentRefinement?.let { if (it.polynomial === polynomial) return it.sequence }
+        previousRefinement?.let { if (it.polynomial === polynomial) return it.sequence }
+        val sequence = sturm(polynomial)
+        arithmetic.step()
+        previousRefinement = currentRefinement
+        currentRefinement = RefinementSequence(polynomial, sequence)
+        return sequence
     }
 }
