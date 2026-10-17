@@ -2658,6 +2658,8 @@ Kotlin, Kotlin script and Java files are parsed with the observer's pinned
 Kotlin compiler 2.4.10 PSI implementation. This dependency belongs only to the
 unpublished benchmark module. The observer records its compiler JAR identities
 and checks its installed distribution and runtime before and after processing.
+Source PSI files are detached from the IDE event system; the scoped compiler
+environment is disposed after processing, without global IDE cache mutation.
 
 `source-declarations.jsonl.gz` retains source boundaries and every declaration,
 expression, statement, source reference and parser error, with lexical parents.

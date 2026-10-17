@@ -23,7 +23,6 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.com.intellij.psi.PsiJavaCodeReferenceElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiJavaFile
 import org.jetbrains.kotlin.com.intellij.psi.PsiLambdaExpression
-import org.jetbrains.kotlin.com.intellij.psi.PsiManager
 import org.jetbrains.kotlin.com.intellij.psi.PsiMember
 import org.jetbrains.kotlin.com.intellij.psi.PsiMethod
 import org.jetbrains.kotlin.com.intellij.psi.PsiMethodCallExpression
@@ -77,7 +76,8 @@ internal class JvmSourceDeclarationParser : AutoCloseable {
         val source = SourceSyntaxIndex(text)
         val fileName = path.substringAfterLast('/')
         val file = if (path.endsWith(".java")) {
-            PsiFileFactory.getInstance(environment.project).createFileFromText(fileName, JavaFileType.INSTANCE, text)
+            PsiFileFactory.getInstance(environment.project)
+                .createFileFromText(fileName, JavaFileType.INSTANCE, text, 0L, false, false)
                 .also { require(it is PsiJavaFile) { "Java parser unavailable" } }
         } else {
             require(path.endsWith(".kt") || path.endsWith(".kts"))
@@ -88,24 +88,20 @@ internal class JvmSourceDeclarationParser : AutoCloseable {
         pending.addLast(SourceSyntaxCursor(file, null, 0))
         var records = 0
         var errors = 0
-        try {
-            while (pending.isNotEmpty()) {
-                val (element, owner, depth) = pending.removeLast()
-                check(++visited <= MAX_NODES && depth <= MAX_DEPTH) { "Complete source syntax exceeds bounds" }
-                var parent = owner
-                if (retained(element)) {
-                    val index = records++
-                    if (element is PsiErrorElement) errors++
-                    emit(node(element, owner, index, source))
-                    parent = index
-                }
-                val children = element.children
-                for (index in children.lastIndex downTo 0) {
-                    pending.addLast(SourceSyntaxCursor(children[index], parent, depth + 1))
-                }
+        while (pending.isNotEmpty()) {
+            val (element, owner, depth) = pending.removeLast()
+            check(++visited <= MAX_NODES && depth <= MAX_DEPTH) { "Complete source syntax exceeds bounds" }
+            var parent = owner
+            if (retained(element)) {
+                val index = records++
+                if (element is PsiErrorElement) errors++
+                emit(node(element, owner, index, source))
+                parent = index
             }
-        } finally {
-            PsiManager.getInstance(environment.project).dropPsiCaches()
+            val children = element.children
+            for (index in children.lastIndex downTo 0) {
+                pending.addLast(SourceSyntaxCursor(children[index], parent, depth + 1))
+            }
         }
         return SourceSyntaxResult(records, errors)
     }
