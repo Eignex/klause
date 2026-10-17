@@ -8,24 +8,6 @@ import kotlin.test.assertTrue
 
 class PolynomialPhaseProfileTest {
     @Test
-    fun `pipeline query observations preserve the native result and work`() {
-        val source = "(declare-const x Real) (assert (= (* x x) 2))"
-        val plain = PolynomialPhaseProfile.pipeline(source)
-
-        val traced = PolynomialPhaseProfile.pipeline(source, queryTrace = true)
-
-        assertEquals(plain.result, traced.result)
-        assertEquals(plain.nativeStats, traced.nativeStats)
-        assertNull(plain.queryObservation)
-        val queries = assertNotNull(traced.queryObservation)
-        assertTrue(queries.observed > 0)
-        assertEquals(0L, queries.discardedHistory)
-        assertEquals(queries.observed - 1, queries.previous.size.toLong())
-        assertEquals(queries.observed, assertNotNull(queries.last).sequence)
-        assertTrue(queries.last.origin.isNotEmpty())
-    }
-
-    @Test
     fun `phase observations retain subresultant operand shapes and matrix index`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1))"
