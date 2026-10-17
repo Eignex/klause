@@ -16,14 +16,30 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.CertifiedLpBound
+import com.eignex.klause.lp.engine.CertifiedLpResult
+import com.eignex.klause.lp.engine.ExactLpWitness
+import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.ProductionLpCertificationPolicy
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.VarStatus
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchLearnedDbParams
@@ -40,12 +56,239 @@ import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
+    @Test
+    fun `fresh fractional float guidance should retain both Boolean alternatives without an assignment`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(), factors = emptyArray())
+        val model = assertNotNull(LpBuilder().apply { addVar(0L, 2L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(model)
+        for (coordinate in listOf(0.75, 1.0)) {
+            val numerical = FloatLpResult(
+                Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)), 0.0, doubleArrayOf(),
+                doubleArrayOf(coordinate), exactState = state,
+            )
+            val result = CertifiedLpResult(
+                numerical, CertifiedLpBound(BigFraction.ZERO), null, null, null, false, { null },
+            )
+            val guide = assertNotNull(
+                FreshIntegerFloatHints.create(
+                    source, result, state, ProductionLpCertificationPolicy, Cancellation.Never,
+                ),
+            )
+            var preferred: Boolean? = null
+            assertTrue(guide.emit(Cancellation.Never, { true }) { preferred = it.single() >= BigFraction.ONE })
+            val preference = assertNotNull(preferred)
+            val decisions = ArrayList<Boolean>()
+            val component = object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    if (decision is SearchDecision.Bool) decisions += decision.literal == Lit.make(0, true)
+                    return ComponentResult.Consistent
+                }
+
+                override fun check(context: SearchContext): ComponentCheck = when (context.boolValue(0)) {
+                    null -> ComponentCheck.Indeterminate
+                    preference -> ComponentCheck.Infeasible()
+                    else -> ComponentCheck.Feasible
+                }
+            }
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+
+            val solved = assertIs<SearchResult.Satisfied>(
+                session.solve(1, candidateHints = SearchCandidateHints { preferred }),
+            )
+
+            assertEquals(listOf(preference, !preference), decisions)
+            assertNull(solved.model.valueOf<ExactLiraAssignment>(component))
+            assertNull(result.exactPrimal)
+        }
+    }
+
+    @Test
+    fun `float guidance should decline results without a fresh production bound frame`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(), factors = emptyArray())
+        val model = assertNotNull(LpBuilder().apply { addVar(0L, 2L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(model)
+        val numerical = FloatLpResult(
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)), 0.0, doubleArrayOf(),
+            doubleArrayOf(0.75), exactState = state,
+        )
+        val bound = CertifiedLpBound(BigFraction.ZERO)
+        val result = CertifiedLpResult(numerical, bound, null, null, null, false, { null })
+        val invalidResults = listOf(
+            CertifiedLpResult(null, bound, null, null, null, false, { null }),
+            CertifiedLpResult(numerical, null, null, null, null, false, { null }),
+            CertifiedLpResult(
+                numerical, bound, ExactLpWitness(listOf(BigFraction.ONE), BigFraction.ZERO),
+                null, null, false, { null },
+            ),
+            CertifiedLpResult(numerical, bound, null, null, null, false, { null }, floatOptimum = numerical),
+        )
+        for (invalid in invalidResults) {
+            assertNull(
+                FreshIntegerFloatHints.create(
+                    source, invalid, state, ProductionLpCertificationPolicy, Cancellation.Never,
+                ),
+            )
+        }
+        for (current in listOf(null, LpExactState(model))) {
+            assertNull(
+                FreshIntegerFloatHints.create(
+                    source, result, current, ProductionLpCertificationPolicy, Cancellation.Never,
+                ),
+            )
+        }
+        assertNull(
+            FreshIntegerFloatHints.create(
+                source, result, state, LpCertificationPolicy { _, ok -> ok }, Cancellation.Never,
+            ),
+        )
+    }
+
+    @Test
+    fun `float guidance should decline partial nonfinite and mismatched coordinate frames`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(), factors = emptyArray())
+        val model = assertNotNull(LpBuilder().apply { addVar(0L, 2L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(model)
+        for ((coordinates, optimal) in listOf(
+            doubleArrayOf(0.75) to false,
+            doubleArrayOf(Double.NaN) to true,
+            doubleArrayOf(Double.POSITIVE_INFINITY) to true,
+            doubleArrayOf(Double.NEGATIVE_INFINITY) to true,
+            doubleArrayOf() to true,
+            doubleArrayOf(0.75, 1.0) to true,
+        )) {
+            val numerical = FloatLpResult(
+                Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)), 0.0, doubleArrayOf(),
+                coordinates, optimal = optimal, exactState = state,
+            )
+            val result = CertifiedLpResult(
+                numerical, CertifiedLpBound(BigFraction.ZERO), null, null, null, false, { null },
+            )
+
+            assertNull(
+                FreshIntegerFloatHints.create(
+                    source, result, state, ProductionLpCertificationPolicy, Cancellation.Never,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `float guidance should decline sources outside the bounded pure integer provider`() {
+        val model = assertNotNull(LpBuilder().apply { addVar(0L, 2L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(model)
+        val numerical = FloatLpResult(
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)), 0.0, doubleArrayOf(),
+            doubleArrayOf(0.75), exactState = state,
+        )
+        val result = CertifiedLpResult(
+            numerical, CertifiedLpBound(BigFraction.ZERO), null, null, null, false, { null },
+        )
+        val sources = listOf(
+            Problem(numBoolVars = 1, intBounds = openBounds(0), factors = emptyArray()),
+            Problem(numBoolVars = 0, intBounds = openBounds(), factors = emptyArray()),
+            Problem(
+                numBoolVars = 1, intBounds = openBounds(), factors = emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
+            ),
+            Problem(numBoolVars = 1, intBounds = openBounds(2), factors = emptyArray()),
+            Problem(numBoolVars = 1, intBounds = openBounds(65_537), factors = emptyArray()),
+        )
+        for (source in sources) {
+            assertNull(
+                FreshIntegerFloatHints.create(
+                    source, result, state, ProductionLpCertificationPolicy, Cancellation.Never,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `stopped float guidance preflight should retain its debit without a producer`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(), factors = emptyArray())
+        val model = assertNotNull(LpBuilder().apply { addVar(0L, 2L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(model)
+        val numerical = FloatLpResult(
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)), 0.0, doubleArrayOf(),
+            doubleArrayOf(0.75), exactState = state,
+        )
+        val result = CertifiedLpResult(
+            numerical, CertifiedLpBound(BigFraction.ZERO), null, null, null, false, { null },
+        )
+        for (limit in listOf(1L, 2L)) {
+            var charged = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = charged >= limit
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+
+            assertNull(FreshIntegerFloatHints.create(source, result, state, ProductionLpCertificationPolicy, stop))
+
+            assertEquals(limit, charged)
+        }
+    }
+
+    @Test
+    fun `stopped float conversion should retain its debit without publishing partial guidance`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(), factors = emptyArray())
+        val model = assertNotNull(LpBuilder().apply { addVar(0L, 2L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(model)
+        val numerical = FloatLpResult(
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)), 0.0, doubleArrayOf(),
+            doubleArrayOf(0.75), exactState = state,
+        )
+        val result = CertifiedLpResult(
+            numerical, CertifiedLpBound(BigFraction.ZERO), null, null, null, false, { null },
+        )
+        val guide = assertNotNull(
+            FreshIntegerFloatHints.create(source, result, state, ProductionLpCertificationPolicy, Cancellation.Never),
+        )
+        for (limit in listOf(1L, 3L, 4L)) {
+            var charged = 0L
+            var published = false
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = charged >= limit
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+
+            assertFalse(guide.emit(stop, {
+                stop.charge(1)
+                true
+            }) { published = true })
+
+            assertFalse(published)
+            assertEquals(if (limit == 1L) 2L else limit, charged)
+        }
+    }
+
+    @Test
+    fun `refused float scalar admission should publish no guidance`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(), factors = emptyArray())
+        val model = assertNotNull(LpBuilder().apply { addVar(0L, 2L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(model)
+        val numerical = FloatLpResult(
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)), 0.0, doubleArrayOf(),
+            doubleArrayOf(0.75), exactState = state,
+        )
+        val result = CertifiedLpResult(
+            numerical, CertifiedLpBound(BigFraction.ZERO), null, null, null, false, { null },
+        )
+        val guide = assertNotNull(
+            FreshIntegerFloatHints.create(source, result, state, ProductionLpCertificationPolicy, Cancellation.Never),
+        )
+        var published = false
+
+        assertFalse(guide.emit(Cancellation.Never, { false }) { published = true })
+
+        assertFalse(published)
+    }
+
     @Test
     fun `explicit integer point preparation should decline without charging its caller`() {
         var charged = 0L

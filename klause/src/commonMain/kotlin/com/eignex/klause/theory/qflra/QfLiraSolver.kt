@@ -26,12 +26,15 @@ import com.eignex.klause.lp.bounding.LpPremisedBound
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.closeSourceLpOwners
+import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
@@ -409,6 +412,18 @@ class ExactLiraSearchComponent private constructor(
         pointHintValues = values
         smtStats?.observePointHintCapture(graph)
         observeCompleteStage(if (graph) "POINT_HINT_GRAPH_CAPTURE" else "POINT_HINT_LP_CAPTURE")
+    }
+
+    private fun captureIntegerFloatHints(result: CertifiedLpResult, context: SearchContext) {
+        if (model.numRealVars != 0 || pointHintRows == null) return
+        val stop = operationStop or pointHintStop
+        val guide = FreshIntegerFloatHints.create(
+            model, result, lp.state, solveContext.certificationPolicy, stop,
+        ) ?: return
+        observeCompleteStage("POINT_HINT_FLOAT_OPPORTUNITY")
+        if (guide.emit(stop, ::hintScalar) { capturePointHints(it, context) } && pointHintValues != null) {
+            observeCompleteStage("POINT_HINT_FLOAT_CAPTURE")
+        }
     }
 
     private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? =
@@ -1196,7 +1211,8 @@ class ExactLiraSearchComponent private constructor(
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
         if (bools.any { it == UNASSIGNED }) {
-            candidate?.let { capturePointHints(it, context) }
+            val point = candidate
+            if (point != null) capturePointHints(point, context) else captureIntegerFloatHints(result, context)
         } else if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
             model.numIntVars > 0 && model.numRealVars > 0 &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy
@@ -1623,6 +1639,53 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
         validated = true,
     )
     return source.takeUnless { stop() }
+}
+
+internal class FreshIntegerFloatHints private constructor(private val coordinates: DoubleArray) {
+    fun emit(
+        stop: Cancellation,
+        admitted: (BigFraction) -> Boolean,
+        consume: (List<BigFraction>) -> Unit,
+    ): Boolean {
+        stop.charge(coordinates.size.toLong() + 1L)
+        if (stop()) return false
+        val guide = ArrayList<BigFraction>(coordinates.size)
+        for (coordinate in coordinates) {
+            stop.charge(1)
+            if (stop()) return false
+            val value = BigFraction.ofDouble(coordinate) ?: return false
+            if (!admitted(value) || stop()) return false
+            guide += value
+        }
+        if (stop()) return false
+        consume(guide)
+        return !stop()
+    }
+
+    companion object {
+        fun create(
+            source: Problem,
+            result: CertifiedLpResult,
+            current: LpExactState?,
+            policy: LpCertificationPolicy,
+            stop: Cancellation,
+        ): FreshIntegerFloatHints? {
+            stop.charge(1)
+            if (stop() || source.numRealVars != 0 || source.numIntVars !in 1..MAX_POINT_HINT_ENTRIES ||
+                source.numBoolVars == 0 || policy !== ProductionLpCertificationPolicy ||
+                result.verdict != LpVerdict.CERTIFIED_BOUND || result.exactPrimal != null
+            ) return null
+            val numerical = result.float ?: return null
+            if (!numerical.optimal || current == null || numerical.exactState !== current ||
+                current.model.n != source.numIntVars || numerical.primal.size != source.numIntVars
+            ) return null
+            for (coordinate in numerical.primal) {
+                stop.charge(1)
+                if (stop() || !coordinate.isFinite()) return null
+            }
+            return FreshIntegerFloatHints(numerical.primal)
+        }
+    }
 }
 
 private const val UNASSIGNED = -1

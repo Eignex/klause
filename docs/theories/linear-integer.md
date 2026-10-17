@@ -39,6 +39,15 @@ sources. Registration charges the opening token; capture and bounded comparison
 evaluation charge the existing numerical operation. No extra LP check or clause
 index is created. Fractional coordinates guide branch order only: complete
 integrality, source checks and exhaustive integer branches retain authority.
+An integer-only default provider can also derive primitive preferences from the
+fresh optimal floating coordinates of that same check when the production result
+has a certified bound and no exact point. Admission requires the current LP state
+identity, full source width and finite coordinates. Charged conversion uses the
+existing entry and scalar limits. These unchecked coordinates supply only Boolean
+polarity: they never become a candidate, source assignment, bound premise or point
+reuse seed. Both Boolean alternatives remain available. `POINT_HINT_FLOAT_OPPORTUNITY`
+counts admitted frames; `POINT_HINT_FLOAT_CAPTURE` counts completed preference
+publication and is a subset of `POINT_HINT_LP_CAPTURE`.
 Custom providers retain precedence. Stops, arithmetic changes, retraction and close
 withhold stale preferences. Explicit zero and positive allowances retain their
 existing real-coordinate producer admission and opt-in behavior.

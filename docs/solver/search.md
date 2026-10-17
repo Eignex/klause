@@ -133,7 +133,13 @@ Source integers may be fractional in that point; complete integrality checks and
 exhaustive integer branching retain their authority. Registration precedes component
 initialization; evaluation uses a point from an existing numerical check. It
 constructs no source-clause index and draws no Boolean proposal. Custom registered
-providers retain precedence, and primitive preferences retain their dirty,
+providers retain precedence. For integer-only default providers, a fresh optimal
+floating frame from the current production-certified bound check can supply
+primitive preferences when no exact point exists. Full source-coordinate width,
+state identity, finite scalars and the existing charged limits gate conversion.
+The floating coordinates are unchecked guidance and retain no point, assignment,
+proof or branch-bound authority. Both Boolean alternatives remain exhaustive.
+Primitive preferences retain their dirty,
 retraction, containing-stop and close lifetime.
 If initialization has already admitted the complete pure-real difference graph under
 the production certification policy, a source at-most-one or exactly-one cardinality
