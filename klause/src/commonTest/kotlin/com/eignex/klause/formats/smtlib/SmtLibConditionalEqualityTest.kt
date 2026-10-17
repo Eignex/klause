@@ -7,7 +7,9 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -20,8 +22,6 @@ import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -738,22 +738,12 @@ class SmtLibConditionalEqualityTest {
                 (minimize (ite b 3 8))
                 """.trimIndent(),
             )
-            ExactLiraSearchComponent(parsed.model).use { component ->
-                val session = SearchSession(
-                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
-                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
-                )
-                assertIs<ComponentResult.Consistent>(session.initialize())
+            val result = BacktrackSolver.source(parsed.model).optimize(
+                assertNotNull(parsed.objective).toLinearObjective(),
+            )
 
-                val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
-
-                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-                val objective = assertNotNull(parsed.objective)
-                val value = objective.intCoefficients.withIndex().fold(bigIntOf(objective.constant)) { sum, (v, c) ->
-                    sum + assignment.ints[v] * bigIntOf(c)
-                }
-                assertEquals(bigIntOf(if (branch) 3 else 8), value)
-            }
+            val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result.result)
+            assertEquals(BigFraction.ofLong(if (branch) 3 else 8), optimum.incumbent.value.rational)
         }
     }
 

@@ -24,6 +24,11 @@ required source pins before installation; only a completed projection is publish
 Source-fixed integer conditions are retained in each attribution, while unproved Boolean
 pins cannot authorize a conditioned encoding. Every strategy consumes the same projection
 and existing exact formula witness check. Unsupported scopes decline without proof.
+Quadratic publications and worker certificates bind the retained original factor
+model and source objective. Publication checking reconstructs exact source integers
+and real coordinates against the complete captured formula, including declared
+domains; wide integers do not pass through a finite-word checker. The derived
+formula's private identity cannot replace the original source binding.
 
 ## Solving and composition
 

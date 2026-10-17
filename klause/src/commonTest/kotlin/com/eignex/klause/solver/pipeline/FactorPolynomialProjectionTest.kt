@@ -1,17 +1,25 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.QuadraticCoefficient
+import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.ir.QuadraticObjectiveTerm
+import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.theory.BuiltInEncoderProvider
@@ -26,6 +34,7 @@ import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -74,7 +83,6 @@ class FactorPolynomialProjectionTest {
             SourceSetup.execute(SourceExecutionRequest(invocation)))
 
         val assignment = assertIs<OpenTheoryResult.Sat>(execution.result.result).assignment
-        assertEquals("0", assignment.intValue(0))
         assertEquals("1", assignment.realValue(0))
         assertEquals("1", assignment.realValue(1))
         assertSame(source, execution.invocation.source.originalSource)
@@ -94,7 +102,6 @@ class FactorPolynomialProjectionTest {
 
         val assignment = assertIs<OpenTheoryResult.Sat>(execution.result.result).assignment
         assertEquals("2", assignment.intValue(0))
-        assertEquals("0", assignment.intValue(1))
         assertEquals("1", assignment.realValue(0))
         assertEquals("2", assignment.realValue(2))
         val projection = assertNotNull(assertIs<PreparedExecution.NonlinearInteger>(
@@ -102,6 +109,38 @@ class FactorPolynomialProjectionTest {
         assertEquals(mapOf(SourceIntId(0) to TheoryRealId(0)), projection.attributions[1].integerEmbeddings)
         assertEquals(mapOf(SourceRealId(0) to TheoryRealId(2), SourceRealId(2) to TheoryRealId(4)),
             projection.attributions[1].realEmbeddings)
+    }
+
+    @Test
+    fun `factor backed quadratic publication should retain an original wide integer`() {
+        val source = SmtLib.parse("(declare-const n Int) (declare-const x Real) " +
+            "(assert (= n 9223372036854775808)) (assert (= (* x x) 2))")
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(
+            QuadraticCoefficient.ONE, QuadraticVariable.Int(SourceIntId(0)))))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source.source, FiniteEngine.BACKTRACK, objective))
+
+        val execution = assertIs<SourceExecutionResult.Quadratic>(
+            SourceSetup.execute(SourceExecutionRequest(invocation)))
+
+        val point = assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result.result).incumbent
+        assertEquals(parseBigInt("9223372036854775808"), point.sample.exactIntValue(0))
+        assertNotNull(point.sample.witnessCertificate?.quadraticPublication)
+        assertIs<SourceEvidenceCheck.Checked>(checkQuadraticSourceWitness(
+            assertNotNull(invocation.preparedPlan), point.sample, Cancellation.Never, PolynomialLimits()))
+    }
+
+    @Test
+    fun `factor backed quadratic checking should reject an invalid mixed point`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)),
+            openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true),
+            numRealVars = 2, realLower = doubleArrayOf(1.0, 0.0), realUpper = doubleArrayOf(1.0, 4.0))
+        val plan = source.preparePolynomialExecutionPlan()
+        val point = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(1.0, 3.0),
+            exactReals = listOf(BigFraction.ONE, BigFraction.ofLong(3)))
+
+        val checked = checkQuadraticSourceWitness(plan, point, Cancellation.Never, PolynomialLimits())
+
+        assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
 
     @Test

@@ -3,14 +3,14 @@ package com.eignex.klause.cli
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class SolveCoreTest(private val route: String) {
@@ -92,7 +92,7 @@ class SolveCoreTest(private val route: String) {
         """.trimIndent()
 
         "quadratic-integer" -> """
-            (declare-const i Int) (assert (and (>= i 0) (<= i 100)))
+            (declare-const i Int) (assert (>= i 0))
             (minimize (- 7 (* i i))) (check-sat)
         """.trimIndent()
 
