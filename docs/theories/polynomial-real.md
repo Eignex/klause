@@ -760,6 +760,24 @@ enclosure excluding a required relation refutes the region. Bounds belong to tha
 region, retain the same arithmetic token and kernel power representation checks,
 and supply no satisfying assignment. An unfinished pass withholds the refutation.
 
+Required equations also supply exact monomial identity consequences. For an
+equation `a*M + R = 0` with nonzero rational `a`, a coordinate occurring only in
+`M` with exponent one permits repeated replacement of divisible monomials by
+`-R/a`. Each replacement lowers that coordinate's degree. This inference divides
+only by the rational coefficient; other occurrences of the coordinate and all
+zero fibres remain admitted. Each defining equation is considered separately.
+Original regional predicates remain unchanged when the consequences are inconclusive.
+
+Exact sign enclosures can extract common nonnegative monomial weights times
+binomial squares from these consequences or the unchanged predicates. Coefficient
+portions are consumed exactly; insufficient positive coefficients leave the
+negative remainder. A square can be zero, while a strictly positive residue
+excludes zero. A negative or unknown-sign weight supplies no nonnegative square
+certificate. Only an enclosure disjoint from a required relation refutes the
+region. This proof supplies no witness, shares the containing arithmetic token,
+suspends during rewriting and certificate construction, and retains kernel degree
+representation limits. Cancellation or exhaustion withholds an unfinished proof.
+
 Projection records a permutation of all original coordinates and any further total graph
 sections. Dependencies in those sections occupy earlier lifting levels. Prefix literal checks
 use those levels rather than source coordinate IDs. Fixed coordinates retain their

@@ -153,6 +153,15 @@ internal class PolynomialAffineReduction private constructor(
                 }
                 inconsistent = magnitudeConflict
             }
+            if (!inconsistent) {
+                val consequences = preparePolynomialMonomialRefutation(current, arithmetic)
+                var consequenceConflict: Boolean? = null
+                while (consequenceConflict == null) {
+                    consequenceConflict = consequences.next()
+                    if (consequenceConflict == null) yield(null)
+                }
+                inconsistent = consequenceConflict
+            }
             arithmetic.step()
             yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent,
                 equationsChanged || fibres.isNotEmpty()))
