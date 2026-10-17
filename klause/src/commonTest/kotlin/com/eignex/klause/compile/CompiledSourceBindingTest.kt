@@ -71,16 +71,16 @@ class CompiledSourceBindingTest {
             Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.25),
                 listOf(BigFraction.ofLong(4).reciprocal())), Cancellation.Never))
         val unbound = Sample(booleanArrayOf(), longArrayOf(2))
-        val private = unbound.withCoordinateFrame(compiled.problem)
+        val privatePoint = unbound.withCoordinateFrame(compiled.problem)
 
         assertEquals(0.25, compiled.decode(x, original))
-        assertEquals(1.0, compiled.decode(x, private))
+        assertEquals(1.0, compiled.decode(x, privatePoint))
         assertEquals(1.0, compiled.decode(x, unbound))
         assertFailsWith<IllegalArgumentException> {
             compiled.decode(x, unbound.withCoordinateFrame(other.problem))
         }
         assertFailsWith<IllegalArgumentException> {
-            compiled.sourceBinding.bindOriginalSample(private, Cancellation.Never)
+            compiled.sourceBinding.bindOriginalSample(privatePoint, Cancellation.Never)
         }
     }
 

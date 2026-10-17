@@ -62,7 +62,10 @@ retains original real rows, including strict and optional relations.
 
 Selected grids own finite filtering, local scoring, scaled row coefficients and
 private arithmetic encodings. Their linear scale and integer payload must be
-representable; a declined geometry or coefficient does not reject schema intake.
+representable; a declined geometry, linear scale or coefficient does not reject
+schema intake. Compatibility float-linear rows retain truncation of scaled
+coefficients and non-strict bounds; private affine helper rows use nearest-integer
+quantization. These choices belong to the selected view, not the original rows.
 Grid exhaustion supplies no original-source refutation. Source execution reconstructs
 and checks complete original coordinates before publication, with private proof
 claims retained separately. See [private projections](../model.md#private-float-projections).

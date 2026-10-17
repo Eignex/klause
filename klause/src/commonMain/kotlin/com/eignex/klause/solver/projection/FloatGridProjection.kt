@@ -28,10 +28,17 @@ internal data class FloatGridVariable(
     val buckets: Int? = null,
     val auxiliary: Boolean = false,
     val absentPin: FloatGridAbsentPin? = null,
+    val preserveBuckets: Boolean = false,
 )
 
-internal class FloatGridRequest(val source: Problem, variables: List<FloatGridVariable>, val owner: Any = Any()) {
+internal class FloatGridRequest(
+    val source: Problem,
+    variables: List<FloatGridVariable>,
+    val owner: Any = Any(),
+    truncatedRows: Set<Int> = emptySet(),
+) {
     val variables = variables.toList()
+    val truncatedRows = truncatedRows.toSet()
 }
 
 internal enum class FloatGridDecline {
@@ -110,7 +117,7 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
             listOf(if (factor.variables.reals.isEmpty()) factor else factor.remap(rename))
         } else {
             val pin = optional.pinRows[id]
-            (if (pin == null) lowerFloatGridFactor(factor, bySource, policy, stop)
+            (if (pin == null) lowerFloatGridFactor(factor, bySource, policy, stop, id in request.truncatedRows)
             else lowerGridPin(factor, pin.first, pin.second))
                 ?: return FloatGridPreparation.Declined(
                     if (stop()) FloatGridDecline.RESOURCE else FloatGridDecline.SCALING, id,
@@ -210,7 +217,8 @@ internal fun floatGridColumn(
         policy.unrangedBounds.upper?.let { BigFraction.of(it.numerator, it.denominator) }
     }) ?: return null
     if (origin > upper) return null
-    val buckets = if (origin == upper) 1 else variable.buckets ?: inheritedBuckets ?: policy.buckets
+    val buckets = if (origin == upper && !variable.preserveBuckets) 1
+        else variable.buckets ?: inheritedBuckets ?: policy.buckets
     val step = if (buckets == 1) BigFraction.ZERO
     else (upper - origin) * BigFraction.ofLong(buckets - 1L).reciprocal()
     val lo = approximateGridValue(origin)
@@ -230,11 +238,12 @@ private fun lowerFloatGridFactor(
     columns: Map<Int, FloatGridColumn>,
     policy: FloatSemantics.Grid,
     cancellation: Cancellation,
+    truncate: Boolean,
 ): List<Factor>? {
     fun coordinate(id: Int): GridCoordinate = columns.getValue(id).coordinate
     return when (factor) {
-        is Linear -> lowerGridRow(factor, columns, policy.linearScale, cancellation)
-        is ReifiedRealLinear -> lowerGridRow(factor, columns, policy.linearScale, cancellation)
+        is Linear -> lowerGridRow(factor, columns, policy.linearScale, cancellation, truncate)
+        is ReifiedRealLinear -> lowerGridRow(factor, columns, policy.linearScale, cancellation, truncate)
         is RealAbs -> {
             val input = coordinate(factor.operand)
             val output = coordinate(factor.result)

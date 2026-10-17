@@ -37,11 +37,13 @@ internal class CompiledSourceBinding(
     realNames: Map<String, Int>,
     variables: List<FloatGridVariable> = emptyList(),
     representations: Map<String, FloatRepresentation> = emptyMap(),
+    truncatedRows: Set<Int> = emptySet(),
 ) {
     val integerNames = integerNames.toMap()
     val realNames = realNames.toMap()
     private val variables = variables.toList()
     private val legacyRepresentations = representations.toMap()
+    private val truncatedRows = truncatedRows.toSet()
     private val legacyDefinition: Lazy<FloatGridDefinition?> = lazy { prepareLegacy() }
     private val legacyColumns by lazy { legacyDefinition.value?.columns()?.associateBy { it.source.index }.orEmpty() }
     val legacyProblem: Problem get() = legacyDefinition.value?.target ?: originalProblem
@@ -53,7 +55,7 @@ internal class CompiledSourceBinding(
         if (SourceSetup.preservesOriginalCompleteArm(invocation)) return
         val selected = selectedVariables(invocation.cancellation) ?: return
         if (selected.isNotEmpty()) SourceSetup.prepareSelectedFloatGrid(invocation, selected,
-            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY)
+            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY, truncatedRows)
     }
 
     fun floatRepresentations(): Map<String, FloatRepresentation> =
@@ -162,7 +164,7 @@ internal class CompiledSourceBinding(
     private fun prepareLegacy(): FloatGridDefinition? {
         val selected = selectedVariables(Cancellation.Never) ?: error("schema finite view preparation interrupted")
         if (selected.isEmpty()) return null
-        val request = FloatGridRequest(originalProblem, selected)
+        val request = FloatGridRequest(originalProblem, selected, truncatedRows = truncatedRows)
         return when (val prepared = prepareFloatGrid(request, Cancellation.Never)) {
             is FloatGridPreparation.Prepared -> prepared.mapping.definition()
             is FloatGridPreparation.Declined -> error("schema finite view declined: ${prepared.cause}")
