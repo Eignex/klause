@@ -2787,6 +2787,16 @@ errors from censuses without an explicit incomplete status also remain fatal.
 No context is selected from multiple events and no target process role is inferred.
 Unreferenced saved exports remain named in `unreferencedSavedExportPaths`.
 Context availability does not change original or mapped pair eligibility.
+`originalPairedStudyControls` retains every original case, including unprofiled
+cold and fixed controls, grouped by its original context and arm. Missing,
+duplicate or unexpected arms remain explicit. Original build metadata authenticates
+recorded source heads; benchmark exit and the target's recorded exit, kill and
+refusal controls stay separate. Outcome presence and compact-JSON value hashes,
+selected declared work fields and every raw-statistic difference key are retained;
+unknown and timing fields are not normalized away. Descriptive `elapsedMs`
+differences and exact ratio operands include excluded contexts and describe CLI
+launch/output duration. Equal outcomes or counters establish neither complete
+state/order/RNG/work identity nor runtime, compiler, quality or savings acceptance.
 `methodRecordingObservations` retains every direct root method, inline callee and caller,
 including unknown identities and methods seen only in failed inline attempts.
 Each row references its original recording, direct roots, successful outside

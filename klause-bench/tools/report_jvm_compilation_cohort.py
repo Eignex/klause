@@ -20,6 +20,11 @@ CONTEXT_KEYS = ('engine', 'index', 'repetition', 'mode', 'recipe')
 METRICS = ('reportedElapsedNanos', 'maxReportedElapsedNanos', 'reportedSuccessfulCodeBytes')
 XML_REFERENCE_FIELDS = ('unmeasuredAllTierXmlSnapshotReferences', 'conflictingXmlSnapshotReferences')
 XML_COLLECTIONS = ('queued', 'tasks', 'nmethods')
+STUDY_OUTCOME_FIELDS = ('feasible', 'proven', 'objective', 'exactObjective', 'finalWitness',
+                        'sourceHashes', 'checkedWitness', 'validationPolicy')
+STUDY_WORK_FIELDS = ('nodes', 'failures', 'restarts', 'propagations', 'propagationWork',
+                     'rootPropagationWork', 'learned', 'lsMoves', 'lsRestarts', 'lsStalls',
+                     'nodeBudgetLimit', 'nodeBudgetSpent', 'nodeBudgetRemaining')
 
 
 def compact_family_census(value):
@@ -86,6 +91,113 @@ def checker_status(entry):
             check.get('verdictCheck') == 'source unsat':
         return 'valid'
     return 'unknown'
+
+
+def study_control_record(metadata, ordinal, checks, heads):
+    record = metadata.get('record')
+    present = isinstance(record, dict)
+    record = record if present else {}
+    stats = record.get('stats')
+    stats_valid = isinstance(stats, dict) and all(isinstance(key, str) and isinstance(value, str)
+                                                 for key, value in stats.items())
+    stats = stats if stats_valid else {}
+    arm = metadata.get('arm')
+    expected = heads.get(arm)
+    problem = metadata.get('problem')
+    status = source_status(metadata, checks) if isinstance(problem, dict) and \
+        (problem.get('format') not in ('MINIZINC', 'XCSP3') or stats_valid) else 'missing'
+    return {'case': metadata['case'], 'originalCaseMetadataIndex': ordinal, 'arm': arm,
+            'benchmarkExit': metadata.get('exit'), 'benchmarkInterrupted': metadata.get('interrupted'),
+            'benchmarkError': metadata.get('error'), 'sourceHashesMatch': metadata.get('sourceHashesMatch'),
+            'originalSourceStatus': status, 'recordPresent': present,
+            'recordCommandIsError': record.get('command') == 'ERROR', 'recordStatsAreStringPairs': stats_valid,
+            'expectedSourceHead': expected, 'recordedSourceHead': record.get('gitSha'),
+            'recordedSourceHeadMatches': record.get('gitSha') == expected if expected is not None else None,
+            'targetLifecycleControls': {key: stats[key] for key in ('exit', 'killed', 'unsupported', 'errorClass')
+                                        if key in stats},
+            'recordedWholeCliMillis': record.get('elapsedMs'),
+            'reportedWorkFields': {key: stats[key] for key in STUDY_WORK_FIELDS if key in stats},
+            'outcomeFieldValueIdentities': {key: {'present': key in record,
+                'compactJsonSha256': hashlib.sha256(json.dumps(record[key], ensure_ascii=True,
+                    separators=(',', ':'), allow_nan=False).encode()).hexdigest() if key in record else None}
+                for key in STUDY_OUTCOME_FIELDS}}
+
+
+def study_controls(measurements, checks, heads):
+    blocks = defaultdict(lambda: defaultdict(list))
+    for ordinal, metadata in enumerate(measurements):
+        if not isinstance(metadata, dict) or \
+                not all(isinstance(metadata.get(name), str) and metadata[name] for name in ('case', 'arm')) or \
+                not all(isinstance(metadata.get(name), str) and metadata[name] for name in ('engine', 'mode')) or \
+                not all(type(metadata.get(name)) is int and metadata[name] >= 0 for name in ('index', 'repetition')) or \
+                not (metadata.get('recipe') is None or isinstance(metadata['recipe'], str)):
+            raise ValueError('Original study control context is malformed')
+        key = tuple(metadata.get(name) for name in CONTEXT_KEYS)
+        blocks[key][metadata.get('arm')].append((ordinal, metadata))
+    pairs = []
+    for key, arms in blocks.items():
+        result = {**dict(zip(CONTEXT_KEYS, key)), 'arms': {}, 'exclusions': [],
+                  'outcomeFieldEquality': None, 'reportedWorkFieldEquality': None,
+                  'allRecordedStatsDifferenceKeys': None, 'originalProblemDescriptionsEqual': None,
+                  'descriptiveWholeCliMillis': None, 'completeWorkOrRngTraceProven': False,
+                  'runtimeSourceBindingProven': False, 'acceptedSavingsCredit': False}
+        for arm, rows in arms.items():
+            result['arms'][arm] = [study_control_record(row, ordinal, checks, heads) for ordinal, row in rows]
+        if set(arms) != {'control', 'candidate'} or any(len(rows) != 1 for rows in arms.values()):
+            result['exclusions'].append('Missing, duplicate or unexpected original control pair arms')
+            pairs.append(result)
+            continue
+        a, b = (arms[arm][0][1] for arm in ('control', 'candidate'))
+        result['originalProblemDescriptionsEqual'] = a['problem'] == b['problem'] \
+            if isinstance(a.get('problem'), dict) and isinstance(b.get('problem'), dict) else None
+        if result['originalProblemDescriptionsEqual'] is not True:
+            result['exclusions'].append('Original control problem descriptions are absent or differ')
+        records = [row.get('record') for row in (a, b)]
+        if not all(isinstance(row, dict) for row in records):
+            result['exclusions'].append('Original benchmark record is absent or malformed')
+            pairs.append(result)
+            continue
+        control, candidate = records
+        controls = [result['arms'][arm][0] for arm in ('control', 'candidate')]
+        identities = [row['outcomeFieldValueIdentities'] for row in controls]
+        result['outcomeFieldEquality'] = {field:
+            identities[0][field]['compactJsonSha256'] == identities[1][field]['compactJsonSha256']
+            if all(row[field]['present'] for row in identities) else None for field in STUDY_OUTCOME_FIELDS}
+        if any(value is not True for value in result['outcomeFieldEquality'].values()):
+            result['exclusions'].append('Original outcome fields differ or are unavailable')
+        if all(row['recordStatsAreStringPairs'] for row in controls):
+            ac, bc = control['stats'], candidate['stats']
+            result['reportedWorkFieldEquality'] = {field: ac[field] == bc[field]
+                if field in ac and field in bc else None for field in STUDY_WORK_FIELDS}
+            result['allRecordedStatsDifferenceKeys'] = sorted(field for field in ac.keys() | bc.keys()
+                if field not in ac or field not in bc or ac[field] != bc[field])
+            if any(value is False for value in result['reportedWorkFieldEquality'].values()):
+                result['exclusions'].append('Original reported work fields differ')
+        else:
+            result['exclusions'].append('Original reported statistic fields are absent or malformed')
+        for arm in ('control', 'candidate'):
+            row = result['arms'][arm][0]
+            if type(row['benchmarkExit']) is not int or row['benchmarkExit'] != 0 or \
+                    row['benchmarkInterrupted'] is not False or row['benchmarkError'] is not None:
+                result['exclusions'].append(arm + ': original benchmark did not complete successfully')
+            if row['targetLifecycleControls'].get('exit') != '0' or \
+                    any(field in row['targetLifecycleControls'] for field in ('killed', 'unsupported', 'errorClass')):
+                result['exclusions'].append(arm + ': original target exit/refusal/failure is nonzero or unavailable')
+            if row['sourceHashesMatch'] is not True or row['recordedSourceHeadMatches'] is not True:
+                result['exclusions'].append(arm + ': original source hash or recorded head is unmatched or unavailable')
+            if row['originalSourceStatus'] != 'valid' or row['recordCommandIsError']:
+                result['exclusions'].append(arm + ': original source outcome is not independently valid')
+        ac, bc = control.get('elapsedMs'), candidate.get('elapsedMs')
+        available = type(ac) is int and ac >= 0 and type(bc) is int and bc >= 0
+        result['descriptiveWholeCliMillis'] = {'available': available, 'control': ac, 'candidate': bc,
+            'candidateMinusControl': bc - ac if available else None,
+            'candidateOverControl': {'numerator': bc, 'denominator': ac} if available and ac > 0 else None,
+            'scope': 'Unqualified original elapsedMs including CLI launch/output; all failures, source and work differences retained. Not compiler elapsed time, throughput, quality or savings acceptance.'}
+        pairs.append(result)
+    return {'allOriginalControlPairs': pairs, 'expectedRecordedSourceHeads': heads,
+            'completeWorkOrRngTraceProven': False, 'runtimeSourceBindingProven': False,
+            'acceptedSavingsCredit': False,
+            'scope': 'Every original mode/engine/index/repetition/recipe/arm, including nonprofiled cold and fixed controls. Outcome presence and compact-JSON field identities, selected source-declared work fields and every raw-statistic difference key are retained. No normalization drops unknown or timing fields. Missing fields are unavailable, not equal-work proof. Counters and equal outcomes do not establish complete state/order/RNG/work traces; raw timings include excluded contexts.'}
 
 
 def observations(case, metadata, report, checks, report_identity, cohort_complete):
@@ -312,6 +424,21 @@ def inspect(selected, manifest, prefix, declaration=None):
                 checks[key] = checker_status(entry)
     mapped_families = mapping.bind(declaration, selected, index, manifest, load_json, MAX_JSON_BYTES) \
         if declaration is not None else None
+    heads = {}
+    builds = selected.get('original-study-builds.json.gz')
+    if builds is not None:
+        references = [value for value in originals.values() if value['path'] == 'original-study-builds.json.gz']
+        if len(references) != 1 or cohort.file_identity(builds) != references[0]['compressed'] or \
+                cohort.gzip_identity(builds, MAX_JSON_BYTES) != \
+                {key: references[0]['originalIdentity'][key] for key in ('size', 'sha256')}:
+            raise ValueError('Retained original study builds differ from producer identity')
+        for build in load_json(builds, True):
+            arm = build['arm']
+            if arm not in ('control', 'candidate') or arm in heads or \
+                    build['actualHead'] != build['expectedHead'] or \
+                    not isinstance(build['actualHead'], str) or not re.fullmatch('[0-9a-f]{40}', build['actualHead']):
+                raise ValueError('Original study source heads are malformed, duplicate or inconsistent')
+            heads[arm] = build['actualHead']
     rows, recordings, represented, mapped_rows, represented_xml = [], [], set(), [], set()
     represented_exports = set()
     method_rows = []
@@ -386,6 +513,7 @@ def inspect(selected, manifest, prefix, declaration=None):
         'pairArmRepresentation': 'observationIndex references sibling familyCaseObservations; all arms and duplicates retained',
         'metadataOnlyCaseNames': sorted(set(metadata) - {row['caseDirectory'] for row in index['cases']}),
         'recordingObservations': recordings,
+        'originalPairedStudyControls': study_controls(measurements, checks, heads),
         'methodRecordingObservations': method_rows,
         'observedMethodSummaries': method_costs.summaries(method_rows, recordings),
         'unreferencedSavedExportPaths': [name for name in selected
@@ -451,6 +579,7 @@ def main():
              'savedJvmContext', 'observedAllClassMetrics', 'observedTierMetrics')}
             for row in result.get('recordingObservations', [])]
         summary['unreferencedSavedExportPaths'] = result.get('unreferencedSavedExportPaths')
+        summary['originalPairedStudyControls'] = result.get('originalPairedStudyControls')
         summary['observedMethodSummaries'] = result.get('observedMethodSummaries')
         summary['observationSummaryScope'] = 'Complete descriptive reported root quantities, including excluded contexts; '
         summary['observationSummaryScope'] += 'not paired eligibility, exhaustive source costs or current-source benefit.'

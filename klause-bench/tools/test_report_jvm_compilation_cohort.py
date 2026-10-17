@@ -13,6 +13,123 @@ import report_jvm_compilation_cohort as review
 
 
 class ReportJvmCompilationCohortTest(unittest.TestCase):
+    def test_original_fixed_controls_keep_outcome_work_and_whole_cli_time_as_distinct_observations(self):
+        heads = {'control': 'a' * 40, 'candidate': 'b' * 40}
+        rows = []
+        for arm, elapsed, cpu in [('control', 100, 'one'), ('candidate', 80, 'two')]:
+            record = dict(feasible=True, proven=False, objective=None, exactObjective=None,
+                          finalWitness={'x': 1}, sourceHashes={'model': 'c' * 64}, checkedWitness=True,
+                          validationPolicy='source', command='solve', gitSha=heads[arm], elapsedMs=elapsed,
+                          stats={'exit': '0', 'nodes': '250', 'failures': '4', 'nodeBudgetSpent': '250', 'cpu': cpu})
+            rows.append(dict(case=arm, engine='cp', index=0, repetition=0, mode='fixed-work', recipe='bounded',
+                             arm=arm, exit=0, interrupted=False, error=None, sourceHashesMatch=True,
+                             problem={'format': 'MPS', 'sourceHashes': {'model': 'c' * 64}}, record=record))
+        before = copy.deepcopy(rows)
+
+        result = review.study_controls(rows, dict.fromkeys(heads, 'valid'), heads)
+
+        self.assertEqual(before, rows)
+        pair, = result['allOriginalControlPairs']
+        self.assertEqual([], pair['exclusions'])
+        self.assertTrue(all(pair['outcomeFieldEquality'].values()))
+        self.assertTrue(pair['reportedWorkFieldEquality']['nodes'])
+        self.assertIsNone(pair['reportedWorkFieldEquality']['lsMoves'])
+        self.assertEqual(['cpu'], pair['allRecordedStatsDifferenceKeys'])
+        self.assertEqual(-20, pair['descriptiveWholeCliMillis']['candidateMinusControl'])
+        self.assertEqual({'numerator': 80, 'denominator': 100}, pair['descriptiveWholeCliMillis']['candidateOverControl'])
+        self.assertTrue(pair['arms']['control'][0]['outcomeFieldValueIdentities']['finalWitness']['present'])
+        self.assertFalse(pair['completeWorkOrRngTraceProven'])
+        self.assertFalse(pair['runtimeSourceBindingProven'])
+        self.assertFalse(pair['acceptedSavingsCredit'])
+
+    def test_missing_duplicate_and_unexpected_study_control_arms_are_all_retained_without_pair_differences(self):
+        for arms in [('control',), ('control', 'control', 'candidate'), ('control', 'candidate', 'other')]:
+            with self.subTest(arms=arms):
+                rows = [dict(case=str(index), engine='cp', index=0, repetition=0, mode='cold-complete',
+                             recipe=None, arm=arm) for index, arm in enumerate(arms)]
+
+                result = review.study_controls(rows, {}, {})
+
+                pair, = result['allOriginalControlPairs']
+                self.assertTrue(pair['exclusions'])
+                self.assertEqual(list(range(len(rows))), sorted(row['originalCaseMetadataIndex']
+                    for values in pair['arms'].values() for row in values))
+                self.assertIsNone(pair['outcomeFieldEquality'])
+                self.assertIsNone(pair['descriptiveWholeCliMillis'])
+                self.assertFalse(pair['acceptedSavingsCredit'])
+
+    def test_original_control_failures_and_mismatches_do_not_disappear_behind_a_successful_benchmark_exit(self):
+        variants = ('target killed', 'source head', 'work', 'outcome', 'missing outcome',
+                    'missing record', 'missing timing', 'boolean timing', 'zero denominator', 'problem',
+                    'outcome type', 'missing problem', 'malformed stats')
+        for variant in variants:
+            with self.subTest(variant=variant):
+                heads = {'control': 'a' * 40, 'candidate': 'b' * 40}
+                rows = [dict(case=arm, engine='cp', index=0, repetition=0, mode='cold-complete', recipe=None,
+                             arm=arm, exit=0, interrupted=False, error=None, sourceHashesMatch=True,
+                             problem={'format': 'MPS', 'sourceHashes': {'model': 'c' * 64}},
+                             record=dict(feasible=True, proven=False, objective=None, exactObjective=None,
+                                         finalWitness={'x': 1}, sourceHashes={'model': 'c' * 64},
+                                         checkedWitness=True, validationPolicy='source', command='solve',
+                                         gitSha=heads[arm], elapsedMs=10, stats={'exit': '0', 'nodes': '250'}))
+                        for arm in heads]
+                candidate = rows[1]['record']
+                if variant == 'target killed':
+                    candidate['stats'].update(exit='137', killed='hard-timeout')
+                elif variant == 'source head':
+                    candidate['gitSha'] = 'f' * 40
+                elif variant == 'work':
+                    candidate['stats']['nodes'] = '251'
+                elif variant == 'outcome':
+                    candidate['finalWitness'] = {'x': 2}
+                elif variant == 'missing outcome':
+                    del candidate['checkedWitness']
+                elif variant == 'missing record':
+                    rows[1]['record'] = None
+                elif variant == 'missing timing':
+                    candidate['elapsedMs'] = None
+                elif variant == 'boolean timing':
+                    candidate['elapsedMs'] = False
+                elif variant == 'zero denominator':
+                    rows[0]['record']['elapsedMs'] = 0
+                elif variant == 'problem':
+                    rows[1]['problem']['sourceHashes']['model'] = 'd' * 64
+                elif variant == 'outcome type':
+                    candidate['checkedWitness'] = 1
+                elif variant == 'missing problem':
+                    rows[1]['problem'] = None
+                elif variant == 'malformed stats':
+                    rows[1]['problem']['format'] = 'MINIZINC'
+                    candidate['stats'] = None
+
+                pair, = review.study_controls(rows, dict.fromkeys(heads, 'valid'), heads)['allOriginalControlPairs']
+
+                self.assertFalse(pair['acceptedSavingsCredit'])
+                self.assertFalse(pair['completeWorkOrRngTraceProven'])
+                if variant in ('target killed', 'source head', 'work', 'outcome', 'missing outcome', 'missing record', 'problem',
+                               'outcome type', 'missing problem', 'malformed stats'):
+                    self.assertTrue(pair['exclusions'])
+                if variant == 'target killed':
+                    self.assertEqual(0, pair['arms']['candidate'][0]['benchmarkExit'])
+                    self.assertEqual('137', pair['arms']['candidate'][0]['targetLifecycleControls']['exit'])
+                    self.assertEqual('hard-timeout', pair['arms']['candidate'][0]['targetLifecycleControls']['killed'])
+                elif variant == 'work':
+                    self.assertFalse(pair['reportedWorkFieldEquality']['nodes'])
+                elif variant == 'outcome':
+                    self.assertFalse(pair['outcomeFieldEquality']['finalWitness'])
+                elif variant == 'outcome type':
+                    self.assertFalse(pair['outcomeFieldEquality']['checkedWitness'])
+                elif variant == 'malformed stats':
+                    self.assertFalse(pair['arms']['candidate'][0]['recordStatsAreStringPairs'])
+                elif variant == 'missing outcome':
+                    self.assertIsNone(pair['outcomeFieldEquality']['checkedWitness'])
+                elif variant in ('missing timing', 'boolean timing'):
+                    self.assertFalse(pair['descriptiveWholeCliMillis']['available'])
+                    self.assertIsNone(pair['descriptiveWholeCliMillis']['candidateMinusControl'])
+                elif variant == 'zero denominator':
+                    self.assertTrue(pair['descriptiveWholeCliMillis']['available'])
+                    self.assertIsNone(pair['descriptiveWholeCliMillis']['candidateOverControl'])
+
     def test_original_checker_outcomes_keep_unknown_invalid_and_proof_limited_statuses(self):
         variants = [({}, 'unknown'), ({'error': 'bad source'}, 'invalid'),
                     ({'check': {'sourceHashVerified': True, 'witness': 'source feasible', 'proof': 'unknown'}}, 'proof-limited'),
