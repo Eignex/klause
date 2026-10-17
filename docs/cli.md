@@ -142,6 +142,10 @@ admission interruption. It holds no concrete theory request. `SolveCore` binds t
 common execution controls; output adapters consume `SourceExecutionResult` from
 `SourceSetup.execute` without selecting another solver or parsing native limits.
 Pipeline telemetry derives from the retained library invocation.
+Native satisfaction verdicts retain the library's source claim qualification.
+The CLI reports complete-pool metadata separately; it does not reinterpret a
+native refutation from the requested engine name. Heuristic exhaustion remains
+incomplete through the producing adapter.
 
 The internal `linearSourceSolvable` adapter accepts an attached `LinearSourceProblem`
 and a renderer of checked `LinearSourceWitness` values. It captures one invocation;
