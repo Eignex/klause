@@ -1572,9 +1572,10 @@ Source serialization quotes identifiers beginning with a minus sign and digit,
 preserving their symbol identity for dependency parsing. Quoted numeral symbols
 remain distinct from numeral literals. Original source bytes retain their recorded
 hash; model-coordinate numeral decoding uses its separate scalar grammar.
-Constant natural powers are serialized as shared multiplication expressions,
+Constant positive integer powers are serialized as shared multiplication expressions,
 preserving integer helper result sorts. Fresh lexical bindings avoid source names;
-zero powers retain numeric base checking. Original source hashes remain unchanged.
+zero powers retain the dependency's partial-power interpretation. Original source
+hashes remain unchanged.
 Algebraic coordinates use integer defining polynomials and one-based distinct
 ordered real-root indices. Approximate decimal coordinates do not establish exact
 irrational equalities. Missing, duplicate, unknown or sort-mismatched coordinates
