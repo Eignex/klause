@@ -90,6 +90,7 @@ internal class QfNraQuery(
 ) {
     private val work = QfNraWork(params)
     private val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
+    var projectionObserver: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null
     val stats: QfNraStats get() = work.snapshot()
     private var result: QfNraResult? = null
     private val preparation = sequence<QfNraResult?> {
@@ -167,7 +168,8 @@ internal class QfNraQuery(
                     }
                     val order = polynomialVariableOrder(polynomials, realCount, arithmetic)
                     val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic,
-                        equations, order, nonzeroPolynomials = nonzero, onRootSection = {
+                        equations, order, nonzeroPolynomials = nonzero, onElimination = projectionObserver,
+                        onRootSection = {
                             val roots = checkNotNull(work.equationalRootLevels)
                             work.equationalRootLevels = roots + minOf(1L, Long.MAX_VALUE - roots)
                         }) {

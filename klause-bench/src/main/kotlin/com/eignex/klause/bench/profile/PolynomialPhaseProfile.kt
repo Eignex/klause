@@ -62,6 +62,8 @@ internal object PolynomialPhaseProfile {
                 else "direct normalized QfNraQuery; separate gate inspection",
             "arithmeticObservations" to if (pipelineMode) "disabled"
                 else "last subresultant and division requests; metadata read after query",
+            "projectionObservations" to if (pipelineMode) "disabled"
+                else "last elimination input family; metadata read after query",
         )))
         val access = PhaseAccess()
         for ((index, source) in cases.withIndex()) {
@@ -220,7 +222,7 @@ internal object PolynomialPhaseProfile {
                 params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance()),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
             val arithmetic = queryType.getDeclaredField("arithmetic").apply { isAccessible = true }.get(owner)
-            val observation = ArithmeticObservation(arithmetic)
+            val observation = ArithmeticObservation(arithmetic, owner)
             val checkpoints = ArrayList<PhaseCheckpoint>()
             val start = System.nanoTime()
             var calls = 0L
@@ -244,12 +246,12 @@ internal object PolynomialPhaseProfile {
                 result.javaClass.methods.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
                 nativeWork, charges - preparationCharges, preparationCharges, stop,
-                observation.subresultants(), observation.division())
+                observation.subresultants(), observation.division(), observation.projection())
         }
     }
 }
 
-private class ArithmeticObservation(arithmetic: Any) {
+private class ArithmeticObservation(arithmetic: Any, query: Any) {
     private val polynomialType = Class.forName("com.eignex.klause.arithmetic.polynomial.Polynomial")
     private val degree = polynomialType.getMethod("degree", Int::class.javaPrimitiveType)
     private val terms = polynomialType.getMethod("getTerms")
@@ -260,6 +262,9 @@ private class ArithmeticObservation(arithmetic: Any) {
     private var index: Int? = null
     private var dividend: Any? = null
     private var divisor: Any? = null
+    private var family: List<Any>? = null
+    private var projectionVariable = 0
+    private var requiredEquation = false
 
     init {
         val subresultants: (Any, Any, Int, Int?) -> Unit = { a, b, coordinate, minor ->
@@ -277,6 +282,12 @@ private class ArithmeticObservation(arithmetic: Any) {
         arithmetic.javaClass.getMethod("setSubresultantObserver", Function4::class.java)
             .invoke(arithmetic, subresultants)
         arithmetic.javaClass.getMethod("setDivisionObserver", Function2::class.java).invoke(arithmetic, division)
+        val projection: (Int, List<Any>, Any?) -> Unit = { coordinate, inputs, equation ->
+            projectionVariable = coordinate
+            family = inputs
+            requiredEquation = equation != null
+        }
+        query.javaClass.getMethod("setProjectionObserver", Function3::class.java).invoke(query, projection)
     }
 
     fun subresultants(): PhaseSubresultants? {
@@ -294,6 +305,36 @@ private class ArithmeticObservation(arithmetic: Any) {
         val count = termCount(b)
         return PhaseDivision(termCount(a), count,
             (variables.invoke(b) as List<*>).isEmpty(), count == 1)
+    }
+
+    fun projection(): PhaseProjection? {
+        val inputs = family ?: return null
+        val termType = Class.forName("com.eignex.klause.arithmetic.polynomial.PolynomialTerm")
+        val monomial = termType.getMethod("getMonomial")
+        val monomialType = Class.forName("com.eignex.klause.arithmetic.polynomial.Monomial")
+        val coordinates = monomialType.getMethod("getVariables")
+        val exponent = monomialType.getMethod("exponent", Int::class.javaPrimitiveType)
+        var termCount = 0L
+        var constantLeaders = 0
+        var commonFactors = 0
+        val degrees = LinkedHashMap<Int, Int>()
+        for (input in inputs) {
+            val inputDegree = degree.invoke(input, projectionVariable) as Int
+            degrees[inputDegree] = (degrees[inputDegree] ?: 0) + 1
+            val payload = (terms.invoke(input) as List<*>).map { monomial.invoke(it) }
+            termCount += payload.size
+            val leaders = payload.filter { exponent.invoke(it, projectionVariable) == inputDegree }
+            if (leaders.size == 1 && coordinates.invoke(leaders.single()) == listOf(projectionVariable)) {
+                constantLeaders++
+            }
+            val first = payload.firstOrNull() ?: continue
+            val candidates = coordinates.invoke(first) as List<*>
+            if (candidates.any { coordinate -> payload.all { (exponent.invoke(it, coordinate) as Int) > 0 } }) {
+                commonFactors++
+            }
+        }
+        return PhaseProjection(projectionVariable, inputs.size, termCount, degrees,
+            constantLeaders, commonFactors, inputs.size.toLong() * (inputs.size - 1) / 2, requiredEquation)
     }
 
     private fun termCount(value: Any): Int = (terms.invoke(value) as List<*>).size
@@ -327,6 +368,19 @@ internal data class PhaseTrace(
     val containingDeadlineStack: List<String>?,
     val lastSubresultants: PhaseSubresultants? = null,
     val lastDivision: PhaseDivision? = null,
+    val lastProjection: PhaseProjection? = null,
+)
+
+@Serializable
+internal data class PhaseProjection(
+    val variable: Int,
+    val polynomials: Int,
+    val terms: Long,
+    val degrees: Map<Int, Int>,
+    val constantLeadingCoefficients: Int,
+    val commonMonomialFactors: Int,
+    val allInputPairs: Long,
+    val requiredEquation: Boolean,
 )
 
 @Serializable

@@ -158,6 +158,14 @@ is bounded and incomplete; a declined convex candidate leaves the image service
 available. Nonlinear constraints, disjunctions and nonconvex objectives cannot
 receive a convex certificate from this adapter.
 
+The complete query can install an optional elimination observer for phase diagnostics.
+It receives the selected coordinate, its boundary family and any selected required
+equation before ordinary projection. It is disabled by default and does not select
+operations or charge native work. Diagnostics retain read-only family references and
+inspect their metadata after the query stops. A recorded family does not certify a
+completed projection or a source verdict; [benchmark diagnostics](../../klause-bench/README.md#focused-probes)
+owns the trace format and interpretation.
+
 ## Results and proof authority
 
 ### Pipeline and frontend publication

@@ -8,6 +8,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -18,6 +19,44 @@ class PolynomialProjectionTest {
     private val arithmetic = PolynomialArithmetic()
     private val x = Polynomial.variable(0)
     private val y = Polynomial.variable(1)
+
+    @Test
+    fun `elimination observations preserve boundaries and native charges`() {
+        val equation = arithmetic.subtract(arithmetic.add(arithmetic.power(x, 2), arithmetic.power(y, 2)),
+            Polynomial.ONE)
+        val inputs = listOf(equation, arithmetic.subtract(y, x))
+        var plainCharges = 0L
+        val plainMeter = WorkMeter { plainCharges += it }
+        val plain = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = plainMeter
+        })
+        var observedCharges = 0L
+        val observedMeter = WorkMeter { observedCharges += it }
+        val observed = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = observedMeter
+        })
+        val events = ArrayList<Pair<Int, List<Polynomial>>>()
+        val equations = ArrayList<Polynomial?>()
+        val pending = PolynomialProjection.prepare(inputs, 2, observed, listOf(equation),
+            onElimination = { variable, family, required ->
+                events.add(variable to family.toList())
+                equations.add(required)
+            })
+
+        val expected = PolynomialProjection.compute(inputs, 2, plain, listOf(equation))
+        var actual: PolynomialProjection? = null
+        while (actual == null) actual = pending.next()
+
+        assertEquals(plainCharges, observedCharges)
+        assertEquals(listOf(1 to inputs), events)
+        assertEquals(listOf(equation), equations)
+        for (level in 0..1) {
+            assertEquals(expected.variable(level), actual.variable(level))
+            assertEquals(expected.polynomials(level), actual.polynomials(level))
+        }
+    }
 
     @Test
     fun `nonzero premises must belong to the input family`() {

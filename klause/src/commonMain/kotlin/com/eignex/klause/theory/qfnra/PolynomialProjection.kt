@@ -56,6 +56,7 @@ internal class PolynomialProjection private constructor(
             preferredOrder: IntArray? = null,
             nonzeroVariables: Set<Int> = emptySet(),
             nonzeroPolynomials: List<Polynomial> = emptyList(),
+            onElimination: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null,
             onRootSection: () -> Unit = {},
             onSection: () -> Unit = {},
         ): Iterator<PolynomialProjection?> = sequence {
@@ -193,6 +194,7 @@ internal class PolynomialProjection private constructor(
                         yield(null)
                         continue
                     }
+                    onElimination?.invoke(variable, top, root?.polynomial)
                     val eliminated = eliminate(top, variable, arithmetic, root?.polynomial, required)
                     var projected: ProjectionElimination? = null
                     while (projected == null) {

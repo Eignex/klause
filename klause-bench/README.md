@@ -2609,6 +2609,12 @@ Direct-query observers retain the last subresultant operands, coordinate, minor
 index and requested matrix side length, plus the last exact-division operand term
 counts and whether its divisor is constant or one monomial. Operand metadata is
 read after the measured query; callbacks retain references without arithmetic work.
+The last elimination family records its coordinate, polynomial and term counts,
+degree histogram, rational leading-coefficient count and common-monomial-factor
+count. Its `allInputPairs` is the theoretical number of unordered input pairs before
+required-equation selection and reducta expansion, not a count of requested or
+completed subresultants. The required-equation flag identifies that selection.
+Family metadata is also read after the query stops; pipeline mode disables these observers.
 These are the most recent requests, possibly incomplete or refused, and must be
 interpreted with the containing deadline stack. They establish no completed result.
 The observers add diagnostic overhead and provide no default CLI timing authority.

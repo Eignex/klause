@@ -32,6 +32,27 @@ class PolynomialPhaseProfileTest {
 
         assertNull(trace.lastSubresultants)
         assertNull(trace.lastDivision)
+        assertNull(trace.lastProjection)
+    }
+
+    @Test
+    fun `phase observations distinguish family pairs and common monomial factors`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = "$declarations (assert (>= (* x0 x1) 0)) (assert (>= (+ (* x0 x1) x1) 0))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, timeoutMs = 10_000)
+
+        val observed = assertNotNull(trace.lastProjection)
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertEquals(1, observed.variable)
+        assertEquals(2, observed.polynomials)
+        assertEquals(3L, observed.terms)
+        assertEquals(mapOf(1 to 2), observed.degrees)
+        assertEquals(0, observed.constantLeadingCoefficients)
+        assertEquals(2, observed.commonMonomialFactors)
+        assertEquals(1L, observed.allInputPairs)
+        assertEquals(false, observed.requiredEquation)
     }
 
     @Test
