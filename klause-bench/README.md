@@ -2367,6 +2367,46 @@ using the complete or heuristic engine alone. These explicit diagnostic controls
 check outcome and deterministic-work parity; they establish no default-route speedup,
 source refutation, independent witness acceptance or optimization claim.
 
+### Mac container measurement capabilities
+
+`bench.profile.CompilationStudyContainerProbe` inspects an existing Docker daemon
+through an explicit `endpoint=unix:///absolute/path.sock` on the Mac profiling
+worker. It uses `/opt/homebrew/bin/docker`, an empty owned temporary client
+configuration and no Docker/proxy environment overrides. It does not read or
+change host Docker contexts, daemon settings or lab infrastructure. The Docker CLI byte identity is checked before and after the query. The probe
+retains the server version, every installed full image ID and each image's ID,
+OS, architecture and byte size. Repository names and image environment/configuration
+are excluded. It neither downloads/builds images nor removes existing images.
+
+An optional `image=sha256:<64 lowercase hex digits>` selects an already installed
+image with Linux and the Mac's native architecture for a separate capability
+check. Tags, remote endpoints and emulated architectures are rejected.
+The guest has no network, a read-only root, a bounded temporary filesystem, one
+CPU quota and guest CPU set `0`; it mounts only an owned nonce file read-only.
+The probe checks that nonce, Linux's allowed CPU list, JDK 25, `taskset`, GNU
+`/usr/bin/time -v` and creation of a threshold-zero compilation/phase/inlining JFR
+configuration. The timed executable is `/bin/true`; no solver, fixture, original
+SDK archive or compilation benchmark is replayed. A container ID written into
+owned staging controls cleanup; failed creation without that receipt cannot
+remove an existing container. Cleanup runs after positive and negative checks.
+
+Each command has a 30-second timeout and 1 MiB per-output bound; the complete
+image inventory is limited to 1,024 IDs and the CLI binary to 256 MiB. All command vectors, outputs, exits,
+observer provenance, nonce and completion fields are retained in the capture.
+Missing tools, unavailable daemons, changed nonce/CPU/JDK facts, malformed or
+excessive inventories, and cleanup failures remain explicit negatives. Empty
+inventories and inventory-only requests do not prove guest readiness.
+
+This establishes capability observations only. Guest CPU affinity does not prove
+physical Mac CPU affinity; container/image identity, full study protocol, matching
+source/runtime/outcome/allocation/order/RNG/work controls and actual compiler
+root/phase evidence remain separate requirements. Existing measurements from
+another platform cannot be transferred by this probe. Run through the supported
+Mac profiling route and preserve/delete owned ended job files as for other captures.
+[Docker CLI configuration precedence](https://docs.docker.com/reference/cli/docker/)
+and [container resource constraints](https://docs.docker.com/engine/containers/resource_constraints/)
+describe the process-scoped client and guest CPU controls used here.
+
 ### Saved JVM compilation census
 
 `bench.profile.JvmDeclarationBindings` accepts `catalog=`, `catalog-sha256=`,
