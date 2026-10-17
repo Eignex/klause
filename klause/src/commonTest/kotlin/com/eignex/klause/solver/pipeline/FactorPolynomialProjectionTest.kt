@@ -21,6 +21,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
@@ -127,6 +128,22 @@ class FactorPolynomialProjectionTest {
         assertNotNull(point.sample.witnessCertificate?.quadraticPublication)
         assertIs<SourceEvidenceCheck.Checked>(checkQuadraticSourceWitness(
             assertNotNull(invocation.preparedPlan), point.sample, Cancellation.Never, PolynomialLimits()))
+    }
+
+    @Test
+    fun `mixed integer optimization should retain its original affine objective binding`() {
+        val source = SmtLib.parse("(declare-const n Int) (declare-const x Real) " +
+            "(assert (= n 9223372036854775808)) (assert (= (* x x) 2)) (minimize n)")
+        val objective = assertNotNull(source.objective).toLinearObjective()
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source.source, ExecutionOperation.OPTIMIZE,
+            FiniteEngine.MIXED, objective = objective))
+
+        val execution = assertIs<SourceExecutionResult.Quadratic>(
+            SourceSetup.execute(SourceExecutionRequest(invocation)))
+
+        val point = assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result.result).incumbent
+        assertEquals(parseBigInt("9223372036854775808"), point.sample.exactIntValue(0))
+        assertEquals(0L, execution.result.result.stats.portfolio.arms.sumOf { it.faults })
     }
 
     @Test
