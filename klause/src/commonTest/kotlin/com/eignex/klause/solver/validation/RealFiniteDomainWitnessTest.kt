@@ -77,7 +77,7 @@ class RealFiniteDomainWitnessTest {
         val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf(0.5))),
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5),
-            exactReals = listOf(BigFraction.ONE / BigFraction.ofLong(2)))
+            exactReals = listOf(BigFraction.ofLong(2).reciprocal()))
 
         val verdict = verifyRealCoordinates(source, point, Cancellation { true })
 

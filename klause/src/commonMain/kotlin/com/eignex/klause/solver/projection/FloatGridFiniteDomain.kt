@@ -30,7 +30,7 @@ internal fun lowerGridFiniteValues(
         if (column.step.isZero) {
             if (value == column.origin) return emptyList()
         } else {
-            val position = (value - column.origin) / column.step
+            val position = (value - column.origin) * column.step.reciprocal()
             if (position.den == BIG_ONE && position.num.fitsLong()) {
                 val bucket = position.num.toLongExact()
                 if (column.coordinate.contains(bucket)) admitted += bucket
