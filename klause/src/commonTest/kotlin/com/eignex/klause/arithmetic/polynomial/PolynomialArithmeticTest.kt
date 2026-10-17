@@ -2,6 +2,7 @@ package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -148,6 +149,102 @@ class PolynomialArithmeticTest {
         val product = arithmetic.multiply(divisor, quotient)
 
         assertEquals(quotient, arithmetic.divideExact(product, divisor))
+    }
+
+    @Test
+    fun `scalar exact division reconstructs multivariate coefficients`() {
+        val polynomial = arithmetic.add(
+            arithmetic.scale(arithmetic.multiply(arithmetic.power(x, 2), y), fraction(5) * fraction(7).reciprocal()),
+            arithmetic.subtract(y, constant(3)),
+        )
+        for (dividend in listOf(Polynomial.ZERO, polynomial)) {
+            for (coefficient in listOf(BigFraction.ONE, fraction(-1), fraction(2) * fraction(3).reciprocal())) {
+                val divisor = Polynomial.constant(coefficient)
+
+                val quotient = arithmetic.divideExact(dividend, divisor)
+
+                assertEquals(dividend, arithmetic.multiply(quotient, divisor))
+            }
+        }
+    }
+
+    @Test
+    fun `unit division completes within the containing work allowance`() {
+        val dividend = Polynomial.of((0 until 128).map { exponent ->
+            PolynomialTerm(Monomial.of(mapOf(0 to exponent, 1 to 1)), fraction(exponent.toLong() + 1))
+        })
+        var spent = 0L
+        val meter = WorkMeter { spent += it }
+        val counted = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 8
+            override fun workMeter(): WorkMeter = meter
+        })
+
+        val quotient = counted.divideExact(dividend, Polynomial.ONE)
+
+        assertEquals(dividend, quotient)
+    }
+
+    @Test
+    fun `scalar exact division observes containing cancellation`() {
+        val stopped = PolynomialArithmetic(Cancellation { true })
+        for (dividend in listOf(Polynomial.ZERO, y)) {
+            for (divisor in listOf(Polynomial.ONE, constant(-1), constant(3))) {
+                assertFailsWith<PolynomialInterrupted> { stopped.divideExact(dividend, divisor) }
+            }
+        }
+    }
+
+    @Test
+    fun `exact division rejects a zero divisor`() {
+        for (dividend in listOf(Polynomial.ZERO, y)) {
+            assertFailsWith<IllegalArgumentException> { arithmetic.divideExact(dividend, Polynomial.ZERO) }
+        }
+    }
+
+    @Test
+    fun `prepared and eager subresultants retain the same native charges`() {
+        val a = arithmetic.add(x, constant(2))
+        val b = arithmetic.add(arithmetic.power(x, 2), constant(3))
+        val c = arithmetic.add(x, constant(4))
+        val d = arithmetic.add(arithmetic.power(x, 3), constant(5))
+        val quadratic = arithmetic.add(arithmetic.scale(arithmetic.power(y, 2), fraction(2)),
+            arithmetic.add(arithmetic.multiply(x, y), arithmetic.add(x, constant(1))))
+        val linear = arithmetic.add(arithmetic.scale(y, fraction(3)), arithmetic.power(x, 2))
+        val resultant = arithmetic.add(
+            arithmetic.subtract(arithmetic.scale(arithmetic.power(x, 4), fraction(2)),
+                arithmetic.scale(arithmetic.power(x, 3), fraction(3))),
+            arithmetic.add(arithmetic.scale(x, fraction(9)), constant(9)),
+        )
+        for ((left, right, expected) in listOf(
+            Triple(arithmetic.add(arithmetic.multiply(a, y), b),
+                arithmetic.add(arithmetic.multiply(c, y), d),
+                arithmetic.subtract(arithmetic.multiply(a, d), arithmetic.multiply(b, c))),
+            Triple(quadratic, linear, resultant),
+        )) {
+            var eagerCharges = 0L
+            val eagerMeter = WorkMeter { eagerCharges += it }
+            val eager = PolynomialArithmetic(object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = eagerMeter
+            })
+            var preparedCharges = 0L
+            val preparedMeter = WorkMeter { preparedCharges += it }
+            val prepared = PolynomialArithmetic(object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = preparedMeter
+            })
+
+            val immediate = eager.principalSubresultants(left, right, 1)
+            val pending = prepared.preparePrincipalSubresultants(left, right, 1)
+            var resumed: List<Polynomial>? = null
+            while (resumed == null) resumed = pending.next()
+
+            assertEquals(listOf(expected), immediate)
+            assertEquals(immediate, resumed)
+            assertTrue(eagerCharges > 0)
+            assertEquals(eagerCharges, preparedCharges)
+        }
     }
 
     @Test

@@ -87,7 +87,12 @@ internal class PolynomialArithmetic(
 
     private fun prepareDivision(dividend: Polynomial, divisor: Polynomial): Iterator<Polynomial?> = sequence {
         require(!divisor.isZero)
-        val lead = divisor.terms.last()
+        val terms = divisor.terms
+        scalarQuotient(dividend, terms.singleOrNull())?.let {
+            yield(it)
+            return@sequence
+        }
+        val lead = terms.last()
         var remainder = dividend
         var quotient = Polynomial.ZERO
         while (!remainder.isZero) {
@@ -107,6 +112,15 @@ internal class PolynomialArithmetic(
         }
         yield(quotient)
     }.iterator()
+
+    private fun scalarQuotient(dividend: Polynomial, divisor: PolynomialTerm?): Polynomial? {
+        if (divisor == null || divisor.monomial != Monomial.ONE) return null
+        if (divisor.coefficient == BigFraction.ONE) {
+            step()
+            return dividend
+        }
+        return scale(dividend, divisor.coefficient.reciprocal())
+    }
 
     fun power(value: Polynomial, exponent: Int): Polynomial {
         require(exponent >= 0)
@@ -166,7 +180,9 @@ internal class PolynomialArithmetic(
 
     fun divideExact(dividend: Polynomial, divisor: Polynomial): Polynomial {
         require(!divisor.isZero)
-        val lead = divisor.terms.last()
+        val terms = divisor.terms
+        scalarQuotient(dividend, terms.singleOrNull())?.let { return it }
+        val lead = terms.last()
         var remainder = dividend
         var quotient = Polynomial.ZERO
         while (!remainder.isZero) {
