@@ -11,6 +11,7 @@ internal class PolynomialAffineReduction private constructor(
     val atoms: List<PolynomialAtom>,
     private val fibres: List<AffineFibre>,
     val changed: Boolean,
+    val inconsistent: Boolean,
 ) {
     fun reconstruct(
         assignment: QfNraAssignment,
@@ -55,6 +56,17 @@ internal class PolynomialAffineReduction private constructor(
                 arithmetic.step()
                 val atom = formula.atoms[index]
                 if (truth) atom else PolynomialAtom(atom.polynomial, complement(atom.relation))
+            }
+            val signChecking = preparePolynomialSignRefutation(current, realCount, arithmetic)
+            var signConflict: Boolean? = null
+            while (signConflict == null) {
+                signConflict = signChecking.next()
+                if (signConflict == null) yield(null)
+            }
+            if (signConflict) {
+                arithmetic.step()
+                yield(PolynomialAffineReduction(current, emptyList(), false, true))
+                return@sequence
             }
             val fibres = ArrayList<AffineFibre>()
             var inconsistent = false
@@ -162,7 +174,7 @@ internal class PolynomialAffineReduction private constructor(
             }
             arithmetic.step()
             yield(PolynomialAffineReduction(current.toList(), fibres.toList(),
-                rewrittenPredicates || fibres.isNotEmpty()))
+                rewrittenPredicates || fibres.isNotEmpty(), inconsistent))
         }.iterator()
     }
 }
