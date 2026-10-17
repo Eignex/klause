@@ -1,4 +1,5 @@
 """Authenticate a retained runtime and stage only its offline image reader inputs."""
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -51,7 +52,28 @@ def resolved_member(name, members):
     raise ValueError('Runtime file link chain exceeds bounds')
 
 
-def prepare_runtime(manifest, archive, expected_archive_hash, destination, report):
+def captured_directory_member(member):
+    original = member.name.rstrip('/') if member.isdir() else member.name
+    if original in ('.', './'):
+        if not member.isdir():
+            raise ValueError('Captured runtime root is not a directory')
+        relative = None
+    else:
+        if not original.startswith('./'):
+            raise ValueError('Captured runtime member lacks its explicit directory prefix')
+        relative = safe_name(original[2:])
+    if member.sparse:
+        raise ValueError('Sparse captured runtime member')
+    mapped = copy.copy(member)
+    mapped.name = 'runtime' if relative is None else 'runtime/' + relative
+    if member.islnk():
+        if not member.linkname.startswith('./'):
+            raise ValueError('Captured runtime hard link lacks its explicit directory prefix')
+        mapped.linkname = 'runtime/' + safe_name(member.linkname[2:])
+    return mapped
+
+
+def prepare_runtime(manifest, archive, expected_archive_hash, destination, report, directory_layout=False):
     report['completed'] = False
     if not re.fullmatch('[0-9a-f]{64}', expected_archive_hash):
         raise ValueError('Invalid archive identity')
@@ -71,6 +93,9 @@ def prepare_runtime(manifest, archive, expected_archive_hash, destination, repor
     with tarfile.open(archive, 'r:gz') as source:
         for member in source:
             report['members'].append({'name': member.name, 'bytes': member.size, 'type': member.type.decode('ascii')})
+            if directory_layout:
+                report['members'][-1]['originalLinkTarget'] = member.linkname
+                member = captured_directory_member(member)
             name = safe_name(member.name)
             if name in members or len(members) >= MAX_MEMBERS:
                 raise ValueError('Duplicate or excessive runtime archive members')
@@ -80,6 +105,8 @@ def prepare_runtime(manifest, archive, expected_archive_hash, destination, repor
             if member.size < 0 or member.size > MAX_FILE_BYTES or total > MAX_EXPANDED_BYTES:
                 raise ValueError('Runtime archive expanded size exceeds bounds')
             members[name] = member
+        if directory_layout and ('runtime' not in members or not members['runtime'].isdir()):
+            raise ValueError('Captured runtime lacks its explicit directory root')
         roots = {name.split('/')[0] for name in members}
         if len(roots) != 1:
             raise ValueError('Runtime archive must have one root')
@@ -120,6 +147,23 @@ def prepare_runtime(manifest, archive, expected_archive_hash, destination, repor
     if digest(archive) != expected_archive_hash:
         raise ValueError('Runtime archive changed while preparing image inputs')
     report['completed'] = True
+
+
+def captured_directory_main():
+    manifest, archive, expected, destination, report_path = sys.argv[2:]
+    report = {'completed': False, 'archiveLayout': 'captured-directory',
+              'scope': 'Original SDK directory-root tar bytes and full runtime identities only. Original paths and link targets retained; no rewritten archive or SDK executable.'}
+    try:
+        manifest = Path(manifest)
+        if manifest.is_symlink() or not manifest.is_file() or manifest.stat().st_size > MAX_JSON_BYTES:
+            raise ValueError('Captured runtime manifest is absent or excessive')
+        prepare_runtime(json.loads(manifest.read_text(), object_pairs_hook=unique_object),
+                        Path(archive), expected, Path(destination), report, directory_layout=True)
+    except BaseException as error:
+        report['error'] = type(error).__name__ + ': ' + str(error)
+        Path(report_path).write_text(json.dumps(report, indent=2) + '\n')
+        raise
+    Path(report_path).write_text(json.dumps(report, indent=2) + '\n')
 
 
 def unique_object(pairs):
@@ -433,6 +477,9 @@ def study_main():
 
 
 def main():
+    if sys.argv[1:2] == ['captured-runtime-directory']:
+        captured_directory_main()
+        return
     if sys.argv[1:2] == ['study-distributions']:
         study_main()
         return

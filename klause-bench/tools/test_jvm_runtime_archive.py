@@ -225,6 +225,73 @@ class JvmRuntimeArchiveTest(unittest.TestCase):
                 self.assertFalse(report['completed'])
                 self.assertFalse(destination.exists())
 
+    def test_captured_sdk_directory_layout_preserves_all_runtime_members_and_guards(self):
+        variants = [None, 'symlink', 'hardlink', 'missing-root', 'duplicate-root', 'unsafe', 'double-prefix',
+                    'absolute', 'no-prefix', 'escaping-link', 'absolute-link', 'unbound-hardlink',
+                    'extra', 'missing', 'changed', 'archive',
+                    'MAX_ARCHIVE_BYTES', 'MAX_EXPANDED_BYTES', 'MAX_MEMBERS', 'MAX_FILE_BYTES']
+        for variant in variants:
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                files = {name: b'x' for name in (*runtime.IMAGE_FILES, 'bin/java')}
+                expected = {name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()}
+                entries = list(files.items())
+                if variant == 'missing':
+                    entries = entries[:-1]
+                elif variant == 'extra':
+                    entries.append(('extra', b'x'))
+                elif variant == 'changed':
+                    expected['release'] = 'c' * 64
+                elif variant in ('unsafe', 'double-prefix', 'absolute', 'no-prefix'):
+                    entries.append(({'unsafe': '../outside', 'double-prefix': './bad',
+                                     'absolute': '/outside', 'no-prefix': 'bare'}[variant], b'x'))
+                archive, destination = Path(directory) / 'sdk.tar.gz', Path(directory) / 'runtime'
+                with tarfile.open(archive, 'w:gz') as stream:
+                    if variant != 'missing-root':
+                        root = tarfile.TarInfo('.')
+                        root.type = tarfile.DIRTYPE
+                        stream.addfile(root)
+                    if variant == 'duplicate-root':
+                        root = tarfile.TarInfo('./')
+                        root.type = tarfile.DIRTYPE
+                        stream.addfile(root)
+                    for name, raw in entries:
+                        path = name if (variant == 'absolute' and name == '/outside') or \
+                            (variant == 'no-prefix' and name == 'bare') else './' + name
+                        member = tarfile.TarInfo(path)
+                        member.size = len(raw)
+                        stream.addfile(member, io.BytesIO(raw))
+                    if variant in ('symlink', 'hardlink', 'escaping-link', 'absolute-link', 'unbound-hardlink'):
+                        member = tarfile.TarInfo('./legal/copy')
+                        member.type = tarfile.LNKTYPE if variant in ('hardlink', 'unbound-hardlink') else tarfile.SYMTYPE
+                        member.linkname = {'symlink': '../release', 'hardlink': './release',
+                                           'escaping-link': '../../../outside', 'absolute-link': '/outside',
+                                           'unbound-hardlink': 'release'}[variant]
+                        stream.addfile(member)
+                        expected['legal/copy'] = hashlib.sha256(b'x').hexdigest()
+                archive_hash = runtime.digest(archive)
+                report = {}
+                bound = variant if variant and variant.startswith('MAX_') else 'MAX_MEMBERS'
+                limit = 0 if variant and variant.startswith('MAX_') else runtime.MAX_MEMBERS
+
+                if variant in (None, 'symlink', 'hardlink'):
+                    runtime.prepare_runtime({'provenance': {'runtime': expected}}, archive, archive_hash,
+                                            destination, report, directory_layout=True)
+
+                    self.assertTrue(report['completed'])
+                    self.assertEqual(expected, report['actualRuntime'])
+                    self.assertEqual('.', report['members'][0]['name'])
+                    self.assertEqual({name: b'x' for name in runtime.IMAGE_FILES},
+                        {path.relative_to(destination).as_posix(): path.read_bytes()
+                         for path in destination.rglob('*') if path.is_file()})
+                else:
+                    with patch.object(runtime, bound, limit), self.assertRaises(ValueError):
+                        runtime.prepare_runtime({'provenance': {'runtime': expected}}, archive,
+                            'c' * 64 if variant == 'archive' else archive_hash, destination, report,
+                            directory_layout=True)
+
+                    self.assertFalse(report['completed'])
+                    self.assertFalse(destination.exists())
+
     def test_only_complete_original_two_arm_study_archives_expose_both_cli_jar_sets(self):
         variants = [None, 'archive', 'missing', 'extra', 'changed', 'duplicate', 'link', 'unsafe',
                     'directory', 'source', 'request', 'missing-build', 'duplicate-arm',

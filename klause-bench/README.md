@@ -2692,6 +2692,15 @@ and helper interruption or timeout reaps the owned process. SDK bytes and image
 inputs remain private. Loaded runtime selection, source-phase completeness and
 compiler/runtime benefit retain separate proof requirements.
 
+SDK archives captured with `tar -C "$JAVA_HOME" ... .` additionally require
+`archive-layout=captured-directory` in saved-local mode. This layout requires one
+explicit directory root and exactly one `./` prefix on every other original
+member. The verifier retains original names and link targets and uses a temporary
+namespace for the existing full-runtime hash and link checks. It never rewrites or
+repacks the original archive. Extra dot segments in member paths, duplicate paths, unsafe links,
+missing roots and extra or changed files remain rejected. Without the explicit
+layout, the original single named-root archive protocol remains in effect.
+
 `bench.profile.JvmInstalledMethodMetadata` accepts `head=`, `manifest=` and
 `manifest-sha256=`. The HTTPS manifest is an original installed CLI provenance
 manifest. Two detached builds of the pinned source must reproduce its complete

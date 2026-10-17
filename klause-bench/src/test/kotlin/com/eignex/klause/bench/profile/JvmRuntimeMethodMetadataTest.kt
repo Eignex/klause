@@ -27,11 +27,22 @@ class JvmRuntimeMethodMetadataTest {
         assertEquals(arguments.associate { it.substringBefore('=') to it.substringAfter('=') }, options)
     }
 
+    @Test
+    fun `captured SDK directory layout remains an explicit local input declaration`() {
+        val layout = "captured-directory"
+        val arguments = remote.filterNot { it.startsWith("archive=") } +
+            listOf("archive=/owned/original-runtime.tar.gz", "archive-mode=saved-local", "archive-layout=$layout")
+
+        val options = JvmRuntimeMethodMetadata.parse(arguments.toTypedArray())
+
+        assertEquals(layout, options["archive-layout"])
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["archive-mode=other", "archive=relative", "archive=https://example.test/runtime.tar.gz",
         "manifest=http://example.test/manifest.json", "manifest=https://user@example.test/manifest.json",
         "manifest=https://example.test/x?query=value", "manifest=https://example.test/x#fragment",
-        "manifest-sha256=bad", "archive-sha256=bad", "unknown=value"])
+        "manifest-sha256=bad", "archive-sha256=bad", "archive-layout=other", "unknown=value"])
     fun `local mode rejects unbound incomplete and remote archive inputs before access`(argument: String) {
         val local = remote.filterNot { it.startsWith("archive=") } +
             listOf("archive=/owned/original-runtime.tar.gz", "archive-mode=saved-local")
@@ -41,11 +52,12 @@ class JvmRuntimeMethodMetadataTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["missing", "duplicate", "local-without-mode"])
+    @ValueSource(strings = ["missing", "duplicate", "local-without-mode", "layout-without-mode"])
     fun `ambiguous and incomplete requests cannot select a runtime`(variant: String) {
         val arguments = when (variant) {
             "missing" -> remote.drop(1)
             "duplicate" -> remote + remote.first()
+            "layout-without-mode" -> remote + "archive-layout=captured-directory"
             else -> remote.filterNot { it.startsWith("archive=") } + "archive=/owned/runtime.tar.gz"
         }
 

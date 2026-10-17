@@ -41,6 +41,7 @@ internal object JvmRuntimeMethodMetadata {
                     put("error", execution.exceptionOrNull()?.let { "${it.javaClass.name}: ${it.message}" })
                     put("runtimeArchiveSha256", options.getValue("archive-sha256"))
                     put("inputMode", options["archive-mode"] ?: "https-archive")
+                    put("archiveLayout", options["archive-layout"] ?: "rooted-runtime")
                     put("originalSdkLauncherInvoked", false)
                     put("loadedClassSelectionProven", false)
                     put("runtimeGeneratedClassesBound", false)
@@ -63,12 +64,14 @@ internal object JvmRuntimeMethodMetadata {
             it.substringBefore('=') to it.substringAfter('=')
         }
         val required = setOf("manifest", "manifest-sha256", "archive", "archive-sha256")
-        require(args.size == options.size && options.keys in listOf(required, required + "archive-mode"))
+        require(args.size == options.size && options.keys in listOf(required, required + "archive-mode",
+            required + setOf("archive-mode", "archive-layout")))
         for (name in listOf("manifest-sha256", "archive-sha256")) {
             require(options.getValue(name).matches(Regex("[0-9a-f]{64}")))
         }
         val local = options["archive-mode"] != null
         require(!local || options["archive-mode"] == "saved-local")
+        require(options["archive-layout"] == null || (local && options["archive-layout"] == "captured-directory"))
         for (name in if (local) listOf("manifest") else listOf("manifest", "archive")) {
             val address = options.getValue(name)
             require(address.length <= 4096)
@@ -110,9 +113,9 @@ internal object JvmRuntimeMethodMetadata {
             copySavedArchive(saved, archive, options.getValue("archive-sha256"))
         }
         val home = File(privateInputs, "runtime")
-        val command = listOf(
-            "python3",
-            helper.path,
+        val command = listOf("python3", helper.path) +
+            (if (options["archive-layout"] == "captured-directory") listOf("captured-runtime-directory")
+            else emptyList()) + listOf(
             manifest.path,
             archive.path,
             options.getValue("archive-sha256"),
