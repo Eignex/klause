@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -17,6 +18,35 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PolynomialTheoryRequestTest {
+    @Test
+    fun `persistent stops during native work should withhold polynomial source verdicts`() {
+        for ((bound, satisfiable) in listOf("2" to true, "(- 1)" to false)) {
+            val input = SmtLibPolynomial.parse(
+                "(declare-const x Real) (assert (= (* x x) $bound))",
+            ).realSource()
+            val complete = OpenTheoryPipeline.execute(input.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+            if (satisfiable) assertIs<OpenTheoryResult.Sat>(complete.result)
+            else assertIs<OpenTheoryResult.Unsat>(complete.result)
+            for (timeout in listOf(false, true)) {
+                var charged = 0L
+                val token = object : Cancellation, WorkMeter {
+                    override fun isCancelled(): Boolean = charged > 0L
+                    override fun workMeter(): WorkMeter = this
+                    override fun charge(units: Long) { charged += units }
+                }
+                val params = if (timeout) PolynomialTheoryParams(timeout = token)
+                else PolynomialTheoryParams(cancellation = token)
+
+                val execution = OpenTheoryPipeline.execute(input.pipelineRequest(), params, FiniteEngine.BACKTRACK)
+
+                val result = assertIs<OpenTheoryResult.Unknown>(execution.result)
+                assertTrue(charged > 0L)
+                assertEquals(if (timeout) TerminationReason.Timeout else TerminationReason.Cancelled, result.reason)
+                assertEquals(timeout, result.stats.run.timedOut)
+            }
+        }
+    }
+
     @Test
     fun `constant polynomial truth should have a runnable empty ALNS projection`() {
         val source = PolynomialRealProblem(

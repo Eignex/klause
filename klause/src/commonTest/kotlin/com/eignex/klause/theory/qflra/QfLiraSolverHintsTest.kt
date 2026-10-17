@@ -25,8 +25,10 @@ import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
@@ -41,12 +43,80 @@ import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
+    @Test
+    fun `learned arithmetic clauses should expose partial point recapture after backjump`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2),
+            realUpper = DoubleArray(2),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 1.0), LinearOp.EQ, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
+            ),
+        )
+        val stats = SmtStatsSink()
+        model.componentPlan().search(
+            model, emptyMap(), Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), stats,
+        ).use { planned ->
+            val component = assertIs<ExactLiraSearchComponent>(planned.theory)
+            val session = planned.session
+            component.observeCompleteTraversal()
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertTrue(component.partialPointHintAvailable())
+            for (variable in 0..2) assertNull(session.boolValue(variable))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertNull(session.boolValue(1))
+            assertNull(session.boolValue(2))
+            val conflict = assertIs<ComponentResult.Conflict>(
+                session.push(SearchDecision.Bool(Lit.make(1, false))),
+            )
+            assertNotNull(session.reasonFor(2))
+            val learned = assertIs<SearchConflictResolution.Backjump>(
+                session.explainedConflict(conflict.explanation),
+            ).conflict
+            val expected = intArrayOf(Lit.make(0, true), Lit.make(1, true))
+            assertEquals(1, learned.decisionLevel)
+            assertContentEquals(expected, learned.guardLiterals.sortedArray())
+            session.popTo(learned.decisionLevel)
+            assertNull(session.boolValue(1))
+            assertNull(session.boolValue(2))
+            assertFalse(component.partialPointHintAvailable())
+            val captures = assertNotNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_LP_CAPTURE"))
+
+            val result = learned.apply(session)
+
+            assertEquals(SearchLearnedConflictResult.Resume, result)
+            assertEquals(false, session.boolValue(0))
+            assertEquals(true, session.boolValue(1))
+            assertNull(session.boolValue(2))
+            assertEquals(1, session.learnedClauseCount)
+            assertContentEquals(expected, assertNotNull(session.reasonFor(1)).literals.sortedArray())
+            assertTrue(component.partialPointHintAvailable())
+            assertEquals(
+                1L,
+                assertNotNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_LP_CAPTURE")) - captures,
+            )
+            session.popTo(0)
+            for (variable in 0..2) assertNull(session.boolValue(variable))
+            assertNull(session.reasonFor(1))
+            assertNull(session.reasonFor(2))
+            assertFalse(component.partialPointHintAvailable())
+        }
+    }
+
     @Test
     fun `hint admission should retain registration results until complete traversal is observed`() {
         val variants = listOf(

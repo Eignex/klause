@@ -47,8 +47,38 @@ defines the admitted guard shape and retains late complete disjunction checking.
 
 [SearchLearning](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 owns shared clauses, attachment and propagation cursors, unit reawakening, reduction and
-telemetry. Watched-clause literal and signature indexes use primitive integer keys;
-clause identifiers and watch-list order remain stable across index growth and rebuilds. Retraction removes trail facts and restores integer premises before clamping
+telemetry.
+
+The session drains pending assertions and shared learned consequences before the next
+full component propagation pass. Learned publications return through the same pending
+delivery, including registered theory payloads and integer premises, before components
+propagate. The learned phase also runs after the component pass. Component installation
+and pending recipient order remain fixed; a component can publish work for the following
+round, so this boundary does not establish a fresh fixpoint before every component.
+
+Each shared learned phase clears both shared conflict owner and native resolver. A new
+component conflict retains its actual owner and returns before a subsequent shared phase.
+Retraction preserves the metadata needed by a pending native conflict resolution; native
+learned continuations and producer exclusion retain their owners.
+
+The shared phase observes containing stops at entry and exit through existing
+[execution controls](resources.md#component-execution-controls). A stop at entry leaves
+attachments untouched and returns indeterminate. After a live entry, a completed valid
+learned conflict retains its named reason even when the exit observation detects a stop;
+other exit-stopped results are indeterminate. A learned contradiction can precede a
+component that would return indeterminate. Clauses, reasons
+and queued semantic delivery retain their ordinary retraction and resumption lifetimes.
+The kernel has no per-literal stop poll, so the observations supply no hard batch latency
+bound. Local operation allowances and representation declines alone are not containing
+stops. No operation or allowance is acquired, reset or refunded by the boundary.
+Existing diagnostic priority remains unchanged: a retained local allowance can mask raw
+cancellation in its reported cause, and transient observations gain no new cause carrier
+or sticky cancellation state. Final source publication retains its caller's checks; the
+internal conflict rule does not impose one stop priority on every public entry point.
+
+Watched-clause literal and signature indexes use primitive integer keys;
+clause identifiers and watch-list order remain stable across index growth and rebuilds.
+Retraction removes trail facts and restores integer premises before clamping
 the learned propagation cursor and notifying components. Root rebuild clears facts while
 retaining learned clauses and reawakening units. Native CP clause state remains CP-owned.
 [SearchRun](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchRun.kt)

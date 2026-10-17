@@ -421,6 +421,9 @@ class SearchSession(
                     }
                 }
             }
+            val beforeComponents = propagateLearnedClauses()
+            if (beforeComponents !is ComponentResult.Consistent) return beforeComponents
+            if (trail.pendingAssertions.isNotEmpty() || selfPublicationsPending) continue
             val result = runComponents { it.propagate(this) }
             if (result !is ComponentResult.Consistent) return result
             val learned = propagateLearnedClauses()
@@ -873,7 +876,28 @@ class SearchSession(
      */
     private fun propagateLearnedClauses(): ComponentResult {
         conflictOwner = null
-        return learning.propagate(this, trail.boolTrail)
+        conflictResolver = null
+        if (containingStopObserved()) return ComponentResult.Indeterminate
+        val result = learning.propagate(this, trail.boolTrail)
+        val stopped = containingStopObserved()
+        return when {
+            result is ComponentResult.Conflict -> result
+            stopped -> ComponentResult.Indeterminate
+            else -> result
+        }
+    }
+
+    private fun containingStopObserved(): Boolean {
+        when (executionControls.stopCause) {
+            SearchStopCause.Timeout,
+            SearchStopCause.Cancelled,
+            SearchStopCause.WorkAllowance,
+            SearchStopCause.CheckAllowance,
+            SearchStopCause.DecisionAllowance,
+            -> return true
+            else -> Unit
+        }
+        return checksExhausted || decisionsExhausted || executionControls.exhausted || cancelled()
     }
 
     override fun truth(literal: Int): Boolean? = literalTruth(literal)
