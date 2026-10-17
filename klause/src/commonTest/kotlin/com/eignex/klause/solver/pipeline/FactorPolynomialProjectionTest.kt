@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
@@ -80,6 +81,30 @@ class FactorPolynomialProjectionTest {
     }
 
     @Test
+    fun `mixed product projection should keep integer and real coordinates separate`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(2, 2), IntDomain(0, 0)),
+            arrayOf(ContinuousProduct(0, 0, 1), RealProduct(0, 0, 2, 1.0, 1.0)),
+            openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
+            numRealVars = 3, realLower = doubleArrayOf(1.0, 1.0, 2.0), realUpper = doubleArrayOf(1.0, 1.0, 2.0))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
+
+        val execution = assertIs<SourceExecutionResult.Polynomial>(
+            SourceSetup.execute(SourceExecutionRequest(invocation)))
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(execution.result.result).assignment
+        assertEquals("2", assignment.intValue(0))
+        assertEquals("0", assignment.intValue(1))
+        assertEquals("1", assignment.realValue(0))
+        assertEquals("2", assignment.realValue(2))
+        val projection = assertNotNull(assertIs<PreparedExecution.NonlinearInteger>(
+            assertNotNull(invocation.preparedPlan).execution).projection)
+        assertEquals(mapOf(SourceIntId(0) to TheoryRealId(0)), projection.attributions[1].integerEmbeddings)
+        assertEquals(mapOf(SourceRealId(0) to TheoryRealId(2), SourceRealId(2) to TheoryRealId(4)),
+            projection.attributions[1].realEmbeddings)
+    }
+
+    @Test
     fun `integer projection should preserve finite holes beside an open declaration`() {
         val source = Problem(0, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 2).excludeValue(1)), emptyArray(),
             openIntLo = booleanArrayOf(true, false), openIntHi = booleanArrayOf(true, false))
@@ -91,8 +116,8 @@ class FactorPolynomialProjectionTest {
             val excluded = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ONE)
             val included = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ofLong(2))
 
-            assertIs<QfNraResult.Unsat>(query.check(PolynomialCondition(lower = excluded, upper = excluded)))
-            assertIs<QfNraResult.Sat>(query.check(PolynomialCondition(lower = included, upper = included)))
+            assertIs<QfNraResult.Unsatisfiable>(query.check(PolynomialCondition(lower = excluded, upper = excluded)))
+            assertIs<QfNraResult.Satisfiable>(query.check(PolynomialCondition(lower = included, upper = included)))
         }
     }
 

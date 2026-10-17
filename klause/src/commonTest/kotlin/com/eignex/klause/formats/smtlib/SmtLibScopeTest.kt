@@ -64,7 +64,8 @@ class SmtLibScopeTest {
         val result = BacktrackSolver.source(source.model).solve()
 
         assertEquals(SourceExecutionKind.NONLINEAR_INTEGER, SourceSetup.executionKind(invocation))
-        assertEquals("1", assertIs<OpenTheoryResult.Sat>(result).assignment.realValue(source.realVarNames.getValue("x")))
+        assertEquals("1", assertIs<OpenTheoryResult.Sat>(result).assignment
+            .realValue(source.realVarNames.getValue("x")))
     }
 
     @Test
