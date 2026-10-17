@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
@@ -82,6 +83,7 @@ import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.snapshotValues
+import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.encodingSourceRealCount
 import com.eignex.klause.theory.linearTheoryModel
@@ -1003,6 +1005,150 @@ class ExactLiraSearchComponent private constructor(
         return true
     }
 
+    private fun implyIntervalGuards(context: SearchContext): ComponentResult? {
+        if (model.numIntVars == 0 || model.numRealVars != 0 || graphFirst || hasPrivateReals ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
+            node.rowAssertions.isNotEmpty() || node.sourceBranches.isNotEmpty() ||
+            node.disequalityDirections.isNotEmpty() || node.directionPremises.isNotEmpty() ||
+            node.branches.isNotEmpty() || node.reducedBranches.isNotEmpty() ||
+            node.transformedBranches.isNotEmpty() || node.retainedReduction != null
+        ) return null
+        if (intervalGuardStopped(context)) return ComponentResult.Indeterminate
+        operationStop.charge(8L)
+        if (intervalGuardStopped(context)) return ComponentResult.Indeterminate
+        val stop = object : Cancellation {
+            private var interrupted = false
+
+            override fun isCancelled(): Boolean {
+                if (!interrupted) interrupted = intervalGuardStopped(context)
+                return interrupted
+            }
+            override fun deadline() = operationStop.deadline()
+            override fun workMeter() = operationStop.workMeter()
+            override fun charge(units: Long) {
+                if (isCancelled()) return
+                operationStop.charge(units)
+                isCancelled()
+            }
+        }
+        var published = false
+        for (prepared in preparedRows) {
+            stop.charge(8L)
+            if (stop()) return ComponentResult.Indeterminate
+            if (!intervalGuardTarget(prepared, context, stop)) continue
+            stop.charge(4L)
+            if (stop()) return ComponentResult.Indeterminate
+            val comparison = prepared.form.comparison(true) { false }
+            val proof = system.intervalGuard(comparison, stop) ?: continue
+            val variable = prepared.row.activator
+            val decision = SearchDecision.Bool(Lit.make(variable, proof.holds))
+            val reason = intervalGuardReason(proof.premise, decision, context, stop) ?: continue
+            stop.charge(reason.literals.size.toLong() + 8L)
+            if (stop()) return ComponentResult.Indeterminate
+            if (!proof.current(lp, context, stop) || !intervalGuardReasonCurrent(reason, decision, context, stop) ||
+                bools[variable] != UNASSIGNED ||
+                context.boolValue(variable) != null || stop()
+            ) continue
+            val implied = context.imply(decision.literal, reason)
+            if (implied != ComponentResult.Consistent) return implied
+            // The current LP frame already exists; ordinary Boolean self-delivery omits this producer.
+            val applied = lp.assertWithin(decision, context, operationStop)
+            if (applied != ComponentResult.Consistent) return applied
+            published = true
+            observeCompleteStage("SOURCE_INTERVAL_GUARD_IMPLIED")
+        }
+        return when {
+            stop() -> ComponentResult.Indeterminate
+            published -> ComponentResult.Consistent
+            else -> null
+        }
+    }
+
+    private fun intervalGuardTarget(
+        prepared: PreparedSourceRow,
+        context: SearchContext,
+        stop: Cancellation,
+    ): Boolean {
+        val variable = prepared.row.activator
+        if (variable !in bools.indices || bools[variable] != UNASSIGNED || context.boolValue(variable) != null ||
+            prepared.disjunction || prepared.row.constants !is IntegralConstants ||
+            (prepared.row.relation != LinearOp.LE && prepared.row.relation != LinearOp.GE)
+        ) return false
+        val factor = model.factors[prepared.address.factor]
+        val source = when (factor) {
+            is ReifiedLinear -> factor
+            is EncodedTheoryFactor -> (factor.source as? ReifiedLinear)?.takeIf {
+                factor.linearForm === it.linearForm
+            }
+            else -> null
+        } ?: return false
+        val form = source.linearForm as? LinearForm.Conjunction ?: return false
+        if (form.rows.size != 1 || form.rows.single() !== prepared.row || source.auxBoolVar != variable) return false
+        for (term in 0 until prepared.row.size) {
+            stop.charge(1L)
+            if (stop()) return false
+            val reference = prepared.row.ref(term)
+            if (!Term.isInt(reference) || Term.intVar(reference) !in 0 until model.numIntVars) return false
+        }
+        return !stop()
+    }
+
+    private fun intervalGuardReason(
+        premise: SearchAtomPremise,
+        decision: SearchDecision.Bool,
+        context: SearchContext,
+        stop: Cancellation,
+    ): SearchExplanation? {
+        stop.charge(8L)
+        if (stop()) return null
+        val pending = ArrayDeque<SearchAtomPremise>()
+        val expanded = HashSet<SearchAtomPremise.All>()
+        pending.add(premise)
+        var remaining = INTERVAL_GUARD_REASON_NODES
+        var visited = 0L
+        while (pending.isNotEmpty()) {
+            stop.charge(4L)
+            if (stop() || remaining-- <= 0) return null
+            visited++
+            when (val current = pending.removeLast()) {
+                is SearchAtomPremise.Asserted -> {
+                    val literal = context.atomLiteral(current.decision) ?: return null
+                    if (Lit.variable(literal) == Lit.variable(decision.literal)) return null
+                }
+                is SearchAtomPremise.All -> {
+                    if (!expanded.add(current)) continue
+                    if (current.premises.size > remaining - pending.size) return null
+                    stop.charge(2L * current.premises.size + 2L)
+                    if (stop()) return null
+                    pending.addAll(current.premises)
+                }
+                SearchAtomPremise.Unavailable -> return null
+            }
+        }
+        stop.charge(8L * visited + 8L)
+        if (stop()) return null
+        return context.explainAtoms(premise, decision).takeUnless { stop() }
+    }
+
+    private fun intervalGuardStopped(context: SearchContext): Boolean =
+        operationStop() || context.cancelled() || context.executionControls.exhausted
+
+    private fun intervalGuardReasonCurrent(
+        reason: SearchExplanation,
+        decision: SearchDecision.Bool,
+        context: SearchContext,
+        stop: Cancellation,
+    ): Boolean {
+        for (literal in reason.literals) {
+            stop.charge(2L)
+            if (stop()) return false
+            if (literal == decision.literal) continue
+            val value = context.boolValue(Lit.variable(literal)) ?: return false
+            if (Lit.evaluate(literal, value)) return false
+        }
+        return !stop()
+    }
+
     private fun assertDisequalities(
         disequalities: List<Triple<RowAddress, ExactComparison, SearchAtomPremise>>,
     ): Boolean {
@@ -1163,6 +1309,7 @@ class ExactLiraSearchComponent private constructor(
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
+        implyIntervalGuards(context)?.let { return it }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()

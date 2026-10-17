@@ -306,6 +306,23 @@ edges and ordinary graph checks spend the current invocation's controls; a rebui
 guard index grants no new allowance. Closing releases private interval and graph
 state. See [difference logic](../theories/difference.md).
 
+Open integer interval implications spend the current exact-linear operation token.
+Prepared-row scans, native-form checks, coefficient hashing, source-side visits and
+cited-side staging are charged before their work or allocation. Exact residual
+arithmetic uses the existing 4,096-bit scalar admission and product preflights.
+One orientation's term and premise buffers are bounded by the complete explanation's
+4,096-node limit; no source-sized eligibility mask, copied attribution or separate
+advisory bank is retained. A nonnull engine side-premise bundle is excluded before
+its copying adapter runs. Stored source-premise DAGs are validated in full.
+
+The metered DAG prewalk prepays the shared explanation validator, result buffers,
+selected-side revalidation and Boolean publication. Refusal retains spent work and
+publishes no partial proof. Operation, context and native stops remain live around
+every debit and before publication. Inferring a fact opens no definition, numerical
+query, atom name or allowance. Its later normal source enforcement can install a
+definition and perform required LP work under existing controls; there is no promise
+of unchanged downstream graph size or query counts.
+
 Exact-linear partial-point polarity hints reuse a completed arithmetic check. Source
 comparison visits and bounded rational operations charge that check's current operation
 token, including its native meter; they create no numerical invocation or allowance.

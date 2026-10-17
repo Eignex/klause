@@ -299,6 +299,25 @@ Boolean antecedents; transient bounds are excluded unless their complete source
 premises are represented. The producing component stops after a new implication
 until the fixpoint reconciles activity. See [difference proofs](../theories/difference.md).
 
+The open exact integer component can imply an undecided native `LE` or `GE`
+comparison from certified sides of its original source columns. The source is one
+`ReifiedLinear` conjunction row, either direct or inside one encoding wrapper
+retaining that same form. Boolean coefficients, real coordinates, changed encodings
+and active private arithmetic branches are excluded. Each signed term needs its
+selected exact side; strict endpoints and every current side witness enter the proof.
+Unavailable, circular or unnameable premises withhold the whole fact. A primal point
+supplies no implication authority.
+
+This interval path requires an absent multi-column definition; constants, singletons
+and existing affine definitions retain their ordinary traversal. Publication retains
+a complete clause reason on the shared trail, self-applies the Boolean to its producer
+and yields to propagation before numerical work. Normal source assertion can then
+install the newly decided row's definition. That definition may survive pop while its
+bound and Boolean fact retract, leaving the target outside this optional path on a
+sibling. Complete source enforcement remains required. See
+[integer theory](../theories/linear-integer.md) and
+[resource allowances](resources.md).
+
 ## Arithmetic coordinate agreement
 
 Prepared registration collections with several arithmetic completion groups install

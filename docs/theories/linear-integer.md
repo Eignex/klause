@@ -49,6 +49,24 @@ coverage gaps under the [vision](../vision.md#shared-model-breadth).
 
 ## Results and proof authority
 
+An undecided native one-row integer comparison can receive an explained Boolean
+fact from exact interval sides of its original columns before its multi-column
+definition exists. The signed activity bound must decide the `LE` or `GE` relation
+or its complement, including strict endpoints, with every selected source witness
+available. This path accepts the unchanged native form through at most one encoding
+wrapper. It excludes Boolean coefficients, real or transformed coordinates, existing
+definitions and active private arithmetic branches. Equality and disequality targets
+retain their existing owner. A point's value or an unrelated LP objective bound is
+not a premise.
+
+The shared session owns the complete clause reason and retracts the fact with its
+source level. The producer self-applies publication and yields before another
+numerical check. Ordinary assertion still enforces the decided row and can install
+its definition; a retained definition then excludes this optional implication path
+after retraction. Missing or stale sides, unavailable names, circular or oversized
+reasons and interruption withhold the entire inference. See
+[shared search](../solver/search.md) and [resources](../solver/resources.md).
+
 `ExactLiraAssignment` carries arbitrary-precision integer coordinates, including
 values beyond `Long`. Publication checks source rows and integrality. A rational
 relaxation point or a failed witness check establishes neither feasibility nor

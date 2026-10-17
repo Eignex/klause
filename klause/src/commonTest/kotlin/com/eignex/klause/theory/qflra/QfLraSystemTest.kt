@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
@@ -27,7 +28,13 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -474,6 +481,129 @@ class QfLraSystemTest {
                 assertEquals(0, assertNotNull(lp.state).model.m)
                 assertTrue(lp.atLevel(0))
             }
+        }
+    }
+
+    @Test
+    fun `source interval proof should leave its target definition and numerical owner unchanged`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val target = ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
+        val source = Problem(3, intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(target))
+        val form = target.linearRows.single().exactForm(0)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, listOf(listOf(form)))
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp), atoms = SearchAtomRegistry(3, maxAtoms = 0))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(1L)), premise(0)))
+            assertTrue(lp.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), premise(1)))
+            val before = assertNotNull(lp.state).model
+
+            val proof = assertNotNull(system.intervalGuard(form.comparison(true) { false }, Cancellation.Never))
+
+            assertTrue(proof.holds)
+            assertTrue(proof.current(lp, session, Cancellation.Never))
+            assertTrue(before === assertNotNull(lp.state).model)
+            assertEquals(2, before.numVars)
+            assertEquals(0, before.m)
+            val reason = assertNotNull(session.explainAtoms(proof.premise, SearchDecision.Bool(Lit.make(2, true))))
+            assertContentEquals(intArrayOf(1, 3, 4), reason.literals.sortedArray())
+        }
+    }
+
+    @Test
+    fun `changed selected sides should invalidate a pending source interval proof`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val target = ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
+        val source = Problem(3, intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(target))
+        val form = target.linearRows.single().exactForm(0)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, listOf(listOf(form)))
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(1L)), axiom))
+            assertTrue(lp.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), axiom))
+            val proof = assertNotNull(system.intervalGuard(form.comparison(true) { false }, Cancellation.Never))
+
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(0L)), axiom))
+
+            assertFalse(proof.current(lp, session, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `engine side premises should withhold interval facts before premise expansion`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val target = ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
+        val source = Problem(3, intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(target))
+        val form = target.linearRows.single().exactForm(0)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, listOf(listOf(form)))
+            assertTrue(system.install())
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(1L),
+                premises = ExactLpPremises(emptyList(), listOf(0))), axiom))
+            assertTrue(lp.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), axiom))
+
+            val proof = system.intervalGuard(form.comparison(true) { false }, Cancellation.Never)
+
+            assertNull(proof)
+        }
+    }
+
+    @Test
+    fun `refused interval certificate storage should charge its caller and produce no proof`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val target = ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
+        val source = Problem(3, intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(target))
+        val form = target.linearRows.single().exactForm(0)
+        var stopped = false
+        val charges = ArrayList<Long>()
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = stopped
+            override fun workMeter(): WorkMeter = WorkMeter { units ->
+                charges += units
+                if (units == 24L) stopped = true
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, listOf(listOf(form)))
+            assertTrue(system.install())
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(1L)), axiom))
+            assertTrue(lp.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), axiom))
+
+            val proof = system.intervalGuard(form.comparison(true) { false }, stop)
+
+            assertNull(proof)
+            assertTrue(stopped)
+            assertEquals(24L, charges.last())
+            assertEquals(2, assertNotNull(lp.state).model.numVars)
+        }
+    }
+
+    @Test
+    fun `oversized exact source sides should withhold an interval proof`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val target = ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
+        val source = Problem(3, intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(target))
+        val form = target.linearRows.single().exactForm(0)
+        val large = BigFraction.of(parseBigInt("1" + "0".repeat(1300)), BIG_ONE)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, listOf(listOf(form)))
+            assertTrue(system.install())
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(large)), axiom))
+            assertTrue(lp.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), axiom))
+
+            val proof = system.intervalGuard(form.comparison(true) { false }, Cancellation.Never)
+
+            assertNull(proof)
         }
     }
 

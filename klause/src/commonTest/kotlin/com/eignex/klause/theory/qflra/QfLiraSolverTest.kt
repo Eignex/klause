@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntegerConstants
@@ -13,25 +14,36 @@ import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExecutionAccounting
+import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.contribute
+import com.eignex.klause.theory.EncodedTheoryFactor
+import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
@@ -547,6 +559,374 @@ class QfLiraSolverTest {
             assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
 
             assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        }
+    }
+
+    @Test
+    fun `separate source bounds should imply either guard polarity with all antecedents`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) {
+            for (holds in listOf(false, true)) {
+                val lower = (op == LinearOp.GE) == holds
+                val source = Problem(
+                    numBoolVars = 4,
+                    intBounds = openBounds(2),
+                    factors = arrayOf(
+                        ReifiedLinear(0, intArrayOf(1), intArrayOf(0), if (lower) LinearOp.GE else LinearOp.LE,
+                            if (lower) 2 else 1),
+                        ReifiedLinear(1, intArrayOf(1), intArrayOf(1), if (lower) LinearOp.GE else LinearOp.LE, 1),
+                        ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), op, if (op == LinearOp.GE) 3 else 2),
+                    ),
+                )
+                ExactLiraSearchComponent(source).use { component ->
+                    val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4, maxAtoms = 0))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+                    assertEquals(holds, session.boolValue(2))
+                    assertEquals(2, session.decisionLevel)
+                    assertContentEquals(
+                        intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, holds)).sortedArray(),
+                        assertNotNull(session.reasonFor(2)).literals.sortedArray(),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `signed source coefficients should select opposite interval sides`() {
+        val source = Problem(
+            numBoolVars = 4,
+            intBounds = openBounds(2),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 2),
+                ReifiedLinear(2, intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4, maxAtoms = 0))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(true, session.boolValue(2))
+            assertContentEquals(intArrayOf(1, 3, 4), assertNotNull(session.reasonFor(2)).literals.sortedArray())
+        }
+    }
+
+    @Test
+    fun `a strict interval endpoint should refute its closed comparison guard`() {
+        val source = Problem(
+            numBoolVars = 4,
+            intBounds = openBounds(2),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+                ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4, maxAtoms = 0))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, false)))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(false, session.boolValue(2))
+            assertContentEquals(intArrayOf(0, 3, 5), assertNotNull(session.reasonFor(2)).literals.sortedArray())
+        }
+    }
+
+    @Test
+    fun `an interval guard fact should retract before an unrelated sibling`() {
+        val source = Problem(
+            numBoolVars = 4,
+            intBounds = openBounds(2),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
+                ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4, maxAtoms = 0))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+            assertEquals(true, session.boolValue(2))
+
+            session.popTo(1)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertNull(session.boolValue(2))
+            assertNull(session.reasonFor(2))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+        }
+    }
+
+    @Test
+    fun `an installed affine definition should retain ordinary guard traversal`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(2),
+            factors = arrayOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(session.boolValue(0))
+            assertNull(session.reasonFor(0))
+        }
+    }
+
+    @Test
+    fun `an interval missing one source side should publish no guard fact`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(2),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `a singleton guard should retain its existing Boolean traversal`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `settled equality and disequality guards should retain their existing owner`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            val source = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(2),
+                factors = arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                    Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                    ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), op, 2),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertNull(session.boolValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `a delegated custom row should not inherit native interval guard authority`() {
+        val native = ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(2),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
+                object : Factor by native {},
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `changed and nested encodings should withhold native interval guard authority`() {
+        for (nested in listOf(false, true)) {
+            val native = ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
+            val attribution = EncodingAttribution(0, listOf(SourceBoolId(0)),
+                listOf(SourceIntId(0), SourceIntId(1)), emptyList())
+            val encoded = if (nested) {
+                EncodedTheoryFactor(EncodedTheoryFactor(native, native.linearForm, attribution),
+                    native.linearForm, attribution)
+            } else {
+                EncodedTheoryFactor(native, LinearForm.Conjunction(native.linearForm.rows), attribution)
+            }
+            val source = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(2),
+                factors = arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                    Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
+                    encoded,
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertNull(session.boolValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `incomplete interval reasons should withhold the entire source guard fact`() {
+        for (refusal in listOf("unavailable", "circular", "unnameable", "oversized", "stale")) {
+            var antecedentsLive = true
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(2),
+                factors = arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, -10),
+                    ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
+                ),
+            )
+            val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(3, maxAtoms = 0))
+            val antecedent = SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(0, true)))
+            val premise = when (refusal) {
+                "unavailable" -> SearchAtomPremise.Unavailable
+                "circular" -> SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(2, true)))
+                "oversized" -> SearchAtomPremise.All(List(4097) { antecedent })
+                else -> antecedent
+            }
+            val context = object : SearchContext by session {
+                override fun boolValue(variable: Int): Boolean? = if (variable < 2) antecedentsLive else null
+                override fun atomLiteral(decision: SearchDecision): Int? =
+                    if (refusal == "unnameable") null else session.atomLiteral(decision)
+                override fun intUpperBound(variable: Int): Long = 1L
+                override fun intUpperBoundPremise(variable: Int): SearchAtomPremise = premise
+            }
+            ExactLiraSearchComponent(source).use { component ->
+                component.useSolveStop(object : Cancellation {
+                    override fun isCancelled(): Boolean = false
+                    override fun workMeter(): WorkMeter = WorkMeter { units ->
+                        if (refusal == "stale" && units == 10L) antecedentsLive = false
+                    }
+                })
+                component.initialize(context)
+
+                component.propagate(context)
+
+                assertNull(session.boolValue(2))
+                assertNull(session.reasonFor(2))
+                if (refusal == "stale") assertEquals(false, antecedentsLive)
+            }
+        }
+    }
+
+    @Test
+    fun `containing stops during interval reason work should withhold the guard and retain their cause`() {
+        for (owner in listOf("parent", "context", "native")) {
+            var armed = false
+            var stopped = false
+            val parent = object : Cancellation {
+                override fun isCancelled(): Boolean = stopped && owner == "parent"
+                override fun workMeter(): WorkMeter = WorkMeter { units ->
+                    if (armed && units == 48L) stopped = true
+                }
+            }
+            val accounting = object : SearchExecutionAccounting {
+                override val exhausted: Boolean get() = stopped && owner == "native"
+            }
+            val controls = SearchExecutionControlAdapter(Cancellation { stopped && owner == "context" }, accounting)
+            val source = Problem(
+                numBoolVars = 4,
+                intBounds = openBounds(2),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
+                    ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                component.useSolveStop(parent)
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4), executionControls = controls)
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                armed = true
+                val result = session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+                assertTrue(stopped)
+                assertIs<ComponentResult.Indeterminate>(result)
+                assertNull(session.boolValue(2))
+                assertEquals(when (owner) {
+                    "parent" -> SearchStopCause.OperationAllowance
+                    "context" -> SearchStopCause.Cancelled
+                    else -> SearchStopCause.WorkAllowance
+                }, controls.stopCause)
+            }
+        }
+    }
+
+    @Test
+    fun `nested SMT integer comparisons should imply a guard through its unchanged native encoding`() {
+        val source = SmtLib.parse("""
+            (set-logic QF_LIA)
+            (declare-const x Int)
+            (declare-const y Int)
+            (declare-const a Bool)
+            (declare-const b Bool)
+            (declare-const c Bool)
+            (assert (or a (<= x 1)))
+            (assert (or b (<= y 1)))
+            (assert (or c (<= (+ x y) 2)))
+            (check-sat)
+        """.trimIndent()).model.bake()
+        val rows = source.factors.filterIsInstance<ReifiedLinear>()
+        val x = rows.single { it.vars.contentEquals(intArrayOf(0)) }
+        val y = rows.single { it.vars.contentEquals(intArrayOf(1)) }
+        val target = rows.single { it.vars.size == 2 }
+        val plan = source.componentPlan()
+        val fragment = assertNotNull(plan.encodedTheoryFragment(source))
+        val encoded = fragment.factors.filterIsInstance<EncodedTheoryFactor>().single { it.source === target }
+        assertTrue(encoded.linearForm === target.linearForm)
+        assertTrue(!source.intBounds.hasLower(0) && !source.intBounds.hasUpper(0))
+        plan.search(source, emptyMap()).use { planned ->
+            assertIs<ExactLiraSearchComponent>(planned.theory)
+            val session = planned.session
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(x.auxBoolVar, true))))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(y.auxBoolVar, true))))
+
+            assertEquals(true, session.boolValue(target.auxBoolVar))
+            assertContentEquals(
+                intArrayOf(Lit.make(x.auxBoolVar, false), Lit.make(y.auxBoolVar, false),
+                    Lit.make(target.auxBoolVar, true)).sortedArray(),
+                assertNotNull(session.reasonFor(target.auxBoolVar)).literals.sortedArray(),
+            )
         }
     }
 

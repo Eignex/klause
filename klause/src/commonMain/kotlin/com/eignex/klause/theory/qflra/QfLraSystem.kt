@@ -19,6 +19,8 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpExactCitedSide
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
@@ -27,9 +29,12 @@ import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.search.SearchAtomPremise
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -249,6 +254,70 @@ internal class LiveQfLraSystem(
         return null
     }
 
+    fun intervalGuard(comparison: ExactComparison, stop: Cancellation): DerivedIntervalGuardTruth? {
+        stop.charge(8L)
+        if (stop() || source.numRealVars != 0 || source.numIntVars == 0 ||
+            (comparison.op != LinearOp.LE && comparison.op != LinearOp.GE) ||
+            comparison.terms.size !in 2 until INTERVAL_GUARD_REASON_NODES
+        ) return null
+        val state = lp.state ?: return null
+        if (state.conflict != null) return null
+        val key = preparedTerms[comparison.ordered]?.positive ?: return null
+        val slot = normalized[key] ?: return null
+        val coefficients = slot.term.coefficients
+        if (slot.column >= 0 || coefficients.size !in 2 until INTERVAL_GUARD_REASON_NODES) return null
+        val work = MixedPointArithmetic(stop)
+        var hashing = coefficients.size.toLong() + 1L
+        for (coefficient in coefficients.values) {
+            if (!work.admitted(coefficient)) return null
+            hashing += 2L + coefficient.num.magnitudeBitLength() / Long.SIZE_BITS +
+                coefficient.den.magnitudeBitLength() / Long.SIZE_BITS
+        }
+        stop.charge(hashing)
+        if (stop() || coefficients in definitions) return null
+        val upper = comparison.op == LinearOp.LE
+        return intervalOrientation(comparison, upper, state, work, stop)
+            ?: intervalOrientation(comparison, !upper, state, work, stop)
+    }
+
+    private fun intervalOrientation(
+        comparison: ExactComparison,
+        upper: Boolean,
+        state: LpExactState,
+        work: MixedPointArithmetic,
+        stop: Cancellation,
+    ): DerivedIntervalGuardTruth? {
+        if (stop() || lp.state !== state || state.conflict != null || !work.admitted(comparison.bound)) return null
+        val depth = state.depth
+        stop.charge(8L * comparison.terms.size + 8L)
+        if (stop()) return null
+        val sides = ArrayList<LpExactCitedSide>(comparison.terms.size)
+        val premises = ArrayList<SearchAtomPremise>(comparison.terms.size)
+        var residual = comparison.bound
+        var strict = false
+        for ((column, coefficient) in comparison.terms) {
+            stop.charge(4L)
+            if (stop() || column !in 0 until columns || !work.admitted(coefficient)) return null
+            val sideUpper = if (coefficient.signum() < 0) !upper else upper
+            val active = state.activeSide(column, sideUpper) ?: return null
+            if (active.side.premises != null || !work.admitted(active.side.number.value)) return null
+            val premise = lp.activeBoundPremise(column, sideUpper) ?: return null
+            if (premise === SearchAtomPremise.Unavailable || stop()) return null
+            residual = work.subtractProduct(residual, coefficient, active.side.number.value) ?: return null
+            strict = strict || active.side.strict
+            sides += LpExactCitedSide(column, sideUpper, active.side, active.witness)
+            premises += premise
+        }
+        val relation = residual.signum()
+        val positive = upper == (comparison.op == LinearOp.LE)
+        val stronger = if (upper) relation > 0 else relation < 0
+        val equalEnough = if (positive) !comparison.strict || strict else comparison.strict || strict
+        if (!stronger && (relation != 0 || !equalEnough)) return null
+        stop.charge(premises.size.toLong() + 4L)
+        if (stop() || lp.state !== state || state.depth != depth || state.conflict != null) return null
+        return DerivedIntervalGuardTruth(positive, SearchAtomPremise.All(premises), state, depth, sides)
+    }
+
     fun assertAtom(atom: SourceBoundAtom, premise: SearchAtomPremise): Boolean {
         val expression = sourceTerms(atom) ?: return false
         return assertTerms(SmtTermKey.of(expression), atom.upper, atom.threshold, atom.strict, premise)
@@ -351,6 +420,31 @@ internal class LiveQfLraSystem(
 }
 
 internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
+
+internal class DerivedIntervalGuardTruth(
+    val holds: Boolean,
+    val premise: SearchAtomPremise,
+    private val state: LpExactState,
+    private val depth: Int,
+    private val sides: List<LpExactCitedSide>,
+) {
+    fun current(lp: LpPropagator, context: SearchContext, stop: Cancellation): Boolean {
+        if (stop() || lp.state !== state || state.depth != depth || context.decisionLevel != depth ||
+            state.conflict != null
+        ) return false
+        for (side in sides) {
+            val value = side.side.number.value
+            stop.charge(6L + value.num.magnitudeBitLength() / Long.SIZE_BITS +
+                value.den.magnitudeBitLength() / Long.SIZE_BITS)
+            if (stop()) return false
+            val active = state.activeSide(side.column, side.upper) ?: return false
+            if (active.side != side.side || active.witness != side.witness || active.side.premises != null) return false
+        }
+        return !stop()
+    }
+}
+
+internal const val INTERVAL_GUARD_REASON_NODES = 4096
 
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
 // rows and a map-keyed lookup pays a hash probe per entry to compare.
