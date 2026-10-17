@@ -357,15 +357,16 @@ private fun validateSourceExecution(request: SourceExecutionRequest): SourceExec
     val invocation = request.invocation
     invocation.freezeExecution()
     val kind = SourceSetup.executionKind(invocation)
+    if (invocation.operation == ExecutionOperation.ENUMERATE &&
+        kind !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.REFUTED)
+    ) {
+        throw PipelineConfigException("all-solution enumeration is unavailable for source ${kind.name.lowercase()}")
+    }
     if (invocation.operation !in setOf(
             ExecutionOperation.SATISFY,
             ExecutionOperation.OPTIMIZE,
             ExecutionOperation.ENUMERATE,
-        ) ||
-        (
-            invocation.operation == ExecutionOperation.ENUMERATE &&
-                kind !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.REFUTED)
-            )
+        )
     ) {
         throw PipelineConfigException("source execution does not support ${invocation.operation} on $kind")
     }
