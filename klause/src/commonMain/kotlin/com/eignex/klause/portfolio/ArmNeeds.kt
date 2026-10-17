@@ -74,10 +74,10 @@ internal class ProblemFacts(
             binaryIntegers = problem.binaryIntegers,
             continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
             integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
-                it is Linear && it.integerConstants != null ||
-                    it is ExactLinear && it.constants is IntegerConstants &&
-                    it.activator == LinearRow.ALWAYS && !it.strict &&
-                    (0 until it.size).all { index -> Term.isInt(it.ref(index)) }
+                (it is Linear && it.integerConstants != null) ||
+                    (it is ExactLinear && it.constants is IntegerConstants &&
+                        it.activator == LinearRow.ALWAYS && !it.strict &&
+                        (0 until it.size).all { index -> Term.isInt(it.ref(index)) })
             },
             booleanObjective = objective?.let {
                 CoreGuidedSearch.eligible(problem, it) &&
