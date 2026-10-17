@@ -125,6 +125,40 @@ class SolveMetricResultTest {
     }
 
     @Test
+    fun `a checked MPS witness should retain feasibility and withhold optimum credit`() {
+        val reported = rec(true, 1.0, 100, true).copy(finalWitness = "v x=1")
+        val validation = SourceValidation("valid", "ground checked", checkedWitness = "v x=1")
+
+        val checked = reported.sourceChecked(validation, approximation = false, witnessOnly = true)
+
+        assertEquals(true, checked.feasible)
+        assertEquals(false, checked.proven)
+        assertEquals("v x=1", checked.checkedWitness)
+        assertEquals("true", checked.stats["reportedProven"])
+        assertEquals(reported.elapsedMs, checked.elapsedMs)
+    }
+
+    @Test
+    fun `unchecked MPS witnesses and refutations should receive no result credit`() {
+        for (feasible in listOf(true, false)) {
+            for (status in listOf("unknown", "invalid")) {
+                val reported = rec(feasible, 1.0, 100, true).copy(finalWitness = "v x=1")
+
+                val checked = reported.sourceChecked(MpsSourceValidation.unknown("unavailable").copy(status = status),
+                    approximation = false, witnessOnly = true)
+
+                assertNull(checked.feasible)
+                assertNull(checked.objective)
+                assertNull(checked.timeToBestMs)
+                assertNull(checked.checkedWitness)
+                assertEquals(false, checked.proven)
+                assertEquals(reported.finalWitness, checked.finalWitness)
+                assertEquals(feasible.toString(), checked.stats["reportedFeasible"])
+            }
+        }
+    }
+
+    @Test
     fun `a solved row should report time-to-best tagged with config and joined features`() {
         val ref = ReferenceEntry(
             "s", "fam/inst", false, null, null, false, 0, "cp-sat", 300_000,

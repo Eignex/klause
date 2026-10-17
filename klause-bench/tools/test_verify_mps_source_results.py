@@ -1,0 +1,151 @@
+"""Ground MPS witness checks cannot obtain a replacement point or proof from a solver."""
+import contextlib
+import hashlib
+import json
+import tempfile
+import types
+import fractions
+import pathlib
+import unittest
+from unittest import mock
+
+import z3
+import verify_source_results as verifier
+import mps_witness_validation as worker
+
+
+class MpsGroundTest(unittest.TestCase):
+    fixture_root = pathlib.Path(__file__).resolve().parents[1] / 'smoke-corpus/mps-linear-source-v1'
+    source = ('ROWS\n N cost\n E row\nCOLUMNS\n x cost 1 row 1\n z cost 0\n'
+              'RHS\n r row 1\nBOUNDS\n FR b x\n FR b z\nENDATA\n')
+
+    def setUp(self):
+        self.guards = contextlib.ExitStack()
+        self.addCleanup(self.guards.close)
+        for name in ('Solver', 'SolverFor', 'SimpleSolver', 'Optimize', 'Tactic', 'Then', 'ParThen', 'TryFor'):
+            self.guards.enter_context(mock.patch.object(z3, name, side_effect=AssertionError('solver call forbidden')))
+        for name in ('source_query_solver', 'require_verdict', 'check_mps_root_bound', 'source', 'check'):
+            self.guards.enter_context(mock.patch.object(verifier, name, side_effect=AssertionError('query fallback forbidden')))
+
+    def check(self, witness='v x=1 z=0', objective='1', exact=False, source=None, **updates):
+        record = dict(feasible=True, finalWitness=witness, kind='optimize', exactObjective=objective, maximize=False)
+        record.update(updates)
+        raw = 'o ' + str(objective) + '\ns SATISFIABLE\n' + witness + '\n'
+        return verifier.check_mps_ground(source or self.source, record, raw, exact)
+
+    def test_complete_sparse_source_point_does_not_query_or_certify_a_proof(self):
+        checked = self.check(proven=True)
+        self.assertTrue(checked['exactFeasible'])
+        self.assertEqual(0, checked['solverSearchQueries'])
+        self.assertFalse(checked['proofCertificateChecked'])
+
+    def test_tolerance_boundary_is_ground_checked_without_nominal_sat_fallback(self):
+        for value, accepted in [('1.0000001', True), ('1.00000010000002', False)]:
+            with self.subTest(value=value):
+                if accepted:
+                    result = self.check('v x=' + value + ' z=0', value)
+                    self.assertTrue(result['toleranceAccepted'])
+                    self.assertFalse(result['exactFeasible'])
+                else:
+                    with self.assertRaisesRegex(AssertionError, 'exceeds original source tolerance'):
+                        self.check('v x=' + value + ' z=0', value)
+        with self.assertRaisesRegex(AssertionError, 'violates exact original source'):
+            self.check('v x=1.0000001 z=0', '1.0000001', exact=True)
+
+    def test_missing_extra_duplicate_nonfinite_and_fractional_integer_coordinates_are_rejected(self):
+        for witness in ('v x=1', 'v x=1 z=0 extra=0', 'v x=1 z=0 x=1',
+                        'v x=NaN z=0', 'v x=Infinity z=0', 'v x=1/0 z=0'):
+            with self.subTest(witness=witness):
+                with self.assertRaises((AssertionError, ValueError, ZeroDivisionError)):
+                    self.check(witness)
+        source = (self.fixture_root / 'bounded-decimal-constant.mps').read_text()
+        with self.assertRaisesRegex(AssertionError, 'fractional integer'):
+            self.check('v I=1/2 X=1/10', '1/8', source=source)
+
+    def test_original_decimal_terms_constant_objectives_and_sense_use_existing_fixtures(self):
+        for name, witness, objective, maximize in (
+                ('original-decimal-cancellation', 'v I=1 X=1', '1', False),
+                ('bounded-decimal-constant', 'v I=0 X=1/10', '1/8', False),
+                ('indicator-disabled', 'v I=0 X=0', '0', False),
+                ('primal-point-max', 'v I=0 X=1', '13', True)):
+            with self.subTest(name=name):
+                result = self.check(witness, objective, exact=True, maximize=maximize,
+                                    source=(self.fixture_root / (name + '.mps')).read_text())
+                self.assertTrue(result['exactFeasible'])
+
+    def test_separate_term_magnitudes_are_opt_in_and_preserve_legacy_proof_arithmetic(self):
+        source = ('ROWS\n N cost\n E row\nCOLUMNS\n x cost 0 row 100000000\n'
+                  ' x row -99999999\nRHS\n r row 0\nBOUNDS\n FR b x\nENDATA\n')
+        result = self.check('v x=1', '0', source=source)
+        self.assertTrue(result['toleranceAccepted'])
+        rows, _, variables, _ = verifier.mps(source, tolerance=True)
+        self.assertFalse(all(z3.is_true(verifier.mps_point(row, variables, {'x': fractions.Fraction(1)}))
+                             for row in rows))
+
+    def test_source_and_retained_stdout_objectives_must_both_match_the_point(self):
+        with self.assertRaisesRegex(AssertionError, 'point objective differs'):
+            self.check(objective='2')
+        record = dict(feasible=True, finalWitness='v x=1 z=0', kind='optimize', exactObjective='1', maximize=False)
+        with self.assertRaisesRegex(AssertionError, 'retained objective differs'):
+            verifier.check_mps_ground(self.source, record, 'o 2\nv x=1 z=0\n', False)
+        for raw in ('o 1\nv x=0 z=0\n', 'o 1\nv x=1 z=0\nv\n'):
+            with self.subTest(raw=raw), self.assertRaisesRegex(AssertionError, 'retained final witness differs'):
+                verifier.check_mps_ground(self.source, record, raw, False)
+
+    def test_exact_policy_header_must_preserve_original_declaration_defaults(self):
+        record = dict(feasible=True, finalWitness='v x=1 z=0', kind='optimize', exactObjective='1',
+                      maximize=False, command='cli --exact -- source.mps')
+        header = ('c klause-source-semantics: format=MPS numeric=DECIMAL_LITERALS overrides=true '
+                  'unbounded-int-lo=0 unbounded-int-hi=1 unbounded-real-lo=0 unbounded-real-hi=open '
+                  'absolute-tolerance=0 relative-tolerance=0\n')
+        result = verifier.check_mps_ground(self.source, record, header + 'o 1\nv x=1 z=0\n', True)
+        self.assertTrue(result['exactFeasible'])
+        with self.assertRaisesRegex(ValueError, 'producer command differs'):
+            verifier.check_mps_ground(self.source, record, 'o 1\nv x=1 z=0\n', False)
+
+    def test_overridden_defaults_and_unsupported_or_incomplete_sources_are_unknown(self):
+        record = dict(feasible=True, finalWitness='v x=1 z=0', kind='optimize', exactObjective='1', maximize=False)
+        with self.assertRaisesRegex(ValueError, 'overridden source semantics'):
+            verifier.check_mps_ground(self.source, record,
+                'c klause-source-semantics: unbounded-real-lo=-1\no 1\nv x=1 z=0', False)
+        for source in (self.source.replace('ENDATA', ''), self.source.replace('ENDATA', 'QUADOBJ\nENDATA')):
+            with self.subTest(source=source):
+                with self.assertRaises(ValueError):
+                    self.check(source=source)
+        with self.assertRaisesRegex(ValueError, 'no complete reported feasible'):
+            self.check(feasible=False, finalWitness=None)
+
+
+class MpsRuntimeFailureTest(unittest.TestCase):
+    def test_dependency_failure_or_timeout_cannot_fall_back_to_producer_acceptance(self):
+        for failure in ('setup-failure', 'timeout', 'overflow', 'incomplete'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
+                out = pathlib.Path(temporary)
+                (out / 'tools').mkdir()
+                tools = {}
+                for name in worker.TOOLS:
+                    raw = name.encode()
+                    (out / 'tools' / name).write_bytes(raw)
+                    tools[name] = hashlib.sha256(raw).hexdigest()
+                for name in ('source.mps', 'stdout.txt', 'record.json', 'request.json'):
+                    (out / name).write_text('{}')
+                (out / 'tools.json').write_text(json.dumps(tools))
+                result = dict(exit=1 if failure == 'setup-failure' else 0,
+                              complete=failure != 'incomplete', timedOut=failure == 'timeout',
+                              overflow=failure == 'overflow', parentStop=None)
+                runner = types.SimpleNamespace(SIGNALS=set(), release=mock.Mock(), stopped=lambda: False,
+                    file_digest=lambda path: hashlib.sha256(path.read_bytes()).hexdigest(),
+                    save=lambda path, value: path.write_text(json.dumps(value)), owned=mock.Mock(return_value=result))
+                with mock.patch.object(worker, 'load', return_value=runner):
+                    worker.supervise(out, worker.bindings(out), tools, 123)
+                checked = json.loads((out / 'result.json').read_text())
+                self.assertEqual('unknown', checked['status'])
+                self.assertIsNone(checked['checkedWitness'])
+                self.assertTrue(checked['cleanupComplete'])
+                self.assertEqual(1, runner.owned.call_count)
+                self.assertEqual(0, checked['solverSearchQueries'])
+                self.assertFalse(checked['proofCertificateChecked'])
+
+
+if __name__ == '__main__':
+    unittest.main()

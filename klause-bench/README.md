@@ -136,7 +136,7 @@ its selection. Use `reference=any` in lab specs to preserve frozen membership.
 
 Settings, budgets, non-default solver seeds, parameters and labels distinguish
 configuration directories. Run configurations separately to compare them.
-`param=source-validation=true` opts MiniZinc integer and XCSP3 runs into independent
+`param=source-validation=true` opts MiniZinc integer, XCSP3 and MPS runs into independent
 source-witness checking and is consumed by the bench before CLI launch.
 
 The `divmod` suite retains self-authored scalar, affine wide, equivalent linear and
@@ -1151,6 +1151,46 @@ not a source optimum/refutation. `reportedFeasible`, `reportedObjective` and
 `reportedProven` retain the original claims. Integer opt-in also captures stdout
 SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
 Earlier incumbents are unchecked, so attribution is limited to the final objective.
+
+MPS runs opt in with `param=source-validation=true` under policy
+`mps-original-ground-witness-v1`. The installed bench uses the maintained independent
+Python MPS parser and exact rational substitution in `verify_source_results.py`.
+It checks the literal final stdout point against every original row, bound,
+indicator and integrality declaration, and recomputes the original objective and
+sense. Default runs permit original MPS absolute/relative tolerances of `1e-7`;
+`exact=true` requires zero slack. Tolerance magnitudes retain separate original
+terms, including cancellation. Original-file declaration defaults apply; unsupported
+semantics overrides, syntax and incomplete points leave checking unknown.
+
+Each check writes original source bytes, stdout, final witness and the complete
+producer record under an adjacent `mps-source-check-*` directory, with SHA-256
+bindings in `result.json`. The saved solve record also retains exact producer-record
+JSON, source retrieval identity and the complete receipt JSON in
+`sourceValidationProducerRecordJson`, `sourceValidationSourceIdentityJson` and
+`sourceValidationReceiptJson`. Literal final coordinates/objective and source/stdout
+hashes remain in the ordinary record. This preserves checker custody when ordinary
+workers return only that record; preserve hash-matching original sources separately
+for later inspection. Packaged checker/requirements hashes, interpreter and pinned
+wheel/extracted-file identities, process logs and cleanup receipts accompany it.
+The existing pinned runtime runner provisions a private `z3-solver==4.15.3.0`
+wheel environment on Linux x86-64/glibc, without global installation. Setup is
+bounded to 180 seconds/2 GiB, point checking to 30 seconds/4 GiB, and the containing
+supervisor to 270 seconds. Sources over 64 MiB, solver stdout over 8 MiB,
+producer records/receipts over 4 MiB and checker streams over 1 MiB remain unchecked. Private dependencies are removed after checking. Missing dependencies,
+timeout, incomplete output, changed custody or failed cleanup cannot yield valid
+credit.
+
+MPS ground checking performs no satisfiability search, repairs, replacement-point
+construction, optimum query or refutation check. Only a valid witness retains
+feasibility/objective credit; unknown/invalid checks and reported UNSAT claims
+become undecided. All proof claims remain uncredited. Original claims stay in
+`reportedFeasible`, `reportedObjective`, `reportedExactObjective` and
+`reportedProven`, and `checkedWitness` is separate from `finalWitness`.
+`sourceValidationSetupMs` and `sourceValidationCheckMs` are outside the solver
+budget and elapsed/incumbent times. `sourceValidationReceiptSha256` binds the
+retained receipt JSON to the saved result. The validation policy separates raw solve
+cache entries; a raw cache hit still checks its retained point afresh and does not
+reuse acceptance. The offline verifier's proof path is unchanged.
 
 XCSP3 integer runs opt in with `param=source-validation=true`. The installed bench
 includes the independent `org.xcsp:xcsp3-tools:2.5` `SolutionChecker`, also used by

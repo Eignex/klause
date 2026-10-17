@@ -26,7 +26,7 @@ class BenchCacheTest {
             )) {
                 assertNotEquals(baseline, BenchCache.keyFor(model, null, "klause", budget, changed))
             }
-            for (policy in listOf(PINNED_SOURCE_POLICY, XCSP_SOURCE_POLICY)) {
+            for (policy in listOf(PINNED_SOURCE_POLICY, XCSP_SOURCE_POLICY, MPS_SOURCE_POLICY)) {
                 assertNotEquals(
                     baseline,
                     BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = policy),
