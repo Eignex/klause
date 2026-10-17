@@ -63,7 +63,7 @@ internal fun prepareLinearSource(
 
 private fun PreparedLinearSource.bind(route: SourceProblemRoute): SourceProblemRoute {
     fun bound(plan: PreparedSourcePlan): PreparedSourcePlan =
-        plan.withLinearSource(view.source, view.sourceIntCount, view.sourceRealCount, objective)
+        plan.withLinearSource(view.source, view.sourceIntegerCoordinates, view.sourceRealCoordinates, objective)
     return when (route) {
         is SourceProblemRoute.Finite -> route.copy(preparedPlan = bound(route.preparedPlan))
 
@@ -114,14 +114,14 @@ private fun LinearSourceView.numericalPlan(objective: LinearObjective?): Prepare
             "linear-numerical",
             ComponentResponsibility.COMPLETION,
             model.factors.indices.toList(),
-            (0 until sourceIntCount).toList(),
+            (0 until model.numIntVars).toList(),
             (0 until model.numRealVars).toList(),
             execution = ComponentExecutionContract(complete, heuristic),
         )
         ),
         0,
-        sourceIntCount,
-        sourceRealCount,
+        model.numIntVars,
+        model.numRealVars,
         operations = setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE),
-    ).withLinearSource(source, sourceIntCount, sourceRealCount, objective)
+    ).withLinearSource(source, sourceIntegerCoordinates, sourceRealCoordinates, objective)
 }

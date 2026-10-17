@@ -48,7 +48,8 @@ class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
             )
         }))
 
-        val outcome = assertIs<FiniteSolveOutcome.Completed>(assertIs<SourceExecutionResult.Finite>(result).result.outcome)
+        val finite = assertIs<SourceExecutionResult.Finite>(result)
+        val outcome = assertIs<FiniteSolveOutcome.Completed>(finite.result.outcome)
         val arms = outcome.stats.portfolio.arms
         val prefix = if (engine == FiniteEngine.ALNS) "alns/" else "ls/"
         assertTrue(arms.isNotEmpty())

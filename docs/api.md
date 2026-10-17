@@ -155,6 +155,12 @@ The numerical route uses `TheoryParams` and its existing serial LP/MIP traversal
 LS/ALNS requests retain witness-only native results. Common strategy controls and
 format-specific CLI registration remain separate from this library surface.
 
+`PreparedSourcePlan.workingCoordinate` maps a typed original coordinate into its
+canonical working namespace, including real declarations with proved integer
+backings. Original declaration counts retain their source meaning. `realCoordinate`
+requires real storage; a cross-kind backing uses the typed mapping. Integer-only
+hint remaps use original integer identities and cannot invent real coordinates.
+
 `executionKind` inspects the installed family; library policy owns
 unsupported-linear optimization fallback to source-checked heuristic execution on the
 same prepared plan. Exact and original-real FlatZinc use the same arithmetic fallback

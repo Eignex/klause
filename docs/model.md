@@ -93,6 +93,13 @@ objectives use a positive integral scale when representable; other affine object
 use a private defining column. Public source counts and original objective descriptors
 exclude that column. Source-safe finite rewrites preserve the original attachment and
 the distinct working factor source used for reconstruction and native certification.
+An unconditional exact equality can give an original real declaration an integer
+backing when its constant and coefficient ratios are integral and bounded integer
+inputs imply a signed-word range. Recognition follows chained definitions under the
+containing preparation token. Guarded or fractional definitions retain real storage;
+original rows, declaration kinds and tolerance qualification remain authoritative.
+The typed working coordinate records the storage namespace independently of the
+original declaration namespace.
 
 ## Distinct integer positions
 
