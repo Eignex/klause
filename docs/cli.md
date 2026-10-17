@@ -144,8 +144,10 @@ The library consumes presolve tuning and checks applicability before worker cons
 `SourceSetup.execute` without selecting another solver or parsing native limits.
 Pipeline telemetry derives from the retained library invocation.
 Native satisfaction verdicts retain the library's source claim qualification.
-The CLI reports complete-pool metadata separately; it does not reinterpret a
-native refutation from the requested engine name. Heuristic exhaustion remains
+The CLI reports library-resolved complete-search metadata separately, including
+explicit worker mixes; it does not reinterpret a native refutation from the requested
+engine name. Missing admission during preparation retains the actual resource stop
+cause. Native enumeration applicability is checked by shared source execution. Heuristic exhaustion remains
 incomplete through the producing adapter.
 
 The internal `linearSourceSolvable` adapter accepts an attached `LinearSourceProblem`

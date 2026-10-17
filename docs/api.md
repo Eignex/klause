@@ -217,6 +217,15 @@ finite factory is called. A foreign shape, engine or operation binding rejects b
 execution; nonfinite enumeration explicitly declines. Source deductions can refute an
 empty enumeration without constructing a worker.
 
+`FiniteSolveResult.completeSearchAdmitted` describes the resolved working strategy,
+including explicit portfolio arm counts. `SourceExecutionResult` forwards that
+metadata for finite execution and retains native strategy admission. The nullable
+value stays absent when preparation or interruption ends before strategy resolution;
+absence does not assert a heuristic-only pool. Auxiliary proof and improvement-only
+workers do not count as complete traversal arms. This metadata establishes no
+original-source witness, bound or terminal authority, including private-grid results;
+those retain their separate native and original-source qualifications.
+
 `ExecutionOption.dryRunPresolve(true)` requests preparation diagnostics through that
 same boundary. Finite execution returns `FiniteSolveOutcome.PreparedOnly`; open
 linear execution returns `SourceExecutionResult.Prepared`, retaining the original

@@ -99,6 +99,11 @@ internal class PortfolioInvocation(
     }
     private var closed = false
 
+    val completeSearchAdmitted: Boolean
+        get() = workers.any {
+            it.family == ArmFamily.Backtrack && !it.improvementOnly && !it.auxiliaryProof && it.permitsSourceProofs
+        }
+
     override fun solve(cancellation: Cancellation): SolveResult {
         check(!closed) { "portfolio invocation is closed" }
         return portfolio.solve(controls.cancellation or cancellation)

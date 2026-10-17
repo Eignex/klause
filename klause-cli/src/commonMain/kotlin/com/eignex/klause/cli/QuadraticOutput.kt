@@ -10,7 +10,7 @@ internal fun reportQuadraticOptimization(
     output: OutputProtocol,
     statistics: Boolean,
     routingElapsedMs: Long,
-    completePool: Boolean,
+    completePool: Boolean?,
     publication: ArithmeticPublication,
 ) {
     val result = execution.result

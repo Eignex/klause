@@ -241,6 +241,17 @@ sealed class SourceExecutionResult protected constructor(
         val elapsed: Duration,
     ) : SourceExecutionResult(invocation)
 
+    /** Resolved complete-search admission, independent of source witness and terminal qualification. */
+    val completeSearchAdmitted: Boolean?
+        get() = when (this) {
+            is Finite -> result.completeSearchAdmitted
+            is Prepared, is Declined, is Refuted -> null
+            else -> invocation.admission?.let { admission ->
+                ExecutionStrategy.COMPLETE in admission.arms &&
+                    SourceSetup.executionKind(invocation) != SourceExecutionKind.HEURISTIC
+            }
+        }
+
     /** Finite preparation, native outcome and scoped engine evidence. */
     class Finite internal constructor(
         invocation: PreparedSourceInvocation,

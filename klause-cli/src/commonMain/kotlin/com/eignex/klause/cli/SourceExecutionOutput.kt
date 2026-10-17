@@ -1,19 +1,16 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialTheoryExecution
 import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
-import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.execute
-import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.result.SolveStats
 import kotlin.time.Duration
 
@@ -26,8 +23,6 @@ internal fun solveCapturedSource(
     controls: SourceExecutionRequest,
     budgetSpent: (Boolean) -> Boolean,
 ) {
-    val invocation = rendering.invocation
-    val kind = SourceSetup.executionKind(invocation)
     if (controls.prepareOnly) {
         val result = SourceSetup.execute(controls) as SourceExecutionResult.Prepared
         val prepared = result.result
@@ -40,7 +35,6 @@ internal fun solveCapturedSource(
         if (prepared.infeasible) errPrintln("  preparation refuted the model")
         return
     }
-    val complete = common.resolvedEngine() !in setOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
     output.begin(solvable.optimize, solvable.maximize)
     val result = SourceSetup.execute(
         controls,
@@ -60,13 +54,14 @@ internal fun solveCapturedSource(
             )
         }),
     )
+    val complete = result.completeSearchAdmitted
     when (result) {
         is SourceExecutionResult.Linear -> {
             when (val execution = result.result) {
                 is OpenTheoryExecution.Optimize -> reportOpenTheoryOptimum(
                     execution, solvable.maximize, rendering.render, common.statistics, output,
                     solvable.routingLpStats, solvable.routingElapsedMs,
-                    completePool = complete && kind != SourceExecutionKind.HEURISTIC,
+                    completePool = complete,
                     publication = publication, budgetExhausted = budgetSpent,
                 )
 
@@ -177,7 +172,7 @@ internal fun reportNativeSatisfaction(
     output: OutputProtocol,
     statistics: Boolean,
     routingElapsedMs: Long,
-    completePool: Boolean,
+    completePool: Boolean?,
 ) {
     val result = execution.result
     output.onVerdictContext(

@@ -543,7 +543,7 @@ internal object SolveCore {
                 output.onVerdictContext(
                     VerdictContext(
                         budgetExhausted = budgetSpent(common, outcome.stats.run.timedOut),
-                        completePool = !request.engine.pureLocalSearch,
+                        completePool = result.completeSearchAdmitted,
                     ),
                 )
                 output.onComplete(outcome.verdict.toCliVerdict())
@@ -656,7 +656,7 @@ internal fun reportOpenTheoryOptimum(
     output: OutputProtocol,
     routingLpStats: LpStats,
     routingElapsedMs: Long,
-    completePool: Boolean = true,
+    completePool: Boolean? = null,
     publication: ArithmeticPublication,
     budgetExhausted: (Boolean) -> Boolean,
 ) {
