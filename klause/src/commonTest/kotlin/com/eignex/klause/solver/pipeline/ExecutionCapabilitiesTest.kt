@@ -2,11 +2,13 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
@@ -67,7 +69,8 @@ class ExecutionCapabilitiesTest {
         val source = Problem(
             0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(ContinuousProduct(0, 0, 0)),
+            factors = arrayOf(ContinuousProduct(0, 0, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
             numRealVars = 1,
             realLower = doubleArrayOf(1.0),
             realUpper = doubleArrayOf(1.0),
@@ -77,7 +80,7 @@ class ExecutionCapabilitiesTest {
             ).realSource().pipelineRequest()
 
         val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            if (target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
+            if (factor is Linear && target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
             else BuiltInEncoderProvider.select(factor, target)
         })
         val unsupported = source.prepareExecutionPlan(providers).capabilities.admission(FiniteEngine.BACKTRACK)

@@ -217,7 +217,7 @@ class SourceSetupTest {
     }
 
     @Test
-    fun `finite maximization should reject an unrepresentable normalized word coefficient`() {
+    fun `maximization should select exact execution for unrepresentable word normalization`() {
         val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), emptyArray())
         for (objective in listOf(
             LinearObjective(boolWeights = longArrayOf(Long.MIN_VALUE)),
@@ -232,9 +232,11 @@ class SourceSetupTest {
                 maximize = true,
             )
 
-            assertFailsWith<IllegalArgumentException> { SourceSetup.prepare(request) }
+            val invocation = SourceSetup.prepare(request)
 
-            assertSame(objective, request.objective)
+            assertIs<SourceProblemRoute.NativeFormula>(invocation.route)
+            assertSame(objective, invocation.sourceObjective)
+            assertSame(source, assertNotNull(invocation.preparedPlan).originalSource)
         }
     }
 

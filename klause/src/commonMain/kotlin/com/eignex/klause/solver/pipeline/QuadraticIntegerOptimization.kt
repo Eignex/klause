@@ -231,7 +231,7 @@ internal class QuadraticIntegerOptimization(
         root = source.integerBounds(invocation, relaxation.arithmetic)
         scope = requireNotNull(plan.quadraticEngineInvocation(objective, sense,
             quadraticAssumptions(controls, engine)))
-        identity = ModelIdentity.of(source, objective)
+        identity = ModelIdentity.of(plan.originalSource, objective)
         initialized = true
     }
 
@@ -256,7 +256,7 @@ internal class QuadraticIntegerOptimization(
     }
 
     fun worker(arm: Int, prepared: PreparedSourcePlan = plan): PortfolioWorker {
-        val model = ModelIdentity.of(source, objective)
+        val model = ModelIdentity.of(plan.originalSource, objective)
         val invocation = plan.quadraticEngineInvocation(objective, sense, quadraticAssumptions(controls, engine))
         val binding = SourceWorkerBinding(model, provesResults = arm == 0, preparedPlan = prepared,
             quadraticInvocation = invocation)

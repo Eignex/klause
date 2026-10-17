@@ -21,7 +21,7 @@ class SmtLibSourceObjectiveTest {
     @Test
     fun `an affine helper objective beside a retained product should keep original declaration coefficients`() {
         val source = SmtLib.parse("(declare-const x Real) (define-fun cost ((v Real)) Real (+ v 7)) " +
-            "(assert (= (* x x) 4)) (assert (> x 0)) (minimize (cost x))")
+            "(assert (= x 2)) (assert (= (* x x) 4)) (minimize (cost x))")
         val objective = assertNotNull(source.objective).toLinearObjective()
         val invocation = SourceSetup.prepare(SourceSetupRequest(source.source,
             ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective))
