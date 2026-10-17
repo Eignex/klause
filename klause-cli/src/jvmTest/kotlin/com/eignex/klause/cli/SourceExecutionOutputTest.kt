@@ -32,9 +32,10 @@ class SourceExecutionOutputTest {
             override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean =
                 error("satisfaction has no source objective")
 
-            override fun onSolution(rendered: String, objective: Long?) {
+            override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
                 points += rendered
                 assertEquals(null, objective)
+                assertEquals(null, continuousObjective)
             }
 
             override fun onComplete(verdict: Verdict) {
