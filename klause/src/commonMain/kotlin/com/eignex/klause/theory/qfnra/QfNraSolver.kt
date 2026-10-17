@@ -43,6 +43,7 @@ internal data class QfNraStats(
     val booleanTheoryResourceRefusals: Long? = null,
     val lastBooleanTheoryResource: PolynomialResource? = null,
     val equationalSections: Long? = null,
+    val equationalRootLevels: Long? = null,
 )
 
 internal enum class QfNraReason { Interrupted, WorkLimit, ResourceLimit }
@@ -125,6 +126,7 @@ internal class QfNraQuery(
             }
             yield(null)
             work.equationalSections = 0
+            work.equationalRootLevels = 0
             work.booleanTheoryRegions = 0
             work.booleanTheoryAtoms = 0
             work.booleanTheoryConstantRefutations = 0
@@ -147,9 +149,18 @@ internal class QfNraQuery(
                         work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                         continue
                     }
-                    val polynomials = region.atoms.keys.map {
+                    val nonzero = HashSet<Int>()
+                    val polynomials = region.atoms.map { (index, truth) ->
                         arithmetic.step()
-                        normalized.atoms[it].polynomial
+                        val atom = normalized.atoms[index]
+                        if (atom.holds(0) != truth) {
+                            val term = atom.polynomial.terms.singleOrNull()
+                            if (term != null) for (variable in term.monomial.variables) {
+                                arithmetic.step()
+                                nonzero.add(variable)
+                            }
+                        }
+                        atom.polynomial
                     }
                     val equations = region.atoms.mapNotNull { (index, truth) ->
                         arithmetic.step()
@@ -159,7 +170,11 @@ internal class QfNraQuery(
                         ) atom.polynomial else null
                     }
                     val order = polynomialVariableOrder(polynomials, realCount, arithmetic)
-                    val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic, equations, order) {
+                    val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic,
+                        equations, order, nonzero, onRootSection = {
+                            val roots = checkNotNull(work.equationalRootLevels)
+                            work.equationalRootLevels = roots + minOf(1L, Long.MAX_VALUE - roots)
+                        }) {
                         val sections = checkNotNull(work.equationalSections)
                         work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
                     }
@@ -217,6 +232,7 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     var booleanTheoryResourceRefusals: Long? = null
     var lastBooleanTheoryResource: PolynomialResource? = null
     var equationalSections: Long? = null
+    var equationalRootLevels: Long? = null
     private var coupledWorkDeclines: Long = 0
     private var dyadicPreExtractionDeclines: Long = 0
     private var spent: Long = 0
@@ -276,7 +292,7 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     fun snapshot(): QfNraStats = QfNraStats(projectedPolynomials, liftedCells, spent,
         dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines,
         booleanTheoryRegions, booleanTheoryAtoms, booleanTheoryConstantRefutations,
-        booleanTheoryResourceRefusals, lastBooleanTheoryResource, equationalSections)
+        booleanTheoryResourceRefusals, lastBooleanTheoryResource, equationalSections, equationalRootLevels)
 }
 
 private const val MAX_WITNESS_WORK = 65_536L
@@ -1489,7 +1505,8 @@ private fun searchCells(
         }
         val cell = frame.nextCell++
         val root = (cell / 2).toInt()
-        val coordinate = frame.point ?: if (cell and 1L != 0L) frame.roots[root] else {
+        val coordinate = frame.point ?: if (frame.rootsOnly) frame.roots[cell.toInt()]
+        else if (cell and 1L != 0L) frame.roots[root] else {
             algebraic.rational(algebraic.sampleBetween(frame.roots.getOrNull(root - 1), frame.roots.getOrNull(root)))
         }
         coordinates[frame.variable] = coordinate
@@ -1513,8 +1530,9 @@ private class CadFrame(
     val variable: Int,
     val roots: List<AlgebraicReal>,
     val point: AlgebraicReal? = null,
+    val rootsOnly: Boolean = false,
 ) {
-    val cellCount: Long = if (point == null) 2L * roots.size + 1 else 1
+    val cellCount: Long = if (point != null) 1 else if (rootsOnly) roots.size.toLong() else 2L * roots.size + 1
     var nextCell: Long = 0
 }
 
@@ -1530,6 +1548,12 @@ private fun liftFrame(
     fixed[variable]?.let { return CadFrame(level, variable, emptyList(), algebraic.rational(it)) }
     projection.section(level)?.let {
         return CadFrame(level, variable, emptyList(), algebraic.evaluate(it, coordinates))
+    }
+    projection.rootSection(level)?.let {
+        val specialized = algebraic.specialize(it.polynomial, variable, coordinates)
+        // A lost leading degree violates this region's source nonzero premises.
+        val roots = if (specialized.degree == it.degree) algebraic.roots(specialized) else emptyList()
+        return CadFrame(level, variable, roots, rootsOnly = true)
     }
     val roots = mutableListOf<AlgebraicReal>()
     for (polynomial in projection.polynomials(level)) {

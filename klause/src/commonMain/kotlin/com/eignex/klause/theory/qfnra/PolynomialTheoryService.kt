@@ -163,6 +163,8 @@ internal class PolynomialTheoryInvocation(
         right.lastBooleanTheoryResource ?: left.lastBooleanTheoryResource,
         if (left.equationalSections == null && right.equationalSections == null) null
         else sum(left.equationalSections ?: 0, right.equationalSections ?: 0),
+        if (left.equationalRootLevels == null && right.equationalRootLevels == null) null
+        else sum(left.equationalRootLevels ?: 0, right.equationalRootLevels ?: 0),
     )
 
     private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)

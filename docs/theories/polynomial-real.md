@@ -654,9 +654,11 @@ unvisited complete stage remains absent.
 ### Projection families
 
 [PolynomialProjection](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
-constructs a complete Collins projection family for rational multivariate
-polynomials. It reads the [exact polynomial kernel](../arithmetic/polynomial.md)
-and owns selection of projection operations and coordinate order.
+constructs complete projection families for rational multivariate polynomials,
+restricted by the region's required equalities when justified root sections are
+available. Ordinary levels use Collins projection. The component reads the
+[exact polynomial kernel](../arithmetic/polynomial.md) and owns selection of
+projection operations and coordinate order.
 The theory does not materialize finite CP domains or depend on the linear engines.
 
 Within a Boolean region, a true equality or false disequality requires its whole
@@ -665,8 +667,8 @@ occurring in exactly one pure linear monomial with a nonzero rational coefficien
 is solved as a polynomial in the remaining coordinates. Every region boundary and
 remaining required equation is substituted before further elimination. A nonzero
 constant required equation refutes that region. Products remain whole equations;
-no factor acquires a zero or nonzero premise. Variable coefficients and nonlinear
-coordinate occurrences retain complete ordinary projection.
+no factor acquires a zero or nonzero premise. Other coordinate occurrences remain
+for subsequent projection; only total rational polynomial graphs are substituted.
 
 Projection records a permutation of all original coordinates and the total graph
 sections. Graph dependencies occupy earlier lifting levels. Prefix literal checks
@@ -683,8 +685,10 @@ returned list do not change captured families. Immutable kernel polynomials may 
 shared. One caller-supplied arithmetic context spans construction; interruption and
 kernel resource stops propagate without publishing a partial family.
 
-Construction eliminates total graph coordinates when available, otherwise follows
-the captured coordinate preference. Complete queries rank the original region
+Construction eliminates total graph coordinates when available, then selects a
+justified required-root coordinate, otherwise follows the captured coordinate
+preference. Required-root selection prefers the earliest eligible elimination
+coordinate in that preference. Complete queries rank the original region
 boundaries by the sum of degrees in each coordinate, then peak degree and number
 of monomials containing it. Smaller scores eliminate first, with descending source
 ID resolving ties. This preference changes no polynomial, declared coordinate,
@@ -699,7 +703,53 @@ dimension retains an empty family. The univariate family occupies the first
 lifting level. Equality sections can override the preference while retaining all
 their coordinate dependencies at earlier lifting levels.
 
-For each eliminated top-variable family, the projection contains all coefficient
+#### Required root sections
+
+A selected source predicate whose truth excludes zero and whose polynomial is one
+monomial proves every coordinate in that monomial nonzero. These facts belong to
+that Boolean region and conditioned query. A required equality can restrict a
+lifting level to its real roots when its leading coefficient is one nonzero
+rational monomial and every coefficient coordinate has such a source nonzero fact.
+A rational constant leading coefficient needs no additional fact. A coefficient
+sum or an unproved nonzero coordinate supplies no permission to omit a zero fiber.
+
+At that level, projection retains all input coefficients, all principal
+subresultants of the selected equation and its derivative, and all principal
+subresultants between that equation and each other polynomial's needed reducta.
+Other derivatives and pairs of other polynomials are unnecessary on the equation's
+root sections. Coefficient invariance fixes the other polynomials' specialized
+degrees. The selected equation has fixed degree on every admitted base cell;
+its derivative subresultants preserve its root branches, and the pair
+subresultants preserve their intersections with the other polynomials. Their
+signs are therefore invariant on each selected root section. This argument
+retains repeated roots and shared zero factors without a square-free assumption.
+
+Lifting isolates every real root of the selected equation and visits no sectors
+at that level. A specialized degree below the selected degree means the leading
+monomial vanished, contradicting this region's source nonzero premises; that
+fiber has no admissible root frame. A required equation without real roots also
+has an empty frame. Regions without a justified leading coefficient retain full
+ordinary projection and their zero fibers. Graph and root sections both retain
+all original coordinate slots and the final complete source check.
+
+When both full input polynomials are required zeroes, their zeroth principal
+subresultant is a necessary lower equation. This consequence is collected only
+for the full inputs, never for arbitrary reducta. A zero resultant supplies no
+sufficiency claim about common roots. A nonzero rational constant resultant
+refutes the region. Lower equations can enable further graph or root sections;
+a graph that forces a source-proved nonzero coordinate to zero also refutes the
+region. These consequences share the existing arithmetic owner and leave every
+original equation in the final source check.
+
+A nullable counter observes selected required-root levels, including levels
+without a projection operation. It counts neither roots nor accepted proofs or
+models, and aggregates across regions and invocation checks with saturation.
+These observations reuse the existing selection without another operation,
+poll or native charge.
+
+#### Ordinary projection levels
+
+For each ordinary eliminated top-variable family, the projection contains all coefficient
 polynomials and every principal subresultant coefficient of each needed nonconstant reductum
 and its derivative, and every principal subresultant coefficient between reducta
 from distinct input polynomials. Equal-degree pairs use the same exact kernel
@@ -739,8 +789,10 @@ receive false. The complete assignment is checked against the original normalize
 formula before capture. It retains every declared numeric coordinate, including
 empty-family dimensions and fixed values.
 
-Full Collins projection and exhaustive section/sector traversal refute a region's
-signed numeric conjunction, including degree loss and nullification. A source
+Ordinary levels exhaust all Collins sections and sectors; required-root levels
+exhaust all real roots under their source premises. Together they refute the
+region's signed numeric conjunction, including admitted degree loss and
+nullification fibers. A source
 UNSAT requires every Boolean region to be covered and numerically refuted; any
 unfinished region withholds that verdict. Both SAT and UNSAT retain the final
 containing stop check. Root indices in returned

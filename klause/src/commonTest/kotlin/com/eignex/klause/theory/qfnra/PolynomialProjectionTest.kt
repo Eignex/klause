@@ -20,6 +20,33 @@ class PolynomialProjectionTest {
     private val y = Polynomial.variable(1)
 
     @Test
+    fun `nonzero constant resultants refute incompatible required equations`() {
+        val first = arithmetic.subtract(arithmetic.add(arithmetic.power(x, 2), arithmetic.power(y, 2)),
+            Polynomial.ONE)
+        val second = arithmetic.add(first, Polynomial.ONE)
+
+        val projection = PolynomialProjection.compute(listOf(first, second), 2,
+            arithmetic, listOf(first, second))
+
+        assertTrue(projection.inconsistentEquations)
+    }
+
+    @Test
+    fun `a required equation avoids unrelated boundary pair matrices`() {
+        val equation = arithmetic.subtract(arithmetic.add(arithmetic.power(x, 2), arithmetic.power(y, 2)),
+            Polynomial.ONE)
+        val first = arithmetic.add(arithmetic.power(y, 3), arithmetic.power(x, 3))
+        val second = arithmetic.subtract(arithmetic.power(y, 3), arithmetic.power(x, 3))
+        val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25))
+
+        val projection = PolynomialProjection.compute(listOf(equation, first, second), 2, limited,
+            listOf(equation), intArrayOf(0, 1))
+
+        assertEquals(equation, projection.rootSection(1)?.polynomial)
+        assertTrue(projection.polynomials(0).isNotEmpty())
+    }
+
+    @Test
     fun `constant leading coefficients exclude reductum only root boundaries`() {
         val polynomial = arithmetic.multiply(arithmetic.add(y, x),
             arithmetic.add(arithmetic.power(y, 2), Polynomial.ONE))

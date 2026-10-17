@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
@@ -16,6 +17,172 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
+    @Test
+    fun `zero resultants do not accept a noncommon required root`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (* x0 x0) 1) (= (* (- x0 1) (- x0 2)) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.ONE, witness.realValue(0).rational)
+    }
+
+    @Test
+    fun `required root projection fits the source matrix allowance`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (assert (and (= (+ (* x0 x0) (* x1 x1)) 1)
+                         (distinct (+ (* x1 x1 x1) (* x0 x0 x0)) 0)
+                         (distinct (- (* x1 x1 x1) (* x0 x0 x0)) 0)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 25)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val x = assertNotNull(witness.realValue(0).rational)
+        val y = assertNotNull(witness.realValue(1).rational)
+        assertEquals(BigFraction.ONE, x * x + y * y)
+        assertTrue(y * y * y + x * x * x != BigFraction.ZERO)
+        assertTrue(y * y * y - x * x * x != BigFraction.ZERO)
+        assertEquals(33, witness.realCount)
+        for (variable in 2..32) assertEquals(BigFraction.ZERO, witness.realValue(variable).rational)
+    }
+
+    @Test
+    fun `nonzero root premises stay within their source Boolean region`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (or (and (not b) (> x0 0) (= (* x0 x1) 1) (< x1 0))
+                        (and b (= x0 0) (= x1 3))))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(witness.boolValue(0))
+        assertEquals(BigFraction.ZERO, witness.realValue(0).rational)
+        assertEquals(BigFraction.ofLong(3), witness.realValue(1).rational)
+        assertEquals(2L, result.stats.booleanTheoryRegions)
+    }
+
+    @Test
+    fun `retracted source pins remove nonzero root premises`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (and (=> b (> x0 0)) (=> b (= (* x0 x1) 1))
+                         (=> (not b) (= x0 0)) (=> (not b) (= x1 3))))
+            """.trimIndent(),
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+
+        service.invocation().use { invocation ->
+            for (pin in listOf(true, false, true)) {
+                val result = invocation.check(PolynomialCondition(bools = mapOf(0 to pin)))
+
+                val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+                val x = assertNotNull(witness.realValue(0).rational)
+                val y = assertNotNull(witness.realValue(1).rational)
+                assertEquals(pin, witness.boolValue(0))
+                if (pin) {
+                    assertTrue(x > BigFraction.ZERO)
+                    assertEquals(BigFraction.ONE, x * y)
+                } else {
+                    assertEquals(BigFraction.ZERO, x)
+                    assertEquals(BigFraction.ofLong(3), y)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `unproved leading coefficients retain their zero fibers`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (* (- x0 1) x1 x1) 0) (> x0 2) (< (* x1 x1) 1)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(assertNotNull(witness.realValue(0).rational) > BigFraction.ofLong(2))
+        assertEquals(BigFraction.ZERO, witness.realValue(1).rational)
+    }
+
+    @Test
+    fun `shared zero factors satisfy weak inequalities on required roots`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (assert (and (= (+ (* x0 x0) (* x1 x1)) 1)
+                         (>= (* (- (+ (* x0 x0) (* x1 x1)) 1) (+ x1 x0 1)) 0)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val x = assertNotNull(witness.realValue(0).rational)
+        val y = assertNotNull(witness.realValue(1).rational)
+        assertEquals(BigFraction.ONE, x * x + y * y)
+    }
+
+    @Test
+    fun `shared zero factors cannot satisfy strict inequalities on required roots`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (assert (and (= (+ (* x0 x0) (* x1 x1)) 1)
+                         (> (* (- (+ (* x0 x0) (* x1 x1)) 1) (+ x1 x0 1)) 0)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `required repeated roots retain their exact algebraic coordinate`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* (- (* x0 x0) 2) (- (* x0 x0) 2)) 0))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+        assertEquals(0, algebraic.compare(algebraic.multiply(witness.realValue(0), witness.realValue(0)),
+            algebraic.rational(BigFraction.ofLong(2))))
+        assertEquals(33, witness.realCount)
+    }
+
+    @Test
+    fun `a required polynomial without real roots refutes its complete region`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (+ (* x0 x0) 1) 0))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
     @Test
     fun `degree ordered complete projection retains original inequality coordinates`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
