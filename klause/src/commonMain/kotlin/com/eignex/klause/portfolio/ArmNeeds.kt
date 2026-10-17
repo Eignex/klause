@@ -1,7 +1,11 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -70,7 +74,10 @@ internal class ProblemFacts(
             binaryIntegers = problem.binaryIntegers,
             continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
             integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
-                it is Linear && it.integerConstants != null
+                it is Linear && it.integerConstants != null ||
+                    it is ExactLinear && it.constants is IntegerConstants &&
+                    it.activator == LinearRow.ALWAYS && !it.strict &&
+                    (0 until it.size).all { index -> Term.isInt(it.ref(index)) }
             },
             booleanObjective = objective?.let {
                 CoreGuidedSearch.eligible(problem, it) &&
