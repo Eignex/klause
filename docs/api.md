@@ -102,6 +102,12 @@ For source orchestration, attach a canonical `Problem` with
 source direction and units; `maximize` records its sense. Setup prefers exact arithmetic
 for pure-real models and for admitted linear integer objectives whose declared range
 exceeds binary64's exact integral range. Other finite models retain finite execution.
+The public `Problem.pipelineRoute` overloads delegate to this setup and retain their
+existing signatures. Their compatibility route preferences do not override canonical
+source ownership. Default calls retain baked source providers; explicit providers,
+LP observation and separate optional-deduction/required-admission stops retain the
+same ownership as a direct setup request.
+
 The same policy serves DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc,
 SMT-LIB linear admission and source-strategy satisfaction. Finite format adapters
 retain the selected route and their existing definition, Boolean-fold, functional
