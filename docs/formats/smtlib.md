@@ -126,6 +126,14 @@ may decline values they cannot represent. Integer-only rational comparisons reta
 exact denominator-cleared lattice thresholds. Source witnesses and proofs remain
 subject to the complete selected relation and original declaration checks.
 
+Hard unit-weight integer sums of total single-guard zero/one conditionals retain
+Boolean cardinality constraints when their LE, GE or EQ threshold lies within the
+literal count. Signed guards and opposite arm orientations preserve each indicator's
+value. Repeated Boolean coordinates and other rows retain their arithmetic encoding.
+Recognition charges the source token and polls cancellation. Existing definition
+liveness retains shared guards and numeric uses while removing unused private columns;
+numeric children and their domain constraints are evaluated before recognition.
+
 
 Asserted and reified equalities between an integer conditional result and a constant
 can lower directly to Boolean tests of its branches. Completed conditional definitions and equality

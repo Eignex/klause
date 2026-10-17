@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Lit
@@ -25,6 +26,177 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SmtLibSelectionTest {
+    @Test
+    fun `indicator cardinalities should preserve signed guards and opposite arms`() {
+        for ((guard, thenValue) in listOf("b" to 1, "b" to 0, "(not b)" to 1, "(not b)" to 0)) {
+            for (op in listOf("<=", ">=", "=")) {
+                for (mask in 0..3) {
+                    val b = mask and 1 != 0
+                    val c = mask and 2 != 0
+                    val selected = if (b == (guard == "b")) thenValue else 1 - thenValue
+                    val count = selected + if (c) 1 else 0
+                    val expected = when (op) {
+                        "<=" -> count <= 1
+                        ">=" -> count >= 1
+                        else -> count == 1
+                    }
+                    val parsed = SmtLib.parse(
+                        """
+                        (declare-const b Bool) (declare-const c Bool)
+                        (assert ($op (+ (ite $guard $thenValue ${1 - thenValue}) (ite c 1 0)) 1))
+                        (assert ${if (b) "b" else "(not b)"})
+                        (assert ${if (c) "c" else "(not c)"})
+                        """.trimIndent(),
+                    )
+
+                    val result = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0))
+
+                    assertEquals(0, parsed.model.numIntVars)
+                    assertEquals(1, parsed.model.factors.filterIsInstance<Cardinality>().size)
+                    if (expected) assertIs<SolveResult.Sat>(result) else assertIs<SolveResult.Unsat>(result)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `indicator cardinalities should preserve zero and full count thresholds`() {
+        for (op in listOf("<=", ">=", "=")) {
+            for (bound in listOf(0, 2)) {
+                val parsed = SmtLib.parse(
+                    """
+                    (declare-const b Bool) (declare-const c Bool)
+                    (assert ($op (+ (ite b 1 0) (ite c 1 0)) $bound))
+                    """.trimIndent(),
+                )
+
+                val sample = assertIs<SolveResult.Sat>(
+                    BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0)),
+                ).assignment
+
+                val count = listOf("b", "c").count { sample.boolValue(parsed.boolVarNames.getValue(it)) }
+                val holds = when (op) {
+                    "<=" -> count <= bound
+                    ">=" -> count >= bound
+                    else -> count == bound
+                }
+                assertTrue(holds)
+                assertEquals(0, parsed.model.numIntVars)
+            }
+        }
+    }
+
+    @Test
+    fun `indicator cardinalities should retain shared composed guard definitions`() {
+        for (mask in 0..7) {
+            val a = mask and 1 != 0
+            val b = mask and 2 != 0
+            val c = mask and 4 != 0
+            val expected = (if (a xor b) 1 else 0) + (if (b && c) 0 else 1) <= 1
+            val parsed = SmtLib.parse(
+                """
+                (declare-const a Bool) (declare-const b Bool) (declare-const c Bool)
+                (assert (let ((g (xor a b)) (h (and b c)))
+                    (<= (+ (ite g 1 0) (ite h 0 1)) 1)))
+                (assert ${if (a) "a" else "(not a)"})
+                (assert ${if (b) "b" else "(not b)"})
+                (assert ${if (c) "c" else "(not c)"})
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0))
+
+            assertEquals(0, parsed.model.numIntVars)
+            assertEquals(1, parsed.model.factors.filterIsInstance<Cardinality>().size)
+            if (expected) assertIs<SolveResult.Sat>(result) else assertIs<SolveResult.Unsat>(result)
+        }
+    }
+
+    @Test
+    fun `indicator cardinalities should preserve independent numeric observations`() {
+        for (mask in 0..3) {
+            val a = mask and 1 != 0
+            val b = mask and 2 != 0
+            val parsed = SmtLib.parse(
+                """
+                (declare-const a Bool) (declare-const b Bool) (declare-const c Bool) (declare-const x Int)
+                (assert (<= 0 x 1)) (assert (not c))
+                (assert (let ((g (and a b))) (let ((v (ite g 1 0)))
+                    (and (<= (+ v (ite c 1 0)) 1) (= x v)))))
+                (assert ${if (a) "a" else "(not a)"})
+                (assert ${if (b) "b" else "(not b)"})
+                """.trimIndent(),
+            )
+
+            val sample = assertIs<SolveResult.Sat>(
+                BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0)),
+            ).assignment
+
+            assertEquals(if (a && b) 1L else 0L, sample.intValue(parsed.intVarNames.getValue("x")))
+            assertEquals(1, parsed.model.factors.filterIsInstance<Cardinality>().size)
+            assertEquals(1, parsed.model.factors.filterIsInstance<Element>().size)
+        }
+    }
+
+    @Test
+    fun `repeated indicator guards should retain their arithmetic multiplicity`() {
+        for (second in listOf("(ite b 1 0)", "(ite (not b) 0 1)")) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool)
+                (assert b) (assert (<= (+ (ite b 1 0) $second) 1))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0))
+
+            assertTrue(parsed.model.factors.none { it is Cardinality })
+            assertIs<SolveResult.Unsat>(result)
+        }
+    }
+
+    @Test
+    fun `other indicator relations should preserve arithmetic fallback`() {
+        for (relation in listOf(
+            "(<= (+ (* 2 (ite b 1 0)) (ite c 1 0)) 2)",
+            "(distinct (+ (ite b 1 0) (ite c 1 0)) 0)",
+            "(or (= (+ (ite b 1 0) (ite c 1 0)) 1) c)",
+            "(<= (+ (ite b 1 0) (ite c 1 0)) 3)",
+            "(>= (+ (ite b 1 0) (ite c 1 0)) -1)",
+        )) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool) (declare-const c Bool)
+                (assert b) (assert (not c)) (assert $relation)
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0))
+
+            assertTrue(parsed.model.factors.none { it is Cardinality })
+            assertIs<SolveResult.Sat>(result)
+        }
+    }
+
+    @Test
+    fun `indicator cardinalities should retain arithmetic dependencies of their guards`() {
+        for (x in listOf(0, 2)) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool) (declare-const c Bool) (declare-const x Int)
+                (assert (<= 0 x 2)) (assert b) (assert (not c))
+                (assert (ite b (= x $x) (= x 1)))
+                (assert (<= (+ (ite (and b (< (div x 2) 1)) 1 0) (ite c 1 0)) 0))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0))
+
+            assertEquals(1, parsed.model.factors.filterIsInstance<Cardinality>().size)
+            if (x == 2) assertIs<SolveResult.Sat>(result) else assertIs<SolveResult.Unsat>(result)
+        }
+    }
+
     @Test
     fun `affine integer conditionals should retain native selection`() {
         val parsed = SmtLib.parse(

@@ -84,6 +84,18 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
 
     fun isDefined(variable: Int): Boolean = variable in definitions
 
+    fun indicatorLiteral(variable: Int): Int? {
+        val definition = definitions[variable] ?: return null
+        val guard = definition.guards.singleOrNull() ?: return null
+        val arm = definition.arms.singleOrNull() ?: return null
+        if (arm.coeffs.isNotEmpty() || definition.default.coeffs.isNotEmpty()) return null
+        return when {
+            arm.constant == 1L && definition.default.constant == 0L -> guard
+            arm.constant == 0L && definition.default.constant == 1L -> Lit.negate(guard)
+            else -> null
+        }
+    }
+
     fun branchUnder(variable: Int, knownLiteral: Int): LinComb? {
         val definition = definitions[variable] ?: return null
         val guard = definition.guards.singleOrNull() ?: return null
