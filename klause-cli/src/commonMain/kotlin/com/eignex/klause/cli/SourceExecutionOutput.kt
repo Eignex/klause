@@ -63,11 +63,13 @@ internal fun solveCapturedSource(
     val result = SourceSetup.execute(
         controls,
         SourceExecutionCallbacks(onLinearIncumbent = { accepted ->
-            publication.publish(
-                rendering.render(OpenTheoryAssignment.Sampled(accepted.sample)),
-                accepted.value,
-                accepted.version,
-            )
+            if (solvable.optimize) {
+                publication.publish(
+                    rendering.render(OpenTheoryAssignment.Sampled(accepted.sample)),
+                    accepted.value,
+                    accepted.version,
+                )
+            }
         }, onQuadraticIncumbent = { accepted ->
             publication.publish(
                 rendering.render(polynomialAssignment(accepted.incumbent.sample)),
