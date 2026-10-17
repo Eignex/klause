@@ -103,7 +103,8 @@ def rational(value):
     return z3.RealVal(f"{value.numerator}/{value.denominator}")
 
 
-def mps(text, tolerance=False):
+def mps(text, tolerance=False, absolute_tolerance=fractions.Fraction('1e-7'),
+        relative_tolerance=fractions.Fraction('1e-7')):
     section, objective_row, maximize, marker = None, None, False, False
     rows, coefficients, rhs, ranges, lower, upper, indicators = {}, {}, {}, {}, {}, {}, {}
     columns, integer = set(), set()
@@ -191,8 +192,10 @@ def mps(text, tolerance=False):
     def slack(bound, magnitude=0):
         if not tolerance:
             return 0
-        scale = rational(max(fractions.Fraction(1), abs(fractions.Fraction(str(bound).replace('D', 'E')))))
-        return rational('1e-7') * z3.If(magnitude > scale, magnitude, scale)
+        scale = rational(abs(fractions.Fraction(str(bound).replace('D', 'E'))))
+        relative = rational(relative_tolerance) * z3.If(magnitude > scale, magnitude, scale)
+        absolute = rational(absolute_tolerance)
+        return z3.If(relative > absolute, relative, absolute)
 
     constraints = []
     for column, variable in variables.items():
@@ -513,13 +516,25 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
         reported_objective = record.get("exactObjective")
         if reported_objective is None:
             reported_objective = record.get("objective")
+        is_smt = case["problem"]["suite"] in SMT_SUITES
+        captured_mps = not is_smt and record.get("stats", {}).get("sourcePolicy") == "captured-linear-source"
+        source_tolerance = None
+        if captured_mps:
+            policy = case.get('sourceTolerance')
+            assert isinstance(policy, dict) and policy.keys() == {'absolute', 'relative'}, \
+                'captured MPS source tolerance is absent or incomplete'
+            assert all(isinstance(value, str) for value in policy.values()), \
+                'captured MPS source tolerance requires rational text'
+            source_tolerance = tuple(fractions.Fraction(policy[key]) for key in ('absolute', 'relative'))
+            assert all(value >= 0 for value in source_tolerance), 'negative captured MPS source tolerance'
+            assert not exact or not any(source_tolerance), 'exact MPS request has nonzero captured tolerance'
         source_key = (case["problem"]["suite"], record["problem"], record["gitSha"], record["sourceHashes"]["model"])
         if source_key not in sources:
             sources[source_key] = source(case, archive, source_root)
         text = sources[source_key]
         key = (record["sourceHashes"]["model"], record["kind"], record["feasible"], str(reported_objective),
                record.get("exactObjective") is not None, record["proven"], record.get("maximize"),
-               record.get("finalWitness"), exact, tolerance_optimum,
+               record.get("finalWitness"), exact, tolerance_optimum, source_tolerance,
                record.get("stats", {}).get("lpRootBound") if root_bounds else None,
                record.get("stats", {}).get("lpRootBoundScale") if root_bounds else None)
         if key in cache:
@@ -547,7 +562,6 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
             assert not record["proven"] and reported_objective is None
             result["verdictCheck"] = "no claimed verdict"
         else:
-            is_smt = case["problem"]["suite"] in SMT_SUITES
             if is_smt:
                 parsed = z3.Optimize()
                 parsed.from_string(text)
@@ -562,7 +576,17 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
                 constraints, objective, variables, maximize = mps(text)
                 assert maximize == record["maximize"]
             assert reported_objective is None or objective is not None, "reported objective is absent from source"
-            solver, result['sourceQueryEncoding'], query = source_query_solver(constraints, variables, is_smt, objective)
+            query_constraints = constraints
+            tolerance_rows = None
+            if captured_mps:
+                result['sourceQuerySemantics'] = 'exact source' if exact else 'MPS tolerance acceptance'
+                result['sourceTolerance'] = dict(zip(('absolute', 'relative'), map(str, source_tolerance)))
+                if not exact:
+                    tolerance_rows, _, _, _ = mps(text, tolerance=True, absolute_tolerance=source_tolerance[0],
+                                                relative_tolerance=source_tolerance[1])
+                    query_constraints = tolerance_rows
+            solver, result['sourceQueryEncoding'], query = source_query_solver(
+                query_constraints, variables, is_smt, objective)
             if record["feasible"] is False:
                 assert record["proven"]
                 require_verdict(solver, z3.unsat, record["problem"], 'source infeasibility')
@@ -593,7 +617,7 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
                     result["witness"] = "exact source feasible" if exact_feasible else "not exact source feasible"
                     if reported_objective is not None:
                         assert mps_objective_matches(-objective if maximize else objective, variables, values,
-                                                     reported_objective, exact,
+                                                     reported_objective, exact or captured_mps,
                                                      record.get("exactObjective") is not None,
                                                      witness), "point objective differs from reported objective"
                         result["objectiveCheck"] = "source point objective matches"
@@ -603,7 +627,8 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
                     if exact:
                         assert exact_feasible, record["problem"]
                     else:
-                        tolerance_rows, _, _, _ = mps(text, tolerance=True)
+                        if tolerance_rows is None:
+                            tolerance_rows, _, _, _ = mps(text, tolerance=True)
                         accepted = all(z3.is_true(mps_point(row, variables, values)) for row in tolerance_rows)
                         result["toleranceAccepted"] = accepted
                         assert accepted, "MPS point exceeds source tolerance"

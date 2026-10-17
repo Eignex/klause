@@ -1387,6 +1387,15 @@ without rediscovering it through a satisfiability search. Strict improvement exc
 still requires its independent source query.
 Tolerance acceptance cannot justify either optimum or infeasibility. Unknown
 records make no proof claim. Unbounded claims and unsupported constructs decline.
+Records marked `stats.sourcePolicy=captured-linear-source` carry accepted-source
+claims and require case-level `sourceTolerance` with `absolute` and `relative`
+rational text from the captured request. Their MPS infeasibility and strict-improvement
+queries use the same configured tolerance-accepted constraints as point checking;
+exact requests require zero metadata and use the nominal source. Reports identify
+this scope and policy in `sourceQuerySemantics` and `sourceTolerance`, and
+cached nominal checks cannot supply an accepted-source proof. Other MPS records
+retain their nominal-source proof scope. These checks establish individual source
+claims, without verifying exported native certificates or general completeness.
 An explicit default-MPS `tolerance-optimum` retains its source point, objective
 and scaled-tolerance checks separately. It receives no exact-source optimality
 credit; native tolerance-certificate verification is unavailable from saved records.
