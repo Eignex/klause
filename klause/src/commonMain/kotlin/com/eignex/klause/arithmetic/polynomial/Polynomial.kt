@@ -81,7 +81,7 @@ internal class Polynomial private constructor(private val coefficients: Map<Mono
         ids to IntArray(ids.size) { degrees.getValue(ids[it]) }
     }
 
-    val terms: List<PolynomialTerm> get() = orderedTerms.toList()
+    val terms: List<PolynomialTerm> get() = List(orderedTerms.size) { orderedTerms[it] }
     val isZero: Boolean get() = coefficients.isEmpty()
     val variables: List<Int> get() = coordinates?.first?.let { ids -> List(ids.size) { ids[it] } } ?: emptyList()
     val mainVariable: Int? get() = coordinates?.first?.lastOrNull()
