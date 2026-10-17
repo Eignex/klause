@@ -427,6 +427,12 @@ facade with the same selected providers, containing token and seed. This mode re
 objectives and records its actual native backend beside the requested entry and engine;
 `entry=pipeline engine=cp` retains the direct pipeline comparison. Compare matched
 revisions and check the recorded backend to distinguish finite and open controls.
+`entry=source-optimize engine=cp|ls` calls the public affine source optimizer with
+the original objective and direction. Optional `nodeLimit=N` supplies one shared
+decision/move ledger. Captures retain the native optimization verdict, minimized
+exact incumbent value and interruption cause separately from the rendered SMT point.
+The SMT replay checks points and objectives; global optimum, ray and refutation
+claims require separate original-source checking.
 The original source bytes remain the checking authority. Constant nonzero integer
 `div`/`mod` are checked with their original Euclidean SMT semantics; variable and zero
 divisors decline independent checking. Each input also interrupts

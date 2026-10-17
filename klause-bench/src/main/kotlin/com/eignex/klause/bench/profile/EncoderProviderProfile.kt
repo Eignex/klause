@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -19,9 +20,11 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
+import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
@@ -44,13 +47,13 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.parseBigInt
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 
 /** Compare default and private equivalent encoders through source routing and independent SMT witness checks. */
 object EncoderProviderProfile {
@@ -58,15 +61,19 @@ object EncoderProviderProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("inputs", "repeats", "warmups", "seed", "parser", "entry", "engine") })
+        require(options.keys.all {
+            it in setOf("inputs", "repeats", "warmups", "seed", "parser", "entry", "engine", "nodeLimit")
+        })
         val repeats = options["repeats"]?.toInt() ?: 3
         val warmups = options["warmups"]?.toInt() ?: 1
         val parser = options["parser"] ?: "admission"
         require(parser in setOf("admission", "factor"))
         val entry = options["entry"] ?: "pipeline"
         val engine = options["engine"] ?: "cp"
-        require(entry in setOf("pipeline", "source") && engine in setOf("cp", "ls"))
-        require(entry == "source" || engine == "cp") { "LS requires the source facade entry" }
+        require(entry in setOf("pipeline", "source", "source-optimize") && engine in setOf("cp", "ls"))
+        require(entry != "pipeline" || engine == "cp") { "LS requires a source facade entry" }
+        val nodeLimit = options["nodeLimit"]?.toLong()
+        require(nodeLimit == null || (entry == "source-optimize" && nodeLimit >= 0))
         val seed = options["seed"]?.toLong() ?: 1L
         require(repeats in 1..100 && warmups in 0..10)
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -86,6 +93,7 @@ object EncoderProviderProfile {
             put("parser", parser)
             put("entry", entry)
             put("engine", engine)
+            put("nodeLimit", nodeLimit)
             put("seed", seed)
             put("repeats", repeats)
             put("warmups", warmups)
@@ -116,6 +124,9 @@ object EncoderProviderProfile {
                 parsed.problem
             }
             require(entry != "source" || problem.objective == null) { "source facade controls require satisfaction" }
+            require(entry != "source-optimize" || problem.objective != null) {
+                "source optimization controls require an original objective"
+            }
             resourceControl(problem, bytes, output.resolve("$index-resource").apply { mkdirs() })
             for (round in -warmups until repeats) {
                 val results = ArrayList<String>()
@@ -133,7 +144,12 @@ object EncoderProviderProfile {
                     }
                     val providers = providers(alternate) { installations++ }
                     val started = System.nanoTime()
-                    val result = if (entry == "source") {
+                    val optimization = if (entry == "source-optimize") {
+                        sourceOptimize(problem, engine, seed, stop, providers, nodeLimit)
+                    } else null
+                    val result = if (optimization != null) {
+                        optimizationPoint(optimization)
+                    } else if (entry == "source") {
                         if (engine == "cp") {
                             BacktrackSolver.source(problem.model).withProjectionProviders(providers)
                                 .solve(BacktrackParams(cancellation = stop, randomSeed = seed))
@@ -193,6 +209,7 @@ object EncoderProviderProfile {
                         is OpenTheoryResult.Unknown -> "unknown"
                     }
                     results += verdict
+                    if (optimization != null) results[results.lastIndex] += "/${optimizationKind(optimization)}"
                     val stdout = if (result is OpenTheoryResult.Sat) {
                         render(problem, result.assignment)
                     } else {
@@ -209,6 +226,18 @@ object EncoderProviderProfile {
                         put("verdict", verdict)
                         put("entry", entry)
                         put("engine", engine)
+                        put("nodeLimit", nodeLimit)
+                        optimization?.let { native ->
+                            put("optimizationVerdict", optimizationKind(native))
+                            put("sourceSense", problem.sense.name)
+                            put("nativeMinimizedValue", when (native) {
+                                is OpenTheoryOptimum.Optimal -> native.value.toString()
+                                is OpenTheoryOptimum.Unbounded -> native.value.toString()
+                                is OpenTheoryOptimum.Bounded -> native.value?.toString()
+                                is OpenTheoryOptimum.Infeasible -> null
+                            })
+                            put("terminationReason", (native as? OpenTheoryOptimum.Bounded)?.reason?.name)
+                        }
                         put("reportedBackend", result.stats.run.backend)
                         put("elapsedNs", elapsed)
                         put("nativeWork", work)
@@ -240,6 +269,51 @@ object EncoderProviderProfile {
                 check(results.distinct().size == 1) { "encoder modes disagreed for $input round=$round: $results" }
             }
         }
+    }
+
+    private fun sourceOptimize(
+        problem: SmtLibProblem,
+        engine: String,
+        seed: Long,
+        stop: Cancellation,
+        providers: FactorProjectionProviders,
+        nodeLimit: Long?,
+    ): OpenTheoryOptimum {
+        val spec = requireNotNull(problem.objective)
+        val minimized = LinearObjective(spec.boolWeights, spec.intCoefficients, spec.constant, spec.realCoefficients)
+        val objective = if (problem.sense == ObjectiveSense.MAXIMIZE) minimized.negated() else minimized
+        val budget = nodeLimit?.let(::NodeBudget)
+        val strategy = if (engine == "cp") BacktrackSolver.source(problem.model) else {
+            LocalSearchSolver.source(problem.model)
+        }
+        val execution = strategy.withProjectionProviders(providers).optimizeOpen(
+            objective,
+            PolynomialTheoryParams(
+                cancellation = stop,
+                strategy = PolynomialStrategyParams(
+                    backtrack = BacktrackParams(randomSeed = seed, nodeBudget = budget),
+                    localSearch = LocalSearchParams(randomSeed = seed, nodeBudget = budget),
+                ),
+            ),
+            TheoryParams(cancellation = stop, randomSeed = seed, nodeBudget = budget),
+            problem.sense,
+        )
+        return (execution as OpenTheoryExecution.Optimize).result
+    }
+
+    private fun optimizationKind(result: OpenTheoryOptimum): String = when (result) {
+        is OpenTheoryOptimum.Optimal -> "optimal"
+        is OpenTheoryOptimum.Infeasible -> "infeasible"
+        is OpenTheoryOptimum.Unbounded -> "unbounded"
+        is OpenTheoryOptimum.Bounded -> if (result.incumbent == null) "unknown" else "best-found"
+    }
+
+    private fun optimizationPoint(result: OpenTheoryOptimum): OpenTheoryResult = when (result) {
+        is OpenTheoryOptimum.Optimal -> OpenTheoryResult.Sat(result.assignment, result.stats)
+        is OpenTheoryOptimum.Unbounded -> OpenTheoryResult.Sat(result.witness, result.stats)
+        is OpenTheoryOptimum.Infeasible -> OpenTheoryResult.Unsat(result.stats)
+        is OpenTheoryOptimum.Bounded -> result.incumbent?.let { OpenTheoryResult.Sat(it, result.stats) }
+            ?: OpenTheoryResult.Unknown(result.reason, result.stats)
     }
 
     private fun resourceControl(problem: SmtLibProblem, source: ByteArray, directory: File) {
