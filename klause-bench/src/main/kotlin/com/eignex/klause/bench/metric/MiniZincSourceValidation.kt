@@ -228,7 +228,8 @@ internal fun SolveRecord.sourceChecked(
     witnessOnly: Boolean = false,
 ): SolveRecord {
     val reject = validation.status == "invalid" ||
-        ((approximation || witnessOnly) && (feasible == false || (feasible == true && validation.status != "valid")))
+        (witnessOnly && (feasible != true || validation.status != "valid")) ||
+        (approximation && (feasible == false || (feasible == true && validation.status != "valid")))
     val checkerStats = listOfNotNull(validation.checker?.let { "sourceValidationChecker" to it }).toMap()
     val verifiedStats = stats + checkerStats + mapOf(
         "sourceValidation" to validation.status,

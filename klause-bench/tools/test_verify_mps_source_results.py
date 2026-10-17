@@ -92,6 +92,20 @@ class MpsGroundTest(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaisesRegex(AssertionError, 'retained final witness differs'):
                 verifier.check_mps_ground(self.source, record, raw, False)
 
+    def test_text_infinity_convention_applies_to_column_and_each_row_side(self):
+        for kind, bound in (('G', '1e20'), ('L', '-1e20'), ('E', '1e20')):
+            with self.subTest(kind=kind):
+                source = ('ROWS\n N cost\n ' + kind + ' row\nCOLUMNS\n x cost 0 row 1\n'
+                          'RHS\n r row ' + bound + '\nBOUNDS\n FX b x 1e20\nENDATA\n')
+                self.assertTrue(self.check('v x=0', '0', exact=True, source=source)['exactFeasible'])
+        source = ('ROWS\n N cost\n L row\nCOLUMNS\n x cost 0 row 1\n'
+                  'RHS\n r row 1e20\nRANGES\n r row 1\nBOUNDS\n FR b x\nENDATA\n')
+        with self.assertRaisesRegex(AssertionError, 'violates exact original source'):
+            self.check('v x=0', '0', exact=True, source=source)
+        self.assertTrue(self.check('v x=99999999999999999999', '0', exact=True, source=source)['exactFeasible'])
+        source = source.replace('r row 1e20', 'r row 1e20 cost 1e20').replace('RANGES\n r row 1\n', '')
+        self.assertTrue(self.check('v x=0', '-100000000000000000000', exact=True, source=source)['exactFeasible'])
+
     def test_exact_policy_header_must_preserve_original_declaration_defaults(self):
         record = dict(feasible=True, finalWitness='v x=1 z=0', kind='optimize', exactObjective='1',
                       maximize=False, command='cli --exact -- source.mps')

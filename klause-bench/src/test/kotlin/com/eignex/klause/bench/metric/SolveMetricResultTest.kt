@@ -140,7 +140,7 @@ class SolveMetricResultTest {
 
     @Test
     fun `unchecked MPS witnesses and refutations should receive no result credit`() {
-        for (feasible in listOf(true, false)) {
+        for (feasible in listOf(true, false, null)) {
             for (status in listOf("unknown", "invalid")) {
                 val reported = rec(feasible, 1.0, 100, true).copy(finalWitness = "v x=1")
 

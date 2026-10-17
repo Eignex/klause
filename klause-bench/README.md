@@ -1159,7 +1159,9 @@ It checks the literal final stdout point against every original row, bound,
 indicator and integrality declaration, and recomputes the original objective and
 sense. Default runs permit original MPS absolute/relative tolerances of `1e-7`;
 `exact=true` requires zero slack. Tolerance magnitudes retain separate original
-terms, including cancellation. Original-file declaration defaults apply; unsupported
+terms, including cancellation. Text bounds at or beyond magnitude `1e20` are open
+for columns and each row side, including derived range endpoints; affine objective
+constants remain literal. Original-file declaration defaults apply; unsupported
 semantics overrides, syntax and incomplete points leave checking unknown.
 
 Each check writes original source bytes, stdout, final witness and the complete
@@ -1171,11 +1173,18 @@ JSON, source retrieval identity and the complete receipt JSON in
 hashes remain in the ordinary record. This preserves checker custody when ordinary
 workers return only that record; preserve hash-matching original sources separately
 for later inspection. Packaged checker/requirements hashes, interpreter and pinned
-wheel/extracted-file identities, process logs and cleanup receipts accompany it.
+wheel/extracted-file identities, process logs and cleanup receipts accompany it. Valid/invalid receipts require the
+pinned runtime/wheel and extracted-file ledger, successful bounded bootstrap/check
+processes, complete stream bytes/hashes and matching child JSON; missing or mutated
+mandatory custody leaves checking unknown.
 The existing pinned runtime runner provisions a private `z3-solver==4.15.3.0`
 wheel environment on Linux x86-64/glibc, without global installation. Setup is
-bounded to 180 seconds/2 GiB, point checking to 30 seconds/4 GiB, and the containing
-supervisor to 270 seconds. Sources over 64 MiB, solver stdout over 8 MiB,
+bounded to 30 seconds/2 GiB, point checking to 30 seconds/4 GiB, and the worker to
+60 seconds. The JVM reserves a 70-second allowance across preparation and waiting,
+plus at most two five-second termination/reaping waits. With the solver's existing
+40-second watchdog and two-second stderr drain for a feasible ten-second run, this
+leaves 18 seconds for source/receipt I/O inside the ordinary 140-second case deadline.
+The external deadline still governs incomplete work. Sources over 64 MiB, solver stdout over 8 MiB,
 producer records/receipts over 4 MiB and checker streams over 1 MiB remain unchecked. Private dependencies are removed after checking. Missing dependencies,
 timeout, incomplete output, changed custody or failed cleanup cannot yield valid
 credit.

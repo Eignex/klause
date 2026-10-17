@@ -66,7 +66,7 @@ def supervise(out, expected, tools, parent):
     assert all(digest((out / 'tools' / name).read_bytes()) == value for name, value in tools.items())
     runner = load(out / 'tools/smt_witness_validation.py', 'smt_witness_validation')
     runner.PARENT = parent
-    runner.DEADLINE = time.monotonic() + 250
+    runner.DEADLINE = time.monotonic() + 60
     for signum in runner.SIGNALS:
         signal.signal(signum, runner.interrupt)
     atexit.register(runner.release)
@@ -82,7 +82,7 @@ def supervise(out, expected, tools, parent):
         try:
             bootstrap = runner.owned([sys.executable, '-I', str(out / 'tools/smt_witness_validation.py'),
                                      'bootstrap', str(out), str(dependencies)], out / 'bootstrap', scratch.name,
-                                     180, 2147483648)
+                                     30, 2147483648)
         finally:
             result['setupMs'] = (time.monotonic_ns() - start) // 1000000
         result['bootstrapProcess'] = bootstrap

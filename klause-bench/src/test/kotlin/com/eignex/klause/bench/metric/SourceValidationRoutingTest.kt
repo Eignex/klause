@@ -7,6 +7,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
+import com.eignex.klause.solver.objective.LinearObjective
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,7 +19,8 @@ class SourceValidationRoutingTest {
     fun `MPS opt in should check raw cached witnesses without changing the solver budget or parameters`() {
         val ref = ProblemRef("original-decimal-cancellation", Format.MPS,
             corpus("mps-linear-source-v1/original-decimal-cancellation.mps"), Category.OPTIMIZATION, Expected.Unknown)
-        val entry = ResolvedProblem(ref, lazy { error("the checker must use the original source") })
+        val entry = ResolvedProblem(ref, lazy { error("the checker must use the original source") },
+            objective = LinearObjective())
         val settings = SolverInvocation.Settings(params = listOf("source-validation=true", "arm=cp"))
         val raw = "o 1\ns SATISFIABLE\nv I=1 X=1\n"
         val tag = UUID.randomUUID().toString()
@@ -40,6 +42,7 @@ class SourceValidationRoutingTest {
                     assertEquals("v I=1 X=1", record.finalWitness)
                     assertEquals(sha256(raw.toByteArray()), record.sourceOutputSha256)
                     assertEquals("producer", record.gitSha)
+                    assertEquals("optimize", record.kind)
                     assertEquals(raw, output)
                     assertFalse(exact)
                     MpsSourceValidation.Result(MpsSourceValidation.unknown("unavailable"))

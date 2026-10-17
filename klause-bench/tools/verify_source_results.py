@@ -249,9 +249,13 @@ def mps(text, tolerance=False, absolute_tolerance=fractions.Fraction('1e-7'),
         magnitude = z3.Sum([z3.Abs(term) for term in magnitude_terms.get(row, [])])
         assertions = []
         def above(side):
+            if ground_source and abs(fractions.Fraction(str(z3.simplify(side)))) >= 10 ** 20:
+                return z3.BoolVal(True)
             return activity >= side - slack(z3.simplify(side), magnitude)
 
         def below(side):
+            if ground_source and abs(fractions.Fraction(str(z3.simplify(side)))) >= 10 ** 20:
+                return z3.BoolVal(True)
             return activity <= side + slack(z3.simplify(side), magnitude)
 
         if kind in ("E", "G"):
