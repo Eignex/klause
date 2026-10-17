@@ -8,6 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.simplex.exact.BigFraction
@@ -108,7 +109,7 @@ class OpenWitnessTest {
         val point = Sample(booleanArrayOf(), longArrayOf(2, 3, 6), reals = doubleArrayOf(0.0, 1.0, 1.0),
             exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE))
 
-        val checked = verifyOpenWitness(source, point, Cancellation.Never, captured)
+        val checked = verifyOpenWitness(source, point, Cancellation.Never, PropagationProblem(source, captured))
 
         assertIs<Verification.Accepted<*, *>>(checked)
     }

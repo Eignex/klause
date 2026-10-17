@@ -2,12 +2,10 @@ package com.eignex.klause.solver.validation
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.fitsLong
 import kotlin.coroutines.cancellation.CancellationException
@@ -31,12 +29,12 @@ internal fun verifyOpenWitness(
     model: Problem, sample: Sample, cancellation: Cancellation = Cancellation.Never,
 ): Verification<Sample, Unit> = if (cancellation()) {
     Verification.Indeterminate("open witness check cancelled")
-} else verifyOpenWitness(model, sample, cancellation, model.selectedFactorProjections())
+} else verifyOpenWitness(model, sample, cancellation, PropagationProblem(model))
 
 internal fun verifyOpenWitness(
-    model: Problem, sample: Sample, cancellation: Cancellation, projections: PreparedFactorProjections,
+    model: Problem, sample: Sample, cancellation: Cancellation, projection: PropagationProblem,
 ): Verification<Sample, Unit> {
-    projections.requireSource(model)
+    require(projection.problem === model) { "witness projection belongs to a different source" }
     if (cancellation()) return Verification.Indeterminate("open witness check cancelled")
     if (sample.exactInts?.any { !it.fitsLong() } == true) {
         return Verification.Indeterminate("wide integer coordinates require an exact theory witness check")
@@ -71,9 +69,9 @@ internal fun verifyOpenWitness(
     cancellation.charge(model.numIntVars.toLong())
     if (cancellation()) return Verification.Indeterminate("open witness check cancelled")
     val point = discrete.withIntDomains(Array(model.numIntVars) { IntDomain(sample.intValue(it), sample.intValue(it)) })
-    val selected = projections.projected(point, retained.toIntArray())
     return try {
-        composedFixpoint(point.bake(selected, cancellation), Candidate(sample, Unit), cancellation)
+        composedFixpoint(projection.bakeRetainedView(point, retained.toIntArray(), cancellation),
+            Candidate(sample, Unit), cancellation)
     } catch (_: CancellationException) {
         Verification.Indeterminate("open witness check cancelled")
     }

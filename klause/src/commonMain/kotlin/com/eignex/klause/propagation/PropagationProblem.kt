@@ -4,6 +4,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.isClausal
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 
@@ -24,6 +26,18 @@ class PropagationProblem private constructor(
     /** Open private mechanisms selected for [problem] during preparation. */
     constructor(problem: Problem, selection: PreparedFactorProjections) : this(problem, null, null, selection) {
         selection.requireSource(problem)
+    }
+
+    internal fun bakeRetainedView(view: Problem, factorIndices: IntArray, cancellation: Cancellation): BakedProblem {
+        require(view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
+            view.numRealVars == problem.numRealVars && factorIndices.size == view.numFactors &&
+            factorIndices.indices.all { index ->
+                val original = factorIndices[index]
+                original in problem.factors.indices && view.factors[index] === problem.factors[original]
+            }
+        ) { "retained propagation view differs from its original coordinates or factors" }
+        val captured = selection ?: problem.selectedFactorProjections()
+        return view.bake(captured.projected(view, factorIndices), cancellation)
     }
 
     /** Whether this projection can use the packed native-SAT propagation lane. */
