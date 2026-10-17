@@ -2448,8 +2448,24 @@ and path agreement are annotations. No code attribute, empty line tables and
 out-of-source lines remain explicit; no bytecode interval or executed path is
 inferred. Class rows link to their complete original stream ordinal, byte hash
 and archive entry. Duplicate origins, failed classes, input-identity failures and
-inconsistent header counts prevent completion. A bound failure retains an explicit
-partial gzip and a negative completion, without accepting its prefix.
+inconsistent header counts prevent completion. A report bound or encoding failure
+retains an explicit partial gzip and a negative completion, without accepting its
+prefix. Input and debug bounds also prevent completion; an input failure can occur
+before a report exists.
+
+Each JSON line uses `key-and-string-tables-v1` to retain repeated values within
+the existing report bound. Its `objectKeys` holds ordered key arrays and `strings`
+holds exact string values, both indexed from zero and reset for every class row.
+Within `value`, `[0, ...items]` denotes an array, `[1, stringIndex]` denotes a
+string, and `[-(keyIndex + 1), ...values]` denotes an object with values in that
+key array's order. Numbers, booleans and null are literal JSON primitives. Empty
+containers, duplicate array entries and original object order remain distinct.
+`expand_report_record` in `review_jvm_source_lines.py` reconstructs the complete
+record; no source, method, line, candidate or error is selected out. Every record
+is expanded and checked against its original compact-JSON byte count/hash before
+writing. The completion includes the encoding, verified record count and
+`allRecordValuesAndObjectOrderRoundTripped`; any mismatch fails the whole review.
+Inspect or expand actual metadata only on the supported profiling worker.
 
 The complete gzip is round-trip size/hash checked. A completed review establishes
 processing and source-input byte checks; it does not establish selected source,

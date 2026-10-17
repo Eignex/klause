@@ -2,6 +2,7 @@
 import gzip
 import hashlib
 import json
+import math
 from pathlib import Path
 import sys
 import tarfile
@@ -14,6 +15,78 @@ from review_jvm_declaration_bindings import (
 
 MAX_SOURCE_JSON_BYTES = 128 * 1024 * 1024
 MAX_REPORT_BYTES = 512 * 1024 * 1024
+
+
+REPORT_ENCODING = 'key-and-string-tables-v1'
+
+
+def encode_report_record(record):
+    keys, strings, key_indices, string_indices = [], [], {}, {}
+
+    def encode(value):
+        if isinstance(value, dict):
+            names = tuple(value)
+            if any(not isinstance(name, str) for name in names):
+                raise ValueError('Report object keys must be strings')
+            if names not in key_indices:
+                key_indices[names] = len(keys)
+                keys.append(list(names))
+            return [-key_indices[names] - 1, *(encode(item) for item in value.values())]
+        if isinstance(value, list):
+            return [0, *(encode(item) for item in value)]
+        if isinstance(value, str):
+            if value not in string_indices:
+                string_indices[value] = len(strings)
+                strings.append(value)
+            return [1, string_indices[value]]
+        if value is None or type(value) in (bool, int) or type(value) is float and math.isfinite(value):
+            return value
+        raise ValueError('Unsupported report value')
+
+    value = encode(record)
+    return {'encoding': REPORT_ENCODING, 'objectKeys': keys, 'strings': strings, 'value': value}
+
+
+def expand_report_record(envelope):
+    if not isinstance(envelope, dict) or set(envelope) != {'encoding', 'objectKeys', 'strings', 'value'} or \
+            envelope['encoding'] != REPORT_ENCODING:
+        raise ValueError('Unknown source-line report encoding')
+    keys, strings = envelope['objectKeys'], envelope['strings']
+    if not isinstance(keys, list) or not isinstance(strings, list) or \
+            any(not isinstance(value, str) for value in strings) or len(set(strings)) != len(strings):
+        raise ValueError('Malformed report dictionaries')
+    for names in keys:
+        if not isinstance(names, list) or any(not isinstance(name, str) for name in names) or len(set(names)) != len(names):
+            raise ValueError('Malformed report object key table')
+
+    def expand(value):
+        if isinstance(value, list):
+            if not value or type(value[0]) is not int:
+                raise ValueError('Missing report value tag')
+            tag = value[0]
+            if tag == 0:
+                return [expand(item) for item in value[1:]]
+            if tag == 1 and len(value) == 2 and type(value[1]) is int and 0 <= value[1] < len(strings):
+                return strings[value[1]]
+            if tag < 0 and 0 <= -tag - 1 < len(keys):
+                names = keys[-tag - 1]
+                if len(value) == len(names) + 1:
+                    return dict(zip(names, (expand(item) for item in value[1:])))
+            raise ValueError('Invalid report dictionary reference or object arity')
+        if value is None or type(value) in (bool, int) or type(value) is float and math.isfinite(value):
+            return value
+        raise ValueError('Untagged or unsupported report value')
+
+    return expand(envelope['value'])
+
+
+def json_identity(value):
+    checksum, size = hashlib.sha256(), 0
+    for chunk in json.JSONEncoder(separators=(',', ':'), allow_nan=False).iterencode(value):
+        raw = chunk.encode('utf-8')
+        checksum.update(raw)
+        size += len(raw)
+    return {'size': size, 'sha256': checksum.hexdigest()}
 
 
 def review(catalog, specification, output, scratch):
@@ -51,6 +124,7 @@ def review(catalog, specification, output, scratch):
     proofs, complete, report_bytes, total_rows, unavailable_payloads = [], True, 0, 0, 0
     report_checksum = hashlib.sha256()
     origins = set()
+    round_tripped_rows = 0
     try:
         with target.open('xb') as raw_output, gzip.GzipFile(fileobj=raw_output, mode='wb', mtime=0) as stream:
             for item, manifest, paths in authenticated:
@@ -95,7 +169,12 @@ def review(catalog, specification, output, scratch):
                         unavailable_payloads += sum(part['status'] != 'parsed-resolved-smap'
                                                     for part in result.get('sourceDebugMaps', []))
                         record = dict(result, origin=origin)
-                        for chunk in json.JSONEncoder(separators=(',', ':')).iterencode(record):
+                        envelope = encode_report_record(record)
+                        original_identity = json_identity(record)
+                        if json_identity(expand_report_record(envelope)) != original_identity:
+                            raise ValueError('Source-line report record does not round trip')
+                        round_tripped_rows += 1
+                        for chunk in json.JSONEncoder(separators=(',', ':'), allow_nan=False).iterencode(envelope):
                             encoded = chunk.encode('utf-8')
                             report_bytes += len(encoded)
                             if report_bytes >= MAX_REPORT_BYTES:
@@ -130,7 +209,9 @@ def review(catalog, specification, output, scratch):
         raise ValueError('Stored source-line report does not round trip')
     return {'completed': complete, 'classRowsReviewed': total_rows, 'unavailableDebugPayloads': unavailable_payloads,
             'uncompressedReportBytes': report_bytes, 'uncompressedReportSha256': report_checksum.hexdigest(),
-            'report': dict(file=target.name, **file_identity(target)),
+            'report': dict(file=target.name, encoding=REPORT_ENCODING, **file_identity(target)),
+            'allRecordValuesAndObjectOrderRoundTripped': round_tripped_rows == total_rows,
+            'recordRoundTripsVerified': round_tripped_rows,
             'inputArchiveProofs': proofs, 'sourceInputs': bindings.finish(),
             'scope': 'Every declared class/method and original line table is retained by authenticated row identity. '
                      'All strata, overlapping rules, missing mappings and outside-source candidates remain explicit. '
