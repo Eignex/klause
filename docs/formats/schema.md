@@ -89,7 +89,10 @@ Helper objectives retain their finite native frame plus an immutable pairing to
 original typed coordinates. Copy and negation preserve or explicitly replace exact
 coefficients and constants. Source `optimize` resolves this pairing through the
 exact quadratic carrier, including affine objectives and coefficients wider than
-binary64's integer precision. A maximize helper is already negated; the operation's
+binary64's integer precision. `CompiledSchema.sourceObjective` exposes the captured
+exact objective for explicit execution and evidence contexts; repeated resolution
+of the same helper retains that immutable identity. The context-free affine bridge
+rejects a private pairing whose native and source meanings differ. A maximize helper is already negated; the operation's
 explicit sense remains authoritative. `optimizeOpen` uses a lossless linear mapping
 when representable and otherwise returns its incomplete unsupported result. Foreign
 helper owners reject before execution.

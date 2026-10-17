@@ -82,6 +82,9 @@ the existing native `OpenTheoryExecution` for finite and supported open-integer 
 Compiled helper objectives retain exact original-coordinate pairings independently
 of their finite native units. The exact `optimize` interface consumes that pairing;
 `optimizeOpen` explicitly declines coefficients without a lossless linear mapping.
+`CompiledSchema.sourceObjective` exposes a helper's exact source carrier without
+converting a private bucket into an original integer. Its immutable identity can
+be retained for original-source result capture.
 The caller's objective sense applies once to the helper's already captured sign.
 It uses the same route selection as satisfaction, including finite execution after
 source-safe bound closure. Typed finite optimization retains assumptions, supplied

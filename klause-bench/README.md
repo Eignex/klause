@@ -2771,7 +2771,8 @@ and hash accompany exact named original-source results; compiler auxiliaries are
 excluded from the original witness map.
 With `entry=source` and `engines=BACKTRACK,LOCAL_SEARCH`, the compiled path uses the
 public source strategy factories. Its affine objective is copied from a captured
-float helper so the exact source pairing is exercised; the quadratic arm uses the
+float helper so the exact source pairing is exercised. `sourceObjective` retains
+the actual helper's exact carrier for result capture; the quadratic arm uses the
 same canonical typed objective. Records identify `compiled-source-strategy` and
 retain the existing independent original-source checks. `entry=setup` is the default
 shared setup probe. Source result capture uses the exact quadratic carrier for both

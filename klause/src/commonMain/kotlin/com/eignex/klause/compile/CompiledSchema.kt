@@ -3,6 +3,7 @@ package com.eignex.klause.compile
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
@@ -113,6 +114,12 @@ class CompiledSchema internal constructor(
 
     /** The schema's declared [defaultBacktrackParams] if any, else [BacktrackPresets.conflictDriven]. */
     fun backtrackParams(): BacktrackParams = defaultBacktrackParams ?: BacktrackPresets.conflictDriven()
+
+    /**
+     * Resolve a helper's exact original-coordinate objective for source execution or evidence capture.
+     * An unbound objective uses original source coordinates; a helper from another compilation rejects.
+     */
+    fun sourceObjective(objective: LinearObjective): QuadraticObjectiveSpec = sourceBinding.originalObjective(objective)
 
     /** Decode [handle]'s Boolean value from [sample]. */
     fun decode(handle: BoolHandle, sample: Sample): Boolean {

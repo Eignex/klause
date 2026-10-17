@@ -216,6 +216,7 @@ class SourceStrategy internal constructor(
         sense: ObjectiveSense,
     ): QuadraticOptimizationExecution {
         compiledSchema?.let { return optimizeSource(it.sourceBinding.originalObjective(objective), polynomial, sense) }
+        require(objective.sourcePairing == null) { "compiled helper objective requires its compiled source strategy" }
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
@@ -322,6 +323,9 @@ class SourceStrategy internal constructor(
         theory: TheoryParams,
         sense: ObjectiveSense,
     ): OpenTheoryExecution {
+        require(compiledSchema != null || objective.sourcePairing == null) {
+            "compiled helper objective requires its compiled source strategy"
+        }
         val sourceObjective = compiledSchema?.sourceBinding?.openObjective(objective)
             ?: if (compiledSchema == null) objective else return OpenTheoryExecution.Optimize(
                 OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY),
@@ -424,7 +428,9 @@ class SourceStrategy internal constructor(
             FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
             FiniteSolveVerdict.UNKNOWN -> OpenTheoryResult.Unknown(
                 (result.nativeSourceResult as? SolveResult.Unknown)?.reason
-                    ?: if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted,
+                    ?: if (scope.stop()) scope.unknown().reason
+                    else if (invocation.floatGrid != null) TerminationReason.Unsupported
+                    else TerminationReason.BudgetExhausted,
                 outcome.stats,
             )
             else -> error("source satisfaction returned an optimization verdict")
@@ -459,7 +465,9 @@ class SourceStrategy internal constructor(
             is MinimizeResult.Unknown -> native.reason
             is MinimizeResult.BestFound -> native.reason
             is MinimizeResult.Unbounded -> TerminationReason.Unsupported
-            else -> if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted
+            else -> if (scope.stop()) scope.unknown().reason
+                else if (invocation.floatGrid != null) TerminationReason.Unsupported
+                else TerminationReason.BudgetExhausted
         }
         val optimum = when (outcome.verdict) {
             FiniteSolveVerdict.OPTIMAL -> OpenTheoryOptimum.Optimal(
