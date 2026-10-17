@@ -48,7 +48,7 @@ class SourceExecutionTest {
             SourceExecutionKind.FUNCTIONS to "(declare-const x Real) (assert (= (sin x) 0))",
         ).map { (kind, text) -> kind to SmtLib.parse(text).source } +
             (SourceExecutionKind.NUMERICAL to SourceAttachment(
-                LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+                LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
             ))
         for ((kind, source) in sources) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(
