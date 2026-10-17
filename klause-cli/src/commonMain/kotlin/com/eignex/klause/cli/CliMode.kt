@@ -200,8 +200,15 @@ internal class CommonOptions {
      */
     var lp: String? = null
 
+    var lpPricingExplicit: Boolean = false
+        private set
+
     /** `--lp-pricing POLICY`: entering-column policy for zero-objective LP solves. */
     var lpPricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT
+        set(value) {
+            field = value
+            lpPricingExplicit = true
+        }
 
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see
      *  [com.eignex.klause.solver.pipeline.EngineParams]). */

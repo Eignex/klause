@@ -138,8 +138,9 @@ retains `best-found` status.
 
 Frontend solve paths retain a `PreparedSourceInvocation`. `SourceRendering` carries
 only finite, exact arithmetic or original linear coordinate renderers, plus an
-admission interruption. It holds no concrete theory request. `SolveCore` binds the
-common execution controls; output adapters consume `SourceExecutionResult` from
+admission interruption. It holds no concrete theory request. `SolveCore` captures application defaults and explicit flag provenance in
+`SourceExecutionPolicy`, which binds finite LP ceilings, pricing and arm defaults.
+The library consumes presolve tuning and checks applicability before worker construction; output adapters consume `SourceExecutionResult` from
 `SourceSetup.execute` without selecting another solver or parsing native limits.
 Pipeline telemetry derives from the retained library invocation.
 Native satisfaction verdicts retain the library's source claim qualification.
@@ -198,15 +199,18 @@ Solver-control flags are common to **every** mode:
     `violated,argmin`), `scoring` (`weighted|raw`), `acceptance` (`greedy|walksat|probsat|skew|sa`) —
     edited across the pool, for A/B-testing each axis.
 - `--presolve <strength>` — `off`, `conservative`, `default`, or `aggressive`, with
-  `+/-<pass>` deltas to toggle individual passes.
+  `+/-<pass>` deltas to toggle individual passes. Explicit overrides and presolve
+  tuning apply to finite or linear source preparation; other native routes decline.
 - `--lp <ceiling>` — relaxation ceiling `off`, `conservative`, `default`, or `aggressive`,
   with `+/-<technique>` deltas. Portfolio arms choose intensity below this ceiling.
   Finite `fixed` uses no LP relaxation and accepts only `off` when this flag is supplied.
+  Native arithmetic routes reject an explicit ceiling.
 - Backtrack overrides `--param lp-variable-shaving=true` and `lp-prune-hulls=true`
   enable objective-independent root work on satisfaction and optimization models.
   `lp-root-cuts=false` disables root cut harvesting independently of node separation.
 - `--lp-pricing <policy>` — zero-objective LP entering selection:
-  `min-bound-support` (default) or `largest-pivot`.
+  `min-bound-support` (default) or `largest-pivot`. An explicit pricing flag applies
+  to finite execution; native arithmetic routes reject it, including the default value.
 - `--exact` — require continuous float interpretation and zero source feasibility tolerance
   for the policies the selected format declares. Already-exact formats retain their exact
   interpretation. An explicit grid or positive tolerance conflicts with this request. Unsupported

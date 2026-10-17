@@ -17,6 +17,17 @@ import kotlin.test.assertTrue
 
 class CliModeOptionsTest {
     @Test
+    fun `explicit default LP pricing should retain its flag provenance`() {
+        val common = CommonOptions()
+        assertEquals(false, common.lpPricingExplicit)
+
+        parseArgs(arrayOf("--lp-pricing", "min-bound-support"), commonFlagSpecs(common)) {}
+
+        assertEquals(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, common.lpPricing)
+        assertEquals(true, common.lpPricingExplicit)
+    }
+
+    @Test
     fun `unsupported caller bound precision should return a clean cli usage diagnostic`() {
         val input = File.createTempFile("callerprecision", ".fzn").apply {
             writeText("var float: x; solve satisfy;")

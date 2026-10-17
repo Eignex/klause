@@ -80,10 +80,12 @@ class SourceExecutionRequest private constructor(
     val transcendental: TranscendentalTheoryParams?,
     /** Containing decision and heuristic allowance when resolved through common execution options. */
     val nodeBudget: NodeBudget?,
+    /** Caller policy retained independently of immutable source declarations. */
+    val policy: SourceExecutionPolicy = SourceExecutionPolicy(explicitPresolve = presolveConfig != null),
 ) {
     /**
      * Resolve common options once for the captured route. Omitted native limits use their parameter
-     * types' defaults. The finite factory supplies optional application hooks and LP policy.
+     * types' defaults. The finite factory supplies optional application hooks and policy defaults.
      */
     constructor(
         invocation: PreparedSourceInvocation,
@@ -98,25 +100,45 @@ class SourceExecutionRequest private constructor(
         presolveCancellation: Cancellation = Cancellation.Never,
         presolveBudget: PresolveBudget? = null,
     ) : this(
+        invocation, SourceExecutionPolicy(explicitPresolve = presolveConfig != null), executionOptions,
+        finiteRequest, cores, randomSeed, nodeBudget, timeout, cancellation, presolveConfig,
+        presolveCancellation, presolveBudget,
+    )
+
+    /** Resolve caller policy and common options for the captured source before constructing workers. */
+    constructor(
+        invocation: PreparedSourceInvocation,
+        policy: SourceExecutionPolicy,
+        executionOptions: ExecutionOptions = ExecutionOptions(),
+        finiteRequest: ((FiniteSolveShape) -> FiniteSolveRequest)? = null,
+        cores: Int = 1,
+        randomSeed: Long? = null,
+        nodeBudget: NodeBudget? = null,
+        timeout: Cancellation = Cancellation.Never,
+        cancellation: Cancellation = Cancellation.Never,
+        presolveConfig: PresolveConfig? = null,
+        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveBudget: PresolveBudget? = null,
+    ) : this(
         invocation,
         bindSourceExecutionControls(
             invocation, executionOptions, finiteRequest, randomSeed, nodeBudget, cores, timeout, cancellation,
-            presolveConfig, presolveCancellation, presolveBudget,
+            presolveConfig, presolveCancellation, presolveBudget, policy,
         ),
-        cores, presolveConfig, presolveCancellation, presolveBudget,
+        cores, presolveCancellation, presolveBudget, policy,
     )
 
     private constructor(
         invocation: PreparedSourceInvocation,
         controls: SourceExecutionControls,
         cores: Int,
-        presolveConfig: PresolveConfig?,
         presolveCancellation: Cancellation,
         presolveBudget: PresolveBudget?,
+        policy: SourceExecutionPolicy,
     ) : this(
         invocation, controls.finiteRequest, controls.theory, controls.polynomial, cores,
-        presolveConfig, presolveCancellation, presolveBudget, controls.nonlinearInteger, controls.transcendental,
-        controls.nodeBudget,
+        controls.presolveConfig, presolveCancellation, presolveBudget, controls.nonlinearInteger, controls.transcendental,
+        controls.nodeBudget, policy,
     )
 
     /** Bind existing finite, linear or polynomial controls to their captured source. */
@@ -159,6 +181,7 @@ class SourceExecutionRequest private constructor(
         if (invocation.request.engine == FiniteEngine.FIXED && cores > 1) {
             throw PipelineConfigException("engine 'fixed' is single-core; use 'backtrack' for a parallel pool")
         }
+        policy.validate(SourceSetup.executionKind(invocation), invocation.request.engine)
     }
 }
 

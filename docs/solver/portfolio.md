@@ -24,6 +24,14 @@ Shared source execution rejects multiple cores for `FIXED` when binding executio
 controls, before constructing a native worker. The finite request boundary enforces
 the same single-core rule for its deferred consumer.
 
+`SourceExecutionPolicy` owns finite application arm defaults and LP ceilings before
+worker construction. Explicit `arms`, `ls` or `bt` settings take precedence over the
+application recipe count. A supplied finite factory retains its callbacks and
+containing allowance; common source binding applies the selected ceiling without
+raising the factory's lower emphasis. Fixed execution uses one arm and LP off.
+Native arithmetic routes reject finite-only explicit policy instead of silently
+ignoring it. Recipe defaults and ceilings carry no witness or proof authority.
+
 The [solver vision](../vision.md#shared-model-breadth) requires an available
 complete-search/local-search pair for every supported model. Current admission gaps
 remain implementation limits. [Sessions](sessions.md) owns assumptions;

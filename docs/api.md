@@ -61,6 +61,22 @@ inapplicable options and conflicting node limits reject through the common entry
 Satisfaction retains the reconstructed callback witness when a finite terminal
 envelope carries no point.
 
+`SourceExecutionPolicy` captures explicit LP ceilings, zero-objective pricing,
+application portfolio defaults and whether a presolve emphasis was explicitly selected.
+The policy overload of `SourceExecutionRequest` validates applicability before invoking
+an application finite factory. LP ceilings and pricing apply to finite execution;
+explicit finite controls decline on native arithmetic routes. `finiteRequest` binds
+fixed execution to one arm with LP off, and portfolio execution to the requested or
+automatic arm count and LP ceiling. Explicit arm settings take precedence over the
+application count. Deferred factories retain typed callbacks, stops and the containing
+node ledger while the common binding applies captured policy.
+
+Typed `ExecutionOption` presolve settings cover affine pivot order, abort fraction,
+rounds and probe allowances. The source boundary consumes them for finite or linear
+preparation and rejects them for other routes. Effort tuning alone preserves the
+implicit local-search emphasis policy; only an explicit emphasis override enables
+that override. Captured options and application input lists remain reusable.
+
 Finite `SourceStrategy.solve` and affine `optimizeOpen` dispatch their captured invocations through
 `SourceSetup.execute` and `FinitePipeline.solve`. Its internal single-consumer adapter
 retains the full typed CP or LS parameters, including assumptions, hooks, starting

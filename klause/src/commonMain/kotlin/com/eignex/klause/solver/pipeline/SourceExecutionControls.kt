@@ -3,8 +3,6 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.util.Cancellation
@@ -16,6 +14,7 @@ internal class SourceExecutionControls(
     val transcendental: TranscendentalTheoryParams?,
     val finiteRequest: (FiniteSolveShape) -> FiniteSolveRequest,
     val nodeBudget: NodeBudget?,
+    val presolveConfig: PresolveConfig?,
 )
 
 internal fun bindSourceExecutionControls(
@@ -30,6 +29,7 @@ internal fun bindSourceExecutionControls(
     presolveConfig: PresolveConfig?,
     presolveCancellation: Cancellation,
     presolveBudget: PresolveBudget?,
+    policy: SourceExecutionPolicy,
 ): SourceExecutionControls {
     val reader = options.reader()
     val limit = reader.defaulted(ExecutionOption.nodeLimit, nodeBudget?.limit)
@@ -39,33 +39,35 @@ internal fun bindSourceExecutionControls(
     val budget = nodeBudget ?: limit?.let(::NodeBudget)
     val seed = reader[ExecutionOption.seed] ?: randomSeed ?: 0L
     val kind = SourceSetup.executionKind(invocation)
+    val preparation = reader.presolve(presolveConfig ?: PresolveConfig.DEFAULT)
+    policy.validate(kind, invocation.request.engine, preparation.requested)
+    val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }
     val stop = cancellation or timeout or invocation.cancellation
-    val finiteOptions = options.without("node-limit").overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
+    val finiteOptions = options.withoutPresolve().without("node-limit")
+        .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
         val supplied = finiteRequest?.invoke(shape)
         if (supplied == null) {
-            FiniteSolveRequest(
-                shape, invocation.request.engine, presolveConfig ?: PresolveConfig.DEFAULT,
-                presolveConfig != null, invocation.operation == ExecutionOperation.ENUMERATE,
+            policy.finiteRequest(
+                shape, invocation.request.engine, resolvedPresolve ?: PresolveConfig.DEFAULT,
+                invocation.operation == ExecutionOperation.ENUMERATE,
                 cancellation = stop, presolveCancellation = presolveCancellation or stop,
                 presolveBudget = presolveBudget, cores = cores, executionOptions = finiteOptions,
-                randomSeed = seed, defaultArms = autoArms(cores),
-                lpConfig = if (invocation.request.engine == FiniteEngine.FIXED) LpConfig.OFF else LpConfig.AGGRESSIVE,
-                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = budget,
+                randomSeed = seed, nodeBudget = budget,
                 solveBudgetMillis = null, allSolutions = invocation.operation == ExecutionOperation.ENUMERATE,
                 solutionCap = null, deadlineExceeded = { timeout.isCancelled() },
                 onEvent = null, onPortfolioEvent = null,
             )
         } else {
             require(supplied.cores == cores) { "finite factory supplied a different lane count" }
-            supplied.withSourceControls(finiteOptions, budget, seed, stop)
+            supplied.withSourceControls(finiteOptions, budget, seed, stop, policy, resolvedPresolve)
         }
     }
     if (kind == SourceExecutionKind.FINITE || kind == SourceExecutionKind.REFUTED) {
         options.validateKnown()
         return SourceExecutionControls(
             TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation),
-            PolynomialTheoryParams(), null, null, finite, budget,
+            PolynomialTheoryParams(), null, null, finite, budget, resolvedPresolve,
         )
     }
     val decisions = reader[ExecutionOption.maxDecisions] ?: BacktrackParams().maxDecisions
@@ -134,7 +136,7 @@ internal fun bindSourceExecutionControls(
         strategy = strategy, nodeBudget = budget,
     ) else null
     reader.finish("source ${kind.name.lowercase()}", "common strategy controls and the selected family's native limits")
-    return SourceExecutionControls(theory, polynomial, integer, functions, finite, budget)
+    return SourceExecutionControls(theory, polynomial, integer, functions, finite, budget, resolvedPresolve)
 }
 
 private fun FiniteSolveRequest.withSourceControls(
@@ -142,6 +144,8 @@ private fun FiniteSolveRequest.withSourceControls(
     budget: NodeBudget?,
     seed: Long,
     stop: Cancellation,
+    policy: SourceExecutionPolicy,
+    resolvedPresolve: PresolveConfig?,
 ): FiniteSolveRequest {
     require(sourceControls == null) { "native finite controls must use the typed source execution constructor" }
     require(nodeBudget == null || nodeBudget === budget) { "finite factory supplied a different node allowance" }
@@ -149,11 +153,15 @@ private fun FiniteSolveRequest.withSourceControls(
         "finite factory supplied a conflicting node-limit"
     }
     return FiniteSolveRequest(
-        shape, engine, presolveConfig, explicitPresolveConfig, solutionSetSensitive,
+        shape, engine, resolvedPresolve ?: presolveConfig,
+        explicitPresolveConfig || policy.explicitPresolve, solutionSetSensitive,
         cancellation = cancellation or stop, presolveCancellation = presolveCancellation or stop,
         presolveBudget = presolveBudget, cores = cores,
-        executionOptions = executionOptions.without("node-limit").overriddenBy(options),
-        randomSeed = seed, defaultArms = defaultArms, lpConfig = lpConfig, zeroObjectivePricing = zeroObjectivePricing,
+        executionOptions = policy.options(engine, executionOptions.withoutPresolve()
+            .without("node-limit").overriddenBy(options)),
+        randomSeed = seed, defaultArms = policy.arms(engine, cores, defaultArms),
+        lpConfig = policy.lpConfig(engine, lpConfig),
+        zeroObjectivePricing = policy.zeroObjectivePricing ?: zeroObjectivePricing,
         nodeBudget = budget, solveBudgetMillis = solveBudgetMillis, allSolutions = allSolutions,
         solutionCap = solutionCap,
         deadlineExceeded = deadlineExceeded, onEvent = onEvent, onPortfolioEvent = onPortfolioEvent,

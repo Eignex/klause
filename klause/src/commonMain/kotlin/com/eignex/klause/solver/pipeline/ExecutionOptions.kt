@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.localsearch.strategy.AxisEdits
 import com.eignex.klause.localsearch.strategy.AxisToken
+import com.eignex.klause.presolve.AffinePivotOrder
 
 /** A typed execution setting. Values describe policy; workers own live heuristic state. */
 class ExecutionOption<T> private constructor(internal val id: String, private val kind: ValueKind) {
@@ -28,6 +29,13 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         ValueKind.DOUBLE -> params.double(id)
         ValueKind.BOOLEAN -> params.bool(id)
         ValueKind.STRING -> params.string(id)
+        ValueKind.AFFINE_PIVOT_ORDER -> params.string(id)?.let { raw ->
+            AffinePivotOrder.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+                ?: pipelineConfigError(
+                    "engine param `$id` expects " +
+                        AffinePivotOrder.entries.joinToString("|") { it.name.lowercase() } + ", got `$raw`",
+                )
+        }
         ValueKind.VARIABLE_SELECTOR -> params.varSelectorKind(id)
         ValueKind.VALUE_SELECTOR -> params.valSelectorKind(id)
         ValueKind.SOURCES -> params.string(id)?.let { AxisEdits.tokens(it) }
@@ -52,13 +60,29 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
     private enum class ValueKind {
         LONG, INT, DOUBLE, BOOLEAN, STRING, VARIABLE_SELECTOR, VALUE_SELECTOR, SOURCES, SCALAR_AXIS, LABELS,
-        ALLOWANCE, OPEN_BRANCHING,
+        ALLOWANCE, OPEN_BRANCHING, AFFINE_PIVOT_ORDER,
     }
 
     internal val allowance: Boolean get() = kind == ValueKind.ALLOWANCE
 
     /** Tuning and resource settings, separate from source declarations. */
     companion object {
+        /** Ordering of pivots during source affine elimination. */
+        val affinePivotOrder: ExecutionOption<AffinePivotOrder> =
+            ExecutionOption("affine-pivot-order", ValueKind.AFFINE_PIVOT_ORDER)
+
+        /** Minimum relative gain that keeps a presolve round active. */
+        val presolveAbortFraction: ExecutionOption<Double> = ExecutionOption("presolve-abort-fraction", ValueKind.DOUBLE)
+
+        /** Maximum presolve rounds. */
+        val presolveMaxRounds: ExecutionOption<Int> = ExecutionOption("presolve-max-rounds", ValueKind.INT)
+
+        /** Per-variable presolve probe allowance. */
+        val presolveProbePerVar: ExecutionOption<Int> = ExecutionOption("presolve-probe-per-var", ValueKind.INT)
+
+        /** Total presolve probe allowance. */
+        val presolveProbeTotal: ExecutionOption<Int> = ExecutionOption("presolve-probe-total", ValueKind.INT)
+
         /** Shared decision and heuristic instruction allowance; null means unlimited. */
         val nodeLimit: ExecutionOption<Long?> = ExecutionOption("node-limit", ValueKind.ALLOWANCE)
 
@@ -300,6 +324,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         internal val byId by lazy {
             listOf(
+                affinePivotOrder, presolveAbortFraction, presolveMaxRounds, presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
                 openHintFlips, openHintMinSplits,
