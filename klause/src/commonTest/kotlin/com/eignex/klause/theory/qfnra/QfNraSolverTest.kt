@@ -20,6 +20,79 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `shared triangular graphs reconstruct within the native allowance`() {
+        val declarations = (0..64).joinToString(" ") { "(declare-const x$it Real)" }
+        val equations = (2..64).joinToString(" ") { "(assert (= x$it (+ x${it - 1} 1)))" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= x1 (* x0 x0))) $equations (assert (> x64 0))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 100_000))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(0, algebraic.compare(witness.realValue(1), algebraic.power(witness.realValue(0), 2)))
+        for (id in 2..64) {
+            assertEquals(0, algebraic.compare(witness.realValue(id),
+                algebraic.add(witness.realValue(id - 1), algebraic.rational(BigFraction.ONE))))
+        }
+        assertTrue(algebraic.sign(witness.realValue(64)) > 0)
+    }
+
+    @Test
+    fun `triangular graph elimination retains unselected equations`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        for (equations in listOf(
+            "(assert (= x2 (+ x0 1))) (assert (= x2 (+ x0 2))) (assert (= x3 (+ x1 3)))",
+            "(assert (= x1 (+ x2 1))) (assert (= x2 (+ x1 1))) (assert (= x3 (* x0 x0)))",
+        )) {
+            val source = SmtLibPolynomial.parse("$declarations $equations")
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+            assertIs<QfNraResult.Unsatisfiable>(result)
+        }
+    }
+
+    @Test
+    fun `triangular substitution retains zero leading coefficient fibers`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (+ x0 1) 1)) (assert (= (* x0 x1) 0)) " +
+                "(assert (= x2 (* x1 x1))) (assert (= x3 (+ x1 2))) (assert (not (= x1 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(0, algebraic.sign(witness.realValue(0)))
+        assertTrue(algebraic.sign(witness.realValue(1)) != 0)
+        assertEquals(0, algebraic.compare(witness.realValue(2), algebraic.power(witness.realValue(1), 2)))
+    }
+
+    @Test
+    fun `interruption during bulk graph work cannot refute the source`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val equations = (1..32).joinToString(" ") { "(assert (= x$it (+ x${it - 1} 1)))" }
+        val source = SmtLibPolynomial.parse("$declarations $equations (assert (> x32 0))")
+        var graphWork = false
+        var charged = 0L
+        val meter = WorkMeter { if (graphWork) charged += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 1000
+            override fun workMeter(): WorkMeter = meter
+        }
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(cancellation = token), PolynomialCondition())
+        query.graphFamilyObserver = { graphWork = true }
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertEquals(QfNraReason.Interrupted, assertIs<QfNraResult.Unknown>(result).reason)
+    }
+
+    @Test
     fun `graph family observation preserves the verdict and native work`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

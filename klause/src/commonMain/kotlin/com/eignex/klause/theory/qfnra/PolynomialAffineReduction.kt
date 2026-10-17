@@ -68,6 +68,34 @@ internal class PolynomialAffineReduction private constructor(
                     break
                 }
                 onFamily?.invoke(current)
+                val triangular = triangularGraphSections(current, arithmetic)
+                if (triangular.size > 1) {
+                    val removed = triangular.map { arithmetic.step(); it.atom }.toSet()
+                    val substitution = PolynomialGraphSubstitution(triangular, arithmetic)
+                    val rewritten = ArrayList<PolynomialAtom>()
+                    for ((index, atom) in current.withIndex()) {
+                        arithmetic.step()
+                        if (index in removed) continue
+                        val rewriting = substitution.prepare(atom.polynomial)
+                        var polynomial: Polynomial? = null
+                        while (polynomial == null) {
+                            polynomial = rewriting.next()
+                            if (polynomial == null) yield(null)
+                        }
+                        if (polynomial.isZero && atom.holds(0)) continue
+                        rewritten.add(PolynomialAtom(polynomial, atom.relation))
+                        yield(null)
+                    }
+                    for (graph in triangular) {
+                        arithmetic.step()
+                        fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
+                        onGraph?.invoke()
+                        yield(null)
+                    }
+                    current = rewritten
+                    yield(null)
+                    continue
+                }
                 val graph = equationalSection(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
                     ?: break
                 val rewritten = ArrayList<PolynomialAtom>()

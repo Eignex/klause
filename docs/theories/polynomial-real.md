@@ -737,6 +737,17 @@ equality alone supplies no factor zero or nonzero premise. Other coordinate
 occurrences remain for subsequent projection; only total rational polynomial
 graphs are substituted.
 
+Complete region reduction can select one total definition per coordinate when the
+defined coordinate is the highest one in its polynomial. Every dependency is then
+smaller, so these definitions form an acyclic triangular family. A bulk wave drops
+only the selected equalities and rewrites all other predicates, including additional
+equalities on a selected coordinate. Its private iterative substitution cache closes
+definitions on demand and yields between graph operations under the query's native
+work and cancellation scope. Reconstruction retains the original graph expressions
+and evaluates each wave from smaller coordinates to larger ones. A single candidate
+uses the ordinary graph-pivot policy. Interrupted or refused closure publishes no
+partial reduced region.
+
 Projection records a permutation of all original coordinates and any further total graph
 sections. Dependencies in those sections occupy earlier lifting levels. Prefix literal checks
 use those levels rather than source coordinate IDs. Fixed coordinates retain their
