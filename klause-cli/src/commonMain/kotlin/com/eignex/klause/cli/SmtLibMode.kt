@@ -148,6 +148,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     override val commentPrefix: String = ";"
     override val streamObjective: Boolean = true
+    override val streamFiniteWitness: Boolean = true
     override val objectivePrefix: String = "; objective="
 
     override fun begin(optimize: Boolean, maximize: Boolean) {
