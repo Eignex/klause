@@ -1,0 +1,57 @@
+package com.eignex.klause.solver.projection
+
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
+import com.eignex.klause.ir.FloatSemantics
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.validation.verifyRealCoordinates
+import com.eignex.klause.util.Cancellation
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+
+class FloatGridFiniteDomainTest {
+    @Test
+    fun `a selected grid should exclude nonmembers without rounding declared values`() {
+        val source = Problem(0, 0, emptyArray(),
+            arrayOf(RealFiniteDomain(0, doubleArrayOf(-1.0, 0.125, 0.5))),
+            numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(5, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(
+            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+
+        val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { point ->
+            assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never))
+        }.toList()
+
+        assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ONE / BigFraction.ofLong(2)),
+            points.map { assertNotNull(it.exactReals).single() }.toSet())
+        for (point in points) assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point))
+        assertEquals(1, source.numRealVars)
+        assertEquals(0, source.numIntVars)
+    }
+
+    @Test
+    fun `private grid exhaustion should preserve the nonempty original membership`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf(0.125))),
+            numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(
+            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+
+        val privateResult = prepared.problem.baked
+
+        assertIs<PropagationResult.Unsat>(privateResult)
+        assertEquals(0.125, (source.factors.single() as RealFiniteDomain).values.single())
+        assertEquals(1, source.numRealVars)
+    }
+}
