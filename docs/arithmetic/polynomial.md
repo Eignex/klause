@@ -27,6 +27,16 @@ order. Coefficient extraction uses ascending exponents; zero has degree -1 and a
 empty coefficient list. Derivatives, substitution and exact division retain source
 coefficient authority without floating conversion.
 
+Each polynomial captures its sorted immutable terms and sparse coordinate IDs with
+their maximum exponents once. Term and coordinate accessors return fresh list views;
+membership, main-coordinate and degree queries read the captured metadata. Zero has
+degree -1, while a nonzero polynomial has degree zero in an absent coordinate.
+Capture uses storage proportional to its terms and occurring coordinates, including
+sparse source IDs. It retains no invocation, arithmetic state or witness information.
+Construction has no cancellation token of its own; caller checkpoints retain their
+existing capture accounting and limits. Derived coordinate metadata does not replace
+the original source counts used by optional admission.
+
 Each monomial captures descending coordinate IDs and their degrees in private
 primitive arrays. Comparison merges those arrays without allocating; equality
 retains the normalized powers, and the cached hash mixes canonical coordinate and

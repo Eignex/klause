@@ -152,7 +152,7 @@ internal class PolynomialProjection private constructor(
                     val projected = ArrayList<Polynomial>()
                     for (polynomial in pending) {
                         arithmetic.step()
-                        val value = if (variable in polynomial.variables) {
+                        val value = if (polynomial.containsVariable(variable)) {
                             arithmetic.substitute(polynomial, variable, section.replacement)
                         } else polynomial
                         rewritten[polynomial] = value

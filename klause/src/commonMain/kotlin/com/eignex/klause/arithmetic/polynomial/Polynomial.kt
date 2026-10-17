@@ -67,12 +67,35 @@ internal class Monomial private constructor(private val powers: Map<Int, Int>) :
 internal data class PolynomialTerm(val monomial: Monomial, val coefficient: BigFraction)
 
 internal class Polynomial private constructor(private val coefficients: Map<Monomial, BigFraction>) {
-    val terms: List<PolynomialTerm> get() = coefficients.entries.sortedBy { it.key }
-        .map { PolynomialTerm(it.key, it.value) }
+    private val orderedTerms = coefficients.entries.sortedBy { it.key }
+        .map { PolynomialTerm(it.key, it.value) }.toTypedArray()
+    private val coordinates = if (orderedTerms.isEmpty() ||
+        (orderedTerms.size == 1 && orderedTerms[0].monomial == Monomial.ONE)
+    ) null else run {
+        val degrees = HashMap<Int, Int>()
+        for (term in orderedTerms) for (variable in term.monomial.variables) {
+            degrees[variable] = maxOf(degrees[variable] ?: 0, term.monomial.exponent(variable))
+        }
+        val ids = degrees.keys.sorted().toIntArray()
+        ids to IntArray(ids.size) { degrees.getValue(ids[it]) }
+    }
+
+    val terms: List<PolynomialTerm> get() = orderedTerms.toList()
     val isZero: Boolean get() = coefficients.isEmpty()
-    val variables: List<Int> get() = coefficients.keys.flatMap { it.variables }.distinct().sorted()
-    val mainVariable: Int? get() = variables.lastOrNull()
-    fun degree(variable: Int): Int = coefficients.keys.maxOfOrNull { it.exponent(variable) } ?: -1
+    val variables: List<Int> get() = coordinates?.first?.let { ids -> List(ids.size) { ids[it] } } ?: emptyList()
+    val mainVariable: Int? get() = coordinates?.first?.lastOrNull()
+
+    fun degree(variable: Int): Int {
+        val captured = coordinates ?: return if (isZero) -1 else 0
+        val index = captured.first.binarySearch(variable)
+        return if (index < 0) 0 else captured.second[index]
+    }
+
+    fun containsVariable(variable: Int): Boolean {
+        val ids = coordinates?.first ?: return false
+        return ids.binarySearch(variable) >= 0
+    }
+
     fun coefficient(monomial: Monomial): BigFraction = coefficients[monomial] ?: BigFraction.ZERO
 
     override fun equals(other: Any?): Boolean = other is Polynomial && coefficients == other.coefficients
