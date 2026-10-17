@@ -125,9 +125,16 @@ disjunctions, private row assertions, source branches, disequality directions or
 retained reductions, under the production certification policy. The caller captures
 at most 4,096 complete Boolean values before source-row capture and checks them
 against both its live values and the shared context before rejecting the leaf.
-The rejection uses the shared traversal's conservative leaf-conflict protocol;
-it imports no residual LP support into another owner and creates no learned source
-explanation. Rounded integer candidates, partial or changed frames, cancellation
+The rejection can explain the complement of that entire captured Boolean cube,
+including unrelated variables and encoding auxiliaries. Declared real bounds and
+the selected signed source rows justify this conservative clause; the residual
+result exports no smaller support or numerical certificate. Premise construction
+and naming charge the containing operation and retain the existing 4,096-node
+explanation limit. The caller rechecks the complete current source and cancellation
+after naming. Naming or node-limit refusal retains an unexplained leaf conflict
+only while the exact source proof remains current; interruption or stale bindings
+withhold publication. The shared traversal owns resolution, retention and backjumping.
+Rounded integer candidates, partial or changed frames, cancellation
 and numerical decline cannot authorize rejection. Point-only consumers retain
 their nullable witness surface. The completion retains the same operation token
 and numerical invocation; no refutation adds a solve or renews an allowance.

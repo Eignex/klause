@@ -1460,11 +1460,14 @@ class ExactLiraSearchComponent private constructor(
                     if (completed === MixedPointCompletionResult.Refuted && sourceValues != null &&
                         currentCompletionSource(sourceValues, context)
                     ) {
-                        assignment = null
-                        outcome = ComponentCheck.Infeasible()
-                        smtStats?.observeConflict(null)
-                        observeCompleteStage("RECOVERY_SOURCE_REFUTED")
-                        return null
+                        val explanation = explainRefutedSourceCube(sourceValues, context, lpStop)
+                        if (currentCompletionSource(sourceValues, context)) {
+                            assignment = null
+                            outcome = ComponentCheck.Infeasible(explanation)
+                            smtStats?.observeConflict(explanation)
+                            observeCompleteStage("RECOVERY_SOURCE_REFUTED")
+                            return null
+                        }
                     }
                 } else {
                     observeCompleteStage("RECOVERY_ROWS_UNAVAILABLE")
@@ -1848,6 +1851,32 @@ private const val MAX_POINT_HINT_ENTRIES = 65_536
 private const val MAX_POINT_HINT_BITS = 4096
 private const val FALSE = 0
 private const val TRUE = 1
+
+internal fun explainRefutedSourceCube(
+    values: IntArray,
+    context: SearchContext,
+    stop: Cancellation,
+): SearchExplanation? {
+    if (values.size > 4096 || stop()) return null
+    stop.charge(8L * values.size + 64L)
+    if (stop()) return null
+    val premises = ArrayList<SearchAtomPremise>(values.size)
+    for (variable in values.indices) {
+        stop.charge(1L)
+        if (stop()) return null
+        val value = values[variable]
+        if ((value != TRUE && value != FALSE) || context.boolValue(variable) != (value == TRUE)) return null
+        premises += SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, value == TRUE)))
+    }
+    if (stop()) return null
+    // Keep every captured Boolean dependency because the residual result exports no support.
+    val explanation = context.explainAtoms(SearchAtomPremise.All(premises))
+    for (variable in values.indices) {
+        stop.charge(1L)
+        if (stop() || context.boolValue(variable) != (values[variable] == TRUE)) return null
+    }
+    return explanation.takeUnless { stop() }
+}
 
 private fun BooleanArray.toStates(): IntArray = IntArray(size) { if (this[it]) TRUE else FALSE }
 

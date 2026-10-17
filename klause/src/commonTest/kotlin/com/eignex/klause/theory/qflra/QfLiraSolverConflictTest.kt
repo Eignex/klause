@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -17,8 +18,10 @@ import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
@@ -32,6 +35,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import kotlin.test.Test
@@ -42,6 +46,183 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverConflictTest {
+    @Test
+    fun `an exact residual refutation should block only its complete Boolean cube`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.MINUS_ONE, BigFraction.ONE),
+                BigFraction.ZERO, strict = true),
+        )
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        session.push(SearchDecision.Bool(Lit.make(1, false)))
+        assertEquals(MixedPointCompletionResult.Refuted,
+            checkMixedPoint(2, 0, DoubleArray(2), rows, Cancellation.Never))
+
+        val explanation = assertNotNull(explainRefutedSourceCube(intArrayOf(1, 0), session, Cancellation.Never))
+        session.learn(explanation)
+        session.popTo(1)
+
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)), explanation.literals.toSet())
+        assertEquals(1, session.learnedClauseCount)
+        assertEquals(true, session.boolValue(1))
+        session.popTo(0)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+    }
+
+    @Test
+    fun `source cube naming should refuse stale or incomplete Boolean bindings`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        session.push(SearchDecision.Bool(Lit.make(1, false)))
+
+        for (values in listOf(intArrayOf(0, 0), intArrayOf(1, -1), intArrayOf(1, 2))) {
+            assertNull(explainRefutedSourceCube(values, session, Cancellation.Never))
+        }
+
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `source cube naming should recheck Boolean bindings after naming`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        session.push(SearchDecision.Bool(Lit.make(1, false)))
+        var named = false
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? = session.atomLiteral(decision).also {
+                if (decision == SearchDecision.Bool(Lit.make(0, true))) named = true
+            }
+
+            override fun boolValue(variable: Int): Boolean? =
+                if (named && variable == 1) true else session.boolValue(variable)
+        }
+
+        val explanation = explainRefutedSourceCube(intArrayOf(1, 0), context, Cancellation.Never)
+
+        assertNull(explanation)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `source cube naming should withhold a clause when naming cancels its operation`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        session.push(SearchDecision.Bool(Lit.make(1, false)))
+        var stopped = false
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? = session.atomLiteral(decision).also {
+                if (decision == SearchDecision.Bool(Lit.make(0, true))) stopped = true
+            }
+        }
+
+        val explanation = explainRefutedSourceCube(intArrayOf(1, 0), context, Cancellation { stopped })
+
+        assertNull(explanation)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `stopped source cube construction should retain its charged work`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        session.push(SearchDecision.Bool(Lit.make(1, false)))
+        var charged = 0L
+        var stopped = false
+        val meter = WorkMeter {
+            charged += it
+            stopped = true
+        }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = stopped
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val explanation = explainRefutedSourceCube(intArrayOf(1, 0), session, stop)
+
+        assertNull(explanation)
+        assertTrue(charged > 0L)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `source cube naming should preserve the existing explanation node limit`() {
+        val session = SearchSession(emptyList())
+        val context = object : SearchContext by session {
+            override fun boolValue(variable: Int): Boolean = false
+        }
+
+        val explanation = explainRefutedSourceCube(IntArray(4096), context, Cancellation.Never)
+
+        assertNull(explanation)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `source cube naming should decline an unnameable Boolean fact`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        session.push(SearchDecision.Bool(Lit.make(1, false)))
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? =
+                if (decision == SearchDecision.Bool(Lit.make(1, false))) null else session.atomLiteral(decision)
+        }
+
+        val explanation = explainRefutedSourceCube(intArrayOf(1, 0), context, Cancellation.Never)
+
+        assertNull(explanation)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `a genuine complete source refutation should explain every captured Boolean`() {
+        val equalities = (0..128).map { variable ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(variable), Term.ofRealVar(129), Term.ofRealVar(130)),
+                List(3) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ZERO)
+        }
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 131,
+            realLower = DoubleArray(131) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(131) { Double.POSITIVE_INFINITY },
+            factors = (equalities + ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(128)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.ZERO,
+                strict = true, activator = 0)).toTypedArray(),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            component.useMixedPointCompletion()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize(), "initial source")
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))),
+                "strict source prefix")
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))),
+                "complete source")
+
+            assertNull(component.nextBranch(session))
+
+            val refuted = assertIs<ComponentCheck.Infeasible>(session.check())
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("RECOVERY_SOURCE_REFUTED"),
+                "stages=${stats.snapshot().completeSearchStages} " +
+                    "outcomes=${stats.snapshot().completeSearchLinearOutcomes}")
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)),
+                assertNotNull(refuted.explanation).literals.toSet())
+            assertNull(session.model().valueOf<Any>(component))
+        }
+    }
+
     @Test
     fun `guarded real equalities should conflict before unrelated Booleans are assigned`() {
         for (positive in listOf(false, true)) {
