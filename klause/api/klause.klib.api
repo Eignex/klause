@@ -6548,6 +6548,25 @@ final class com.eignex.klause.factor.arithmetic/RealArrayMinMax : com.eignex.kla
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/RealArrayMinMax.structuralKey|structuralKey(){}[0]
 }
 
+final class com.eignex.klause.factor.arithmetic/RealFiniteDomain : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/RealFiniteDomain|null[0]
+    constructor <init>(kotlin/Int, kotlin/DoubleArray) // com.eignex.klause.factor.arithmetic/RealFiniteDomain.<init>|<init>(kotlin.Int;kotlin.DoubleArray){}[0]
+
+    final val size // com.eignex.klause.factor.arithmetic/RealFiniteDomain.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.factor.arithmetic/RealFiniteDomain.size.<get-size>|<get-size>(){}[0]
+    final val structuralKeyWeight // com.eignex.klause.factor.arithmetic/RealFiniteDomain.structuralKeyWeight|{}structuralKeyWeight[0]
+        final fun <get-structuralKeyWeight>(): kotlin/Int // com.eignex.klause.factor.arithmetic/RealFiniteDomain.structuralKeyWeight.<get-structuralKeyWeight>|<get-structuralKeyWeight>(){}[0]
+    final val values // com.eignex.klause.factor.arithmetic/RealFiniteDomain.values|{}values[0]
+        final fun <get-values>(): kotlin/DoubleArray // com.eignex.klause.factor.arithmetic/RealFiniteDomain.values.<get-values>|<get-values>(){}[0]
+    final val variable // com.eignex.klause.factor.arithmetic/RealFiniteDomain.variable|{}variable[0]
+        final fun <get-variable>(): kotlin/Int // com.eignex.klause.factor.arithmetic/RealFiniteDomain.variable.<get-variable>|<get-variable>(){}[0]
+    final val variables // com.eignex.klause.factor.arithmetic/RealFiniteDomain.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/RealVars // com.eignex.klause.factor.arithmetic/RealFiniteDomain.variables.<get-variables>|<get-variables>(){}[0]
+
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/RealFiniteDomain.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/RealFiniteDomain.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/RealFiniteDomain.structuralKey|structuralKey(){}[0]
+}
+
 final class com.eignex.klause.factor.arithmetic/RealProduct : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/RealProduct|null[0]
     constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Double, kotlin/Double) // com.eignex.klause.factor.arithmetic/RealProduct.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Double;kotlin.Double){}[0]
 
