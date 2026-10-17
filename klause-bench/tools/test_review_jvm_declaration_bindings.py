@@ -1,9 +1,11 @@
 import hashlib
 import io
+import json
 from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import review_jvm_declaration_bindings as bindings
 
@@ -196,6 +198,43 @@ class ReviewJvmDeclarationBindingsTest(unittest.TestCase):
             self.assertEqual(['metadata.jsonl'], list(selected))
             self.assertEqual(files['metadata.jsonl'], selected['metadata.jsonl'].read_bytes())
             self.assertFalse((scratch / 'unselected.txt').exists())
+
+    def test_later_archive_authentication_precedes_any_declaration_row(self):
+        specification = {'schema': 1, 'sources': [{'id': 'source', 'path': 'src/Example.kt',
+            'sha256': 'a' * 64, 'sourceFile': 'Example.kt', 'packages': ['p'], 'members': []}]}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output, scratch = root / 'output', root / 'scratch'
+            output.mkdir()
+            scratch.mkdir()
+            inputs, downloads = [], {}
+            for index in range(2):
+                files = {'rows.jsonl': b'not valid declaration JSON\n',
+                         'completion.json': b'{"completed":true}',
+                         'inventory.json': b'{"classes":1,"allDeclaredClassMetadataComplete":true}',
+                         'unselected.txt': b'original'}
+                archive = root / f'input-{index}.tar.gz'
+                with tarfile.open(archive, 'w:gz') as stream:
+                    for name, raw in files.items():
+                        body = b'changed!' if index == 1 and name == 'unselected.txt' else raw
+                        info = tarfile.TarInfo(name)
+                        info.size = len(body)
+                        stream.addfile(info, io.BytesIO(body))
+                manifest = json.dumps({'archive': bindings.file_identity(archive), 'files': {
+                    name: {'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+                    for name, raw in files.items()}}).encode()
+                manifest_url = f'https://fixture.invalid/{index}.manifest.json'
+                archive_url = f'https://fixture.invalid/{index}.tar.gz'
+                downloads[manifest_url], downloads[archive_url] = manifest, archive.read_bytes()
+                inputs.append({'id': str(index), 'manifest': manifest_url,
+                    'manifestSha256': hashlib.sha256(manifest).hexdigest(), 'archive': archive_url,
+                    'rowsMember': 'rows.jsonl', 'completionMember': 'completion.json',
+                    'inventoryMember': 'inventory.json'})
+
+            with patch.object(bindings, 'download', side_effect=lambda address, target, maximum, expected:
+                              target.write_bytes(downloads[address])):
+                with self.assertRaisesRegex(ValueError, 'Archive member bytes differ from manifest'):
+                    bindings.review({'schema': 1, 'inputs': inputs}, specification, output, scratch)
 
 
 if __name__ == '__main__':
