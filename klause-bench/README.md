@@ -2392,7 +2392,14 @@ all measured children. Network access serves preparation, source acquisition and
 checking; the container is not an offline sandbox.
 
 Build preparation uses a disposable Gradle daemon with Kotlin compilation in that
-process, so no build daemon remains during measurements. Before either arm's
+process, so no build daemon remains during measurements. The same retained
+`compilation-study/jvm-only.init.gradle` disables the CLI convention's native
+release-asset packaging for both study builds. That convention otherwise queries
+a Kotlin/Native host even when only `installJvmDist` is requested; Linux ARM64 is
+a supported JVM host but cannot run Kotlin/Native. The original pinned checkouts,
+solver/CLI sources, generated build identity and JVM distribution tasks are
+unchanged. Ordinary builds, native validation and release packaging retain their
+existing configuration. Before either arm's
 worktree is removed, the complete installed CLI and harness are copied under
 `private-installed/<arm>/`. Every file's size and SHA-256 are checked against both
 the original tree and retained copy, and the original build manifests are checked

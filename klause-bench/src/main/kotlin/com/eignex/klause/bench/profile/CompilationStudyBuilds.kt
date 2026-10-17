@@ -17,6 +17,8 @@ internal class CompilationStudyBuilds(private val root: File, private val out: F
 
     fun prepare(heads: Map<String, String>): Map<String, CompilationStudyBuild> {
         validateHeads(heads)
+        val initialization = jvmBuildInitialization()
+        val initializationSha256 = sha256(initialization.readBytes())
         return listOf("control", "candidate").associateWith { arm ->
             val head = heads.getValue(arm)
             val tree = File(workspace, arm)
@@ -32,9 +34,11 @@ internal class CompilationStudyBuilds(private val root: File, private val out: F
             check("KLAUSE_CLI_PREFLIGHT_OPTS" in invocation.readText()) {
                 "Pinned harness lacks separate CLI preflight options: $head"
             }
+            check(sha256(initialization.readBytes()) == initializationSha256)
             command(tree, out, "$arm-build", listOf("./gradlew", ":klause-cli:installJvmDist",
-                ":klause-bench:installDist", "--max-workers=2", "--no-daemon",
+                ":klause-bench:installDist", "--init-script", initialization.path, "--max-workers=2", "--no-daemon",
                 "-Pkotlin.compiler.execution.strategy=in-process"))
+            check(sha256(initialization.readBytes()) == initializationSha256)
             check(command(tree, out, "$arm-clean-after", listOf("git", "status", "--porcelain")).isBlank())
             val launcher = File(tree, "klause-cli/build/install/klause-cli-jvm/bin/klause-cli")
             val bench = File(tree, "klause-bench/build/install/klause-bench/bin/klause-bench")
@@ -55,6 +59,15 @@ internal class CompilationStudyBuilds(private val root: File, private val out: F
             Reports.writeJson(File(out, "study-builds.json").path, receipts)
             CompilationStudyBuild(arm, tree, bench, provenance)
         }
+    }
+
+    private fun jvmBuildInitialization(): File {
+        val source = File(root, "klause-bench/compilation-study/jvm-only.init.gradle")
+        val bytes = source.readBytes()
+        val initialization = File(out, "jvm-only.init.gradle").apply { writeBytes(bytes) }
+        Reports.writeJson(File(out, "build-initialization.json").path,
+            mapOf("source" to source.path, "applied" to initialization.path, "sha256" to sha256(bytes)))
+        return initialization
     }
 
     override fun close() {

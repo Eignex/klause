@@ -1,0 +1,6 @@
+// JVM study builds do not require host-specific native release packaging.
+gradle.beforeProject { target ->
+    target.pluginManager.withPlugin('com.eignex.cli') {
+        target.extensions.getByName('eignexCli').releaseAssetsEnabled.set(false)
+    }
+}
