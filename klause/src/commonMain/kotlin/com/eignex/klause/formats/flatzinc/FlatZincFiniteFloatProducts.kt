@@ -1,35 +1,16 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.reifyRealLinear
-import com.eignex.klause.lowering.tseitinOr
 
 internal fun FlatZincCompiler.emitFiniteFloatDomains() {
     for ((variable, values) in finiteFloatChoices) {
-        val guards = values.map { exactFloatValueLiteral(variable, it) }.distinct().toIntArray()
-        if (guards.isEmpty()) {
-            postFalseFactor()
-            continue
-        }
-        factors.add(Clause(guards))
-        if (guards.size <= 4) {
-            for (i in guards.indices) {
-                for (j in i + 1 until guards.size) {
-                    factors.add(Clause(intArrayOf(Lit.negate(guards[i]), Lit.negate(guards[j]))))
-                }
-            }
-        } else {
-            var prefix = guards[0]
-            for (i in 1 until guards.size) {
-                factors.add(Clause(intArrayOf(Lit.negate(prefix), Lit.negate(guards[i]))))
-                if (i < guards.lastIndex) prefix = tseitinOr(listOf(prefix, guards[i]))
-            }
-        }
+        factors.add(RealFiniteDomain(variable, values))
     }
 }
 
@@ -59,14 +40,8 @@ internal fun FlatZincCompiler.emitFiniteFloatProduct(a: FloatRef, b: FloatRef, r
         factors.add(ContinuousProduct(first.bk.varId, second.bk.varId, output))
         return
     }
-    if (values.isEmpty()) {
-        postFalseFactor()
-        return
-    }
     val selected = if (selectA) first else second
-    val guards = IntArray(values.size) { exactFloatValueLiteral(selected.bk.varId, values[it]) }
-    factors.add(Clause(guards))
-    factors.add(ContinuousProduct(first.bk.varId, second.bk.varId, output, selected.bk.varId, values, guards))
+    factors.add(ContinuousProduct(first.bk.varId, second.bk.varId, output, selected.bk.varId, values))
 }
 
 internal fun FlatZincCompiler.exactFloatValueLiteral(variable: Int, value: Double): Int {

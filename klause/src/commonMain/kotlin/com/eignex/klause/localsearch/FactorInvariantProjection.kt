@@ -148,6 +148,7 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
     }
 
     is RealAbs -> RealAbsInvariant(operand, result)
+    is RealFiniteDomain -> NoInvariant
     is RealArrayMinMax -> RealArrayMinMaxInvariant(this)
 
     is RealProduct -> RealProductInvariant(intOperand, realOperand, result)

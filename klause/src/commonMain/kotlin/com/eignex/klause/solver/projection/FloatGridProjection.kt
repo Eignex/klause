@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.GridProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.table.RealElement
@@ -180,7 +181,7 @@ private fun preflightFloatFactor(
     if (projected == 0) return true
     if (projected != roles.reals.size) return false
     return when (factor) {
-        is Linear, is ReifiedRealLinear, is RealAbs, is RealArrayMinMax, is RealElement -> true
+        is Linear, is ReifiedRealLinear, is RealAbs, is RealArrayMinMax, is RealElement, is RealFiniteDomain -> true
         is ContinuousProduct -> factor.finiteChoices?.let { choices ->
             choices.size == 1 && source.realLower[choices.operand] == choices.valueAt(0) &&
                 source.realUpper[choices.operand] == choices.valueAt(0)
@@ -257,6 +258,7 @@ private fun lowerFloatGridFactor(
             coordinate((factor.result as Power.Coordinate.Real).id.index)))
         is RealArrayMinMax -> listOf(lowerGridMinMax(factor, columns, policy.linearScale, cancellation) ?: return null)
         is RealElement -> lowerGridElement(factor, columns, cancellation)
+        is RealFiniteDomain -> lowerGridFiniteDomain(factor, columns.getValue(factor.variable), cancellation)
         else -> null
     }
 }

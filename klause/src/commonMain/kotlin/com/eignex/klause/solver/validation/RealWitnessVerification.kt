@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Distinct
@@ -68,7 +69,13 @@ internal fun verifyRealCoordinates(
         }
     }
     if (model.numRealVars == 0) return Verification.Accepted(Candidate(sample, Unit))
-    val reals = sample.exactReals ?: return Verification.Indeterminate("continuous values are not certified")
+    val reals = if (model.factors.any { it is RealFiniteDomain }) {
+        when (val membership = checkRealFiniteDomains(model, sample, cancellation)) {
+            is Verification.Accepted -> membership.candidate.assignment
+            is Verification.Rejected -> return membership
+            is Verification.Indeterminate -> return membership
+        }
+    } else sample.exactReals ?: return Verification.Indeterminate("continuous values are not certified")
     if (reals.size != model.numRealVars) return Verification.Rejected("assignment does not cover the real variables")
     for (id in reals.indices) {
         cancellation.charge(1)
@@ -96,6 +103,7 @@ internal fun verifyRealCoordinates(
         cancellation.charge(1)
         if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
         if (factor.variables.reals.isEmpty()) continue
+        if (factor is RealFiniteDomain) continue
         if (factor is Distinct) {
             if (!factor.isSatisfied(sample::exactIntValue, sample::boolValue, reals::get)) {
                 return Verification.Rejected("real factor $id refutes the assignment")

@@ -12,6 +12,7 @@ import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.WideDivMod
 import com.eignex.klause.factor.global.AllDifferent
@@ -94,6 +95,7 @@ object BuiltInEncoderProvider : EncoderProvider {
         factor is RealElement && target != EncodingTarget.DIFFERENCE -> selectionEncoder
         factor is RealArrayMinMax && target != EncodingTarget.DIFFERENCE -> selectionEncoder
         factor is ContinuousProduct -> continuousProductEncoder(factor, target)
+        factor is RealFiniteDomain -> realFiniteDomainEncoder(target)
         target == EncodingTarget.POLYNOMIAL && factor is RealProduct -> mixedProduct
         target == EncodingTarget.LINEAR && factor is RealProduct -> conditionedProduct(factor)
         factor.exactTheoryOwnable && (target != EncodingTarget.DIFFERENCE ||

@@ -206,14 +206,18 @@ values, minimum/maximum, constant-array selection, multiplication/division by
 constants, and products with a finite selected operand. Exact absolute values retain
 `RealAbs` in the source model; the selected consumer installs its complete equality
 alternatives privately. Implied inequalities alone do not enforce this relation.
-Finite-choice products whose finite encoding fits the captured alternative limit retain
-`ContinuousProduct` with their declared values and source Boolean equality literals,
+Finite membership retains `RealFiniteDomain` for every applicable original real,
+including disconnected declarations and compatibility components. No domain-cover
+Booleans are allocated at intake. Finite-choice products whose finite encoding fits
+the captured alternative limit retain `ContinuousProduct` with their declared values,
 including constant results and operand aliases. Other products retain their unrestricted
 original equality; an encoding limit cannot reject source intake.
 Private selected linear consumers install the complete product alternatives;
 frontends do not expand those products into guarded rows. Literal-only exact
 products retain fixed real operands so binary64 multiplication cannot round away
 a failed exact source equality.
+The finite backtracking facade uses the same selected exact linear completion for
+these value covers. An LP relaxation alone cannot establish membership or a product.
 
 Finite integer float images retain affine maps to source integer values. Fixed
 integer selections and products can be eliminated while preserving source values
