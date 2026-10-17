@@ -438,6 +438,26 @@ class MpsModeTest {
     }
 
     @Test
+    fun `a complete finite portfolio should retain an original integer optimum certificate`() {
+        val source = File.createTempFile("mps-finite-optimum-certificate", ".mps").apply {
+            writeText(
+                "OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n LI B I 0\n UI B I 2\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=100", source.absolutePath)))
+        }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o 2" in text.lines(), text)
+        assertTrue("v I=2" in text.lines(), text)
+        assertTrue("c optimizationStatus=attained-optimum" in text.lines(), text)
+    }
+
+    @Test
     fun `integral real definitions should retain original coordinates beside finite integer backing`() {
         for ((realFirst, exact) in listOf(false to false, false to true, true to false, true to true)) {
             val integer = " M0 'MARKER' 'INTORG'\n X DEF -3\n M1 'MARKER' 'INTEND'\n"
