@@ -31,7 +31,10 @@ Optimization exhaustion without an incumbent is an original-source refutation on
 when its installed complete worker routes objective cutoffs through the scheduler
 and used no finite shared cutoff. The scheduler retains observed cutoffs for proof admission: a callback that returned only positive infinity leaves
 the source space unrestricted; a finite cutoff supports its conditional bound.
-Heuristic and improvement-only arms do not gain refutation authority from exhaustion.
+With a checked incumbent, the same unrestricted complete exhaustion establishes
+attainment even when root completion finishes before consulting a shared cutoff.
+The completion still passes the model, objective, invocation and witness checks.
+Heuristic and improvement-only arms gain no completion authority from exhaustion.
 
 ## Witnesses and proof scope
 
