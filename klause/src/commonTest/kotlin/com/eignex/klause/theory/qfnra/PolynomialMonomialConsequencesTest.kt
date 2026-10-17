@@ -88,6 +88,28 @@ class PolynomialMonomialConsequencesTest {
     }
 
     @Test
+    fun `a nonconstant monomial identity supplies a weighted square refutation`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const p$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (declare-const a Real) (declare-const b Real) (declare-const d Real)
+            (declare-const t Real) (declare-const y Real) (declare-const c Real)
+            (assert (and (>= d 0) (>= t 0) (>= y 0) (> c 0) (= (* a b) (* d t y))
+              (= (+ (* d d t y) (* t y) (* d t t y y) d (* d d) (* t t y y)
+                (* (- 6) a b) c) 0)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 50_000))
+
+        val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(0L, refuted.stats.dyadicAttempts)
+        assertEquals(0L, refuted.stats.projectedPolynomials)
+    }
+
+    @Test
     fun `unknown zero factors retain feasible singular values`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const a Real) (declare-const x Real) (assert (and (= (* a x) 0) (> x 1) (>= a 0)))",
