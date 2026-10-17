@@ -2619,6 +2619,10 @@ Its `allInputPairs` is the theoretical number of unordered input pairs before
 required-equation selection and reducta expansion, not a count of requested or
 completed subresultants. The required-equation flag identifies that selection.
 Family metadata is also read after the query stops; pipeline mode disables these observers.
+The last completed reduced region separately retains its full private conjunction
+before CAD boundary construction. Post-query metadata records predicate relations,
+atom and term counts, distinct real coordinates and total degrees. A linear boundary
+family alone does not establish that every predicate in this conjunction is affine.
 These are the most recent requests, possibly incomplete or refused, and must be
 interpreted with the containing deadline stack. They establish no completed result.
 The observers add diagnostic overhead and provide no default CLI timing authority.

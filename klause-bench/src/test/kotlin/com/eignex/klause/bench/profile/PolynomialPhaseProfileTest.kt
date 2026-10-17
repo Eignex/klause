@@ -33,6 +33,7 @@ class PolynomialPhaseProfileTest {
         assertNull(trace.lastSubresultants)
         assertNull(trace.lastDivision)
         assertNull(trace.lastProjection)
+        assertNull(trace.lastReducedRegion)
     }
 
     @Test
@@ -71,6 +72,11 @@ class PolynomialPhaseProfileTest {
         assertEquals(mapOf(1 to 3), observed.degrees)
         assertEquals(mapOf(1L to 1, 2L to 2), observed.totalDegrees)
         assertEquals(1, observed.constantAffineCoordinates)
+        val region = assertNotNull(trace.lastReducedRegion)
+        assertEquals(3, region.atoms)
+        assertEquals(2, region.realCoordinates)
+        assertEquals(mapOf("NE" to 1, "GT" to 2), region.relations)
+        assertEquals(mapOf(1L to 1, 2L to 2), region.totalDegrees)
     }
 
     @Test

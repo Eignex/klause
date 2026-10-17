@@ -246,7 +246,7 @@ internal object PolynomialPhaseProfile {
                 result.javaClass.methods.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
                 nativeWork, charges - preparationCharges, preparationCharges, stop,
-                observation.subresultants(), observation.division(), observation.projection())
+                observation.subresultants(), observation.division(), observation.projection(), observation.reducedRegion())
         }
     }
 }
@@ -265,6 +265,7 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
     private var family: List<Any>? = null
     private var projectionVariable = 0
     private var requiredEquation = false
+    private var reducedAtoms: List<Any>? = null
 
     init {
         val subresultants: (Any, Any, Int, Int?) -> Unit = { a, b, coordinate, minor ->
@@ -288,6 +289,8 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
             requiredEquation = equation != null
         }
         query.javaClass.getMethod("setProjectionObserver", Function3::class.java).invoke(query, projection)
+        val reducedRegion: (List<Any>) -> Unit = { reducedAtoms = it }
+        query.javaClass.getMethod("setReducedRegionObserver", Function1::class.java).invoke(query, reducedRegion)
     }
 
     fun subresultants(): PhaseSubresultants? {
@@ -351,6 +354,38 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
     }
 
     private fun termCount(value: Any): Int = (terms.invoke(value) as List<*>).size
+
+    fun reducedRegion(): PhaseReducedRegion? {
+        val atoms = reducedAtoms ?: return null
+        val atomType = Class.forName("com.eignex.klause.theory.qfnra.PolynomialAtom")
+        val polynomial = atomType.getMethod("getPolynomial")
+        val relation = atomType.getMethod("getRelation")
+        val termType = Class.forName("com.eignex.klause.arithmetic.polynomial.PolynomialTerm")
+        val monomial = termType.getMethod("getMonomial")
+        val monomialType = Class.forName("com.eignex.klause.arithmetic.polynomial.Monomial")
+        val coordinates = monomialType.getMethod("getVariables")
+        val exponent = monomialType.getMethod("exponent", Int::class.javaPrimitiveType)
+        val relations = LinkedHashMap<String, Int>()
+        val totalDegrees = LinkedHashMap<Long, Int>()
+        val ids = HashSet<Int>()
+        var termCount = 0L
+        for (atom in atoms) {
+            val kind = relation.invoke(atom).toString()
+            relations[kind] = (relations[kind] ?: 0) + 1
+            val input = polynomial.invoke(atom)
+            val payload = terms.invoke(input) as List<*>
+            termCount += payload.size
+            var totalDegree = 0L
+            for (term in payload) {
+                val powers = monomial.invoke(term)
+                val members = (coordinates.invoke(powers) as List<*>).map { it as Int }
+                ids.addAll(members)
+                totalDegree = maxOf(totalDegree, members.sumOf { (exponent.invoke(powers, it) as Int).toLong() })
+            }
+            totalDegrees[totalDegree] = (totalDegrees[totalDegree] ?: 0) + 1
+        }
+        return PhaseReducedRegion(atoms.size, termCount, relations, ids.size, totalDegrees)
+    }
 }
 
 @Serializable
@@ -382,6 +417,16 @@ internal data class PhaseTrace(
     val lastSubresultants: PhaseSubresultants? = null,
     val lastDivision: PhaseDivision? = null,
     val lastProjection: PhaseProjection? = null,
+    val lastReducedRegion: PhaseReducedRegion? = null,
+)
+
+@Serializable
+internal data class PhaseReducedRegion(
+    val atoms: Int,
+    val terms: Long,
+    val relations: Map<String, Int>,
+    val realCoordinates: Int,
+    val totalDegrees: Map<Long, Int>,
 )
 
 @Serializable

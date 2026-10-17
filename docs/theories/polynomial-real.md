@@ -162,7 +162,10 @@ The complete query can install an optional elimination observer for phase diagno
 It receives the selected coordinate, its boundary family and any selected required
 equation before ordinary projection. It is disabled by default and does not select
 operations or charge native work. Diagnostics retain read-only family references and
-inspect their metadata after the query stops. A recorded family does not certify a
+inspect their metadata after the query stops. A separate optional observer receives
+the full private conjunction after completed graph and affine reduction, retaining
+predicate relations before boundary-family construction. It shares the same disabled
+default and reference-only diagnostic contract. A recorded family does not certify a
 completed projection or a source verdict; [benchmark diagnostics](../../klause-bench/README.md#focused-probes)
 owns the trace format and interpretation.
 

@@ -5,6 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -17,6 +18,30 @@ import kotlin.test.assertTrue
 
 class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
+
+    @Test
+    fun `reduced region observation retains predicates without changing native work`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= x0 (* x1 x1))) (assert (not (= x0 0)))",
+        )
+        val plain = solveQfNra(source.formula, source.boolCount, source.realCount)
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(), PolynomialCondition())
+        var atoms: List<PolynomialAtom>? = null
+        query.reducedRegionObserver = { atoms = it }
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertIs<QfNraResult.Satisfiable>(plain)
+        assertIs<QfNraResult.Satisfiable>(result)
+        assertEquals(plain.stats.workSpent, result.stats.workSpent)
+        val atom = checkNotNull(atoms).single()
+        assertEquals(PolynomialRelation.NE, atom.relation)
+        assertEquals(listOf(1), atom.polynomial.variables)
+        assertEquals(2, atom.polynomial.degree(1))
+    }
 
     @Test
     fun `graph reduction retains a false zero disequality`() {

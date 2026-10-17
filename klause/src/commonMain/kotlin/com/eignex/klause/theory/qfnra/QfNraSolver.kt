@@ -91,6 +91,7 @@ internal class QfNraQuery(
     private val work = QfNraWork(params)
     private val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
     var projectionObserver: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null
+    var reducedRegionObserver: ((List<PolynomialAtom>) -> Unit)? = null
     val stats: QfNraStats get() = work.snapshot()
     private var result: QfNraResult? = null
     private val preparation = sequence<QfNraResult?> {
@@ -159,6 +160,7 @@ internal class QfNraQuery(
                         reduction = reducing.next()
                         if (reduction == null) yield(null)
                     }
+                    reducedRegionObserver?.invoke(reduction.atoms)
                     val activeFormula = if (reduction.eliminatedCount == 0) normalized
                     else PolynomialFormula.conjunction(reduction.atoms, arithmetic)
                     val activeRegion = if (reduction.eliminatedCount == 0) region
