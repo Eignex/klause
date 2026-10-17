@@ -23,6 +23,27 @@ class MacContainerCompilationStudyTest {
         assertEquals("unix:///owned/docker.sock", options.endpoint)
     }
 
+    @Test
+    fun `the original fixture request keeps both pinned heads behind its guest mode selector`() {
+        val arguments = arrayOf("control=${"b".repeat(40)}", "endpoint=unix:///owned/docker.sock",
+            "fixture-allocation=existing-matching", "candidate=${"c".repeat(40)}")
+
+        val options = MacContainerCompilationStudy.parse(arguments)
+
+        assertEquals(listOf("fixture-allocation=existing-matching", "control=${"b".repeat(40)}",
+            "candidate=${"c".repeat(40)}"), options.studyArguments)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["fixture-allocation=other", "selection=https://example.test/selection.json",
+        "plan-sha256=unpaired", "fixture-allocation=existing-matching"])
+    fun `original fixture requests reject mixed duplicate and unrecognized modes`(extra: String) {
+        val arguments = arrayOf("control=${"b".repeat(40)}", "candidate=${"c".repeat(40)}",
+            "endpoint=unix:///owned/docker.sock", "fixture-allocation=existing-matching", extra)
+
+        assertFailsWith<IllegalArgumentException> { MacContainerCompilationStudy.parse(arguments) }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["endpoint=tcp://remote:2375", "candidate=main", "image=mutable", "families=unpaired"])
     fun `duplicate unknown remote and incomplete options fail before daemon access`(extra: String) {

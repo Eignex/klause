@@ -1,0 +1,21 @@
+import groovy.json.JsonOutput
+
+gradle.projectsEvaluated {
+    def target = gradle.rootProject.project(':klause')
+    def compilation = target.extensions.getByName('kotlin').targets.getByName('jvm').compilations.getByName('test')
+    target.tasks.register('writeOriginalFixtureClasspath') {
+        dependsOn(compilation.compileTaskProvider)
+        dependsOn(compilation.output.allOutputs)
+        doLast {
+            def outputs = compilation.output.allOutputs.files.findAll { it.isDirectory() }
+            def jars = compilation.runtimeDependencyFiles.files.findAll {
+                it.isFile() && it.name.endsWith('.jar')
+            }
+            def destination = new File(target.providers.gradleProperty('klause.fixture.classpath').get())
+            destination.text = JsonOutput.toJson([
+                outputs: outputs.collect { it.canonicalPath },
+                jars: jars.collect { it.canonicalPath }
+            ])
+        }
+    }
+}

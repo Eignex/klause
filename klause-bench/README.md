@@ -2369,6 +2369,38 @@ source refutation, independent witness acceptance or optimization claim.
 
 ### Compilation study in an owned Linux guest
 
+For allocation observations of the existing seeded AllDifferent reason-oracle
+methods, pass `fixture-allocation=existing-matching control=<commit>
+candidate=<commit> endpoint=<unix-socket>` to the same profile. This mode uses no
+model selection or study plan. Both complete original fixture method bodies must
+match their fixed source identities: matching retains its 300 seeded iterations
+and except-zero its 150. No solver or fixture source is edited.
+
+The owned build compiles the pinned test outputs through
+`compilation-study/fixture-classpath.init.gradle`, outside all measurements.
+Installed production CLI jars precede the byte-retained test outputs,
+test-only dependencies and observer probe jar. Same-name dependencies must match
+the original CLI bytes; both Regin facades must load from its exact original jar,
+and the test class from its retained output with its recorded byte hash.
+Every installed distribution, retained test output, dependency and probe identity
+is checked before and after each child process. SDK, installed distributions and
+compiled test outputs remain private.
+
+Each fixture has three fresh alternating control/candidate JVM pairs, pinned to
+guest CPU 0 with Serial GC, one active processor and a 3 GiB heap. Each process
+invokes the unchanged original method 30 times for natural warmup and 21 times
+for measurement. All rounds 0 through 20 are retained; rounds 11 through 20 carry
+a separate predeclared late-window marker. Nanoseconds and current-thread
+allocated bytes include the complete reason oracle and reflection invocation.
+They exclude other threads and native allocation and establish no whole-CLI or
+compiler saving. No GC, tier or compilation policy is forced beyond those runtime
+controls. Raw stdout/stderr, VM arguments, PID, guest CPU list, class origins,
+commands and exits remain captured. A five-minute child timeout or incomplete,
+duplicate, negative or unexpected output stays a failed invocation; remaining
+declared cases still run. Fixture assertion success does not establish complete
+state/order/RNG/work identity, original-source benchmark outcomes or performance
+acceptance.
+
 `bench.profile.MacContainerCompilationStudy` runs the original paired
 `CliCompilationStudy` kernel through the Mac profiling route. It accepts that
 kernel's pinned source, selection, plan and optional family arguments plus one

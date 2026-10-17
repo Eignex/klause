@@ -7,6 +7,11 @@ out=$3
 observer_cli=$4
 observer_bench=$5
 shift 5
+main_class=com.eignex.klause.bench.profile.CliCompilationStudy
+if [[ "${1:-}" == fixture-allocation=existing-matching ]]; then
+    main_class=com.eignex.klause.bench.profile.OriginalFixtureAllocationStudy
+    shift
+fi
 mkdir -p "$out" "$work/tmp"
 export DEBIAN_FRONTEND=noninteractive GRADLE_USER_HOME="$work/gradle"
 export KLAUSE_CORPUS="$work/corpus" KLAUSE_BENCH_CORPUS_MAX_GB=off
@@ -39,11 +44,13 @@ mkdir -p "$work/driver/klause-cli/build/install/klause-cli-jvm"
 mkdir -p "$work/driver/klause-bench/build/install/klause-bench"
 cp -a "$observer_cli/." "$work/driver/klause-cli/build/install/klause-cli-jvm/"
 cp -a "$observer_bench/." "$work/driver/klause-bench/build/install/klause-bench/"
-python3 -m venv "$work/checker"
-"$work/checker/bin/python" -m pip download --dest "$work/wheels" \
-    -r "$work/driver/klause-bench/tools/requirements-source-checks.txt" \
-    > "$out/wheels.stdout" 2> "$out/wheels.stderr"
-export PIP_NO_INDEX=1 PIP_FIND_LINKS="$work/wheels"
+if [[ "$main_class" == com.eignex.klause.bench.profile.CliCompilationStudy ]]; then
+    python3 -m venv "$work/checker"
+    "$work/checker/bin/python" -m pip download --dest "$work/wheels" \
+        -r "$work/driver/klause-bench/tools/requirements-source-checks.txt" \
+        > "$out/wheels.stdout" 2> "$out/wheels.stderr"
+    export PIP_NO_INDEX=1 PIP_FIND_LINKS="$work/wheels"
+fi
 export OUT="$out/study"
 mkdir -p "$OUT"
 java -Xmx512m --enable-preview --enable-native-access=ALL-UNNAMED \
@@ -52,4 +59,4 @@ java -Xmx512m --enable-preview --enable-native-access=ALL-UNNAMED \
     "-Dklause.bench.corpusCache=$work/corpus" \
     "-Dklause.workspace.root=$work/driver" \
     -cp "$work/driver/klause-bench/build/install/klause-bench/lib/*" \
-    com.eignex.klause.bench.profile.CliCompilationStudy "$@"
+    "$main_class" "$@"

@@ -142,8 +142,10 @@ internal object MacContainerCompilationStudy {
             it.substringBefore('=') to it.substringAfter('=')
         }
         val studyKeys = setOf("selection", "sha256", "control", "candidate", "plan", "plan-sha256")
+        val allocationKeys = setOf("endpoint", "control", "candidate", "fixture-allocation")
         require(options.size == args.size && options.keys in listOf(studyKeys + "endpoint",
-            studyKeys + setOf("endpoint", "families", "families-sha256")))
+            studyKeys + setOf("endpoint", "families", "families-sha256"), allocationKeys))
+        options["fixture-allocation"]?.let { require(it == "existing-matching") }
         for (key in listOf("sha256", "plan-sha256", "families-sha256")) {
             options[key]?.let { require(it.matches(Regex("[0-9a-f]{64}"))) }
         }
@@ -156,7 +158,12 @@ internal object MacContainerCompilationStudy {
         }
         val endpoint = CompilationStudyContainerProbe.parse(arrayOf("endpoint=${options.getValue("endpoint")}"))
         CompilationStudyBuilds.validateHeads(listOf("control", "candidate").associateWith(options::getValue))
-        return MacContainerStudyOptions(endpoint.endpoint, args.filterNot { it.startsWith("endpoint=") })
+        val arguments = if ("fixture-allocation" in options) {
+            listOf("fixture-allocation=existing-matching") + args.filterNot {
+                it.startsWith("endpoint=") || it.startsWith("fixture-allocation=")
+            }
+        } else args.filterNot { it.startsWith("endpoint=") }
+        return MacContainerStudyOptions(endpoint.endpoint, arguments)
     }
 
     @Suppress("LongParameterList")
