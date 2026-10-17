@@ -64,4 +64,3 @@ internal fun refutePolynomialSigns(
     }
     return false
 }
-
