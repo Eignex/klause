@@ -70,7 +70,7 @@ class QfLiraSolverLpTest {
     @Test
     fun `a compatible Boolean extension should reuse its exact LP point without another query`() {
         val source = Problem(
-            numBoolVars = 2,
+            numBoolVars = 3,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
             numRealVars = 2,
             realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
@@ -96,7 +96,7 @@ class QfLiraSolverLpTest {
             component.observeCompleteTraversal()
             component.useMixedPointCompletion()
             val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertEquals(true, hints.preferredBool(0))
             val initialQueries = queries
@@ -106,6 +106,8 @@ class QfLiraSolverLpTest {
 
             assertEquals(initialQueries, queries)
             assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertEquals(initialQueries, queries)
 
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
 
@@ -113,9 +115,10 @@ class QfLiraSolverLpTest {
             assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
             assertNull(component.nextBranch(session))
             assertIs<ComponentCheck.Feasible>(session.check())
-            val witness = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component))
+            val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
             assertEquals(true, witness.boolValue(0))
             assertEquals(false, witness.boolValue(1))
+            assertEquals(true, witness.boolValue(2))
             assertTrue(witness.reals[0] > BigFraction.ZERO && witness.reals[0] <= BigFraction.ONE)
             assertTrue(witness.reals[1] < BigFraction.ZERO)
             assertEquals(BigFraction.ZERO, witness.reals[0] + witness.reals[1])
@@ -301,6 +304,7 @@ class QfLiraSolverLpTest {
 
     @Test
     fun `stopped prefix validation should lose reuse authority before resuming`() {
+        val stats = SmtStatsSink()
         var charged = 0L
         var stopOnCharge = false
         var stopped = false
@@ -308,7 +312,7 @@ class QfLiraSolverLpTest {
             override fun isCancelled(): Boolean = stopped
             override fun workMeter(): WorkMeter = WorkMeter {
                 charged += it
-                if (stopOnCharge) stopped = true
+                if (stopOnCharge && stats.snapshot().completeSearchMinUnassignedBooleans == 1) stopped = true
             }
         }
         val source = Problem(
@@ -329,7 +333,6 @@ class QfLiraSolverLpTest {
             queries++
             solver.resolveBounds(allowance)
         }
-        val stats = SmtStatsSink()
         ExactLiraSearchComponent(source).use { component ->
             component.solveWith(LpSolveContext(factory))
             component.useSolveStop(token)
@@ -424,11 +427,13 @@ class QfLiraSolverLpTest {
         var queries = 0
         val factory = TrackingLpFactory { solver, allowance ->
             queries++
+            val current = solver.resolveBounds(allowance)
             if (unchecked) {
-                val prior = assertNotNull(last)
-                FloatLpResult(prior.basis, 0.0, DoubleArray(prior.duals.size), DoubleArray(prior.primal.size))
+                val prior = current ?: assertNotNull(last)
+                FloatLpResult(prior.basis, 0.0, DoubleArray(prior.duals.size), DoubleArray(prior.primal.size),
+                    exactState = solver.solvedExactState)
             } else {
-                solver.resolveBounds(allowance).also { last = it }
+                current.also { last = it }
             }
         }
         val stats = SmtStatsSink()
@@ -451,9 +456,11 @@ class QfLiraSolverLpTest {
 
             assertTrue(queries > before)
             assertEquals(0, stats.snapshot().completeSearchMinUnassignedBooleans)
-            assertEquals(1L, stats.snapshot().completeSearchStages?.get("RECOVERY_SOURCE_REFUTED"))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("RECOVERY_SOURCE_REFUTED"),
+                "queries=$queries stages=${stats.snapshot().completeSearchStages} " +
+                    "outcomes=${stats.snapshot().completeSearchLinearOutcomes}")
             assertIs<ComponentCheck.Infeasible>(session.check())
-            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertNull(session.model().valueOf<Any>(component))
         }
     }
 
