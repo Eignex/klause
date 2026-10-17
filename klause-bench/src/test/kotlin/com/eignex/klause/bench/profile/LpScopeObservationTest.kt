@@ -348,11 +348,17 @@ class LpScopeObservationTest {
             generation = generation, numericalOwner = numerical,
         )
 
-        fun enter(method: LpScopeObservation.Method, candidate: LpScopeObservation.Shape? = null, append: Boolean = true) {
+        fun enter(
+            method: LpScopeObservation.Method,
+            candidate: LpScopeObservation.Shape? = null,
+            append: Boolean = true
+        ) {
             observer.ledger(method, true)
             observer.enter(
                 method, owner, state(), controls, clock++, 1L,
-                LpScopeObservation.Shapes(LpScopeObservation.Shape(model, matrix, rows, matrix.size + rows), candidate, append),
+                LpScopeObservation.Shapes(
+                    LpScopeObservation.Shape(model, matrix, rows, matrix.size + rows), candidate, append
+                ),
             )
         }
 

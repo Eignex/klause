@@ -238,7 +238,9 @@ internal class LpScopeObservation(
             matchedEntries++
             priorKinds[origin.kind] = priorKinds.getValue(origin.kind) + 1L
         }
-        owner.frames.addLast(Frame(method, Stamp(state), controls, origin, owner.serial, owner.binding, now, match, replacement))
+        owner.frames.addLast(
+            Frame(method, Stamp(state), controls, origin, owner.serial, owner.binding, now, match, replacement)
+        )
         if (method != Method.PUSH) {
             owner.origin = null
         }
@@ -346,7 +348,8 @@ internal class LpScopeObservation(
         val replacementEntries = shapeCells.filterNotNull().sumOf { it.entries }
         val replacementReturns = shapeCells.filterNotNull().sumOf { it.accepted + it.rejected }
         val complete = replacementEntries == entries[Method.REPLACE.ordinal] &&
-            replacementReturns == returns[Method.REPLACE.ordinal] && !disabled && unmatched.values.all { it == 0L } && missingRootCandidates == 0L &&
+            replacementReturns == returns[Method.REPLACE.ordinal] && !disabled &&
+            unmatched.values.all { it == 0L } && missingRootCandidates == 0L &&
             owners.all { it.frames.isEmpty() }
         return linkedMapOf(
             "status" to if (complete) "COMPLETE" else "INCONCLUSIVE",

@@ -116,7 +116,8 @@ class LpScopeObservationAgentTest {
                     "replace",
                     MethodTypeDesc.of(
                         ConstantDescs.CD_boolean,
-                        if (suffix == "ReplaceDescriptor") objectType else ClassDesc.of("com.eignex.klause.lp.engine.LpBoundTrail"),
+                        if (suffix == "ReplaceDescriptor") objectType else
+                            ClassDesc.of("com.eignex.klause.lp.engine.LpBoundTrail"),
                         ClassDesc.of("com.eignex.klause.util.Cancellation"),
                         ConstantDescs.CD_boolean,
                         ClassDesc.of("com.eignex.klause.lp.engine.LpLayoutRemap"),
