@@ -2744,6 +2744,13 @@ Pipeline caller charges include source/search preparation and are separate from
 the native arithmetic snapshot. This mode does not render a CLI model or independently
 validate a source witness. Keep ordinary CLI records for publication/control evidence.
 
+Add `cpuSamples=true` with `pipeline=true` to record execution samples inside the
+measured child JVM. Each input writes `cpu.jfr` and `cpu-summary.txt` using the
+existing profiler's phase, self-sample and caller summaries. The recording covers
+source admission, preparation and solving; corpus fetch is outside it. Recording
+setup and summary generation are outside the unchanged containing solve deadline.
+Samples provide CPU attribution, not independent verdict or witness validation.
+
 ### Table profiling
 
 ```sh

@@ -7,6 +7,10 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.bench.tools.ProfileConfig
+import com.eignex.klause.bench.tools.ProfileEvent
+import com.eignex.klause.bench.tools.ProfileScope
+import com.eignex.klause.bench.tools.Profiler
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -23,6 +27,7 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import java.io.File
+import java.io.PrintStream
 import java.lang.management.ManagementFactory
 import java.util.Base64
 import kotlin.coroutines.cancellation.CancellationException
@@ -34,11 +39,16 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..3 && args[0].startsWith("request64="))
+        require(args.size in 1..4 && args[0].startsWith("request64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs") })
+        require(options.size == args.size - 1 && options.keys.all {
+            it in setOf("pipeline", "timeoutMs", "cpuSamples")
+        })
         require(options["pipeline"] == null || options["pipeline"] == "true")
         val pipelineMode = options["pipeline"] == "true"
+        require(options["cpuSamples"] == null || options["cpuSamples"] == "true")
+        val cpuSamples = options["cpuSamples"] == "true"
+        require(!cpuSamples || pipelineMode) { "cpuSamples requires pipeline=true" }
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
         require(timeoutMs > 0)
         val encoded = args[0].substringAfter('=')
@@ -61,6 +71,7 @@ internal object PolynomialPhaseProfile {
             "containingTimeoutMs" to timeoutMs.toString(),
             "maximumWork" to "null",
             "representationLimits" to "default",
+            "cpuSamples" to cpuSamples.toString(),
             "route" to if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
                 else "direct normalized QfNraQuery; separate gate inspection",
         )))
@@ -74,7 +85,14 @@ internal object PolynomialPhaseProfile {
             directory.resolve("source.smt2").writeBytes(bytes)
             val text = bytes.decodeToString()
             if (pipelineMode) {
-                directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text, timeoutMs)))
+                val recording = directory.resolve("cpu.jfr")
+                val trace = if (cpuSamples) Profiler.record(ProfileConfig(
+                    event = ProfileEvent.CPU, scope = ProfileScope.ALL, outFile = recording,
+                )) { pipeline(text, timeoutMs) } else pipeline(text, timeoutMs)
+                directory.resolve("pipeline.json").writeText(Json.encodeToString(trace))
+                if (cpuSamples) PrintStream(directory.resolve("cpu-summary.txt")).use {
+                    Profiler.summarizeCli(recording, it)
+                }
             } else {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
