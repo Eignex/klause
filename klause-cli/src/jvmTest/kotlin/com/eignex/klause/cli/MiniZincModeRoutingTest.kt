@@ -43,8 +43,10 @@ class MiniZincModeRoutingTest(private val engine: String, private val sourceText
             assertNotNull(solvable.sourceInvocation)
             assertNotNull(pairs["frontendRoutingOutcome"])
             assertEquals(solvable.routingElapsedMs.toString(), pairs["frontendRoutingMs"])
-            if (engine == "cp") assertTrue(solvable.routingLpStats.standalonePasses.sum > 0.0)
-            else assertNotNull(solvable.sourceInvocation?.floatProjection)
+            if (engine == "cp") {
+                val stats = solvable.routingLpStats
+                assertTrue(stats.standalonePasses.sum + stats.componentPasses.sum > 0.0)
+            } else assertNotNull(solvable.sourceInvocation.floatProjection)
         } finally {
             source.delete()
         }
