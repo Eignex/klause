@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.LinearSourceIndicator
 import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.LinearSourceProblem
@@ -59,14 +60,22 @@ class LinearSourceExecutionTest {
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
-                nodeBudget = com.eignex.klause.backtrack.NodeBudget(100),
+                nodeBudget = NodeBudget(100),
                 solveBudgetMillis = null, allSolutions = false, solutionCap = null,
                 deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
             )
         }))
 
+        val finite = assertIs<SourceExecutionResult.Finite>(result)
+        val completed = assertIs<FiniteSolveOutcome.Completed>(finite.result.outcome)
         val outcome = assertNotNull(result.linearSource)
-        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
+        val diagnostic = "native=${outcome.nativeConclusion}, source=${outcome.conclusion}, " +
+            "nominal=${outcome.nominalSourceExact}, coverage=${outcome.claimsCoverTolerance}, " +
+            "unrestricted=${outcome.nativeClaimsUnrestricted}, exact=${outcome.incumbent?.exact}, " +
+            "values=${outcome.incumbent?.values}, objective=${outcome.incumbent?.objective}, " +
+            "arms=${completed.stats.portfolio.arms}"
+        assertEquals(FiniteSolveVerdict.OPTIMAL, completed.verdict, diagnostic)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion, diagnostic)
         assertEquals(listOf(BigFraction.ofLong(5), BigFraction.ONE), outcome.incumbent?.values)
         assertEquals(BigFraction.ofLong(5), outcome.incumbent?.objective)
     }
@@ -89,7 +98,7 @@ class LinearSourceExecutionTest {
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
-                nodeBudget = com.eignex.klause.backtrack.NodeBudget(100),
+                nodeBudget = NodeBudget(100),
                 solveBudgetMillis = null, allSolutions = false, solutionCap = null,
                 deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
             )
