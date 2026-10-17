@@ -24,7 +24,9 @@ internal object JvmBytecodeInputs {
         for (input in specification.inputs) {
             require(input.id.length in 1..4096 && input.id.none(Char::isISOControl) && ids.add(input.id))
             require(input.kind in setOf("jars", "runtime-image"))
-            require(input.sourceHead.matches(Regex("[0-9a-f]{40}")))
+            require(input.studySourceHeads.size in 1..16)
+            require(input.studySourceHeads.toSet().size == input.studySourceHeads.size)
+            require(input.studySourceHeads.all { it.matches(Regex("[0-9a-f]{40}")) })
             require(input.root.length in 1..4096 && input.root.none(Char::isISOControl))
             val root = File(input.root)
             require(root.isAbsolute && root.normalize().path == root.path && roots.add(root.path))
@@ -36,7 +38,9 @@ internal object JvmBytecodeInputs {
             }
             if (input.kind == "runtime-image") {
                 require(input.files.keys.containsAll(listOf("lib/modules", "lib/jrt-fs.jar", "release")))
-            } else require(input.files.keys.any { it.endsWith(".jar") })
+            } else {
+                require(input.files.keys.any { it.endsWith(".jar") })
+            }
         }
         require(specification.inputs.sumOf { it.files.size } <= MAX_FILES)
         require(specification.inputs.sumOf { input -> input.files.values.sumOf { it.bytes } } <= MAX_INPUT_BYTES)
@@ -84,9 +88,13 @@ internal object JvmBytecodeInputs {
         while (index < text.length) {
             when (text[index]) {
                 '{' -> frames.addLast(BytecodeJsonKeys())
+
                 '[' -> frames.addLast(null)
+
                 '}', ']' -> if (frames.isNotEmpty()) frames.removeLast()
+
                 ',' -> frames.lastOrNull()?.expectKey = true
+
                 '"' -> {
                     val start = index++
                     while (index < text.length && text[index] != '"') {
@@ -115,7 +123,7 @@ internal data class JvmBytecodeSpecification(val schema: Int, val inputs: List<J
 internal data class JvmBytecodeInput(
     val id: String,
     val kind: String,
-    val sourceHead: String,
+    val studySourceHeads: List<String>,
     val root: String,
     val files: Map<String, CaptureFile>,
 )

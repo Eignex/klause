@@ -10,10 +10,25 @@ import kotlinx.serialization.json.jsonObject
 internal object JvmBytecodeEncoding {
     const val ENCODING = "bytecode-columns-v1"
     val columns = linkedMapOf(
-        "constantPool" to listOf("index", "tag", "width", "references", "bootstrapIndex", "methodHandleKind",
-            "symbolicText"),
-        "instructions" to listOf("bci", "opcode", "byteLength", "constantPoolIndex", "localIndex", "branchTargets",
-            "switchPaddingBytes", "subroutineReturnTargetUnresolved"),
+        "constantPool" to listOf(
+            "index",
+            "tag",
+            "width",
+            "references",
+            "bootstrapIndex",
+            "methodHandleKind",
+            "symbolicText",
+        ),
+        "instructions" to listOf(
+            "bci",
+            "opcode",
+            "byteLength",
+            "constantPoolIndex",
+            "localIndex",
+            "branchTargets",
+            "switchPaddingBytes",
+            "subroutineReturnTargetUnresolved",
+        ),
         "branchTargets" to listOf("kind", "bci", "caseKey"),
         "exceptionHandlers" to listOf("startBci", "endBciExclusive", "handlerBci", "catchType"),
         "lineNumberTables" to listOf("startPc", "lineNumber", "instructionBoundary"),
@@ -31,9 +46,13 @@ internal object JvmBytecodeEncoding {
 
     private fun transform(value: JsonElement, encode: Boolean): JsonElement = when (value) {
         is JsonArray -> JsonArray(value.map { transform(it, encode) })
-        is JsonObject -> JsonObject(value.mapValues { (key, child) ->
+
+        is JsonObject -> JsonObject(
+            value.mapValues { (key, child) ->
             val names = columns[key]
-            if (names == null) transform(child, encode) else {
+            if (names == null) {
+                transform(child, encode)
+            } else {
                 fun row(input: JsonElement): JsonElement = if (encode) {
                     val fields = transform(input, true).jsonObject
                     require(fields.keys.toList() == names) { "Unexpected bytecode record columns" }
@@ -43,11 +62,15 @@ internal object JvmBytecodeEncoding {
                     require(fields.size == names.size) { "Unexpected bytecode record width" }
                     transform(JsonObject(names.mapIndexed { index, name -> name to fields[index] }.toMap()), false)
                 }
-                JsonArray(child.jsonArray.map { input ->
+                JsonArray(
+                    child.jsonArray.map { input ->
                     if (key == "lineNumberTables") JsonArray(input.jsonArray.map(::row)) else row(input)
-                })
+                }
+                )
             }
-        })
+        }
+        )
+
         else -> value
     }
 }

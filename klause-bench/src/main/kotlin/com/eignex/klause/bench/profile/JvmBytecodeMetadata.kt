@@ -7,8 +7,8 @@ import java.lang.classfile.ClassFile
 import java.lang.classfile.Opcode
 import java.lang.classfile.attribute.CodeAttribute
 import java.lang.classfile.constantpool.ClassEntry
-import java.lang.classfile.constantpool.ConstantPool
 import java.lang.classfile.constantpool.ConstantDynamicEntry
+import java.lang.classfile.constantpool.ConstantPool
 import java.lang.classfile.constantpool.DynamicConstantPoolEntry
 import java.lang.classfile.constantpool.PoolEntry
 
@@ -34,24 +34,38 @@ internal object JvmBytecodeMetadataReader {
                     }
                 }
             }
-            JvmMethodBytecode(index, method.methodName().stringValue(), method.methodType().stringValue(),
-                method.flags().flagsMask(), method.attributes().map { it.attributeName().stringValue() }, code)
+            JvmMethodBytecode(
+                index,
+                method.methodName().stringValue(),
+                method.methodType().stringValue(),
+                method.flags().flagsMask(),
+                method.attributes().map { it.attributeName().stringValue() },
+                code,
+            )
         }
         val bootstraps = (0 until pool.bootstrapMethodCount()).map { index ->
             val entry = pool.bootstrapMethodEntry(index)
             require(entry.bsmIndex() == index)
             JvmBytecodeBootstrap(index, entry.bootstrapMethod().index(), entry.arguments().map { it.index() })
         }
-        return JvmBytecodeMetadata(model.thisClass().asInternalName(), CaptureFile(bytes.size.toLong(), sha256(bytes)),
+        return JvmBytecodeMetadata(
+            model.thisClass().asInternalName(), CaptureFile(bytes.size.toLong(), sha256(bytes)),
             model.majorVersion(), model.minorVersion(), model.flags().flagsMask(),
             model.superclass().map { it.asInternalName() }.orElse(null),
             model.interfaces().map { it.asInternalName() }, model.attributes().map { it.attributeName().stringValue() },
             model.findAttributes(Attributes.sourceFile()).map { it.sourceFile().stringValue() },
             pool.size(), JvmBytecodeSymbols.read(pool), bootstraps,
             model.fields().mapIndexed { index, field ->
-                JvmBytecodeField(index, field.fieldName().stringValue(), field.fieldType().stringValue(),
-                    field.flags().flagsMask(), field.attributes().map { it.attributeName().stringValue() })
-            }, methods)
+                JvmBytecodeField(
+                    index,
+                    field.fieldName().stringValue(),
+                    field.fieldType().stringValue(),
+                    field.flags().flagsMask(),
+                    field.attributes().map { it.attributeName().stringValue() },
+                )
+            },
+                methods,
+        )
     }
 
     private fun readCode(code: CodeAttribute, pool: ConstantPool): JvmMethodCode {
@@ -76,8 +90,15 @@ internal object JvmBytecodeMetadataReader {
                 JvmBytecodeLine(line.startPc(), line.lineNumber(), line.startPc() in starts)
             }
         }
-        return JvmMethodCode(CaptureFile(bytes.size.toLong(), sha256(bytes)), code.maxStack(), code.maxLocals(),
-            code.attributes().map { it.attributeName().stringValue() }, lines, instructions, handlers)
+        return JvmMethodCode(
+            CaptureFile(bytes.size.toLong(), sha256(bytes)),
+            code.maxStack(),
+            code.maxLocals(),
+            code.attributes().map { it.attributeName().stringValue() },
+            lines,
+            instructions,
+            handlers,
+        )
     }
 
     @Suppress("CyclomaticComplexMethod")
@@ -85,16 +106,31 @@ internal object JvmBytecodeMetadataReader {
         val tag = entry.tag()
         val allowed = when (Opcode.valueOf(instruction.opcode)) {
             Opcode.GETSTATIC, Opcode.PUTSTATIC, Opcode.GETFIELD, Opcode.PUTFIELD -> setOf(PoolEntry.TAG_FIELDREF)
+
             Opcode.INVOKEVIRTUAL -> setOf(PoolEntry.TAG_METHODREF)
+
             Opcode.INVOKESPECIAL, Opcode.INVOKESTATIC ->
                 setOf(PoolEntry.TAG_METHODREF, PoolEntry.TAG_INTERFACE_METHODREF)
+
             Opcode.INVOKEINTERFACE -> setOf(PoolEntry.TAG_INTERFACE_METHODREF)
+
             Opcode.INVOKEDYNAMIC -> setOf(PoolEntry.TAG_INVOKE_DYNAMIC)
+
             Opcode.NEW, Opcode.ANEWARRAY, Opcode.CHECKCAST, Opcode.INSTANCEOF, Opcode.MULTIANEWARRAY ->
                 setOf(PoolEntry.TAG_CLASS)
-            Opcode.LDC, Opcode.LDC_W -> setOf(PoolEntry.TAG_INTEGER, PoolEntry.TAG_FLOAT, PoolEntry.TAG_STRING,
-                PoolEntry.TAG_CLASS, PoolEntry.TAG_METHOD_TYPE, PoolEntry.TAG_METHOD_HANDLE, PoolEntry.TAG_DYNAMIC)
+
+            Opcode.LDC, Opcode.LDC_W -> setOf(
+                PoolEntry.TAG_INTEGER,
+                PoolEntry.TAG_FLOAT,
+                PoolEntry.TAG_STRING,
+                PoolEntry.TAG_CLASS,
+                PoolEntry.TAG_METHOD_TYPE,
+                PoolEntry.TAG_METHOD_HANDLE,
+                PoolEntry.TAG_DYNAMIC,
+            )
+
             Opcode.LDC2_W -> setOf(PoolEntry.TAG_LONG, PoolEntry.TAG_DOUBLE, PoolEntry.TAG_DYNAMIC)
+
             else -> error("Unexpected constant pool operand")
         }
         require(tag in allowed) { "Constant pool operand has the wrong kind" }

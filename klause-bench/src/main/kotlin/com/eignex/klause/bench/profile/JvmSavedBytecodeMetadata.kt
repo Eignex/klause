@@ -24,9 +24,11 @@ internal object JvmSavedBytecodeMetadata {
             InstalledBuild.writeManifest(provenance, observer, runtime)
             val execution = runCatching {
                 val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
-                for (name in listOf("JvmSavedBytecodeMetadata.kt", "JvmBytecodeInputs.kt", "JvmBytecodeInventory.kt",
+                for (name in listOf(
+                    "JvmSavedBytecodeMetadata.kt", "JvmBytecodeInputs.kt", "JvmBytecodeInventory.kt",
                     "JvmBytecodeReport.kt", "JvmBytecodeEncoding.kt", "JvmBytecodeMetadata.kt", "JvmBytecodeSymbols.kt",
-                    "JvmBytecodeLayout.kt", "JvmRuntimeImage.kt", "ProfileCaptureArchive.kt")) {
+                    "JvmBytecodeLayout.kt", "JvmRuntimeImage.kt", "ProfileCaptureArchive.kt",
+                )) {
                     File(root, "klause-bench/src/main/kotlin/com/eignex/klause/bench/profile/$name")
                         .copyTo(File(out, name))
                 }
@@ -44,7 +46,9 @@ internal object JvmSavedBytecodeMetadata {
             }
             execution.exceptionOrNull()?.let { failure -> preservation.exceptionOrNull()?.let(failure::addSuppressed) }
             val available = execution.getOrNull()?.get("allClassMetadataAvailable") == JsonPrimitive(true)
-            Reports.writeJson(File(out, "completion.json").path, buildJsonObject {
+            Reports.writeJson(
+                File(out, "completion.json").path,
+                buildJsonObject {
                 execution.getOrNull()?.forEach { (name, value) -> put(name, value) }
                 put("completed", execution.isSuccess && preservation.isSuccess && available)
                 put("errorType", (execution.exceptionOrNull() ?: preservation.exceptionOrNull())?.javaClass?.name)
@@ -56,7 +60,8 @@ internal object JvmSavedBytecodeMetadata {
                 put("fullSourcePhaseCoverageProven", false)
                 put("compilerElapsedTimeProven", false)
                 put("acceptedSavingsCredit", false)
-            })
+            }
+            )
             execution.getOrThrow()
             preservation.getOrThrow()
             check(available) { "Unavailable class metadata remains in the complete inventory" }
@@ -73,8 +78,10 @@ internal object JvmSavedBytecodeMetadata {
         val address = options.getValue("specification")
         require(address.length <= 4096 && address.none(Char::isISOControl))
         val uri = URI(address)
-        require(uri.scheme == "https" && uri.host != null && uri.rawUserInfo == null &&
-            uri.rawQuery == null && uri.rawFragment == null)
+        require(
+            uri.scheme == "https" && uri.host != null && uri.rawUserInfo == null &&
+            uri.rawQuery == null && uri.rawFragment == null
+        )
         return options
     }
 
