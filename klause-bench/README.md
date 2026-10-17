@@ -2793,7 +2793,16 @@ x=0, y=1 and cost 12, including an intermediate value outside its compatibility
 grid. Presence retains extrema 4 and 30. Use `absent-unpinned` with the absent schema
 and `pinAbsent=false` to leave the underlying absent value unconstrained; optional
 decoding still returns null. Every case retains its original SMT constraints for
-independent witness and bound checking.
+independent witness and bound checking. Its shifted-product absent point is outside
+both the intermediate and output compatibility grids, so that private view cannot
+provide a positive absence witness.
+
+The complementary `schema-source-floats-square-v1` inputs retain the same optional
+x with two buckets, y in [0,1], y=x*x and cost 3*x+y+7. The absent source point
+x=0, y=0 has cost 7; the optional value carrier must represent x=0 outside the
+present grid {-1,1}. Present and absent-unpinned extrema are 5 and 11. Use the
+matching schema and source directories, including `pinAbsent=false` for the
+unpinned source, to qualify positive public-helper and decoder behavior.
 The source objective must be affine, with integer Boolean weights/constant fitting
 Long and real coefficients exactly representable in binary64. Other objectives
 decline rather than acquire rounded coefficients. Each execution gets fresh state,
