@@ -2442,6 +2442,39 @@ source refutation, independent witness acceptance or optimization claim.
 
 ### Saved JVM compilation census
 
+`bench.profile.JvmDeclarationBindings` accepts `catalog=`, `catalog-sha256=`,
+`declarations=` and `declarations-sha256=` HTTPS inputs. Its input catalog has
+`schema: 1` and an `inputs` array. Each input supplies a unique `id`, `manifest`,
+`manifestSha256`, `archive`, `rowsMember`, `completionMember` and `inventoryMember`.
+These identify complete published installed-JAR or runtime-image metadata archives.
+Every archive and member is authenticated before any declaration row is read,
+including unselected members. Completion and inventory headers stay verbatim;
+failed declarations and inconsistent inventory counts prevent completion.
+
+The declaration specification has `schema: 1` and a `sources` array. Each source
+supplies a unique `id`, original source `path` and `sha256`, `sourceFile` basename,
+explicit `packages` and a `members` array of unique `id`/`name` queries. Additional
+source headers, phases and obligations stay verbatim. Matching retains every class
+with that source-file attribute in those packages, including all unqueried/private
+members, generated classes and alternate multi-release entries. Package matching
+does not select a class prefix or a successful observed compilation. Rows outside
+the requested files retain original input/entry/row identities and source attributes.
+Every same-named overload remains a candidate for each requested source declaration;
+source types are not erased or guessed. Mangled/generated and accessor names remain
+distinct candidates, absent members stay unavailable, and source-debug/line metadata
+is opaque. Alternative declarations and multiple source-file attributes stay explicit.
+
+This is a declaration concordance, not an ordinary-phase mapping or loaded-source,
+executed-path, inlining, physical-root or cost proof. Source hashes in the supplied
+specification are annotations, not proof of a class's source. Full input archives
+remain recoverable by their public identities. Run this saved-metadata reader on a
+lab worker; it invokes no solver, checker, original JVM or recording exporter.
+Limits are eight archives totalling 2 GiB compressed, 16 GiB expanded per archive,
+100,000 members per archive, 2 GiB staged metadata, 512 MiB per metadata stream,
+100,000 class rows per input, 16 MiB per JSON document/row, 4,096 source entries,
+10,000 source member queries and a 64 MiB complete report. A limit decline is
+negative, and never permits a smaller successful subset or a raised bound.
+
 `com.eignex.klause.bench.profile.JvmCompilationCohortReview` accepts `manifest=`,
 `manifest-sha256=` and `archive=` HTTPS inputs. It authenticates the complete
 original archive and every member before decoding any recording. It extracts
