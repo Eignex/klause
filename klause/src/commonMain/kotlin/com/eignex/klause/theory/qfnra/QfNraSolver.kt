@@ -154,11 +154,12 @@ internal class QfNraQuery(
                     val equations = region.atoms.mapNotNull { (index, truth) ->
                         arithmetic.step()
                         val atom = normalized.atoms[index]
-                        if (atom.relation == PolynomialRelation.EQ && truth ||
-                            atom.relation == PolynomialRelation.NE && !truth
+                        if ((atom.relation == PolynomialRelation.EQ && truth) ||
+                            (atom.relation == PolynomialRelation.NE && !truth)
                         ) atom.polynomial else null
                     }
-                    val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic, equations) {
+                    val order = polynomialVariableOrder(polynomials, realCount, arithmetic)
+                    val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic, equations, order) {
                         val sections = checkNotNull(work.equationalSections)
                         work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
                     }

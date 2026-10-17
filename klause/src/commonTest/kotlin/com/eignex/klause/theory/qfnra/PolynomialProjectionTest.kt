@@ -19,6 +19,29 @@ class PolynomialProjectionTest {
     private val y = Polynomial.variable(1)
 
     @Test
+    fun `a supplied coordinate order retains its projected root change boundary`() {
+        val polynomial = arithmetic.subtract(arithmetic.power(x, 2), y)
+
+        val projection = PolynomialProjection.compute(listOf(polynomial), 2, arithmetic,
+            preferredOrder = intArrayOf(1, 0))
+
+        assertEquals(1, projection.variable(0))
+        assertEquals(0, projection.variable(1))
+        assertTrue(projection.polynomials(0).any {
+            arithmetic.substitute(it, 1, Polynomial.ZERO).isZero
+        })
+    }
+
+    @Test
+    fun `coordinate preferences must be complete permutations`() {
+        for (order in listOf(intArrayOf(0), intArrayOf(0, 0), intArrayOf(0, 2))) {
+            assertFailsWith<IllegalArgumentException> {
+                PolynomialProjection.compute(listOf(x, y), 2, arithmetic, preferredOrder = order)
+            }
+        }
+    }
+
+    @Test
     fun `projection should separate a change in the number of real sections`() {
         val polynomial = arithmetic.subtract(arithmetic.power(y, 2), x)
 

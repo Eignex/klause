@@ -656,7 +656,7 @@ unvisited complete stage remains absent.
 [PolynomialProjection](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
 constructs a complete Collins projection family for rational multivariate
 polynomials. It reads the [exact polynomial kernel](../arithmetic/polynomial.md)
-and owns selection of projection operations and declared variable order.
+and owns selection of projection operations and coordinate order.
 The theory does not materialize finite CP domains or depend on the linear engines.
 
 Within a Boolean region, a true equality or false disequality requires its whole
@@ -683,12 +683,21 @@ returned list do not change captured families. Immutable kernel polynomials may 
 shared. One caller-supplied arithmetic context spans construction; interruption and
 kernel resource stops propagate without publishing a partial family.
 
-Construction eliminates total graph coordinates when available, otherwise the
-highest remaining source coordinate. It stores one polynomial family per lifting
+Construction eliminates total graph coordinates when available, otherwise follows
+the captured coordinate preference. Complete queries rank the original region
+boundaries by the sum of degrees in each coordinate, then peak degree and number
+of monomials containing it. Smaller scores eliminate first, with descending source
+ID resolving ties. This preference changes no polynomial, declared coordinate,
+optional admission or numeric coverage. Its construction shares the original
+arithmetic and cancellation owner. The projection helper accepts a complete
+permutation; its unspecified preference is descending source-ID elimination.
+
+Projection stores one polynomial family per lifting
 level, containing boundaries involving that level's coordinate after later levels
 have been removed. Lower-level polynomials carry through elimination. An absent
 dimension retains an empty family. The univariate family occupies the first
-lifting level. Without equality sections, this is ascending source-ID lifting.
+lifting level. Equality sections can override the preference while retaining all
+their coordinate dependencies at earlier lifting levels.
 
 For each eliminated top-variable family, the projection contains all coefficient
 polynomials, every principal subresultant coefficient of each nonconstant reductum

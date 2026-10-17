@@ -12,9 +12,28 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
+    @Test
+    fun `degree ordered complete projection retains original inequality coordinates`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (> x0 (* x1 x1)) (> x1 0) (> x0 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val x = assertNotNull(witness.realValue(0).rational)
+        val y = assertNotNull(witness.realValue(1).rational)
+        assertEquals(33, witness.realCount)
+        assertTrue(y > BigFraction.ZERO)
+        assertTrue(x > y * y)
+        for (variable in 2..32) assertEquals(BigFraction.ZERO, witness.realValue(variable).rational)
+    }
+
     @Test
     fun `containing work exhaustion withholds a completed equality conflict`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }

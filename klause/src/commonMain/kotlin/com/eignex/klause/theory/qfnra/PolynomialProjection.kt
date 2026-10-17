@@ -34,8 +34,9 @@ internal class PolynomialProjection private constructor(
             variableCount: Int,
             arithmetic: PolynomialArithmetic,
             requiredZeroes: List<Polynomial> = emptyList(),
+            preferredOrder: IntArray? = null,
         ): PolynomialProjection {
-            val pending = prepare(polynomials, variableCount, arithmetic, requiredZeroes)
+            val pending = prepare(polynomials, variableCount, arithmetic, requiredZeroes, preferredOrder)
             while (true) pending.next()?.let { return it }
         }
 
@@ -44,6 +45,7 @@ internal class PolynomialProjection private constructor(
             variableCount: Int,
             arithmetic: PolynomialArithmetic,
             requiredZeroes: List<Polynomial> = emptyList(),
+            preferredOrder: IntArray? = null,
             onSection: () -> Unit = {},
         ): Iterator<PolynomialProjection?> = sequence {
             require(variableCount >= 0)
@@ -59,6 +61,14 @@ internal class PolynomialProjection private constructor(
             val variables = IntArray(variableCount) { it }
             val sections = arrayOfNulls<Polynomial>(variableCount)
             val available = BooleanArray(variableCount) { true }
+            val order = preferredOrder?.copyOf() ?: IntArray(variableCount) { it }
+            require(order.size == variableCount)
+            val seen = BooleanArray(variableCount)
+            for (variable in order) {
+                arithmetic.step()
+                require(variable in 0 until variableCount && !seen[variable])
+                seen[variable] = true
+            }
             val inputs = HashSet<Polynomial>()
             if (requiredZeroes.isNotEmpty()) for (polynomial in polynomials) {
                 arithmetic.step()
@@ -81,11 +91,11 @@ internal class PolynomialProjection private constructor(
                 }
                 equations = projectionFamily(equations, arithmetic)
                 val section = equationalSection(equations, pending, arithmetic)
-                while (fallback >= 0 && !available[fallback]) {
+                while (fallback >= 0 && !available[order[fallback]]) {
                     arithmetic.step()
                     fallback--
                 }
-                val variable = section?.variable ?: fallback
+                val variable = section?.variable ?: order[fallback]
                 check(variable >= 0 && available[variable])
                 variables[level] = variable
                 available[variable] = false
