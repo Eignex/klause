@@ -313,31 +313,37 @@ private class FixedReconstructionVerifier(
     }
     private fun compare(x: Frac128, y: Frac128): Int = sign(minus(x, y))
 
+    private fun withinBounds(column: Int, value: Frac128): Boolean {
+        val bounds = a.bounds[column]
+        bounds.lower?.let {
+            val comparison = compare(value, from(it.number.value))
+            if (comparison < 0 || (comparison == 0 && it.strict)) {
+                pointRejection = classifyPointRejection(column, a.n, comparison == 0 && it.strict)
+                return false
+            }
+        }
+        bounds.upper?.let {
+            val comparison = compare(value, from(it.number.value))
+            if (comparison > 0 || (comparison == 0 && it.strict)) {
+                pointRejection = classifyPointRejection(column, a.n, comparison == 0 && it.strict)
+                return false
+            }
+        }
+        return true
+    }
+
     fun point(primal: List<BigFraction>): ReconstructedPoint? {
         meter.storage(a.size.toLong() * 32L)
         val x = primal.map { from(it) }.toMutableList()
         val slack = a.rhs.map { from(it) }.toMutableList()
+        for (j in x.indices) if (!withinBounds(j, x[j])) return null
         for (j in 0 until a.n) {
             for ((row, coefficient) in a.matrix[j]) slack[row] = minus(slack[row], times(from(coefficient), x[j]))
         }
         x.addAll(slack)
         var value = from(a.constant)
         for (j in x.indices) {
-            val bounds = a.bounds[j]
-            bounds.lower?.let {
-                val compare = compare(x[j], from(it.number.value))
-                if (compare < 0 || (compare == 0 && it.strict)) {
-                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
-                    return null
-                }
-            }
-            bounds.upper?.let {
-                val compare = compare(x[j], from(it.number.value))
-                if (compare > 0 || (compare == 0 && it.strict)) {
-                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
-                    return null
-                }
-            }
+            if (j >= a.n && !withinBounds(j, x[j])) return null
             value = plus(value, times(from(a.costs[j]), x[j]))
         }
         val sourceObjective = plus(times(value, reciprocal(from(a.scale))), from(a.external))

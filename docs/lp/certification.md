@@ -66,6 +66,12 @@ Integer aggregation uses Int128. Rational reconstruction, factors and continuati
 escalate from `Frac128` to `BigFraction`; residual refinement uses `BigFraction`.
 Oversized authority starts wide, and fixed-width overflow restarts the whole
 operation from authority. Failed attempts and precision restarts are charged.
+Fixed-width point reconstruction checks converted structural coordinates against
+their exact bounds before computing logical slacks. Input and right-hand-side
+admission still precede this check. A rejected coordinate rejects only that
+candidate; accepted points require every logical side and the exact objective.
+Early rejection retains spending through the check and avoids charging row
+arithmetic that it does not perform.
 Integer quotient checks reject magnitudes outside the signed result range before
 rounding can wrap an unsigned intermediate. Assignment subproblems track path
 reachability separately from exact costs; unrepresentable residual costs decline

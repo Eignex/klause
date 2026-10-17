@@ -58,6 +58,78 @@ class ReconstructedCertificateTest {
 
         assertNull(result.witness)
         assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+        assertEquals(LpPointRejection.LOGICAL_BOUND, result.pointRejection)
+    }
+
+    @Test
+    fun `a structural bound violation should reject before unrelated row products exceed the bit limit`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(Long.MAX_VALUE), Relation.LE, 1L)
+        }.build(Sense.MINIMIZE)
+
+        val result = verifyRationalCertificate(
+            model,
+            listOf(BigFraction.ofLong(Long.MAX_VALUE)),
+            limits = ReconstructionLimits(maxBits = 64),
+        )
+
+        assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+        assertEquals(LpPointRejection.COLUMN_BOUND, result.pointRejection)
+        assertNull(result.witness)
+        assertNull(result.bound)
+        assertNull(result.conflict)
+    }
+
+    @Test
+    fun `strict structural endpoints should reject before unrelated row products exceed the bit limit`() {
+        val zero = ExactLpNumber.of(0L)
+        val endpoint = ExactLpNumber.of(Long.MAX_VALUE)
+        for (upper in listOf(false, true)) {
+            val side = ExactLpSide(endpoint, strict = true)
+            val source = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, endpoint))),
+                listOf(zero),
+                listOf(
+                    ExactLpColumn(if (upper) ExactLpBounds(upper = side) else ExactLpBounds(lower = side)),
+                    ExactLpColumn(ExactLpBounds()),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(zero, zero)),
+            )
+
+            val result = verifyRationalCertificate(
+                assertNotNull(LpExactState(source).toWorkingModel()),
+                listOf(BigFraction.ofLong(Long.MAX_VALUE)),
+                limits = ReconstructionLimits(maxBits = 64),
+            )
+
+            assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+            assertEquals(LpPointRejection.STRICT_COLUMN_ENDPOINT, result.pointRejection)
+            assertNull(result.witness)
+            assertNull(result.bound)
+            assertNull(result.conflict)
+        }
+    }
+
+    @Test
+    fun `a structural bound violation should retain complete input admission`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, Long.MAX_VALUE)
+        }.build(Sense.MINIMIZE)
+
+        val result = verifyRationalCertificate(
+            model,
+            listOf(BigFraction.ofLong(2L)),
+            limits = ReconstructionLimits(maxBits = 32),
+        )
+
+        assertEquals(ReconstructionDecline.BITS, result.metrics.decline)
+        assertNull(result.pointRejection)
+        assertNull(result.witness)
+        assertNull(result.bound)
+        assertNull(result.conflict)
     }
 
     @Test
