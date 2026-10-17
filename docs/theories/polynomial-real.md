@@ -607,7 +607,14 @@ complete Boolean coverage and numeric refutation of every covered region.
 
 [PolynomialBooleanRegions](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
 uses shared Boolean propagation over the original normalized DAG, treating numeric
-predicates as opaque leaves. Decisions visit source Boolean leaves before numeric
+predicates with remaining variables as opaque leaves. A normalized constant
+polynomial has one exact truth under the query's source pins. Its comparison truth
+is installed before any Boolean decision, including strict and disequal relations
+and their negations. These facts remain on the initial trail across region changes;
+another conditioned query constructs its own facts. They do not select a real point
+or reopen the optional probe.
+
+Decisions visit source Boolean leaves before numeric
 leaves, trying false before true. The bounded optional refuter retains its original
 admission and charged traversal; complete region enumeration does not call it with
 larger limits or reopen optional admission.

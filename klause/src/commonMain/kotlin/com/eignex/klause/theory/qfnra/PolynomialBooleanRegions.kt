@@ -10,13 +10,14 @@ internal data class PolynomialBooleanRegion(val atoms: Map<Int, Boolean>, val bo
 internal class PolynomialBooleanRegions(
     private val nodes: List<FormulaNode>,
     private val root: Int,
+    private val atoms: List<PolynomialAtom>,
     private val arithmetic: PolynomialArithmetic,
 ) {
     private val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
     private val exclusions = ArrayList<List<Literal>>()
 
     fun prepare(): Iterator<PolynomialBooleanRegion?> = sequence<PolynomialBooleanRegion?> {
-        if (!state.initialize()) return@sequence
+        if (!initialize()) return@sequence
         while (true) {
             arithmetic.step()
             if (!propagate()) {
@@ -36,6 +37,20 @@ internal class PolynomialBooleanRegions(
             yield(null)
         }
     }.iterator()
+
+    private fun initialize(): Boolean {
+        if (!state.initialize()) return false
+        // Constant predicates have the same truth in every cell of this conditioned query.
+        for ((index, node) in nodes.withIndex()) {
+            arithmetic.step()
+            if (node !is FormulaNode.Atom) continue
+            val atom = atoms[node.atom]
+            if (atom.polynomial.mainVariable != null) continue
+            val sign = atom.polynomial.terms.firstOrNull()?.coefficient?.signum() ?: 0
+            if (!state.assign(index, if (atom.holds(sign)) TRUE else FALSE)) return false
+        }
+        return true
+    }
 
     private fun propagate(): Boolean {
         while (true) {

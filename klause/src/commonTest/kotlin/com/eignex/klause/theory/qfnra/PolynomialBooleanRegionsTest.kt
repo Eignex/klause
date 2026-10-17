@@ -16,6 +16,82 @@ import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
     @Test
+    fun `constant numeric truth excludes impossible Boolean alternatives before regions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) (assert (or (not (= x0 0)) (and b (= x1 3))))",
+        )
+        val fixed = mapOf(0 to BigFraction.ZERO)
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+            PolynomialCondition(lower = fixed, upper = fixed))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(witness.boolValue(0))
+        assertEquals(BigFraction.ofLong(3), witness.realValue(1).rational)
+        assertEquals(1L, result.stats.booleanTheoryRegions)
+    }
+
+    @Test
+    fun `false constant requirements refute without issuing a numeric region`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) (assert (and (> x0 0) (or b (not b))))",
+        )
+        val fixed = mapOf(0 to BigFraction.ZERO)
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            condition = PolynomialCondition(lower = fixed, upper = fixed))
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(0L, result.stats.booleanTheoryRegions)
+    }
+
+    @Test
+    fun `constant atom truth preserves strict disequal and negated comparison polarity`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val fixed = mapOf(0 to BigFraction.ZERO)
+        for ((operator, rhs, truth) in listOf(
+            Triple("=", "0", true), Triple("distinct", "0", false),
+            Triple("<", "1", true), Triple("<=", "(- 1)", false),
+            Triple(">", "(- 1)", true), Triple(">=", "1", false),
+        )) {
+            val source = SmtLibPolynomial.parse(
+                "$declarations (declare-const b Bool) (assert (or (not ($operator x0 $rhs)) (and b (= x1 3))))",
+            )
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+                QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+                PolynomialCondition(lower = fixed, upper = fixed))
+
+            val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+            assertEquals(truth, witness.boolValue(0), operator)
+            assertEquals(BigFraction.ofLong(if (truth) 3L else 0L), witness.realValue(1).rational, operator)
+        }
+    }
+
+    @Test
+    fun `constant facts retract with numeric source pins`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) (assert (or (not (= x0 0)) (and b (= x1 3))))",
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+
+        service.invocation().use { invocation ->
+            for ((pin, coordinate, bool) in listOf(Triple(0L, 3L, true), Triple(1L, 0L, false), Triple(0L, 3L, true))) {
+                val fixed = mapOf(0 to BigFraction.ofLong(pin))
+                val result = invocation.check(PolynomialCondition(lower = fixed, upper = fixed))
+
+                val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+                assertEquals(BigFraction.ofLong(coordinate), witness.realValue(1).rational)
+                assertEquals(bool, witness.boolValue(0))
+            }
+        }
+    }
+
+    @Test
     fun `a refuted first region does not hide a later numeric root`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
