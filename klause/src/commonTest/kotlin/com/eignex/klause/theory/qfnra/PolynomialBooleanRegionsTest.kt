@@ -27,7 +27,8 @@ class PolynomialBooleanRegionsTest {
         val result = solveQfNra(source.formula, source.boolCount, source.realCount)
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
-        assertEquals(BigFraction.ONE, witness.realValue(0).rational)
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+        assertEquals(0, algebraic.compare(witness.realValue(0), algebraic.rational(BigFraction.ONE)))
     }
 
     @Test
@@ -46,11 +47,16 @@ class PolynomialBooleanRegionsTest {
             QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 25)))
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
-        val x = assertNotNull(witness.realValue(0).rational)
-        val y = assertNotNull(witness.realValue(1).rational)
-        assertEquals(BigFraction.ONE, x * x + y * y)
-        assertTrue(y * y * y + x * x * x != BigFraction.ZERO)
-        assertTrue(y * y * y - x * x * x != BigFraction.ZERO)
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+        val x = witness.realValue(0)
+        val y = witness.realValue(1)
+        val xx = algebraic.multiply(x, x)
+        val yy = algebraic.multiply(y, y)
+        val xxx = algebraic.multiply(xx, x)
+        val yyy = algebraic.multiply(yy, y)
+        assertEquals(0, algebraic.compare(algebraic.add(xx, yy), algebraic.rational(BigFraction.ONE)))
+        assertTrue(algebraic.sign(algebraic.add(yyy, xxx)) != 0)
+        assertTrue(algebraic.sign(algebraic.subtract(yyy, xxx)) != 0)
         assertEquals(33, witness.realCount)
         for (variable in 2..32) assertEquals(BigFraction.ZERO, witness.realValue(variable).rational)
     }
@@ -134,9 +140,10 @@ class PolynomialBooleanRegionsTest {
         val result = solveQfNra(source.formula, source.boolCount, source.realCount)
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
-        val x = assertNotNull(witness.realValue(0).rational)
-        val y = assertNotNull(witness.realValue(1).rational)
-        assertEquals(BigFraction.ONE, x * x + y * y)
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+        val xx = algebraic.multiply(witness.realValue(0), witness.realValue(0))
+        val yy = algebraic.multiply(witness.realValue(1), witness.realValue(1))
+        assertEquals(0, algebraic.compare(algebraic.add(xx, yy), algebraic.rational(BigFraction.ONE)))
     }
 
     @Test
@@ -232,7 +239,8 @@ class PolynomialBooleanRegionsTest {
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(witness.boolValue(0))
         assertEquals(33, witness.realCount)
-        assertEquals(BigFraction.ofLong(2), witness.realValue(0).rational)
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+        assertEquals(0, algebraic.compare(witness.realValue(0), algebraic.rational(BigFraction.ofLong(2))))
         for (variable in 2..32) assertEquals(BigFraction.ZERO, witness.realValue(variable).rational)
         assertEquals(2L, result.stats.booleanTheoryRegions)
         assertEquals(2L, result.stats.equationalSections)
@@ -249,7 +257,8 @@ class PolynomialBooleanRegionsTest {
             QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
-        assertEquals(BigFraction.ofLong(2), witness.realValue(0).rational)
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+        assertEquals(0, algebraic.compare(witness.realValue(0), algebraic.rational(BigFraction.ofLong(2))))
         assertEquals(1L, result.stats.equationalSections)
     }
 
@@ -286,7 +295,9 @@ class PolynomialBooleanRegionsTest {
 
                 val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
                 assertEquals(pin, witness.boolValue(0))
-                assertEquals(BigFraction.ofLong(if (pin) 2L else 3L), witness.realValue(0).rational)
+                val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+                assertEquals(0, algebraic.compare(witness.realValue(0),
+                    algebraic.rational(BigFraction.ofLong(if (pin) 2L else 3L))))
             }
         }
     }

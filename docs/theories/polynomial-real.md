@@ -749,6 +749,11 @@ poll or native charge.
 
 #### Ordinary projection levels
 
+A top family containing only rational univariate polynomials has no lower-coordinate
+boundaries. It carries the lower families unchanged and isolates its roots during
+lifting, including when other declared coordinates are absent from the family.
+Its constant feasibility is decided by those cells without a projection matrix.
+
 For each ordinary eliminated top-variable family, the projection contains all coefficient
 polynomials and every principal subresultant coefficient of each needed nonconstant reductum
 and its derivative, and every principal subresultant coefficient between reducta

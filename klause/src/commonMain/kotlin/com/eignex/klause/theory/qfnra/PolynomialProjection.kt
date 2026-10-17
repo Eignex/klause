@@ -165,6 +165,18 @@ internal class PolynomialProjection private constructor(
                         required.add(equation)
                         if (variable !in equation.variables) lowerEquations.add(equation)
                     }
+                    var independent = true
+                    for (polynomial in top) for (coordinate in polynomial.variables) {
+                        arithmetic.step()
+                        if (coordinate != variable) independent = false
+                    }
+                    if (independent) {
+                        // Rational univariate boundaries contribute no lower-coordinate projection.
+                        equations = lowerEquations
+                        pending = projectionFamily(lower, arithmetic)
+                        yield(null)
+                        continue
+                    }
                     val eliminated = eliminate(top, variable, arithmetic, root?.polynomial, required)
                     var projected: ProjectionElimination? = null
                     while (projected == null) {
