@@ -9,13 +9,13 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.tools.Profiler
-import java.io.File
-import java.io.PrintStream
-import java.util.concurrent.TimeUnit
 import jdk.jfr.consumer.RecordingFile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.io.PrintStream
+import java.util.concurrent.TimeUnit
 
 internal object CliRecordingCapture {
     private const val MAX_SOURCE_BYTES = 16 * 1024 * 1024
@@ -36,10 +36,21 @@ internal object CliRecordingCapture {
         val input = File(out, "input.smt2").apply { writeBytes(bytes) }
         val runtime = File(System.getProperty("java.home")).canonicalFile
         val settings = File(out, "cli.jfc")
-        CompilationStudyBuilds.command(root, out, "jfr-settings", listOf(
-            File(runtime, "bin/jfr").path, "configure", "--input", "profile", "--output", settings.path,
-            "jdk.InitialEnvironmentVariable#enabled=false", "jdk.InitialSystemProperty#enabled=false",
-        ))
+        CompilationStudyBuilds.command(
+            root,
+            out,
+            "jfr-settings",
+            listOf(
+                File(runtime, "bin/jfr").path,
+                "configure",
+                "--input",
+                "profile",
+                "--output",
+                settings.path,
+                "jdk.InitialEnvironmentVariable#enabled=false",
+                "jdk.InitialSystemProperty#enabled=false",
+            ),
+        )
         val recording = File(out, "cli.jfr")
         val launcher = SolverInvocation.klauseCliBin().canonicalFile
         val command = command(request, launcher, input)
@@ -61,22 +72,25 @@ internal object CliRecordingCapture {
         } finally {
             if (process.isAlive) CompilationStudyBuilds.kill(process)
         }
-        Reports.writeJson(File(out, "measurement.json").path, buildJsonObject {
-            put("head", Reports.readGitSha())
-            put("scope", "whole-cli-child-jvm")
-            put("sourceSha256", request.sha256)
-            put("sourceBytes", bytes.size)
-            put("timeoutMs", request.timeout)
-            put("seed", request.seed)
-            put("processors", 1)
-            put("childPid", process.pid())
-            put("exit", process.exitValue())
-            put("watchdog", !completed)
-            put("processElapsedNs", System.nanoTime() - started)
-            put("jvmOptions", environment.getValue("KLAUSE_CLI_OPTS"))
-            put("settingsSha256", sha256(settings.readBytes()))
-            put("ordinaryTimingCredit", false)
-        })
+        Reports.writeJson(
+            File(out, "measurement.json").path,
+            buildJsonObject {
+                put("head", Reports.readGitSha())
+                put("scope", "whole-cli-child-jvm")
+                put("sourceSha256", request.sha256)
+                put("sourceBytes", bytes.size)
+                put("timeoutMs", request.timeout)
+                put("seed", request.seed)
+                put("processors", 1)
+                put("childPid", process.pid())
+                put("exit", process.exitValue())
+                put("watchdog", !completed)
+                put("processElapsedNs", System.nanoTime() - started)
+                put("jvmOptions", environment.getValue("KLAUSE_CLI_OPTS"))
+                put("settingsSha256", sha256(settings.readBytes()))
+                put("ordinaryTimingCredit", false)
+            },
+        )
         check(completed && process.exitValue() == 0) { "Profiled CLI did not finish successfully" }
         check(sha256(input.readBytes()) == request.sha256) { "Measured source changed" }
         check(before == InstalledBuild.capture(launcher, runtime, environment)) { "Installed build changed" }
@@ -93,14 +107,17 @@ internal object CliRecordingCapture {
         }
         check(File(out, "summary.txt").length() <= MAX_SUMMARY_BYTES)
         check(sha256(recording.readBytes()) == digest) { "Recording changed during summarization" }
-        Reports.writeJson(File(out, "recording.json").path, buildJsonObject {
-            put("sha256", digest)
-            put("bytes", recording.length())
-            put("childPid", process.pid())
-            put("sourceSha256", request.sha256)
-            put("summarySha256", sha256(File(out, "summary.txt").readBytes()))
-            put("independentSourceCheck", false)
-        })
+        Reports.writeJson(
+            File(out, "recording.json").path,
+            buildJsonObject {
+                put("sha256", digest)
+                put("bytes", recording.length())
+                put("childPid", process.pid())
+                put("sourceSha256", request.sha256)
+                put("summarySha256", sha256(File(out, "summary.txt").readBytes()))
+                put("independentSourceCheck", false)
+            },
+        )
     }
 
     internal fun parse(args: Array<String>): Request {
@@ -120,32 +137,53 @@ internal object CliRecordingCapture {
     }
 
     internal fun command(request: Request, launcher: File, source: File): List<String> = listOf(
-        launcher.absolutePath, source.absolutePath, "-t", request.timeout.toString(), "-r", request.seed.toString(), "-s",
+        launcher.absolutePath,
+        source.absolutePath,
+        "-t",
+        request.timeout.toString(),
+        "-r",
+        request.seed.toString(),
+        "-s",
     )
 
     internal fun childEnvironment(
-        inherited: Map<String, String>, runtime: File, recording: File, settings: File,
+        inherited: Map<String, String>,
+        runtime: File,
+        recording: File,
+        settings: File,
     ): Map<String, String> = inherited.toMutableMap().apply {
         for (name in listOf("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")) remove(name)
         put("JAVA_HOME", runtime.path)
         put("JAVA_OPTS", "")
-        put("KLAUSE_CLI_OPTS", "$BASE_OPTIONS -XX:StartFlightRecording=filename=${recording.path}," +
-            "settings=${settings.path},dumponexit=true -Xlog:jfr+startup=warning")
+        put(
+            "KLAUSE_CLI_OPTS",
+            "$BASE_OPTIONS -XX:StartFlightRecording=filename=${recording.path}," +
+                "settings=${settings.path},dumponexit=true -Xlog:jfr+startup=warning",
+        )
     }
 
     private fun childIdentity(recording: File): ChildIdentity = RecordingFile(recording.toPath()).use { reader ->
         while (reader.hasMoreEvents()) {
             val event = reader.readEvent()
             if (event.eventType.name == "jdk.JVMInformation") {
-                return@use ChildIdentity(event.getString("javaArguments"), event.getString("jvmArguments"),
-                    if (event.hasField("pid")) event.getLong("pid") else null)
+                return@use ChildIdentity(
+                    event.getString("javaArguments"),
+                    event.getString("jvmArguments"),
+                    if (event.hasField("pid")) event.getLong("pid") else null,
+                )
             }
         }
         error("CLI recording has no JVM identity")
     }
 
     @Serializable
-    internal data class Request(val suite: String, val problem: String, val sha256: String, val timeout: Long, val seed: Long)
+    internal data class Request(
+        val suite: String,
+        val problem: String,
+        val sha256: String,
+        val timeout: Long,
+        val seed: Long,
+    )
 
     @Serializable
     private data class ChildIdentity(val command: String, val options: String, val pid: Long?)
