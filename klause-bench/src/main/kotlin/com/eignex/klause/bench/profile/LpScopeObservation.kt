@@ -38,6 +38,34 @@ internal class LpScopeObservation(
 
     class Shapes(val current: Shape, val candidate: Shape? = null, val append: Boolean = false)
 
+    class Recovery(val decline: String?, val phase: String?, val counters: Map<String, Long>)
+
+    class Certificate(
+        val verdict: String?,
+        val floatOptimal: Boolean?,
+        val witness: Boolean,
+        val bound: Boolean,
+        val recovery: Map<String, Recovery?>,
+    )
+
+    private class RecoveryCell {
+        var present = 0L
+        var absent = 0L
+        val declines = LinkedHashMap<String, Long>()
+        val phases = LinkedHashMap<String, Long>()
+        val counters = LinkedHashMap<String, Long>()
+    }
+
+    private class CertificateCell(
+        val certificate: Certificate,
+        val sourceBound: Boolean,
+        val production: Boolean,
+    ) {
+        var returns = 0L
+        val recovery = listOf("reconstruction", "exactPoint", "refinement", "basisVerification")
+            .associateWith { RecoveryCell() }
+    }
+
     private class ShapeCell {
         var entries = 0L
         var accepted = 0L
@@ -163,6 +191,8 @@ internal class LpScopeObservation(
     private val shapeSamples = ArrayList<Map<String, Any?>>()
     private val shapeRefusals = linkedMapOf("column-budget" to 0L, "snapshot-width" to 0L, "snapshot-count" to 0L)
     private var columnVisits = 0L
+    private val certificateCells = LinkedHashMap<String, CertificateCell>()
+    private var certificateReturns = 0L
 
     private val returnedKinds = linkedMapOf(
         "NULL" to 0L,
@@ -260,6 +290,7 @@ internal class LpScopeObservation(
         acceptedPush: Boolean,
         now: Long,
         shape: Shape? = null,
+        certificate: Certificate? = null,
     ) {
         if (disabled || method == Method.PROPAGATOR) return
         val owner = owner(value) ?: return
@@ -295,6 +326,8 @@ internal class LpScopeObservation(
             }
 
             Method.SOLVE -> {
+                if (certificate == null) fail("missing-certificate-metadata")
+                else recordCertificate(resultKind, certificate, owner.bound, state.production)
                 val duration = (now - frame.started).coerceAtLeast(0L)
                 solveNanos = add(solveNanos, duration)
                 val unchanged = frame.stamp.identity.matches(state.identity) && frame.stamp.sameMath(state) &&
@@ -347,7 +380,8 @@ internal class LpScopeObservation(
         }
         val replacementEntries = shapeCells.filterNotNull().sumOf { it.entries }
         val replacementReturns = shapeCells.filterNotNull().sumOf { it.accepted + it.rejected }
-        val complete = replacementEntries == entries[Method.REPLACE.ordinal] &&
+        val complete = certificateReturns == returns[Method.SOLVE.ordinal] &&
+            replacementEntries == entries[Method.REPLACE.ordinal] &&
             replacementReturns == returns[Method.REPLACE.ordinal] && !disabled &&
             unmatched.values.all { it == 0L } && missingRootCandidates == 0L &&
             owners.all { it.frames.isEmpty() }
@@ -374,10 +408,110 @@ internal class LpScopeObservation(
             "traceDropped" to droppedTrace,
             "trace" to trace.toList(),
             "appendShape" to shapeSnapshot(),
+            "returnedCertificateMetadata" to certificateSnapshot(),
             "ordinaryTimingOrRecoveryCredit" to false,
             "certificateReuseAuthority" to false,
         )
     }
+
+    private fun certificateKind(certificate: Certificate): String? = when (certificate.verdict) {
+        null -> if (certificate.floatOptimal == null && !certificate.witness && !certificate.bound &&
+            certificate.recovery.values.all { it == null }
+        ) "NULL" else null
+        "CERTIFIED_BOUND" -> if (certificate.bound && !certificate.witness) "BOUND" else null
+        "FEASIBLE" -> if (certificate.witness) {
+            if (certificate.bound) "BOTH" else "WITNESS"
+        } else null
+        "ATTAINED_OPTIMUM" -> if (certificate.witness && certificate.bound) "BOTH" else null
+        "INDETERMINATE" -> if (!certificate.witness && !certificate.bound) "NONE" else null
+        "INFEASIBLE", "UNBOUNDED", "TOLERANCE_OPTIMUM" -> "OTHER"
+        else -> null
+    }
+
+    private fun recordCertificate(kind: String, certificate: Certificate, sourceBound: Boolean, production: Boolean) {
+        if (certificateKind(certificate) != kind) {
+            fail("certificate-cohort-mismatch")
+            return
+        }
+        val key = listOf(
+            sourceBound, production, kind, certificate.verdict,
+            certificate.floatOptimal, certificate.witness, certificate.bound,
+        ).joinToString("|")
+        if (key !in certificateCells && certificateCells.size == 128) {
+            fail("certificate-cohort-cap")
+            return
+        }
+        val cell = certificateCells.getOrPut(key) {
+            CertificateCell(Certificate(
+                certificate.verdict, certificate.floatOptimal, certificate.witness, certificate.bound, emptyMap(),
+            ), sourceBound, production)
+        }
+        if (certificate.recovery.keys != cell.recovery.keys) {
+            fail("certificate-metadata-shape")
+            return
+        }
+        certificateReturns++
+        cell.returns++
+        for ((name, recovery) in certificate.recovery) {
+            val detail = cell.recovery.getValue(name)
+            if (recovery == null) {
+                detail.absent++
+            } else {
+                if (recovery.counters.size > 16 || recovery.counters.any { (key, value) ->
+                        key.length !in 1..48 || value < 0L
+                    } || listOfNotNull(recovery.decline, recovery.phase).any { it.length !in 1..48 }
+                ) {
+                    fail("certificate-invalid-scalar")
+                    return
+                }
+                detail.present++
+                countLabel(detail.declines, recovery.decline ?: "NO_DECLINE")
+                countLabel(detail.phases, recovery.phase ?: "NO_PHASE")
+                for ((counter, value) in recovery.counters) {
+                    if (counter !in detail.counters && detail.counters.size == 16) {
+                        fail("certificate-scalar-cap")
+                        return
+                    }
+                    detail.counters[counter] = certificateAdd(detail.counters[counter] ?: 0L, value)
+                }
+            }
+        }
+    }
+
+    private fun countLabel(labels: MutableMap<String, Long>, label: String) {
+        if (label !in labels && labels.size == 32) {
+            fail("certificate-label-cap")
+            return
+        }
+        labels[label] = certificateAdd(labels[label] ?: 0L, 1L)
+    }
+
+    private fun certificateAdd(total: Long, increment: Long): Long = if (increment > Long.MAX_VALUE - total) {
+        fail("certificate-counter-overflow")
+        Long.MAX_VALUE
+    } else total + increment
+
+    private fun certificateSnapshot(): Map<String, Any?> = mapOf(
+        "normalSolveReturns" to certificateReturns,
+        "missingMetadataMeaning" to "unobserved retained result metadata; does not establish an absent attempt",
+        "completeCertifierItinerary" to false,
+        "cohorts" to certificateCells.map { (key, cell) ->
+            mapOf(
+                "key" to key, "sourceBound" to cell.sourceBound, "production" to cell.production,
+                "verdict" to cell.certificate.verdict,
+                "floatOptimal" to cell.certificate.floatOptimal,
+                "witnessPresent" to cell.certificate.witness, "boundPresent" to cell.certificate.bound,
+                "normalReturns" to cell.returns,
+                "recovery" to cell.recovery.mapValues { (_, detail) ->
+                    mapOf(
+                        "present" to detail.present, "absent" to detail.absent,
+                        "declines" to detail.declines.toMap(), "phases" to detail.phases.toMap(),
+                        "counterSums" to detail.counters.toMap(),
+                    )
+                },
+            )
+        },
+    )
 
     private fun shapeEntry(method: Method, owner: Owner, state: State, shapes: Shapes?): ShapeFrame? {
         if (method != Method.REPLACE && method != Method.SOLVE && method != Method.FLOAT) return null

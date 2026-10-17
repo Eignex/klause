@@ -318,12 +318,149 @@ class LpScopeObservationTest {
         assertEquals(listOf("replacement-publication-mismatch"), case.report()["failures"])
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1])
+    fun `certificate cohorts and recovery ledgers should cover every return after trace saturation`(limit: Int) {
+        val case = ObservationCase(LpScopeObservation(traceLimit = limit))
+        val recovery = mapOf(
+            "reconstruction" to LpScopeObservation.Recovery("CANDIDATE", "POINT", mapOf("pointChecks" to 1L)),
+            "exactPoint" to LpScopeObservation.Recovery(null, null, mapOf("checks" to 1L, "witness" to 0L)),
+            "refinement" to LpScopeObservation.Recovery("WORK", null, mapOf("work" to 7L)),
+            "basisVerification" to null,
+        )
+        for (optimal in listOf(null, false, true)) {
+            case.enter(LpScopeObservation.Method.SOLVE)
+            case.returned(LpScopeObservation.Method.SOLVE, "BOUND", metadata = LpScopeObservation.Certificate(
+                "CERTIFIED_BOUND", optimal, false, true, recovery,
+            ))
+        }
+
+        val report = case.report()
+        val metadata = report["returnedCertificateMetadata"] as Map<*, *>
+        val cohorts = metadata["cohorts"] as List<*>
+
+        assertEquals("COMPLETE", report["status"])
+        assertEquals(3L, metadata["normalSolveReturns"])
+        assertEquals(false, metadata["completeCertifierItinerary"])
+        assertEquals(3, cohorts.size)
+        for (entry in cohorts) {
+            val cohort = entry as Map<*, *>
+            val details = cohort["recovery"] as Map<*, *>
+            val refinement = details["refinement"] as Map<*, *>
+            val point = details["exactPoint"] as Map<*, *>
+            assertEquals(1L, cohort["normalReturns"])
+            assertEquals(true, cohort["sourceBound"])
+            assertEquals(true, cohort["production"])
+            assertEquals(mapOf("WORK" to 1L), refinement["declines"])
+            assertEquals(mapOf("work" to 7L), refinement["counterSums"])
+            assertEquals(mapOf("NO_DECLINE" to 1L), point["declines"])
+            assertEquals(1L, (details["basisVerification"] as Map<*, *>)["absent"])
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["binding", "policy"])
+    fun `source binding and production policy should separate returned cohorts`(change: String) {
+        val case = ObservationCase()
+        case.positive()
+        if (change == "binding") case.observer.bind(case.owner, null, null) else case.production = false
+
+        case.positive()
+
+        val metadata = case.report()["returnedCertificateMetadata"] as Map<*, *>
+        val cohorts = metadata["cohorts"] as List<*>
+        assertEquals("COMPLETE", case.report()["status"])
+        assertEquals(2L, metadata["normalSolveReturns"])
+        assertEquals(2, cohorts.size)
+        val field = if (change == "binding") "sourceBound" else "production"
+        assertEquals(setOf(false, true), cohorts.map { (it as Map<*, *>)[field] }.toSet())
+    }
+
+    @Test
+    fun `a normal solve without a metadata observation should be inconclusive`() {
+        val case = ObservationCase()
+        case.enter(LpScopeObservation.Method.SOLVE)
+
+        case.returned(LpScopeObservation.Method.SOLVE, "NULL", metadata = null)
+
+        assertEquals("INCONCLUSIVE", case.report()["status"])
+        assertEquals(listOf("missing-certificate-metadata"), case.report()["failures"])
+    }
+
+    @ParameterizedTest
+    @CsvSource("CERTIFIED_BOUND,NONE,false,false", "FEASIBLE,BOUND,true,false", "UNKNOWN,NONE,false,false")
+    fun `inconsistent returned evidence should refuse its cohort`(
+        verdict: String, kind: String, witness: Boolean, bound: Boolean,
+    ) {
+        val case = ObservationCase()
+        case.enter(LpScopeObservation.Method.SOLVE)
+        val metadata = LpScopeObservation.Certificate(verdict, true, witness, bound,
+            listOf("reconstruction", "exactPoint", "refinement", "basisVerification").associateWith { null })
+
+        case.returned(LpScopeObservation.Method.SOLVE, kind, metadata = metadata)
+
+        assertEquals("INCONCLUSIVE", case.report()["status"])
+        assertEquals(listOf("certificate-cohort-mismatch"), case.report()["failures"])
+    }
+
+    @Test
+    fun `a missing recovery metadata slot should refuse a complete ledger`() {
+        val case = ObservationCase()
+        case.enter(LpScopeObservation.Method.SOLVE)
+
+        case.returned(LpScopeObservation.Method.SOLVE, "BOUND", metadata = LpScopeObservation.Certificate(
+            "CERTIFIED_BOUND", true, false, true, emptyMap(),
+        ))
+
+        assertEquals("INCONCLUSIVE", case.report()["status"])
+        assertEquals(listOf("certificate-metadata-shape"), case.report()["failures"])
+    }
+
+    @Test
+    fun `negative retained counters should make the metadata inconclusive`() {
+        val case = ObservationCase()
+        val recovery = listOf("reconstruction", "exactPoint", "refinement", "basisVerification")
+            .associateWith { if (it == "refinement") LpScopeObservation.Recovery("WORK", null,
+                mapOf("work" to -1L)) else null }
+        case.enter(LpScopeObservation.Method.SOLVE)
+
+        case.returned(LpScopeObservation.Method.SOLVE, "BOUND", metadata = LpScopeObservation.Certificate(
+            "CERTIFIED_BOUND", true, false, true, recovery,
+        ))
+
+        assertEquals("INCONCLUSIVE", case.report()["status"])
+        assertEquals(listOf("certificate-invalid-scalar"), case.report()["failures"])
+    }
+
+    @Test
+    fun `overflowing retained sums should make the metadata inconclusive without wrapping`() {
+        val case = ObservationCase()
+        val recovery = listOf("reconstruction", "exactPoint", "refinement", "basisVerification")
+            .associateWith { if (it == "refinement") LpScopeObservation.Recovery("WORK", null,
+                mapOf("work" to Long.MAX_VALUE)) else null }
+        repeat(2) {
+            case.enter(LpScopeObservation.Method.SOLVE)
+            case.returned(LpScopeObservation.Method.SOLVE, "BOUND", metadata = LpScopeObservation.Certificate(
+                "CERTIFIED_BOUND", true, false, true, recovery,
+            ))
+        }
+
+        val report = case.report()
+
+        assertEquals("INCONCLUSIVE", report["status"])
+        assertEquals(listOf("certificate-counter-overflow"), report["failures"])
+        val cohorts = (report["returnedCertificateMetadata"] as Map<*, *>)["cohorts"] as List<*>
+        val details = (cohorts.single() as Map<*, *>)["recovery"] as Map<*, *>
+        assertEquals(mapOf("work" to Long.MAX_VALUE), (details["refinement"] as Map<*, *>)["counterSums"])
+    }
+
     private class ObservationCase(val observer: LpScopeObservation = LpScopeObservation()) {
         val owner = Any()
         val root = Any()
         val session = Any()
         var context = Any()
         var policy = Any()
+        var production = true
         var factory = Any()
         var model = Any()
         var numerical: Any? = Any()
@@ -345,7 +482,7 @@ class LpScopeObservationTest {
         private fun state() = LpScopeObservation.State(
             identity, model, context, policy, factory,
             revisions.toList(), depth, editAttempts = edits, editSuccesses = successes,
-            generation = generation, numericalOwner = numerical,
+            generation = generation, numericalOwner = numerical, production = production,
         )
 
         fun enter(
@@ -362,11 +499,28 @@ class LpScopeObservationTest {
             )
         }
 
-        fun returned(method: LpScopeObservation.Method, kind: String = "OTHER", push: Boolean = false) {
+        fun returned(
+            method: LpScopeObservation.Method,
+            kind: String = "OTHER",
+            push: Boolean = false,
+            metadata: LpScopeObservation.Certificate? = LpScopeObservation.Certificate(
+                when (kind) {
+                    "BOTH" -> "ATTAINED_OPTIMUM"
+                    "WITNESS" -> "FEASIBLE"
+                    "BOUND" -> "CERTIFIED_BOUND"
+                    "NONE" -> "INDETERMINATE"
+                    "NULL" -> null
+                    else -> "INFEASIBLE"
+                },
+                null, kind in listOf("BOTH", "WITNESS"), kind in listOf("BOTH", "BOUND"),
+                listOf("reconstruction", "exactPoint", "refinement", "basisVerification")
+                    .associateWith { null },
+            ),
+        ) {
             observer.ledger(method, false)
             observer.returned(
                 method, owner, state(), kind, push, clock++,
-                LpScopeObservation.Shape(model, matrix, rows, matrix.size + rows),
+                LpScopeObservation.Shape(model, matrix, rows, matrix.size + rows), metadata,
             )
         }
 

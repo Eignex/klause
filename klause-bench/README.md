@@ -1690,6 +1690,19 @@ coverage, interrupted methods or observation failures make the capture inconclus
 The tool performs no certificate reuse, extra solve or source checking. Instrumented
 counts and elapsed attribution supply no ordinary timing or verdict credit.
 
+Normal scoped solve returns also retain certificate metadata cohorts by result kind,
+verdict, floating-point presence/optimality and witness/bound presence, separated by
+the existing source binding and production-policy observations. Each cohort
+has separate presence, decline, phase and nonnegative counter-sum ledgers for the
+returned reconstruction, exact-point recovery, refinement and basis metadata.
+All returns contribute after the trace prefix fills. Raw allowlisted fields supply
+these observations; no numerical vectors, computed getters or certificate values
+are inspected. Missing metadata means unobserved retained output, not that a
+certifier never ran. The report does not describe the complete certification path.
+Schema mismatches, missing observations, inconsistent cohorts and sum overflow make
+it inconclusive. Work and allocation sums retain their reported modeled units;
+they establish neither physical allocation nor recoverable solve time.
+
 Replacement aggregates retain joint old/candidate structural, row and total widths
 in fixed logarithmic buckets, including calls beyond the trace prefix. Native owner
 presence and the first observed scoped `solve`/`solveFloat` entry are separate phase

@@ -221,6 +221,7 @@ internal object LpScopeObservationAgent {
                 recorder.returned(
                     method, emitter, state, kind, result is Boolean && result, System.nanoTime(),
                     if (method == LpScopeObservation.Method.REPLACE) access.shape(state.model) else null,
+                    if (method == LpScopeObservation.Method.SOLVE) access.certificate(result) else null,
                 )
             } catch (failure: Throwable) {
                 recorder.fail("return:${failure.javaClass.simpleName}")
@@ -353,6 +354,26 @@ internal object LpScopeObservationAgent {
             return accessor.get(value)
         }
 
+        fun certificate(result: Any?): LpScopeObservation.Certificate = LpScopeObservation.Certificate(
+            result?.let { (field(it, "verdict") as Enum<*>).name },
+            result?.let { field(it, "float") }?.let { field(it, "optimal") as Boolean },
+            result?.let { field(it, "witness") } != null,
+            result?.let { field(it, "bound") } != null,
+            recoveryTypes.keys.associateWith { name ->
+                result?.let { field(it, name) }?.let { metadata ->
+                    LpScopeObservation.Recovery(
+                        (field(metadata, "decline") as Enum<*>?)?.name,
+                        if (name in phasedRecovery) (field(metadata, "phase") as Enum<*>).name else null,
+                        recoveryCounters.getValue(name).associateWith { counter ->
+                            if (name == "exactPoint" && counter == "witness") {
+                                if (field(metadata, counter) != null) 1L else 0L
+                            } else number(field(metadata, counter)).also { require(it >= 0L) }
+                        },
+                    )
+                }
+            },
+        )
+
         fun state(owner: Any): LpScopeObservation.State {
             val state = requireNotNull(field(requireNotNull(field(owner, "trail")), "state"))
             val context = requireNotNull(field(owner, "context"))
@@ -438,6 +459,25 @@ internal object LpScopeObservationAgent {
         }
 
         companion object {
+            private val recoveryTypes = linkedMapOf(
+                "reconstruction" to "ReconstructionMetrics",
+                "exactPoint" to "ExactPointRecovery",
+                "refinement" to "LpRefinementMetrics",
+                "basisVerification" to "ExactBasisMetrics",
+            )
+            private val phasedRecovery = setOf("reconstruction", "basisVerification")
+            private val recoveryCounters = mapOf(
+                "reconstruction" to listOf(
+                    "attempts", "pointChecks", "dualChecks", "rayChecks", "pointSuccesses",
+                    "dualSuccesses", "raySuccesses", "work", "allocation",
+                ),
+                "exactPoint" to listOf("witness", "checks", "repairs", "work", "allocation"),
+                "refinement" to listOf(
+                    "eligible", "strictAttempts", "strictWitnesses", "strictConflicts", "rounds",
+                    "witnesses", "conflicts", "work", "allocation",
+                ),
+                "basisVerification" to listOf("eligible", "builds", "solves", "verificationChecks"),
+            )
             val schema = mapOf(
                 "${ENGINE}LpScopedSolver" to listOf(
                     "trail", "context", "closed", "workingActive", "editAttempts",
@@ -457,7 +497,11 @@ internal object LpScopeObservationAgent {
                 ),
                 "${ENGINE}ExactLpModel" to listOf("matrix", "rows", "columns"),
                 "${ENGINE}LpSolveContext" to listOf("certificationPolicy", "engineFactory"),
-                "${ENGINE}CertifiedLpResult" to listOf("witness", "bound", "verdict"),
+                "${ENGINE}CertifiedLpResult" to listOf(
+                    "witness", "bound", "verdict", "float", "reconstruction", "exactPoint",
+                    "refinement", "basisVerification",
+                ),
+                "${ENGINE}FloatLpResult" to listOf("optimal"),
                 "${ENGINE}LpRefinementLimits" to listOf(
                     "maxRounds", "maxAuxiliaries", "maxCoordinates", "maxEntries",
                     "maxBits", "maxWork", "maxAllocation", "maxPivots", "time",
@@ -467,7 +511,10 @@ internal object LpScopeObservationAgent {
                     "maxBits", "maxWork", "maxAllocation", "maxTimeNs", "maxImportPivots", "maxPivots",
                 ),
                 "com.eignex.klause.lp.bounding.LpPropagator" to listOf("owner", "modelKey", "proofContext"),
-            )
+            ) + recoveryTypes.map { (name, type) ->
+                "$ENGINE$type" to (recoveryCounters.getValue(name) + "decline" +
+                    if (name in phasedRecovery) listOf("phase") else emptyList())
+            }
         }
     }
 

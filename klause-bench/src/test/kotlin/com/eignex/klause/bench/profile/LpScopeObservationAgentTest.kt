@@ -79,11 +79,19 @@ class LpScopeObservationAgentTest {
             "methods" to before,
         ))
         val fields = LpScopeObservationAgent.fieldSchema(loader)
-        assertEquals(9, fields.size)
+        assertEquals(14, fields.size)
         assertEquals(
             listOf("matrix:java.util.List", "rows:java.util.List", "columns:java.util.List"),
             fields["com.eignex.klause.lp.engine.ExactLpModel"],
         )
+        assertEquals(listOf("optimal:boolean"), fields["com.eignex.klause.lp.engine.FloatLpResult"])
+        for (type in listOf(
+            "ReconstructionMetrics", "ExactPointRecovery", "LpRefinementMetrics", "ExactBasisMetrics",
+        )) {
+            val metadata = checkNotNull(fields["com.eignex.klause.lp.engine.$type"])
+            assertEquals(1, metadata.count { it.startsWith("decline:") })
+            assertEquals(false, metadata.any { it.startsWith("operations:") || it.startsWith("elapsed:") })
+        }
         println(
             "LP_SCOPE_COMPILED_SCHEMA=" + LpScopeObservationAgent.json(mapOf("classes" to schemas, "fields" to fields)),
         )
