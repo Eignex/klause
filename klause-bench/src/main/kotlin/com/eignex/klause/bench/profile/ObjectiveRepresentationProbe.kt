@@ -165,11 +165,10 @@ internal object ObjectiveRepresentationProbe {
                 val log = File(output, "checker-install.log")
                 val environment = File(output, "checker-venv")
                 require(!environment.exists()) { "Checker environment already exists: $environment" }
-                val create = arrayOf("python3", "-m", "venv", environment.absolutePath)
-                if (runProcess(log, *create, required = false) != 0) {
+                if (runProcess(log, "python3", "-m", "venv", environment.absolutePath, required = false) != 0) {
                     runProcess(log, "sudo", "apt-get", "update")
                     runProcess(log, "sudo", "apt-get", "install", "-y", "python3-venv")
-                    runProcess(log, *create)
+                    runProcess(log, "python3", "-m", "venv", environment.absolutePath)
                 }
                 val python = File(environment, "bin/python").absolutePath
                 runProcess(log, python, "-m", "pip", "install", "-r",
