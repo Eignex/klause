@@ -164,6 +164,17 @@ is bounded and incomplete; a declined convex candidate leaves the image service
 available. Nonlinear constraints, disjunctions and nonconvex objectives cannot
 receive a convex certificate from this adapter.
 
+The complete query can install an optional elimination observer for phase diagnostics.
+It receives the selected coordinate, its boundary family and any selected required
+equation before ordinary projection. It is disabled by default and does not select
+operations or charge native work. Diagnostics retain read-only family references and
+inspect their metadata after the query stops. A separate optional observer receives
+the full private conjunction after completed graph and affine reduction, retaining
+predicate relations before boundary-family construction. It shares the same disabled
+default and reference-only diagnostic contract. A recorded family does not certify a
+completed projection or a source verdict; [benchmark diagnostics](../../klause-bench/README.md#focused-probes)
+owns the trace format and interpretation.
+
 ## Results and proof authority
 
 ### Pipeline and frontend publication
@@ -602,32 +613,212 @@ instrumented queries and does not establish coverage of its unobserved portions.
 These aggregate events identify
 execution stages, not the private cause of a failed proposal or an inner cost clock.
 
-Complete Collins projection followed by exact lifting partitions the real space
-into sign-invariant cells when probing supplies no witness. Refutation requires
-exhaustion of the relevant cells and Boolean alternatives; unsuccessful repairs
-supply no refutation authority. Both witness paths retain the final stop check.
+After the unchanged optional probe, complete traversal enumerates Boolean regions
+before constructing their numeric projection families. Each region is a source
+implicant: assigned Boolean leaves and signed numeric predicates suffice to establish
+the original formula. Numeric truth assignments are premises to check, not witnesses.
+A satisfying result still requires complete exact source checking. Refutation requires
+complete Boolean coverage and numeric refutation of every covered region.
+
+### Boolean regions
+
+[PolynomialBooleanRegions](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
+uses shared Boolean propagation over the original normalized DAG, treating numeric
+predicates with remaining variables as opaque leaves. A normalized constant
+polynomial has one exact truth under the query's source pins. Its comparison truth
+is installed before any Boolean decision, including strict and disequal relations
+and their negations. These facts remain on the initial trail across region changes;
+another conditioned query constructs its own facts. They do not select a real point
+or reopen the optional probe.
+
+Decisions visit source Boolean leaves before numeric
+leaves, trying false before true. The bounded optional refuter retains its original
+admission and charged traversal; complete region enumeration does not call it with
+larger limits or reopen optional admission.
+
+A topological proof scan distinguishes imposed gate truth from a witnessed Boolean
+value. True conjunctions and false disjunctions require all children; a true
+disjunction or false conjunction needs one witnessed decisive child. Negation
+reverses the required truth. An iterative walk captures only the supporting leaf
+literals, preserving shared reference identity. Other leaves are irrelevant within
+that implicant. Each region's numeric family retains the polynomials of its signed
+numeric literals in original atom order.
+
+Private exclusion clauses prevent revisiting emitted leaf cubes, including their
+irrelevant completions. They describe coverage of this traversal and never enter
+shared clause learning or explanation exchange. Exhausting the remaining Boolean
+abstraction covers every source model only when every emitted region was numerically
+refuted. A representation-limited region can be skipped while searching another
+region for SAT, but it permanently withholds global UNSAT. If no witness is found,
+its resource refusal remains UNKNOWN even after Boolean enumeration finishes.
+Containing cancellation or work exhaustion stops the entire query immediately.
+
+Normalization, the single optional prefix, Boolean propagation and exclusions,
+conditional projection, lifting and full source checking share one native arithmetic
+and cancellation owner. Region changes and resumable checkpoints renew no allowance.
+Original real and Boolean counts, fixed source values and the immutable source
+formula remain captured; no region creates finite CP domains or a fresh probe.
+A private counter records issued numeric regions, including constant contradictions;
+another records their selected atom occurrences. Neither counts certified refutations.
+Separate observations count completed constant contradictions and representation
+refusals, retaining the last observed resource kind. That kind describes the last
+instrumented refusal, not an exclusive cause of the whole invocation. These
+observations reuse existing outcomes without another operation, poll or work charge.
+Projection and lifting counts accumulate
+across regions. Invocation snapshots merge observations with saturation, and an
+unvisited complete stage remains absent.
 
 ### Projection families
 
 [PolynomialProjection](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
-constructs a complete Collins projection family for rational multivariate
-polynomials. It reads the [exact polynomial kernel](../arithmetic/polynomial.md)
-and owns selection of projection operations and declared variable order.
+constructs complete projection families for rational multivariate polynomials,
+restricted by the region's required equalities when justified root sections are
+available. Ordinary levels use Collins projection. The component reads the
+[exact polynomial kernel](../arithmetic/polynomial.md) and owns selection of
+projection operations and coordinate order.
 The theory does not materialize finite CP domains or depend on the linear engines.
+
+Each complete Boolean region first substitutes its total required-equation graph
+sections using the same graph-selection primitive as projection, preserving every
+remaining predicate's relation. Satisfied zero predicates are discharged; false zero
+predicates remain contradictions. Completed graphs use the existing section counter,
+including graphs completed before a later interruption or representation decline.
+The region then applies exact affine inequality elimination to the exposed constraints.
+A coordinate qualifies only when every occurrence is a pure linear monomial with a
+nonzero rational coefficient in an inequality. Occurrences in equalities,
+disequalities, powers or variable coefficients retain that coordinate for CAD.
+For every lower/upper bound pair, elimination requires the upper polynomial minus
+the lower polynomial to be nonnegative, strictly positive when either bound is strict. One-sided fibres
+need no remaining inequality. A coordinate is selected only when these pairs do not
+increase the active constraint count; every completed step removes one coordinate
+from that conjunction. All work and suspension checkpoints use the same query owner.
+
+CAD receives the equivalent reduced conjunction with the original real count and
+the region's source Boolean assignment. After a reduced witness, stored graph and
+interval fibres are reconstructed together in reverse order. A graph evaluates its
+polynomial at the reconstructed remaining coordinates. Exact algebraic maxima/minima determine an interval;
+coincident weak endpoints retain their exact value, and nonempty open intervals use
+certified rational interior samples, including one-sided unbounded intervals.
+Every original coordinate remains in the reconstructed assignment. The original
+normalized formula receives the ordinary full source check before publication.
+Incomplete elimination or reconstruction cannot publish a partial witness or
+establish exhaustion. The optional probe runs once on its original scope before
+these complete transformations; no reduced conjunction re-enters its admission.
+
+Boundary canonicalization separates a polynomial's common monomial into its distinct
+coordinate factors and the remaining primitive polynomial, then removes duplicate
+boundaries. Sign invariance of those factors preserves the original product's sign,
+including every zero-coordinate fibre and odd or repeated powers. This applies to
+initial boundaries, graph substitutions and projected families under the same
+arithmetic owner. Required-zero equations and retained required-nonzero polynomials
+stay whole in the boundary family: graph rewrites and necessary resultants refer to
+those complete relations. No product equation becomes simultaneous factor equations.
+Lifting still evaluates every original selected predicate and the full source formula.
+
+Within a Boolean region, a true equality or false disequality requires its whole
+polynomial to vanish. These premises permit total graph sections: a coordinate
+occurring in exactly one pure linear monomial with a nonzero rational coefficient
+is solved as a polynomial in the remaining coordinates. Every region boundary,
+remaining required equation and selected nonzero predicate is substituted before
+further elimination. A nonzero constant required equation or a zero required
+nonzero polynomial refutes that region. Products remain whole equations; a product
+equality alone supplies no factor zero or nonzero premise. Other coordinate
+occurrences remain for subsequent projection; only total rational polynomial
+graphs are substituted.
+
+Projection records a permutation of all original coordinates and any further total graph
+sections. Dependencies in those sections occupy earlier lifting levels. Prefix literal checks
+use those levels rather than source coordinate IDs. Fixed coordinates retain their
+source values; graph coordinates are reconstructed by exact evaluation at the
+selected earlier coordinates. Every original declaration remains in the complete
+assignment and final source check. Section premises belong only to their Boolean
+region and conditioned query. Completed section observations accumulate under the
+same native owner, including sections preceding a later representation refusal;
+they measure completed transformations, not accepted models or region refutations.
 
 The returned family owns its level buffers. Input list mutation and mutation of a
 returned list do not change captured families. Immutable kernel polynomials may be
 shared. One caller-supplied arithmetic context spans construction; interruption and
 kernel resource stops propagate without publishing a partial family.
 
-Variable IDs define ascending lifting order. Construction eliminates variables in
-descending order and stores one polynomial family per declared ID, containing only
-polynomials whose main variable is that ID. Lower-variable polynomials carry through
-elimination. An absent dimension retains an empty family. The univariate family is
-the last projection level.
+Construction eliminates total graph coordinates when available, then selects a
+justified required-root coordinate, otherwise follows the captured coordinate
+preference. Required-root selection prefers the earliest eligible elimination
+coordinate in that preference. Complete queries rank the current reduced region
+boundaries by the sum of degrees in each coordinate, then peak degree and number
+of monomials containing it. Smaller scores eliminate first, with descending source
+ID resolving ties. This preference changes no polynomial, declared coordinate,
+optional admission or numeric coverage. Its construction shares the original
+arithmetic and cancellation owner. The projection helper accepts a complete
+permutation; its unspecified preference is descending source-ID elimination.
 
-For each eliminated top-variable family, the projection contains all coefficient
-polynomials, every principal subresultant coefficient of each nonconstant reductum
+Projection stores one polynomial family per lifting
+level, containing boundaries involving that level's coordinate after later levels
+have been removed. Lower-level polynomials carry through elimination. An absent
+dimension retains an empty family. The univariate family occupies the first
+lifting level. Equality sections can override the preference while retaining all
+their coordinate dependencies at earlier lifting levels.
+
+#### Required root sections
+
+A selected region predicate whose truth excludes zero proves its whole polynomial
+nonzero. Total graph substitutions preserve that premise. Whenever the original
+or rewritten polynomial is one monomial, every coordinate in it is nonzero. For
+example, `z != 0` and `z = x*y` prove both `x != 0` and `y != 0`; a sum supplies
+no such factor inference. Rewritten nonzero constants discharge the premise, and
+zero refutes the region. After ordinary projection eliminates a coordinate,
+predicates involving it stop supplying graph rewrite facts; already proved
+coordinate facts remain valid. These proof facts belong to that Boolean region
+and conditioned query, and reuse the boundary substitutions and native owner.
+Every source predicate remains in the complete source check. A required equality
+can restrict a lifting level to its real roots when its leading coefficient is one nonzero
+rational monomial and every coefficient coordinate has such a source nonzero fact.
+A rational constant leading coefficient needs no additional fact. A coefficient
+sum or an unproved nonzero coordinate supplies no permission to omit a zero fiber.
+
+At that level, projection retains all input coefficients, all principal
+subresultants of the selected equation and its derivative, and all principal
+subresultants between that equation and each other polynomial's needed reducta.
+Other derivatives and pairs of other polynomials are unnecessary on the equation's
+root sections. Coefficient invariance fixes the other polynomials' specialized
+degrees. The selected equation has fixed degree on every admitted base cell;
+its derivative subresultants preserve its root branches, and the pair
+subresultants preserve their intersections with the other polynomials. Their
+signs are therefore invariant on each selected root section. This argument
+retains repeated roots and shared zero factors without a square-free assumption.
+
+Lifting isolates every real root of the selected equation and visits no sectors
+at that level. A specialized degree below the selected degree means the leading
+monomial vanished, contradicting this region's source nonzero premises; that
+fiber has no admissible root frame. A required equation without real roots also
+has an empty frame. Regions without a justified leading coefficient retain full
+ordinary projection and their zero fibers. Graph and root sections both retain
+all original coordinate slots and the final complete source check.
+
+When both full input polynomials are required zeroes, their zeroth principal
+subresultant is a necessary lower equation. This consequence is collected only
+for the full inputs, never for arbitrary reducta. A zero resultant supplies no
+sufficiency claim about common roots. A nonzero rational constant resultant
+refutes the region. Lower equations can enable further graph or root sections;
+a graph that forces a source-proved nonzero coordinate to zero also refutes the
+region. These consequences share the existing arithmetic owner and leave every
+original equation in the final source check.
+
+A nullable counter observes selected required-root levels, including levels
+without a projection operation. It counts neither roots nor accepted proofs or
+models, and aggregates across regions and invocation checks with saturation.
+These observations reuse the existing selection without another operation,
+poll or native charge.
+
+#### Ordinary projection levels
+
+A top family containing only rational univariate polynomials has no lower-coordinate
+boundaries. It carries the lower families unchanged and isolates its roots during
+lifting, including when other declared coordinates are absent from the family.
+Its constant feasibility is decided by those cells without a projection matrix.
+
+For each ordinary eliminated top-variable family, the projection contains all coefficient
+polynomials and every principal subresultant coefficient of each needed nonconstant reductum
 and its derivative, and every principal subresultant coefficient between reducta
 from distinct input polynomials. Equal-degree pairs use the same exact kernel
 operation. Zero and rational constant projections add no boundaries. Projection
@@ -637,12 +828,15 @@ normalization concerns zero loci and does not provide signed source-atom truth.
 Coefficient signs preserve degree and identically-zero specializations over a base
 cell. Subresultant vanishing preserves distinct-root counts and common-root
 structure. Together they preserve delineability, including repeated roots, shared
-roots and vanishing leading coefficients. The complete projection includes all
-reducta rather than relying on a nonvanishing discriminant or leading coefficient.
+roots and vanishing leading coefficients. The reductum list stops at its first
+nonzero rational leading coefficient. That coefficient cannot vanish under any base
+specialization, so lower degrees cannot occur on that fiber. Variable leading
+coefficients retain the degree-loss reducta; the construction assumes no nonzero
+variable coefficient or discriminant.
 
 ### Lifting and truth
 
-Traversal uses an iterative stack in ascending variable order. Each projection
+Traversal uses an iterative stack in ascending projection-level order. Each projection
 polynomial specializes at the exact earlier coordinates. Identically-zero
 specializations add no roots; nonzero constants also add none. Kernel isolation
 supplies every distinct real root, and exact comparison sorts and deduplicates the
@@ -650,17 +844,25 @@ union. Each root is a section sample; kernel rational samples lie strictly insid
 the intervening and unbounded sectors. Empty families still contribute a whole-line
 sector, so every declared dimension receives a coordinate.
 
-At a prefix, only original atoms whose variables are all assigned have definite
-truth. Higher atoms and every Boolean variable remain unknown. A three-valued false
-formula prunes that base cell because those lower signs are invariant throughout
-the cell. No prefix supplies a satisfying result. At a complete sample, exact
-algebraic evaluation decides every atom and iterative Boolean search preserves
-reference correlation. Unused Boolean IDs receive false. The complete assignment
-is checked against the normalized source formula before capture.
+At a prefix, region literals whose numeric variables are all assigned have definite
+truth. A violated literal prunes the base cell because its polynomial belongs to
+that region's sign-invariant family. Higher literals remain unresolved. No prefix
+supplies a satisfying result. An omitted source atom need not have invariant sign;
+the region's Boolean proof establishes source truth independently of it whenever
+all selected literals hold.
 
-Full Collins projection and exhaustive section/sector traversal provide a
-sign-invariant decomposition, including degree loss and nullification. A satisfying
-result requires a complete exact witness; an unsatisfiable result requires exhaustion
-of every unpruned cell and its Boolean alternatives. Root indices in returned
+At a complete region sample, exact algebraic evaluation checks every original atom.
+The region supplies its Boolean leaf assignments; Boolean IDs outside the proof
+receive false. The complete assignment is checked against the original normalized
+formula before capture. It retains every declared numeric coordinate, including
+empty-family dimensions and fixed values.
+
+Ordinary levels exhaust all Collins sections and sectors; required-root levels
+exhaust all real roots under their source premises. Together they refute the
+region's signed numeric conjunction, including admitted degree loss and
+nullification fibers. A source
+UNSAT requires every Boolean region to be covered and numerically refuted; any
+unfinished region withholds that verdict. Both SAT and UNSAT retain the final
+containing stop check. Root indices in returned
 `AlgebraicReal` values identify their rational defining polynomial's distinct roots,
 not the position in a specialized lifting family.

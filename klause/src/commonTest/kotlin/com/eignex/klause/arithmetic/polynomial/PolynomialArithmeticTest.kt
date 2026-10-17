@@ -2,6 +2,7 @@ package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -111,6 +112,46 @@ class PolynomialArithmeticTest {
     }
 
     @Test
+    fun `affine subresultants agree with Sylvester determinants without matrix allocation`() {
+        val z = Polynomial.variable(2)
+        for ((left, right) in listOf(
+            arithmetic.add(arithmetic.multiply(y, x), Polynomial.ONE) to
+                arithmetic.add(arithmetic.multiply(y, x), constant(2)),
+            arithmetic.add(arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), x),
+                arithmetic.subtract(arithmetic.power(z, 2), Polynomial.ONE)) to
+                arithmetic.add(arithmetic.multiply(arithmetic.subtract(y, Polynomial.ONE), x),
+                    arithmetic.add(z, constant(2))),
+        )) {
+            val expected = arithmetic.resultant(left, right, 0)
+            val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
+
+            val immediate = limited.principalSubresultants(left, right, 0)
+            val pending = limited.preparePrincipalSubresultants(left, right, 0)
+            var resumed: List<Polynomial>? = null
+            while (resumed == null) resumed = pending.next()
+
+            assertEquals(listOf(expected), immediate)
+            assertEquals(immediate, resumed)
+        }
+    }
+
+    @Test
+    fun `affine subresultant products retain containing cancellation across checkpoints`() {
+        val a = Polynomial.of((0..16).map { PolynomialTerm(Monomial.of(mapOf(1 to it)), BigFraction.ONE) })
+        val b = Polynomial.of((0..16).map { PolynomialTerm(Monomial.of(mapOf(2 to it)), BigFraction.ONE) })
+        val left = arithmetic.add(arithmetic.multiply(a, x), b)
+        val right = arithmetic.add(arithmetic.multiply(b, x), a)
+        var stopped = false
+        val limited = PolynomialArithmetic(Cancellation { stopped }, PolynomialLimits(maxMatrixCells = 0))
+        val pending = limited.preparePrincipalSubresultants(left, right, 0)
+
+        assertNull(pending.next())
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { pending.next() }
+    }
+
+    @Test
     fun `solve cancellation should terminate prepared subresultants`() {
         var stopped = false
         val counted = PolynomialArithmetic(Cancellation { stopped })
@@ -119,6 +160,75 @@ class PolynomialArithmeticTest {
         stopped = true
 
         assertFailsWith<PolynomialInterrupted> { pending.next() }
+    }
+
+    @Test
+    fun `arithmetic observations preserve subresultants and native charges`() {
+        val left = arithmetic.add(arithmetic.power(x, 2), y)
+        val right = arithmetic.add(x, y)
+        var plainCharges = 0L
+        val plainMeter = WorkMeter { plainCharges += it }
+        val plain = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = plainMeter
+        })
+        var observedCharges = 0L
+        val observedMeter = WorkMeter { observedCharges += it }
+        val observed = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = observedMeter
+        })
+        var lastLeft: Polynomial? = null
+        var lastRight: Polynomial? = null
+        var coordinate: Int? = null
+        var index: Int? = null
+        var divisor: Polynomial? = null
+        observed.subresultantObserver = { a, b, variable, minor ->
+            lastLeft = a
+            lastRight = b
+            coordinate = variable
+            index = minor
+        }
+        observed.divisionObserver = { _, value -> divisor = value }
+
+        val immediate = plain.principalSubresultants(left, right, 0)
+        val pending = observed.preparePrincipalSubresultants(left, right, 0)
+        var resumed: List<Polynomial>? = null
+        while (resumed == null) resumed = pending.next()
+
+        assertEquals(immediate, resumed)
+        assertEquals(plainCharges, observedCharges)
+        assertEquals(left, lastLeft)
+        assertEquals(right, lastRight)
+        assertEquals(0, coordinate)
+        assertEquals(0, index)
+        assertEquals(Polynomial.ONE, divisor)
+    }
+
+    @Test
+    fun `subresultant observation retains a refused matrix request`() {
+        val left = arithmetic.add(arithmetic.power(x, 2), y)
+        val right = arithmetic.add(x, y)
+        for (prepared in listOf(false, true)) {
+            val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
+            var coordinate: Int? = null
+            var index: Int? = null
+            limited.subresultantObserver = { _, _, variable, minor ->
+                coordinate = variable
+                index = minor
+            }
+
+            val stopped = assertFailsWith<PolynomialResourceLimit> {
+                if (prepared) {
+                    val pending = limited.preparePrincipalSubresultants(left, right, 0)
+                    while (pending.next() == null) Unit
+                } else limited.principalSubresultants(left, right, 0)
+            }
+
+            assertEquals(PolynomialResource.MATRIX_CELLS, stopped.resource)
+            assertEquals(0, coordinate)
+            assertEquals(0, index)
+        }
     }
 
     @Test
@@ -148,6 +258,102 @@ class PolynomialArithmeticTest {
         val product = arithmetic.multiply(divisor, quotient)
 
         assertEquals(quotient, arithmetic.divideExact(product, divisor))
+    }
+
+    @Test
+    fun `scalar exact division reconstructs multivariate coefficients`() {
+        val polynomial = arithmetic.add(
+            arithmetic.scale(arithmetic.multiply(arithmetic.power(x, 2), y), fraction(5) * fraction(7).reciprocal()),
+            arithmetic.subtract(y, constant(3)),
+        )
+        for (dividend in listOf(Polynomial.ZERO, polynomial)) {
+            for (coefficient in listOf(BigFraction.ONE, fraction(-1), fraction(2) * fraction(3).reciprocal())) {
+                val divisor = Polynomial.constant(coefficient)
+
+                val quotient = arithmetic.divideExact(dividend, divisor)
+
+                assertEquals(dividend, arithmetic.multiply(quotient, divisor))
+            }
+        }
+    }
+
+    @Test
+    fun `unit division completes within the containing work allowance`() {
+        val dividend = Polynomial.of((0 until 128).map { exponent ->
+            PolynomialTerm(Monomial.of(mapOf(0 to exponent, 1 to 1)), fraction(exponent.toLong() + 1))
+        })
+        var spent = 0L
+        val meter = WorkMeter { spent += it }
+        val counted = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 8
+            override fun workMeter(): WorkMeter = meter
+        })
+
+        val quotient = counted.divideExact(dividend, Polynomial.ONE)
+
+        assertEquals(dividend, quotient)
+    }
+
+    @Test
+    fun `scalar exact division observes containing cancellation`() {
+        val stopped = PolynomialArithmetic(Cancellation { true })
+        for (dividend in listOf(Polynomial.ZERO, y)) {
+            for (divisor in listOf(Polynomial.ONE, constant(-1), constant(3))) {
+                assertFailsWith<PolynomialInterrupted> { stopped.divideExact(dividend, divisor) }
+            }
+        }
+    }
+
+    @Test
+    fun `exact division rejects a zero divisor`() {
+        for (dividend in listOf(Polynomial.ZERO, y)) {
+            assertFailsWith<IllegalArgumentException> { arithmetic.divideExact(dividend, Polynomial.ZERO) }
+        }
+    }
+
+    @Test
+    fun `prepared and eager subresultants retain the same native charges`() {
+        val a = arithmetic.add(x, constant(2))
+        val b = arithmetic.add(arithmetic.power(x, 2), constant(3))
+        val c = arithmetic.add(x, constant(4))
+        val d = arithmetic.add(arithmetic.power(x, 3), constant(5))
+        val quadratic = arithmetic.add(arithmetic.scale(arithmetic.power(y, 2), fraction(2)),
+            arithmetic.add(arithmetic.multiply(x, y), arithmetic.add(x, constant(1))))
+        val linear = arithmetic.add(arithmetic.scale(y, fraction(3)), arithmetic.power(x, 2))
+        val resultant = arithmetic.add(
+            arithmetic.subtract(arithmetic.scale(arithmetic.power(x, 4), fraction(2)),
+                arithmetic.scale(arithmetic.power(x, 3), fraction(3))),
+            arithmetic.add(arithmetic.scale(x, fraction(9)), constant(9)),
+        )
+        for ((left, right, expected) in listOf(
+            Triple(arithmetic.add(arithmetic.multiply(a, y), b),
+                arithmetic.add(arithmetic.multiply(c, y), d),
+                arithmetic.subtract(arithmetic.multiply(a, d), arithmetic.multiply(b, c))),
+            Triple(quadratic, linear, resultant),
+        )) {
+            var eagerCharges = 0L
+            val eagerMeter = WorkMeter { eagerCharges += it }
+            val eager = PolynomialArithmetic(object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = eagerMeter
+            })
+            var preparedCharges = 0L
+            val preparedMeter = WorkMeter { preparedCharges += it }
+            val prepared = PolynomialArithmetic(object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = preparedMeter
+            })
+
+            val immediate = eager.principalSubresultants(left, right, 1)
+            val pending = prepared.preparePrincipalSubresultants(left, right, 1)
+            var resumed: List<Polynomial>? = null
+            while (resumed == null) resumed = pending.next()
+
+            assertEquals(listOf(expected), immediate)
+            assertEquals(immediate, resumed)
+            assertTrue(eagerCharges > 0)
+            assertEquals(eagerCharges, preparedCharges)
+        }
     }
 
     @Test

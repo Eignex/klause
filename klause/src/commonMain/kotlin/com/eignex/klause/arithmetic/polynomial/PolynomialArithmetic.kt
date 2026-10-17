@@ -21,6 +21,9 @@ internal class PolynomialArithmetic(
     private val cancellation: Cancellation = Cancellation.Never,
     private val limits: PolynomialLimits = PolynomialLimits(),
 ) {
+    var subresultantObserver: ((Polynomial, Polynomial, Int, Int?) -> Unit)? = null
+    var divisionObserver: ((Polynomial, Polynomial) -> Unit)? = null
+
     fun step() {
         if (cancellation()) throw PolynomialInterrupted()
         cancellation.charge(1)
@@ -87,7 +90,13 @@ internal class PolynomialArithmetic(
 
     private fun prepareDivision(dividend: Polynomial, divisor: Polynomial): Iterator<Polynomial?> = sequence {
         require(!divisor.isZero)
-        val lead = divisor.terms.last()
+        divisionObserver?.invoke(dividend, divisor)
+        val terms = divisor.terms
+        scalarQuotient(dividend, terms.singleOrNull())?.let {
+            yield(it)
+            return@sequence
+        }
+        val lead = terms.last()
         var remainder = dividend
         var quotient = Polynomial.ZERO
         while (!remainder.isZero) {
@@ -107,6 +116,15 @@ internal class PolynomialArithmetic(
         }
         yield(quotient)
     }.iterator()
+
+    private fun scalarQuotient(dividend: Polynomial, divisor: PolynomialTerm?): Polynomial? {
+        if (divisor == null || divisor.monomial != Monomial.ONE) return null
+        if (divisor.coefficient == BigFraction.ONE) {
+            step()
+            return dividend
+        }
+        return scale(dividend, divisor.coefficient.reciprocal())
+    }
 
     fun power(value: Polynomial, exponent: Int): Polynomial {
         require(exponent >= 0)
@@ -166,7 +184,10 @@ internal class PolynomialArithmetic(
 
     fun divideExact(dividend: Polynomial, divisor: Polynomial): Polynomial {
         require(!divisor.isZero)
-        val lead = divisor.terms.last()
+        divisionObserver?.invoke(dividend, divisor)
+        val terms = divisor.terms
+        scalarQuotient(dividend, terms.singleOrNull())?.let { return it }
+        val lead = terms.last()
         var remainder = dividend
         var quotient = Polynomial.ZERO
         while (!remainder.isZero) {
@@ -203,12 +224,18 @@ internal class PolynomialArithmetic(
     }
 
     fun principalSubresultants(left: Polynomial, right: Polynomial, variable: Int): List<Polynomial> {
+        subresultantObserver?.invoke(left, right, variable, null)
         step()
         val a = coefficients(left, variable)
         val b = coefficients(right, variable)
         val m = a.lastIndex
         val n = b.lastIndex
+        if (m == 1 && n == 1) {
+            subresultantObserver?.invoke(left, right, variable, 0)
+            return listOf(subtract(multiply(a[1], b[0]), multiply(a[0], b[1])))
+        }
         return (0 until minOf(m, n)).map { index ->
+            subresultantObserver?.invoke(left, right, variable, index)
             val matrix = matrix(m.toLong() + n - 2L * index)
             val size = matrix.size
             for (row in 0 until n - index) {
@@ -232,13 +259,32 @@ internal class PolynomialArithmetic(
         right: Polynomial,
         variable: Int,
     ): Iterator<List<Polynomial>?> = sequence {
+        subresultantObserver?.invoke(left, right, variable, null)
         step()
         val a = coefficients(left, variable)
         val b = coefficients(right, variable)
         val m = a.lastIndex
         val n = b.lastIndex
+        if (m == 1 && n == 1) {
+            subresultantObserver?.invoke(left, right, variable, 0)
+            val first = prepareMultiply(a[1], b[0])
+            var ad: Polynomial? = null
+            while (ad == null) {
+                ad = first.next()
+                if (ad == null) yield(null)
+            }
+            val second = prepareMultiply(a[0], b[1])
+            var bc: Polynomial? = null
+            while (bc == null) {
+                bc = second.next()
+                if (bc == null) yield(null)
+            }
+            yield(listOf(subtract(ad, bc)))
+            return@sequence
+        }
         val result = ArrayList<Polynomial>()
         for (index in 0 until minOf(m, n)) {
+            subresultantObserver?.invoke(left, right, variable, index)
             val matrix = matrix(m.toLong() + n - 2L * index)
             val size = matrix.size
             for (row in 0 until n - index) {
