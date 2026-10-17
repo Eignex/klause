@@ -3,19 +3,40 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 
-internal class PolynomialProjection private constructor(private val levels: Array<List<Polynomial>>) {
+internal class PolynomialProjection private constructor(
+    private val levels: Array<List<Polynomial>>,
+    private val variables: IntArray,
+    private val sections: Array<Polynomial?>,
+    arithmetic: PolynomialArithmetic,
+    val inconsistentEquations: Boolean = false,
+    val equationalSections: Int = 0,
+) {
+    private val ranks = IntArray(variables.size).also { ranks ->
+        for (level in variables.indices) {
+            arithmetic.step()
+            ranks[variables[level]] = level
+        }
+    }
     val variableCount: Int get() = levels.size
     val polynomialCount: Long get() = levels.sumOf { it.size.toLong() }
 
-    fun polynomials(variable: Int): List<Polynomial> = levels[variable].toList()
+    fun variable(level: Int): Int = variables[level]
+    fun level(variable: Int): Int = ranks[variable]
+    fun section(level: Int): Polynomial? = sections[level]
+    fun polynomials(level: Int): List<Polynomial> {
+        check(!inconsistentEquations)
+        return levels[level].toList()
+    }
 
     companion object {
         fun compute(
             polynomials: List<Polynomial>,
             variableCount: Int,
             arithmetic: PolynomialArithmetic,
+            requiredZeroes: List<Polynomial> = emptyList(),
+            preferredOrder: IntArray? = null,
         ): PolynomialProjection {
-            val pending = prepare(polynomials, variableCount, arithmetic)
+            val pending = prepare(polynomials, variableCount, arithmetic, requiredZeroes, preferredOrder)
             while (true) pending.next()?.let { return it }
         }
 
@@ -23,6 +44,9 @@ internal class PolynomialProjection private constructor(private val levels: Arra
             polynomials: List<Polynomial>,
             variableCount: Int,
             arithmetic: PolynomialArithmetic,
+            requiredZeroes: List<Polynomial> = emptyList(),
+            preferredOrder: IntArray? = null,
+            onSection: () -> Unit = {},
         ): Iterator<PolynomialProjection?> = sequence {
             require(variableCount >= 0)
             arithmetic.step()
@@ -34,17 +58,79 @@ internal class PolynomialProjection private constructor(private val levels: Arra
                 arithmetic.step()
                 emptyList<Polynomial>()
             }
-            var pending = projectionFamily(polynomials, arithmetic)
-            for (variable in variableCount - 1 downTo 0) {
+            val variables = IntArray(variableCount) { it }
+            val sections = arrayOfNulls<Polynomial>(variableCount)
+            val available = BooleanArray(variableCount) { true }
+            val order = preferredOrder?.copyOf() ?: IntArray(variableCount) { it }
+            require(order.size == variableCount)
+            val seen = BooleanArray(variableCount)
+            for (variable in order) {
                 arithmetic.step()
+                require(variable in 0 until variableCount && !seen[variable])
+                seen[variable] = true
+            }
+            val inputs = HashSet<Polynomial>()
+            if (requiredZeroes.isNotEmpty()) for (polynomial in polynomials) {
+                arithmetic.step()
+                inputs.add(polynomial)
+            }
+            for (equation in requiredZeroes) {
+                arithmetic.step()
+                require(equation in inputs) { "A required zero must belong to the input family" }
+            }
+            var equations = requiredZeroes
+            var pending = projectionFamily(polynomials, arithmetic)
+            var fallback = variableCount - 1
+            var sectionCount = 0
+            for (level in variableCount - 1 downTo 0) {
+                arithmetic.step()
+                if (inconsistentEquations(equations, arithmetic)) {
+                    yield(PolynomialProjection(Array(variableCount) { emptyList() },
+                        IntArray(variableCount) { it }, arrayOfNulls(variableCount), arithmetic, true, sectionCount))
+                    return@sequence
+                }
+                equations = projectionFamily(equations, arithmetic)
+                val section = equationalSection(equations, pending, arithmetic)
+                while (fallback >= 0 && !available[order[fallback]]) {
+                    arithmetic.step()
+                    fallback--
+                }
+                val variable = section?.variable ?: order[fallback]
+                check(variable >= 0 && available[variable])
+                variables[level] = variable
+                available[variable] = false
                 val top = mutableListOf<Polynomial>()
                 val lower = mutableListOf<Polynomial>()
                 for (polynomial in pending) {
                     arithmetic.step()
-                    if (polynomial.mainVariable == variable) top.add(polynomial) else lower.add(polynomial)
+                    if (variable in polynomial.variables) top.add(polynomial) else lower.add(polynomial)
                 }
-                levels[variable] = top.toList()
-                if (variable > 0) {
+                levels[level] = if (section == null) top.toList() else emptyList()
+                if (section != null) {
+                    sections[level] = section.replacement
+                    val rewritten = HashMap<Polynomial, Polynomial>()
+                    val projected = ArrayList<Polynomial>()
+                    for (polynomial in pending) {
+                        arithmetic.step()
+                        val value = if (variable in polynomial.variables) {
+                            arithmetic.substitute(polynomial, variable, section.replacement)
+                        } else polynomial
+                        rewritten[polynomial] = value
+                        projected.add(value)
+                        yield(null)
+                    }
+                    equations = equations.map {
+                        arithmetic.step()
+                        rewritten.getValue(it)
+                    }
+                    pending = projectionFamily(projected, arithmetic)
+                    sectionCount++
+                    onSection()
+                } else if (level > 0) {
+                    equations = equations.filter {
+                        arithmetic.step()
+                        variable !in it.variables
+                    }
                     val eliminated = eliminate(top, variable, arithmetic)
                     var projected: List<Polynomial>? = null
                     while (projected == null) {
@@ -55,9 +141,21 @@ internal class PolynomialProjection private constructor(private val levels: Arra
                 }
             }
             arithmetic.step()
-            yield(PolynomialProjection(levels))
+            if (inconsistentEquations(equations, arithmetic)) {
+                yield(PolynomialProjection(Array(variableCount) { emptyList() },
+                    IntArray(variableCount) { it }, arrayOfNulls(variableCount), arithmetic, true, sectionCount))
+            } else yield(PolynomialProjection(levels, variables, sections, arithmetic,
+                equationalSections = sectionCount))
         }.iterator()
     }
+}
+
+private fun inconsistentEquations(equations: List<Polynomial>, arithmetic: PolynomialArithmetic): Boolean {
+    for (equation in equations) {
+        arithmetic.step()
+        if (!equation.isZero && equation.variables.isEmpty()) return true
+    }
+    return false
 }
 
 private fun projectionFamily(values: List<Polynomial>, arithmetic: PolynomialArithmetic): List<Polynomial> {

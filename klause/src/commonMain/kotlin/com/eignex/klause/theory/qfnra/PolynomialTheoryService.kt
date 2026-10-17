@@ -152,6 +152,17 @@ internal class PolynomialTheoryInvocation(
         else sum(left.coupledWorkDeclines ?: 0, right.coupledWorkDeclines ?: 0),
         if (left.dyadicPreExtractionDeclines == null && right.dyadicPreExtractionDeclines == null) null
         else sum(left.dyadicPreExtractionDeclines ?: 0, right.dyadicPreExtractionDeclines ?: 0),
+        if (left.booleanTheoryRegions == null && right.booleanTheoryRegions == null) null
+        else sum(left.booleanTheoryRegions ?: 0, right.booleanTheoryRegions ?: 0),
+        if (left.booleanTheoryAtoms == null && right.booleanTheoryAtoms == null) null
+        else sum(left.booleanTheoryAtoms ?: 0, right.booleanTheoryAtoms ?: 0),
+        if (left.booleanTheoryConstantRefutations == null && right.booleanTheoryConstantRefutations == null) null
+        else sum(left.booleanTheoryConstantRefutations ?: 0, right.booleanTheoryConstantRefutations ?: 0),
+        if (left.booleanTheoryResourceRefusals == null && right.booleanTheoryResourceRefusals == null) null
+        else sum(left.booleanTheoryResourceRefusals ?: 0, right.booleanTheoryResourceRefusals ?: 0),
+        right.lastBooleanTheoryResource ?: left.lastBooleanTheoryResource,
+        if (left.equationalSections == null && right.equationalSections == null) null
+        else sum(left.equationalSections ?: 0, right.equationalSections ?: 0),
     )
 
     private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
