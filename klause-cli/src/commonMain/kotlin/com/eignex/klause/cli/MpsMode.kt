@@ -46,21 +46,27 @@ internal object MpsMode : CliMode {
             outputState = MpsOutputState()
             val overrides = common.sourceOverrides(mpsSemantics)
             val parsed = Mps.parse(openFileSource(path))
-            val stop = common.routingPreparationCancellation()
-            val source = parsed.toLinearSourceProblem(overrides, stop) ?: return interruptedSolvable(
-                if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,
-                start.elapsedNow().inWholeMilliseconds,
-            )
-            val state = MpsOutputState(
-                source.semantics.declared.undeclaredIntegers != source.semantics.effective.undeclaredIntegers ||
-                    source.semantics.declared.undeclaredReals != source.semantics.effective.undeclaredReals,
-            )
-            outputState = state
-            val reconstruct = parsed.fitsMpsReconstructionBudget(stop)
-            return linearSourceSolvable(SourceAttachment(source, common.config.problemSettings()), common, { witness ->
-                state.exactSourceWitness = witness.exact
-                renderMpsSourceWitness(witness, reconstruct, stop)
-            }, start.elapsedNow().inWholeMilliseconds)
+            return common.routingPreparationCancellation().use { stop ->
+                val source = parsed.toLinearSourceProblem(overrides, stop) ?: return interruptedSolvable(
+                    if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,
+                    start.elapsedNow().inWholeMilliseconds,
+                )
+                val state = MpsOutputState(
+                    source.semantics.declared.undeclaredIntegers != source.semantics.effective.undeclaredIntegers ||
+                        source.semantics.declared.undeclaredReals != source.semantics.effective.undeclaredReals,
+                )
+                outputState = state
+                val reconstruct = parsed.fitsMpsReconstructionBudget(stop)
+                linearSourceSolvable(
+                    SourceAttachment(source, common.config.problemSettings()),
+                    common,
+                    { witness ->
+                        state.exactSourceWitness = witness.exact
+                        renderMpsSourceWitness(witness, reconstruct, stop)
+                    },
+                    start.elapsedNow().inWholeMilliseconds,
+                )
+            }
         }
 
         override fun output(common: CommonOptions): OutputProtocol {

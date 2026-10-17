@@ -65,6 +65,14 @@ and dependency passes to that same preparation token. An interrupted capture exp
 no partial projection. Derived finite ranges require exact signed-word endpoints;
 representation decline retains the real column and its original rows.
 
+CLI routing preparation owns a scoped view of the shared presolve meter. Required
+admission keeps charging it after optional probing exhausts its slice. Source
+conversion and setup release that meter on every exit before retained native execution;
+the containing deadline and cancellation stay live. Native operations use their
+invocation meters and decision/move ledgers. A released preparation meter cannot
+force native arithmetic into work-metered polling. See [presolve](presolve.md#phase-allowance-and-telemetry)
+for phase ownership.
+
 ## Units and boundaries
 
 | Allowance | Unit and owner | Unlimited / zero | Stop surface |
