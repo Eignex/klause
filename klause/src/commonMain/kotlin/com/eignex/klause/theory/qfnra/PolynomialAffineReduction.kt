@@ -29,7 +29,7 @@ internal class PolynomialAffineReduction private constructor(
             val upper = endpoint(fibre.upper, point, false, arithmetic, algebraic)
             check(lower != null || upper != null)
             val comparison = if (lower != null && upper != null) algebraic.compare(lower.value, upper.value) else -1
-            check(comparison < 0 || comparison == 0 && !checkNotNull(lower).strict && !checkNotNull(upper).strict)
+            check(comparison < 0 || (comparison == 0 && !checkNotNull(lower).strict && !checkNotNull(upper).strict))
             point[fibre.variable] = if (comparison == 0) checkNotNull(lower).value
             else algebraic.rational(algebraic.sampleBetween(lower?.value, upper?.value))
         }
@@ -144,7 +144,7 @@ private fun affineCoordinate(atoms: List<PolynomialAtom>, realCount: Int, arithm
         val pairs = lower[variable].toLong() * upper[variable]
         // Larger affine projections retain their original constraints for CAD.
         if (blocked[variable] || occurrences == 0L || pairs > occurrences) continue
-        if (pairs < bestPairs || pairs == bestPairs && occurrences > bestOccurrences) {
+        if (pairs < bestPairs || (pairs == bestPairs && occurrences > bestOccurrences)) {
             best = variable
             bestPairs = pairs
             bestOccurrences = occurrences.toInt()
