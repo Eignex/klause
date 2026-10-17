@@ -38,6 +38,31 @@ import kotlin.test.assertTrue
 
 class ExactLinearTest {
     @Test
+    fun `empty integer source rows should grade exact truth at signed word bounds`() {
+        for (relation in LinearOp.entries) {
+            for (bound in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
+                for ((activator, indicator) in listOf(-1 to true, 0 to false, 0 to true)) {
+                    val row = ExactLinear.of(intArrayOf(), emptyList(), relation,
+                        BigFraction.ofLong(bound), activator = activator)
+                    val source = Problem(activator + 1, 0, emptyArray(), arrayOf(row))
+                    val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
+                    if (activator >= 0) state.assignment.setBool(activator, indicator)
+                    val holds = when (relation) {
+                        LinearOp.LE -> bound > 0L
+                        LinearOp.GE -> bound < 0L
+                        LinearOp.EQ -> false
+                        LinearOp.NE -> true
+                    }
+
+                    state.recompute()
+
+                    assertEquals(holds == indicator, state.cost == 0L, "$relation $bound $activator $indicator")
+                }
+            }
+        }
+    }
+
+    @Test
     fun `word sized constants should reject a pinned activity beyond signed 128 bits`() {
         for (coefficient in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
             for (relation in listOf(LinearOp.LE, LinearOp.GE)) {
