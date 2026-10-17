@@ -2706,7 +2706,8 @@ performance gain. Field/method incompatibility fails the diagnostic explicitly.
 query through its containing stop. Its `request64=<base64>` argument encodes up to
 18 `{suite, problem, sha256}` catalog identities, with at most 48 KiB of encoded
 request and 1 MiB per original source. It requires the frozen original hash before
-parsing and retains those bytes. Run the committed profile through the lab on AWS.
+parsing and retains those bytes. Run actual phase attribution through the lab on
+Mac; ordinary solver, reference and checker work uses AWS spot.
 The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
 
@@ -2743,6 +2744,17 @@ The source must select polynomial admission; a linear route fails explicitly.
 Pipeline caller charges include source/search preparation and are separate from
 the native arithmetic snapshot. This mode does not render a CLI model or independently
 validate a source witness. Keep ordinary CLI records for publication/control evidence.
+
+Add `queryTrace=true` with `pipeline=true` to observe the actual composed polynomial
+queries. The fresh prepared service installs an invocation-local observer before
+execution. Each query records its creation stack, invocation identity, native stats
+and terminal result or pending state. At most 4,096 previous query summaries are
+retained; `discardedHistory` explicitly counts omitted summaries without stopping
+search. Only the last query retains arithmetic, projection-family and reduced-region
+references. Their metadata is read after execution stops. A pending observer request
+does not establish completed arithmetic, a CPU hotspot or a source verdict. The trace
+does not emit a wire model or perform independent checking. Direct-query mode also
+reports its final observed subresultant, division, projection and reduced region.
 
 ### Table profiling
 

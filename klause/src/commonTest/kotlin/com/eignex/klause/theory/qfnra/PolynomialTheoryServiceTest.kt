@@ -16,6 +16,28 @@ import kotlin.test.assertTrue
 
 class PolynomialTheoryServiceTest {
     @Test
+    fun `query observation is captured by its invocation without changing native work`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val plain = service.invocation().use { it.check() }
+        val observed = ArrayList<QfNraQuery>()
+        service.queryObserver = { owner, query ->
+            assertEquals(1L, owner.queries)
+            observed += query
+        }
+        val invocation = service.invocation()
+        service.queryObserver = null
+
+        val result = invocation.use { it.check() }
+        val fresh = service.invocation().use { it.check() }
+
+        assertIs<QfNraResult.Satisfiable>(result)
+        assertEquals(plain.stats, result.stats)
+        assertEquals(plain.stats, fresh.stats)
+        assertEquals(listOf(result.stats), observed.map { it.stats })
+    }
+
+    @Test
     fun `completed query should have no further elements`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)

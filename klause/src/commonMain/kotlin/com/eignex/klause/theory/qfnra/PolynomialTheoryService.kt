@@ -63,8 +63,10 @@ internal class PolynomialTheoryService(
             )
         },
     )
+    var queryObserver: ((PolynomialTheoryInvocation, QfNraQuery) -> Unit)? = null
+
     fun invocation(params: QfNraParams = QfNraParams()): PolynomialTheoryInvocation =
-        PolynomialTheoryInvocation(formula, boolCount, realCount, params, fixedReals)
+        PolynomialTheoryInvocation(formula, boolCount, realCount, params, fixedReals, queryObserver)
 }
 
 internal class PolynomialTheoryInvocation(
@@ -73,6 +75,7 @@ internal class PolynomialTheoryInvocation(
     private val realCount: Int,
     private val params: QfNraParams,
     private val fixedReals: Map<Int, BigFraction>,
+    private val queryObserver: ((PolynomialTheoryInvocation, QfNraQuery) -> Unit)?,
 ) : AutoCloseable {
     private var closed = false
     private var active = false
@@ -106,6 +109,7 @@ internal class PolynomialTheoryInvocation(
             PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper))
         pending = query
         queries = sum(queries, 1)
+        queryObserver?.invoke(this, query)
         return object : Iterator<QfNraResult?> {
             private var finished = false
             override fun hasNext(): Boolean = !closed && !finished

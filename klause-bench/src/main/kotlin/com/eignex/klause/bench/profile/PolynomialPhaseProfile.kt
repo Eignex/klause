@@ -17,6 +17,7 @@ import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
@@ -34,11 +35,14 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..3 && args[0].startsWith("request64="))
+        require(args.size in 1..4 && args[0].startsWith("request64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs") })
+        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs", "queryTrace") })
         require(options["pipeline"] == null || options["pipeline"] == "true")
         val pipelineMode = options["pipeline"] == "true"
+        require(options["queryTrace"] == null || options["queryTrace"] == "true")
+        val queryTrace = options["queryTrace"] == "true"
+        require(!queryTrace || pipelineMode)
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
         require(timeoutMs > 0)
         val encoded = args[0].substringAfter('=')
@@ -61,6 +65,7 @@ internal object PolynomialPhaseProfile {
             "containingTimeoutMs" to timeoutMs.toString(),
             "maximumWork" to "null",
             "representationLimits" to "default",
+            "queryTrace" to queryTrace.toString(),
             "route" to if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
                 else "direct normalized QfNraQuery; separate gate inspection",
         )))
@@ -74,7 +79,7 @@ internal object PolynomialPhaseProfile {
             directory.resolve("source.smt2").writeBytes(bytes)
             val text = bytes.decodeToString()
             if (pipelineMode) {
-                directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text, timeoutMs)))
+                directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text, timeoutMs, queryTrace)))
             } else {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
@@ -84,7 +89,11 @@ internal object PolynomialPhaseProfile {
         }
     }
 
-    internal fun pipeline(text: String, timeoutMs: Long = 60_000L): PipelinePhaseTrace {
+    internal fun pipeline(
+        text: String,
+        timeoutMs: Long = 60_000L,
+        queryTrace: Boolean = false,
+    ): PipelinePhaseTrace {
         val observation = DeadlineObservation(timeoutMs)
         val source = try {
             SmtLib.parse(text, cancellation = observation)
@@ -95,6 +104,10 @@ internal object PolynomialPhaseProfile {
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = observation,
         ))
+        val queries = if (queryTrace) PipelineQueryObservation(
+            (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request
+                ?: error("query phase observation requires polynomial admission"),
+        ) else null
         val preparedCharges = observation.charges
         val completed = SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = PolynomialTheoryParams(
             timeout = observation,
@@ -108,7 +121,7 @@ internal object PolynomialPhaseProfile {
                 if (completed is SourceExecutionResult.Refuted) "SourceRefuted" else "Unknown",
                 (completed as? SourceExecutionResult.Declined)?.reason?.toString(),
                 "source-preparation", null, "not started", "not started",
-                preparedCharges, observation.charges - preparedCharges, observation.stack,
+                preparedCharges, observation.charges - preparedCharges, observation.stack, queries?.snapshot(),
             )
         }
         val execution = (completed as? SourceExecutionResult.Polynomial)?.result
@@ -117,7 +130,7 @@ internal object PolynomialPhaseProfile {
             (execution.result as? OpenTheoryResult.Unknown)?.reason?.toString(),
             execution.resource?.toString(), execution.nativeResource,
             execution.stats.toString(), execution.result.stats.toString(),
-            preparedCharges, observation.charges - preparedCharges, observation.stack)
+            preparedCharges, observation.charges - preparedCharges, observation.stack, queries?.snapshot())
     }
 
     private class DeadlineObservation(timeoutMs: Long) : Cancellation, WorkMeter {
@@ -236,6 +249,8 @@ internal object PolynomialPhaseProfile {
             val owner = query.newInstance(original, boolCount.invoke(source), realCount.invoke(source),
                 params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance()),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
+            val arithmetic = queryType.getDeclaredField("arithmetic").apply { isAccessible = true }.get(owner)
+            val observation = ArithmeticObservation(arithmetic, owner)
             val checkpoints = ArrayList<PhaseCheckpoint>()
             val start = System.nanoTime()
             var calls = 0L
@@ -258,8 +273,193 @@ internal object PolynomialPhaseProfile {
             return PhaseTrace(checkpoints, result.javaClass.simpleName,
                 result.javaClass.methods.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
-                nativeWork, charges - preparationCharges, preparationCharges, stop)
+                nativeWork, charges - preparationCharges, preparationCharges, stop,
+                observation.subresultants(), observation.division(), observation.projection(),
+                observation.reducedRegion())
         }
+    }
+}
+
+private class PipelineQueryObservation(request: Any) {
+    private val history = ArrayList<PipelineQuery>()
+    private var observed = 0L
+    private var discarded = 0L
+    private var current: Any? = null
+    private var arithmetic: ArithmeticObservation? = null
+    private var invocation = 0
+    private var invocationQuery = 0L
+    private var origin = emptyList<String>()
+
+    init {
+        val resolved = Class.forName("com.eignex.klause.solver.pipeline.PolynomialTheoryRequestKt").methods.single {
+            it.name.substringBefore('$') == "resolvedModel" && it.parameterCount == 1
+        }.invoke(null, request)
+        val service = resolved.javaClass.getMethod("getService").invoke(resolved)
+        val observer: (Any, Any) -> Unit = { owner, query ->
+            current?.let {
+                if (history.size < 4096) history += summarize(it) else discarded++
+            }
+            observed++
+            current = query
+            invocation = System.identityHashCode(owner)
+            invocationQuery = owner.javaClass.getMethod("getQueries").invoke(owner) as Long
+            origin = Thread.currentThread().stackTrace.map { it.toString() }
+            val context = query.javaClass.getDeclaredField("arithmetic").apply { isAccessible = true }.get(query)
+            arithmetic = ArithmeticObservation(context, query)
+        }
+        service.javaClass.methods.single {
+            it.name.substringBefore('$') == "setQueryObserver" && it.parameterCount == 1
+        }.invoke(service, observer)
+    }
+
+    private fun summarize(query: Any): PipelineQuery {
+        val result = query.javaClass.getDeclaredField("result").apply { isAccessible = true }.get(query)
+        return PipelineQuery(observed, invocation, invocationQuery, origin,
+            result?.javaClass?.simpleName ?: "Pending",
+            result?.javaClass?.methods?.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
+            result?.javaClass?.methods?.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
+            query.javaClass.getMethod("getStats").invoke(query).toString())
+    }
+
+    fun snapshot(): PipelineQueries = PipelineQueries(observed, discarded, history.toList(),
+        current?.let(::summarize), arithmetic?.subresultants(), arithmetic?.division(),
+        arithmetic?.projection(), arithmetic?.reducedRegion())
+}
+
+private class ArithmeticObservation(arithmetic: Any, query: Any) {
+    private val polynomialType = Class.forName("com.eignex.klause.arithmetic.polynomial.Polynomial")
+    private val degree = polynomialType.getMethod("degree", Int::class.javaPrimitiveType)
+    private val terms = polynomialType.getMethod("getTerms")
+    private val variables = polynomialType.getMethod("getVariables")
+    private var left: Any? = null
+    private var right: Any? = null
+    private var variable = 0
+    private var index: Int? = null
+    private var dividend: Any? = null
+    private var divisor: Any? = null
+    private var family: List<Any>? = null
+    private var projectionVariable = 0
+    private var requiredEquation = false
+    private var reducedAtoms: List<Any>? = null
+
+    init {
+        val subresultants: (Any, Any, Int, Int?) -> Unit = { a, b, coordinate, minor ->
+            left = a
+            right = b
+            variable = coordinate
+            index = minor
+            dividend = null
+            divisor = null
+        }
+        val division: (Any, Any) -> Unit = { a, b ->
+            dividend = a
+            divisor = b
+        }
+        arithmetic.javaClass.getMethod("setSubresultantObserver", Function4::class.java)
+            .invoke(arithmetic, subresultants)
+        arithmetic.javaClass.getMethod("setDivisionObserver", Function2::class.java).invoke(arithmetic, division)
+        val projection: (Int, List<Any>, Any?) -> Unit = { coordinate, inputs, equation ->
+            projectionVariable = coordinate
+            family = inputs
+            requiredEquation = equation != null
+        }
+        query.javaClass.getMethod("setProjectionObserver", Function3::class.java).invoke(query, projection)
+        val reducedRegion: (List<Any>) -> Unit = { reducedAtoms = it }
+        query.javaClass.getMethod("setReducedRegionObserver", Function1::class.java).invoke(query, reducedRegion)
+    }
+
+    fun subresultants(): PhaseSubresultants? {
+        val a = left ?: return null
+        val b = checkNotNull(right)
+        val m = degree.invoke(a, variable) as Int
+        val n = degree.invoke(b, variable) as Int
+        return PhaseSubresultants(variable, index, m, n, termCount(a), termCount(b),
+            index?.let { m.toLong() + n - 2L * it })
+    }
+
+    fun division(): PhaseDivision? {
+        val a = dividend ?: return null
+        val b = checkNotNull(divisor)
+        val count = termCount(b)
+        return PhaseDivision(termCount(a), count,
+            (variables.invoke(b) as List<*>).isEmpty(), count == 1)
+    }
+
+    fun projection(): PhaseProjection? {
+        val inputs = family ?: return null
+        val termType = Class.forName("com.eignex.klause.arithmetic.polynomial.PolynomialTerm")
+        val monomial = termType.getMethod("getMonomial")
+        val monomialType = Class.forName("com.eignex.klause.arithmetic.polynomial.Monomial")
+        val coordinates = monomialType.getMethod("getVariables")
+        val exponent = monomialType.getMethod("exponent", Int::class.javaPrimitiveType)
+        var termCount = 0L
+        var constantLeaders = 0
+        var commonFactors = 0
+        val degrees = LinkedHashMap<Int, Int>()
+        val totalDegrees = LinkedHashMap<Long, Int>()
+        val allCoordinates = HashSet<Int>()
+        val nonlinearCoordinates = HashSet<Int>()
+        for (input in inputs) {
+            val inputDegree = degree.invoke(input, projectionVariable) as Int
+            degrees[inputDegree] = (degrees[inputDegree] ?: 0) + 1
+            val payload = (terms.invoke(input) as List<*>).map { monomial.invoke(it) }
+            termCount += payload.size
+            var totalDegree = 0L
+            for (term in payload) {
+                val ids = (coordinates.invoke(term) as List<*>).map { it as Int }
+                allCoordinates.addAll(ids)
+                val powers = ids.map { exponent.invoke(term, it) as Int }
+                totalDegree = maxOf(totalDegree, powers.sumOf { it.toLong() })
+                if (ids.size != 1 || powers.single() != 1) nonlinearCoordinates.addAll(ids)
+            }
+            totalDegrees[totalDegree] = (totalDegrees[totalDegree] ?: 0) + 1
+            val leaders = payload.filter { exponent.invoke(it, projectionVariable) == inputDegree }
+            if (leaders.size == 1 && coordinates.invoke(leaders.single()) == listOf(projectionVariable)) {
+                constantLeaders++
+            }
+            val first = payload.firstOrNull() ?: continue
+            val candidates = coordinates.invoke(first) as List<*>
+            if (candidates.any { coordinate -> payload.all { (exponent.invoke(it, coordinate) as Int) > 0 } }) {
+                commonFactors++
+            }
+        }
+        return PhaseProjection(projectionVariable, inputs.size, termCount, degrees,
+            constantLeaders, commonFactors, inputs.size.toLong() * (inputs.size - 1) / 2, requiredEquation,
+            totalDegrees, allCoordinates.count { it !in nonlinearCoordinates })
+    }
+
+    private fun termCount(value: Any): Int = (terms.invoke(value) as List<*>).size
+
+    fun reducedRegion(): PhaseReducedRegion? {
+        val atoms = reducedAtoms ?: return null
+        val atomType = Class.forName("com.eignex.klause.theory.qfnra.PolynomialAtom")
+        val polynomial = atomType.getMethod("getPolynomial")
+        val relation = atomType.getMethod("getRelation")
+        val termType = Class.forName("com.eignex.klause.arithmetic.polynomial.PolynomialTerm")
+        val monomial = termType.getMethod("getMonomial")
+        val monomialType = Class.forName("com.eignex.klause.arithmetic.polynomial.Monomial")
+        val coordinates = monomialType.getMethod("getVariables")
+        val exponent = monomialType.getMethod("exponent", Int::class.javaPrimitiveType)
+        val relations = LinkedHashMap<String, Int>()
+        val totalDegrees = LinkedHashMap<Long, Int>()
+        val ids = HashSet<Int>()
+        var termCount = 0L
+        for (atom in atoms) {
+            val kind = relation.invoke(atom).toString()
+            relations[kind] = (relations[kind] ?: 0) + 1
+            val input = polynomial.invoke(atom)
+            val payload = terms.invoke(input) as List<*>
+            termCount += payload.size
+            var totalDegree = 0L
+            for (term in payload) {
+                val powers = monomial.invoke(term)
+                val members = (coordinates.invoke(powers) as List<*>).map { it as Int }
+                ids.addAll(members)
+                totalDegree = maxOf(totalDegree, members.sumOf { (exponent.invoke(powers, it) as Int).toLong() })
+            }
+            totalDegrees[totalDegree] = (totalDegrees[totalDegree] ?: 0) + 1
+        }
+        return PhaseReducedRegion(atoms.size, termCount, relations, ids.size, totalDegrees)
     }
 }
 
@@ -289,6 +489,52 @@ internal data class PhaseTrace(
     val chargeSum: Long,
     val preparationCharges: Long,
     val containingDeadlineStack: List<String>?,
+    val lastSubresultants: PhaseSubresultants? = null,
+    val lastDivision: PhaseDivision? = null,
+    val lastProjection: PhaseProjection? = null,
+    val lastReducedRegion: PhaseReducedRegion? = null,
+)
+
+@Serializable
+internal data class PhaseReducedRegion(
+    val atoms: Int,
+    val terms: Long,
+    val relations: Map<String, Int>,
+    val realCoordinates: Int,
+    val totalDegrees: Map<Long, Int>,
+)
+
+@Serializable
+internal data class PhaseProjection(
+    val variable: Int,
+    val polynomials: Int,
+    val terms: Long,
+    val degrees: Map<Int, Int>,
+    val constantLeadingCoefficients: Int,
+    val commonMonomialFactors: Int,
+    val allInputPairs: Long,
+    val requiredEquation: Boolean,
+    val totalDegrees: Map<Long, Int>,
+    val constantAffineCoordinates: Int,
+)
+
+@Serializable
+internal data class PhaseSubresultants(
+    val variable: Int,
+    val index: Int?,
+    val leftDegree: Int,
+    val rightDegree: Int,
+    val leftTerms: Int,
+    val rightTerms: Int,
+    val matrixSize: Long?,
+)
+
+@Serializable
+internal data class PhaseDivision(
+    val dividendTerms: Int,
+    val divisorTerms: Int,
+    val divisorIsConstant: Boolean,
+    val divisorIsMonomial: Boolean,
 )
 
 @Serializable
@@ -302,4 +548,29 @@ internal data class PipelinePhaseTrace(
     val preparationCharges: Long,
     val executionCharges: Long,
     val containingDeadlineStack: List<String>?,
+    val queryObservation: PipelineQueries? = null,
+)
+
+@Serializable
+internal data class PipelineQueries(
+    val observed: Long,
+    val discardedHistory: Long,
+    val previous: List<PipelineQuery>,
+    val last: PipelineQuery?,
+    val lastSubresultants: PhaseSubresultants?,
+    val lastDivision: PhaseDivision?,
+    val lastProjection: PhaseProjection?,
+    val lastReducedRegion: PhaseReducedRegion?,
+)
+
+@Serializable
+internal data class PipelineQuery(
+    val sequence: Long,
+    val invocation: Int,
+    val invocationQuery: Long,
+    val origin: List<String>,
+    val result: String,
+    val reason: String?,
+    val resource: String?,
+    val stats: String,
 )

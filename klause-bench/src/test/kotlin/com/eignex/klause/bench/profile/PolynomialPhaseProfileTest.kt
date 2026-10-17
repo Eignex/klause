@@ -2,10 +2,101 @@ package com.eignex.klause.bench.profile
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialPhaseProfileTest {
+    @Test
+    fun `pipeline query observations preserve the native result and work`() {
+        val source = "(declare-const x Real) (assert (= (* x x) 2))"
+        val plain = PolynomialPhaseProfile.pipeline(source)
+
+        val traced = PolynomialPhaseProfile.pipeline(source, queryTrace = true)
+
+        assertEquals(plain.result, traced.result)
+        assertEquals(plain.nativeStats, traced.nativeStats)
+        assertNull(plain.queryObservation)
+        val queries = assertNotNull(traced.queryObservation)
+        assertTrue(queries.observed > 0)
+        assertEquals(0L, queries.discardedHistory)
+        assertEquals(queries.observed - 1, queries.previous.size.toLong())
+        assertEquals(queries.observed, assertNotNull(queries.last).sequence)
+        assertTrue(queries.last.origin.isNotEmpty())
+    }
+
+    @Test
+    fun `phase observations retain subresultant operand shapes and matrix index`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, timeoutMs = 10_000)
+
+        val observed = assertNotNull(trace.lastSubresultants)
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertTrue(observed.variable in 0..1)
+        assertEquals(0, observed.index)
+        assertEquals(2, observed.leftDegree)
+        assertEquals(1, observed.rightDegree)
+        assertEquals(3, observed.leftTerms)
+        assertEquals(1, observed.rightTerms)
+        assertEquals(3L, observed.matrixSize)
+    }
+
+    @Test
+    fun `phase observations remain absent without arithmetic requests`() {
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure("(assert false)")
+
+        assertNull(trace.lastSubresultants)
+        assertNull(trace.lastDivision)
+        assertNull(trace.lastProjection)
+        assertNull(trace.lastReducedRegion)
+    }
+
+    @Test
+    fun `phase observations distinguish family pairs and common monomial factors`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = "$declarations (assert (> (* x0 x1) 0)) (assert (> (+ (* x0 x1) x1) 0))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, timeoutMs = 10_000)
+
+        val observed = assertNotNull(trace.lastProjection)
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertTrue(observed.variable in 0..1)
+        assertEquals(2, observed.polynomials)
+        assertEquals(3L, observed.terms)
+        assertEquals(mapOf(1 to 2), observed.degrees)
+        assertEquals(mapOf(2L to 2), observed.totalDegrees)
+        assertEquals(0, observed.constantAffineCoordinates)
+        assertEquals(0, observed.constantLeadingCoefficients)
+        assertEquals(2, observed.commonMonomialFactors)
+        assertEquals(1L, observed.allInputPairs)
+        assertEquals(false, observed.requiredEquation)
+    }
+
+    @Test
+    fun `phase family metadata distinguishes total degree from rational affine coordinates`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = "$declarations (assert (not (= x0 0))) " +
+            "(assert (> (+ x0 (* x1 x1)) 0)) (assert (> (- (* x1 x1) x0) 0))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, timeoutMs = 10_000)
+
+        val observed = assertNotNull(trace.lastProjection)
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertEquals(mapOf(1 to 3), observed.degrees)
+        assertEquals(mapOf(1L to 1, 2L to 2), observed.totalDegrees)
+        assertEquals(1, observed.constantAffineCoordinates)
+        val region = assertNotNull(trace.lastReducedRegion)
+        assertEquals(3, region.atoms)
+        assertEquals(2, region.realCoordinates)
+        assertEquals(mapOf("NE" to 1, "GT" to 2), region.relations)
+        assertEquals(mapOf(1L to 1, 2L to 2), region.totalDegrees)
+    }
+
     @Test
     fun `a negated conjunction declines conjunctive guidance after normalization`() {
         val source = """

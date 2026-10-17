@@ -106,6 +106,13 @@ CAD, exact witness capture and the final verdict poll share cancellation and all
 limits. Closing the invocation rejects further queries; captured scalar witnesses
 remain readable. Invocations share no mutable traversal or refinement state.
 
+A fresh diagnostic-owned service can install a default-null query observer before
+opening workers. Each invocation captures that callback by value and calls it after
+registering a fresh query, before arithmetic advances. Observers retain read-only
+references for phase attribution; they supply no conditions, candidates or limits.
+This hook is local to the prepared service and does not share traversal state across
+invocations. Reconfiguring it affects only subsequent invocations.
+
 `PolynomialSearchComponent` consumes shared Boolean facts and semantic integer bounds.
 Integer columns map to theory coordinates without creating continuous CP domains.
 A query over an unfixed integer interval is a real relaxation: its exact refutation
