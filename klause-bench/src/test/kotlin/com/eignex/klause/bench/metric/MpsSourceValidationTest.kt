@@ -46,8 +46,8 @@ class MpsSourceValidationTest {
         sourceTolerance = mapOf("absolute" to "1/10000000", "relative" to "1/10000000"),
         witnessCheck = "all original MPS rows bounds integrality and objective evaluated at supplied point")
     private val childFields = setOf("status", "reason", "scope", "bindings", "solverSearchQueries",
-        "proofCertificateChecked", "checkedWitness", "checker", "groundArithmetic", "exactFeasible", "toleranceAccepted",
-        "sourceTolerance", "witnessCheck")
+        "proofCertificateChecked", "checkedWitness", "checker", "groundArithmetic", "exactFeasible",
+        "toleranceAccepted", "sourceTolerance", "witnessCheck")
     private val child = JsonObject(Reports.json.parseToJsonElement(Reports.json.encodeToString(base)).jsonObject
         .filterKeys { it in childFields }).toString() + "\n"
     private val childStream = MpsCheckerStream(child.toByteArray().size.toLong(), child.toByteArray().size.toLong(),

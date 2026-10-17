@@ -106,7 +106,8 @@ internal object MpsSourceReceipt {
         require(receipt.setupMs + receipt.checkMs <= 70_000)
         val child = Reports.json.parseToJsonElement(logs.getValue("check.stdout")).jsonObject
         val fields = setOf("status", "reason", "scope", "bindings", "solverSearchQueries",
-            "proofCertificateChecked", "checkedWitness", "checker", "groundArithmetic") + if (receipt.status == "valid") {
+            "proofCertificateChecked", "checkedWitness", "checker", "groundArithmetic") +
+            if (receipt.status == "valid") {
             setOf("exactFeasible", "toleranceAccepted", "sourceTolerance", "witnessCheck")
         } else {
             emptySet()
