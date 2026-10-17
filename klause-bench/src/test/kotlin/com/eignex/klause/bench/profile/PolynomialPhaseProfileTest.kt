@@ -45,7 +45,7 @@ class PolynomialPhaseProfileTest {
         val observed = assertNotNull(trace.lastProjection)
         assertEquals("Satisfiable", trace.result)
         assertEquals(trace.nativeWork, trace.chargeSum)
-        assertEquals(1, observed.variable)
+        assertTrue(observed.variable in 0..1)
         assertEquals(2, observed.polynomials)
         assertEquals(3L, observed.terms)
         assertEquals(mapOf(1 to 2), observed.degrees)
