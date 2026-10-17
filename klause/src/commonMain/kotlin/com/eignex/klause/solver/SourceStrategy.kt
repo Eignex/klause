@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.bindResult
 import com.eignex.klause.ir.ObjectiveSense
@@ -15,6 +16,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
@@ -59,7 +61,7 @@ import com.eignex.klause.util.WorkMeter
 class SourceStrategy internal constructor(
     /** Original model, before strategy projections or source-safe bound preparation. */
     val source: Problem,
-    /** Complete traversal or heuristic execution, without changing source constraints. */
+    /** Default traversal or heuristic execution, without changing source constraints. */
     val engine: FiniteEngine,
     /** Captured schema names and typed source locations, when constructed from a schema or compilation. */
     val compiledSchema: CompiledSchema? = null,
@@ -75,6 +77,120 @@ class SourceStrategy internal constructor(
     /** Use this provider bundle for subsequent invocations over the same immutable source. */
     fun withProjectionProviders(providers: FactorProjectionProviders): SourceStrategy =
         SourceStrategy(source, engine, compiledSchema, providers)
+
+    /** Run an explicit engine with common options and the containing source allowances. */
+    fun solve(
+        engine: FiniteEngine,
+        executionOptions: ExecutionOptions = ExecutionOptions(),
+        cores: Int = 1,
+        timeout: Cancellation = Cancellation.Never,
+        cancellation: Cancellation = Cancellation.Never,
+        nodeBudget: NodeBudget? = null,
+    ): OpenTheoryResult {
+        val stop = timeout or cancellation
+        fun stopped(stats: SolveStats = SolveStats.EMPTY): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(
+            if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
+            else TerminationReason.Cancelled, stats,
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            sourceAttachment(), ExecutionOperation.SATISFY, engine,
+            providers = projectionProviders, cancellation = stop,
+        ))
+        compiledSchema?.sourceBinding?.selectView(invocation)
+        val execution = SourceSetup.execute(SourceExecutionRequest(
+            invocation, executionOptions, cores = cores, timeout = timeout, cancellation = cancellation,
+            nodeBudget = nodeBudget,
+        ))
+        val result = when (execution) {
+            is SourceExecutionResult.Polynomial -> execution.result.result
+            is SourceExecutionResult.Transcendental -> execution.result.result
+            is SourceExecutionResult.Linear ->
+                (execution.result as OpenTheoryExecution.Satisfy).result
+            is SourceExecutionResult.Finite -> {
+                val outcome = execution.result.outcome as? FiniteSolveOutcome.Completed
+                    ?: return OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
+                        .withSourceSemantics(source.semantics)
+                when (outcome.verdict) {
+                    FiniteSolveVerdict.SAT -> OpenTheoryResult.Sat(
+                        OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample)), outcome.stats,
+                    )
+                    FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
+                    else -> OpenTheoryResult.Unknown(
+                        (execution.result.nativeSourceResult as? SolveResult.Unknown)?.reason
+                            ?: if (stop()) stopped().reason
+                            else if (invocation.floatGrid != null) TerminationReason.Unsupported
+                            else TerminationReason.BudgetExhausted,
+                        outcome.stats,
+                    )
+                }
+            }
+            is SourceExecutionResult.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
+            is SourceExecutionResult.Declined -> OpenTheoryResult.Unknown(execution.reason, SolveStats.EMPTY)
+            is SourceExecutionResult.Numerical, is SourceExecutionResult.Quadratic ->
+                OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
+        }
+        if (stop()) return stopped(result.stats).withSourceSemantics(source.semantics)
+        val sample = when (val assignment = (result as? OpenTheoryResult.Sat)?.assignment) {
+            is OpenTheoryAssignment.Sampled -> assignment.sample
+            is OpenTheoryAssignment.Difference -> assignment.sample
+            else -> null
+        }
+        val bound = if (sample != null && compiledSchema != null) {
+            compiledSchema.sourceBinding.bindOriginalSample(sample, stop)
+                ?: return stopped(result.stats).withSourceSemantics(source.semantics)
+        } else null
+        return (if (bound != null && result is OpenTheoryResult.Sat) {
+            result.copy(assignment = OpenTheoryAssignment.Sampled(bound))
+        } else result).withSourceSemantics(source.semantics)
+    }
+
+    /** Optimize an affine source objective with an explicit engine and common execution controls. */
+    fun optimize(
+        objective: LinearObjective,
+        engine: FiniteEngine,
+        executionOptions: ExecutionOptions = ExecutionOptions(),
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+        cores: Int = 1,
+        timeout: Cancellation = Cancellation.Never,
+        cancellation: Cancellation = Cancellation.Never,
+        nodeBudget: NodeBudget? = null,
+    ): QuadraticOptimizationExecution {
+        val original = compiledSchema?.sourceBinding?.originalObjective(objective) ?: run {
+            require(objective.sourcePairing == null) { "compiled helper objective requires its compiled source strategy" }
+            objective.toQuadraticObjectiveSpec()
+        }
+        return optimize(original, engine, executionOptions, sense, cores, timeout, cancellation, nodeBudget)
+    }
+
+    /** Optimize an exact quadratic source objective with an explicit engine and common execution controls. */
+    fun optimize(
+        objective: QuadraticObjectiveSpec,
+        engine: FiniteEngine,
+        executionOptions: ExecutionOptions = ExecutionOptions(),
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+        cores: Int = 1,
+        timeout: Cancellation = Cancellation.Never,
+        cancellation: Cancellation = Cancellation.Never,
+        nodeBudget: NodeBudget? = null,
+    ): QuadraticOptimizationExecution {
+        val stop = timeout or cancellation
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            sourceAttachment(), engine, objective, sense, projectionProviders, stop, stop,
+            requiresQuadraticCompletion = true,
+        ))
+        val execution = SourceSetup.execute(SourceExecutionRequest(
+            invocation, executionOptions, cores = cores, timeout = timeout, cancellation = cancellation,
+            nodeBudget = nodeBudget,
+        ))
+        return when (execution) {
+            is SourceExecutionResult.Quadratic -> compiledSchema?.sourceBinding?.bindResult(execution) {
+                if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
+                else TerminationReason.Cancelled
+            } ?: execution.result
+            is SourceExecutionResult.Declined -> unsupportedQuadratic(sense, execution.reason)
+            else -> unsupportedQuadratic(sense)
+        }.withSourceSemantics(source.semantics)
+    }
 
     /**
      * Solve through the shared source route. [polynomial] retains finite strategy controls and arithmetic limits;
@@ -191,9 +307,9 @@ class SourceStrategy internal constructor(
     }
 
     /**
-     * Optimize an affine objective over bounded integer declarations and exact continuous constraints.
+     * Optimize an affine objective over supported integer declarations and exact continuous constraints.
      * The lossless shared bridge retains exact values, objective direction, bounds and attainment results.
-     * Open integer optimization uses [optimizeOpen]; an unsupported polynomial encoding explicitly declines.
+     * [optimizeOpen] retains the linear result surface; an unsupported polynomial encoding explicitly declines.
      */
     fun optimize(
         objective: LinearObjective,

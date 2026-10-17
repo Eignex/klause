@@ -120,9 +120,11 @@ establish exactness merely because the interval collapses to one value.
 
 ## Theory invocation scopes
 
-Finite source-strategy satisfaction and affine optimization use the same captured source execution entry.
-Each call supplies its own complete typed single-consumer controls to the selected
-finite factory. The native result and reconstructed source outcome are retained in
+Source-strategy satisfaction and affine or quadratic optimization use the captured
+source execution entry. Explicit-engine calls bind common options and portfolio
+lanes per invocation; typed compatibility calls retain their single-consumer finite
+controls. Compiled objective ownership and result frames belong to the captured
+source binding. The native result and reconstructed source outcome are retained in
 that call's completed envelope; another call cannot replace its interruption reason
 or coordinates. The native optimization result remains separate from the reconstructed
 point and its exactly evaluated source objective. Native solving and publication use
