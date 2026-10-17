@@ -70,6 +70,8 @@ class QfLiraSolverHintsTest {
                     realLower = DoubleArray(3),
                     realUpper = DoubleArray(3),
                     factors = arrayOf(
+                        Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                            doubleArrayOf(1.0), LinearOp.EQ, 0.0),
                         ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
                             doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
                         declaration,
@@ -129,6 +131,8 @@ class QfLiraSolverHintsTest {
             realLower = DoubleArray(3),
             realUpper = DoubleArray(3),
             factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0),
                 ReifiedRealLinear(63, intArrayOf(), doubleArrayOf(), intArrayOf(0),
                     doubleArrayOf(1.0), LinearOp.LE, 0.0),
                 ReifiedRealLinear(65529, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
@@ -137,6 +141,9 @@ class QfLiraSolverHintsTest {
         )
         for (defaultOpening in listOf(false, true)) {
             ExactLiraSearchComponent(model).use { component ->
+                val stats = SmtStatsSink()
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
                 val prepared = component.partialPointHints(Cancellation.Never, defaultOpening)
                 if (!defaultOpening) {
                     assertNull(prepared)
@@ -146,6 +153,8 @@ class QfLiraSolverHintsTest {
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 val before = component.lpMetrics
+                val stages = stats.snapshot().completeSearchStages
+                assertTrue((stages?.get("POINT_HINT_SELECTED_CAPTURE") ?: 0L) > 0L, stages.toString())
 
                 assertContentEquals(intArrayOf(63, 65529), variables)
                 assertEquals(true, hints.preferredBool(63))
@@ -170,8 +179,10 @@ class QfLiraSolverHintsTest {
                 doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)
             val unconditional = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
                 doubleArrayOf(1.0), LinearOp.EQ, 0.0)
-            for (factors in listOf(arrayOf<Factor>(first, second, other), arrayOf<Factor>(first, other, second),
-                arrayOf<Factor>(other, second, first), arrayOf<Factor>(first, unconditional, other, second))) {
+            for (factors in listOf(arrayOf<Factor>(unconditional, first, second, other),
+                arrayOf<Factor>(unconditional, first, other, second),
+                arrayOf<Factor>(unconditional, other, second, first),
+                arrayOf<Factor>(first, unconditional, other, second))) {
                 val model = Problem(
                     numBoolVars = 65530,
                     intBounds = openBounds(0),
@@ -215,6 +226,8 @@ class QfLiraSolverHintsTest {
             realLower = DoubleArray(3),
             realUpper = DoubleArray(3),
             factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0),
                 ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
                     doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
                 declaration,
@@ -245,6 +258,8 @@ class QfLiraSolverHintsTest {
             realLower = DoubleArray(3),
             realUpper = DoubleArray(3),
             factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0),
                 ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
                     doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
                 ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
@@ -310,8 +325,12 @@ class QfLiraSolverHintsTest {
             numRealVars = 540,
             realLower = DoubleArray(540) { 1e20 },
             realUpper = DoubleArray(540) { 1e20 },
-            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
-                doubleArrayOf(1.0, 1.0, -2.0), LinearOp.LE, 0.0)),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, -2.0), LinearOp.EQ, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, -2.0), LinearOp.LE, 0.0),
+            ),
         )
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(model).use { component ->
@@ -356,6 +375,8 @@ class QfLiraSolverHintsTest {
             realLower = DoubleArray(3),
             realUpper = DoubleArray(3),
             factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0),
                 ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
                     doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
                 ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
@@ -427,6 +448,8 @@ class QfLiraSolverHintsTest {
             realLower = DoubleArray(3),
             realUpper = DoubleArray(3),
             factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0),
                 ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
                     doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
                 declaration,
