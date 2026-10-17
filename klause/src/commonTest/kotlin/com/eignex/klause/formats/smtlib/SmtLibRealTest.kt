@@ -1,18 +1,196 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryCompletion
+import com.eignex.klause.solver.search.ClauseSearchComponent
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.StringCharSource
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SmtLibRealTest {
+    @Test
+    fun `a false closed equality comparison should force its opposite without arithmetic`() {
+        val source = SmtLib.parse(
+            "(declare-const x Real) (declare-const b Bool) " +
+                "(assert (= b (= x 0.0))) (assert (not b))",
+        )
+        val comparisons = source.model.factors.filterIsInstance<ExactLinear>()
+            .filter { it.activator != LinearRow.ALWAYS }
+        assertEquals(2, comparisons.size)
+        val session = SearchSession(listOf(ClauseSearchComponent(source.model.factors.filterIsInstance<Clause>())))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        for (first in comparisons.indices) {
+            val other = comparisons[1 - first].activator
+            assertNull(session.boolValue(other))
+
+            assertIs<ComponentResult.Consistent>(
+                session.push(SearchDecision.Bool(Lit.make(comparisons[first].activator, false))),
+            )
+
+            assertEquals(true, session.boolValue(other))
+            session.popTo(0)
+            assertNull(session.boolValue(other))
+        }
+    }
+
+    @Test
+    fun `equality should permit both closed comparisons at its boundary`() {
+        val source = SmtLib.parse(
+            "(declare-const x Real) (declare-const b Bool) " +
+                "(assert (= b (= x 0.0))) (assert b) (assert (= x 0.0))",
+        )
+        val comparisons = source.model.factors.filterIsInstance<ExactLinear>()
+            .filter { it.activator != LinearRow.ALWAYS }
+        val session = SearchSession(listOf(ClauseSearchComponent(source.model.factors.filterIsInstance<Clause>())))
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertEquals(2, comparisons.size)
+        comparisons.forEach { assertEquals(true, session.boolValue(it.activator)) }
+        assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve())
+    }
+
+    @Test
+    fun `negated real equality should retain values on either side of its boundary`() {
+        for (value in listOf("(- 1.0)", "1.0")) {
+            val source = SmtLib.parse(
+                "(declare-const x Real) (declare-const b Bool) " +
+                    "(assert (= b (= x 0.0))) (assert (not b)) (assert (= x $value))",
+            )
+
+            val result = BacktrackSolver.source(source.model).solve()
+
+            assertIs<OpenTheoryResult.Sat>(result)
+        }
+    }
+
+    @Test
+    fun `real equality helpers should retain definition and local binding scopes`() {
+        val source = SmtLib.parse(
+            """
+                (declare-const x Real)
+                (declare-const y Real)
+                (declare-const a Bool)
+                (declare-const b Bool)
+                (define-fun zero () Bool (= x 0.0))
+                (assert (= x 1.0))
+                (assert (= y 0.0))
+                (assert (let ((x y)) (= a zero)))
+                (assert (let ((x y)) (= b (= x 0.0))))
+                (assert (not a))
+                (assert b)
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `conditional real equality should retain the selected branch truth`() {
+        for (condition in listOf(false, true)) {
+            val source = SmtLib.parse(
+                """
+                    (declare-const x Real)
+                    (declare-const y Real)
+                    (declare-const c Bool)
+                    (declare-const b Bool)
+                    (assert (= x 0.0))
+                    (assert (= y 1.0))
+                    (assert (= c $condition))
+                    (assert (= b (ite c (= x 0.0) (= y 0.0))))
+                    (assert (= b $condition))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(source.model).solve()
+
+            assertIs<OpenTheoryResult.Sat>(result)
+        }
+    }
+
+    @Test
+    fun `mixed and private real equality terms should retain their Boolean relaxation`() {
+        for (term in listOf("(+ x (to_real n))", "(ite c x y)")) {
+            val source = SmtLib.parse(
+                "(declare-const x Real) (declare-const y Real) (declare-const n Int) " +
+                    "(declare-const c Bool) (declare-const b Bool) " +
+                    "(assert (= b (= $term 0.0))) (assert (not b))",
+            )
+            val comparisons = source.model.factors.filterIsInstance<ExactLinear>()
+                .filter { it.activator != LinearRow.ALWAYS }
+            assertEquals(2, comparisons.size)
+            val session = SearchSession(listOf(ClauseSearchComponent(source.model.factors.filterIsInstance<Clause>())))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(
+                session.push(SearchDecision.Bool(Lit.make(comparisons[0].activator, false))),
+            )
+
+            assertNull(session.boolValue(comparisons[1].activator))
+        }
+    }
+
+    @Test
+    fun `a real equality cover should not retain an unused integer conditional`() {
+        val source = SmtLib.parse(
+            "(declare-const x Real) " +
+                "(assert (let ((s (ite (= x 0.0) 1 2))) (= (ite true 1 s) 1))) " +
+                "(assert (= x 1.0))",
+        )
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        assertTrue(source.model.factors.all { it.intVars.isEmpty() })
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `source work exhaustion should withhold the real equality cover`() {
+        for (limit in listOf(4L, 6L)) {
+            var work = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = work > limit
+                override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            }
+            val builder = Compiler.Builder(DEFAULT_UNBOUNDED_INT_LO, DEFAULT_UNBOUNDED_INT_HI,
+                strictBounds = false, sourceCancellation = stop)
+            builder.command(requireNotNull(SExprReader(StringCharSource("(declare-const x Real)")).readCommandOrNull()))
+            val term = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)
+            val zero = RealComb(emptyMap(), emptyMap(), BigFraction.ZERO)
+
+            assertFailsWith<PolynomialSourceInterrupted> {
+                builder.reifyRealRel("=", term, zero)
+            }
+
+            assertTrue(work > limit)
+            assertTrue(builder.factors.filterIsInstance<Clause>().isEmpty())
+            assertEquals(2, builder.factors.filterIsInstance<ExactLinear>().size)
+        }
+    }
+
     @Test
     fun `identical folded real comparisons should share one predicate literal`() {
         val source = SmtLib.parse(

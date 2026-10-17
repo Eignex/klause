@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -167,9 +168,14 @@ private fun exactRealRow(
 internal fun Compiler.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb): Int {
     val d = a.plus(b.scaled(BigFraction.MINUS_ONE))
     if (op == "=") {
-        return reifyAnd(
-            listOf(reifyRealAtom(d, LinearOp.LE, strict = false), reifyRealAtom(d, LinearOp.GE, strict = false)),
-        )
+        val lower = reifyRealAtom(d, LinearOp.LE, strict = false)
+        val upper = reifyRealAtom(d, LinearOp.GE, strict = false)
+        if (hasDeclaredRealEqualityCover(d)) {
+            sourceCancellation.charge(3L)
+            if (sourceCancellation()) throw PolynomialSourceInterrupted()
+            factors.add(Clause(intArrayOf(lower, upper)))
+        }
+        return reifyAnd(listOf(lower, upper))
     }
     val (linOp, strict) = when (op) {
         "<=" -> LinearOp.LE to false
@@ -179,6 +185,21 @@ internal fun Compiler.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb)
         else -> throw UnsupportedSmtException("real relation '$op'")
     }
     return reifyRealAtom(d, linOp, strict)
+}
+
+private fun Compiler.Builder.hasDeclaredRealEqualityCover(term: RealComb): Boolean {
+    sourceCancellation.charge(term.realCoeffs.size.toLong() + 1L)
+    if (sourceCancellation()) throw PolynomialSourceInterrupted()
+    if (term.isConstant || term.intCoeffs.isNotEmpty()) return false
+    // Declarations precede build-time helpers, so source Real coordinates form this prefix.
+    val declaredReals = realNames.size
+    var nonconstant = false
+    for ((variable, coefficient) in term.realCoeffs) {
+        if (sourceCancellation()) throw PolynomialSourceInterrupted()
+        if (variable < 0 || variable >= declaredReals) return false
+        if (!coefficient.isZero) nonconstant = true
+    }
+    return nonconstant
 }
 
 private fun Compiler.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict: Boolean): Int {

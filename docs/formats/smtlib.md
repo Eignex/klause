@@ -126,6 +126,14 @@ may decline values they cannot represent. Integer-only rational comparisons reta
 exact denominator-cleared lattice thresholds. Source witnesses and proofs remain
 subject to the complete selected relation and original declaration checks.
 
+A reified nonconstant affine equality using only declared Real coordinates retains
+both closed comparison predicates and their full Boolean AND. Their disjunction
+is also retained as a source clause: at least one comparison holds, and both hold
+at equality. This clause is independent of the AND gate's definition slice and
+uses the predicates' existing signed literals. Mixed integer terms and private
+helper coordinates retain their ordinary encoding. Eligibility scanning and clause
+construction charge the source token and stop on cancellation.
+
 Hard unit-weight integer sums of total single-guard zero/one conditionals retain
 Boolean cardinality constraints when their LE, GE or EQ threshold lies within the
 literal count. Signed guards and opposite arm orientations preserve each indicator's
