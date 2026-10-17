@@ -43,6 +43,7 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.admission
 import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.maximizeSourceObjective
 import com.eignex.klause.solver.pipeline.minimize
 import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.polynomialRequest
