@@ -1,5 +1,7 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.ObjectiveSense
@@ -18,6 +20,8 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.eq
+import com.eignex.klause.schema.times
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
@@ -30,6 +34,7 @@ import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -63,16 +68,17 @@ class CompiledSourceBindingTest {
 
     @Test
     fun `a complete original source arm should retain a point outside its compatibility grid`() {
+        val x = FloatHandle("x", 0.0, 1.0)
         val compiled = SchemaDef<SchemaEntry>(mapOf(
             "x" to FloatSpec(0.0, 1.0, 2),
             "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -1.0)),
-            "half" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.EQ, 0.5)),
+            "square" to NamedConstraint((x * x) eq 0.25),
         )).compile()
 
         val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(compiled).solve())
 
-        assertEquals("1/2", result.assignment.realValue(assertNotNull(compiled.sourceRealId(
-            FloatHandle("x", 0.0, 1.0))).index))
+        val point = assertNotNull(result.assignment.algebraicRealValue(assertNotNull(compiled.sourceRealId(x)).index))
+        assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-1, 2), point))
     }
 
     @Test

@@ -2764,21 +2764,36 @@ JVM with `-XX:ActiveProcessorCount` and its own `objective-probe.jfr`; the lab's
 parent recording covers the wrapper. Settings record the actual execution JVM.
 `schema=<JSON SchemaDef>` selects the compiled/schema path for the same original
 polynomial real sources. Declaration names must agree; real coordinates use public
-compiled source IDs and float objective handles. Finite-grid floats, integer schema
-declarations absent from the original source and aliased named real coordinates
-decline. The captured schema bytes
+compiled source IDs and float objective handles. Preparation and capture use the
+canonical source Problem, including floats with a private compatibility bucket.
+Integer schema declarations absent from the original source and aliased named real
+coordinates decline. The captured schema bytes
 and hash accompany exact named original-source results; compiler auxiliaries are
 excluded from the original witness map.
 With `entry=source` and `engines=BACKTRACK,LOCAL_SEARCH`, the compiled path uses the
-public source strategy factories. Its affine objective is copied from a captured
-float helper so the exact source pairing is exercised. `sourceObjective` retains
-the actual helper's exact carrier for result capture; the quadratic arm uses the
+public source strategy factories. Its affine objective is assembled through each
+public helper's actual native unit coordinate and copied onto a captured helper
+basis. A private float can use a separate value carrier; its helper weights must
+fit Long exactly. `sourceObjective` retains the actual helper's exact carrier for
+result capture; the quadratic arm uses the
 same canonical typed objective. Records identify `compiled-source-strategy` and
 retain the existing independent original-source checks. `entry=setup` is the default
 shared setup probe. Source result capture uses the exact quadratic carrier for both
 source strategy arms. Checker provisioning first uses the host's existing Python
 venv support; the Linux package bootstrap runs only when environment creation fails.
 Dependencies remain inside the owned job environment.
+Source strategy records also check the original sample frame and public FloatHandle
+decoders, including optional presence-first decoding. `pinAbsent=false` supplies the
+schema compiler's absent-value semantic override and records its effective value.
+
+The `schema-source-floats-v1` inputs exercise optional x in [-1,1] with two requested
+buckets, y in [0,4], the unguarded product y=(x+1)*(x+1) and cost 3*x+5*y+7. Use its
+`absent` or `present` source directory with the matching schema file. Absence has
+x=0, y=1 and cost 12, including an intermediate value outside its compatibility
+grid. Presence retains extrema 4 and 30. Use `absent-unpinned` with the absent schema
+and `pinAbsent=false` to leave the underlying absent value unconstrained; optional
+decoding still returns null. Every case retains its original SMT constraints for
+independent witness and bound checking.
 The source objective must be affine, with integer Boolean weights/constant fitting
 Long and real coefficients exactly representable in binary64. Other objectives
 decline rather than acquire rounded coefficients. Each execution gets fresh state,
