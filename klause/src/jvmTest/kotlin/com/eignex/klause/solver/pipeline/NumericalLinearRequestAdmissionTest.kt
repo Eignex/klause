@@ -5,14 +5,14 @@ import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.solver.result.TerminationReason
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class NumericalLinearRequestAdmissionTest(private val engine: FiniteEngine) {
@@ -25,16 +25,23 @@ class NumericalLinearRequestAdmissionTest(private val engine: FiniteEngine) {
     @Test
     fun `open numerical sources should decline unavailable heuristic workers before publication`() {
         val source = LinearSourceProblem(listOf(LinearSourceVariable("i", true)), emptyList())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.SATISFY, engine,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.SATISFY,
+            engine,
+        )
+        )
         val budget = NodeBudget(3)
         var publications = 0
         val request = SourceExecutionRequest(invocation, ExecutionOptions(), nodeBudget = budget)
 
-        val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(
-            request, SourceExecutionCallbacks(onLinearIncumbent = { publications++ }),
-        ))
+        val result = assertIs<SourceExecutionResult.Numerical>(
+            SourceSetup.execute(
+            request,
+            SourceExecutionCallbacks(onLinearIncumbent = { publications++ }),
+        )
+        )
 
         assertEquals(TerminationReason.Unsupported, result.result.reason)
         assertNull(result.result.incumbent)
