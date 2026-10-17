@@ -124,6 +124,7 @@ internal object ObjectiveRepresentationProbe {
         File(output, "settings.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
             put("capture", if (capture) "required" else "none")
+            put("entry", if (sourceEntry) "source" else "setup")
             put("seed", seed)
             put("nativeWork", work)
             put("maxFlips", moves)
@@ -162,11 +163,14 @@ internal object ObjectiveRepresentationProbe {
             "existing" -> checkOutput(output, engines, "python3")
             "provision" -> {
                 val log = File(output, "checker-install.log")
-                runProcess(log, "sudo", "apt-get", "update")
-                runProcess(log, "sudo", "apt-get", "install", "-y", "python3-venv")
                 val environment = File(output, "checker-venv")
                 require(!environment.exists()) { "Checker environment already exists: $environment" }
-                runProcess(log, "python3", "-m", "venv", environment.absolutePath)
+                val create = arrayOf("python3", "-m", "venv", environment.absolutePath)
+                if (runProcess(log, *create, required = false) != 0) {
+                    runProcess(log, "sudo", "apt-get", "update")
+                    runProcess(log, "sudo", "apt-get", "install", "-y", "python3-venv")
+                    runProcess(log, *create)
+                }
                 val python = File(environment, "bin/python").absolutePath
                 runProcess(log, python, "-m", "pip", "install", "-r",
                     "klause-bench/tools/requirements-source-checks.txt")
@@ -204,10 +208,12 @@ internal object ObjectiveRepresentationProbe {
         }.toString() + "\n")
     }
 
-    private fun runProcess(log: File, vararg command: String) {
+    private fun runProcess(log: File, vararg command: String, required: Boolean = true): Int {
         val process = ProcessBuilder(command.toList()).redirectErrorStream(true)
             .redirectOutput(ProcessBuilder.Redirect.appendTo(log)).start()
-        check(process.waitFor() == 0) { "${command.first()} failed; see ${log.path}" }
+        val exit = process.waitFor()
+        check(!required || exit == 0) { "${command.first()} failed; see ${log.path}" }
+        return exit
     }
 
     private fun measure(
@@ -340,6 +346,20 @@ internal object ObjectiveRepresentationProbe {
                 replay = "foreign original objective rejected"
                 if (pins.sourceCondition() != Assumptions.None.sourceCondition()) {
                     val unrestricted = requireNotNull(plan.sourceResultCapture(revision, objectiveIdentity = "cost"))
+                    check(unrestricted.quadratic(result, "weaker-condition") === result)
+                    weaker = "weaker original condition rejected"
+                }
+            } else {
+                val replacement = requireNotNull(compiled.model.problem.quadraticSourceResultCapture(
+                    capture.context.scope, QuadraticObjectiveSpec(quadratic.terms, quadratic.constant),
+                ))
+                check(replacement.quadratic(result, "replacement-objective") === result)
+                replay = "foreign original objective rejected"
+                if (pins.sourceCondition() != Assumptions.None.sourceCondition()) {
+                    val unrestricted = requireNotNull(compiled.model.problem.quadraticSourceResultCapture(
+                        SourceScope(revision, Assumptions.None.sourceCondition(), SourceObjective("cost", result.sense)),
+                        quadratic,
+                    ))
                     check(unrestricted.quadratic(result, "weaker-condition") === result)
                     weaker = "weaker original condition rejected"
                 }
