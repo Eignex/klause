@@ -162,9 +162,9 @@ internal class QfNraQuery(
                     }
                     if (reduction.inconsistent) continue
                     reducedRegionObserver?.invoke(reduction.atoms)
-                    val activeFormula = if (reduction.eliminatedCount == 0) normalized
+                    val activeFormula = if (!reduction.changed) normalized
                     else PolynomialFormula.conjunction(reduction.atoms, arithmetic)
-                    val activeRegion = if (reduction.eliminatedCount == 0) region
+                    val activeRegion = if (!reduction.changed) region
                     else PolynomialBooleanRegion(activeFormula.atoms.indices.associateWith {
                         arithmetic.step()
                         true

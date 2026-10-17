@@ -11,6 +11,7 @@ internal class PolynomialAffineReduction private constructor(
     val atoms: List<PolynomialAtom>,
     private val fibres: List<AffineFibre>,
     val inconsistent: Boolean,
+    val changed: Boolean,
 ) {
     val eliminatedCount: Int get() = fibres.size
 
@@ -64,37 +65,51 @@ internal class PolynomialAffineReduction private constructor(
             }
             if (signConflict) {
                 arithmetic.step()
-                yield(PolynomialAffineReduction(current, emptyList(), true))
+                yield(PolynomialAffineReduction(current, emptyList(), true, false))
                 return@sequence
             }
             val fibres = ArrayList<AffineFibre>()
             var inconsistent = false
-            while (true) {
-                val equations = current.mapNotNull { atom ->
-                    arithmetic.step()
-                    if (atom.relation == PolynomialRelation.EQ) atom.polynomial else null
+            var equationsChanged = false
+            while (!inconsistent) {
+                val previousFibres = fibres.size
+                val factoring = preparePolynomialNonzeroReduction(current, arithmetic)
+                var factored: PolynomialNonzeroReduction? = null
+                while (factored == null) {
+                    factored = factoring.next()
+                    if (factored == null) yield(null)
                 }
-                if (inconsistentEquations(equations, arithmetic) || zeroContradiction(current, arithmetic)) {
-                    inconsistent = true
-                    break
-                }
-                val graph = equationalSection(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
-                    ?: break
-                val rewritten = ArrayList<PolynomialAtom>()
-                for (atom in current) {
+                current = factored.atoms
+                equationsChanged = equationsChanged || factored.changed
+                while (true) {
+                    val equations = current.mapNotNull { atom ->
+                        arithmetic.step()
+                        if (atom.relation == PolynomialRelation.EQ) atom.polynomial else null
+                    }
+                    if (inconsistentEquations(equations, arithmetic) || zeroContradiction(current, arithmetic)) {
+                        inconsistent = true
+                        break
+                    }
+                    val graph = equationalSection(
+                        equations, current.map { arithmetic.step(); it.polynomial }, arithmetic,
+                    ) ?: break
+                    val rewritten = ArrayList<PolynomialAtom>()
+                    for (atom in current) {
+                        arithmetic.step()
+                        val polynomial = if (graph.variable in atom.polynomial.variables) {
+                            arithmetic.substitute(atom.polynomial, graph.variable, graph.replacement)
+                        } else atom.polynomial
+                        if (polynomial.isZero && atom.holds(0)) continue
+                        rewritten.add(PolynomialAtom(polynomial, atom.relation))
+                        yield(null)
+                    }
                     arithmetic.step()
-                    val polynomial = if (graph.variable in atom.polynomial.variables) {
-                        arithmetic.substitute(atom.polynomial, graph.variable, graph.replacement)
-                    } else atom.polynomial
-                    if (polynomial.isZero && atom.holds(0)) continue
-                    rewritten.add(PolynomialAtom(polynomial, atom.relation))
+                    fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
+                    current = rewritten
+                    onGraph?.invoke()
                     yield(null)
                 }
-                arithmetic.step()
-                fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
-                current = rewritten
-                onGraph?.invoke()
-                yield(null)
+                if (!factored.changed && fibres.size == previousFibres) break
             }
             while (!inconsistent) {
                 val variable = affineCoordinate(current, realCount, arithmetic)
@@ -139,7 +154,8 @@ internal class PolynomialAffineReduction private constructor(
                 inconsistent = magnitudeConflict
             }
             arithmetic.step()
-            yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent))
+            yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent,
+                equationsChanged || fibres.isNotEmpty()))
         }.iterator()
     }
 }

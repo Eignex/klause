@@ -721,8 +721,8 @@ occurring in exactly one pure linear monomial with a nonzero rational coefficien
 is solved as a polynomial in the remaining coordinates. Every region boundary,
 remaining required equation and selected nonzero predicate is substituted before
 further elimination. A nonzero constant required equation or a zero required
-nonzero polynomial refutes that region. Products remain whole equations; a product
-equality alone supplies no factor zero or nonzero premise. Other coordinate
+nonzero polynomial refutes that region. A product equality alone supplies no factor
+zero or nonzero premise. Other coordinate
 occurrences remain for subsequent projection; only total rational polynomial
 graphs are substituted.
 
@@ -737,6 +737,16 @@ inconsistent. An empty sign set refutes only that Boolean region. Zero fibres an
 mixed-sign cancellation remain admitted. This complete proof pass shares the
 query's native work and cancellation owner; it does not re-enter the bounded
 witness probe or alter its original admission and attempt limits.
+
+Required nonzero monomial predicates independently certify that each coordinate
+factor is nonzero. Regional reduction can cancel those coordinates' common powers
+from required zero equations, then use the resulting polynomial graphs. It never
+divides signed inequalities. Coordinates without such premises retain their zero
+fibres. Cancellation and graph closure alternate until stable under the same
+arithmetic and cancellation owner. Any equation rewrite reaches projection even
+when it eliminates no coordinate. The current region retains the nonzero premises,
+every original coordinate slot and the complete original formula check; another
+region or query starts with separate facts.
 
 After graph and affine reduction, each complete region can also supply necessary
 closed rational magnitude bounds. In an oriented sum of nonnegative even
