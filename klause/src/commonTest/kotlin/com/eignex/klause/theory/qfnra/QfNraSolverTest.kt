@@ -24,7 +24,7 @@ class QfNraSolverTest {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
             "$declarations (assert (<= (* 2 x1) (* 2 x0 x0))) " +
-                "(assert (<= (* -3 x1) (* -3 x0 x0))) " +
+                "(assert (<= (* (- 3) x1) (* (- 3) x0 x0))) " +
                 "(assert (>= x2 (+ x1 1))) (assert (<= x2 (+ x1 1))) " +
                 "(assert (= (+ x0 1) 3))",
         )
