@@ -104,6 +104,7 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.negate
 import com.eignex.klause.util.rem
 import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 
 /** An exact integer/rational witness for an open QF_LIRA or QF_LIA model. */
 class ExactLiraAssignment(
@@ -1603,7 +1604,18 @@ private data class PreparedIntegerSelection(val address: RowAddress, val selecto
 
 private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
     val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    val integerSelections = ArrayList<PreparedIntegerSelection>()
+    var selectionWork = 1L
     val preparedRows = model.factors.flatMapIndexed { factorIndex, factor ->
+        selectionWork++
+        val form = factor.linearForm
+        if (form is LinearForm.Disjunction && form.rows.size == 2) {
+            selectionWork += 8L
+            form.integerSelection(factorIndex, model.numIntVars)?.let { selection ->
+                integerSelections += selection
+                selectionWork += 3L
+            }
+        }
         factor.linearRows.mapIndexed { index, row ->
             PreparedSourceRow(
                 RowAddress(factorIndex, index),
@@ -1618,13 +1630,10 @@ private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
         (0 until row.size).any { !Term.isBool(row.ref(it)) }
     }
     val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
-    val selections = model.factors.mapIndexedNotNull { index, factor ->
-        factor.linearForm.integerSelection(index, model.numIntVars)
-    }
-    val inspected = model.factors.count { (it.linearForm as? LinearForm.Disjunction)?.rows?.size == 2 }
     return PreparedExactLiraSource(
         model, exactForms, preparedRows, arithmeticRows, arithmeticVariables, validated = false,
-        integerSelections = selections, integerSelectionPreparationWork = 8L * inspected + 3L * selections.size,
+        integerSelections = integerSelections.toList(),
+        integerSelectionPreparationWork = selectionWork + integerSelections.size + 1L,
     )
 }
 
