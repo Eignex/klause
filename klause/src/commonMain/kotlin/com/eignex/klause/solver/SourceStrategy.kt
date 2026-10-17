@@ -118,7 +118,8 @@ class SourceStrategy internal constructor(
                         .withSourceSemantics(source.semantics)
                 when (outcome.verdict) {
                     FiniteSolveVerdict.SAT -> OpenTheoryResult.Sat(
-                        OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample ?: finiteWitness)), outcome.stats,
+                        OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample ?: finiteWitness)),
+                        outcome.stats,
                     )
                     FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
                     else -> OpenTheoryResult.Unknown(
