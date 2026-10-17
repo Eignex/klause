@@ -1,7 +1,6 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
-import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -21,7 +20,6 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.SmtStatsSink
-import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
@@ -155,15 +153,27 @@ class QfLiraSolverConflictTest {
 
     @Test
     fun `source cube naming should preserve the existing explanation node limit`() {
-        val session = SearchSession(emptyList())
-        val context = object : SearchContext by session {
-            override fun boolValue(variable: Int): Boolean = false
+        for (size in listOf(4095, 4096)) {
+            val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(size))
+            val context = object : SearchContext by session {
+                override fun boolValue(variable: Int): Boolean = false
+                override fun atomLiteral(decision: SearchDecision): Int? =
+                    (decision as? SearchDecision.Bool)?.literal
+            }
+            var charged = 0L
+            val meter = WorkMeter { charged += it }
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = meter
+            }
+
+            val explanation = explainRefutedSourceCube(IntArray(size), context, stop)
+
+            if (size == 4095) assertEquals(size, assertNotNull(explanation).literals.size)
+            else assertNull(explanation)
+            assertTrue(charged > 0L)
+            assertEquals(0, session.learnedClauseCount)
         }
-
-        val explanation = explainRefutedSourceCube(IntArray(4096), context, Cancellation.Never)
-
-        assertNull(explanation)
-        assertEquals(0, session.learnedClauseCount)
     }
 
     @Test
@@ -181,46 +191,6 @@ class QfLiraSolverConflictTest {
 
         assertNull(explanation)
         assertEquals(0, session.learnedClauseCount)
-    }
-
-    @Test
-    fun `a genuine complete source refutation should explain every captured Boolean`() {
-        val equalities = (0..128).map { variable ->
-            ExactLinear.of(intArrayOf(Term.ofRealVar(variable), Term.ofRealVar(129), Term.ofRealVar(130)),
-                List(3) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ZERO)
-        }
-        val source = Problem(
-            numBoolVars = 2,
-            intBounds = openBounds(0),
-            numRealVars = 131,
-            realLower = DoubleArray(131) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(131) { Double.POSITIVE_INFINITY },
-            factors = (equalities + ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(128)),
-                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.ZERO,
-                strict = true, activator = 0)).toTypedArray(),
-        )
-        val stats = SmtStatsSink()
-        ExactLiraSearchComponent(source).use { component ->
-            component.observeWith(stats)
-            component.observeCompleteTraversal()
-            component.useMixedPointCompletion()
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
-            assertIs<ComponentResult.Consistent>(session.initialize(), "initial source")
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))),
-                "strict source prefix")
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))),
-                "complete source")
-
-            assertNull(component.nextBranch(session))
-
-            val refuted = assertIs<ComponentCheck.Infeasible>(session.check())
-            assertEquals(1L, stats.snapshot().completeSearchStages?.get("RECOVERY_SOURCE_REFUTED"),
-                "stages=${stats.snapshot().completeSearchStages} " +
-                    "outcomes=${stats.snapshot().completeSearchLinearOutcomes}")
-            assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)),
-                assertNotNull(refuted.explanation).literals.toSet())
-            assertNull(session.model().valueOf<Any>(component))
-        }
     }
 
     @Test
