@@ -29,6 +29,7 @@ class SourceSetupRequest private constructor(
     val boundCancellation: Cancellation,
     /** Original exact quadratic source objective, when the operation supplies one. */
     val quadraticObjective: QuadraticObjectiveSpec?,
+    internal val requiresQuadraticCompletion: Boolean = false,
 ) {
     /** Bind an affine operation or the objective already embedded in a native formula. */
     constructor(
@@ -54,6 +55,20 @@ class SourceSetupRequest private constructor(
     ) : this(
         source, ExecutionOperation.OPTIMIZE, engine, null, sense == ObjectiveSense.MAXIMIZE,
         providers, cancellation, boundCancellation, quadraticObjective,
+    )
+
+    internal constructor(
+        source: SourceAttachment,
+        engine: FiniteEngine,
+        quadraticObjective: QuadraticObjectiveSpec,
+        sense: ObjectiveSense,
+        providers: FactorProjectionProviders,
+        cancellation: Cancellation,
+        boundCancellation: Cancellation,
+        requiresQuadraticCompletion: Boolean,
+    ) : this(
+        source, ExecutionOperation.OPTIMIZE, engine, null, sense == ObjectiveSense.MAXIMIZE,
+        providers, cancellation, boundCancellation, quadraticObjective, requiresQuadraticCompletion,
     )
 
     init {
