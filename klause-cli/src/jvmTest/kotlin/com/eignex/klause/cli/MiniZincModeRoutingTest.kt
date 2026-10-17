@@ -1,7 +1,8 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.ir.BoundOverride
+import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.SemanticOverrides
-import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.solver.result.SolveStats
 import java.io.File
 import kotlin.test.Test
@@ -31,7 +32,9 @@ class MiniZincModeRoutingTest(private val engine: String, private val sourceText
         try {
             val common = CommonOptions().apply {
                 this.engine = this@MiniZincModeRoutingTest.engine
-                semanticOverrides = SemanticOverrides(undeclaredIntegers = UndeclaredIntegerBounds())
+                semanticOverrides = SemanticOverrides(
+                    undeclaredIntegers = BoundsOverride(BoundOverride.Open, BoundOverride.Open),
+                )
             }
 
             val solvable = MiniZincMode.newSession().load(source.absolutePath, common)
