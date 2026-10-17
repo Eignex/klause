@@ -305,16 +305,18 @@ rows for those strategies; default continuous LP tolerance remains separate. SMT
 objectives that lack a complete theory route can use open local search for witnesses;
 its engine policy is described by
 [input semantics](formats.md#finite-and-open-models).
-`--param node-limit=N` is a solve-wide work budget. Finite routes charge decision nodes
-and counted local-search instructions at five quarters per instruction; parallel finite
-portfolios assign persistent worker quotas. Complete open routes charge native open-theory decisions, checks, LIA row visits, and the
-candidate hint's local-search moves on an open route. `--param open-hint-flips=N` spends up to N
+`--param node-limit=N` is a solve-wide decision and heuristic instruction budget.
+Finite and open routes charge committed decisions and counted local-search instructions
+at five quarters per instruction; parallel portfolios assign persistent worker quotas.
+`--param open-work-limit=auto|unlimited|N` separately bounds native open arithmetic
+policy work, including checks, LIA row visits and hint production. Omitted limits
+are unlimited. `--param open-hint-flips=N` spends up to N
 local-search flips, once per request, on an unverified first-branch order over the model's shared
 clauses; it is off unless asked for, changes only which side of a Boolean split is tried first, and
 reports under `-s` (`openHint*`) what it drew and how many splits it went on to order. The flips come
-out of the same `node-limit` budget the search spends — the draw gets what is left of it and is
+out of the same `open-work-limit` budget the search spends — the draw gets what is left of it and is
 charged for what it uses — so hinted and unhinted runs share the same total
-allowance. Without a `node-limit` there is nothing to divide and the draw gets the N it asked for; ask
+allowance. Without an `open-work-limit` there is nothing to divide and the draw gets the N it asked for; ask
 for more flips than the limit holds and the draw takes the whole remainder, leaving the traversal
 none. The allowance is not spent until `--param open-hint-min-splits=N` splits have asked for a
 hint (default 128), so a model the theory dominates — which reaches almost no split — never pays

@@ -20,6 +20,33 @@ import kotlin.test.assertTrue
 
 class ExecutionOptionsTest {
     @Test
+    fun `resource settings should retain automatic unlimited and zero as distinct policies`() {
+        for ((raw, expected) in listOf("auto" to 13L, "unlimited" to null, "0" to 0L, "7" to 7L)) {
+            val options = ExecutionOptions.parse(listOf("nra-work-limit=$raw"))
+
+            assertEquals(expected, options.reader().defaulted(ExecutionOption.nraWorkLimit, 13L))
+        }
+    }
+
+    @Test
+    fun `conflicting resource settings should reject both typed and parsed declarations`() {
+        for (options in listOf(
+            ExecutionOptions(ExecutionOption.nodeLimit(3L), ExecutionOption.nodeLimit(null)),
+            ExecutionOptions.parse(listOf("node-limit=3", "node-limit=unlimited")),
+            ExecutionOptions.parse(listOf("node-limit=3", "node-limit=4", "nra-work-limit=0", "nra-work-limit=1")),
+        )) {
+            assertFailsWith<PipelineConfigException> { options.reader()[ExecutionOption.nodeLimit] }
+        }
+    }
+
+    @Test
+    fun `equivalent repeated resource amounts should retain one allowance`() {
+        val options = ExecutionOptions.parse(listOf("node-limit=0", "node-limit=00"))
+
+        assertEquals(0L, options.reader()[ExecutionOption.nodeLimit])
+    }
+
+    @Test
     fun `numerical completion policy should preserve captured tuning and independent consumption`() {
         val options = ExecutionOptions.parse(listOf("seed=7", "arms=2"))
 

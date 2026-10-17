@@ -1,0 +1,196 @@
+package com.eignex.klause.solver.pipeline
+
+import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceVariable
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.solver.result.TerminationReason
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+class SourceExecutionControlsTest {
+    @Test
+    fun `source option binding should retain the containing ledger across native families`() {
+        val sources = listOf(
+            "(declare-const x Real) (assert (> x 0))",
+            "(declare-const x Real) (assert (= (* x x) 2))",
+            "(declare-const x Int) (assert (= (* x x) 2))",
+            "(declare-const x Real) (assert (= (sin x) 0))",
+        ).map { SmtLib.parse(it).source } + SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+        )
+        val budget = NodeBudget(3)
+        budget.spend()
+        for (source in sources) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            ))
+
+            val request = SourceExecutionRequest(invocation, ExecutionOptions(), nodeBudget = budget)
+
+            assertSame(budget, request.nodeBudget)
+            assertSame(budget, request.theory.nodeBudget)
+            assertSame(budget, request.polynomial.strategy.backtrack.nodeBudget)
+            assertSame(budget, request.polynomial.strategy.localSearch.nodeBudget)
+            request.nonlinearInteger?.let { assertSame(budget, it.nodeBudget) }
+            request.transcendental?.let { assertSame(budget, it.nodeBudget) }
+            assertEquals(1L, budget.spent)
+        }
+    }
+
+    @Test
+    fun `source options should keep node and native arithmetic allowances independent`() {
+        val source = SmtLib.parse("(declare-const x Real) (assert (> x 0))").source
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+
+        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf(
+            "node-limit=0", "open-work-limit=unlimited",
+        )))
+        val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(request))
+
+        assertEquals(0L, assertNotNull(request.nodeBudget).limit)
+        assertEquals(Long.MAX_VALUE, request.theory.openWorkLimit)
+        assertIs<OpenTheoryResult.Sat>(assertIs<OpenTheoryExecution.Satisfy>(result.result).result)
+        assertEquals(0L, request.nodeBudget?.spent)
+    }
+
+    @Test
+    fun `native source auto limits should use the parameter defaults`() {
+        val source = SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+
+        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf(
+            "nia-candidates=auto", "nia-moves=auto", "nra-dense-coefficients=auto", "nra-matrix-cells=auto",
+        )))
+
+        val integer = assertNotNull(request.nonlinearInteger)
+        assertEquals(NonlinearIntegerTheoryParams().maximumCandidates, integer.maximumCandidates)
+        assertEquals(NonlinearIntegerTheoryParams().maximumMoves, integer.maximumMoves)
+        assertEquals(PolynomialTheoryParams().maximumDenseCoefficients, request.polynomial.maximumDenseCoefficients)
+        assertEquals(PolynomialTheoryParams().maximumMatrixCells, request.polynomial.maximumMatrixCells)
+    }
+
+    @Test
+    fun `native source unlimited limits should preserve their native sentinels`() {
+        val source = SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+
+        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf(
+            "nia-candidates=unlimited", "nia-moves=unlimited", "nra-work-limit=unlimited",
+            "nra-dense-coefficients=unlimited", "nra-matrix-cells=unlimited",
+        )))
+
+        assertEquals(Long.MAX_VALUE, assertNotNull(request.nonlinearInteger).maximumCandidates)
+        assertEquals(Long.MAX_VALUE, request.nonlinearInteger?.maximumMoves)
+        assertNull(request.polynomial.maximumWork)
+        assertNull(request.polynomial.maximumDenseCoefficients)
+        assertNull(request.polynomial.maximumMatrixCells)
+    }
+
+    @Test
+    fun `source native zero work should stop arithmetic without spending the node ledger`() {
+        val source = SmtLib.parse("(declare-const x Real) (assert (= (* x x) 2))").source
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val request = SourceExecutionRequest(invocation, ExecutionOptions(
+            ExecutionOption.nodeLimit(7L), ExecutionOption.nraWorkLimit(0L),
+        ))
+
+        val execution = assertIs<SourceExecutionResult.Polynomial>(SourceSetup.execute(request)).result
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
+        assertEquals(0L, request.nodeBudget?.spent)
+    }
+
+    @Test
+    fun `source option seeds should bind the same default and override to every strategy`() {
+        val source = SmtLib.parse("(declare-const x Real) (assert (= (* x x) 2))").source
+        for ((options, fallback, expected) in listOf(
+            Triple(ExecutionOptions(), null, 0L),
+            Triple(ExecutionOptions(), 19L, 19L),
+            Triple(ExecutionOptions(ExecutionOption.seed(-7L)), 19L, -7L),
+        )) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                source, ExecutionOperation.SATISFY, FiniteEngine.MIXED,
+            ))
+
+            val request = SourceExecutionRequest(invocation, options, randomSeed = fallback)
+
+            assertEquals(expected, request.theory.randomSeed)
+            assertEquals(expected, request.polynomial.strategy.backtrack.randomSeed)
+            assertEquals(expected, request.polynomial.strategy.localSearch.randomSeed)
+        }
+    }
+
+    @Test
+    fun `source options should reject conflicting containing allowances`() {
+        val source = SmtLib.parse("(declare-const x Real) (assert (> x 0))").source
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val budget = NodeBudget(3)
+        for (options in listOf(
+            ExecutionOptions(ExecutionOption.nodeLimit(2L)),
+            ExecutionOptions(ExecutionOption.nodeLimit(null)),
+            ExecutionOptions.parse(listOf("node-limit=3", "node-limit=4")),
+        )) {
+            assertFailsWith<PipelineConfigException> {
+                SourceExecutionRequest(invocation, options, nodeBudget = budget)
+            }
+        }
+        assertEquals(0L, budget.spent)
+    }
+
+    @Test
+    fun `source execution should reject unknown options across source families`() {
+        for (text in listOf(
+            "(declare-const b Bool) (assert b)",
+            "(declare-const x Real) (assert (> x 0))",
+            "(declare-const x Real) (assert (= (* x x) 2))",
+            "(declare-const x Int) (assert (= (* x x) 2))",
+            "(declare-const x Real) (assert (= (sin x) 0))",
+        )) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SmtLib.parse(text).source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            ))
+
+            val failure = assertFailsWith<PipelineConfigException> {
+                SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("unknown=1"))))
+            }
+
+            assertTrue("unknown" in assertNotNull(failure.message))
+        }
+    }
+
+    @Test
+    fun `default finite source controls should retain the selected engine and containing allowance`() {
+        val source = SmtLib.parse("(declare-const b Bool) (assert b)").source
+        for (engine in FiniteEngine.entries) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, engine))
+            val budget = NodeBudget(4)
+
+            val request = SourceExecutionRequest(invocation, ExecutionOptions(), nodeBudget = budget)
+            val finite = assertNotNull(request.finiteRequest).invoke(invocation.finiteShape())
+
+            assertEquals(engine, finite.engine)
+            assertSame(invocation, finite.shape.sourceInvocation)
+            assertSame(budget, finite.nodeBudget)
+            assertEquals(0L, finite.randomSeed)
+            assertEquals(0L, finite.executionOptions.reader()[ExecutionOption.seed])
+        }
+    }
+}

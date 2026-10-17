@@ -15,7 +15,6 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
 
 internal fun solveNativeSource(
     solvable: Solvable,
@@ -23,20 +22,13 @@ internal fun solveNativeSource(
     common: CommonOptions,
     output: OutputProtocol,
     publication: ArithmeticPublication,
-    deadline: Cancellation,
-    cores: Int,
+    controls: SourceExecutionRequest,
 ) {
     val invocation = pipeline.invocation
     if (invocation.operation == ExecutionOperation.ENUMERATE) {
         usageError("all-solution enumeration is unavailable for this exact source")
     }
     val kind = SourceSetup.executionKind(invocation)
-    val controls = if (kind == SourceExecutionKind.NONLINEAR_INTEGER) {
-        val budget = SolveCore.takeNodeBudget(common).also { common.nodeBudget = it }
-        SourceExecutionRequest(invocation, nonlinearIntegerParams(common, deadline, budget), cores)
-    } else {
-        SourceExecutionRequest(invocation, polynomial = polynomialParams(common, deadline), cores = cores)
-    }
     val complete = common.resolvedEngine() !in setOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
     output.begin(solvable.optimize, solvable.maximize)
     val result = SourceSetup.execute(
