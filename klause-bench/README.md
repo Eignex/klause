@@ -429,8 +429,11 @@ objectives and records its actual native backend beside the requested entry and 
 `entry=pipeline engine=cp` retains the direct pipeline comparison. Compare matched
 revisions and check the recorded backend to distinguish finite and open controls.
 `entry=source-optimize engine=cp|ls` calls the public affine source optimizer with
-the original objective and direction. Optional `nodeLimit=N` supplies one shared
-decision/move ledger. Captures retain the native optimization verdict, minimized
+the original objective and direction. Both source facade entries accept `nodeLimit=N`
+for one shared decision/move ledger. `binding=selected` supplies it through the native
+strategy and common theory controls; `binding=common` supplies it through only the
+common controls. Captures record the actual ledger limit and spend, open decisions
+and native backend. Captures retain the native optimization verdict, minimized
 exact incumbent value and interruption cause separately from the rendered SMT point.
 The SMT replay checks points and objectives; global optimum, ray and refutation
 claims require separate original-source checking. Optimization captures retain each

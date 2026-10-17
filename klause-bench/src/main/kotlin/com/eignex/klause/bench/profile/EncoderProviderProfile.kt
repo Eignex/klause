@@ -69,7 +69,7 @@ object EncoderProviderProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(
             options.keys.all {
-            it in setOf("inputs", "repeats", "warmups", "seed", "parser", "entry", "engine", "nodeLimit")
+            it in setOf("inputs", "repeats", "warmups", "seed", "parser", "entry", "engine", "nodeLimit", "binding")
         }
         )
         val repeats = options["repeats"]?.toInt() ?: 3
@@ -81,7 +81,10 @@ object EncoderProviderProfile {
         require(entry in setOf("pipeline", "source", "source-optimize") && engine in setOf("cp", "ls"))
         require(entry != "pipeline" || engine == "cp") { "LS requires a source facade entry" }
         val nodeLimit = options["nodeLimit"]?.toLong()
-        require(nodeLimit == null || (entry == "source-optimize" && nodeLimit >= 0))
+        require(nodeLimit == null || (entry != "pipeline" && nodeLimit >= 0))
+        val binding = options["binding"] ?: "selected"
+        require(binding in setOf("selected", "common"))
+        require(entry != "pipeline" || binding == "selected")
         val seed = options["seed"]?.toLong() ?: 1L
         require(repeats in 1..100 && warmups in 0..10)
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -103,6 +106,7 @@ object EncoderProviderProfile {
                 put("entry", entry)
                 put("engine", engine)
                 put("nodeLimit", nodeLimit)
+                put("binding", binding)
                 put("seed", seed)
                 put("repeats", repeats)
                 put("warmups", warmups)
@@ -146,9 +150,12 @@ object EncoderProviderProfile {
                         override fun workMeter(): WorkMeter = WorkMeter { work += it }
                     }
                     val providers = providers(alternate) { installations++ }
+                    val budget = nodeLimit?.let(::NodeBudget)
+                    val selectedBudget = budget.takeIf { binding == "selected" }
+                    val theory = TheoryParams(cancellation = stop, randomSeed = seed, nodeBudget = budget)
                     val started = System.nanoTime()
                     val optimization = if (entry == "source-optimize") {
-                        sourceOptimize(problem, engine, seed, stop, providers, nodeLimit)
+                        sourceOptimize(problem, engine, seed, stop, providers, selectedBudget, theory)
                     } else {
                         null
                     }
@@ -157,10 +164,20 @@ object EncoderProviderProfile {
                     } else if (entry == "source") {
                         if (engine == "cp") {
                             BacktrackSolver.source(factorSource(problem)).withProjectionProviders(providers)
-                                .solve(BacktrackParams(cancellation = stop, randomSeed = seed))
+                                .solve(
+                                    BacktrackParams(
+                                        cancellation = stop, randomSeed = seed, nodeBudget = selectedBudget,
+                                    ),
+                                    theory = theory,
+                                )
                         } else {
                             LocalSearchSolver.source(factorSource(problem)).withProjectionProviders(providers)
-                                .solve(LocalSearchParams(cancellation = stop, randomSeed = seed))
+                                .solve(
+                                    LocalSearchParams(
+                                        cancellation = stop, randomSeed = seed, nodeBudget = selectedBudget,
+                                    ),
+                                    theory = theory,
+                                )
                         }
                     } else {
                         val route = SourceSetup.prepare(
@@ -269,6 +286,13 @@ object EncoderProviderProfile {
                             put("entry", entry)
                             put("engine", engine)
                             put("nodeLimit", nodeLimit)
+                            put("binding", binding)
+                            put("nodeBudgetLimit", budget?.limit)
+                            put("nodeBudgetSpent", budget?.spent)
+                            put("openDecisions", result.stats.openTheory.let {
+                                it.openBoolDecisions + it.openIntDecisions + it.openTheoryDecisions
+                            })
+                            put("terminationReason", (result as? OpenTheoryResult.Unknown)?.reason?.name)
                             optimization?.let { native ->
                                 put("optimizationVerdict", optimizationKind(native))
                                 put("sourceSense", problem.sense.name)
@@ -311,7 +335,7 @@ object EncoderProviderProfile {
                             "elapsedNs=$elapsed nativeWork=$work installations=$installations",
                     )
                 }
-                if (entry == "source-optimize") {
+                if (entry == "source-optimize" || nodeLimit != null) {
                     output.resolve("$index-comparison-$round.json").writeText(
                         buildJsonObject {
                         put("sourceSha256", sha256(bytes))
@@ -337,11 +361,11 @@ object EncoderProviderProfile {
         seed: Long,
         stop: Cancellation,
         providers: FactorProjectionProviders,
-        nodeLimit: Long?,
+        selectedBudget: NodeBudget?,
+        theory: TheoryParams,
     ): OpenTheoryOptimum {
         val spec = requireNotNull(problem.objective)
         val objective = LinearObjective(spec.boolWeights, spec.intCoefficients, spec.constant, spec.realCoefficients)
-        val budget = nodeLimit?.let(::NodeBudget)
         val strategy = if (engine == "cp") {
             BacktrackSolver.source(factorSource(problem))
         } else {
@@ -352,11 +376,11 @@ object EncoderProviderProfile {
             PolynomialTheoryParams(
                 cancellation = stop,
                 strategy = PolynomialStrategyParams(
-                    backtrack = BacktrackParams(randomSeed = seed, nodeBudget = budget),
-                    localSearch = LocalSearchParams(randomSeed = seed, nodeBudget = budget),
+                    backtrack = BacktrackParams(randomSeed = seed, nodeBudget = selectedBudget),
+                    localSearch = LocalSearchParams(randomSeed = seed, nodeBudget = selectedBudget),
                 ),
             ),
-            TheoryParams(cancellation = stop, randomSeed = seed, nodeBudget = budget),
+            theory,
             problem.sense,
         )
         return (execution as OpenTheoryExecution.Optimize).result
