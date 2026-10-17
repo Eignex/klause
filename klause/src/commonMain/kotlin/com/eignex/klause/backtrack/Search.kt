@@ -2,9 +2,9 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.boundsMidpoint
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
-import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
