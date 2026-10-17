@@ -119,13 +119,14 @@ class SourceStrategyTest {
 
     @Test
     fun `finite affine heuristic completion should optimize its real objective in the original direction`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), emptyArray(),
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(constant = 7, realCoefficients = doubleArrayOf(3.0))
         for (sense in ObjectiveSense.entries) {
             val budget = NodeBudget(1000)
             val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17, nodeBudget = budget),
+                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17, nodeBudget = budget,
+                    initialAssignment = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(0.0))),
             ))
 
             val execution = assertIs<OpenTheoryExecution.Optimize>(LocalSearchSolver.source(source).optimizeOpen(
