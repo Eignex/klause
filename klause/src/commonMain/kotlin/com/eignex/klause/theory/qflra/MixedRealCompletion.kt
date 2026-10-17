@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.lp.SourceLp
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.admittedSourcePoint
+import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
@@ -14,21 +15,39 @@ internal fun completeMixedRealComponents(
     budget: SourceLpBudget,
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
-): List<BigFraction>? {
-    if (columns <= 0 || columns.toLong() * columns > 65536L) return null
+): List<BigFraction>? = (checkMixedRealComponents(columns, rows, budget, stop, onStage = onStage)
+    as? MixedPointCompletionResult.Point)?.values
+
+internal fun checkMixedRealComponents(
+    columns: Int,
+    rows: List<ExactRationalInequality>,
+    budget: SourceLpBudget,
+    stop: Cancellation,
+    originCells: Long = 0L,
+    onStage: ((String) -> Unit)? = null,
+): MixedPointCompletionResult {
+    if (columns <= 0 || columns.toLong() * columns > 65536L || originCells !in 0L..65536L) {
+        return MixedPointCompletionResult.Declined
+    }
     // Each parent can change at most once per union; the batch covers all compressed walks.
     stop.charge(8L * columns * columns + columns)
-    if (stop()) return null
+    if (stop()) return MixedPointCompletionResult.Declined
     val groups = IntDisjointSet(columns)
     var entries = 0L
     for (row in rows) {
         entries += row.columns.size + 1L
         stop.charge(8L * (row.columns.size + 1L))
-        if (entries > 65536L || stop() || row.columns.any { it !in 0 until columns }) return null
-        if (!row.coefficients.admittedSourcePoint() || !listOf(row.rhs).admittedSourcePoint()) return null
+        if (entries > 65536L || stop() || row.columns.any { it !in 0 until columns }) {
+            return MixedPointCompletionResult.Declined
+        }
+        if (!row.coefficients.admittedSourcePoint() || !listOf(row.rhs).admittedSourcePoint()) {
+            return MixedPointCompletionResult.Declined
+        }
         val first = row.columns.firstOrNull()
         if (first == null) {
-            if (if (row.strict) BigFraction.ZERO >= row.rhs else BigFraction.ZERO > row.rhs) return null
+            if (if (row.strict) BigFraction.ZERO >= row.rhs else BigFraction.ZERO > row.rhs) {
+                return if (stop()) MixedPointCompletionResult.Declined else MixedPointCompletionResult.Refuted
+            }
             continue
         }
         for (column in row.columns) groups.union(first, column)
@@ -36,34 +55,35 @@ internal fun completeMixedRealComponents(
     val byRoot = HashMap<Int, MutableList<ExactRationalInequality>>()
     for (row in rows) {
         stop.charge(4L)
-        if (stop()) return null
+        if (stop()) return MixedPointCompletionResult.Declined
         val first = row.columns.firstOrNull() ?: continue
         byRoot.getOrPut(groups.find(first)) { ArrayList() } += row
     }
     stop.charge(4L * columns)
-    if (stop()) return null
+    if (stop()) return MixedPointCompletionResult.Declined
     val members = groups.groups()
     val point = MutableList(columns) { BigFraction.ZERO }
     for (component in members) {
         stop.charge(4L + component.size)
-        if (stop()) return null
+        if (stop()) return MixedPointCompletionResult.Declined
         val selected = byRoot[groups.find(component.first())] ?: continue
         onStage?.invoke("RECOVERY_REAL_COMPONENT")
         val local = component.withIndex().associate { it.value to it.index }
         val localRows = ArrayList<ExactRationalInequality>(selected.size)
         for (row in selected) {
             stop.charge(row.columns.size.toLong() + 1L)
-            if (stop()) return null
+            if (stop()) return MixedPointCompletionResult.Declined
             localRows += ExactRationalInequality(row.columns.map { local.getValue(it) }.toIntArray(),
                 row.coefficients, row.rhs, row.strict)
         }
         val graph = RealDifferenceSystem.prepareRows(component.size, localRows, stop)
-        if (stop()) return null
+        if (stop()) return MixedPointCompletionResult.Declined
         var compacted = false
         val values = if (graph != null) {
             onStage?.invoke("RECOVERY_REAL_COMPONENT_GRAPH")
             val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
-            if (stop()) return null
+            if (stop()) return MixedPointCompletionResult.Declined
+            if (result is RealDifferenceSystem.Result.Infeasible) return MixedPointCompletionResult.Refuted
             (result as? RealDifferenceSystem.Result.Feasible)?.point
         } else {
             onStage?.invoke("RECOVERY_REAL_COMPONENT_SHAPE_${component.size}_${localRows.size}")
@@ -71,7 +91,7 @@ internal fun completeMixedRealComponents(
                 localRows
             } else {
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_COMPACTION_ATTEMPT")
-                val reduced = compactMixedRealRows(component.size, localRows, stop)
+                val reduced = compactMixedRealRows(component.size, localRows, stop, originCells)
                 if (reduced == null) {
                     onStage?.invoke("RECOVERY_REAL_COMPONENT_COMPACTION_DECLINED")
                 } else {
@@ -80,37 +100,46 @@ internal fun completeMixedRealComponents(
                 }
                 reduced
             }
-            if (stop()) return null
+            if (stop()) return MixedPointCompletionResult.Declined
             if (numericalRows == null || !budget.admitsDimensions(component.size, numericalRows.size.toLong())) {
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_DIMENSION")
-                return null
+                return MixedPointCompletionResult.Declined
             }
             onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_REQUEST")
             SourceLp(numericalRows, component.size, budget).use { owner ->
                 val result = owner.solve(stop)
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_${result?.verdict?.name ?: "NO_RESULT"}")
+                if (stop()) return MixedPointCompletionResult.Declined
+                if (result?.verdict == LpVerdict.INFEASIBLE) return MixedPointCompletionResult.Refuted
                 result?.exactPrimal?.take(component.size)
             }
         }
         if (values == null || values.size != component.size || stop()) {
             onStage?.invoke("RECOVERY_REAL_COMPONENT_NO_POINT")
-            return null
+            return MixedPointCompletionResult.Declined
         }
         if (compacted) {
             stop.charge(localRows.sumOf { it.columns.size.toLong() + 1L })
-            if (stop() || !MixedPointArithmetic(stop).satisfies(values, localRows)) return null
+            if (stop() || !MixedPointArithmetic(stop).satisfies(values, localRows)) {
+                return MixedPointCompletionResult.Declined
+            }
         }
         for (index in component.indices) point[component[index]] = values[index]
     }
-    return point.takeUnless { stop() }?.also { onStage?.invoke("RECOVERY_REAL_COMPONENTS_POINT") }
+    if (stop()) return MixedPointCompletionResult.Declined
+    onStage?.invoke("RECOVERY_REAL_COMPONENTS_POINT")
+    return if (stop()) MixedPointCompletionResult.Declined else MixedPointCompletionResult.Point(point)
 }
 
 internal fun compactMixedRealRows(
     columns: Int,
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
+    originCells: Long = 0L,
 ): List<ExactRationalInequality>? {
-    if (columns <= 0 || columns.toLong() * columns > 65536L || rows.size > 65536) return null
+    if (columns <= 0 || columns.toLong() * columns > 65536L || rows.size > 65536 ||
+        originCells !in 0L..65536L
+    ) return null
     var terms = 0L
     for (row in rows) {
         stop.charge(1L)
@@ -118,7 +147,7 @@ internal fun compactMixedRealRows(
         if (stop() || terms + rows.size > 65536L) return null
     }
     // Covers live component views, survivor references and bounded rational scratch.
-    val cells = 96L * rows.size + 4L * terms + 16L * columns + 8192L
+    val cells = 96L * rows.size + 4L * terms + 16L * columns + 8192L + originCells
     if (cells > 65536L) return null
     stop.charge(4L * rows.size + 2L * columns + 1L)
     if (stop()) return null

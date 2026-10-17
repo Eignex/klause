@@ -1099,6 +1099,26 @@ class ExactLiraSearchComponent private constructor(
         node.directionPremises.isEmpty() && node.branches.isEmpty() && node.reducedBranches.isEmpty() &&
         node.transformedBranches.isEmpty() && node.retainedReduction == null
 
+    private fun completionSourceValues(context: SearchContext): IntArray? {
+        if (!canReusePoint() || bools.size > 4096) return null
+        lpStop.charge(4L * bools.size + 64L)
+        if (operationStop() || bools.indices.any { variable ->
+                bools[variable] == UNASSIGNED || context.boolValue(variable) != (bools[variable] == TRUE)
+            }
+        ) return null
+        val values = bools.copyOf()
+        return values.takeUnless { operationStop() }
+    }
+
+    private fun currentCompletionSource(values: IntArray, context: SearchContext): Boolean {
+        lpStop.charge(6L * values.size + 1L)
+        if (operationStop() || !canReusePoint() || values.size != bools.size) return false
+        return values.indices.all { variable ->
+            values[variable] != UNASSIGNED && values[variable] == bools[variable] &&
+                context.boolValue(variable) == (values[variable] == TRUE)
+        } && values.contentEquals(bools) && canReusePoint() && !operationStop()
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
         sourceEqualityConflict = null
         var point = reusablePoint?.takeIf {
@@ -1452,13 +1472,26 @@ class ExactLiraSearchComponent private constructor(
             val retained = floatCandidate
             floatCandidate = null
             if (retained != null) {
+                val sourceValues = completionSourceValues(context)
                 val rows = agreementSourceRows(context)
                 if (rows != null) {
-                    candidate = completeMixedPoint(model.numRealVars, model.numIntVars, retained, rows, lpStop,
+                    val completed = checkMixedPoint(model.numRealVars, model.numIntVars, retained, rows, lpStop,
                         onStage = ::observeCompleteStage,
                         realCompletion = { columns, residual, token ->
-                            reduction.completeReals(columns, residual, token, ::observeCompleteStage)
+                            val cells = sourceValues?.let { it.size.toLong() + 64L } ?: 0L
+                            reduction.checkReals(columns, residual, token, cells, ::observeCompleteStage)
                         })
+                    candidate = (completed as? MixedPointCompletionResult.Point)?.values
+                    if (completed === MixedPointCompletionResult.Refuted && sourceValues != null &&
+                        currentCompletionSource(sourceValues, context)
+                    ) {
+                        pointReuseEligible = false
+                        assignment = null
+                        outcome = ComponentCheck.Infeasible()
+                        smtStats?.observeConflict(null)
+                        observeCompleteStage("RECOVERY_SOURCE_REFUTED")
+                        return null
+                    }
                 } else {
                     observeCompleteStage("RECOVERY_ROWS_UNAVAILABLE")
                 }
@@ -1872,12 +1905,13 @@ private class ExactLiraReductionCache(
     }
     private val results = HashMap<ExactLiraReductionKey, ExactLiraReduction>()
 
-    fun completeReals(
+    fun checkReals(
         columns: Int,
         rows: List<ExactRationalInequality>,
         stop: Cancellation,
+        originCells: Long,
         onStage: (String) -> Unit,
-    ): List<BigFraction>? = completeMixedRealComponents(columns, rows, budget, stop, onStage)
+    ): MixedPointCompletionResult = checkMixedRealComponents(columns, rows, budget, stop, originCells, onStage)
 
     fun reduce(
         bools: IntArray,

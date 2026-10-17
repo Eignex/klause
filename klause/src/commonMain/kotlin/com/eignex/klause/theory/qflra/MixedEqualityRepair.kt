@@ -238,24 +238,37 @@ internal class MixedEqualityRepair(
         return SourceEqualityResidual.Rows(residual)
     }
 
-    fun completePoint(
+    fun completeResult(
         rows: List<ExactRationalInequality>,
-        realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)?,
-    ): List<BigFraction>? {
-        val residual = (reduceRows(rows) as? SourceEqualityResidual.Rows)?.rows ?: return null
+        realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> MixedPointCompletionResult)?,
+    ): MixedPointCompletionResult {
+        val reduced = reduceRows(rows)
+        if (stop()) return MixedPointCompletionResult.Declined
+        val residual = when (reduced) {
+            is SourceEqualityResidual.Rows -> reduced.rows
+            SourceEqualityResidual.Refuted -> return MixedPointCompletionResult.Refuted
+            SourceEqualityResidual.Declined -> return MixedPointCompletionResult.Declined
+        }
         val graph = RealDifferenceSystem.prepareRows(pivots.size, residual, stop)
-        if (stop()) return null
+        if (stop()) return MixedPointCompletionResult.Declined
         val free = if (graph == null) {
             onStage?.invoke("RECOVERY_EQUALITY_GRAPH_UNAVAILABLE")
-            realCompletion?.invoke(pivots.size, residual, stop) ?: return null
+            val completed = realCompletion?.invoke(pivots.size, residual, stop)
+            if (stop()) return MixedPointCompletionResult.Declined
+            when (completed) {
+                is MixedPointCompletionResult.Point -> completed.values
+                MixedPointCompletionResult.Refuted -> return MixedPointCompletionResult.Refuted
+                else -> return MixedPointCompletionResult.Declined
+            }
         } else {
             onStage?.invoke("RECOVERY_EQUALITY_GRAPH_ATTEMPT")
             val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
-            if (stop()) return null
-            (result as? RealDifferenceSystem.Result.Feasible)?.point ?: return null
+            if (stop()) return MixedPointCompletionResult.Declined
+            if (result is RealDifferenceSystem.Result.Infeasible) return MixedPointCompletionResult.Refuted
+            (result as? RealDifferenceSystem.Result.Feasible)?.point ?: return MixedPointCompletionResult.Declined
         }
         onStage?.invoke("RECOVERY_EQUALITY_FREE_POINT")
-        return point(free)
+        return point(free)?.let { MixedPointCompletionResult.Point(it) } ?: MixedPointCompletionResult.Declined
     }
 }
 

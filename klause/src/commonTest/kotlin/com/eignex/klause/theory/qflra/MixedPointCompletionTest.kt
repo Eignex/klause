@@ -18,6 +18,114 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `exact general residual refutation should survive equality elimination`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget()
+
+        val result = checkMixedPoint(4, 0, DoubleArray(4), rows, Cancellation.Never,
+            realCompletion = { columns, residual, stop -> checkMixedRealComponents(columns, residual, budget, stop) })
+
+        assertEquals(MixedPointCompletionResult.Refuted, result)
+        assertEquals(1, budget.operations)
+    }
+
+    @Test
+    fun `a refuted rounded integer guess should not refute the source rows`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2, 3, 4), List(4) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget()
+
+        val result = checkMixedPoint(4, 1, DoubleArray(5), rows, Cancellation.Never,
+            realCompletion = { columns, residual, stop -> checkMixedRealComponents(columns, residual, budget, stop) })
+
+        assertEquals(MixedPointCompletionResult.Declined, result)
+        assertEquals(1, budget.operations)
+        assertTrue(listOf(BigFraction.ONE, BigFraction.ZERO, BigFraction.ONE, BigFraction.ZERO,
+            BigFraction.MINUS_ONE).satisfiesSourceRows(rows))
+    }
+
+    @Test
+    fun `closed equality contradictions should not request another numerical check`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        var requests = 0
+
+        val result = checkMixedPoint(3, 0, DoubleArray(3), rows, Cancellation.Never,
+            realCompletion = { _, _, _ ->
+                requests++
+                MixedPointCompletionResult.Declined
+            })
+
+        assertEquals(MixedPointCompletionResult.Refuted, result)
+        assertEquals(0, requests)
+    }
+
+    @Test
+    fun `strict graph contradictions should refute an empty integer part`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO, strict = true),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+        )
+
+        val result = checkMixedPoint(1, 0, doubleArrayOf(0.0), rows, Cancellation.Never)
+
+        assertEquals(MixedPointCompletionResult.Refuted, result)
+    }
+
+    @Test
+    fun `cancelled equality refutation should remain declined`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        var cancelled = false
+
+        val result = checkMixedPoint(3, 0, DoubleArray(3), rows, Cancellation { cancelled },
+            onStage = { stage -> if (stage == "RECOVERY_EQUALITY_REFUTED") cancelled = true })
+
+        assertTrue(cancelled)
+        assertEquals(MixedPointCompletionResult.Declined, result)
+    }
+
+    @Test
+    fun `unavailable general completion should not become a source refutation`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget(maxOperations = 0)
+
+        val result = checkMixedPoint(4, 0, DoubleArray(4), rows, Cancellation.Never,
+            realCompletion = { columns, residual, stop -> checkMixedRealComponents(columns, residual, budget, stop) })
+
+        assertEquals(MixedPointCompletionResult.Declined, result)
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
     fun `source prefixes should satisfy rows outside the difference fragment`() {
         val rows = listOf(
             ExactRationalInequality(

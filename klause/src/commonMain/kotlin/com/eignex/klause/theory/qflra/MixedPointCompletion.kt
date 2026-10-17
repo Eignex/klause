@@ -8,6 +8,12 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.math.round
 
+internal sealed interface MixedPointCompletionResult {
+    class Point(val values: List<BigFraction>) : MixedPointCompletionResult
+    data object Refuted : MixedPointCompletionResult
+    data object Declined : MixedPointCompletionResult
+}
+
 internal fun completeMixedPoint(
     realColumns: Int,
     integerColumns: Int,
@@ -16,11 +22,32 @@ internal fun completeMixedPoint(
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
     realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)? = null,
-): List<BigFraction>? {
+): List<BigFraction>? = (checkMixedPoint(realColumns, integerColumns, primal, rows, stop, onStage = onStage,
+    realCompletion = realCompletion?.let { complete ->
+        { columns, residual, token ->
+            complete(columns, residual, token)?.let { MixedPointCompletionResult.Point(it) }
+                ?: MixedPointCompletionResult.Declined
+        }
+    }) as? MixedPointCompletionResult.Point)?.values
+
+internal fun checkMixedPoint(
+    realColumns: Int,
+    integerColumns: Int,
+    primal: DoubleArray,
+    rows: List<ExactRationalInequality>,
+    stop: Cancellation,
+    onStage: ((String) -> Unit)? = null,
+    realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> MixedPointCompletionResult)? = null,
+): MixedPointCompletionResult {
     onStage?.invoke("RECOVERY_ATTEMPT")
-    fun declined(stage: String): List<BigFraction>? {
+    fun declined(stage: String): MixedPointCompletionResult {
         onStage?.invoke(stage)
-        return null
+        return MixedPointCompletionResult.Declined
+    }
+    fun refuted(stage: String): MixedPointCompletionResult {
+        onStage?.invoke(stage)
+        return if (integerColumns == 0 && !stop()) MixedPointCompletionResult.Refuted
+            else MixedPointCompletionResult.Declined
     }
     if (realColumns !in 1..10000 || integerColumns !in 0..100000 || rows.size > 100000) {
         return declined("RECOVERY_INPUT")
@@ -68,7 +95,7 @@ internal fun completeMixedPoint(
         if (stop()) return declined("RECOVERY_STOPPED")
         if (arithmetic.satisfies(point, rows) && !stop()) {
             onStage?.invoke(if (reconstruct) "RECOVERY_RECONSTRUCTED_POINT" else "RECOVERY_IEEE_POINT")
-            return point
+            return MixedPointCompletionResult.Point(point)
         }
     }
     val residual = ArrayList<ExactRationalInequality>()
@@ -90,7 +117,7 @@ internal fun completeMixedPoint(
         }
         if (real.isEmpty()) {
             if (if (row.strict) BigFraction.ZERO >= bound else BigFraction.ZERO > bound) {
-                return declined("RECOVERY_INTEGER_ROWS")
+                return refuted("RECOVERY_INTEGER_ROWS")
             }
         } else {
             residual += ExactRationalInequality(real.toIntArray(), coefficients, bound, row.strict)
@@ -98,18 +125,23 @@ internal fun completeMixedPoint(
     }
     if (residual.any { it.columns.size > 2 }) {
         onStage?.invoke("RECOVERY_EQUALITY_REPAIR_ATTEMPT")
-        val repair = prepareMixedEqualityRepair(realColumns, residual, stop, onStage)
+        val prepared = prepareSourceEqualities(realColumns, residual, stop, onStage)
+        if (stop()) return declined("RECOVERY_STOPPED")
+        if (prepared === SourceEqualityPreparation.Refuted) return refuted("RECOVERY_EQUALITY_REFUTED")
+        val repair = (prepared as? SourceEqualityPreparation.Ready)?.repair
         val repaired = realGuess?.let { repair?.point(it) }
         if (stop()) return declined("RECOVERY_STOPPED")
         for (difference in listOf(false, true)) {
-            val reals = if (difference) repair?.completePoint(residual, realCompletion) else repaired
+            val completed = if (difference) repair?.completeResult(residual, realCompletion) else
+                repaired?.let { MixedPointCompletionResult.Point(it) }
             if (stop()) return declined("RECOVERY_STOPPED")
-            if (reals == null) continue
+            if (completed === MixedPointCompletionResult.Refuted) return refuted("RECOVERY_RESIDUAL_REFUTED")
+            val reals = (completed as? MixedPointCompletionResult.Point)?.values ?: continue
             val point = reals + integers
             stop.charge(rowWork)
             if (!stop() && arithmetic.satisfies(point, rows) && !stop()) {
                 onStage?.invoke(if (difference) "RECOVERY_EQUALITY_RESIDUAL_POINT" else "RECOVERY_EQUALITY_POINT")
-                return point
+                return MixedPointCompletionResult.Point(point)
             }
             onStage?.invoke("RECOVERY_EQUALITY_REJECTED")
         }
@@ -123,11 +155,12 @@ internal fun completeMixedPoint(
             ?: return declined("RECOVERY_GRAPH_UNAVAILABLE")
         val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
         if (stop()) return declined("RECOVERY_STOPPED")
+        if (result is RealDifferenceSystem.Result.Infeasible) return refuted("RECOVERY_GRAPH_REFUTED")
         (result as? RealDifferenceSystem.Result.Feasible)?.point ?: return declined("RECOVERY_GRAPH_NO_POINT")
     }
     val point = reals + integers
     stop.charge(rowWork)
     val valid = !stop() && arithmetic.satisfies(point, rows) && !stop()
     onStage?.invoke(if (valid) "RECOVERY_GRAPH_POINT" else "RECOVERY_GRAPH_NO_POINT")
-    return point.takeIf { valid }
+    return if (valid) MixedPointCompletionResult.Point(point) else MixedPointCompletionResult.Declined
 }

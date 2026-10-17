@@ -219,4 +219,81 @@ class MixedRealCompletionTest {
         assertNull(point)
         assertEquals(0, budget.operations)
     }
+
+    @Test
+    fun `an exact general component contradiction should refute the real residual`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val stages = ArrayList<String>()
+
+        val result = checkMixedRealComponents(3, rows, SourceLpBudget(), Cancellation.Never) { stages += it }
+
+        assertEquals(MixedPointCompletionResult.Refuted, result)
+        assertTrue("RECOVERY_REAL_COMPONENT_LP_INFEASIBLE" in stages)
+    }
+
+    @Test
+    fun `a declined numerical component should not refute its residual`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget(maxOperations = 0)
+
+        val result = checkMixedRealComponents(3, rows, budget, Cancellation.Never)
+
+        assertEquals(MixedPointCompletionResult.Declined, result)
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
+    fun `stopping after numerical refutation should withhold the residual result`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        var cancelled = false
+        val stop = Cancellation { cancelled }
+
+        val result = checkMixedRealComponents(3, rows, SourceLpBudget(), stop) { stage ->
+            if (stage == "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE") cancelled = true
+        }
+
+        assertTrue(cancelled)
+        assertEquals(MixedPointCompletionResult.Declined, result)
+    }
+
+    @Test
+    fun `source snapshot storage should count against compaction admission`() {
+        val rows = List(130) {
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ONE)
+        }
+
+        val compacted = compactMixedRealRows(2, rows, Cancellation.Never, originCells = 65536L)
+
+        assertNull(compacted)
+    }
+
+    @Test
+    fun `an exact graph contradiction should refute the real residual`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+        )
+
+        val result = checkMixedRealComponents(1, rows, SourceLpBudget(), Cancellation.Never)
+
+        assertEquals(MixedPointCompletionResult.Refuted, result)
+    }
+
+    @Test
+    fun `stopped real components should decline rather than refute`() {
+        val rows = listOf(ExactRationalInequality(intArrayOf(), emptyList(), BigFraction.MINUS_ONE))
+
+        val result = checkMixedRealComponents(1, rows, SourceLpBudget(), Cancellation { true })
+
+        assertEquals(MixedPointCompletionResult.Declined, result)
+    }
 }
