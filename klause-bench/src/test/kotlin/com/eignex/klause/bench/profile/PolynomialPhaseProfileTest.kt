@@ -8,6 +8,26 @@ import kotlin.test.assertTrue
 
 class PolynomialPhaseProfileTest {
     @Test
+    fun `graph family metadata distinguishes independent leaves from shared triangular graphs`() {
+        val source = """
+            (declare-const x0 Real) (declare-const x1 Real)
+            (declare-const x2 Real) (declare-const x3 Real)
+            (assert (= x0 (* x1 x1))) (assert (= x2 (+ x1 x3)))
+            (assert (= (+ x1 1) 1)) (assert (> x3 0))
+        """.trimIndent()
+
+        val family = assertNotNull(PolynomialPhaseProfile.PhaseAccess().gate(source).graphFamily)
+
+        assertEquals(4, family.atoms)
+        assertEquals(3, family.equations)
+        assertEquals(3, family.constantCoefficientGraphEquations)
+        assertEquals(2, family.independentLeafEquations)
+        assertEquals(2, family.triangularGraphEquations)
+        assertEquals(2, family.triangularGraphCoordinates)
+        assertEquals(mapOf(1 to 2, 2 to 1, 3 to 1), family.coordinateOccurrenceHistogram)
+    }
+
+    @Test
     fun `interleaved query observations retain work performed after another query starts`() {
         val observation = PipelineQueryObservation()
         val access = PolynomialPhaseProfile.PhaseAccess()

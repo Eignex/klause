@@ -48,6 +48,7 @@ internal class PolynomialAffineReduction private constructor(
             region: PolynomialBooleanRegion,
             realCount: Int,
             arithmetic: PolynomialArithmetic,
+            onFamily: ((List<PolynomialAtom>) -> Unit)? = null,
             onGraph: (() -> Unit)? = null,
         ): Iterator<PolynomialAffineReduction?> = sequence {
             var current = region.atoms.map { (index, truth) ->
@@ -66,6 +67,7 @@ internal class PolynomialAffineReduction private constructor(
                     inconsistent = true
                     break
                 }
+                onFamily?.invoke(current)
                 val graph = equationalSection(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
                     ?: break
                 val rewritten = ArrayList<PolynomialAtom>()

@@ -92,6 +92,7 @@ internal class QfNraQuery(
     private val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
     var projectionObserver: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null
     var reducedRegionObserver: ((List<PolynomialAtom>) -> Unit)? = null
+    var graphFamilyObserver: ((List<PolynomialAtom>) -> Unit)? = null
     val stats: QfNraStats get() = work.snapshot()
     private var result: QfNraResult? = null
     private val preparation = sequence<QfNraResult?> {
@@ -151,7 +152,8 @@ internal class QfNraQuery(
                         work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                         continue
                     }
-                    val reducing = PolynomialAffineReduction.prepare(normalized, region, realCount, arithmetic) {
+                    val reducing = PolynomialAffineReduction.prepare(normalized, region, realCount, arithmetic,
+                        onFamily = graphFamilyObserver) {
                         val sections = checkNotNull(work.equationalSections)
                         work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
                     }

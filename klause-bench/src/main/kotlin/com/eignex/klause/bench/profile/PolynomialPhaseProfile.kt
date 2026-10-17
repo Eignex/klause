@@ -227,7 +227,7 @@ internal object PolynomialPhaseProfile {
             val nodes = formulaType.getDeclaredField("nodes").apply { isAccessible = true }.get(normalized) as List<*>
             val kinds = nodes.groupingBy { requireNotNull(it).javaClass.simpleName }.eachCount()
             return PhaseGate(realCount.invoke(source) as Int, boolCount.invoke(source) as Int,
-                atoms.size, guides?.size, kinds, charges)
+                atoms.size, guides?.size, kinds, charges, graphFamilyShape(atoms))
         }
 
         fun measure(
@@ -283,7 +283,7 @@ internal object PolynomialPhaseProfile {
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
                 nativeWork, charges - preparationCharges, preparationCharges, stop,
                 observation.subresultants(), observation.division(), observation.projection(),
-                observation.reducedRegion())
+                observation.reducedRegion(), observation.graphFamily())
         }
     }
 }
@@ -353,7 +353,8 @@ private class ObservedPipelineQuery(
     }
 
     fun snapshot(): PipelineQueryPhase = PipelineQueryPhase(summarize(),
-        arithmetic.subresultants(), arithmetic.division(), arithmetic.projection(), arithmetic.reducedRegion())
+        arithmetic.subresultants(), arithmetic.division(), arithmetic.projection(), arithmetic.reducedRegion(),
+        arithmetic.graphFamily())
 }
 
 private class ArithmeticObservation(arithmetic: Any, query: Any) {
@@ -371,6 +372,7 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
     private var projectionVariable = 0
     private var requiredEquation = false
     private var reducedAtoms: List<Any>? = null
+    private var graphAtoms: List<Any>? = null
 
     init {
         val subresultants: (Any, Any, Int, Int?) -> Unit = { a, b, coordinate, minor ->
@@ -396,6 +398,8 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
         query.javaClass.getMethod("setProjectionObserver", Function3::class.java).invoke(query, projection)
         val reducedRegion: (List<Any>) -> Unit = { reducedAtoms = it }
         query.javaClass.getMethod("setReducedRegionObserver", Function1::class.java).invoke(query, reducedRegion)
+        val graphFamily: (List<Any>) -> Unit = { graphAtoms = it }
+        query.javaClass.getMethod("setGraphFamilyObserver", Function1::class.java).invoke(query, graphFamily)
     }
 
     fun subresultants(): PhaseSubresultants? {
@@ -460,6 +464,8 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
 
     private fun termCount(value: Any): Int = (terms.invoke(value) as List<*>).size
 
+    fun graphFamily(): PhaseGraphFamily? = graphAtoms?.let(::graphFamilyShape)
+
     fun reducedRegion(): PhaseReducedRegion? {
         val atoms = reducedAtoms ?: return null
         val atomType = Class.forName("com.eignex.klause.theory.qfnra.PolynomialAtom")
@@ -493,6 +499,53 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
     }
 }
 
+private fun graphFamilyShape(atoms: List<*>): PhaseGraphFamily {
+    val atomType = Class.forName("com.eignex.klause.theory.qfnra.PolynomialAtom")
+    val polynomial = atomType.getMethod("getPolynomial")
+    val relation = atomType.getMethod("getRelation")
+    val polynomialType = Class.forName("com.eignex.klause.arithmetic.polynomial.Polynomial")
+    val variables = polynomialType.getMethod("getVariables")
+    val terms = polynomialType.getMethod("getTerms")
+    val monomial = Class.forName("com.eignex.klause.arithmetic.polynomial.PolynomialTerm").getMethod("getMonomial")
+    val monomialType = Class.forName("com.eignex.klause.arithmetic.polynomial.Monomial")
+    val coordinates = monomialType.getMethod("getVariables")
+    val exponent = monomialType.getMethod("exponent", Int::class.javaPrimitiveType)
+    val occurrences = HashMap<Int, Int>()
+    for (atom in atoms) for (id in variables.invoke(polynomial.invoke(atom)) as List<*>) {
+        val coordinate = id as Int
+        occurrences[coordinate] = (occurrences[coordinate] ?: 0) + 1
+    }
+    var equations = 0
+    var graphs = 0
+    var leaves = 0
+    var triangular = 0
+    val triangularCoordinates = HashSet<Int>()
+    for (atom in atoms) {
+        if (relation.invoke(atom).toString() != "EQ") continue
+        equations++
+        val input = polynomial.invoke(atom)
+        val counts = HashMap<Int, Int>()
+        val linear = HashSet<Int>()
+        for (term in terms.invoke(input) as List<*>) {
+            val powers = monomial.invoke(term)
+            val ids = (coordinates.invoke(powers) as List<*>).map { it as Int }
+            for (id in ids) counts[id] = (counts[id] ?: 0) + 1
+            val id = ids.singleOrNull() ?: continue
+            if (exponent.invoke(powers, id) == 1) linear.add(id)
+        }
+        val eligible = linear.filter { counts[it] == 1 }
+        if (eligible.isNotEmpty()) graphs++
+        if (eligible.any { occurrences[it] == 1 }) leaves++
+        val highest = (variables.invoke(input) as List<*>).map { it as Int }.maxOrNull()
+        if (highest != null && highest in eligible) {
+            triangular++
+            triangularCoordinates.add(highest)
+        }
+    }
+    return PhaseGraphFamily(atoms.size, equations, occurrences.size, graphs, leaves, triangular,
+        triangularCoordinates.size, occurrences.values.groupingBy { it }.eachCount())
+}
+
 @Serializable
 private data class PhaseSource(val suite: String, val problem: String, val sha256: String)
 
@@ -504,6 +557,7 @@ internal data class PhaseGate(
     val conjunctiveAtoms: Int?,
     val normalizedNodeKinds: Map<String, Int>,
     val separateInspectionWork: Long,
+    val graphFamily: PhaseGraphFamily? = null,
 )
 
 @Serializable
@@ -523,6 +577,7 @@ internal data class PhaseTrace(
     val lastDivision: PhaseDivision? = null,
     val lastProjection: PhaseProjection? = null,
     val lastReducedRegion: PhaseReducedRegion? = null,
+    val lastGraphFamily: PhaseGraphFamily? = null,
 )
 
 @Serializable
@@ -598,6 +653,7 @@ internal data class PipelineQueryPhase(
     val lastDivision: PhaseDivision?,
     val lastProjection: PhaseProjection?,
     val lastReducedRegion: PhaseReducedRegion?,
+    val lastGraphFamily: PhaseGraphFamily?,
 )
 
 @Serializable
@@ -611,4 +667,16 @@ internal data class PipelineQuery(
     val resource: String?,
     val stats: String,
     val nativeWork: Long,
+)
+
+@Serializable
+internal data class PhaseGraphFamily(
+    val atoms: Int,
+    val equations: Int,
+    val realCoordinates: Int,
+    val constantCoefficientGraphEquations: Int,
+    val independentLeafEquations: Int,
+    val triangularGraphEquations: Int,
+    val triangularGraphCoordinates: Int,
+    val coordinateOccurrenceHistogram: Map<Int, Int>,
 )

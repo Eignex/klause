@@ -178,7 +178,11 @@ operations or charge native work. Diagnostics retain read-only family references
 inspect their metadata after the query stops. A separate optional observer receives
 the full private conjunction after completed graph and affine reduction, retaining
 predicate relations before boundary-family construction. It shares the same disabled
-default and reference-only diagnostic contract. A recorded family does not certify a
+default and reference-only diagnostic contract. A graph-family observer receives
+the current selected numeric region before each graph pivot is chosen. It retains
+the latest family per query for structural inspection after interruption or
+completion, under the same disabled default and reference-only contract.
+A recorded family does not certify a
 completed projection or a source verdict; [benchmark diagnostics](../../klause-bench/README.md#focused-probes)
 owns the trace format and interpretation.
 

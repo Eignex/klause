@@ -20,6 +20,28 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `graph family observation preserves the verdict and native work`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= x0 (* x1 x1))) (assert (not (= x0 0)))",
+        )
+        val plain = solveQfNra(source.formula, source.boolCount, source.realCount)
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(), PolynomialCondition())
+        val families = ArrayList<List<PolynomialAtom>>()
+        query.graphFamilyObserver = { families += it }
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertIs<QfNraResult.Satisfiable>(plain)
+        assertIs<QfNraResult.Satisfiable>(result)
+        assertEquals(plain.stats.workSpent, result.stats.workSpent)
+        assertEquals(setOf(PolynomialRelation.EQ, PolynomialRelation.NE), families.first().map { it.relation }.toSet())
+        assertEquals(listOf(PolynomialRelation.NE), families.last().map { it.relation })
+    }
+
+    @Test
     fun `reduced region observation retains predicates without changing native work`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

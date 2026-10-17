@@ -2760,6 +2760,14 @@ execution stops. A pending observer request
 does not establish completed arithmetic, a CPU hotspot or a source verdict. The trace
 does not emit a wire model or perform independent checking. Direct-query mode also
 reports its final observed subresultant, division, projection and reduced region.
+`lastGraphFamily` describes the latest selected numeric region at a graph pivot:
+equation and coordinate counts, constant-coefficient graph candidates, independent
+leaves, and candidates whose highest coordinate occurs in one pure linear term.
+The latter are triangular in coordinate order; their unique coordinate count is
+separate from the number of equations. Coordinate-occurrence histograms distinguish
+shared definitions from independent leaves. These counts are read after stopping
+and do not select pivots or establish eliminability of a whole family. Direct gate
+inspection reports the same metadata on its separately normalized input atoms.
 
 ### Table profiling
 
