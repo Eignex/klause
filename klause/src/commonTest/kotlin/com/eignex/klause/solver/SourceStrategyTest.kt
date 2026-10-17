@@ -77,7 +77,7 @@ class SourceStrategyTest {
 
         val point = assertIs<OpenTheoryAssignment.Sampled>(assertIs<OpenTheoryResult.Sat>(result).assignment).sample
         assertSame(strategy.source, point.coordinateFrame)
-        assertEquals(0.125, point.realValue(assertNotNull(compiled.sourceRealId(x)).index))
+        assertEquals(0.125, compiled.decode(x, point))
     }
 
     @Test
