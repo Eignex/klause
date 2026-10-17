@@ -1,0 +1,6 @@
+var 1..2: i;
+var 1..2: j;
+var float: x :: output_var;
+constraint array_float_element(i, [0.125, 0.375], x);
+constraint array_float_element(j, [0.5, 0.75], x);
+solve satisfy;

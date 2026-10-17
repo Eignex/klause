@@ -945,6 +945,12 @@ To capture several cases on one provisioned instance, supply only
 and creates numbered directories for each case. A failed case records `failure.json`
 and does not skip later planned cases.
 
+`smoke-corpus/real-finite-domains-v1` supplies sparse disconnected sets, finite products
+and aliases, original Boolean conditions, signed zeros and singleton membership.
+The six satisfiable inputs support `checkFzn=true` original-source witness checks.
+`empty-intersection.fzn` is a separate contradictory-source observation; absence of
+a witness does not independently certify its refutation.
+
 `planned.json` records the requested input and settings before launch. `capture.json`
 records exit, marker count, interruption trigger, reader failure, and output hashes;
 `arrivals.jsonl` preserves all observed lines, including terminal metadata. Marker counts
