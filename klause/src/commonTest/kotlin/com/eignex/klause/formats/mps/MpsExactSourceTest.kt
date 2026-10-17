@@ -54,8 +54,8 @@ class MpsExactSourceTest {
         val tolerance = source.toProblem()
         val exact = source.toExactSourceProblem()
 
-        assertFalse(tolerance.sourceExact)
-        tolerance.sourceWitness(listOf(value))
+        assertTrue(tolerance.sourceExact)
+        assertFalse(tolerance.sourceWitness(listOf(value)).exact)
         assertFailsWith<MpsLoweringException> { exact.sourceWitness(listOf(value)) }
     }
 
