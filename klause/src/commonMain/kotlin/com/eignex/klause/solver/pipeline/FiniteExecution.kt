@@ -216,6 +216,15 @@ class FiniteSolveResult(
     /** Terminal result after preparation. */
     val outcome: FiniteSolveOutcome,
 ) {
+    private var completeSearch: Boolean? = null
+
+    /** Whether the resolved working strategy admits a complete search arm; absent before strategy resolution. */
+    val completeSearchAdmitted: Boolean? get() = completeSearch
+
+    internal fun bindCompleteSearchAdmission(value: Boolean?) {
+        completeSearch = value
+    }
+
     private var retainedSourceResult: SolveResult? = null
     internal val nativeSourceResult: SolveResult? get() = retainedSourceResult
     private var retainedSourceMinimum: MinimizeResult? = null
@@ -419,7 +428,9 @@ private sealed class FiniteExecutionResult {
         val unboundedDirection: List<BigFraction>? = null,
         val nativeSourceResult: SolveResult? = null,
         val nativeSourceMinimum: MinimizeResult? = null,
-    ) : FiniteExecutionResult()
+    ) : FiniteExecutionResult() {
+        var completeSearchAdmitted: Boolean? = null
+    }
 
     /** The route was inspected instead of executed. */
     class DryRun(
@@ -456,12 +467,17 @@ private fun FinitePipeline.execute(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult = if (request.sourceControls != null) {
-    executeSourceFinite(request, callbacks)
+    executeSourceFinite(request, callbacks).withCompleteSearch(request.sourceControls is SourceFiniteControls.Backtrack)
 } else when (request.engine) {
-    FiniteEngine.FIXED -> executeFixed(request, callbacks)
+    FiniteEngine.FIXED -> executeFixed(request, callbacks).withCompleteSearch(true)
 
     FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
         executePortfolio(request, callbacks)
+}
+
+private fun FiniteExecutionResult.withCompleteSearch(value: Boolean): FiniteExecutionResult {
+    if (this is FiniteExecutionResult.Completed) completeSearchAdmitted = value
+    return this
 }
 
 /** Prepare a finite model once, then execute the selected engine route. */
@@ -490,9 +506,11 @@ internal fun FinitePipeline.solve(
         outcome: FiniteSolveOutcome,
         nativeSourceResult: SolveResult? = null,
         nativeSourceMinimum: MinimizeResult? = null,
+        completeSearchAdmitted: Boolean? = null,
     ): FiniteSolveResult =
-        gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
-            ?: FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
+        (gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
+            ?: FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum))
+            .also { it.bindCompleteSearchAdmission(completeSearchAdmitted) }
     if (request.shape.sourceInvocation != null && stop()) {
         return result(
             FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
@@ -637,6 +655,7 @@ internal fun FinitePipeline.solve(
             .toSolveOutcome().withPresolve(preparation.presolve),
         (execution as? FiniteExecutionResult.Completed)?.nativeSourceResult,
         (execution as? FiniteExecutionResult.Completed)?.nativeSourceMinimum,
+        (execution as? FiniteExecutionResult.Completed)?.completeSearchAdmitted,
     )
 }
 
@@ -1018,7 +1037,7 @@ private fun executePortfolio(
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {
-        return if (request.optimize) {
+        val completed = if (request.optimize) {
             var streamed = 0L
             val result = it.minimize(request.cancellation) { improvement ->
                 callbacks.onImprovement(improvement.toFiniteImprovement())
@@ -1028,6 +1047,7 @@ private fun executePortfolio(
         } else {
             executePortfolioSatisfy(it.solve(request.cancellation), !request.engine.pureLocalSearch, callbacks, start)
         }
+        return completed.withCompleteSearch(it.completeSearchAdmitted)
     }
 }
 

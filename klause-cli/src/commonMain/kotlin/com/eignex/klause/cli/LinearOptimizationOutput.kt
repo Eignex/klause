@@ -14,7 +14,7 @@ internal fun reportLinearOptimization(
     publication: ArithmeticPublication,
     statistics: Boolean,
     routingElapsedMs: Long,
-    completePool: Boolean,
+    completePool: Boolean?,
     routingLpStats: LpStats = LpStats(),
     budgetExhausted: (Boolean) -> Boolean = { it },
     receipt: SourceIncumbentPublication? = null,

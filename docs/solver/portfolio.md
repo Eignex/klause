@@ -47,6 +47,17 @@ attainment even when root completion finishes before consulting a shared cutoff.
 The completion still passes the model, objective, invocation and witness checks.
 Heuristic and improvement-only arms gain no completion authority from exhaustion.
 
+Resolved finite metadata inspects the materialized worker families and their source
+bindings. A complete-search flag requires a backtrack-family worker that permits
+source proofs and is neither auxiliary nor improvement-only. Explicit `bt=0` mixes
+therefore retain their actual worker composition. Fixed and typed finite strategies
+retain their selected complete or heuristic admission. Preparation-only and unresolved
+interrupted results carry no search-admission value. Native source results use their
+captured strategy admission; frontends forward the library value without selecting
+traits from engine names. This operational metadata does not establish a source
+verdict or alter native proof qualification. Root deductions and typed certificates
+retain their existing evidence checks independently of that flag.
+
 ## Witnesses and proof scope
 
 Open portfolios transport exact assignments in `Sample` rather than through a side

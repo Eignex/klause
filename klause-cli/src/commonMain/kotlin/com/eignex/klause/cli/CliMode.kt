@@ -564,9 +564,8 @@ internal class VerdictContext(
     val budgetExhausted: Boolean = false,
     /** Precise open-theory stop reason when one is available. */
     val terminationReason: TerminationReason? = null,
-    /** Whether the pool carried an arm that can prove. A pure-local-search pool reports `unknown` at
-     *  every budget, so its `unknown` is structural rather than a matter of time. */
-    val completePool: Boolean = true,
+    /** Resolved complete-search admission; absent when preparation ended before strategy selection. */
+    val completePool: Boolean? = null,
 )
 
 /**
@@ -574,7 +573,7 @@ internal class VerdictContext(
  * in which case the caller learns only that it was not reached.
  */
 internal fun VerdictContext.softVerdictCause(): String = when {
-    !completePool -> "no arm in the pool can prove a verdict"
+    completePool == false -> "no arm in the pool can prove a verdict"
     terminationReason == TerminationReason.Timeout -> "wall timeout"
     terminationReason == TerminationReason.BudgetExhausted -> "fixed work exhausted"
     terminationReason == TerminationReason.Cancelled -> "cancelled"

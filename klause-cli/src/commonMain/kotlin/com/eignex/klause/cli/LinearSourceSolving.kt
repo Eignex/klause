@@ -1,20 +1,16 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.ExecutionOperation
-import com.eignex.klause.solver.pipeline.ExecutionStrategy
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.LinearSourceConclusion
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
-import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.execute
-import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -28,12 +24,6 @@ internal fun solveLinearSource(
     output: OutputProtocol,
     publication: ArithmeticPublication,
 ) {
-    val invocation = rendering.invocation
-    if (invocation.operation == ExecutionOperation.ENUMERATE &&
-        SourceSetup.executionKind(invocation) !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.REFUTED)
-    ) {
-        usageError("all-solution enumeration requires an admitted finite source execution")
-    }
     output.begin(solvable.optimize, solvable.maximize)
     var points = 0L
     var lastPoint: LinearSourceWitness? = null
@@ -87,13 +77,11 @@ internal fun solveLinearSource(
     val incumbentAccepted = qualified.incumbent?.let(::publish) == true
     output.onLinearSourceResult(result)
     val stats = result.linearSourceStats()
-    val complete = invocation.admission?.arms?.contains(ExecutionStrategy.COMPLETE) == true &&
-        SourceSetup.executionKind(invocation) != SourceExecutionKind.HEURISTIC
     output.onVerdictContext(
         VerdictContext(
         budgetExhausted = stats.run.timedOut,
         terminationReason = result.linearSourceReason(),
-        completePool = complete,
+        completePool = result.completeSearchAdmitted,
     )
     )
     val solutions = if (solvable.optimize) publication.solutions else points

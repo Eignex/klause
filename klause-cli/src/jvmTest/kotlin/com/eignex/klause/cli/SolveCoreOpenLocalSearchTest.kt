@@ -61,7 +61,7 @@ class SolveCoreOpenLocalSearchTest(private val maximize: Boolean) {
                 return true
             }
             override fun onVerdictContext(context: VerdictContext) {
-                assertFalse(context.completePool)
+                assertEquals(false, context.completePool)
                 terminal = true
             }
             override fun onComplete(verdict: Verdict) {

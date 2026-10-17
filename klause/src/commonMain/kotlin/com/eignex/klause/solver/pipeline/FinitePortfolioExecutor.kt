@@ -70,7 +70,7 @@ internal fun FinitePipeline.portfolioExecutor(
     cancellation: Cancellation,
     numericalCompletion: Boolean,
     sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
-): PortfolioExecutor {
+): PortfolioInvocation {
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
