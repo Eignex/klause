@@ -1054,7 +1054,8 @@ class ExactLiraSearchComponent private constructor(
         node.transformedBranches.isEmpty() && node.retainedReduction == null
 
     private fun canRefuteSourceEqualities(): Boolean =
-        sourceInstalled && unassignedBooleans > 0 && !graphFirst && !hasPrivateReals && model.numIntVars == 0 &&
+        sourceInstalled && completeTraversalObserved && mixedPointCompletion && unassignedBooleans > 0 &&
+        !graphFirst && !hasPrivateReals && model.numIntVars == 0 &&
         admitsSourceEqualityColumns(model.numRealVars) && !hasSourceDisjunctions &&
         solveContext.certificationPolicy === ProductionLpCertificationPolicy &&
         node.rowAssertions.isEmpty() && node.sourceBranches.isEmpty() && node.disequalityDirections.isEmpty() &&
@@ -1436,7 +1437,9 @@ class ExactLiraSearchComponent private constructor(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
-        if (freshPoint == null && unassignedBooleans > 0) {
+        if (completeTraversalObserved && mixedPointCompletion && unassignedBooleans > 0 && freshPoint == null &&
+            result.verdict == LpVerdict.CERTIFIED_BOUND && result.float?.optimal == true
+        ) {
             val explanation = refuteSourceEqualities(context)
             if (operationStop()) return ComponentResult.Indeterminate
             if (explanation != null) {

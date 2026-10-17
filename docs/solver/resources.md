@@ -406,7 +406,8 @@ that partial mutable search; a retry keeps the immutable source plan, canonical
 CP projection, selected theory fragment, completed native row factory and charged work. Active query assertions retract even when an invocation expires.
 
 The optional pure-real [source-equality proof](../theories/linear-real.md) runs after
-an ordinary fresh query without a checked point. Capture, exact arithmetic, support
+an ordinary fresh query with an optimal floating candidate and certified bound but
+no checked point, within the tracked complete invocation. Capture, exact arithmetic, support
 and premise naming charge that same operation token. It adds no numerical query,
 child allowance or refund. Source capture rejects oversized raw row shapes and
 dependencies before substitution, admits the signed operator's doubled equality

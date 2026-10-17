@@ -69,60 +69,63 @@ import kotlin.test.assertTrue
 class QfLiraSolverLpTest {
     @Test
     fun `a compatible Boolean extension should reuse its exact LP point without another query`() {
-        val source = Problem(
-            numBoolVars = 3,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            numRealVars = 2,
-            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
-            factors = arrayOf(
-                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO),
-                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-                    LinearOp.LE, BigFraction.ONE, activator = 0),
-                ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
-                    LinearOp.GE, BigFraction.ZERO, activator = 1),
-            ),
-        )
-        var queries = 0
-        val factory = TrackingLpFactory { solver, allowance ->
-            queries++
-            solver.resolveBounds(allowance)
-        }
-        val stats = SmtStatsSink()
-        ExactLiraSearchComponent(source).use { component ->
-            component.solveWith(LpSolveContext(factory))
-            component.observeWith(stats)
-            component.observeCompleteTraversal()
-            component.useMixedPointCompletion()
-            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            assertEquals(true, hints.preferredBool(0))
-            val initialQueries = queries
-            assertTrue(initialQueries > 0)
+        for ((tracked, completion) in listOf(false to true, true to false, true to true)) {
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+                numRealVars = 2,
+                realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+                factors = arrayOf(
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                        listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO),
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                        LinearOp.LE, BigFraction.ONE, activator = 0),
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                        LinearOp.GE, BigFraction.ZERO, activator = 1),
+                ),
+            )
+            var queries = 0
+            val factory = TrackingLpFactory { solver, allowance ->
+                queries++
+                solver.resolveBounds(allowance)
+            }
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(source).use { component ->
+                component.solveWith(LpSolveContext(factory))
+                component.observeWith(stats)
+                if (tracked) component.observeCompleteTraversal()
+                if (completion) component.useMixedPointCompletion()
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(true, hints.preferredBool(0))
+                val initialQueries = queries
+                assertTrue(initialQueries > 0)
 
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
-            assertEquals(initialQueries, queries)
-            assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
-            assertEquals(initialQueries, queries)
+                assertEquals(initialQueries, queries)
+                assertEquals(if (tracked) 1L else null, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+                assertEquals(initialQueries, queries)
 
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
 
-            assertTrue(queries > initialQueries)
-            assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
-            assertNull(component.nextBranch(session))
-            assertIs<ComponentCheck.Feasible>(session.check())
-            val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
-            assertEquals(true, witness.boolValue(0))
-            assertEquals(false, witness.boolValue(1))
-            assertEquals(true, witness.boolValue(2))
-            assertTrue(witness.reals[0] > BigFraction.ZERO && witness.reals[0] <= BigFraction.ONE)
-            assertTrue(witness.reals[1] < BigFraction.ZERO)
-            assertEquals(BigFraction.ZERO, witness.reals[0] + witness.reals[1])
-            assertNull(stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_NO_POINT_ATTEMPT"))
+                assertTrue(queries > initialQueries)
+                assertEquals(if (tracked) 1L else null, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+                assertNull(component.nextBranch(session))
+                assertIs<ComponentCheck.Feasible>(session.check())
+                val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
+                assertEquals(true, witness.boolValue(0))
+                assertEquals(false, witness.boolValue(1))
+                assertEquals(true, witness.boolValue(2))
+                assertTrue(witness.reals[0] > BigFraction.ZERO && witness.reals[0] <= BigFraction.ONE)
+                assertTrue(witness.reals[1] < BigFraction.ZERO)
+                assertEquals(BigFraction.ZERO, witness.reals[0] + witness.reals[1])
+                assertNull(stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_NO_POINT_ATTEMPT"))
+                assertEquals(if (tracked) 1L else null, stats.snapshot().completeSearchLinearChecks)
+            }
         }
     }
 

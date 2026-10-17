@@ -108,8 +108,12 @@ Explicit zero retains bounded construction observations without component steeri
 positive values permit indexed preferences. Arithmetic and index work keep their
 existing cumulative owners and limits, independently of the Boolean draw's flip ceiling.
 
-An incomplete canonical pure-real Boolean frame can also use closed source-equality
-elimination after its ordinary fresh LP result supplies no checked exact point.
+A tracked complete invocation with mixed-point completion enabled can use closed
+source-equality elimination at an incomplete canonical pure-real Boolean frame.
+Its ordinary fresh LP result must carry both an optimal floating candidate and a
+certified bound, with no checked exact point. Direct-only components, disabled
+completion, indeterminate results and absent or partial floating candidates do not
+enter this optional proof.
 This optional proof does not run on a reused or fresh checked point, a certified LP
 conflict, a missing numerical result or an interrupted operation. It retains the
 production certification policy and excludes private real coordinates, source

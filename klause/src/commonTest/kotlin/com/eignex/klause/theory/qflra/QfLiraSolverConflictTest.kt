@@ -182,15 +182,24 @@ class QfLiraSolverConflictTest {
     }
 
     @Test
-    fun `bounded source comparisons should decline oversized inactive Boolean coefficients`() {
-        val form = ExactRowForm(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
-            intArrayOf(Lit.make(0, true)), listOf(BigFraction.of(BIG_ONE shl 4097, BIG_ONE)),
-            LinearOp.LE, false, true)
+    fun `bounded source comparisons should reject oversized inputs before Boolean folding`() {
+        val huge = BigFraction.of(BIG_ONE shl 4097, BIG_ONE)
         val arithmetic = MixedPointArithmetic(Cancellation.Never)
+        val forms = listOf(
+            ExactRowForm(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                intArrayOf(Lit.make(0, false)), listOf(huge), LinearOp.LE, false, true),
+            ExactRowForm(mapOf(0 to BigFraction.ONE), huge,
+                intArrayOf(Lit.make(0, true)), listOf(huge), LinearOp.LE, false, true),
+            ExactRowForm(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                intArrayOf(Lit.make(0, true), Lit.make(0, true)), listOf(huge, huge.negated()),
+                LinearOp.LE, false, true),
+        )
 
-        val comparison = form.checkedComparison(true, { false }, arithmetic::admitted, arithmetic::preflight)
+        for (form in forms) {
+            val comparison = form.checkedComparison(true, { true }, arithmetic::admitted, arithmetic::preflight)
 
-        assertNull(comparison)
+            assertNull(comparison)
+        }
     }
 
     @Test
