@@ -800,9 +800,7 @@ internal class LocalSearchEngine(
             },
             current = { (liveCompletion as? Completion.Witness)?.sample ?: state.assignment.snapshot() },
         ) else null
-        var checkInitialCompletion = continuousCompletion || (completedMoves != null && params.initialAssignment?.let {
-            it.numBoolVars == problem.numBoolVars && it.numIntVars == problem.numIntVars
-        } == true)
+        var checkInitialCompletion = continuousCompletion || completedMoves != null
 
         fun reportProgress() = progress.optimization(
             totalFlips, restartCount, stallCount, bestObj, bestSample != null,

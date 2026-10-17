@@ -85,6 +85,28 @@ class LocalSearchEngineCompletionTest {
     }
 
     @Test
+    fun `generated mixed optimization starts should receive charged real completion`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(1, 1)),
+            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
+                listOf(BigFraction.ofLong(3), BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val search = LocalSearchEngine(LocalSearchModel.of(problem.bake()),
+            greedyRepairOnRestart = false, completion = LeafRealCompletion(problem, objective))
+        val budget = NodeBudget(100)
+
+        val result = search.improvements(objective,
+            LocalSearchParams(maxFlips = 1, nodeBudget = budget, randomSeed = 17), null).last()
+
+        val point = assertIs<MinimizeResult.BestFound>(result).sample
+        assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), point.exactReals)
+        assertEquals(1L, point.intValue(0))
+        assertTrue(budget.spent > 0)
+    }
+
+    @Test
     fun `an exhausted allowance should not begin continuous completion`() {
         val problem = Problem(
             0, 0, emptyArray(),
