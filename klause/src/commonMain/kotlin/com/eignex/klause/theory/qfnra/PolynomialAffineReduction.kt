@@ -66,22 +66,31 @@ internal class PolynomialAffineReduction private constructor(
                     inconsistent = true
                     break
                 }
-                val graph = equationalSection(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
-                    ?: break
+                val graphs = equationalSections(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
+                if (graphs.isEmpty()) break
+                val independent = if (graphs.size > 1) graphs.map { arithmetic.step(); it.variable }.toSet()
+                else emptySet()
                 val rewritten = ArrayList<PolynomialAtom>()
                 for (atom in current) {
                     arithmetic.step()
-                    val polynomial = if (graph.variable in atom.polynomial.variables) {
+                    if (independent.isNotEmpty() && atom.relation == PolynomialRelation.EQ &&
+                        atom.polynomial.variables.any { arithmetic.step(); it in independent }
+                    ) continue
+                    val graph = graphs.first()
+                    val polynomial = if (independent.isEmpty() && graph.variable in atom.polynomial.variables) {
                         arithmetic.substitute(atom.polynomial, graph.variable, graph.replacement)
                     } else atom.polynomial
                     if (polynomial.isZero && atom.holds(0)) continue
                     rewritten.add(PolynomialAtom(polynomial, atom.relation))
                     yield(null)
                 }
-                arithmetic.step()
-                fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
+                for (graph in graphs) {
+                    arithmetic.step()
+                    fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
+                    onGraph?.invoke()
+                    yield(null)
+                }
                 current = rewritten
-                onGraph?.invoke()
                 yield(null)
             }
             while (!inconsistent) {

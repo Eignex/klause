@@ -20,6 +20,50 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `independent graph leaves reconstruct within the native allowance`() {
+        val declarations = (0..128).joinToString(" ") { "(declare-const x$it Real)" }
+        val equations = (1..128).joinToString(" ") { "(assert (= x$it (+ (* x0 x0) $it)))" }
+        val source = SmtLibPolynomial.parse("$declarations $equations")
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 100_000))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val square = algebraic.power(witness.realValue(0), 2)
+        for (id in 1..128) {
+            assertEquals(0, algebraic.compare(witness.realValue(id),
+                algebraic.add(square, algebraic.rational(BigFraction.ofLong(id.toLong())))))
+        }
+    }
+
+    @Test
+    fun `independent leaves retain a shared constant equation contradiction`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val equations = (1..32).joinToString(" ") { "(assert (= x$it (+ x0 $it)))" }
+        val source = SmtLibPolynomial.parse("$declarations $equations (assert (= x0 0)) (assert (> x0 0))")
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `interrupted independent graph elimination cannot refute the source`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val equations = (1..32).joinToString(" ") { "(assert (= x$it (+ (* x0 x0) $it)))" }
+        val source = SmtLibPolynomial.parse("$declarations $equations")
+        lateinit var query: QfNraQuery
+        val token = Cancellation { (query.stats.equationalSections ?: 0) > 0 }
+        query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(cancellation = token), PolynomialCondition())
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertEquals(QfNraReason.Interrupted, assertIs<QfNraResult.Unknown>(result).reason)
+    }
+
+    @Test
     fun `reduced region observation retains predicates without changing native work`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

@@ -733,6 +733,16 @@ equality alone supplies no factor zero or nonzero premise. Other coordinate
 occurrences remain for subsequent projection; only total rational polynomial
 graphs are substituted.
 
+Complete region reduction removes independent graph leaves in one wave. A selected
+coordinate must occur in only its defining equality throughout the current region;
+at most one coordinate is selected per equality. Its nonzero rational coefficient
+makes that equality total, and the occurrence condition keeps every selected
+coordinate out of the other selected definitions. The remaining predicates need no
+substitution for these coordinates. Shared coordinates retain single-graph
+substitution, including constant equations whose fill score is zero. Exact graph
+fibers reconstruct the removed coordinates in reverse wave order under the same
+native work and cancellation scope.
+
 Projection records a permutation of all original coordinates and any further total graph
 sections. Dependencies in those sections occupy earlier lifting levels. Prefix literal checks
 use those levels rather than source coordinate IDs. Fixed coordinates retain their
