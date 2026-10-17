@@ -929,6 +929,36 @@ separately from whole-CLI comparisons and exclude warmup rounds from measurement
 
 ### CLI stream capture
 
+`com.eignex.klause.bench.profile.CliBranchAttemptCapture` preserves an original catalog
+SMT source and launches the installed CLI with one bounded passive agent. Supply
+`suite=... problem=... sha256=... timeout=10000 seed=1` through the maintained lab
+profile client. The child keeps the default engine, P1, 3 GiB Serial GC and no child
+JFR. Its watchdog is twice the requested timeout plus 20 seconds; each output stream
+retains at most 128 KiB. Source, process/runtime/distribution manifests, command,
+agent/config hashes and actual compiled target/field schemas remain beside the report.
+
+The agent transforms one private `SearchRun.advanceFrame` callsite immediately before
+`SearchSession.push`. It preserves the original stack, arguments, return and exception
+behavior and reads no solver or context getter. An actual source-order run, optionally
+wrapped once for point polarity, must have one matching arithmetic component context.
+Only the selected source Boolean slot and trusted built-in dependency-set membership
+are read. `ARITHMETIC_DEPENDENCY` and `NON_ARITHMETIC` describe that membership;
+named Boolean and other shared decisions have separate roles. These are attempted
+branches before propagation, including attempts that later fail, rather than committed
+decisions. No other Boolean slots or predicate values are inspected, so this does not
+establish unresolved arithmetic alternatives, primitive-input or derived-gate ownership,
+starvation, or a useful alternative ordering.
+
+The report retains at most 16 weak owner identities, eight components per callback,
+64 first-attempt records and one million total events. Fixed role totals continue
+after the trace fills. Owner identity uses weak referents rather than hash-only keys;
+expired owners do not renew the allowance. Missing, ambiguous, assigned-slot, mode,
+schema, helper and cap failures withhold qualification as `INCONCLUSIVE`.
+The field cache, failure labels, agent, config, report and combined output storage
+also have fixed bounds. Captures perform no extra parse, numerical operation or
+branch selection. Instrumented counts and timings provide no ordinary performance,
+source-verdict or proof credit.
+
 `com.eignex.klause.bench.profile.CliStreamCapture` runs the installed CLI as a subprocess
 and retains original input bytes, build/runtime provenance, command, stdout, stderr,
 and a JSONL arrival record with byte offsets and subprocess liveness. Run it through
