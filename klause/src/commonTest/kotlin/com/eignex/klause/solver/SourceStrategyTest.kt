@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
@@ -47,6 +48,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRequest
@@ -113,6 +115,34 @@ class SourceStrategyTest {
         assertEquals(BigFraction.ofLong(7), result.value)
         assertEquals(TerminationReason.BudgetExhausted, result.reason)
         assertEquals(73L, initial.intValue(0))
+    }
+
+    @Test
+    fun `finite affine heuristic optimization should complete rational coordinates without a supplied start`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 2)),
+            arrayOf(Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(3.0),
+                LinearOp.EQ, 0.0)), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        for (sense in ObjectiveSense.entries) {
+            val budget = NodeBudget(1000)
+            val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(randomSeed = 17, nodeBudget = budget),
+            ))
+
+            val execution = assertIs<OpenTheoryExecution.Optimize>(LocalSearchSolver.source(source).optimizeOpen(
+                objective, params, TheoryParams(randomSeed = 17, nodeBudget = budget), sense,
+            ))
+
+            val result = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
+            val point = assertNotNull(result.incumbent)
+            val exact = assertIs<SourceValue.Rational>(assertNotNull(execution.acceptedIncumbent).value).value
+            assertEquals(exact.toString(), point.realValue(0))
+            assertTrue(point.intValue(0) in setOf("1", "2"))
+            assertEquals(BigFraction.of(parseBigInt(point.intValue(0)), BIG_ONE), exact * BigFraction.ofLong(3))
+            assertEquals(if (sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact, result.value)
+            assertEquals("ls", result.stats.run.backend)
+        }
     }
 
     @Test
