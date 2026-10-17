@@ -98,7 +98,7 @@ class SolveCoreTest(private val route: String) {
 
         else -> """
             var 0..1: i :: output_var;
-            var 6..8: cost :: output_var;
+            var 6..7: cost :: output_var;
             var float: source_cost :: output_var;
             var float: r :: output_var;
             var float: x :: output_var;
@@ -107,8 +107,8 @@ class SolveCoreTest(private val route: String) {
             constraint int2float(i,r);
             constraint int2float(cost,source_cost);
             constraint float_times(r,x,y);
-            constraint float_le(-2.0,x);
-            constraint float_le(x,2.0);
+            constraint float_le(0.0,x);
+            constraint float_le(x,1.0);
             solve minimize source_cost;
         """.trimIndent()
     }

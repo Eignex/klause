@@ -114,7 +114,7 @@ LP observation and separate optional-deduction/required-admission stops retain t
 same ownership as a direct setup request.
 
 The same policy serves DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc,
-SMT-LIB linear admission and source-strategy satisfaction. Finite format adapters
+SMT-LIB source admission and source-strategy satisfaction. Finite format adapters
 retain the selected route and their existing definition, Boolean-fold, functional
 objective and search hints. Arithmetic adapters render original exact coordinates;
 XCSP3 objective values beyond binary64's exact integral range retain their original units.
@@ -219,10 +219,11 @@ same-kind remap and retains its typed working coordinates.
 `executionKind` inspects the installed family; library policy owns
 unsupported-linear optimization fallback to source-checked heuristic execution on the
 same prepared plan. Exact and original-real FlatZinc use the same arithmetic fallback
-as SMT-LIB linear admission. Those paths, the MiniZinc finite invocation path and
+as SMT-LIB source admission. Those paths, the MiniZinc finite invocation path and
 source-strategy arithmetic satisfaction consume this dispatcher. Native SMT formula
 and quadratic consumers also submit their attachments through it; their CLI carrier
-owns rendering only. Existing SMT admission still chooses its source representation.
+owns rendering only. SMT admission retains factor or exact-expression content according
+to its representation, independently of the installed solving mechanisms.
 Required native preparation charges source-coordinate capture to the containing token;
 an interrupted preparation exports no executable plan and returns `Declined`, with
 its original source and stop reason. This supplies no engine refutation or certificate.
@@ -290,9 +291,9 @@ The quadratic `minimize` overload uses shared exact integer branching and return
 the same quadratic incumbent/bound result surface for open and arbitrary-width
 integer coordinates. Heuristic engines retain checked incumbents; complete
 traversal must cover every remaining integer branch before a global claim.
-SMT-LIB admission retains the existing source snapshot through
-`SmtLibProblem.source`, with an exact `quadraticObjective` in original coordinates
-and its source sense. The CLI binds this attachment and objective through shared
+SMT-LIB admission retains factor or exact-expression content through
+`SmtLibProblem.source`, with affine or exact quadratic metadata in original
+coordinates and its source sense. The CLI binds this attachment and objective through shared
 setup and renders the exact optimization result.
 
 

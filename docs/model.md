@@ -75,11 +75,11 @@ original checks and engine admission still govern the resulting finite plan. LP-
 observation also runs for an empty deduction phase, and a stop raised by that observer
 withholds the plan. Real coordinates and exact-objective preferences retain arithmetic
 preparation.
-DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc and SMT-LIB linear admission
+DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc and SMT-LIB source admission
 use the same selection policy and retain the selected route through finite adaptation.
 Finite format adapters preserve their existing private definition and objective hints;
 these compatibility shapes retain their existing finite execution controls.
-`SourceSetup.execute` dispatches captured finite, open-linear and polynomial operations.
+`SourceSetup.execute` dispatches captured finite and exact arithmetic operations.
 Its result retains the entire producing native execution alongside the original source
 interpretation. Exact linear and polynomial publication callbacks keep their own
 accepted samples, values and receipts. Heuristic fallback retains the captured plan,
