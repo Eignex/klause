@@ -5,6 +5,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.execute
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
