@@ -179,7 +179,12 @@ class LpEngineTest {
             }
 
             val cuts = engine.harvestRootCuts(
-                assertNotNull(engine.lpRelaxer), PropagationSession(problem), listOf(first, second), false, false, token,
+                assertNotNull(engine.lpRelaxer),
+                PropagationSession(problem),
+                listOf(first, second),
+                false,
+                false,
+                token,
             )
 
             assertTrue(cuts.isEmpty())
