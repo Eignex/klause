@@ -2825,6 +2825,14 @@ Source strategy records also check the original sample frame and public FloatHan
 decoders, including optional presence-first decoding. `pinAbsent=false` supplies the
 schema compiler's absent-value semantic override and records its effective value.
 
+Without a schema, `entry=source` uses the admitted factor source with the public
+Problem strategy factories and default source semantics. Native formula inputs
+decline. `source-strategy-v1` contains open integer affine minimization and bound
+refutation controls. `requireIncumbent=false` permits missing points for refuted or
+incomplete records; the independent checker still validates every reported point,
+bound and refutation. The default requires an incumbent for every record. Checker
+runtime and dependency versions accompany the source checks.
+
 The `schema-source-floats-v1` inputs exercise optional x in [-1,1] with two requested
 buckets, y in [0,4], the unguarded product y=(x+1)*(x+1) and cost 3*x+5*y+7. Use its
 `absent` or `present` source directory with the matching schema file. Absence has

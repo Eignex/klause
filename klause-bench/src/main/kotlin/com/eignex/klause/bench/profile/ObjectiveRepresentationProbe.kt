@@ -94,7 +94,7 @@ internal object ObjectiveRepresentationProbe {
         require(options.keys.all {
             it in setOf(
                 "source", "engines", "out", "work", "seed", "moves", "timeout",
-                "checker", "processors", "schema", "conditions", "capture", "entry", "pinAbsent",
+                "checker", "processors", "schema", "conditions", "capture", "entry", "pinAbsent", "requireIncumbent",
             )
         })
         val capture = when (options["capture"] ?: "none") {
@@ -108,6 +108,7 @@ internal object ObjectiveRepresentationProbe {
             else -> error("entry must be setup or source")
         }
         val absentPinning = options["pinAbsent"]?.toBooleanStrict()
+        val requireIncumbent = options["requireIncumbent"]?.toBooleanStrict() ?: true
         val processors = options["processors"]?.toInt() ?: 1
         require(processors > 0)
         if (Runtime.getRuntime().availableProcessors() != processors) {
@@ -140,6 +141,7 @@ internal object ObjectiveRepresentationProbe {
             put("revision", Reports.readGitSha())
             put("capture", if (capture) "required" else "none")
             put("entry", if (sourceEntry) "source" else "setup")
+            put("requireIncumbent", requireIncumbent)
             put("pinAbsentOptionalValues", originalSource?.semantics?.effective?.pinAbsentOptionalValues)
             put("seed", seed)
             put("nativeWork", work)
@@ -177,15 +179,15 @@ internal object ObjectiveRepresentationProbe {
             CompiledInput(it, original.pipelineRequest(), realIds, handles, original, integerHandles, optionals)
         }
         require(!capture || prepared != null) { "Original IR capture requires a compiled schema" }
-        require(!sourceEntry || (prepared != null && engines.all {
+        require(!sourceEntry || engines.all {
             it == FiniteEngine.BACKTRACK || it == FiniteEngine.LOCAL_SEARCH
-        })) { "Source strategy entry requires a compiled schema and BACKTRACK or LOCAL_SEARCH engines" }
+        }) { "Source strategy entry requires BACKTRACK or LOCAL_SEARCH engines" }
         for (source in sources.sortedBy { it.path }) {
             measure(source, output, engines, work, seed, moves, timeout, prepared, conditions, capture, sourceEntry)
         }
         when (options["checker"] ?: "none") {
             "none" -> Unit
-            "existing" -> checkOutput(output, engines, "python3")
+            "existing" -> checkOutput(output, engines, "python3", requireIncumbent)
             "provision" -> {
                 val log = File(output, "checker-install.log")
                 val environment = File(output, "checker-venv")
@@ -199,7 +201,7 @@ internal object ObjectiveRepresentationProbe {
                 runProcess(log, python, "-m", "pip", "install", "-r",
                     "klause-bench/tools/requirements-source-checks.txt")
                 runProcess(File(output, "checker-dependencies.txt"), python, "-m", "pip", "freeze")
-                checkOutput(output, engines, python)
+                checkOutput(output, engines, python, requireIncumbent)
                 check(environment.deleteRecursively()) { "Could not dispose the owned checker environment" }
             }
             else -> error("checker must be none, existing or provision")
@@ -221,10 +223,12 @@ internal object ObjectiveRepresentationProbe {
         check(child.waitFor() == 0) { "Objective probe JVM failed" }
     }
 
-    private fun checkOutput(output: File, engines: List<FiniteEngine>, python: String) {
+    private fun checkOutput(output: File, engines: List<FiniteEngine>, python: String, requireIncumbent: Boolean) {
+        runProcess(File(output, "checker-runtime.txt"), python, "--version")
         runProcess(File(output, "checker.log"), python, "klause-bench/tools/verify_objective_probe.py",
             output.absolutePath, "--engines", engines.joinToString(",") { it.name },
-            "--require-incumbent", "--output", File(output, "source-checks.json").absolutePath)
+            *(if (requireIncumbent) arrayOf("--require-incumbent") else emptyArray()),
+            "--output", File(output, "source-checks.json").absolutePath)
         val tools = listOf("verify_objective_probe.py", "verify_nra_source_results.py", "verify_source_results.py",
             "requirements-source-checks.txt")
         File(output, "checker-tool-hashes.json").writeText(buildJsonObject {
@@ -247,14 +251,20 @@ internal object ObjectiveRepresentationProbe {
         val bytes = input.readBytes()
         val identity = sha256(bytes)
         File(output, "$identity.smt2").writeBytes(bytes)
-        val captured = SmtLib.parse(bytes.toString(Charsets.UTF_8), Long.MIN_VALUE, Long.MAX_VALUE)
+        val captured = if (sourceEntry && compiled == null) SmtLib.parse(bytes.toString(Charsets.UTF_8))
+            else SmtLib.parse(bytes.toString(Charsets.UTF_8), Long.MIN_VALUE, Long.MAX_VALUE)
         val capturedObjective = requireNotNull(
             captured.quadraticObjective ?: captured.objective?.toQuadraticObjectiveSpec(),
         ) {
             "Probe requires a captured exact source objective: $input"
         }
         val source = sourceNames(captured)
-        require(compiled != null || source.ints.isEmpty()) { "Integer sources require an explicit compiled schema" }
+        require(compiled != null || source.ints.isEmpty() || sourceEntry) {
+            "Integer sources require a compiled schema or source strategy entry"
+        }
+        val factorSource = if (sourceEntry && compiled == null) {
+            requireNotNull(captured.source.originalSource as? Problem) { "Source strategy entry requires a factor source" }
+        } else null
         val original = affineObjective(source, capturedObjective)
         val affine = if (compiled == null) original else compiledObjective(compiled, source, original)
         val quadratic = if (compiled == null) capturedObjective else affine.toQuadraticObjectiveSpec()
@@ -308,12 +318,16 @@ internal object ObjectiveRepresentationProbe {
                 }
                 var sourceQuadratic = quadratic
                 val execution = if (sourceEntry) {
-                    val model = requireNotNull(compiled).model
-                    val strategy = if (engine == FiniteEngine.BACKTRACK) BacktrackSolver.source(model)
-                        else LocalSearchSolver.source(model)
+                    val strategy = if (compiled != null) {
+                        if (engine == FiniteEngine.BACKTRACK) BacktrackSolver.source(compiled.model)
+                        else LocalSearchSolver.source(compiled.model)
+                    } else {
+                        if (engine == FiniteEngine.BACKTRACK) BacktrackSolver.source(requireNotNull(factorSource))
+                        else LocalSearchSolver.source(requireNotNull(factorSource))
+                    }
                     if (encoding == "linear") {
-                        val paired = pairedObjective(compiled, affine)
-                        sourceQuadratic = model.sourceObjective(paired)
+                        val paired = if (compiled != null) pairedObjective(compiled, affine) else affine
+                        sourceQuadratic = compiled?.model?.sourceObjective(paired) ?: quadratic
                         strategy.optimize(paired, params, captured.sense)
                     } else strategy.optimize(quadratic, params, captured.sense)
                 } else (completed as? SourceExecutionResult.Quadratic)?.result
@@ -323,7 +337,8 @@ internal object ObjectiveRepresentationProbe {
                     put("sourceSha256", identity)
                     put("engine", engine.name)
                     put("encoding", encoding)
-                    put("entry", if (sourceEntry) "compiled-source-strategy"
+                    put("entry", if (sourceEntry && compiled != null) "compiled-source-strategy"
+                            else if (sourceEntry) "source-strategy"
                             else if (compiled == null) "polynomial-source" else "compiled-schema")
                     put("condition", condition)
                     put("elapsedNanos", elapsed)
@@ -556,7 +571,7 @@ internal object ObjectiveRepresentationProbe {
         put("lsMoves", result.stats.ls.moves.sum)
         if (result is QuadraticOptimizationResult.WithIncumbent) {
             val sample = result.incumbent.sample
-            if (sourceEntry) put("decoders", sourceDecoders(requireNotNull(compiled), sample))
+            if (sourceEntry && compiled != null) put("decoders", sourceDecoders(compiled, sample))
             put("objective", scalar(result.incumbent.value))
             put("witness", buildJsonObject {
                 for ((name, id) in source.reals) {
