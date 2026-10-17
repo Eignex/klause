@@ -41,15 +41,24 @@ def inspect(report, selected, represented):
             cohort.gzip_identity(path, events.MAX_EXPORT_BYTES) != result['uncompressedIdentity']:
         raise ValueError('Saved JFR export bytes differ from original census identity')
     counts, size = Counter(), 0
-    with gzip.open(path, 'rb') as source:
-        for ordinal, event in events.JsonEvents(source):
-            counts[event['type']] += 1
-            if event['type'] != 'jdk.JVMInformation':
-                continue
-            size += len(json.dumps(event, ensure_ascii=True).encode('utf-8'))
-            if size > MAX_CONTEXT_BYTES or len(result['jvmInformationEvents']) >= MAX_CONTEXT_EVENTS:
-                raise ValueError('Complete saved JVM information exceeds context bounds')
-            result['jvmInformationEvents'].append({'eventIndex': ordinal, 'values': event['values']})
+    try:
+        with gzip.open(path, 'rb') as source:
+            for ordinal, event in events.JsonEvents(source):
+                counts[event['type']] += 1
+                if event['type'] != 'jdk.JVMInformation':
+                    continue
+                size += len(json.dumps(event, ensure_ascii=True).encode('utf-8'))
+                if size > MAX_CONTEXT_BYTES or len(result['jvmInformationEvents']) >= MAX_CONTEXT_EVENTS:
+                    raise ValueError('Complete saved JVM information exceeds context bounds')
+                result['jvmInformationEvents'].append({'eventIndex': ordinal, 'values': event['values']})
+    except (ValueError, UnicodeError) as error:
+        if report.get('completed') is not False:
+            raise
+        result['jvmInformationEvents'].clear()
+        result['exportReadError'] = {'type': type(error).__name__, 'message': str(error)}
+        result['exclusions'].extend(['Original recording census is incomplete',
+                                     'Failed original export cannot supply a complete JVM context'])
+        return result
     result['completeSavedExportRead'] = True
     original_counts = report.get('eventCounts')
     if original_counts is not None:

@@ -2779,6 +2779,11 @@ Every JVMInformation event retains its original event index and complete values,
 including unknown fields, commands, arguments, process identity and start time
 when recorded. Missing exports, absent events, repeated or conflicting contexts,
 incomplete original censuses and mismatched event counts remain explicit.
+An unreadable export from an explicitly incomplete original census retains an
+`exportReadError` and an unavailable context. No parsed JVMInformation prefix is
+returned; the complete failed export and its identities stay in the evidence.
+Compressed or expanded identity mismatches remain fatal before parsing. Parse
+errors from censuses without an explicit incomplete status also remain fatal.
 No context is selected from multiple events and no target process role is inferred.
 Unreferenced saved exports remain named in `unreferencedSavedExportPaths`.
 Context availability does not change original or mapped pair eligibility.

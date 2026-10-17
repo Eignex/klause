@@ -63,13 +63,14 @@ class JvmRecordingContextTest(unittest.TestCase):
             path.write_bytes(gzip.compress(raw))
             report = {'exportFile': dict(path=path.name, **review.cohort.file_identity(path)),
                       'retainedExportUncompressedIdentity': {'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}}
-            for key in ('exportFile', 'retainedExportUncompressedIdentity'):
-                changed = copy.deepcopy(report)
-                changed[key]['sha256'] = '0' * 64
-                with self.subTest(key=key), patch.object(review.events, 'JsonEvents') as parser:
-                    with self.assertRaisesRegex(ValueError, 'bytes differ'):
-                        review.inspect(changed, {path.name: path}, set())
-                    parser.assert_not_called()
+            for completed in (None, False):
+                for key in ('exportFile', 'retainedExportUncompressedIdentity'):
+                    changed = dict(copy.deepcopy(report), completed=completed)
+                    changed[key]['sha256'] = '0' * 64
+                    with self.subTest(key=key, completed=completed), patch.object(review.events, 'JsonEvents') as parser:
+                        with self.assertRaisesRegex(ValueError, 'bytes differ'):
+                            review.inspect(changed, {path.name: path}, set())
+                        parser.assert_not_called()
 
     def test_a_saved_export_cannot_supply_two_recording_contexts(self):
         report = {'exportFile': {'path': 'events-000000.json.gz', 'size': 1, 'sha256': 'a' * 64}}
@@ -153,6 +154,32 @@ class JvmRecordingContextTest(unittest.TestCase):
             self.assertTrue(result['censusEventCountsMatch'])
             self.assertIn('Original recording census is incomplete', result['exclusions'])
             self.assertFalse(result['completeProcessLifetimeProven'])
+
+    def test_failed_census_with_an_unreadable_export_retains_an_unavailable_context_without_a_prefix(self):
+        for raw in (b'', b'{"recording":{"events":[{"type":"jdk.JVMInformation","values":{}}]',
+                    b'{"recording":{"events":[{"type":"jdk.JVMInformation","values":{"text":"\xff"}}]}}'):
+            with self.subTest(raw=raw), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / 'events-000000.json.gz'
+                path.write_bytes(gzip.compress(raw))
+                report = {'completed': False, 'exportFile': dict(path=path.name, **review.cohort.file_identity(path)),
+                          'retainedExportUncompressedIdentity': {'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}}
+                before, represented = copy.deepcopy(report), set()
+
+                result = review.inspect(report, {path.name: path}, represented)
+
+                self.assertEqual(before, report)
+                self.assertEqual({path.name}, represented)
+                self.assertEqual(report['exportFile'], result['exportIdentity'])
+                self.assertEqual(report['retainedExportUncompressedIdentity'], result['uncompressedIdentity'])
+                self.assertFalse(result['completeSavedExportRead'])
+                self.assertIsNone(result['censusEventCountsMatch'])
+                self.assertEqual([], result['jvmInformationEvents'])
+                self.assertTrue(result['exportReadError'])
+                self.assertIn('Original recording census is incomplete', result['exclusions'])
+                self.assertFalse(result['acceptedSavingsCredit'])
+
+                with self.assertRaises((ValueError, UnicodeError)):
+                    review.inspect(dict(report, completed=True), {path.name: path}, set())
 
 
 if __name__ == '__main__':
