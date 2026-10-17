@@ -3198,3 +3198,46 @@ the original MiniZinc source check separately from compiled FlatZinc semantics.
 checks source hashes and pins the retained DZN assignments into the original model
 using the recorded compiler configuration. It records this original-source result
 separately from checking exact-coordinate comments against compiled FlatZinc.
+
+### Source syntax inventories
+
+`bench.profile.JvmSourceDeclarations` accepts `declarations=` and
+`declarations-sha256=` for an HTTPS source specification containing `schema: 1` and a
+`sources` array. Each entry supplies `id`, `path`, `sourceFile`, `sha256` and
+the complete `sourceText`. All entries are byte-authenticated before parsing;
+duplicate JSON keys, IDs and paths, unsafe paths and invalid UTF-8 fail admission.
+Kotlin, Kotlin script and Java files are parsed with the observer's pinned
+Kotlin compiler 2.4.10 PSI implementation. This dependency belongs only to the
+unpublished benchmark module. The observer records its compiler JAR identities
+and checks its installed distribution and runtime before and after processing.
+Source PSI files are detached from the IDE event system; the scoped compiler
+environment is disposed after processing, without global IDE cache mutation.
+
+`source-declarations.jsonl.gz` retains source boundaries and every declaration,
+expression, statement, source reference and parser error, with lexical parents.
+Constructors, accessors, local functions, lambdas, default expressions and property
+initializers/delegates retain separate nodes; overloads retain separate ranges.
+Each node has original UTF-16 offsets, exact UTF-8 byte offsets/hash and original
+line positions. PSI requires LF line endings; CRLF and CR are normalized for
+parsing, and every node boundary maps back to the unchanged original source.
+Literal comment/string text creates no declaration; executable string
+interpolations retain their source constructs. A syntax error
+retains the complete tree and fails the completion; other failures retain a partial
+gzip without accepting its prefix. The complete gzip is round-trip checked.
+The first record declares `source-syntax-columns-v1` and its ordered `nodeColumns`
+and `rangeColumns`. Each `syntax-node` stores the corresponding arrays; its
+`psiKind` is an integer index into preceding `psi-kind` records containing the
+complete compiler PSI class name. The dictionary is shared within the report and
+bounded to 4,096 names. Expanding the column arrays and class index preserves every
+node value and object-key order; the observer checks each round trip before writing.
+`source-start` and `source-end` records bind the nodes to the original file identity
+and retain its complete node/error counts. Inspect or expand actual reports only
+on the supported profiling worker.
+Input JSON is bounded to 128 MiB, total source to 64 MiB and 4,096 files, traversal
+to 10 million PSI nodes and depth 4,096, and the uncompressed report to 512 MiB.
+Bounds decline the complete inventory rather than select a smaller source set.
+This is syntax parsing, without symbol resolution, original-source compilation
+or target-program launch. Source ranges do not establish resolved calls,
+generated JVM members, semantic phases, actual loaded selection or compiler costs.
+Run and inspect actual source/metadata inventories on the supported profiling
+worker and retain complete positive, unavailable and negative results.
