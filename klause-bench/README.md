@@ -3312,3 +3312,68 @@ worker. Complete source/class line candidates do not prove source/JVM overload
 selection, generated bodies, class-loader selection, semantic phases, physical roots,
 compiler elapsed time, solver outcomes or compilation savings. Those proof flags
 remain false independently of complete byte and range checks.
+
+### Saved bytecode inventories
+
+`bench.profile.JvmSavedBytecodeMetadata` reads complete prepared JAR distributions
+and runtime images on the supported profiling worker. It accepts `specification=`
+and `specification-sha256=` for one pinned HTTPS JSON document. The document has
+`schema: 1` and an `inputs` array. Each input supplies a unique `id`, `kind` (`jars`
+or `runtime-image`), `sourceHead`, absolute `root`, and a `files` object mapping every
+relative regular-file path to its `bytes` and `sha256`. Roots must be distinct,
+canonical directories; symbolic links, missing files and unlisted files decline
+the inventory. Every listed file is authenticated before and after inspection.
+`sourceHead` retains the request's provenance claim; establishing that claim requires
+the original capture manifests and archive identities, independently of these checks.
+
+Prepare inputs from the complete authenticated original captures, preserving their
+private raw bytes and original manifest mappings. Preparation and cleanup belong to
+the caller. The reader neither rebuilds nor launches the original CLI or SDK and
+does not delete its inputs. JAR inspection disables signature verification and never
+defines the inspected classes. Runtime inspection uses the authenticated image's
+`jrt-fs.jar` provider and its image-reader helpers in a separate, closed class loader;
+those helpers execute in the observer. Every declared module must match `release`
+and contain `module-info.class`. The reader visits `/modules`, without treating
+package aliases as additional definitions or choosing a loaded class.
+
+`bytecode-metadata.jsonl.gz` contains a schema record, every class entry, and an
+end census. JAR entry indexes include non-class entries; runtime entry indexes count
+classes in provider traversal order. Alternate multi-release entries remain separate.
+Duplicate JAR entry names retain every ambiguous position with unavailable bytes
+and metadata; no name-based ZIP lookup is credited as a physical-entry identity.
+Class parse failures retain their class hash and exception type without embedding
+exception text or selecting a successful prefix. An unavailable class leaves the
+complete traversal report readable but makes `completion.json` unsuccessful.
+
+Class metadata retains hierarchy, ordered fields and methods, descriptors, access
+flags, attribute names and absent code. Each code body retains its byte identity,
+stack/local limits, every instruction's byte position, size and opcode, explicit
+local indexes, constant-pool indexes, encoded branch/switch destinations and ordered
+exception handlers. Switch order and repeated destinations remain intact. `ret`
+targets stay unresolved. Every original line-table position is retained in order,
+including duplicates and points outside instruction boundaries. These are static
+positions; they do not identify executed branches or intervals owned by a source node.
+Source debug mappings come from the separately retained original class metadata,
+joined by original class-byte identity.
+
+Every constant-pool slot and bootstrap entry is represented, including unused
+entries, two-slot constants, method handles, method types and dynamic references.
+References and bootstrap arguments remain indexes, so cycles require no constant
+resolution. Only UTF-8 text with a structural class/member/type/module/package role
+is emitted from the pool; unrelated literal values and instruction immediates stay
+opaque. A UTF-8 entry shared with a literal is emitted when it also has a structural
+role. Field/method declarations and source file names retain their own text.
+The reversible `bytecode-columns-v1` encoding declares the ordered columns for
+pool entries, instructions, branch targets, handlers and line entries in its schema.
+Every encoded class round trips before emission; the complete gzip report round
+trips by byte count and SHA-256 before completion.
+
+Bounds are eight inputs, 4,096 files, 512 MiB per input file and 2 GiB total input
+bytes; each root admits at most 200,000 paths. The complete inventory admits 200,000
+JAR/image resource entries and 100,000 classes, with 16 MiB per class, 65,535 bytes
+per code body and one million instructions per class. The specification is bounded
+to 16 MiB, each report row to 128 MiB, and the whole report to 4 GiB logical and
+512 MiB compressed bytes. Bound or traversal failures retain a partial report and
+decline the whole inventory. No JVM class-file verification, virtual/dynamic callee
+selection, generated-body selection, source-phase coverage, physical compiler-root
+accounting, compiler elapsed time or savings is established by this metadata.
