@@ -67,7 +67,11 @@ class LinearSourceSolvingTest(private val engine: String) {
         SolveCore.solve(solvable, common, output)
 
         assertEquals(listOf("n=3" to (BigFraction.ofLong(11) * BigFraction.ofLong(10).reciprocal())), points)
-        assertTrue(completed == Verdict.OPTIMAL || completed == Verdict.BEST_FOUND)
+        if (engine in setOf("fixed", "cp", "mixed")) {
+            assertEquals(Verdict.OPTIMAL, completed)
+        } else {
+            assertTrue(completed == Verdict.OPTIMAL || completed == Verdict.BEST_FOUND)
+        }
         assertSame(source, retained?.linearSource?.source)
         assertSame(solvable.sourceInvocation, retained?.invocation)
     }
