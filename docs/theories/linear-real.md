@@ -129,6 +129,14 @@ Explicit zero retains bounded construction observations without component steeri
 positive values permit indexed preferences. Arithmetic and index work keep their
 existing cumulative owners and limits, independently of the Boolean draw's flip ceiling.
 
+At a complete Boolean leaf, an optimal floating LP point can propose source-aware
+completion when numerical exact-point recovery declines. Pure-real sources with
+no private real coordinates use the same completion with an empty integer part.
+Rational reconstruction, closed source-equality repair and residual real completion
+retain their existing scalar, storage and numerical limits and the containing
+operation allowance. Only a point checked against every selected exact source row
+can become a witness; a floating point or failed completion supplies no proof.
+
 Linear completion also serves finite mixed models and local-search candidates.
 Boolean pins and source rows stay intact through completion. The shared search
 session owns traversal; [LP architecture](../lp/architecture.md) owns numerical
