@@ -28,7 +28,9 @@ import kotlin.math.ceil
 internal fun ExactLinear.propagationView(): Propagator {
     if (variables.reals.isNotEmpty()) return NoPropagator
     val vars = IntArray(size) { Term.intVar(ref(it)) }
-    val integer = constants as? IntegerConstants
+    val integer = (constants as? IntegerConstants)?.takeIf {
+        it.permitsCompactPropagation(activator != LinearRow.ALWAYS)
+    }
     return when {
         integer != null && activator == LinearRow.ALWAYS ->
             LinearPropagator(variables.boolVars, intVars, integer.coeffs, vars, relation, integer.bound)
@@ -42,6 +44,21 @@ internal fun ExactLinear.propagationView(): Propagator {
         else -> WideLinearPropagator(intVars, vars, Array(size) { constants.exactCoeff(it) },
             relation, constants.exactBound)
     }
+}
+
+private fun IntegerConstants.permitsCompactPropagation(reified: Boolean): Boolean {
+    // Endpoint complements can escape Long, and a widened interval cannot certify either endpoint.
+    if (reified && (bound == Long.MIN_VALUE || bound == Long.MAX_VALUE)) return false
+    // This coefficient budget keeps activity and residuals inside signed 128 bits even on full Long domains.
+    var remaining = Long.MAX_VALUE
+    for (index in 0 until coefficients.size) {
+        val coefficient = coeff(index)
+        if (coefficient == Long.MIN_VALUE) return false
+        val magnitude = if (coefficient < 0L) -coefficient else coefficient
+        if (magnitude > remaining) return false
+        remaining -= magnitude
+    }
+    return true
 }
 
 internal fun LinearIndicator.propagationView(): Propagator = if (variables.reals.isNotEmpty()) NoPropagator else
