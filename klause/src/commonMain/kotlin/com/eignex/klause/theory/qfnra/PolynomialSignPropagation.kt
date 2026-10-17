@@ -2,6 +2,14 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
+import com.eignex.klause.theory.qfnra.PolynomialSigns.ALL_SIGNS
+import com.eignex.klause.theory.qfnra.PolynomialSigns.NEGATIVE_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.NONZERO_SIGNS
+import com.eignex.klause.theory.qfnra.PolynomialSigns.POSITIVE_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.ZERO_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.addSigns
+import com.eignex.klause.theory.qfnra.PolynomialSigns.multiplySigns
+import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
 
 internal fun preparePolynomialSignRefutation(
     atoms: List<PolynomialAtom>,
