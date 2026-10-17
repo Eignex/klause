@@ -271,7 +271,171 @@ def saved_main():
     Path(report_path).write_text(json.dumps(report, indent=2) + '\n')
 
 
+def prepare_study_distributions(capture, archive, expected_archive_hash, source_heads, destination, report):
+    report['completed'] = False
+    if not isinstance(source_heads, dict) or set(source_heads) != {'control', 'candidate'} or \
+            any(not isinstance(value, str) or not re.fullmatch('[0-9a-f]{40}', value)
+                for value in source_heads.values()) or not isinstance(expected_archive_hash, str) or \
+            not re.fullmatch('[0-9a-f]{64}', expected_archive_hash):
+        raise ValueError('Invalid saved study source or archive identity')
+    if archive.is_symlink() or not archive.is_file() or archive.stat().st_size > MAX_ARCHIVE_BYTES or \
+            digest(archive) != expected_archive_hash:
+        raise ValueError('Saved study archive identity mismatch')
+    if not isinstance(capture, dict) or type(capture.get('schema')) is not int or capture['schema'] != 1 or \
+            type(capture.get('archiveBytes')) is not int or capture['archiveBytes'] != archive.stat().st_size or \
+            capture.get('archiveSha256') != expected_archive_hash:
+        raise ValueError('Saved study capture manifest differs from archive identity')
+    expected = capture.get('files')
+    if not isinstance(expected, dict) or not expected or len(expected) > MAX_MEMBERS:
+        raise ValueError('Saved study member inventory is absent or excessive')
+    for name, item in expected.items():
+        safe_name(name)
+        parts = name.split('/')
+        if len(name.encode()) > 4096 or len(parts) > 64 or \
+                any(ord(char) < 32 or ord(char) == 127 for char in name) or \
+                any('/'.join(parts[:index]) in expected for index in range(1, len(parts))) or \
+                not isinstance(item, dict) or type(item.get('bytes')) is not int or \
+                not 0 <= item['bytes'] <= MAX_FILE_BYTES or not isinstance(item.get('sha256'), str) or \
+                not re.fullmatch('[0-9a-f]{64}', item['sha256']):
+            raise ValueError('Invalid saved study member identity or path')
+    proofs = {'allocation-request.json', 'study-builds.json'} | {
+        arm + suffix for arm in source_heads
+        for suffix in ('-provenance.json', '-harness-provenance.json', '-retained-distributions.json')}
+    if not proofs <= set(expected) or any(expected[name]['bytes'] > MAX_JSON_BYTES for name in proofs):
+        raise ValueError('Original saved study provenance is absent or oversized')
+    selected = {name for name in expected if name.endswith('.jar') and any(
+        name.startswith('private-installed/' + arm + '/cli/lib/') for arm in source_heads)}
+    if not selected or destination.exists() or destination.is_symlink():
+        raise ValueError('Original saved study jars are absent or staging already exists')
+    actual, seen, paths, directories, total = {}, set(), {}, [], 0
+    report.update(expectedCaptureMembers=expected, verifiedCaptureMembers=actual)
+    with tempfile.TemporaryDirectory(prefix='saved-study-jars-', dir=destination.parent) as temporary:
+        temporary = Path(temporary)
+        with tarfile.open(archive, 'r|gz') as source:
+            for member in source:
+                name = member.name.rstrip('/') if member.isdir() else member.name
+                safe_name(name)
+                parts = name.split('/')
+                if name in seen or len(seen) >= MAX_MEMBERS or len(name.encode()) > 4096 or len(parts) > 64 or \
+                        any(ord(char) < 32 or ord(char) == 127 for char in name) or \
+                        member.issym() or member.islnk() or member.sparse:
+                    raise ValueError('Duplicate, linked, unsafe or excessive saved study member')
+                seen.add(name)
+                if member.isdir():
+                    if name in expected or any('/'.join(parts[:index]) in expected
+                                               for index in range(1, len(parts))):
+                        raise ValueError('Saved study file conflicts with a directory')
+                    directories.append(name)
+                    continue
+                if not member.isfile() or name not in expected:
+                    raise ValueError('Unexpected saved study member')
+                total += member.size
+                if member.size != expected[name]['bytes'] or member.size < 0 or total > MAX_EXPANDED_BYTES:
+                    raise ValueError('Saved study member size differs or exceeds bounds')
+                retained = name in proofs or name in selected
+                path = temporary / str(len(paths)) if retained else None
+                output = path.open('xb') if retained else None
+                checksum, size = hashlib.sha256(), 0
+                try:
+                    with source.extractfile(member) as stream:
+                        while chunk := stream.read(1024 * 1024):
+                            size += len(chunk)
+                            if size > member.size:
+                                raise ValueError('Saved study member exceeds its header')
+                            checksum.update(chunk)
+                            if output is not None:
+                                output.write(chunk)
+                finally:
+                    if output is not None:
+                        output.close()
+                actual[name] = {'bytes': size, 'sha256': checksum.hexdigest()}
+                if actual[name] != expected[name]:
+                    raise ValueError('Saved study member differs from its original identity')
+                if retained:
+                    paths[name] = path
+        if actual != expected:
+            raise ValueError('Complete saved study membership differs from manifest')
+        headers = {name: json.loads(paths[name].read_bytes(), object_pairs_hook=unique_object) for name in proofs}
+        if headers['allocation-request.json'] != source_heads:
+            raise ValueError('Original study request differs from pinned source heads')
+        builds = headers['study-builds.json']
+        if not isinstance(builds, list) or len(builds) != 2 or \
+                any(not isinstance(build, dict) for build in builds) or \
+                {build.get('arm') for build in builds} != set(source_heads):
+            raise ValueError('Original study builds are missing or repeated')
+        distributions = {}
+        for build in builds:
+            arm = build['arm']
+            if build.get('expectedHead') != source_heads[arm] or build.get('actualHead') != source_heads[arm]:
+                raise ValueError('Original study build source differs')
+            retained = headers[arm + '-retained-distributions.json']
+            if not isinstance(retained, dict) or set(retained) != {'cli', 'harness'}:
+                raise ValueError('Original retained distributions are incomplete')
+            for kind, suffix, hash_key in [('cli', '-provenance.json', 'provenanceSha256'),
+                                           ('harness', '-harness-provenance.json', 'harnessProvenanceSha256')]:
+                name = arm + suffix
+                original = headers[name]
+                files = retained[kind]
+                if actual[name]['sha256'] != build.get(hash_key) or not isinstance(original, dict) or \
+                        not isinstance(files, dict) or not files:
+                    raise ValueError('Original study distribution provenance differs')
+                prefix = 'private-installed/' + arm + '/' + kind + '/'
+                archived = {key.removeprefix(prefix): item for key, item in actual.items()
+                            if key.startswith(prefix)}
+                if archived != files or not isinstance(original.get('provenance'), dict) or \
+                        original['provenance'].get('distribution') != \
+                        {key: item['sha256'] for key, item in archived.items()}:
+                    raise ValueError('Complete original study distribution differs from retained bytes')
+                if kind == 'cli':
+                    if original.get('launcher') != build.get('cli'):
+                        raise ValueError('Original study CLI launcher provenance differs')
+                    distributions[arm] = original['provenance']['distribution']
+        staged = temporary / 'distribution'
+        staged.mkdir()
+        jar_files = {}
+        for arm, distribution in distributions.items():
+            jars = {name: value for name, value in distribution.items() if name.endswith('.jar')}
+            if not jars or any(not name.startswith('lib/') for name in jars):
+                raise ValueError('Original study CLI jar set is absent or unsafe')
+            jar_files[arm] = {}
+            for name, value in sorted(jars.items()):
+                target = staged / arm / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                paths['private-installed/' + arm + '/cli/' + name].replace(target)
+                jar_files[arm][name] = digest(target)
+                if jar_files[arm][name] != value:
+                    raise ValueError('Staged study jar differs from original distribution')
+        if digest(archive) != expected_archive_hash:
+            raise ValueError('Saved study archive changed during authentication')
+        staged.replace(destination)
+        report.update(completed=True, allCaptureMemberBytesVerifiedBeforeStaging=True,
+                      bothCompleteOriginalDistributionsVerified=True, originalSourceHeads=source_heads,
+                      originalStudyHeadersCopiedVerbatim=headers, originalDistributions=distributions,
+                      explicitArchiveDirectories=directories, stagedJarFiles=jar_files)
+
+
+def study_main():
+    capture, capture_hash, archive, archive_hash, control, candidate, destination, report_path = sys.argv[2:]
+    report = {'completed': False, 'scope': 'Complete original study archive and both original CLI/harness distribution bytes only; no original executable, class reader or workload runs during staging.'}
+    try:
+        capture = Path(capture)
+        if capture.is_symlink() or not capture.is_file() or capture.stat().st_size > MAX_JSON_BYTES or \
+                not re.fullmatch('[0-9a-f]{64}', capture_hash) or digest(capture) != capture_hash:
+            raise ValueError('Saved study capture manifest identity differs')
+        prepare_study_distributions(json.loads(capture.read_bytes(), object_pairs_hook=unique_object),
+                                    Path(archive), archive_hash, {'control': control, 'candidate': candidate},
+                                    Path(destination), report)
+    except BaseException as error:
+        report['error'] = type(error).__name__ + ': ' + str(error)
+        Path(report_path).write_text(json.dumps(report, indent=2) + '\n')
+        raise
+    Path(report_path).write_text(json.dumps(report, indent=2) + '\n')
+
+
 def main():
+    if sys.argv[1:2] == ['study-distributions']:
+        study_main()
+        return
     if sys.argv[1:2] == ['saved-distribution']:
         saved_main()
         return

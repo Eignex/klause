@@ -165,7 +165,7 @@ class JvmRuntimeArchiveTest(unittest.TestCase):
         variants = ['archive', 'missing', 'extra', 'changed', 'duplicate', 'link', 'unsafe',
                     'jar-identity', 'extra-jar', 'source', 'completion', 'original-distribution',
                     'control', 'candidate', 'control-map', 'candidate-map',
-                    'MAX_ARCHIVE_BYTES', 'MAX_EXPANDED_BYTES', 'MAX_MEMBERS', 'MAX_FILE_BYTES']
+                    'MAX_ARCHIVE_BYTES', 'MAX_EXPANDED_BYTES', 'MAX_MEMBERS', 'MAX_FILE_BYTES', 'MAX_JSON_BYTES']
         for variant in variants:
             with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
                 distribution = {'lib/first.jar': hashlib.sha256(b'first').hexdigest()}
@@ -224,6 +224,116 @@ class JvmRuntimeArchiveTest(unittest.TestCase):
 
                 self.assertFalse(report['completed'])
                 self.assertFalse(destination.exists())
+
+    def test_only_complete_original_two_arm_study_archives_expose_both_cli_jar_sets(self):
+        variants = [None, 'archive', 'missing', 'extra', 'changed', 'duplicate', 'link', 'unsafe',
+                    'directory', 'source', 'request', 'missing-build', 'duplicate-arm',
+                    'provenance-hash', 'harness-provenance-hash', 'distribution', 'harness-distribution',
+                    'extra-jar', 'missing-jar', 'duplicate-json-key', 'schema', 'size', 'manifest-sha',
+                    'member-hash', 'boolean-size', 'file-prefix',
+                    'MAX_ARCHIVE_BYTES', 'MAX_EXPANDED_BYTES', 'MAX_MEMBERS', 'MAX_FILE_BYTES', 'MAX_JSON_BYTES']
+        for variant in variants:
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                heads = {'control': 'a' * 40, 'candidate': 'b' * 40}
+                files = {'unselected.txt': b'unselected'}
+                builds = []
+                for arm, head in heads.items():
+                    retained = {}
+                    build = {'arm': arm, 'expectedHead': head, 'actualHead': head,
+                             'cli': '/original/' + arm + '/cli'}
+                    for kind in ('cli', 'harness'):
+                        contents = {'lib/first.jar': b'first', 'bin/cli': b'launcher'}
+                        retained[kind] = {name: {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+                                          for name, raw in contents.items()}
+                        original = {'launcher': build['cli'], 'provenance': {'distribution': {
+                            name: item['sha256'] for name, item in retained[kind].items()}}}
+                        suffix = '-provenance.json' if kind == 'cli' else '-harness-provenance.json'
+                        files[arm + suffix] = json.dumps(original).encode()
+                        key = 'provenanceSha256' if kind == 'cli' else 'harnessProvenanceSha256'
+                        build[key] = hashlib.sha256(files[arm + suffix]).hexdigest()
+                        files.update({'private-installed/' + arm + '/' + kind + '/' + name: raw
+                                      for name, raw in contents.items()})
+                    if arm == 'control' and variant in ('distribution', 'harness-distribution'):
+                        retained['cli' if variant == 'distribution' else 'harness']['lib/first.jar']['sha256'] = 'c' * 64
+                    files[arm + '-retained-distributions.json'] = json.dumps(retained).encode()
+                    builds.append(build)
+                if variant == 'source':
+                    builds[0]['actualHead'] = 'c' * 40
+                elif variant == 'missing-build':
+                    builds.pop()
+                elif variant == 'duplicate-arm':
+                    builds[1]['arm'] = 'control'
+                elif variant == 'provenance-hash':
+                    builds[0]['provenanceSha256'] = 'c' * 64
+                elif variant == 'harness-provenance-hash':
+                    builds[0]['harnessProvenanceSha256'] = 'c' * 64
+                files['study-builds.json'] = json.dumps(builds).encode()
+                files['allocation-request.json'] = json.dumps(dict(heads, control='c' * 40)
+                    if variant == 'request' else heads).encode()
+                if variant == 'duplicate-json-key':
+                    files['allocation-request.json'] = ('{"control":"' + heads['control'] +
+                        '","control":"' + heads['control'] + '","candidate":"' + heads['candidate'] + '"}').encode()
+                elif variant == 'extra-jar':
+                    files['private-installed/control/cli/lib/extra.jar'] = b'extra'
+                elif variant == 'missing-jar':
+                    del files['private-installed/control/cli/lib/first.jar']
+                elif variant == 'file-prefix':
+                    files['unselected.txt/child'] = b'child'
+                expected = {name: {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+                            for name, raw in files.items()}
+                if variant == 'member-hash':
+                    expected['unselected.txt']['sha256'] = 'c' * 64
+                elif variant == 'boolean-size':
+                    expected['unselected.txt']['bytes'] = True
+                entries = list(files.items())
+                if variant == 'missing':
+                    entries = [(name, raw) for name, raw in entries if name != 'unselected.txt']
+                elif variant == 'changed':
+                    entries = [(name, b'UNSELECTED' if name == 'unselected.txt' else raw) for name, raw in entries]
+                elif variant in ('extra', 'duplicate', 'link', 'unsafe', 'directory'):
+                    entries.append(({'extra': 'extra.txt', 'duplicate': 'unselected.txt', 'link': 'linked',
+                                     'unsafe': '../outside', 'directory': 'unselected.txt'}[variant], b'x'))
+                archive, destination = Path(directory) / 'study.tar.gz', Path(directory) / 'distribution'
+                with tarfile.open(archive, 'w:gz') as stream:
+                    for index, (name, raw) in enumerate(entries):
+                        member = tarfile.TarInfo(name)
+                        if variant == 'link' and name == 'linked':
+                            member.type, member.linkname = tarfile.SYMTYPE, 'unselected.txt'
+                            stream.addfile(member)
+                        elif variant == 'directory' and index == len(entries) - 1:
+                            member.type = tarfile.DIRTYPE
+                            stream.addfile(member)
+                        else:
+                            member.size = len(raw)
+                            stream.addfile(member, io.BytesIO(raw))
+                archive_hash = runtime.digest(archive)
+                capture = {'schema': 1, 'archiveBytes': archive.stat().st_size,
+                           'archiveSha256': archive_hash, 'files': expected}
+                if variant == 'schema':
+                    capture['schema'] = True
+                elif variant == 'size':
+                    capture['archiveBytes'] += 1
+                elif variant == 'manifest-sha':
+                    capture['archiveSha256'] = 'c' * 64
+                report = {}
+                bound = variant if variant and variant.startswith('MAX_') else 'MAX_MEMBERS'
+                limit = 0 if variant and variant.startswith('MAX_') else runtime.MAX_MEMBERS
+
+                if variant is None:
+                    runtime.prepare_study_distributions(capture, archive, archive_hash, heads, destination, report)
+
+                    self.assertTrue(report['completed'])
+                    self.assertEqual(expected, report['verifiedCaptureMembers'])
+                    self.assertEqual({'control/lib/first.jar': b'first', 'candidate/lib/first.jar': b'first'},
+                        {path.relative_to(destination).as_posix(): path.read_bytes()
+                         for path in destination.rglob('*') if path.is_file()})
+                else:
+                    with patch.object(runtime, bound, limit), self.assertRaises(ValueError):
+                        runtime.prepare_study_distributions(capture, archive,
+                            'c' * 64 if variant == 'archive' else archive_hash, heads, destination, report)
+
+                    self.assertFalse(report['completed'])
+                    self.assertFalse(destination.exists())
 
 
 if __name__ == '__main__':

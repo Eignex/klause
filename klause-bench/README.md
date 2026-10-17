@@ -2470,6 +2470,27 @@ File size does not validate recording contents: `recordingContentsVerified` and
 source-outcome acceptance remain false until their separate complete reviews.
 All original records and failure labels remain retained for those reviews.
 
+`bench.profile.JvmSavedStudyMethodMetadata` inspects both original installed CLI
+JAR sets retained by an existing fixture-allocation study. Supply pinned `control`
+and `candidate` commits, `capture-manifest` with its `capture-manifest-sha256`, and
+an absolute local `archive` path with its `archive-sha256`. The manifest is fetched
+over HTTPS; the original private archive is copied with a 256 MiB bound and checked
+before and after inspection. It remains private, along with retained JAR copies.
+No original CLI, fixture or SDK executable runs and neither arm is rebuilt.
+
+The staging helper authenticates the complete original archive before exposing
+either arm. The original request and both build records must match the pinned
+heads. Both CLI and harness provenance hashes, complete retained distribution
+maps, launcher identity and every archive member must agree. Missing, additional,
+changed, repeated, linked, sparse, unsafe or excessive payloads reject staging.
+Both CLI JAR sets become visible together after verification; unrelated payloads
+are authenticated without becoming reader inputs. The existing bounded class-file
+inventory writes separate control/candidate metadata. Failures and partial reader
+outputs remain retained, and failed cleanup prevents successful completion.
+This binds metadata to retained distribution bytes; it does not establish loaded
+class selection, generated classes, exhaustive source phases, compiler costs,
+runtime equivalence or performance acceptance.
+
 ### Mac container measurement capabilities
 
 `bench.profile.CompilationStudyContainerProbe` inspects an existing Docker daemon
