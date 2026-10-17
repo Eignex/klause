@@ -91,7 +91,7 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is Distinct -> scoringView()
 
-    is ExactLinear -> scoringView()
+    is ExactLinear -> scoringView(domains)
 
     is LinearIndicator -> scoringView()
 
