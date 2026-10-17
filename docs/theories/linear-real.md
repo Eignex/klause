@@ -108,6 +108,34 @@ Explicit zero retains bounded construction observations without component steeri
 positive values permit indexed preferences. Arithmetic and index work keep their
 existing cumulative owners and limits, independently of the Boolean draw's flip ceiling.
 
+An incomplete canonical pure-real Boolean frame can also use closed source-equality
+elimination after its ordinary fresh LP result supplies no checked exact point.
+This optional proof does not run on a reused or fresh checked point, a certified LP
+conflict, a missing numerical result or an interrupted operation. It retains the
+production certification policy and excludes private real coordinates, source
+disjunctions, private assertions, directed disequalities, source branches and retained
+reductions. Complete Boolean leaves retain their separate completion path.
+
+The equality proof captures only resolved signed source rows and immutable declared
+real bounds. An unresolved Boolean coefficient or activator omits that row, and an
+undirected disequality supplies no inequality. Bounded substitution admits even
+inactive Boolean coefficients before using them. The resulting weaker conjunction
+can establish a contradiction for every completion of the unresolved Booleans; it
+cannot supply a source witness.
+
+Closed input rows own their column and coefficient containers before observation.
+Each inequality retains its actual source-row origin; both sides of an equality
+share that origin. Equality pivots retain both actually matched opposite rows,
+including their Boolean dependencies. Elimination unions a pivot's support only
+when its nonzero coefficient is used, and a false residual retains its own input row.
+The completed opaque support selects the captured activator and signed Boolean-term
+facts that justify a clause. It is neither a minimal core nor a numerical certificate.
+Naming checks those used facts against both component and shared-context values
+before and after naming, with a final structural and cancellation check. The shared
+traversal owns learning and backjumping. Missing used facts, unavailable storage,
+arithmetic decline or interruption withhold this optional conflict. No conflict,
+point, support workspace or mutable proof catalogue is cached across callbacks.
+
 At a complete Boolean leaf, an optimal floating LP point can propose source-aware
 completion when numerical exact-point recovery declines. Pure-real sources with
 no private real coordinates use the same completion with an empty integer part.

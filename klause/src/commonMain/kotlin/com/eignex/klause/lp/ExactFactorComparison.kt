@@ -152,6 +152,13 @@ internal class ExactRowForm(
         booleanValue: (Int) -> Boolean?,
         admit: (BigFraction) -> Boolean,
         preflight: (BigFraction, BigFraction) -> Boolean,
+    ): ExactComparison? = checkedComparison(true, booleanValue, admit, preflight)
+
+    fun checkedComparison(
+        truth: Boolean,
+        booleanValue: (Int) -> Boolean?,
+        admit: (BigFraction) -> Boolean,
+        preflight: (BigFraction, BigFraction) -> Boolean,
     ): ExactComparison? {
         if (!admit(rhs) || terms.values.any { !admit(it) }) return null
         var bound = rhs
@@ -166,7 +173,7 @@ internal class ExactRowForm(
                 if (!admit(bound)) return null
             }
         }
-        return ExactComparison(terms, bound, relation, strict, hasReals, ordered)
+        return comparisonAt(bound, truth)
     }
 
     /** The comparison the row states when its activator holds [truth] under [booleanValue]. */
@@ -176,15 +183,17 @@ internal class ExactRowForm(
             val literal = booleanLiterals[k]
             if (booleanValue(Lit.variable(literal)) == Lit.isPositive(literal)) bound -= booleanCoefficients[k]
         }
-        return ExactComparison(
-            terms,
-            bound,
-            if (truth) relation else relation.complemented(),
-            strict = if (truth) strict else !strict,
-            hasReals = hasReals,
-            ordered = ordered,
-        )
+        return comparisonAt(bound, truth)
     }
+
+    private fun comparisonAt(bound: BigFraction, truth: Boolean): ExactComparison = ExactComparison(
+        terms,
+        bound,
+        if (truth) relation else relation.complemented(),
+        strict = if (truth) strict else !strict,
+        hasReals = hasReals,
+        ordered = ordered,
+    )
 }
 
 /** This row's [ExactRowForm] over the mixed columns, the first [realColumns] of them continuous. */

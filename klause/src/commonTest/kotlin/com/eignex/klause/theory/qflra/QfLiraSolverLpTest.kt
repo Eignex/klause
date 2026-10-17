@@ -122,6 +122,7 @@ class QfLiraSolverLpTest {
             assertTrue(witness.reals[0] > BigFraction.ZERO && witness.reals[0] <= BigFraction.ONE)
             assertTrue(witness.reals[1] < BigFraction.ZERO)
             assertEquals(BigFraction.ZERO, witness.reals[0] + witness.reals[1])
+            assertNull(stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_NO_POINT_ATTEMPT"))
         }
     }
 

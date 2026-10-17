@@ -16,6 +16,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.constsOf
+import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -36,6 +37,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -44,6 +46,153 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverConflictTest {
+    @Test
+    fun `source equality naming should omit unused unresolved Boolean premises`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(3))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        session.push(SearchDecision.Bool(Lit.make(1, false)))
+
+        val explanation = assertNotNull(explainRefutedSourcePremises(
+            intArrayOf(1, -1, -1), intArrayOf(1, 0, -1), session, Cancellation.Never, 0L,
+        ))
+
+        assertEquals(setOf(Lit.make(0, false)), explanation.literals.toSet())
+        assertNull(session.boolValue(2))
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `source equality naming should reject changed used Boolean premises`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+        for (current in listOf(intArrayOf(0), intArrayOf(-1))) {
+            assertNull(explainRefutedSourcePremises(intArrayOf(1), current, session, Cancellation.Never, 0L))
+        }
+        assertNull(explainRefutedSourcePremises(intArrayOf(0), intArrayOf(0), session, Cancellation.Never, 0L))
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `source equality naming should recheck used premises after naming`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        var named = false
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? = session.atomLiteral(decision).also {
+                named = true
+            }
+
+            override fun boolValue(variable: Int): Boolean? = if (named) false else session.boolValue(variable)
+        }
+
+        val explanation = explainRefutedSourcePremises(intArrayOf(1), intArrayOf(1), context, Cancellation.Never, 0L)
+
+        assertTrue(named)
+        assertNull(explanation)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `source equality naming should decline an unnameable used premise`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? = null
+        }
+
+        val explanation = explainRefutedSourcePremises(intArrayOf(1), intArrayOf(1), context, Cancellation.Never, 0L)
+
+        assertNull(explanation)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `source equality naming should withhold a clause when naming stops its operation`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        var stopped = false
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? = session.atomLiteral(decision).also {
+                stopped = true
+            }
+        }
+
+        val explanation = explainRefutedSourcePremises(
+            intArrayOf(1), intArrayOf(1), context, Cancellation { stopped }, 0L,
+        )
+
+        assertTrue(stopped)
+        assertNull(explanation)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `stopped source equality naming should retain its charged work`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        var charged = 0L
+        val meter = WorkMeter { charged += it }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged > 0L
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val explanation = explainRefutedSourcePremises(intArrayOf(1), intArrayOf(1), session, stop, 0L)
+
+        assertNull(explanation)
+        assertTrue(charged > 0L)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `source equality naming should include retained rows in its storage admission`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.initialize()
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+        val admitted = explainRefutedSourcePremises(intArrayOf(1), intArrayOf(1), session, Cancellation.Never, 65384L)
+        val declined = explainRefutedSourcePremises(intArrayOf(1), intArrayOf(1), session, Cancellation.Never, 65385L)
+
+        assertNotNull(admitted)
+        assertNull(declined)
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `bounded source comparisons should preserve signed substitutions and strict complements`() {
+        val form = ExactRowForm(mapOf(0 to BigFraction.ONE), BigFraction.ofLong(3),
+            intArrayOf(Lit.make(0, false)), listOf(BigFraction.ofLong(2)), LinearOp.LE, true, true)
+        val arithmetic = MixedPointArithmetic(Cancellation.Never)
+
+        for (truth in listOf(false, true)) {
+            val comparison = assertNotNull(form.checkedComparison(truth, { false },
+                arithmetic::admitted, arithmetic::preflight))
+
+            assertEquals(BigFraction.ONE, comparison.bound)
+            assertEquals(if (truth) LinearOp.LE else LinearOp.GE, comparison.op)
+            assertEquals(truth, comparison.strict)
+        }
+    }
+
+    @Test
+    fun `bounded source comparisons should decline oversized inactive Boolean coefficients`() {
+        val form = ExactRowForm(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+            intArrayOf(Lit.make(0, true)), listOf(BigFraction.of(BIG_ONE shl 4097, BIG_ONE)),
+            LinearOp.LE, false, true)
+        val arithmetic = MixedPointArithmetic(Cancellation.Never)
+
+        val comparison = form.checkedComparison(true, { false }, arithmetic::admitted, arithmetic::preflight)
+
+        assertNull(comparison)
+    }
+
     @Test
     fun `an exact residual refutation should block only its complete Boolean cube`() {
         val rows = listOf(

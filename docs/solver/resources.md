@@ -405,6 +405,35 @@ rearms the containing deadline. An interrupted native root installation releases
 that partial mutable search; a retry keeps the immutable source plan, canonical
 CP projection, selected theory fragment, completed native row factory and charged work. Active query assertions retract even when an invocation expires.
 
+The optional pure-real [source-equality proof](../theories/linear-real.md) runs after
+an ordinary fresh query without a checked point. Capture, exact arithmetic, support
+and premise naming charge that same operation token. It adds no numerical query,
+child allowance or refund. Source capture rejects oversized raw row shapes and
+dependencies before substitution, admits the signed operator's doubled equality
+capacity before constructing its inequalities, and retains the 4,096-bit scalar
+limit. Unavailable closed support capture declines the optional proof.
+
+For `C` real columns, `F` prepared rows, `D` Boolean dependency entries and `B`
+Boolean values, the four origin/snapshot arrays reserve
+`O = 2C + 2F + (F + 1) + D + B + 48` conservative cells before allocation.
+Both `C² + O` and the conservative source capture entries plus `O` must fit 65,536
+cells. Closed numeric copying and support additionally use `R` actual inequalities,
+`T` actual column entries and `w = ceil(R / 64)` words. Their joint reservation is
+`A = O + (33R + 2T + 16) + (C + 2)w + 5R + 128`; both `C² + A` and actual
+capture entries plus `A` must fit the same ceiling before snapshots or trace buffers
+are allocated. This includes the simultaneous pivot, working and output masks,
+paired-row indices and boxed direction records. The estimates assume eight-byte
+cells and conservative 64-byte object headers; they are not measured heap sizes.
+
+Only the completed output mask survives tracing. Used dependencies mark the owned
+Boolean snapshot in place, without another premise set. Before constructing `K`
+premises, naming reserves `O + 33R + 2E + 16 + w + 24K + 128` cells, where `E`
+is the conservative captured row/term count, under the same 65,536 ceiling.
+It also retains the shared 4,096-node explanation limit, including the conjunction
+node. Initialization, copies, unions, scans, context reads and explanation construction
+retain their charges on every decline. Polls surround allocation, arithmetic,
+observation and naming; stopped work publishes no partial support or clause.
+
 Encoder construction observes the containing invocation token during normal source
 routing, component preparation and polynomial assembly. Exact linear formula expansion
 charges row, term and distribution visits to that token's meter; polynomial assembly
