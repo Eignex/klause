@@ -56,25 +56,28 @@ class LpScopeObservationAgentTest {
         assertSame(failure, actual.cause)
     }
 
-    @Test
-    fun `compiled targets should have complete method and field schemas`() {
+    @ParameterizedTest
+    @ValueSource(strings = [
+        "com/eignex/klause/lp/engine/LpScopedSolver",
+        "com/eignex/klause/lp/bounding/LpPropagator",
+    ])
+    fun `compiled targets should have complete method and field schemas`(name: String) {
         val loader = javaClass.classLoader
-        val schemas = LpScopeObservationAgent.targetMethods().map { (name, selected) ->
-            val bytes = checkNotNull(loader.getResourceAsStream("$name.class")).use { it.readBytes() }
-            val before = LpScopeObservationAgent.schema(bytes, selected)
+        val selected = checkNotNull(LpScopeObservationAgent.targetMethods()[name])
+        val bytes = checkNotNull(loader.getResourceAsStream("$name.class")).use { it.readBytes() }
+        val before = LpScopeObservationAgent.schema(bytes, selected)
 
-            val rewritten = LpScopeObservationAgent.rewrite(bytes, selected, loader)
+        val rewritten = LpScopeObservationAgent.rewrite(bytes, selected, loader)
 
-            assertEquals(selected.size, before.size)
-            assertEquals(before, LpScopeObservationAgent.schema(rewritten, selected))
-            assertNotEquals(LpScopeObservationAgent.sha(bytes), LpScopeObservationAgent.sha(rewritten))
-            mapOf(
-                "class" to name,
-                "beforeSha256" to LpScopeObservationAgent.sha(bytes),
-                "afterSha256" to LpScopeObservationAgent.sha(rewritten),
-                "methods" to before,
-            )
-        }
+        assertEquals(selected.size, before.size)
+        assertEquals(before, LpScopeObservationAgent.schema(rewritten, selected))
+        assertNotEquals(LpScopeObservationAgent.sha(bytes), LpScopeObservationAgent.sha(rewritten))
+        val schemas = listOf(mapOf(
+            "class" to name,
+            "beforeSha256" to LpScopeObservationAgent.sha(bytes),
+            "afterSha256" to LpScopeObservationAgent.sha(rewritten),
+            "methods" to before,
+        ))
         val fields = LpScopeObservationAgent.fieldSchema(loader)
         assertEquals(9, fields.size)
         assertEquals(
