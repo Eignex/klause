@@ -112,9 +112,24 @@ primitive path; explicit allowances retain their existing producer admission.
 Optional hint storage admits at most 65,536 source
 row/term/coordinate/index entries.
 The scalar policy admits 4,096-bit normalized rationals and bounds intermediate
-products before evaluation. Copying, term visits and bit/word arithmetic costs
+products before evaluation. Eager copying, term visits and bit/word arithmetic costs
 charge the current operation token's native meter and poll its unchanged deadline.
-No LP or graph invocation, complete-check charge or allowance is created for hints.
+An already admitted default integer-only producer can retain a fully counted private
+point snapshot and original-order row links within the same entry ceiling. Capture
+withholds every activator with an unknown Boolean coefficient input or a disjunction
+row. Other activators are evaluated only on consultation, combining all their rows
+and caching only a completed, live preference. The selected source variable and its
+two exhaustive alternatives remain unchanged.
+
+The producing operation prepays one 65,536-unit modeled advisory bank. Consultations
+share that credit and poll live containing stops without retaining the ended operation
+token, charging the parent twice or opening another numerical allowance. Unused
+credit is not refunded; same-point pins, queries and restarts cannot replenish it.
+Private advisory exhaustion withholds preferences, while a containing stop retains
+its established source-search cause. A private storage refusal uses the same point's
+eager evaluation. The full allocation, generation and stop contract is described in
+[resource allowances](../solver/resources.md). No LP or graph invocation,
+complete-check charge or allowance is created for hints.
 Default graph suppression retains registration and all capture work already spent.
 Release occurs only after a live consultation passes the existing availability and
 containing-stop checks. It prevents subsequent optional captures without changing the

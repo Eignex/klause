@@ -306,15 +306,36 @@ edges and ordinary graph checks spend the current invocation's controls; a rebui
 guard index grants no new allowance. Closing releases private interval and graph
 state. See [difference logic](../theories/difference.md).
 
-Exact-linear partial-point polarity hints reuse a completed arithmetic check. Source
-comparison visits and bounded rational operations charge that check's current operation
-token, including its native meter; they create no numerical invocation or allowance.
+Exact-linear partial-point polarity hints reuse a completed arithmetic check. Eager
+source comparison visits and bounded rational operations charge that check's current
+operation token, including its native meter; they create no numerical invocation or
+allowance.
 With null `openHintFlips`, one linear completion owner with source integer or real
 coordinates can register bounded comparison rows, charging the opening token. Integer
 columns use the same entry and scalar limits; their fractional point values remain
-branch-order guesses. Evaluation of its existing completed point charges that
-check's existing operation token. This direct primitive path creates no source-clause
-index or Boolean draw.
+branch-order guesses. Eager evaluation charges the producing check's operation token.
+This direct primitive path creates no source-clause index or Boolean draw.
+
+An already admitted integer-only producer can defer comparison evaluation under one
+prepaid advisory bank. Registration retains private row links in original order,
+using the preference buffer for temporary heads. Capture fixes unknown Boolean
+coefficient inputs and disjunction rows as unavailable for that point generation.
+An assigned input cannot change without retraction, which invalidates the generation.
+The private coordinate snapshot, retained rational words, row links, registered IDs,
+preference cache and fixed arithmetic workspace must fit the original 65,536-entry
+ceiling. A lazy storage refusal evaluates the same existing point eagerly; it does
+not decline the admitted producer, enlarge the ceiling or request another point.
+
+The live producing operation prepays 65,536 modeled advisory work units once, through
+its existing native meter. All delayed row visits, bounded arithmetic and cached
+consultations share that bank. Its token polls the live containing and optional
+stops, but charges only prepaid credit; it retains no ended operation lease and
+opens no numerical operation or check. Unused credit is not refunded. A same-point
+fast path retains the bank's spent balance; retraction, restart, release and close
+invalidate its point without replenishing credit. Only a later required producer
+query and a fresh parent precharge can fund another generation. Advisory exhaustion
+withholds optional preferences and supplies no search stop or source evidence.
+Containing cancellation and native stops retain their existing reporting and priority.
 For a default opening with an established complete pure-real difference graph,
 an at-most-one or exactly-one source Boolean cardinality over three or more
 literals retains direct comparison guidance under the existing operation token.

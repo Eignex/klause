@@ -92,6 +92,7 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -220,6 +221,8 @@ class ExactLiraSearchComponent private constructor(
     private var floatCandidate: DoubleArray? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
+    private var pointHintBuffer: IntArray? = null
+    private var prepaidPointHints: PrepaidIntegerPointHints? = null
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
     private var dirty = true
@@ -321,6 +324,7 @@ class ExactLiraSearchComponent private constructor(
         ) {
             return null
         }
+        if (model.numRealVars == 0) return integerPointHints(stop)
         var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
         val rows = ArrayList<PreparedSourceRow>()
         val variables = LinkedHashSet<Int>()
@@ -338,9 +342,83 @@ class ExactLiraSearchComponent private constructor(
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
         pointHintStop = stop
-        return variables.toIntArray() to SearchCandidateHints { variable ->
+        return variables.toIntArray() to pointHintProvider(defaultOpening, defaultGraphSelections)
+    }
+
+    @Suppress("LongMethod")
+    private fun integerPointHints(stop: Cancellation): Pair<IntArray, SearchCandidateHints>? {
+        stop.charge(model.numBoolVars.toLong() + 1L)
+        if (stop()) return null
+        val values = IntArray(model.numBoolVars) { UNASSIGNED }
+        var entries = model.numIntVars.toLong() + model.numBoolVars
+        var rowCount = 0
+        var variableCount = 0
+        for (prepared in preparedRows) {
+            stop.charge(1L)
+            if (stop()) return null
+            val variable = prepared.row.activator
+            if (variable == LinearRow.ALWAYS) continue
+            if (variable !in values.indices) return null
+            entries += prepared.row.size.toLong() + 1L
+            if (entries > MAX_POINT_HINT_ENTRIES) return null
+            rowCount++
+            if (values[variable] == UNASSIGNED) {
+                values[variable] = TRUE
+                variableCount++
+            }
+        }
+        if (rowCount == 0) return null
+        stop.charge(rowCount.toLong() + variableCount + values.size + 1L)
+        if (stop()) return null
+        val rows = arrayOfNulls<PreparedSourceRow>(rowCount)
+        val variables = IntArray(variableCount)
+        values.fill(UNASSIGNED)
+        var rowIndex = 0
+        var variableIndex = 0
+        for (prepared in preparedRows) {
+            stop.charge(1L)
+            if (stop()) return null
+            val variable = prepared.row.activator
+            if (variable == LinearRow.ALWAYS) continue
+            rows[rowIndex++] = prepared
+            if (values[variable] == UNASSIGNED) {
+                values[variable] = TRUE
+                variables[variableIndex++] = variable
+            }
+        }
+        stop.charge(rowCount.toLong() + 1L)
+        if (stop()) return null
+        val selected = rows.requireNoNulls().asList()
+        val cells = entries + rowCount + variableCount + PREPAID_HINT_SCRATCH
+        val prepaid = if (cells <= MAX_POINT_HINT_ENTRIES) {
+            stop.charge(rowCount.toLong() + values.size + 1L)
+            if (stop()) return null
+            val next = IntArray(rowCount)
+            values.fill(UNASSIGNED)
+            for (index in selected.indices.reversed()) {
+                stop.charge(1L)
+                if (stop()) return null
+                val variable = selected[index].row.activator
+                next[index] = values[variable]
+                values[variable] = index
+            }
+            PrepaidIntegerPointHints(values, next, cells)
+        } else null
+        if (stop()) return null
+        pointHintRows = selected
+        pointHintBuffer = values
+        prepaidPointHints = prepaid
+        pointHintStop = stop
+        return variables to pointHintProvider(defaultOpening = true, defaultGraphSelections = false)
+    }
+
+    private fun pointHintProvider(defaultOpening: Boolean, defaultGraphSelections: Boolean): SearchCandidateHints =
+        SearchCandidateHints { variable ->
             observeCompleteStage("POINT_HINT_CONSULTED")
-            if (!partialPointHintAvailable()) {
+            val current = context
+            val containingStopped = prepaidPointHints?.point != null && current != null &&
+                containingHintStopped(current)
+            if (containingStopped || !partialPointHintAvailable()) {
                 observeCompleteStage("POINT_HINT_UNAVAILABLE")
                 null
             } else if (defaultOpening && graphFirst && !defaultGraphSelections) {
@@ -348,15 +426,84 @@ class ExactLiraSearchComponent private constructor(
                 releasePartialPointHints()
                 null
             } else {
-                val preference = when (pointHintValues?.getOrNull(variable)) {
-                    TRUE -> true
-                    FALSE -> false
-                    else -> null
+                val prepaid = prepaidPointHints?.takeIf { it.point != null }
+                val preference = if (prepaid != null) prepaidPointPreference(variable, prepaid) else {
+                    when (pointHintValues?.getOrNull(variable)) {
+                        TRUE -> true
+                        FALSE -> false
+                        else -> null
+                    }
                 }
                 observeCompleteStage(if (preference == null) "POINT_HINT_NO_PREFERENCE" else "POINT_HINT_PREFERRED")
                 preference
             }
         }
+
+    @Suppress("LongMethod")
+    private fun prepaidPointPreference(variable: Int, prepaid: PrepaidIntegerPointHints): Boolean? {
+        val point = prepaid.point ?: return null
+        val current = context ?: return null
+        val rows = pointHintRows ?: return null
+        val value = prepaid.values.getOrNull(variable) ?: return null
+        if (containingHintStopped(current)) return null
+        prepaid.charge(1L)
+        var preference = value
+        if (value <= PREPAID_HINT_PENDING) {
+            val token = prepaid or pointHintStop or parentStop or current.executionControls.cancellation or
+                Cancellation { current.executionControls.exhausted }
+            var index = PREPAID_HINT_PENDING - value
+            preference = UNASSIGNED
+            while (index >= 0) {
+                if (token() || prepaid.point !== point) break
+                token.charge(1L)
+                if (token()) break
+                val prepared = rows[index]
+                observeCompleteStage("POINT_HINT_PREPAID_ROW")
+                val comparison = if (prepared.disjunction) null else prepared.form.hintComparison(
+                    { input -> bools[input].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
+                    { scalar -> hintScalar(scalar, token) },
+                    { left, right -> hintPreflight(left, right, token) },
+                )
+                val truth = comparison?.let { hintTruth(it, { column -> point.getOrNull(column) }, token) }
+                if (truth == null) {
+                    preference = DECLINED_HINT
+                    break
+                }
+                val proposed = if (truth) TRUE else FALSE
+                if (preference != UNASSIGNED && preference != proposed) {
+                    preference = DECLINED_HINT
+                    break
+                }
+                preference = proposed
+                index = prepaid.next[index]
+            }
+        } else {
+            observeCompleteStage("POINT_HINT_PREPAID_CACHE_HIT")
+        }
+        if (prepaid.exhausted) {
+            prepaid.invalidate()
+            pointHintValues = null
+            observeCompleteStage("POINT_HINT_PREPAID_EXHAUSTED")
+            return null
+        }
+        if (containingHintStopped(current) || pointHintStop() || prepaid.point !== point ||
+            !partialPointHintAvailable()
+        ) {
+            return null
+        }
+        prepaid.values[variable] = preference
+        return when (preference) {
+            TRUE -> true
+            FALSE -> false
+            else -> null
+        }
+    }
+
+    private fun containingHintStopped(current: SearchContext): Boolean {
+        if (current.cancelled() || current.executionControls.exhausted) return true
+        if (!parentStop()) return false
+        current.executionControls.reportStop(SearchStopCause.OperationAllowance)
+        return true
     }
 
     internal fun partialPointHintAvailable(): Boolean {
@@ -370,6 +517,8 @@ class ExactLiraSearchComponent private constructor(
 
     internal fun releasePartialPointHints() {
         defaultDisjunctionHints = false
+        prepaidPointHints = null
+        pointHintBuffer = null
         pointHintRows = null
         pointHintValues = null
         pointHintLevel = -1
@@ -378,11 +527,16 @@ class ExactLiraSearchComponent private constructor(
 
     private fun capturePointHints(point: List<BigFraction>, context: SearchContext, graph: Boolean = false) {
         pointHintValues = null
+        prepaidPointHints?.invalidate()
         val rows = pointHintRows ?: return
         if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
         operationStop.charge(model.numBoolVars.toLong() + point.size + 1L)
         if (operationStop() || point.any { !hintScalar(it) }) return
-        val values = IntArray(model.numBoolVars) { UNASSIGNED }
+        val values = pointHintBuffer?.also { it.fill(UNASSIGNED) }
+            ?: IntArray(model.numBoolVars) { UNASSIGNED }
+        val prepaid = prepaidPointHints
+        if (prepaid != null && capturePrepaidPoint(point, context, rows, prepaid)) return
+        if (operationStop() || pointHintStop() || context.cancelled()) return
         for (prepared in rows) {
             operationStop.charge(1)
             if (operationStop() || pointHintStop()) return
@@ -411,20 +565,69 @@ class ExactLiraSearchComponent private constructor(
         observeCompleteStage(if (graph) "POINT_HINT_GRAPH_CAPTURE" else "POINT_HINT_LP_CAPTURE")
     }
 
+    private fun capturePrepaidPoint(
+        point: List<BigFraction>,
+        context: SearchContext,
+        rows: List<PreparedSourceRow>,
+        prepaid: PrepaidIntegerPointHints,
+    ): Boolean {
+        var cells = prepaid.cells
+        for (value in point) {
+            val words = (value.num.magnitudeBitLength().toLong() + 63L) / 64L +
+                (value.den.magnitudeBitLength().toLong() + 63L) / 64L
+            operationStop.charge(words + 2L)
+            cells += 4L * words
+            if (operationStop() || pointHintStop()) return false
+            if (cells > MAX_POINT_HINT_ENTRIES) {
+                observeCompleteStage("POINT_HINT_PREPAID_STORAGE_FALLBACK")
+                return false
+            }
+        }
+        for ((index, prepared) in rows.withIndex()) {
+            operationStop.charge(prepared.row.size.toLong() + 1L)
+            if (operationStop() || pointHintStop()) return false
+            val variable = prepared.row.activator
+            if (prepaid.values[variable] == UNASSIGNED) prepaid.values[variable] = PREPAID_HINT_PENDING - index
+            if (prepared.disjunction || (0 until prepared.row.size).any { term ->
+                    val reference = prepared.row.ref(term)
+                    Term.isBool(reference) && bools[Lit.variable(Term.lit(reference))] == UNASSIGNED
+                }
+            ) prepaid.values[variable] = DECLINED_HINT
+        }
+        if (operationStop() || pointHintStop()) return false
+        operationStop.charge(PREPAID_HINT_WORK)
+        observeCompleteStage("POINT_HINT_PREPAID_CHARGED")
+        if (operationStop() || pointHintStop() || context.cancelled()) return false
+        prepaid.fund(point)
+        pointHintValues = prepaid.values
+        pointHintLevel = context.decisionLevel
+        smtStats?.observePointHintCapture(false)
+        observeCompleteStage("POINT_HINT_LP_CAPTURE")
+        observeCompleteStage("POINT_HINT_PREPAID_CAPTURE")
+        return true
+    }
+
     private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? =
         hintTruth(comparison) { point.getOrNull(it) }
 
-    private inline fun hintTruth(comparison: ExactComparison, value: (Int) -> BigFraction?): Boolean? {
+    private inline fun hintTruth(comparison: ExactComparison, value: (Int) -> BigFraction?): Boolean? =
+        hintTruth(comparison, value, operationStop)
+
+    private inline fun hintTruth(
+        comparison: ExactComparison,
+        value: (Int) -> BigFraction?,
+        token: Cancellation,
+    ): Boolean? {
         var activity = BigFraction.ZERO
         for ((column, coefficient) in comparison.terms) {
             val coordinate = value(column) ?: return null
-            if (!hintPreflight(coefficient, coordinate)) return null
+            if (!hintPreflight(coefficient, coordinate, token)) return null
             val product = coefficient * coordinate
-            if (!hintScalar(product) || !hintPreflight(activity, product)) return null
+            if (!hintScalar(product, token) || !hintPreflight(activity, product, token)) return null
             activity += product
-            if (!hintScalar(activity)) return null
+            if (!hintScalar(activity, token)) return null
         }
-        if (!hintPreflight(activity, comparison.bound)) return null
+        if (!hintPreflight(activity, comparison.bound, token)) return null
         return when (comparison.op) {
             LinearOp.LE -> if (comparison.strict) activity < comparison.bound else activity <= comparison.bound
             LinearOp.GE -> if (comparison.strict) activity > comparison.bound else activity >= comparison.bound
@@ -433,19 +636,24 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun hintScalar(value: BigFraction): Boolean {
+    private fun hintScalar(value: BigFraction): Boolean = hintScalar(value, operationStop)
+
+    private fun hintScalar(value: BigFraction, token: Cancellation): Boolean {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
-        operationStop.charge(1L + bits / Long.SIZE_BITS)
-        return bits <= MAX_POINT_HINT_BITS && !operationStop() && !pointHintStop()
+        token.charge(1L + bits / Long.SIZE_BITS)
+        return bits <= MAX_POINT_HINT_BITS && !token() && !pointHintStop()
     }
 
-    private fun hintPreflight(left: BigFraction, right: BigFraction): Boolean {
+    private fun hintPreflight(left: BigFraction, right: BigFraction): Boolean =
+        hintPreflight(left, right, operationStop)
+
+    private fun hintPreflight(left: BigFraction, right: BigFraction, token: Cancellation): Boolean {
         val bits = maxOf(left.num.magnitudeBitLength(), left.den.magnitudeBitLength()).toLong() +
             maxOf(right.num.magnitudeBitLength(), right.den.magnitudeBitLength()) + 2L
         if (bits > MAX_POINT_HINT_BITS * 2L + 2L) return false
         val words = bits / Long.SIZE_BITS + 1L
-        operationStop.charge(bits + words * words)
-        return !operationStop() && !pointHintStop()
+        token.charge(bits + words * words)
+        return !token() && !pointHintStop()
     }
 
     init {
@@ -606,6 +814,7 @@ class ExactLiraSearchComponent private constructor(
     }
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) {
+        prepaidPointHints?.invalidate()
         floatCandidate = null
         pointHintValues = null
         lp.onRestart(context)
@@ -869,6 +1078,8 @@ class ExactLiraSearchComponent private constructor(
         candidate = null
         floatCandidate = null
         val priorHints = pointHintValues
+        val priorPrepaidPoint = prepaidPointHints?.point
+        prepaidPointHints?.invalidate()
         pointHintValues = null
         val wasDirty = dirty
         dirty = true
@@ -891,6 +1102,7 @@ class ExactLiraSearchComponent private constructor(
                     dirty = wasDirty
                     if (!dirty) {
                         pointHintValues = priorHints
+                        prepaidPointHints?.restore(priorPrepaidPoint)
                         pointHintLevel = context.decisionLevel
                     }
                     return ComponentResult.Consistent
@@ -1100,6 +1312,7 @@ class ExactLiraSearchComponent private constructor(
         candidate = null
         assignment = null
         pointHintValues = null
+        prepaidPointHints?.invalidate()
         smtStats?.observeConflict(explanation)
         outcome = ComponentCheck.Infeasible(explanation)
         return ComponentResult.Conflict(explanation)
@@ -1110,6 +1323,7 @@ class ExactLiraSearchComponent private constructor(
         if (!dirty) return ComponentResult.Consistent
         floatCandidate = null
         pointHintValues = null
+        prepaidPointHints?.invalidate()
         // Root publications precede their delivery to components during shared initialization.
         if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
             bools.indices.all { context.boolValue(it) != null }
@@ -1484,6 +1698,7 @@ class ExactLiraSearchComponent private constructor(
         candidate = null
         floatCandidate = null
         pointHintValues = null
+        prepaidPointHints?.invalidate()
         dirty = true
     }
 
@@ -1624,6 +1839,48 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
     )
     return source.takeUnless { stop() }
 }
+
+private class PrepaidIntegerPointHints(
+    val values: IntArray,
+    val next: IntArray,
+    val cells: Long,
+) : Cancellation, WorkMeter {
+    var point: List<BigFraction>? = null
+        private set
+    private var remaining = 0L
+    var exhausted = false
+        private set
+
+    fun fund(point: List<BigFraction>) {
+        this.point = point
+        remaining = PREPAID_HINT_WORK
+        exhausted = false
+    }
+
+    fun invalidate() {
+        point = null
+    }
+
+    fun restore(point: List<BigFraction>?) {
+        if (!exhausted) this.point = point
+    }
+
+    override fun workMeter(): WorkMeter = this
+    override fun isCancelled(): Boolean = exhausted
+
+    override fun charge(units: Long) {
+        if (units < 0L || units > remaining || exhausted) {
+            remaining = 0L
+            exhausted = true
+        } else {
+            remaining -= units
+        }
+    }
+}
+
+private const val PREPAID_HINT_WORK = 65_536L
+private const val PREPAID_HINT_SCRATCH = 8_464L
+private const val PREPAID_HINT_PENDING = -3
 
 private const val UNASSIGNED = -1
 private const val DECLINED_HINT = -2

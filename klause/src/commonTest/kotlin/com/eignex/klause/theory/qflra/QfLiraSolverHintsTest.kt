@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -16,6 +17,7 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
@@ -25,10 +27,13 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExecutionAccounting
+import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
@@ -775,6 +780,325 @@ class QfLiraSolverHintsTest {
                 assertEquals(complete, (observed.completeSearchStages?.get("POINT_HINT_LP_CAPTURE") ?: 0L) > 0L)
             }
         }
+    }
+
+    @Test
+    fun `prepaid integer hints should evaluate only the consulted activator`() {
+        val stats = SmtStatsSink()
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_CAPTURE"))
+            assertNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_ROW"))
+
+            assertEquals(false, hints.preferredBool(0))
+            assertEquals(false, hints.preferredBool(0))
+
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_ROW"))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_CACHE_HIT"))
+            assertNull(session.boolValue(0))
+            assertEquals(false, hints.preferredBool(1))
+            assertEquals(2L, stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_ROW"))
+        }
+    }
+
+    @Test
+    fun `prepaid consultations should not charge the producing meter twice`() {
+        val charges = ArrayList<Long>()
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charges += it }
+        }
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.useSolveStop(stop)
+            val hints = assertNotNull(component.partialPointHints(stop, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val producingCharge = charges.sum()
+            assertEquals(1, charges.count { it == 65_536L })
+
+            repeat(4) { assertEquals(false, hints.preferredBool(0)) }
+
+            assertEquals(producingCharge, charges.sum())
+            assertNull(session.executionControls.stopCause)
+        }
+    }
+
+    @Test
+    fun `a capture unknown Boolean input should remain withheld after its fast path pin`() {
+        val stats = SmtStatsSink()
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                ReifiedPseudoBoolean(1, longArrayOf(1), intArrayOf(Lit.make(0, true)), PbOp.GE, 1),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertNull(hints.preferredBool(1))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertTrue(component.partialPointHintAvailable())
+            assertNull(hints.preferredBool(1))
+            assertEquals(false, hints.preferredBool(2))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_CAPTURE"))
+        }
+    }
+
+    @Test
+    fun `prepaid rows should agree before preferring their shared activator`() {
+        for (agree in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(),
+                factors = arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, if (agree) 0 else 1),
+                ),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val preference = hints.preferredBool(0)
+
+                assertEquals(if (agree) true else null, preference)
+                assertNull(session.boolValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `an exhausted advisory bank should stay shared across activators and fast path pins`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(false, hints.preferredBool(0))
+
+            repeat(65_536) { hints.preferredBool(0) }
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+
+            assertNull(hints.preferredBool(0))
+            assertNull(hints.preferredBool(1))
+            assertNull(session.executionControls.stopCause)
+        }
+    }
+
+    @Test
+    fun `same level restart should not refill a prepaid hint bank`() {
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(false, hints.preferredBool(0))
+
+            session.restart()
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertNull(hints.preferredBool(0))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_CHARGED"))
+        }
+    }
+
+    @Test
+    fun `a mandatory fresh arithmetic query should prepay its own hint generation`() {
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertEquals(2L, stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_CHARGED"))
+            assertEquals(false, hints.preferredBool(0))
+            session.popTo(0)
+            assertNull(hints.preferredBool(0))
+        }
+    }
+
+    @Test
+    fun `an advisory precharge stopped by its producer should report the real operation stop`() {
+        var stopped = false
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = stopped
+            override fun workMeter(): WorkMeter = WorkMeter { units ->
+                if (units == 65_536L) stopped = true
+            }
+        }
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.useSolveStop(stop)
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            val initialized = session.initialize()
+
+            assertIs<ComponentResult.Indeterminate>(initialized)
+            assertNull(hints.preferredBool(0))
+            assertEquals(SearchStopCause.OperationAllowance, session.executionControls.stopCause)
+        }
+    }
+
+    @Test
+    fun `live prepaid consultations should retain containing stop priorities`() {
+        for (stoppedOwner in listOf("parent", "context", "native")) {
+            var stopped = false
+            val parent = Cancellation { stopped && stoppedOwner == "parent" }
+            val containing = Cancellation { stopped && stoppedOwner == "context" }
+            val accounting = object : SearchExecutionAccounting {
+                override val exhausted: Boolean get() = stopped && stoppedOwner == "native"
+            }
+            val controls = SearchExecutionControlAdapter(containing, accounting)
+            ExactLiraSearchComponent(partialModel()).use { component ->
+                component.useSolveStop(parent)
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+                val session = SearchSession(
+                    listOf(component), atoms = SearchAtomRegistry(2), executionControls = controls,
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(false, hints.preferredBool(0))
+
+                stopped = true
+                val preference = hints.preferredBool(0)
+
+                assertNull(preference)
+                val expected = when (stoppedOwner) {
+                    "parent" -> SearchStopCause.OperationAllowance
+                    "context" -> SearchStopCause.Cancelled
+                    else -> SearchStopCause.WorkAllowance
+                }
+                assertEquals(expected, controls.stopCause)
+            }
+        }
+    }
+
+    @Test
+    fun `lazy storage refusal should retain the admitted eager integer preferences`() {
+        for (booleans in listOf(57_071, 57_061)) {
+            val model = Problem(
+                numBoolVars = booleans,
+                intBounds = openBounds(),
+                factors = arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ),
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(booleans))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertEquals(false, hints.preferredBool(0))
+
+                assertNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_CAPTURE"))
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_LP_CAPTURE"))
+            }
+        }
+    }
+
+    @Test
+    fun `an unresolved disjunction should withhold its prepaid activator`() {
+        val below = ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)
+        val above = ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+        val disjunction = object : Factor by below {
+            override val linearForm: LinearForm = LinearForm.Disjunction(
+                listOf(
+                    TaggedLinearRow(intArrayOf(Term.ofIntVar(0)), below.constants, LinearOp.LE, activator = 0),
+                    TaggedLinearRow(intArrayOf(Term.ofIntVar(0)), above.constants, LinearOp.GE, activator = 0),
+                ),
+            )
+        }
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0), below, disjunction),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(hints.preferredBool(0))
+
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_CAPTURE"))
+            assertNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_ROW"))
+        }
+    }
+
+    @Test
+    fun `an optional hint stop should not become a source stop for a prepaid point`() {
+        var stopped = false
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            val hints = assertNotNull(
+                component.partialPointHints(Cancellation { stopped }, defaultOpening = true),
+            ).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(false, hints.preferredBool(0))
+
+            stopped = true
+
+            assertNull(hints.preferredBool(0))
+            assertNull(session.executionControls.stopCause)
+            assertIs<SearchResult.Satisfied>(session.solve(2))
+        }
+    }
+
+    @Test
+    fun `closing a prepaid provider should withhold its retained point preferences`() {
+        val component = ExactLiraSearchComponent(partialModel())
+        val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertEquals(false, hints.preferredBool(0))
+
+        component.close()
+
+        assertNull(hints.preferredBool(0))
+        assertEquals(false, component.partialPointHintAvailable())
     }
 
     private fun partialModel(): Problem = Problem(
