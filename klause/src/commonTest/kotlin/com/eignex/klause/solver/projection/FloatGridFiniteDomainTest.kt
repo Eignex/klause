@@ -34,7 +34,7 @@ class FloatGridFiniteDomainTest {
             assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never))
         }.toList()
 
-        assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ONE / BigFraction.ofLong(2)),
+        assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ofLong(2).reciprocal()),
             points.map { assertNotNull(it.exactReals)[0] }.toSet())
         for (point in points) assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point))
     }
@@ -52,7 +52,7 @@ class FloatGridFiniteDomainTest {
             assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never))
         }.toList()
 
-        assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ONE / BigFraction.ofLong(2)),
+        assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ofLong(2).reciprocal()),
             points.map { assertNotNull(it.exactReals).single() }.toSet())
         for (point in points) assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point))
         assertEquals(1, source.numRealVars)

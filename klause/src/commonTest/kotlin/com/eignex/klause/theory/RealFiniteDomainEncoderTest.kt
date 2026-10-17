@@ -64,7 +64,7 @@ class RealFiniteDomainEncoderTest {
                 assertEquals(0, arithmetic.compare(result.assignment.realValue(0),
                     arithmetic.rational(BigFraction.ofLong(if (truth) 2 else -1))))
                 assertEquals(0, arithmetic.compare(result.assignment.realValue(1),
-                    arithmetic.rational(BigFraction.ONE / BigFraction.ofLong(8))))
+                    arithmetic.rational(BigFraction.ofLong(8).reciprocal())))
             }
         }
         assertEquals(2, source.numRealVars)
@@ -102,7 +102,7 @@ class RealFiniteDomainEncoderTest {
         val result = assertIs<SolveResult.Sat>(BacktrackSolver(source.bake()).solve())
 
         assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, result.assignment))
-        assertEquals(BigFraction.ONE / BigFraction.ofLong(8), assertNotNull(result.assignment.exactReals)[0])
+        assertEquals(BigFraction.ofLong(8).reciprocal(), assertNotNull(result.assignment.exactReals)[0])
         assertEquals(2, result.assignment.numRealVars)
         assertEquals(0, source.numIntVars)
     }
