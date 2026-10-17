@@ -77,7 +77,8 @@ internal class LinearAuthorityInvocation(
         })
     private val run = session.openRun(context.coordinates.count {
         it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
-    }, SearchSolveParams(params.maxDecisions), booleanBranching = branching, nodePolicy = component)
+    }, SearchSolveParams(state.remainingDecisions()), decisionBudget = state.decisionBudget,
+        booleanBranching = branching, nodePolicy = component)
 
     @Suppress("TooGenericExceptionCaught") // Callback failure retires the invocation and preserves cleanup failures.
     fun runSlice(

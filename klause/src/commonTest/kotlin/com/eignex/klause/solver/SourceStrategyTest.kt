@@ -66,6 +66,43 @@ import kotlin.test.assertTrue
 
 class SourceStrategyTest {
     @Test
+    fun `finite source traversal should retain the common node allowance`() {
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(AllDifferent(intArrayOf(0, 1), 0, 2)))
+        val budget = NodeBudget(0)
+
+        val result = BacktrackSolver.source(source).solve(theory = TheoryParams(nodeBudget = budget))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(0L, budget.spent)
+    }
+
+    @Test
+    fun `finite source heuristic should retain the common node allowance`() {
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(AllDifferent(intArrayOf(0, 1), 0, 2)))
+        val budget = NodeBudget(0)
+
+        val result = LocalSearchSolver.source(source).solve(
+            LocalSearchParams(initialAssignment = Sample(booleanArrayOf(), longArrayOf(0, 0)), randomSeed = 17),
+            theory = TheoryParams(nodeBudget = budget),
+        )
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(0L, budget.spent)
+    }
+
+    @Test
+    fun `open source traversal should accept its typed node allowance`() {
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+            openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
+        val budget = NodeBudget(1)
+
+        val result = BacktrackSolver.source(source).solve(BacktrackParams(nodeBudget = budget))
+
+        assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals(1L, budget.spent)
+    }
+
+    @Test
     fun `finite affine optimization should preserve complete decision limits`() {
         val source = Problem(2, 0, emptyArray(), arrayOf(Clause(
             intArrayOf(Lit.make(0, true), Lit.make(1, true)),

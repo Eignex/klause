@@ -27,6 +27,7 @@ import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchSelection
 import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRestart
@@ -459,6 +460,7 @@ class OpenTheoryEngine internal constructor(
             val run = planned.session.openRun(
                 model.numBoolVars,
                 solveParams,
+                decisionBudget = state.decisionBudget,
                 booleanBranching = branching,
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = nodePolicy,
@@ -594,6 +596,14 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     val work = OpenTheoryWorkSink(params.openWorkLimit)
     val smt = SmtStatsSink()
     private val maxDecisions = params.maxDecisions
+    val decisionBudget = params.nodeBudget?.let { budget ->
+        SearchDecisionBudget {
+            val available = !budget.allowance.exhausted()
+            // A concurrent stop cannot erase the charge for this committed decision.
+            budget.allowance.spend()
+            available
+        }
+    } ?: SearchDecisionBudget.Unlimited
     var clauses = OpenTheoryClauseStats()
         private set
     private var capturedGlue = 0L
@@ -652,7 +662,10 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     fun remainingDecisions(): Long {
         val workStats = work.snapshot()
         val committed = workStats.openBoolDecisions + workStats.openIntDecisions + workStats.openTheoryDecisions
-        return maxDecisions - committed
+        return minOf(
+            (maxDecisions - committed).coerceAtLeast(0),
+            params.nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE,
+        )
     }
 
     fun capture(session: com.eignex.klause.solver.search.SearchSession?) {

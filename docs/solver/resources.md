@@ -104,7 +104,12 @@ see [private CP preparation](portfolio.md#private-cp-preparation).
 
 The solve-wide decision/move currency excludes propagation and LP work. Ordinary LS
 instructions and CP repair decisions charge the same containing `NodeBudget`. The
-private clausal primal search and walk also charge that ledger. Their decisions and
+complete open traversal, retained linear queries and numerical source traversal charge
+committed decisions to that same ledger. Remaining decision capacity is read again for
+each feasibility round; rebuilding a traversal does not renew it. A root witness or
+refutation that needs no decision can survive an exhausted node allowance. Source
+strategies bind one supplied ledger across their finite and arithmetic projections.
+The private clausal primal search and walk also charge that ledger. Their decisions and
 walk instructions are not included in the enclosing arm's `nodes` and `lsMoves`
 counters, so those exported counters alone cannot reconstruct the solve charge. ALNS
 charges each outer iteration's declared flip allowance once; the inner LS repair is

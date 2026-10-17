@@ -63,7 +63,12 @@ Typed `BacktrackParams` and `LocalSearchParams` overloads retain their finite an
 polynomial controls. `PolynomialTheoryParams` supplies native polynomial limits and
 common pins; `TheoryParams` supplies open-linear limits. These are distinct work
 currencies. A source operation owns fresh private state; shared node allowances retain
-their identity. Deduction scopes and CP tolerance acceptance explicitly decline because
+their identity. An allowance supplied by either the selected finite parameters or
+`TheoryParams` reaches finite, polynomial and open execution through the same source
+binding. Different ledgers in the selected parameters and `TheoryParams` reject before
+preparation. Complete open decisions
+and heuristic moves charge that ledger; required arithmetic work keeps its own currency.
+Deduction scopes and CP tolerance acceptance explicitly decline because
 source execution requires exact coordinates and cannot discard restrictions. Extra CP
 components, open pins and finite-only open hooks return `Unknown(Unsupported)`.
 Exact polynomial LS also declines finite seeding, incumbent exchange, custom scoring
