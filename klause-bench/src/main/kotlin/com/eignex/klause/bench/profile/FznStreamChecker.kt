@@ -65,7 +65,9 @@ internal object FznStreamChecker {
             val helperCost = helperCosts.singleOrNull()
             val exactCost = exactCosts.singleOrNull()
             val cost = if (sense != null) {
-                requireNotNull(exactCost ?: commentCost ?: helperCost) { "FlatZinc publication requires its exact cost" }
+                requireNotNull(exactCost ?: commentCost ?: helperCost) {
+                    "FlatZinc publication requires its exact cost"
+                }
             } else {
                 require(commentCost == null && helperCost == null && exactCost == null) {
                     "Satisfaction publication carries an objective cost"
