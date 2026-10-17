@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntegerConstants
@@ -21,14 +22,19 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.RegisteredTheoryDecision
+import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SearchTheoryAtom
+import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.contribute
@@ -50,6 +56,311 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `a pinned integer selection should refute its row before Boolean completion`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+        ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = session.push(SearchDecision.IntEqual(2, 0L))
+
+            assertNotNull(assertIs<ComponentResult.Conflict>(result).explanation)
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `unfixed integer selectors should not require row name capacity`() {
+        for (publishRange in listOf(false, true)) {
+            val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+                Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+            ))
+            ExactLiraSearchComponent(model).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1, maxAtoms = 0))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                if (publishRange) {
+                    session.publish(SearchDecision.IntAtLeast(2, 0L), SearchAtomPremise.All(emptyList()))
+                    session.publish(SearchDecision.IntAtMost(2, 1L), SearchAtomPremise.All(emptyList()))
+                }
+
+                assertIs<ComponentResult.Consistent>(session.propagate())
+            }
+        }
+    }
+
+    @Test
+    fun `a selected integer row should cite both current selector bound premises`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        var implied: Int? = null
+        var captured: SearchExplanation? = null
+        val context = object : SearchContext by session {
+            override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                implied = literal
+                captured = explanation
+                return session.imply(literal, explanation)
+            }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val pin = SearchDecision.IntEqual(2, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, context))
+
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+            val lower = assertNotNull(session.atomLiteral(SearchDecision.IntAtLeast(2, 0L)))
+            val upper = assertNotNull(session.atomLiteral(SearchDecision.IntAtMost(2, 0L)))
+            assertEquals(setOf(assertNotNull(implied), lower xor 1, upper xor 1),
+                assertNotNull(captured).literals.toSet())
+        }
+    }
+
+    @Test
+    fun `pending integer row delivery should defer numerical checks`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        var selected: RegisteredTheoryDecision? = null
+        var checks = 0
+        val context = object : SearchContext by session {
+            override fun registerAtom(
+                positive: SearchTheoryDecision,
+                negative: SearchTheoryDecision,
+            ): SearchTheoryAtom? =
+                session.registerAtom(positive, negative)?.also { selected = it.positive }
+            override fun consumeCheck(): Boolean {
+                checks++
+                return true
+            }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val pin = SearchDecision.IntEqual(2, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, context))
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            assertEquals(0, checks)
+
+            assertIs<ComponentResult.Consistent>(
+                component.assert(SearchDecision.Theory(assertNotNull(selected)), context),
+            )
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            assertEquals(1, checks)
+        }
+    }
+
+    @Test
+    fun `missing selector premises should refuse before naming a row`() {
+        for (missingLower in listOf(false, true)) {
+            val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+                Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+            ))
+            val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+            var names = 0
+            val context = object : SearchContext by session {
+                override fun intLowerBoundPremise(variable: Int): SearchAtomPremise =
+                    if (missingLower) SearchAtomPremise.Unavailable else session.intLowerBoundPremise(variable)
+                override fun intUpperBoundPremise(variable: Int): SearchAtomPremise =
+                    if (missingLower) session.intUpperBoundPremise(variable) else SearchAtomPremise.Unavailable
+                override fun registerAtom(
+                    positive: SearchTheoryDecision,
+                    negative: SearchTheoryDecision,
+                ): SearchTheoryAtom? {
+                    names++
+                    return session.registerAtom(positive, negative)
+                }
+            }
+            ExactLiraSearchComponent(model).use { component ->
+                assertIs<ComponentResult.Consistent>(component.initialize(context))
+                val pin = SearchDecision.IntEqual(2, 0L)
+                assertIs<ComponentResult.Consistent>(session.push(pin))
+                assertIs<ComponentResult.Consistent>(component.assert(pin, context))
+
+                assertIs<ComponentResult.Indeterminate>(component.propagate(context))
+
+                assertEquals(0, names)
+            }
+        }
+    }
+
+    @Test
+    fun `exhausted row name capacity should withhold integer selection admission`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1, maxAtoms = 2))
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Consistent>(component.initialize(session))
+            val pin = SearchDecision.IntEqual(2, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, session))
+
+            assertIs<ComponentResult.Indeterminate>(component.propagate(session))
+
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `cancelled selector explanation should withhold a row name`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        var stopped = false
+        var names = 0
+        val context = object : SearchContext by session {
+            override fun intUpperBoundPremise(variable: Int): SearchAtomPremise {
+                stopped = true
+                return session.intUpperBoundPremise(variable)
+            }
+            override fun registerAtom(
+                positive: SearchTheoryDecision,
+                negative: SearchTheoryDecision,
+            ): SearchTheoryAtom? {
+                names++
+                return session.registerAtom(positive, negative)
+            }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            component.useOperationAllowance { parent -> Cancellation { parent() || stopped } }
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val pin = SearchDecision.IntEqual(2, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, context))
+
+            assertIs<ComponentResult.Indeterminate>(component.propagate(context))
+
+            assertEquals(0, names)
+            assertTrue(component.operationBudgetExhausted)
+        }
+    }
+
+    @Test
+    fun `retracting a selector pin should not retain its pending equality`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        var implications = 0
+        val context = object : SearchContext by session {
+            override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                implications++
+                return session.imply(literal, explanation)
+            }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val pin = SearchDecision.IntEqual(2, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, context))
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            assertEquals(1, implications)
+            session.popTo(0)
+            component.retract(0)
+
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+            assertEquals(1, implications)
+            assertNull(session.intLowerBound(2))
+            assertNull(session.intUpperBound(2))
+        }
+    }
+
+    @Test
+    fun `a false selected equality should conflict with its current selector pin`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        var selected: SearchTheoryAtom? = null
+        val context = object : SearchContext by session {
+            override fun registerAtom(
+                positive: SearchTheoryDecision,
+                negative: SearchTheoryDecision,
+            ): SearchTheoryAtom? =
+                session.registerAtom(positive, negative)?.also { selected = it }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val pin = SearchDecision.IntEqual(2, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, context))
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            val atom = assertNotNull(selected)
+            session.popTo(0)
+            component.retract(0)
+            val falseRow = SearchDecision.Theory(atom.negative)
+            assertIs<ComponentResult.Consistent>(session.push(falseRow))
+            assertIs<ComponentResult.Consistent>(component.assert(falseRow, context))
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, context))
+
+            val conflict = assertIs<ComponentResult.Conflict>(component.propagate(context))
+
+            assertTrue(atom.positive.literal in assertNotNull(conflict.explanation).literals)
+        }
+    }
+
+    @Test
+    fun `late disjunction naming should reuse an implied integer selection row`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1, maxAtoms = 6))
+        var selected: RegisteredTheoryDecision? = null
+        val context = object : SearchContext by session {
+            override fun registerAtom(
+                positive: SearchTheoryDecision,
+                negative: SearchTheoryDecision,
+            ): SearchTheoryAtom? =
+                session.registerAtom(positive, negative)?.also { selected = it.positive }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val pin = SearchDecision.IntEqual(2, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, context))
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            assertIs<ComponentResult.Consistent>(
+                component.assert(SearchDecision.Theory(assertNotNull(selected)), context),
+            )
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            val unrelated = SearchDecision.Bool(Lit.make(0, true))
+            assertIs<ComponentResult.Consistent>(session.push(unrelated))
+            assertIs<ComponentResult.Consistent>(component.assert(unrelated, context))
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+            assertNotNull(component.nextBranch(context))
+        }
+    }
+
+    @Test
+    fun `constant array selections should retain their ordinary admission path`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(3), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 2, 3), arrIsVars = false, indexOffset = 0),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1, maxAtoms = 2))
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Consistent>(component.initialize(session))
+            val pin = SearchDecision.IntEqual(2, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, session))
+
+            assertIs<ComponentResult.Consistent>(component.propagate(session))
+        }
+    }
+
     @Test
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")

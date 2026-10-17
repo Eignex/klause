@@ -468,6 +468,10 @@ class ExactLiraSearchComponent private constructor(
         pollContextStop = solveStop != null && solveStop !== contextStop
         beginOperation()
         return try {
+            if (preparedSource.integerSelectionPreparationWork > 0L) {
+                operationStop.charge(preparedSource.integerSelectionPreparationWork)
+                if (operationStop()) return ComponentResult.Indeterminate
+            }
             graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
             if (graphFirst) smtStats?.observeRealGraphOpening()
@@ -704,6 +708,63 @@ class ExactLiraSearchComponent private constructor(
             impliedDisjunct = true
         }
         return ComponentResult.Consistent
+    }
+
+    private fun enforceIntegerSelections(context: SearchContext): ComponentResult {
+        impliedDisjunct = false
+        for (selection in preparedSource.integerSelections) {
+            operationStop.charge(4L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            val asserted = node.rowAssertions[selection.address]?.payload as? NamedDisjunctDecision
+            if (asserted?.holds == true) continue
+            if (context.intLowerBound(selection.selector) != selection.value ||
+                context.intUpperBound(selection.selector) != selection.value
+            ) continue
+            val premise = SearchAtomPremise.All(listOf(
+                context.intLowerBoundPremise(selection.selector), context.intUpperBoundPremise(selection.selector),
+            ))
+            val antecedents = integerSelectionAntecedents(premise, context) ?: return ComponentResult.Indeterminate
+            val row = model.factors[selection.address.factor].linearRows[selection.address.row]
+            val disjunct = registerDisjunct(row, context, selection.address) ?: return ComponentResult.Indeterminate
+            if (operationStop()) return ComponentResult.Indeterminate
+            if (context.truth(disjunct.holds) != true) {
+                val literal = disjunct.holds.literal
+                val reason = if (literal in antecedents.literals) antecedents else {
+                    SearchExplanation(intArrayOf(literal) + antecedents.literals)
+                }
+                val result = context.imply(literal, reason)
+                if (operationStop()) return ComponentResult.Indeterminate
+                if (result !is ComponentResult.Consistent) return result
+                observeCompleteStage("INTEGER_SELECTION_ROW_IMPLIED")
+            }
+            impliedDisjunct = true
+            return ComponentResult.Consistent
+        }
+        return ComponentResult.Consistent
+    }
+
+    private fun integerSelectionAntecedents(
+        premise: SearchAtomPremise,
+        context: SearchContext,
+    ): SearchExplanation? {
+        val pending = ArrayDeque<SearchAtomPremise>()
+        val expanded = HashSet<SearchAtomPremise.All>()
+        pending.addLast(premise)
+        var remaining = MAX_INTEGER_SELECTION_REASON_NODES
+        while (pending.isNotEmpty()) {
+            if (remaining-- <= 0) return null
+            // Shared explanation validation does not debit this numerical operation.
+            operationStop.charge(2L)
+            if (operationStop()) return null
+            val current = pending.removeLast()
+            if (current is SearchAtomPremise.All && expanded.add(current)) {
+                if (current.premises.size > remaining - pending.size) return null
+                pending.addAll(current.premises)
+            }
+        }
+        val explanation = context.explainAtoms(premise, maxNodes = MAX_INTEGER_SELECTION_REASON_NODES) ?: return null
+        operationStop.charge(explanation.literals.size.toLong() + 8L)
+        return explanation.takeUnless { operationStop() }
     }
 
     private fun disjunctionReason(
@@ -1114,6 +1175,9 @@ class ExactLiraSearchComponent private constructor(
         if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
             bools.indices.all { context.boolValue(it) != null }
         ) return ComponentResult.Consistent
+        val selected = enforceIntegerSelections(context)
+        if (selected !is ComponentResult.Consistent) return selected
+        if (impliedDisjunct) return ComponentResult.Consistent
         val enforced = enforceDisjunctions(context)
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
@@ -1531,7 +1595,11 @@ private class PreparedExactLiraSource(
     val arithmeticRows: List<LinearRow>,
     val arithmeticVariables: Set<Int>,
     val validated: Boolean,
+    val integerSelections: List<PreparedIntegerSelection> = emptyList(),
+    val integerSelectionPreparationWork: Long = 0L,
 )
+
+private data class PreparedIntegerSelection(val address: RowAddress, val selector: Int, val value: Long)
 
 private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
     val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
@@ -1550,8 +1618,13 @@ private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
         (0 until row.size).any { !Term.isBool(row.ref(it)) }
     }
     val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
+    val selections = model.factors.mapIndexedNotNull { index, factor ->
+        factor.linearForm.integerSelection(index, model.numIntVars)
+    }
+    val inspected = model.factors.count { (it.linearForm as? LinearForm.Disjunction)?.rows?.size == 2 }
     return PreparedExactLiraSource(
         model, exactForms, preparedRows, arithmeticRows, arithmeticVariables, validated = false,
+        integerSelections = selections, integerSelectionPreparationWork = 8L * inspected + 3L * selections.size,
     )
 }
 
@@ -1566,10 +1639,16 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
     val preparedRows = ArrayList<PreparedSourceRow>()
     val arithmeticRows = ArrayList<LinearRow>()
     val arithmeticVariables = LinkedHashSet<Int>()
+    val integerSelections = ArrayList<PreparedIntegerSelection>()
     for ((factorIndex, factor) in model.factors.withIndex()) {
         if (!charge(1)) return null
         val form = factor.linearForm
         if (form !is LinearForm.Conjunction && form !is LinearForm.Disjunction) return null
+        if (form is LinearForm.Disjunction && form.rows.size == 2 && !charge(8L)) return null
+        form.integerSelection(factorIndex, model.numIntVars)?.let { selection ->
+            if (!charge(3L)) return null
+            integerSelections += selection
+        }
         val forms = ArrayList<ExactRowForm>()
         for ((rowIndex, row) in factor.linearRows.withIndex()) {
             if (!charge(1)) return null
@@ -1616,15 +1695,42 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
         if (!charge(forms.size.toLong() + 1L)) return null
         exactForms += forms.toList()
     }
-    val copies = exactForms.size.toLong() + preparedRows.size + arithmeticRows.size + arithmeticVariables.size + 1L
+    val copies = exactForms.size.toLong() + preparedRows.size + arithmeticRows.size + arithmeticVariables.size +
+        integerSelections.size + 1L
     if (!charge(copies)) return null
     val source = PreparedExactLiraSource(
         model, exactForms.toList(), preparedRows.toList(), arithmeticRows.toList(), arithmeticVariables.toSet(),
-        validated = true,
+        validated = true, integerSelections = integerSelections.toList(),
     )
     return source.takeUnless { stop() }
 }
 
+private fun LinearForm?.integerSelection(factor: Int, integerVariables: Int): PreparedIntegerSelection? {
+    val rows = (this as? LinearForm.Disjunction)?.rows ?: return null
+    if (rows.size != 2) return null
+    val target = rows.indexOfFirst { it.relation == LinearOp.EQ }
+    if (target < 0) return null
+    val equality = rows[target]
+    val guard = rows[target xor 1]
+    if (guard.activator != LinearRow.ALWAYS || guard.strict || guard.size != 1 ||
+        guard.relation != LinearOp.NE || !Term.isInt(guard.ref(0))
+    ) return null
+    val selector = Term.intVar(guard.ref(0))
+    if (selector !in 0 until integerVariables) return null
+    val guardConstants = guard.constants as? IntegralConstants ?: return null
+    if (guardConstants.exactCoeff(0) != BIG_ONE || !guardConstants.exactBound.fitsLong()) return null
+    if (equality.activator != LinearRow.ALWAYS || equality.strict || equality.size != 2 ||
+        (0 until equality.size).any { !Term.isInt(equality.ref(it)) ||
+            Term.intVar(equality.ref(it)) !in 0 until integerVariables }
+    ) return null
+    val constants = equality.constants as? IntegralConstants ?: return null
+    if (constants.exactCoeff(0) != BIG_ONE || constants.exactCoeff(1) != -BIG_ONE ||
+        constants.exactBound != BIG_ZERO
+    ) return null
+    return PreparedIntegerSelection(RowAddress(factor, target), selector, guardConstants.exactBound.toLongExact())
+}
+
+private const val MAX_INTEGER_SELECTION_REASON_NODES = 4096
 private const val UNASSIGNED = -1
 private const val DECLINED_HINT = -2
 private const val MAX_POINT_HINT_ENTRIES = 65_536

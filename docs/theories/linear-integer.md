@@ -33,6 +33,15 @@ and ceiling thresholds. Finite variables receive scoped fixings from their finit
 owner, preserving bounds and holes. Shared search owns decision levels, retraction and conflict
 learning; the arithmetic component owns row assertions and numerical checks.
 
+A variable-array selection can retain the source clause `index != k OR result = entry`.
+When published finite bounds pin the index to `k`, the linear component can imply
+that equality before unrelated Boolean choices complete. Both current bound premises
+must have a shared explanation before the selected row receives its existing source
+address name. Pending delivery defers numerical checks; retraction removes the row
+through its ordinary scope. Other disjunctions retain their complete traversal path.
+Preparation, inspection and explanation work consume the current owner allowance;
+atom capacity, numerical limits and cancellation remain in force.
+
 With null `openHintFlips`, one exact-linear completion owner can reuse a completed
 partial LP point for direct primitive Boolean preferences, including integer-only
 sources. Registration charges the opening token; capture and bounded comparison
