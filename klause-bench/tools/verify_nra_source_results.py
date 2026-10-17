@@ -41,6 +41,73 @@ def sexpr(expression, *, source_symbols=False):
     return ''.join(parts)
 
 
+
+def source_sexprs(commands):
+    names = set()
+    pending = list(commands)
+    while pending:
+        node = pending.pop()
+        if isinstance(node, str):
+            names.add(symbol(node))
+        else:
+            pending.extend(node)
+    overridden = any(command and command[0] in ('declare-const', 'declare-fun', 'define-fun')
+                     and symbol(command[1]) in ('^', '*', '+', 'let') for command in commands)
+    counter = 0
+
+    def fresh():
+        nonlocal counter
+        while True:
+            name = '_klause_checked_power_' + str(counter)
+            counter += 1
+            if name not in names:
+                names.add(name)
+                return name
+
+    def power(base, exponent):
+        if exponent == 0:
+            return ['+', ['*', '0', base], '1']
+        if exponent == 1:
+            return ['*', '1', base]
+        bindings, selected = [], []
+        name = fresh()
+        bindings.append((name, base))
+        while exponent:
+            if exponent & 1:
+                selected.append(name)
+            exponent >>= 1
+            if exponent:
+                squared = fresh()
+                bindings.append((squared, ['*', name, name]))
+                name = squared
+        result = selected[0] if len(selected) == 1 else ['*', *selected]
+        for name, value in reversed(bindings):
+            result = ['let', [[name, value]], result]
+        return result
+
+    result = []
+    for command in commands:
+        work, values = [(command, False)], []
+        while work:
+            node, combine = work.pop()
+            if isinstance(node, str):
+                values.append(node)
+            elif not combine:
+                work.append((node, True))
+                work.extend((child, False) for child in reversed(node))
+            else:
+                rebuilt = values[-len(node):] if node else []
+                if node:
+                    del values[-len(node):]
+                if not overridden and len(rebuilt) == 3 and rebuilt[0] == '^' and \
+                        isinstance(rebuilt[2], str) and re.fullmatch(r'[0-9]+', rebuilt[2]):
+                    rebuilt = power(rebuilt[1], int(rebuilt[2]))
+                values.append(rebuilt)
+        assert len(values) == 1
+        result.append(sexpr(values[0], source_symbols=True))
+    return result
+
+
 def root_polynomial(expression):
     if isinstance(expression, str):
         assert expression == 'x' or re.fullmatch(r'-?\d+', expression), 'invalid root polynomial atom'
@@ -105,8 +172,7 @@ def source_formula(text):
         else:
             assert operator in ('set-logic', 'set-info', 'set-option', 'get-model', 'get-value', 'exit'), \
                 'unsupported source command ' + operator
-    constraints = list(z3.parse_smt2_string('\n'.join(
-        sexpr(command, source_symbols=True) for command in semantic)))
+    constraints = list(z3.parse_smt2_string('\n'.join(source_sexprs(semantic))))
     known = {value.get_id() for value in variables.values()}
     pending = list(constraints)
     seen = set()

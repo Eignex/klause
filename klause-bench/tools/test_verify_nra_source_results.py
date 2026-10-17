@@ -128,6 +128,22 @@ class NraSourceCheckTest(unittest.TestCase):
         with self.assertRaises(z3.Z3Exception):
             check.check_witness(source, '((define-fun x () Int (- 1)))')
 
+    def test_integer_helper_powers_keep_integer_sort_and_original_witness_checks(self):
+        for exponent, result in ((0, 1), (1, 2), (2, 4), (5, 32)):
+            source = '(declare-const x Int) (declare-const _klause_checked_power_0 Int) ' \
+                     '(define-fun power ((n Int)) Int (^ n ' + str(exponent) + ')) ' \
+                     '(assert (= (power x) ' + str(result) + ')) (assert (= _klause_checked_power_0 7))'
+            witness = '((define-fun x () Int 2) (define-fun _klause_checked_power_0 () Int 7))'
+            with self.subTest(exponent=exponent), \
+                    mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+                self.assertEqual(2, check.check_witness(source, witness)['coordinates'])
+
+    def test_power_translation_rejects_boolean_bases_even_at_zero(self):
+        source = '(declare-const b Bool) (define-fun power () Int (^ b 0)) (assert (= power 1))'
+
+        with self.assertRaises(z3.Z3Exception):
+            check.check_witness(source, '((define-fun b () Bool true))')
+
     def test_source_assumptions_are_checked(self):
         source = '(declare-const p Bool) (assert (or p (not p))) (check-sat-assuming ((not p)))'
         with self.assertRaisesRegex(AssertionError, 'original source assertion 1 is false'):
