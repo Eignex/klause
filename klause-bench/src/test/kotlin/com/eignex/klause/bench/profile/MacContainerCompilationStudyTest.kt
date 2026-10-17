@@ -38,10 +38,14 @@ class MacContainerCompilationStudyTest {
     @ValueSource(strings = ["fixture-allocation=other", "selection=https://example.test/selection.json",
         "plan-sha256=unpaired", "fixture-allocation=existing-matching"])
     fun `original fixture requests reject mixed duplicate and unrecognized modes`(extra: String) {
-        val arguments = arrayOf("control=${"b".repeat(40)}", "candidate=${"c".repeat(40)}",
-            "endpoint=unix:///owned/docker.sock", "fixture-allocation=existing-matching", extra)
+        val mode = if (extra == "fixture-allocation=other") emptyList() else
+            listOf("fixture-allocation=existing-matching")
+        val arguments = listOf("control=${"b".repeat(40)}", "candidate=${"c".repeat(40)}",
+            "endpoint=unix:///owned/docker.sock") + mode + extra
 
-        assertFailsWith<IllegalArgumentException> { MacContainerCompilationStudy.parse(arguments) }
+        assertFailsWith<IllegalArgumentException> {
+            MacContainerCompilationStudy.parse(arguments.toTypedArray())
+        }
     }
 
     @ParameterizedTest

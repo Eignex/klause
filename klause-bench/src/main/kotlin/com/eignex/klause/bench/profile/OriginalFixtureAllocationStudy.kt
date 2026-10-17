@@ -239,7 +239,8 @@ internal object OriginalFixtureAllocationStudy {
                 check(stdout.length() <= MAX_OUTPUT_BYTES && stderr.length() <= MAX_OUTPUT_BYTES)
                 check(System.nanoTime() < deadline) { "Original fixture process timed out" }
             }
-            check(process.exitValue() == 0 && stdout.length() <= MAX_OUTPUT_BYTES && stderr.length() <= MAX_OUTPUT_BYTES)
+            check(process.exitValue() == 0 &&
+                stdout.length() <= MAX_OUTPUT_BYTES && stderr.length() <= MAX_OUTPUT_BYTES)
             measurements = OriginalFixtureAllocationProtocol.measurements(stdout.readText(), fixture.key)
         } catch (failure: Exception) {
             error = failure.toString()
