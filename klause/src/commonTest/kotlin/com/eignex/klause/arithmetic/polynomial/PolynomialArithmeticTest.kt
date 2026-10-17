@@ -123,6 +123,75 @@ class PolynomialArithmeticTest {
     }
 
     @Test
+    fun `arithmetic observations preserve subresultants and native charges`() {
+        val left = arithmetic.add(arithmetic.power(x, 2), y)
+        val right = arithmetic.add(x, y)
+        var plainCharges = 0L
+        val plainMeter = WorkMeter { plainCharges += it }
+        val plain = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = plainMeter
+        })
+        var observedCharges = 0L
+        val observedMeter = WorkMeter { observedCharges += it }
+        val observed = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = observedMeter
+        })
+        var lastLeft: Polynomial? = null
+        var lastRight: Polynomial? = null
+        var coordinate: Int? = null
+        var index: Int? = null
+        var divisor: Polynomial? = null
+        observed.subresultantObserver = { a, b, variable, minor ->
+            lastLeft = a
+            lastRight = b
+            coordinate = variable
+            index = minor
+        }
+        observed.divisionObserver = { _, value -> divisor = value }
+
+        val immediate = plain.principalSubresultants(left, right, 0)
+        val pending = observed.preparePrincipalSubresultants(left, right, 0)
+        var resumed: List<Polynomial>? = null
+        while (resumed == null) resumed = pending.next()
+
+        assertEquals(immediate, resumed)
+        assertEquals(plainCharges, observedCharges)
+        assertEquals(left, lastLeft)
+        assertEquals(right, lastRight)
+        assertEquals(0, coordinate)
+        assertEquals(0, index)
+        assertEquals(Polynomial.ONE, divisor)
+    }
+
+    @Test
+    fun `subresultant observation retains a refused matrix request`() {
+        val left = arithmetic.add(arithmetic.power(x, 2), y)
+        val right = arithmetic.add(x, y)
+        for (prepared in listOf(false, true)) {
+            val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
+            var coordinate: Int? = null
+            var index: Int? = null
+            limited.subresultantObserver = { _, _, variable, minor ->
+                coordinate = variable
+                index = minor
+            }
+
+            val stopped = assertFailsWith<PolynomialResourceLimit> {
+                if (prepared) {
+                    val pending = limited.preparePrincipalSubresultants(left, right, 0)
+                    while (pending.next() == null) Unit
+                } else limited.principalSubresultants(left, right, 0)
+            }
+
+            assertEquals(PolynomialResource.MATRIX_CELLS, stopped.resource)
+            assertEquals(0, coordinate)
+            assertEquals(0, index)
+        }
+    }
+
+    @Test
     fun `terms should merge and cancel independent of producer mutation`() {
         val powers = mutableMapOf(0 to 2)
         val monomial = Monomial.of(powers)

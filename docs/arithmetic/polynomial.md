@@ -54,6 +54,13 @@ completed polynomial or subresultant family, with null checkpoints carrying no m
 interruption and representation failures remain terminal. Callers own cursor disposal
 and the meaning of suspension; the kernel does not read search or propagation state.
 
+Optional context-local observers retain subresultant operands, the eliminated
+coordinate and requested minor index, or exact-division operands. They are disabled
+by default and do not select operations or change limits. The phase diagnostic
+records immutable operand references during execution and reads their sizes after
+the query stops; native arithmetic charges remain unchanged. A recorded matrix
+request can precede allocation refusal and does not certify a completed operation.
+
 ## Rational roots and scalar identity
 
 `RationalPolynomial` captures ascending rational coefficients and trims trailing

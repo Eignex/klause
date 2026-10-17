@@ -21,6 +21,9 @@ internal class PolynomialArithmetic(
     private val cancellation: Cancellation = Cancellation.Never,
     private val limits: PolynomialLimits = PolynomialLimits(),
 ) {
+    var subresultantObserver: ((Polynomial, Polynomial, Int, Int?) -> Unit)? = null
+    var divisionObserver: ((Polynomial, Polynomial) -> Unit)? = null
+
     fun step() {
         if (cancellation()) throw PolynomialInterrupted()
         cancellation.charge(1)
@@ -87,6 +90,7 @@ internal class PolynomialArithmetic(
 
     private fun prepareDivision(dividend: Polynomial, divisor: Polynomial): Iterator<Polynomial?> = sequence {
         require(!divisor.isZero)
+        divisionObserver?.invoke(dividend, divisor)
         val terms = divisor.terms
         scalarQuotient(dividend, terms.singleOrNull())?.let {
             yield(it)
@@ -180,6 +184,7 @@ internal class PolynomialArithmetic(
 
     fun divideExact(dividend: Polynomial, divisor: Polynomial): Polynomial {
         require(!divisor.isZero)
+        divisionObserver?.invoke(dividend, divisor)
         val terms = divisor.terms
         scalarQuotient(dividend, terms.singleOrNull())?.let { return it }
         val lead = terms.last()
@@ -219,12 +224,14 @@ internal class PolynomialArithmetic(
     }
 
     fun principalSubresultants(left: Polynomial, right: Polynomial, variable: Int): List<Polynomial> {
+        subresultantObserver?.invoke(left, right, variable, null)
         step()
         val a = coefficients(left, variable)
         val b = coefficients(right, variable)
         val m = a.lastIndex
         val n = b.lastIndex
         return (0 until minOf(m, n)).map { index ->
+            subresultantObserver?.invoke(left, right, variable, index)
             val matrix = matrix(m.toLong() + n - 2L * index)
             val size = matrix.size
             for (row in 0 until n - index) {
@@ -248,6 +255,7 @@ internal class PolynomialArithmetic(
         right: Polynomial,
         variable: Int,
     ): Iterator<List<Polynomial>?> = sequence {
+        subresultantObserver?.invoke(left, right, variable, null)
         step()
         val a = coefficients(left, variable)
         val b = coefficients(right, variable)
@@ -255,6 +263,7 @@ internal class PolynomialArithmetic(
         val n = b.lastIndex
         val result = ArrayList<Polynomial>()
         for (index in 0 until minOf(m, n)) {
+            subresultantObserver?.invoke(left, right, variable, index)
             val matrix = matrix(m.toLong() + n - 2L * index)
             val size = matrix.size
             for (row in 0 until n - index) {

@@ -60,6 +60,8 @@ internal object PolynomialPhaseProfile {
             "representationLimits" to "default",
             "route" to if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
                 else "direct normalized QfNraQuery; separate gate inspection",
+            "arithmeticObservations" to if (pipelineMode) "disabled"
+                else "last subresultant and division requests; metadata read after query",
         )))
         val access = PhaseAccess()
         for ((index, source) in cases.withIndex()) {
@@ -217,6 +219,8 @@ internal object PolynomialPhaseProfile {
             val owner = query.newInstance(original, boolCount.invoke(source), realCount.invoke(source),
                 params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance()),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
+            val arithmetic = queryType.getDeclaredField("arithmetic").apply { isAccessible = true }.get(owner)
+            val observation = ArithmeticObservation(arithmetic)
             val checkpoints = ArrayList<PhaseCheckpoint>()
             val start = System.nanoTime()
             var calls = 0L
@@ -239,9 +243,60 @@ internal object PolynomialPhaseProfile {
             return PhaseTrace(checkpoints, result.javaClass.simpleName,
                 result.javaClass.methods.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
-                nativeWork, charges - preparationCharges, preparationCharges, stop)
+                nativeWork, charges - preparationCharges, preparationCharges, stop,
+                observation.subresultants(), observation.division())
         }
     }
+}
+
+private class ArithmeticObservation(arithmetic: Any) {
+    private val polynomialType = Class.forName("com.eignex.klause.arithmetic.polynomial.Polynomial")
+    private val degree = polynomialType.getMethod("degree", Int::class.javaPrimitiveType)
+    private val terms = polynomialType.getMethod("getTerms")
+    private val variables = polynomialType.getMethod("getVariables")
+    private var left: Any? = null
+    private var right: Any? = null
+    private var variable = 0
+    private var index: Int? = null
+    private var dividend: Any? = null
+    private var divisor: Any? = null
+
+    init {
+        val subresultants: (Any, Any, Int, Int?) -> Unit = { a, b, coordinate, minor ->
+            left = a
+            right = b
+            variable = coordinate
+            index = minor
+            dividend = null
+            divisor = null
+        }
+        val division: (Any, Any) -> Unit = { a, b ->
+            dividend = a
+            divisor = b
+        }
+        arithmetic.javaClass.getMethod("setSubresultantObserver", Function4::class.java)
+            .invoke(arithmetic, subresultants)
+        arithmetic.javaClass.getMethod("setDivisionObserver", Function2::class.java).invoke(arithmetic, division)
+    }
+
+    fun subresultants(): PhaseSubresultants? {
+        val a = left ?: return null
+        val b = checkNotNull(right)
+        val m = degree.invoke(a, variable) as Int
+        val n = degree.invoke(b, variable) as Int
+        return PhaseSubresultants(variable, index, m, n, termCount(a), termCount(b),
+            index?.let { m.toLong() + n - 2L * it })
+    }
+
+    fun division(): PhaseDivision? {
+        val a = dividend ?: return null
+        val b = checkNotNull(divisor)
+        val count = termCount(b)
+        return PhaseDivision(termCount(a), count,
+            (variables.invoke(b) as List<*>).isEmpty(), count == 1)
+    }
+
+    private fun termCount(value: Any): Int = (terms.invoke(value) as List<*>).size
 }
 
 @Serializable
@@ -270,6 +325,27 @@ internal data class PhaseTrace(
     val chargeSum: Long,
     val preparationCharges: Long,
     val containingDeadlineStack: List<String>?,
+    val lastSubresultants: PhaseSubresultants? = null,
+    val lastDivision: PhaseDivision? = null,
+)
+
+@Serializable
+internal data class PhaseSubresultants(
+    val variable: Int,
+    val index: Int?,
+    val leftDegree: Int,
+    val rightDegree: Int,
+    val leftTerms: Int,
+    val rightTerms: Int,
+    val matrixSize: Long?,
+)
+
+@Serializable
+internal data class PhaseDivision(
+    val dividendTerms: Int,
+    val divisorTerms: Int,
+    val divisorIsConstant: Boolean,
+    val divisorIsMonomial: Boolean,
 )
 
 @Serializable

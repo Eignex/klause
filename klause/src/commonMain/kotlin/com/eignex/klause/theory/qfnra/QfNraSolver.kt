@@ -89,10 +89,10 @@ internal class QfNraQuery(
     condition: PolynomialCondition,
 ) {
     private val work = QfNraWork(params)
+    private val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
     val stats: QfNraStats get() = work.snapshot()
     private var result: QfNraResult? = null
     private val preparation = sequence<QfNraResult?> {
-        val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
         val algebraic = AlgebraicArithmetic(arithmetic)
         try {
             arithmetic.step()

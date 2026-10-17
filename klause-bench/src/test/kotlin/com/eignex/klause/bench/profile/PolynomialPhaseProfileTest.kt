@@ -2,10 +2,38 @@ package com.eignex.klause.bench.profile
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialPhaseProfileTest {
+    @Test
+    fun `phase observations retain subresultant operand shapes and matrix index`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, timeoutMs = 10_000)
+
+        val observed = assertNotNull(trace.lastSubresultants)
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertTrue(observed.variable in 0..1)
+        assertEquals(0, observed.index)
+        assertEquals(2, observed.leftDegree)
+        assertEquals(1, observed.rightDegree)
+        assertEquals(3, observed.leftTerms)
+        assertEquals(1, observed.rightTerms)
+        assertEquals(3L, observed.matrixSize)
+    }
+
+    @Test
+    fun `phase observations remain absent without arithmetic requests`() {
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure("(assert false)")
+
+        assertNull(trace.lastSubresultants)
+        assertNull(trace.lastDivision)
+    }
+
     @Test
     fun `a negated conjunction declines conjunctive guidance after normalization`() {
         val source = """

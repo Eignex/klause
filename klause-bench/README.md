@@ -2594,7 +2594,7 @@ performance gain. Field/method incompatibility fails the diagnostic explicitly.
 query through its containing stop. Its `request64=<base64>` argument encodes up to
 18 `{suite, problem, sha256}` catalog identities, with at most 48 KiB of encoded
 request and 1 MiB per original source. It requires the frozen original hash before
-parsing and retains those bytes. Run the committed profile through the lab on AWS.
+parsing and retains those bytes. Run the committed profile through the lab with `host=auto`.
 The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
 
@@ -2604,8 +2604,15 @@ selects the containing deadline for source-matched diagnostics at another budget
 the saved settings retain the actual value. It does not change native or representation
 limits. The separate gate inspection uses its own deadline of the same duration. The diagnostic records normalization and
 bounded-probe returns, completed projection and the terminal result/reason/resource.
-At the first containing deadline poll it captures the operation stack. Its constant
-caller meter must exactly match the native query snapshot, excluding separately
+At the first containing deadline poll it captures the operation stack.
+Direct-query observers retain the last subresultant operands, coordinate, minor
+index and requested matrix side length, plus the last exact-division operand term
+counts and whether its divisor is constant or one monomial. Operand metadata is
+read after the measured query; callbacks retain references without arithmetic work.
+These are the most recent requests, possibly incomplete or refused, and must be
+interpreted with the containing deadline stack. They establish no completed result.
+The observers add diagnostic overhead and provide no default CLI timing authority.
+The caller meter must exactly match the native query snapshot, excluding separately
 reported parsing charges. A separate bounded normalization records conjunctive
 guidance admission and normalized node kinds; its work does not enter the query.
 No observer supplies a candidate, changes a limit or changes a cancellation result.
