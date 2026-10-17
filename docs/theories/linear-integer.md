@@ -28,6 +28,12 @@ before publishing a completed point. SMT admission remains defined by
 
 The linear component asserts active source rows under shared Boolean choices.
 Exact integer reductions and bound reasoning can simplify the remaining system.
+An active strict source inequality with integral coefficients, an integral endpoint
+and only integer coordinates closes by one integer unit before numerical term
+normalization. This can expose a conflict under partial Boolean choices. Its
+original scoped premises justify the closed side; fractional activities and
+continuous coordinates retain their strict rational semantics. Inspection and
+exact endpoint adjustment consume the current arithmetic operation allowance.
 A fractional open-integer candidate causes complementary branches at exact floor
 and ceiling thresholds. Finite variables receive scoped fixings from their finite
 owner, preserving bounds and holes. Shared search owns decision levels, retraction and conflict

@@ -550,6 +550,223 @@ class QfLiraSolverTest {
         }
     }
 
+    @Test
+    fun `complemented integer inequalities should explain a partial Boolean conflict`() {
+        for (first in listOf(0, 1)) {
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(first, false))))
+
+                val conflict = assertIs<ComponentResult.Conflict>(
+                    session.push(SearchDecision.Bool(Lit.make(1 - first, false))),
+                )
+
+                assertEquals(setOf(Lit.make(0, true), Lit.make(1, true)),
+                    assertNotNull(conflict.explanation).literals.toSet())
+                assertNull(session.boolValue(2))
+                assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+            }
+        }
+    }
+
+    @Test
+    fun `strict integer rows should refute a gap before Boolean completion`() {
+        val source = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(), doubleArrayOf(),
+                    LinearOp.LE, 1.0, strict = true),
+                ReifiedRealLinear(1, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(), doubleArrayOf(),
+                    LinearOp.GE, 0.0, strict = true),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val conflict = assertIs<ComponentResult.Conflict>(
+                session.push(SearchDecision.Bool(Lit.make(1, true))),
+            )
+
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+                assertNotNull(conflict.explanation).literals.toSet())
+            assertNull(session.boolValue(2))
+        }
+    }
+
+    @Test
+    fun `strict integral activities should close before coefficient normalization`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) {
+            val coefficient = if (op == LinearOp.LE) 2.0 else -2.0
+            val bound = if (op == LinearOp.LE) 1.0 else -1.0
+            val source = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(),
+                factors = arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(coefficient), intArrayOf(),
+                        doubleArrayOf(), op, bound, strict = true),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                assertNull(session.boolValue(1))
+                val witness = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(1)).model
+                    .valueOf<ExactLiraAssignment>(component))
+                assertEquals(BIG_ZERO, witness.intValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `retracted integer closure should admit a closed sibling`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            session.popTo(1)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            val witness = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(0)).model
+                .valueOf<ExactLiraAssignment>(component))
+            assertTrue(witness.intValue(0) >= BIG_ONE)
+            assertEquals(false, witness.boolValue(0))
+            assertEquals(true, witness.boolValue(1))
+        }
+    }
+
+    @Test
+    fun `fractional integer activities and endpoints should retain their source witnesses`() {
+        for ((coefficient, bound) in listOf(0.5 to 0.0, 1.0 to 0.5)) {
+            val source = Problem(
+                numBoolVars = 1,
+                intBounds = openBounds(),
+                factors = arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(coefficient), intArrayOf(),
+                        doubleArrayOf(), LinearOp.LE, bound),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+                val witness = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(0)).model
+                    .valueOf<ExactLiraAssignment>(component))
+                assertEquals(BIG_ONE, witness.intValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `strict real activity should retain a fractional witness beside integer coordinates`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.5),
+            realUpper = doubleArrayOf(0.5),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val witness = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(0)).model
+                .valueOf<ExactLiraAssignment>(component))
+            assertEquals(BigFraction.ofDouble(0.5), witness.reals.single())
+        }
+    }
+
+    @Test
+    fun `strict integer closure should preserve endpoints beyond Long`() {
+        for (bound in listOf(parseBigInt("9223372036854775807"), parseBigInt("-9223372036854775808"))) {
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(0), arrayOf(BIG_ONE), LinearOp.LE, bound),
+                    ReifiedLinear(1, intArrayOf(0), arrayOf(BIG_ONE), LinearOp.GE, bound + BIG_ONE),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+                val conflict = assertIs<ComponentResult.Conflict>(
+                    session.push(SearchDecision.Bool(Lit.make(1, false))),
+                )
+
+                assertEquals(setOf(Lit.make(0, true), Lit.make(1, true)),
+                    assertNotNull(conflict.explanation).literals.toSet())
+                assertNull(session.boolValue(2))
+            }
+        }
+    }
+
+    @Test
+    fun `interrupted integer source admission should retain work without a proof`() {
+        var armed = false
+        var charged = 0L
+        val meter = WorkMeter { if (armed) charged += it }
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(128),
+            factors = arrayOf(ReifiedLinear(0, IntArray(128) { 1 }, IntArray(128) { it }, LinearOp.LE, 0)),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            component.useOperationAllowance { parent ->
+                object : Cancellation {
+                    override fun isCancelled(): Boolean = parent() || (armed && charged >= 8L)
+                    override fun workMeter(): WorkMeter = meter
+                }
+            }
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            armed = true
+
+            assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertTrue(charged >= 8L)
+            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertNull(session.boolValue(1))
+        }
+    }
+
     private fun comparisonClauseModel(xUpper: Long) = Problem(
         numBoolVars = 0,
         intBounds = openBounds(2),

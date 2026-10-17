@@ -985,7 +985,8 @@ class ExactLiraSearchComponent private constructor(
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
-                if (!system.assertComparison(comparison, null, premise)) return false
+                val closed = closeIntegerSourceComparison(comparison) ?: return false
+                if (!system.assertComparison(closed, null, premise)) return false
                 sourceAssertionLevels[index] = context.decisionLevel
             }
         }
@@ -1001,6 +1002,31 @@ class ExactLiraSearchComponent private constructor(
         if (!assertDisequalities(disequalities)) return false
         nodesByLevel.put(context.decisionLevel, node)
         return true
+    }
+
+    private fun closeIntegerSourceComparison(comparison: ExactComparison): ExactComparison? {
+        operationStop.charge(1L)
+        if (operationStop()) return null
+        if (!comparison.strict || (comparison.op != LinearOp.LE && comparison.op != LinearOp.GE) ||
+            comparison.terms.isEmpty() || comparison.bound.den != BIG_ONE
+        ) return comparison
+        val integerColumns = model.numRealVars until model.numRealVars + model.numIntVars
+        for ((column, coefficient) in comparison.terms) {
+            operationStop.charge(1L)
+            if (operationStop()) return null
+            if (column !in integerColumns || coefficient.den != BIG_ONE) return comparison
+        }
+        val words = comparison.bound.num.magnitudeBitLength().toLong() / Long.SIZE_BITS + 1L
+        operationStop.charge(4L + words)
+        if (operationStop()) return null
+        // Close the integral activity before normalization can divide its coefficients.
+        val bound = if (comparison.op == LinearOp.LE) comparison.bound - BigFraction.ONE
+            else comparison.bound + BigFraction.ONE
+        if (operationStop()) return null
+        return ExactComparison(
+            comparison.terms, bound, comparison.op, strict = false,
+            hasReals = comparison.hasReals, ordered = comparison.ordered,
+        )
     }
 
     private fun assertDisequalities(
