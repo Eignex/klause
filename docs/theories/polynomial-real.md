@@ -726,6 +726,18 @@ equality alone supplies no factor zero or nonzero premise. Other coordinate
 occurrences remain for subsequent projection; only total rational polynomial
 graphs are substituted.
 
+Complete regional reduction first propagates necessary coordinate signs through
+its signed polynomial predicates. Private sign sets denote negative, zero and
+positive real values; they do not materialize finite CP domains or provide a
+witness. Monomial powers respect parity and zero, and sums of opposite signs
+retain every possible sign. A coordinate sign is excluded only when the resulting
+polynomial sign overapproximation cannot satisfy the predicate. An occurrence
+worklist propagates each narrowing to adjacent predicates until stable or
+inconsistent. An empty sign set refutes only that Boolean region. Zero fibres and
+mixed-sign cancellation remain admitted. This complete proof pass shares the
+query's native work and cancellation owner; it does not re-enter the bounded
+witness probe or alter its original admission and attempt limits.
+
 Projection records a permutation of all original coordinates and any further total graph
 sections. Dependencies in those sections occupy earlier lifting levels. Prefix literal checks
 use those levels rather than source coordinate IDs. Fixed coordinates retain their

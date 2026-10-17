@@ -160,6 +160,7 @@ internal class QfNraQuery(
                         reduction = reducing.next()
                         if (reduction == null) yield(null)
                     }
+                    if (reduction.inconsistent) continue
                     reducedRegionObserver?.invoke(reduction.atoms)
                     val activeFormula = if (reduction.eliminatedCount == 0) normalized
                     else PolynomialFormula.conjunction(reduction.atoms, arithmetic)
