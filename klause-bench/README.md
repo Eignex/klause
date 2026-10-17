@@ -3222,7 +3222,7 @@ line positions. PSI requires LF line endings; CRLF and CR are normalized for
 parsing, and every node boundary maps back to the unchanged original source.
 Literal comment/string text creates no declaration; executable string
 interpolations retain their source constructs. A syntax error
-retains the complete tree and fails the completion; other failures retain a partial
+retains the complete tree and fails the completion; caught processing failures retain a partial
 gzip without accepting its prefix. The complete gzip is round-trip checked.
 The first record declares `source-syntax-columns-v1` and its ordered `nodeColumns`
 and `rangeColumns`. Each `syntax-node` stores the corresponding arrays; its
