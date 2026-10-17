@@ -25,20 +25,6 @@ val mpsSemantics: SourceSemantics = SourceSemantics(
     ),
 )
 
-internal fun MpsModel.effectiveDeclarations(policy: EffectiveSourceSemantics): MpsModel {
-    val numbers = sourceNumbers()
-    val bounds = checkNotNull(effectiveVariableBounds(policy, numbers, Cancellation.Never))
-    val declarations = variables.mapIndexed { index, variable ->
-        if (bounds[index] === numbers.variableBounds[index]) variable else {
-            variable.copy(lower = bounds[index].first?.double, upper = bounds[index].second?.double)
-        }
-    }
-    return MpsModel(name, sense, objective, declarations, constraints, semantics).withSourceNumbers(MpsSourceNumbers(
-        bounds, numbers.constraintCoefficients, numbers.constraintBounds,
-        numbers.objectiveCoefficients, numbers.objectiveConstant, numbers.explicitVariableRanges,
-    )).exactAdapterSnapshot()
-}
-
 internal fun MpsModel.effectiveVariableBounds(
     policy: EffectiveSourceSemantics,
     numbers: MpsSourceNumbers,
