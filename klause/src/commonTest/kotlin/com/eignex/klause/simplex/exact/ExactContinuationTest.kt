@@ -10,6 +10,97 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `already seated imports should preserve strict and closed source equations`() {
+        for (strict in listOf(false, true)) {
+            val input = ExactContinuationInput(
+                listOf(List(3) { it to BigFraction.ONE }),
+                List(3) { BigFraction.ofLong(it + 1L) },
+                List(4) { BigFraction.ZERO },
+                listOf(BigFraction.ONE, null, null, null),
+                listOf(1, 2, 3),
+                listOf(
+                    ContinuationStatus.LOWER, ContinuationStatus.BASIC,
+                    ContinuationStatus.BASIC, ContinuationStatus.BASIC,
+                ),
+                lowerStrict = listOf(strict, false, false, false),
+            )
+
+            val result = ExactContinuation(input).resume()
+
+            val point = assertNotNull(result.values)
+            assertTrue(point[0] >= BigFraction.ZERO && point[0] <= BigFraction.ONE)
+            if (strict) assertTrue(point[0] > BigFraction.ZERO)
+            for (row in 0 until 3) {
+                assertEquals(BigFraction.ofLong(row + 1L), point[0] + point[row + 1])
+                assertTrue(point[row + 1] >= BigFraction.ZERO)
+            }
+            assertNull(result.ray)
+            assertNull(result.metrics.decline)
+            assertEquals(0, result.metrics.imports)
+            assertEquals(0, result.metrics.pivots)
+        }
+    }
+
+    @Test
+    fun `a pivot after an already seated target should expose the resulting conflict`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)),
+            listOf(BigFraction.ZERO, BigFraction.ONE),
+            List(3) { BigFraction.ZERO },
+            listOf(null, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(1, 0),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        assertEquals(listOf(BigFraction.MINUS_ONE, BigFraction.ONE), result.ray)
+        assertNull(result.values)
+        assertNull(result.metrics.decline)
+        assertEquals(1, result.metrics.imports)
+        assertEquals(0, result.metrics.pivots)
+    }
+
+    @Test
+    fun `interrupted imports should preserve cancellation and cumulative resume allowances`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)),
+            listOf(BigFraction.ZERO, BigFraction.ONE),
+            List(3) { BigFraction.ZERO },
+            listOf(null, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(1, 0),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+        )
+        val session = ExactContinuation(input)
+        val stopped = session.resume(ExactContinuationLimits(maxImportPivots = 0))
+
+        val cancelled = session.resume(cancellation = Cancellation { true })
+        val exhausted = session.resume(ExactContinuationLimits(maxWork = session.usedWork))
+        val resumed = session.resume()
+
+        assertEquals(ContinuationDecline.IMPORT_LIMIT, stopped.metrics.decline)
+        assertEquals(1, stopped.metrics.importPosition)
+        assertEquals(ContinuationDecline.CANCELLED, cancelled.metrics.decline)
+        assertEquals(ContinuationDecline.WORK, exhausted.metrics.decline)
+        for (partial in listOf(stopped, cancelled, exhausted)) {
+            assertNull(partial.values)
+            assertNull(partial.ray)
+        }
+        assertEquals(listOf(BigFraction.MINUS_ONE, BigFraction.ONE), resumed.ray)
+        assertEquals(0, resumed.metrics.builds)
+        assertEquals(1, resumed.metrics.imports)
+        assertEquals(
+            stopped.metrics.work + cancelled.metrics.work + exhausted.metrics.work + resumed.metrics.work,
+            session.usedWork,
+        )
+        assertEquals(
+            stopped.metrics.allocation + cancelled.metrics.allocation + exhausted.metrics.allocation +
+                resumed.metrics.allocation,
+            session.usedAllocation,
+        )
+    }
+
+    @Test
     fun `strict endpoints should materialize interior coordinates in either direction`() {
         for (upper in listOf(false, true)) {
             val input = ExactContinuationInput(

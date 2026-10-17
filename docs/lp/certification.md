@@ -89,6 +89,13 @@ arithmetic, scalar growth, storage and verification share the continuation's
 cumulative allowances, with unchanged dimension and pivot caps. Nonzero objectives
 retain closure continuation and their existing strict-refinement policy.
 
+Within one import advance, a completed conflict scan remains valid while the
+tableau, headings and endpoint seats are unchanged. Already seated targets and
+repairs without a pivot retain that result; every pivot invalidates it. Each
+import position still checks the current resource and cancellation token. This
+scan state is local to the advance and is discarded before row reordering,
+feasibility work, interruption or resume; it retains no point or certificate.
+
 Continuation phase accounting accumulates in primitive counters and materializes
 report maps at observation boundaries. A declined charge leaves totals and phase
 reports at the accepted prefix; reports retain zero charges and first-visit order.

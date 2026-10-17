@@ -437,8 +437,13 @@ private class RationalContinuationLane<F>(
         budget.step()
         if (scalarPeak > budget.limits.maxBits) throw ContinuationStop(ContinuationDecline.BITS)
         budget.phase = ContinuationPhase.IMPORT
+        var completedImportScan = false
         while (position < input.m) {
-            findConflict(budget)?.let { return it }
+            budget.step()
+            if (!completedImportScan) {
+                findConflict(budget)?.let { return it }
+                completedImportScan = true
+            }
             val target = input.headings[position]
             if (target !in headings) {
                 val row = headings.indices.firstOrNull {
@@ -453,12 +458,14 @@ private class RationalContinuationLane<F>(
                     val leave = headings[row]
                     val seat = input.statuses[leave].takeUnless { it == ContinuationStatus.BASIC } ?: canonical(leave)
                     pivot(row, target, seat, budget)
+                    completedImportScan = false
                     imported()
                 }
             }
             position++
         }
-        findConflict(budget)?.let { return it }
+        budget.step()
+        if (!completedImportScan) findConflict(budget)?.let { return it }
         if (!ordered) {
             budget.phase = ContinuationPhase.REPAIR
             budget.step(input.m.toLong(), input.m * 32L)
