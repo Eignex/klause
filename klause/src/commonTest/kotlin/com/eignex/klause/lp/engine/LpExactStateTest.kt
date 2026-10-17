@@ -7,6 +7,7 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -14,6 +15,79 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpExactStateTest {
+    @Test
+    fun `distinct zero and wide witnesses should retain the strongest side`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val assertions = listOf(0L, 128L, Long.MAX_VALUE).mapIndexed { index, witness ->
+            LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(index.toLong() + 1L)), witness, 0)
+        }
+
+        val state = LpExactState(source, assertions)
+
+        assertEquals(assertions.last(), state.activeSide(0, false))
+    }
+
+    @Test
+    fun `duplicate witnesses should be rejected in an initial state`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        for (witness in listOf(0L, 128L, Long.MAX_VALUE)) {
+            val lower = LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), witness, 0)
+            val upper = lower.copy(upper = true, side = ExactLpSide(ExactLpNumber.of(8L)))
+
+            assertFailsWith<IllegalArgumentException> { LpExactState(source, listOf(lower, upper)) }
+        }
+    }
+
+    @Test
+    fun `an appended witness should be distinct from the shared prefix`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        for (witness in listOf(0L, 128L, Long.MAX_VALUE)) {
+            val lower = LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), witness, 0)
+            val before = LpExactState(source, listOf(lower))
+            val upper = lower.copy(upper = true, side = ExactLpSide(ExactLpNumber.of(8L)))
+
+            assertFailsWith<IllegalArgumentException> {
+                LpExactState(source, before.assertions + upper, rows = before.rows, previous = before)
+            }
+        }
+    }
+
+    @Test
+    fun `duplicate witnesses should be rejected within a changed tail`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val lower = LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), 0L, 0)
+        val before = LpExactState(source, listOf(lower))
+        val upper = lower.copy(upper = true, side = ExactLpSide(ExactLpNumber.of(8L)), witness = Long.MAX_VALUE)
+        val tighter = upper.copy(side = ExactLpSide(ExactLpNumber.of(7L)))
+
+        assertFailsWith<IllegalArgumentException> {
+            LpExactState(source, before.assertions + listOf(upper, tighter), rows = before.rows, previous = before)
+        }
+    }
+
+    @Test
+    fun `a changed suffix should permit reuse of its removed witness`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val lower = LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), 0L, 0)
+        val upper = lower.copy(upper = true, side = ExactLpSide(ExactLpNumber.of(8L)), witness = Long.MAX_VALUE)
+        val before = LpExactState(source, listOf(lower, upper))
+        val replacement = upper.copy(side = ExactLpSide(ExactLpNumber.of(7L)))
+
+        val after = LpExactState(source, listOf(lower, replacement), rows = before.rows, previous = before)
+
+        assertEquals(replacement, after.activeSide(0, true))
+    }
+
+    @Test
+    fun `negative witnesses should be rejected before publication`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        for (witness in listOf(-1L, Long.MIN_VALUE)) {
+            val assertion = LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), witness, 0)
+
+            assertFailsWith<IllegalArgumentException> { LpExactState(source, listOf(assertion)) }
+        }
+    }
+
     @Test
     fun `cached owner views should respect cancellation and caller projection isolation`() {
         val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
