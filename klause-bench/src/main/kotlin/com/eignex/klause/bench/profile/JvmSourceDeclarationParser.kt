@@ -7,7 +7,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.jetbrains.kotlin.K1Deprecation
-import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
@@ -34,6 +33,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiReferenceExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiStatement
 import org.jetbrains.kotlin.com.intellij.psi.PsiVariable
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.psi.KtAnonymousInitializer
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtClassBody
@@ -55,11 +55,12 @@ import org.jetbrains.kotlin.psi.KtSecondaryConstructor
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 
 @OptIn(CompilerConfiguration.Internals::class, K1Deprecation::class)
+@Suppress("TooGenericExceptionCaught")
 internal class JvmSourceDeclarationParser : AutoCloseable {
     private val disposable = Disposer.newDisposable("klause-source-declarations")
     private val environment = try {
         val configuration = CompilerConfiguration().apply {
-            put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
+            put(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
         }
         KotlinCoreEnvironment.createForProduction(disposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES)
     } catch (failure: Exception) {
@@ -95,33 +96,7 @@ internal class JvmSourceDeclarationParser : AutoCloseable {
                 if (retained(element)) {
                     val index = records++
                     if (element is PsiErrorElement) errors++
-                    emit(buildJsonObject {
-                        put("index", index)
-                        put("parentIndex", owner?.let(::JsonPrimitive) ?: JsonNull)
-                        put("kind", kind(element))
-                        put("psiKind", element.javaClass.name)
-                        put("name", when (element) {
-                            is KtNamedDeclaration -> element.name
-                            is PsiNamedElement -> element.name
-                            else -> null
-                        })
-                        put("role", role(element))
-                        put("package", when (element) {
-                            is KtFile -> element.packageFqName.asString()
-                            is PsiJavaFile -> element.packageName
-                            else -> null
-                        })
-                        put("range", source.range(element))
-                        put("syntaxError", (element as? PsiErrorElement)?.errorDescription)
-                        put("referencedName", when (element) {
-                            is KtSimpleNameExpression -> element.getReferencedName()
-                            is PsiReferenceExpression -> element.referenceName
-                            is PsiJavaCodeReferenceElement -> element.referenceName
-                            else -> null
-                        })
-                        put("symbolResolutionProven", false)
-                        put("jvmMemberOrGeneratedBodyInferred", false)
-                    })
+                    emit(node(element, owner, index, source))
                     parent = index
                 }
                 val children = element.children
@@ -134,6 +109,35 @@ internal class JvmSourceDeclarationParser : AutoCloseable {
         }
         return SourceSyntaxResult(records, errors)
     }
+
+    private fun node(element: PsiElement, parent: Int?, index: Int, source: SourceSyntaxIndex): JsonObject =
+        buildJsonObject {
+            put("index", index)
+            put("parentIndex", parent?.let(::JsonPrimitive) ?: JsonNull)
+            put("kind", kind(element))
+            put("psiKind", element.javaClass.name)
+            put("name", when (element) {
+                is KtNamedDeclaration -> element.name
+                is PsiNamedElement -> element.name
+                else -> null
+            })
+            put("role", role(element))
+            put("package", when (element) {
+                is KtFile -> element.packageFqName.asString()
+                is PsiJavaFile -> element.packageName
+                else -> null
+            })
+            put("range", source.range(element))
+            put("syntaxError", (element as? PsiErrorElement)?.errorDescription)
+            put("referencedName", when (element) {
+                is KtSimpleNameExpression -> element.getReferencedName()
+                is PsiReferenceExpression -> element.referenceName
+                is PsiJavaCodeReferenceElement -> element.referenceName
+                else -> null
+            })
+            put("symbolResolutionProven", false)
+            put("jvmMemberOrGeneratedBodyInferred", false)
+        }
 
     override fun close() {
         if (!closed) {

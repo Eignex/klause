@@ -141,7 +141,7 @@ internal object JvmSourceDeclarations {
         return value.content
     }
 
-    @Suppress("LongMethod")
+    @Suppress("LongMethod", "TooGenericExceptionCaught")
     private fun inspect(sources: List<SourceSyntaxInput>, out: File): JsonObject {
         val report = File(out, "source-declarations.jsonl.gz")
         check(!report.exists())
