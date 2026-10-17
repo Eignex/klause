@@ -41,15 +41,32 @@ constant cases. Principal subresultant coefficients use the truncated Sylvester
 matrices for indices 0 through one less than the smaller degree. Index zero is
 the resultant; leading coefficients are separately accessible. Policy chooses
 which polynomials, reducta and coefficient families to project.
+For two inputs affine in the eliminated coordinate, their sole principal subresultant is the exact difference
+of coefficient products. Both eager and prepared paths evaluate that expression
+without allocating a dense matrix. Coefficients can vanish under specialization;
+the identity introduces no nonzero premise or division. Prepared products retain
+their ordinary cancellation and suspension checkpoints.
 
 Prepared subresultant cursors retain private matrices, pivot signs, previous divisors
 and pending polynomial products across caller checkpoints. Multiplication snapshots
 its immutable term lists once and merges completed products in batches of 256; exact
 division retains its remainder and quotient between reductions. The prepared and eager
-paths charge the same native operations. Cursors expose only a completed polynomial
-or subresultant family, with null checkpoints carrying no mathematical result. Native
+paths charge the same native operations. Division by a nonzero rational constant
+scales the captured coefficients directly; division by one returns the immutable
+dividend after a cancellation and work checkpoint. Neither operation performs
+polynomial long division or changes representation limits. Cursors expose only a
+completed polynomial or subresultant family, with null checkpoints carrying no mathematical result. Native
 interruption and representation failures remain terminal. Callers own cursor disposal
 and the meaning of suspension; the kernel does not read search or propagation state.
+
+Optional context-local observers retain subresultant operands, the eliminated
+coordinate and requested minor index, or exact-division operands. They are disabled
+by default and do not select operations or change limits. Observers retain immutable
+operand references; reading their metadata after an operation leaves native arithmetic
+charges unchanged. A recorded matrix
+request can precede allocation refusal and does not certify a completed operation.
+The reported minor order also describes a matrix-free affine determinant; it does
+not assert that a matrix was allocated.
 
 ## Rational roots and scalar identity
 
