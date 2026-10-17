@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceRealId
@@ -79,7 +80,9 @@ class OpenWitnessTest {
 
     @Test
     fun `a real relation without a complete checker should remain indeterminate`() {
-        val relation = Power(Power.Coordinate.Real(SourceRealId(0)), 2, Power.Coordinate.Real(SourceRealId(1)))
+        val relation = object : Factor by Power(
+            Power.Coordinate.Real(SourceRealId(0)), 2, Power.Coordinate.Real(SourceRealId(1)),
+        ) {}
         val source = Problem(0, 0, emptyArray(), arrayOf(relation), numRealVars = 2,
             realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(2.0, 4.0))
         val point = Sample(booleanArrayOf(), longArrayOf(), reals = doubleArrayOf(1.0, 1.0),
