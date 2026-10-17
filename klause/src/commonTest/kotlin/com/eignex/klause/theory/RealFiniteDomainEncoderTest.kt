@@ -116,5 +116,6 @@ class RealFiniteDomainEncoderTest {
         val result = source.baked
 
         assertIs<PropagationResult.Unsat>(result)
+        assertIs<OpenTheoryResult.Unsat>(BacktrackSolver.source(source).solve())
     }
 }
