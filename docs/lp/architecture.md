@@ -130,6 +130,17 @@ withhold the proof. Cut policy considers efficacy, parallelism, orthogonality,
 age and row caps. An integer-specialized separator does not imply general
 mixed-integer coverage.
 
+Aggregation MIR mines unconditional, non-strict integer-coordinate `Linear` and
+`ExactLinear` rows with signed-word constants, retaining their stored units.
+Normalized strict integer rows use their closed stored comparison. Conditional,
+real-coordinate and wider rows decline this projection. Every source coordinate
+needs an LP column and a declared lower bound for the global rounding shift;
+invented finite endpoints cannot justify it. Flips, shifts, aggregation and
+unshifting use checked word arithmetic and decline overflowing combinations.
+The existing 48-row and 16-cut caps and root/node scheduling remain authoritative.
+Equivalent rows with different positive scales can yield different half cuts;
+this projection does not rescale source rows or change objective units.
+
 Cut scheduling follows active LP bounding, the requested cost tier and the
 relaxation size guard, including ordinary linear models without global factors.
 Tableau emission checks the assembled LP's actual integral structural columns,

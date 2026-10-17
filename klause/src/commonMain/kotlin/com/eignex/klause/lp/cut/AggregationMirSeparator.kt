@@ -1,11 +1,15 @@
 package com.eignex.klause.lp.cut
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.model.PbOp
@@ -15,9 +19,10 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 
 /**
- * Aggregation MIR cuts of the {0,½} Chvátal–Gomory family over the integer [Linear] rows. A single
+ * Aggregation MIR cuts of the {0,½} Chvátal–Gomory family over integer [LinearRow] comparisons. A single
  * integer row `Σ a_j x_j ≤ b` yields no Gomory/MIR cut on its own — its data is integral, so the
  * fractionality those cuts exploit only appears in the simplex tableau. Combining rows with the
  * fractional multiplier ½ reintroduces it: for any subset `S` of `≤`-rows,
@@ -30,8 +35,9 @@ import com.eignex.klause.util.mulExact
  *
  * Separation enumerates single rows and pairs, emitting a combination only when the LP point violates
  * the resulting cut (an even combination reproduces a scaled original row and never separates). Rows
- * and emitted cuts are capped so the root harvest stays bounded. [Linear] rows over integers and
- * [PseudoBoolean] / [Cardinality] rows over 0/1 literals are both mined (a negated literal `¬x` enters
+ * and emitted cuts are capped so the root harvest stays bounded. Unconditional, non-strict [Linear]
+ * and [ExactLinear] rows with compact integer constants and integer coordinates, together with
+ * [PseudoBoolean] / [Cardinality] rows over 0/1 literals are mined (a negated literal `¬x` enters
  * as `1 − x`, its constant folded into the rhs), and a pair may mix the two. Flow-cover cuts live in
  * [FlowCoverSeparator].
  */
@@ -59,28 +65,16 @@ internal class AggregationMirSeparator : CutSeparator {
         return cuts
     }
 
-    /** Normalize each [Linear] / [PseudoBoolean] / [Cardinality] factor to `≤`-rows over shifted
+    /** Normalize each eligible linear / [PseudoBoolean] / [Cardinality] factor to `≤`-rows over shifted
      *  nonnegative variables, recording each column's declared lower bound in [loOf]. GE flips sign;
      *  EQ / a cardinality range contributes both directions. */
     private fun collectRows(ctx: CutContext, loOf: MutableIntLongMap): List<Row> {
         val rows = ArrayList<Row>()
         for (factor in ctx.problem.factors) {
             when (factor) {
-                // A real or wide row carries no plain-integer Long coefficients to build a cut row from.
-                is Linear -> if (factor.integerConstants != null) {
-                    when (factor.op) {
-                        LinearOp.LE -> addRow(ctx, factor, flip = false, loOf, rows)
+                is Linear -> addLinearRows(ctx, factor, loOf, rows)
 
-                        LinearOp.GE -> addRow(ctx, factor, flip = true, loOf, rows)
-
-                        LinearOp.EQ -> {
-                            addRow(ctx, factor, flip = false, loOf, rows)
-                            addRow(ctx, factor, flip = true, loOf, rows)
-                        }
-
-                        else -> Unit // NE has no valid linear relaxation row
-                    }
-                }
+                is ExactLinear -> addLinearRows(ctx, factor, loOf, rows)
 
                 is PseudoBoolean -> {
                     if (!permitsLongPseudoBoolean(factor.constants)) continue
@@ -113,6 +107,29 @@ internal class AggregationMirSeparator : CutSeparator {
         return rows
     }
 
+    private fun addLinearRows(
+        ctx: CutContext,
+        row: LinearRow,
+        loOf: MutableIntLongMap,
+        out: MutableList<Row>,
+    ) {
+        if (row.constants !is IntegerConstants || row.activator != LinearRow.ALWAYS || row.strict ||
+            !row.isIntegerOnly
+        ) return
+        when (row.relation) {
+            LinearOp.LE -> addRow(ctx, row, flip = false, loOf, out)
+
+            LinearOp.GE -> addRow(ctx, row, flip = true, loOf, out)
+
+            LinearOp.EQ -> {
+                addRow(ctx, row, flip = false, loOf, out)
+                addRow(ctx, row, flip = true, loOf, out)
+            }
+
+            else -> Unit
+        }
+    }
+
     /** Normalize a 0/1 literal-weighted `≤`-row `Σ wₖ·Lₖ ≤ bound` (after [flip] for a `≥` row) into a
      *  [Row] over Boolean columns: a positive literal contributes `+w·x`, a negative `¬x` contributes
      *  `w·(1−x) = −w·x + w`, folding the constant into the rhs. Skips the row if any literal's variable
@@ -130,17 +147,17 @@ internal class AggregationMirSeparator : CutSeparator {
             val coef = MutableIntLongMap()
             // Columns in first-seen order, so the emitted row keeps the source row's column order.
             val order = IntArrayList()
-            var b = if (flip) -bound else bound
+            var b = if (flip) subExact(0L, bound) else bound
             for (k in lits.indices) {
                 val col = ctx.relaxation.boolColOf[Lit.variable(lits[k])]
                 if (col < 0) return
-                val w = if (flip) -weightOf(k) else weightOf(k)
+                val w = if (flip) subExact(0L, weightOf(k)) else weightOf(k)
                 if (!coef.containsKey(col)) order.add(col)
                 if (Lit.isPositive(lits[k])) {
                     coef.put(col, addExact(coef.getOrDefault(col, 0L), w))
                 } else {
-                    coef.put(col, addExact(coef.getOrDefault(col, 0L), -w))
-                    b = addExact(b, -w)
+                    coef.put(col, subExact(coef.getOrDefault(col, 0L), w))
+                    b = subExact(b, w)
                 }
                 loOf.put(col, 0L)
             }
@@ -159,30 +176,31 @@ internal class AggregationMirSeparator : CutSeparator {
 
     private fun addRow(
         ctx: CutContext,
-        factor: Linear,
+        factor: LinearRow,
         flip: Boolean,
         loOf: MutableIntLongMap,
         out: MutableList<Row>,
     ) {
-        val row = factor.integerConstants ?: return
-        val k = factor.vars.size
+        val row = factor.constants as? IntegerConstants ?: return
+        val k = factor.size
         val cols = IntArray(k)
         val a = LongArray(k)
         try {
-            var b = if (flip) -row.bound else row.bound
+            var b = if (flip) subExact(0L, row.bound) else row.bound
             for (idx in 0 until k) {
-                val col = ctx.relaxation.intColOf[factor.vars[idx]]
+                val variable = Term.intVar(factor.ref(idx))
+                val col = ctx.relaxation.intColOf[variable]
                 if (col < 0) return // a variable without an LP column ⇒ skip the row
-                val coeff = if (flip) -row.coeff(idx) else row.coeff(idx)
+                val coeff = if (flip) subExact(0L, row.coeff(idx)) else row.coeff(idx)
                 cols[idx] = col
                 a[idx] = coeff
                 // The rounding needs `y_j = x_j − lo_j ≥ 0`, and the cut is emitted globally. Over a
                 // column the model leaves open below, the root box's endpoint is not a lower bound of the
                 // model, so the shift would not hold there — drop the row instead of shifting by it.
-                if (!ctx.statesLowerBound(factor.vars[idx])) return
-                val lo = ctx.rootDomain(factor.vars[idx]).min
+                if (!ctx.statesLowerBound(variable)) return
+                val lo = ctx.rootDomain(variable).min
                 loOf.put(col, lo)
-                b = addExact(b, -mulExact(coeff, lo)) // shift to y_j = x_j − lo_j
+                b = subExact(b, mulExact(coeff, lo)) // shift to y_j = x_j − lo_j
             }
             out.add(Row(cols, a, b))
         } catch (_: CheckedLongOverflowException) {
