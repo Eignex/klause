@@ -14221,6 +14221,14 @@ final class com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate { // com
         final fun <get-source>(): com.eignex.klause.ir/SourceRealId // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.source.<get-source>|<get-source>(){}[0]
     final val step // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.step|{}step[0]
         final fun <get-step>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.step.<get-step>|<get-step>(){}[0]
+    final val valueBuckets // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.valueBuckets|{}valueBuckets[0]
+        final fun <get-valueBuckets>(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.valueBuckets.<get-valueBuckets>|<get-valueBuckets>(){}[0]
+    final val valueOrigin // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.valueOrigin|{}valueOrigin[0]
+        final fun <get-valueOrigin>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.valueOrigin.<get-valueOrigin>|<get-valueOrigin>(){}[0]
+    final val valueStep // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.valueStep|{}valueStep[0]
+        final fun <get-valueStep>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.valueStep.<get-valueStep>|<get-valueStep>(){}[0]
+    final val valueVariable // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.valueVariable|{}valueVariable[0]
+        final fun <get-valueVariable>(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.valueVariable.<get-valueVariable>|<get-valueVariable>(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/SourceFloatProjection { // com.eignex.klause.solver.pipeline/SourceFloatProjection|null[0]

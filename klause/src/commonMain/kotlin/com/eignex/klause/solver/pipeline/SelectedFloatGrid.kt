@@ -49,8 +49,9 @@ internal fun SourceSetup.prepareSelectedFloatGrid(
     invocation: PreparedSourceInvocation,
     variables: List<FloatGridVariable>,
     purpose: FloatGridConsumerPurpose,
+    truncatedRows: Set<Int> = emptySet(),
 ): SelectedFloatGridPreparation = selectFloatGrid(invocation, purpose) { consumer, stop ->
-    prepareFloatGrid(FloatGridRequest(invocation.source.problem, variables, consumer), stop)
+    prepareFloatGrid(FloatGridRequest(invocation.source.problem, variables, consumer, truncatedRows), stop)
 }
 
 internal fun SourceSetup.prepareSelectedFloatGrid(

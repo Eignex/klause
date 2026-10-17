@@ -22,11 +22,5 @@ internal fun schemaSemantics(overrides: SemanticOverrides): EffectiveSourceSeman
     val effective = resolved.effective
     val grid = effective.floats as? FloatSemantics.Grid
     require(grid == null || grid.buckets >= 2) { "schema float grids require at least two buckets" }
-    if (grid != null) {
-        val scale = grid.linearScale.toDouble()
-        require(scale < -Long.MIN_VALUE.toDouble() && scale.toLong() == grid.linearScale) {
-            "schema float-linear scale cannot be represented exactly in binary64"
-        }
-    }
     return resolved
 }

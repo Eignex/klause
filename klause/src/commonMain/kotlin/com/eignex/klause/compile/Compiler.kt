@@ -119,6 +119,7 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
     val floatDecoders = mutableMapOf<String, FloatSpec>()
     val auxiliaryReals = HashSet<Int>()
     val floatAbsentPins = HashMap<Int, FloatGridAbsentPin>()
+    val truncatedFloatRows = HashSet<Int>()
     val realVarIdByName get() = problemBuilder.realVarIdByName
 
     /**
@@ -488,8 +489,9 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     val specsById = namedReals.entries.associate { (name, id) -> id to floatDecoders.getValue(name) }
     val binding = CompiledSourceBinding(source, intVarIdByName, namedReals,
         (0 until source.numRealVars).map { id ->
-            FloatGridVariable(SourceRealId(id), specsById[id]?.buckets, id in auxiliaryReals, floatAbsentPins[id])
-        }, schemaFloatRepresentations(def))
+            FloatGridVariable(SourceRealId(id), specsById[id]?.buckets, id in auxiliaryReals, floatAbsentPins[id],
+                preserveBuckets = id in specsById)
+        }, schemaFloatRepresentations(def), truncatedFloatRows)
     return CompiledSchema(
         problem = source,
         boolVarIdByName = boolVarIdByName.toMap(),

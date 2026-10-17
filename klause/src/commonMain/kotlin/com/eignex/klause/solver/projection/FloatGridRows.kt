@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.projection
 
-import com.eignex.klause.factor.arithmetic.GridCoordinate
 import com.eignex.klause.factor.arithmetic.GridArrayMinMax
+import com.eignex.klause.factor.arithmetic.GridCoordinate
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
@@ -17,16 +17,17 @@ import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.div
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.isZero
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem as bigRemainder
 import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.roundToLong
+import com.eignex.klause.util.rem as bigRemainder
 
 private class FloatGridRow(
     val integers: IntArray,
@@ -44,11 +45,12 @@ internal fun lowerGridRow(
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
     cancellation: Cancellation,
+    truncate: Boolean = false,
 ): List<Factor>? {
     val constants = factor.realConstants ?: return null
     return lowerGridRow(FloatGridRow(factor.vars, DoubleArray(factor.vars.size) { constants.intCoefficients.at(it) },
         factor.realVars, DoubleArray(factor.realVars.size) { constants.realCoefficients.at(it) },
-        factor.op, constants.bound, constants.strict, null), columns, scale, cancellation)
+        factor.op, constants.bound, constants.strict, null), columns, scale, cancellation, truncate)
 }
 
 internal fun lowerGridRow(
@@ -56,14 +58,16 @@ internal fun lowerGridRow(
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
     cancellation: Cancellation,
+    truncate: Boolean = false,
 ): List<Factor>? = lowerGridRow(FloatGridRow(factor.vars, factor.intCoeffs, factor.realVars, factor.realCoeffs,
-    factor.op, factor.bound, factor.strict, factor.aux), columns, scale, cancellation)
+    factor.op, factor.bound, factor.strict, factor.aux), columns, scale, cancellation, truncate)
 
 private fun lowerGridRow(
     row: FloatGridRow,
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
     cancellation: Cancellation,
+    truncate: Boolean,
 ): List<Factor>? = with(row) {
     val terms = LinkedHashMap<Int, BigFraction>()
     var right = BigFraction.ofDouble(bound) ?: return null
@@ -90,7 +94,8 @@ private fun lowerGridRow(
         cancellation.charge(1)
         if (cancellation()) return null
         variables[index] = entry.key
-        coefficients[index] = nearestInteger(entry.value * multiplier).word() ?: return null
+        val scaled = entry.value * multiplier
+        coefficients[index] = (if (truncate) scaled.num / scaled.den else nearestInteger(scaled)).word() ?: return null
     }
     val scaled = right * multiplier
     val integerBound = if (strict) {
@@ -99,7 +104,7 @@ private fun lowerGridRow(
             LinearOp.GE -> -scaled.negated().ceilInteger() + BIG_ONE
             else -> return null
         }
-    } else nearestInteger(scaled)
+    } else if (truncate) scaled.num / scaled.den else nearestInteger(scaled)
     val loweredBound = integerBound.word() ?: return null
     if (cancellation()) return null
     return listOf(if (reifier == null) Linear(coefficients, variables, operation, loweredBound)

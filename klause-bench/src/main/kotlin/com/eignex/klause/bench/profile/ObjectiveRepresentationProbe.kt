@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
@@ -15,6 +16,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.schema.BoolHandle
@@ -83,13 +85,18 @@ internal object ObjectiveRepresentationProbe {
         require(options.keys.all {
             it in setOf(
                 "source", "engines", "out", "work", "seed", "moves", "timeout",
-                "checker", "processors", "schema", "conditions", "capture",
+                "checker", "processors", "schema", "conditions", "capture", "entry",
             )
         })
         val capture = when (options["capture"] ?: "none") {
             "none" -> false
             "required" -> true
             else -> error("capture must be none or required")
+        }
+        val sourceEntry = when (options["entry"] ?: "setup") {
+            "setup" -> false
+            "source" -> true
+            else -> error("entry must be setup or source")
         }
         val processors = options["processors"]?.toInt() ?: 1
         require(processors > 0)
@@ -144,8 +151,11 @@ internal object ObjectiveRepresentationProbe {
         conditionBytes?.let { File(output, "conditions.json").writeBytes(it) }
         val prepared = compiled?.let { CompiledInput(it, it.problem.pipelineRequest(), realIds, handles) }
         require(!capture || prepared != null) { "Original IR capture requires a compiled schema" }
+        require(!sourceEntry || (prepared != null && engines.all {
+            it == FiniteEngine.BACKTRACK || it == FiniteEngine.LOCAL_SEARCH
+        })) { "Source strategy entry requires a compiled schema and BACKTRACK or LOCAL_SEARCH engines" }
         for (source in sources.sortedBy { it.path }) {
-            measure(source, output, engines, work, seed, moves, timeout, prepared, conditions, capture)
+            measure(source, output, engines, work, seed, moves, timeout, prepared, conditions, capture, sourceEntry)
         }
         when (options["checker"] ?: "none") {
             "none" -> Unit
@@ -202,7 +212,7 @@ internal object ObjectiveRepresentationProbe {
 
     private fun measure(
         input: File, output: File, engines: List<FiniteEngine>, work: Long, seed: Long, moves: Int, timeout: Long,
-        compiled: CompiledInput?, conditions: JsonObject?, capture: Boolean,
+        compiled: CompiledInput?, conditions: JsonObject?, capture: Boolean, sourceEntry: Boolean,
     ) {
         val bytes = input.readBytes()
         val identity = sha256(bytes)
@@ -231,19 +241,21 @@ internal object ObjectiveRepresentationProbe {
                     ),
                 )
                 val started = System.nanoTime()
-                val setup = if (encoding == "linear") {
-                    SourceSetupRequest(attachment, ExecutionOperation.OPTIMIZE, engine, affine,
-                        captured.sense == ObjectiveSense.MAXIMIZE, cancellation = params.timeout)
-                } else SourceSetupRequest(attachment, engine, quadratic, captured.sense,
-                    cancellation = params.timeout)
-                val invocation = SourceSetup.prepare(setup)
-                val completed = SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = params))
+                val completed = if (sourceEntry) null else {
+                    val setup = if (encoding == "linear") {
+                        SourceSetupRequest(attachment, ExecutionOperation.OPTIMIZE, engine, affine,
+                            captured.sense == ObjectiveSense.MAXIMIZE, cancellation = params.timeout)
+                    } else SourceSetupRequest(attachment, engine, quadratic, captured.sense,
+                        cancellation = params.timeout)
+                    SourceSetup.execute(SourceExecutionRequest(SourceSetup.prepare(setup), polynomial = params))
+                }
                 if (completed is SourceExecutionResult.Declined || completed is SourceExecutionResult.Refuted) {
                     val record = buildJsonObject {
                         put("sourceSha256", identity)
                         put("engine", engine.name)
                         put("encoding", encoding)
-                        put("entry", if (compiled == null) "polynomial-source" else "compiled-schema")
+                        put("entry", if (sourceEntry) "compiled-source-strategy"
+                            else if (compiled == null) "polynomial-source" else "compiled-schema")
                         put("condition", condition)
                         put("elapsedNanos", System.nanoTime() - started)
                         put("nativeWork", 0)
@@ -262,17 +274,30 @@ internal object ObjectiveRepresentationProbe {
                     File(output, "$identity.${engine.name}.$encoding.json").writeText(record.toString() + "\n")
                     continue
                 }
-                val execution = (completed as? SourceExecutionResult.Quadratic)?.result
+                val execution = if (sourceEntry) {
+                    val model = requireNotNull(compiled).model
+                    val strategy = if (engine == FiniteEngine.BACKTRACK) BacktrackSolver.source(model)
+                        else LocalSearchSolver.source(model)
+                    if (encoding == "linear") {
+                        val helper = compiled.handles.values.firstOrNull()?.let(model::minimize)
+                        val paired = helper?.copy(boolWeights = affine.boolWeights,
+                            intCoefficients = affine.intCoefficients, constant = affine.constant,
+                            realCoefficients = affine.realCoefficients) ?: affine
+                        strategy.optimize(paired, params, captured.sense)
+                    } else strategy.optimize(quadratic, params, captured.sense)
+                } else (completed as? SourceExecutionResult.Quadratic)?.result
                     ?: error("source setup did not install quadratic optimization: $completed")
                 val elapsed = System.nanoTime() - started
                 val scopeRecord = if (capture) captureRecord(
-                    requireNotNull(compiled), affine, quadratic, pins, identity, execution.result, encoding,
+                    requireNotNull(compiled), affine, quadratic, pins, identity, execution.result,
+                    if (sourceEntry) "quadratic" else encoding,
                 ) else null
                 val record = buildJsonObject {
                     put("sourceSha256", identity)
                     put("engine", engine.name)
                     put("encoding", encoding)
-                    put("entry", if (compiled == null) "polynomial-source" else "compiled-schema")
+                    put("entry", if (sourceEntry) "compiled-source-strategy"
+                            else if (compiled == null) "polynomial-source" else "compiled-schema")
                     put("condition", condition)
                     put("elapsedNanos", elapsed)
                     put("nativeWork", execution.nativeWork)

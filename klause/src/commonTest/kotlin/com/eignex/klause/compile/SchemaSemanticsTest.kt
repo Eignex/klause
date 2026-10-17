@@ -193,15 +193,47 @@ class SchemaSemanticsTest {
     }
 
     @Test
-    fun `schema compilation should decline a float linear scale that would be rounded`() {
-        val source = SchemaDef<SchemaEntry>(emptyMap())
+    fun `a rounded private grid scale should retain original source declarations`() {
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, 0.0)),
+        ))
 
-        val error = assertFailsWith<IllegalArgumentException> {
-            source.compile(
-                semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(7, 9_007_199_254_740_993L)),
-            )
-        }
+        val compiled = source.compile(
+            semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(7, 9_007_199_254_740_993L)),
+        )
 
-        assertTrue("cannot be represented exactly in binary64" in error.message.orEmpty())
+        assertEquals(1, compiled.sourceBinding.originalProblem.numRealVars)
+        assertEquals(0, compiled.sourceBinding.originalProblem.numIntVars)
+        assertFailsWith<IllegalStateException> { compiled.problem }
+    }
+
+    @Test
+    fun `legacy float rows should preserve truncation of scaled coefficients`() {
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, 2),
+            "grid" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -0.5)),
+            "limited" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(6e-7), listOf("x"), IntCmpOp.LE, 4e-8)),
+        ))
+        val compiled = source.compile(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(2, 1_000_000)))
+
+        val values = BacktrackSolver(compiled.problem.bake()).enumerate()
+            .map { it.intValue(compiled.intVarIdByName.getValue("x")) }.toSet()
+
+        assertEquals(setOf(0L, 1L), values)
+    }
+
+    @Test
+    fun `a declared singleton range should retain its requested compatibility bucket count`() {
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(3.5, 3.5, 5),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.LT, 4.0)),
+        )).compile()
+
+        val values = BacktrackSolver(compiled.problem.bake()).enumerate()
+            .map { it.intValue(compiled.intVarIdByName.getValue("x")) }.toSet()
+
+        assertEquals((0L..4L).toSet(), values)
+        assertEquals(5, compiled.floatDecoders.getValue("x").buckets)
     }
 }

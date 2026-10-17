@@ -12577,6 +12577,10 @@ public final class com/eignex/klause/solver/pipeline/SourceFloatGridCoordinate {
 	public final fun getOrigin ()Lcom/eignex/klause/ir/SemanticRational;
 	public final fun getSource-P0Uu7zc ()I
 	public final fun getStep ()Lcom/eignex/klause/ir/SemanticRational;
+	public final fun getValueBuckets ()I
+	public final fun getValueOrigin ()Lcom/eignex/klause/ir/SemanticRational;
+	public final fun getValueStep ()Lcom/eignex/klause/ir/SemanticRational;
+	public final fun getValueVariable ()I
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceFloatProjection {
