@@ -18,6 +18,60 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `a bound request should retain only its requested evidence before a complete solve`() {
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            val bound = assertNotNull(owner.solve(evidenceGoal = LpEvidenceGoal.BOUND))
+
+            assertTrue(bound.boundRequestSatisfied)
+            assertEquals(LpVerdict.CERTIFIED_BOUND, bound.verdict)
+            assertEquals(BigFraction.ONE, bound.lowerBound)
+            assertNull(bound.exactPrimal)
+            assertNull(bound.reconstruction)
+            assertNull(bound.refinement)
+            assertNull(bound.continuation)
+            assertSame(owner.state, assertNotNull(bound.bound?.support).state)
+
+            val complete = assertNotNull(owner.solve())
+
+            assertFalse(complete.boundRequestSatisfied)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, complete.verdict)
+            assertEquals(listOf(BigFraction.ONE), complete.exactPrimal)
+        }
+    }
+
+    @Test
+    fun `a bound request should preserve a numerical infeasibility certificate`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 2L)
+            val y = addVar(0L, 2L)
+            addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 3L)
+            addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.LE, 1L)
+        }.build(Sense.MINIMIZE)
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            val result = assertNotNull(owner.solve(evidenceGoal = LpEvidenceGoal.BOUND))
+
+            assertFalse(result.boundRequestSatisfied)
+            assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+            assertNotNull(result.conflictSupport)
+            assertNull(result.witness)
+        }
+    }
+
+    @Test
+    fun `a bound request should preserve a contradictory source side`() {
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(11L)), 1L))
+
+            val result = assertNotNull(owner.solve(evidenceGoal = LpEvidenceGoal.BOUND))
+
+            assertFalse(result.boundRequestSatisfied)
+            assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+            assertNotNull(result.boundConflict)
+            assertSame(owner.state, assertNotNull(result.conflictSupport).state)
+        }
+    }
+
+    @Test
     fun `new columns rows and bound assertions should publish in one preparation`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

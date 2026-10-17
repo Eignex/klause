@@ -64,6 +64,108 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
     @Test
+    fun `a last nonarithmetic Boolean should require a fresh complete LP check`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(-1, -1), longArrayOf(1, 1), null, null),
+            factors = (List<Factor>(129) { index ->
+                Linear(intArrayOf(1, index + 1), intArrayOf(0, 1), LinearOp.LE, 100)
+            } + ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 100)).toTypedArray(),
+        )
+        val factory = TrackingLpFactory()
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            component.useMixedPointCompletion()
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(null, stats.snapshot().completeSearchStages?.get("PARTIAL_BOUND_REQUEST"))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("PARTIAL_BOUND_SATISFIED"))
+            assertIs<ComponentCheck.Indeterminate>(session.check())
+            val resolves = factory.resolves
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(resolves + 1, factory.resolves)
+            assertIs<ComponentCheck.Feasible>(session.check())
+            assertEquals(1L, stats.snapshot().completeSearchLinearChecks)
+            assertEquals(1L, stats.snapshot().completeSearchLinearPoints)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("PARTIAL_BOUND_REQUEST"))
+        }
+    }
+
+    @Test
+    fun `partial bound requests should require a large default integer completion opening`() {
+        for (opening in listOf("direct", "explicit", "released", "small", "mixed")) {
+            val source = Problem(
+                numBoolVars = 2,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(-1, -1), longArrayOf(1, 1), null, null),
+                numRealVars = if (opening == "mixed") 1 else 0,
+                realLower = if (opening == "mixed") doubleArrayOf(-1.0) else doubleArrayOf(),
+                realUpper = if (opening == "mixed") doubleArrayOf(1.0) else doubleArrayOf(),
+                factors = (List<Factor>(if (opening == "small") 1 else 129) { index ->
+                    Linear(intArrayOf(1, index + 1), intArrayOf(0, 1), LinearOp.LE, 100)
+                } + ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 100)).toTypedArray(),
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(source).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                if (opening != "direct") component.useMixedPointCompletion()
+                component.partialPointHints(Cancellation.Never, defaultOpening = opening != "explicit")
+                if (opening == "released") component.releasePartialPointHints()
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                assertNull(stats.snapshot().completeSearchStages?.get("PARTIAL_BOUND_REQUEST"), opening)
+            }
+        }
+    }
+
+    @Test
+    fun `recompleting a popped Boolean should require a fresh complete LP check`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(-1, -1), longArrayOf(1, 1), null, null),
+            factors = (List<Factor>(129) { index ->
+                Linear(intArrayOf(1, index + 1), intArrayOf(0, 1), LinearOp.LE, 100)
+            } + ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 100)).toTypedArray(),
+        )
+        val factory = TrackingLpFactory()
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            component.useMixedPointCompletion()
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("PARTIAL_BOUND_SATISFIED"))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentCheck.Feasible>(session.check())
+            session.popTo(1)
+            assertIs<ComponentCheck.Indeterminate>(session.check())
+            val resolves = factory.resolves
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertEquals(resolves + 1, factory.resolves)
+            assertIs<ComponentCheck.Feasible>(session.check())
+            assertEquals(2L, stats.snapshot().completeSearchLinearChecks)
+            assertEquals(2L, stats.snapshot().completeSearchLinearPoints)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("PARTIAL_BOUND_REQUEST"))
+        }
+    }
+
+    @Test
     fun `LP cancellation should retain its parent meter and distinct session stop`() {
         var stopped = false
         var charged = 0L
@@ -659,6 +761,7 @@ class QfLiraSolverLpTest {
     ) : LpEngineFactory by ProductionLpEngineFactory {
         var created = 0
         var closed = 0
+        var resolves = 0
         lateinit var lastCancellation: Cancellation
 
         override fun newPersistentSolver(
@@ -682,7 +785,10 @@ class QfLiraSolverLpTest {
                 pricing,
             )
             return object : PersistentLpSolver by delegate {
-                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = resolve(delegate, allowance)
+                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                    resolves++
+                    return resolve(delegate, allowance)
+                }
 
                 override fun close() {
                     closed++

@@ -32,6 +32,7 @@ import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpEvidenceGoal
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
@@ -42,6 +43,7 @@ import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.lp.exactMixedEchelonHermite
 import com.eignex.klause.lp.exactMixedTriangularBounds
+import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.lp.sourceDoubleBoundedSplit
 import com.eignex.klause.lp.sourceEqualityRows
@@ -219,6 +221,7 @@ class ExactLiraSearchComponent private constructor(
     private var candidate: List<BigFraction>? = null
     private var floatCandidate: DoubleArray? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
+    private var defaultPointOpening = false
     private var pointHintValues: IntArray? = null
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
@@ -337,6 +340,7 @@ class ExactLiraSearchComponent private constructor(
         stop.charge(rows.size.toLong() + variables.size + 1L)
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
+        defaultPointOpening = defaultOpening
         pointHintStop = stop
         return variables.toIntArray() to SearchCandidateHints { variable ->
             observeCompleteStage("POINT_HINT_CONSULTED")
@@ -369,6 +373,7 @@ class ExactLiraSearchComponent private constructor(
         if (partialPointHintAvailable()) context?.boolValue(variable) else null
 
     internal fun releasePartialPointHints() {
+        defaultPointOpening = false
         defaultDisjunctionHints = false
         pointHintRows = null
         pointHintValues = null
@@ -1166,7 +1171,19 @@ class ExactLiraSearchComponent private constructor(
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
-        val result = lp.solve(sparsePointRecovery = true)
+        val boundRequest = defaultPointOpening && completeTraversalObserved && mixedPointCompletion &&
+            model.numRealVars == 0 && model.numIntVars > 0 && context.decisionLevel > 0 &&
+            !complete &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy &&
+            (lp.state?.model?.m ?: 0) > RationalBasisLimits().dimension
+        if (boundRequest) {
+            lpStop.charge(1L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            observeCompleteStage("PARTIAL_BOUND_REQUEST")
+        }
+        val result = lp.solve(sparsePointRecovery = true,
+            evidenceGoal = if (boundRequest) LpEvidenceGoal.BOUND else LpEvidenceGoal.COMPLETE)
+        if (result?.boundRequestSatisfied == true) observeCompleteStage("PARTIAL_BOUND_SATISFIED")
         if (complete) {
             val key = if (result == null) "NO_RESULT" else listOf(
                 result.verdict.name,

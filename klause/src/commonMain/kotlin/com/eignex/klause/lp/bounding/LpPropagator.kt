@@ -2,6 +2,7 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
+import com.eignex.klause.lp.engine.LpEvidenceGoal
 import com.eignex.klause.lp.engine.DEFAULT_REFACTOR_UPDATE_LIMIT
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpModel
@@ -399,7 +400,11 @@ internal class LpPropagator(
             current.solveFloat(if (allowance != null) null else warm, token, allowance).also { solved = true }
         }
 
-    fun solve(token: Cancellation = cancellation, sparsePointRecovery: Boolean = false): CertifiedLpResult? =
+    fun solve(
+        token: Cancellation = cancellation,
+        sparsePointRecovery: Boolean = false,
+        evidenceGoal: LpEvidenceGoal = LpEvidenceGoal.COMPLETE,
+    ): CertifiedLpResult? =
         solveOwned {
             val profile = effort()
             it.solve(
@@ -408,6 +413,7 @@ internal class LpPropagator(
                 fullContinuation = profile.fullContinuation,
                 observer = certificationObserver,
                 sparsePointRecovery = sparsePointRecovery,
+                evidenceGoal = evidenceGoal,
             ).also { solved = true }
         }
 

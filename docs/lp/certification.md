@@ -33,6 +33,20 @@ mapped endpoint against original declarations, rows or invocation restrictions.
 Missing source origins withhold derivation coverage even when numerical certification
 has completed.
 
+Scoped queries default to complete certification. An internal bound-evidence request
+can stop the optional witness and refinement ladder after a fresh optimal floating
+solve supplies a newly accepted exact bound under production policy. Exact input,
+current solver/result authority, direct bound conflicts and early continuation
+checks precede this selection. A remembered bound cannot satisfy the request.
+Missing bounds, partial floating solves and other policies retain complete effort,
+including the ordinary null-result conflict path. The request supplies no feasibility
+claim and can defer conflicts found by optional refinement of an optimal floating
+candidate. Final ownership, current cancellation checks and cumulative spending
+remain in force; neither results nor failed attempts are reused to skip a solve.
+The [integer consumer](../theories/linear-integer.md#solving-and-composition) selects
+this weaker goal only for admitted partial queries and requires complete evidence
+again at Boolean completion.
+
 Ceiling an objective bound requires a proved integral objective
 lattice. Combine packages only when authority, scope and objective units match.
 Exact rejection of one candidate is not a refutation of the model. Cross-arm

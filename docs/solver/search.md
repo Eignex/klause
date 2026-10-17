@@ -110,7 +110,16 @@ internal planned opening and the existing `SearchCandidateHints` surface. Caller
 and deferred hints retain precedence. A component preference only reorders the
 two sides of an already selected Boolean split; propagation and complete component
 checks retain authority. The provider belongs to its opening and completed partial
-fixpoint, including retraction and close lifetime. A source-clause adapter recognizes
+fixpoint, including retraction and close lifetime.
+The [integer completion owner](../theories/linear-integer.md#solving-and-composition)
+can request weaker LP evidence during an admitted partial fixpoint. A bound-only
+return leaves its complete component check indeterminate. Assigning the final
+Boolean or retracting a level invalidates that result, so a complete assignment
+requires a fresh full numerical query and all source checks, even if no arithmetic
+row changed. Shared search never promotes the weaker result to feasibility or
+refutation.
+
+A source-clause adapter recognizes
 complete signed conjunction definitions of two or more inputs, including nested gates and
 disjunctions expressed by signed De Morgan inputs. Primitive preferences remain
 the leaves. Each consultation evaluates a bounded dependency closure with sparse

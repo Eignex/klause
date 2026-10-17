@@ -9,12 +9,104 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpSolveTest {
+    @Test
+    fun `a nonoptimal candidate should retain complete witness certification for a bound request`() {
+        val state = LpExactState(assertNotNull(LpBuilder().apply {
+            addVar(0L, 1L)
+        }.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(state.toWorkingModel())
+        newLpSolver(model, componentSplit = false).use { solver ->
+            val fresh = assertNotNull(solver.solve())
+            val partial = FloatLpResult(fresh.basis, fresh.objective, fresh.duals, fresh.primal,
+                optimal = false, exactState = state)
+
+            val result = certifyLpResult(model, solver, partial, evidenceGoal = LpEvidenceGoal.BOUND)
+
+            assertFalse(result.boundRequestSatisfied)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            assertEquals(listOf(BigFraction.ZERO), result.exactPrimal)
+        }
+    }
+
+    @Test
+    fun `a remembered bound should not satisfy a request without a fresh certified bound`() {
+        val state = LpExactState(assertNotNull(LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
+        }.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(state.toWorkingModel())
+        val counters = LpCounterResults()
+        counters.remember(model, CertifiedLpResult(null, CertifiedLpBound(BigFraction.ZERO),
+            null, null, null, false, { null }), ProductionLpCertificationPolicy)
+        newLpSolver(model, componentSplit = false).use { solver ->
+            val fresh = assertNotNull(solver.solve())
+            val withoutDuals = FloatLpResult(fresh.basis, fresh.objective, doubleArrayOf(), fresh.primal,
+                exactState = state)
+
+            val result = certifyLpResult(model, solver, withoutDuals, counterResults = counters,
+                evidenceGoal = LpEvidenceGoal.BOUND)
+
+            assertFalse(result.boundRequestSatisfied)
+            assertNotNull(result.exactPrimal)
+        }
+    }
+
+    @Test
+    fun `a custom acceptance policy should retain complete certification for a bound request`() {
+        for (accept in listOf(false, true)) {
+            val state = LpExactState(assertNotNull(LpBuilder().apply {
+                addVar(0L, 1L)
+            }.build(Sense.MINIMIZE).authoritativeModel()))
+            val model = assertNotNull(state.toWorkingModel())
+            newLpSolver(model, componentSplit = false).use { solver ->
+                val fresh = assertNotNull(solver.solve())
+
+                val result = certifyLpResult(model, solver, fresh,
+                    policy = LpCertificationPolicy { _, success -> accept && success },
+                    evidenceGoal = LpEvidenceGoal.BOUND)
+
+                assertFalse(result.boundRequestSatisfied)
+                assertEquals(accept, result.exactPrimal != null)
+                assertEquals(accept, result.bound != null)
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation after a fresh bound should withhold a bound request and counter publication`() {
+        val state = LpExactState(assertNotNull(LpBuilder().apply {
+            addVar(0L, 1L)
+        }.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(state.toWorkingModel())
+        val counters = LpCounterResults()
+        var cancelled = false
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                if (certifier == LpCertifier.INTEGER && success) cancelled = true
+            }
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+        newLpSolver(model, componentSplit = false).use { solver ->
+            val fresh = assertNotNull(solver.solve())
+
+            val result = certifyLpResult(model, solver, fresh, Cancellation { cancelled }, observer,
+                counterResults = counters, evidenceGoal = LpEvidenceGoal.BOUND)
+
+            assertTrue(cancelled)
+            assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+            assertNull(result.float)
+            assertNull(counters.read(model, ProductionLpCertificationPolicy))
+        }
+    }
+
     @Test
     fun `requested sparse recovery should certify independent denominators beyond the basis ceiling`() {
         val builder = LpBuilder()
@@ -636,11 +728,15 @@ class LpSolveTest {
         }
         assertTrue(trail.assertBound(0, false, ExactLpSide(one), 5L))
 
-        val result = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, candidate)
+        for (goal in LpEvidenceGoal.entries) {
+            val result = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, candidate,
+                evidenceGoal = goal)
 
-        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
-        assertNull(result.reconstruction)
-        assertNull(result.witness)
+            assertFalse(result.boundRequestSatisfied)
+            assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+            assertNull(result.reconstruction)
+            assertNull(result.witness)
+        }
     }
 
     @Test

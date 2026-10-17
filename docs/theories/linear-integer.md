@@ -43,6 +43,19 @@ Custom providers retain precedence. Stops, arithmetic changes, retraction and cl
 withhold stale preferences. Explicit zero and positive allowances retain their
 existing real-coordinate producer admission and opt-in behavior.
 
+An ordinary complete invocation with an admitted default point producer requests
+only bound evidence at nonroot, incomplete integer-only prefixes whose current LP
+row count exceeds the exact basis dimension ceiling. Each query still asserts the
+current source rows and performs a fresh floating solve. A fresh optimal candidate
+with a newly certified exact bound can omit optional point and refinement effort;
+this can withhold partial point preferences and delay optional strict conflicts.
+Root, small, real/mixed, explicit, released and private openings retain complete
+certification. The last Boolean assignment marks the arithmetic component dirty
+even when it adds no row, forcing a fresh complete query. Retraction also invalidates
+the prior result. A partial bound supplies neither a continuous branching witness
+nor a feasible complete check. See [LP evidence requests](../lp/certification.md#proof-packages)
+for the numerical admission and ownership contract.
+
 [Open portfolios](../solver/portfolio.md) can pair the proof-producing route with
 source-checked local-search workers. Current strategy admission limits remain
 coverage gaps under the [vision](../vision.md#shared-model-breadth).
