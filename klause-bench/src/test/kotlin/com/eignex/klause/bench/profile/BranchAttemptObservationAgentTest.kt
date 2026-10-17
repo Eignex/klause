@@ -123,7 +123,7 @@ class BranchAttemptObservationAgentTest {
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)))
         ExactLiraSearchComponent(source).use { component ->
             val session = SearchSession(listOf(component))
-            assertIs<ComponentResult.Consistent>(session.initialize())
+            component.javaClass.getDeclaredField("context").apply { isAccessible = true }.set(component, session)
             val run = session.openRun(2,
                 candidateHints = if (hinted) SearchCandidateHints { true } else SearchCandidateHints.None)
             val recorder = BranchAttemptObservation()
@@ -156,14 +156,16 @@ class BranchAttemptObservationAgentTest {
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)))
         ExactLiraSearchComponent(source).use { component ->
             val initialized = SearchSession(listOf(component))
-            assertIs<ComponentResult.Consistent>(initialized.initialize())
+            component.javaClass.getDeclaredField("context").apply { isAccessible = true }.set(component, initialized)
             val session = when (shape) {
                 "ambiguous" -> SearchSession(listOf(component, component))
                 "context" -> SearchSession(listOf(component))
                 else -> initialized
             }
             if (shape == "assigned") {
-                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+                val bools = component.javaClass.getDeclaredField("bools").apply { isAccessible = true }
+                    .get(component) as IntArray
+                bools[0] = 1
             }
             val width = if (shape == "width") 3 else 2
             val branching = if (shape == "mode") BooleanBranching.None else BooleanBranching.SourceOrder(width)

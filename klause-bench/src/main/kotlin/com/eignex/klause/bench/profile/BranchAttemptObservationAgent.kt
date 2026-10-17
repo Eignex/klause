@@ -48,14 +48,14 @@ internal object BranchAttemptObservationAgent {
         val config = Properties().apply { file.inputStream().use(::load) }
         require(
             config.stringPropertyNames() == setOf(
-            "report",
-            "coreJar",
-            "agentSha256",
-            "fieldSchemaSha256",
-            "class.$TARGET",
-            "schema.$TARGET",
-            "rewrite.$TARGET",
-        )
+                "report",
+                "coreJar",
+                "agentSha256",
+                "fieldSchemaSha256",
+                "class.$TARGET",
+                "schema.$TARGET",
+                "rewrite.$TARGET",
+            ),
         )
         val ownJar = File(javaClass.protectionDomain.codeSource.location.toURI())
         require(ownJar.isFile && ownJar.length() in 1L..524288L)
@@ -66,73 +66,76 @@ internal object BranchAttemptObservationAgent {
         val transformations = ArrayList<Map<String, Any?>>()
         instrumentation.addTransformer(
             object : ClassFileTransformer {
-            override fun transform(
-                loader: ClassLoader?,
-                className: String?,
-                classBeingRedefined: Class<*>?,
-                protectionDomain: ProtectionDomain?,
-                classfileBuffer: ByteArray,
-            ): ByteArray? {
-                if (className != TARGET) return null
-                return synchronized(recorder) {
-                    try {
-                        require(transformations.isEmpty() && classBeingRedefined == null)
-                        require(classfileBuffer.size <= 2 * 1024 * 1024)
-                        val location = requireNotNull(protectionDomain?.codeSource?.location)
-                        require(File(location.toURI()).canonicalFile == core)
-                        require(sha(classfileBuffer) == config.getProperty("class.$TARGET"))
-                        val selected = targetMethods().getValue(TARGET)
-                        val schema = schema(classfileBuffer, selected)
-                        require(sha(schemaText(schema).toByteArray()) == config.getProperty("schema.$TARGET"))
-                        val output = rewrite(classfileBuffer, selected, loader)
-                        require(sha(output) == config.getProperty("rewrite.$TARGET"))
-                        transformations += mapOf(
-                            "class" to TARGET,
-                            "beforeSha256" to sha(classfileBuffer),
-                            "afterSha256" to sha(output),
-                            "methods" to schema,
-                            "codeSource" to location.toString(),
-                        )
-                        output
-                    } catch (_: Throwable) {
-                        recorder.fail("transform-helper")
-                        null
+                override fun transform(
+                    loader: ClassLoader?,
+                    className: String?,
+                    classBeingRedefined: Class<*>?,
+                    protectionDomain: ProtectionDomain?,
+                    classfileBuffer: ByteArray,
+                ): ByteArray? {
+                    if (className != TARGET) return null
+                    return synchronized(recorder) {
+                        try {
+                            require(transformations.isEmpty() && classBeingRedefined == null)
+                            require(classfileBuffer.size <= 2 * 1024 * 1024)
+                            val location = requireNotNull(protectionDomain?.codeSource?.location)
+                            require(File(location.toURI()).canonicalFile == core)
+                            require(sha(classfileBuffer) == config.getProperty("class.$TARGET"))
+                            val selected = targetMethods().getValue(TARGET)
+                            val schema = schema(classfileBuffer, selected)
+                            require(sha(schemaText(schema).toByteArray()) == config.getProperty("schema.$TARGET"))
+                            val output = rewrite(classfileBuffer, selected, loader)
+                            require(sha(output) == config.getProperty("rewrite.$TARGET"))
+                            transformations += mapOf(
+                                "class" to TARGET,
+                                "beforeSha256" to sha(classfileBuffer),
+                                "afterSha256" to sha(output),
+                                "methods" to schema,
+                                "codeSource" to location.toString(),
+                            )
+                            output
+                        } catch (_: Throwable) {
+                            recorder.fail("transform-helper")
+                            null
+                        }
                     }
                 }
-            }
-        },
-            false
+            },
+            false,
         )
         Runtime.getRuntime().addShutdownHook(
             Thread({
-            synchronized(recorder) {
-                if (transformations.size != 1) recorder.fail("transform-coverage")
-                val fields = try {
-                    fieldSchema(javaClass.classLoader)
-                } catch (_: Throwable) {
-                    recorder.fail("field-schema")
-                    emptyMap()
+                synchronized(recorder) {
+                    if (transformations.size != 1) recorder.fail("transform-coverage")
+                    val fields = try {
+                        fieldSchema(javaClass.classLoader)
+                    } catch (_: Throwable) {
+                        recorder.fail("field-schema")
+                        emptyMap()
+                    }
+                    val fieldSha = sha(json(fields).toByteArray())
+                    if (fieldSha != config.getProperty("fieldSchemaSha256")) recorder.fail("field-schema-mismatch")
+                    val report = recorder.snapshot() + mapOf(
+                        "fieldSchema" to fields,
+                        "fieldSchemaSha256" to fieldSha,
+                        "transformations" to transformations.toList(),
+                        "agentSha256" to config.getProperty("agentSha256"),
+                        "configSha256" to sha(file.readBytes()),
+                        "pid" to ProcessHandle.current().pid(),
+                        "javaCommand" to System.getProperty("sun.java.command"),
+                        "jvmArguments" to ManagementFactory.getRuntimeMXBean().inputArguments,
+                        "processors" to Runtime.getRuntime().availableProcessors(),
+                    )
+                    val text = json(report)
+                    File(config.getProperty("report")).writeText(
+                        if (text.toByteArray().size <= 524288) {
+                            text
+                        } else {
+                            "{\"status\":\"INCONCLUSIVE\",\"failures\":[\"report-cap\"]}"
+                        },
+                    )
                 }
-                val fieldSha = sha(json(fields).toByteArray())
-                if (fieldSha != config.getProperty("fieldSchemaSha256")) recorder.fail("field-schema-mismatch")
-                val report = recorder.snapshot() + mapOf(
-                    "fieldSchema" to fields, "fieldSchemaSha256" to fieldSha,
-                    "transformations" to transformations.toList(), "agentSha256" to config.getProperty("agentSha256"),
-                    "configSha256" to sha(file.readBytes()), "pid" to ProcessHandle.current().pid(),
-                    "javaCommand" to System.getProperty("sun.java.command"),
-                    "jvmArguments" to ManagementFactory.getRuntimeMXBean().inputArguments,
-                    "processors" to Runtime.getRuntime().availableProcessors(),
-                )
-                val text = json(report)
-                File(config.getProperty("report")).writeText(
-                    if (text.toByteArray().size <= 524288) {
-                        text
-                    } else {
-                        "{\"status\":\"INCONCLUSIVE\",\"failures\":[\"report-cap\"]}"
-                    },
-                )
-            }
-        }, "branch-attempt-report")
+            }, "branch-attempt-report"),
         )
     }
 
@@ -204,7 +207,8 @@ internal object BranchAttemptObservationAgent {
         "java.util.Collections\$EmptySet",
     )
 
-    internal fun trustedSet(value: Any): Boolean = trustedCollection(value, trustedSets, "kotlin.collections.EmptySet")
+    internal fun trustedSet(value: Any): Boolean =
+        trustedCollection(value, trustedSets, "kotlin.collections.EmptySet")
 
     private val trustedLists = setOf(
         "java.util.ArrayList",
@@ -233,7 +237,9 @@ internal object BranchAttemptObservationAgent {
         val model = ClassFile.of().parse(bytes)
         require(model.thisClass().asInternalName() == TARGET)
         val method = model.methods().single { it.methodName().stringValue() == METHOD }
-        require(method.flags().flagsMask() and 15 == 2 && method.methodTypeSymbol().descriptorString() == METHOD_TYPE)
+        require(
+            method.flags().flagsMask() and 15 == 2 && method.methodTypeSymbol().descriptorString() == METHOD_TYPE,
+        )
         var line = -1
         val sites = ArrayList<Map<String, Any?>>()
         for (part in method.code().orElseThrow()) {
@@ -252,11 +258,11 @@ internal object BranchAttemptObservationAgent {
         require(sites.size == 1)
         return listOf(
             mapOf(
-            "name" to METHOD,
-            "descriptor" to METHOD_TYPE,
-            "flags" to method.flags().flagsMask(),
-            "prePushSites" to sites,
-        )
+                "name" to METHOD,
+                "descriptor" to METHOD_TYPE,
+                "flags" to method.flags().flagsMask(),
+                "prePushSites" to sites,
+            ),
         )
     }
 
@@ -274,12 +280,14 @@ internal object BranchAttemptObservationAgent {
             if (element is MethodModel && element.methodName().stringValue() == METHOD) {
                 builder.transformMethod(
                     element,
-                    MethodTransform.transformingCode(CodeTransform { code, part ->
+                    MethodTransform.transformingCode(
+                        CodeTransform { code, part ->
                         if (part is InvokeInstruction && isPush(part)) {
                             code.dup2().aload(0).invokestatic(helper, "attempted", helperType)
                         }
                         code.with(part)
-                    }),
+                    }
+                    ),
                 )
             } else {
                 builder.with(element)
@@ -343,22 +351,22 @@ internal object BranchAttemptObservationAgent {
             append('"')
             for (character in value) {
                 when (character) {
-                '"' -> append("\\\"")
+                    '"' -> append("\\\"")
 
-                '\\' -> append("\\\\")
+                    '\\' -> append("\\\\")
 
-                '\n' -> append("\\n")
+                    '\n' -> append("\\n")
 
-                '\r' -> append("\\r")
+                    '\r' -> append("\\r")
 
-                '\t' -> append("\\t")
+                    '\t' -> append("\\t")
 
-                else -> if (character.code < 32) {
-                    append("\\u%04x".format(Locale.ROOT, character.code))
-                } else {
-                    append(character)
+                    else -> if (character.code < 32) {
+                        append("\\u%04x".format(Locale.ROOT, character.code))
+                    } else {
+                        append(character)
+                    }
                 }
-            }
             }
             append('"')
         }
