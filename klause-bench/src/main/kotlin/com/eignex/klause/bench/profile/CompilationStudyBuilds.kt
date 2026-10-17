@@ -33,7 +33,8 @@ internal class CompilationStudyBuilds(private val root: File, private val out: F
                 "Pinned harness lacks separate CLI preflight options: $head"
             }
             command(tree, out, "$arm-build", listOf("./gradlew", ":klause-cli:installJvmDist",
-                ":klause-bench:installDist", "--max-workers=2"))
+                ":klause-bench:installDist", "--max-workers=2", "--no-daemon",
+                "-Pkotlin.compiler.execution.strategy=in-process"))
             check(command(tree, out, "$arm-clean-after", listOf("git", "status", "--porcelain")).isBlank())
             val launcher = File(tree, "klause-cli/build/install/klause-cli-jvm/bin/klause-cli")
             val bench = File(tree, "klause-bench/build/install/klause-bench/bin/klause-bench")
@@ -42,6 +43,13 @@ internal class CompilationStudyBuilds(private val root: File, private val out: F
             InstalledBuild.writeManifest(provenance, launcher, File(System.getProperty("java.home")))
             val harness = File(out, "$arm-harness-provenance.json")
             InstalledBuild.writeManifest(harness, bench, File(System.getProperty("java.home")))
+            val retained = listOf("cli" to launcher, "harness" to bench).associate { (name, executable) ->
+                name to CompilationStudyDistributions.retain(executable.parentFile.parentFile,
+                    File(out, "private-installed/$arm/$name"))
+            }
+            Reports.writeJson(File(out, "$arm-retained-distributions.json").path, retained)
+            InstalledBuild.readManifest(provenance, launcher, File(System.getProperty("java.home")), emptyMap())
+            InstalledBuild.readManifest(harness, bench, File(System.getProperty("java.home")), emptyMap())
             receipts += CompilationStudyBuildReceipt(arm, head, actual, tree.path, launcher.path,
                 sha256(provenance.readBytes()), sha256(harness.readBytes()))
             Reports.writeJson(File(out, "study-builds.json").path, receipts)

@@ -2367,6 +2367,59 @@ using the complete or heuristic engine alone. These explicit diagnostic controls
 check outcome and deterministic-work parity; they establish no default-route speedup,
 source refutation, independent witness acceptance or optimization claim.
 
+### Compilation study in an owned Linux guest
+
+`bench.profile.MacContainerCompilationStudy` runs the original paired
+`CliCompilationStudy` kernel through the Mac profiling route. It accepts that
+kernel's pinned source, selection, plan and optional family arguments plus one
+explicit local Unix socket `endpoint`. It requires ARM64, at least 12 GiB host
+free disk space and a Linux daemon with two CPUs and 6 GiB memory. It does not
+change daemon, host or lab settings. A failed capacity check is a negative result.
+
+The fixed native Linux image digest identifies Temurin JDK 25.0.4.1+1. Preparation
+runs `compilation-study/run.sh` in one owned writable container with a 6 GiB memory
+limit, no swap, two guest CPUs, a PID limit and a reduced capability set. It
+installs the source checker and frontend tools, preserves their package versions,
+Java settings, process CPU list and complete original SDK archive, and creates
+its own Git registry, corpus metadata/staging and Gradle home. Existing corpus
+collection directories are mounted read-only into that owned corpus root; no
+second full corpus copy is made and cache eviction is disabled. Missing collections
+are fetched into owned staging. Observer distributions and the
+script are mounted read-only. The kernel fetches and builds both requested arms,
+uses the original CLI heap, thread limits, affinity, seed, case ordering, source
+hashes and JFR settings, then runs the independent original-source checkers outside
+all measured children. Network access serves preparation, source acquisition and
+checking; the container is not an offline sandbox.
+
+Build preparation uses a disposable Gradle daemon with Kotlin compilation in that
+process, so no build daemon remains during measurements. Before either arm's
+worktree is removed, the complete installed CLI and harness are copied under
+`private-installed/<arm>/`. Every file's size and SHA-256 are checked against both
+the original tree and retained copy, and the original build manifests are checked
+again. Links, special files, empty distributions, more than 10,000 files or more
+than 2 GiB per distribution reject retention. These bytes and the SDK archive
+remain private evidence; copying does not publish their contents or authorize
+private model publication.
+
+The wrapper captures every command, exit, failure and package setup result.
+During pulls and the study it stops at a 4 GiB host disk reserve. A unique name and
+nonce label bind container cleanup even when creation fails before returning an
+ID. Cleanup removes that container, the image reference only when this invocation
+introduced it, and its owned scratch directory. Image removal never uses force;
+a conflict leaves explicit cleanup failure and retained staging. Existing images,
+other containers, shared corpus data and host build caches are preserved.
+Successful and failed guest output is captured, including its nested complete
+study archive. Preserve all ended job bytes off the Mac and hash them before
+supported job deletion; then authenticate and inspect nested archives on the
+supported profiling worker. Raw SDKs, installed distributions, model bytes and
+recordings require the existing source-filtered publication rules.
+
+Guest CPU affinity does not prove physical Mac CPU affinity, and measurements
+cannot be pooled with earlier Linux results. Wrapper completion proves no
+compilation saving or outcome acceptance. Full ordinary/private phases, callers,
+compiler roots, runtime, allocation, original-source outcomes and RNG/work
+controls retain their separate acceptance requirements.
+
 ### Mac container measurement capabilities
 
 `bench.profile.CompilationStudyContainerProbe` inspects an existing Docker daemon
