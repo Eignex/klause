@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.bool.internals.reifiedDegree
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -59,9 +60,15 @@ internal fun LinearIndicator.propagationView(): Propagator = if (variables.reals
         }
     }
 
-internal fun ExactLinear.scoringView(): Invariant = if (variables.reals.isEmpty()) {
-    ExactLinearInvariant(constants, IntArray(size) { Term.intVar(ref(it)) }, relation, activator)
-} else ExactLinearScore(this)
+internal fun ExactLinear.scoringView(domains: Array<IntDomain>? = null): Invariant {
+    if (variables.reals.isNotEmpty()) return ExactLinearScore(this)
+    val vars = IntArray(size) { Term.intVar(ref(it)) }
+    val integer = constants as? IntegerConstants
+    return if (integer != null && domains != null && !needsExactSum(integer, vars, domains)) {
+        if (activator == LinearRow.ALWAYS) LinearInvariant(integer.coeffs, vars, relation, integer.bound)
+        else ReifiedLinearInvariant(activator, integer.coeffs, vars, relation, integer.bound)
+    } else ExactLinearInvariant(constants, vars, relation, activator)
+}
 
 internal fun LinearIndicator.scoringView(): Invariant = ExactLinearScore(row, indicator, whenOne)
 

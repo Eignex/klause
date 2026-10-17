@@ -1009,6 +1009,11 @@ Scheduling windows and dense-timeline admission restrictions apply to built-in
 scorers. A selected alternate scorer receives the actual move domains and owns its
 own numeric and resource limits.
 
+Exact integer source rows use compact incremental linear scoring and moves when
+the actual move domains keep activity and deltas within signed-word arithmetic.
+Unknown domains, wider constants or larger activity retain exact adaptive sums.
+The immutable source row and original-source acceptance remain unchanged.
+
 ## Continuous arithmetic scores
 
 `ContinuousProduct`, real `Power`, `RealProduct` and `RealAbs` retain their source
