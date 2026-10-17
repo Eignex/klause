@@ -75,6 +75,9 @@ Ordinary finite portfolio verdicts and incumbent callbacks retain the common sou
 interpretation when every worker is bound to the same source model. An unbound or
 mixed-source low-level portfolio cannot infer that metadata for a sample-free aggregate.
 Policy metadata does not establish witness or proof authority.
+Raw linear invocation bindings recognize their embedded original objective when
+admitting completed native bound evidence. The execution objective remains in working
+units; original-source qualification separately checks scope and source transfer.
 
 Portfolio evidence names its source model and objective. These are opaque in-memory
 identities: a fresh or transformed model needs its own check, even if structurally
