@@ -234,6 +234,16 @@ private fun Problem.pipelineRouteObserved(
     preparationCancellation: Cancellation = boundCancellation,
 ): SourceProblemRoute {
     val selection = projectionCapture ?: providers.prepare(this)
+    if (!routeLinearToTheory && nativeFiniteSource(selection, preparationCancellation)) {
+        onLpStats?.invoke(LpStatsSink(LpRoute.STANDALONE).snapshot())
+        val prepared = prepareExecutionPlan(this, objective, maximize, true, providers, selection,
+            preparationCancellation)
+        return if (prepared.decline == PreparedPlanDecline.RESOURCE) {
+            SourceProblemRoute.UnsupportedOpen(null, this, prepared)
+        } else {
+            SourceProblemRoute.Finite(this, requireNotNull(prepared.componentPlan), prepared)
+        }
+    }
     val source = if (requiresPolynomialCompletion(selection)) {
         null
     } else {
@@ -332,6 +342,19 @@ private fun Problem.pipelineRouteObserved(
     } else {
         SourceProblemRoute.OpenTheory(request)
     }
+}
+
+private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, stop: Cancellation): Boolean {
+    if (numRealVars != 0) return false
+    for (variable in 0 until numIntVars) {
+        stop.charge(1)
+        if (stop() || !intBounds.hasLower(variable) || !intBounds.hasUpper(variable)) return false
+    }
+    for (index in factors.indices) {
+        stop.charge(1)
+        if (stop() || !finiteRealFactorSupported(index, projections)) return false
+    }
+    return !stop()
 }
 
 /**
