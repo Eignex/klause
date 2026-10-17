@@ -159,15 +159,15 @@ private fun divModU(a: U128, b: U128, q: U128) {
 @OptIn(ExperimentalUnsignedTypes::class)
 private fun mul256(a: U128, b: U128, out: ULongArray) {
     out.fill(0uL)
-    val aw = ulongArrayOf(a.lo, a.hi)
-    val bw = ulongArrayOf(b.lo, b.hi)
     for (i in 0 until 2) {
+        val wordA = if (i == 0) a.lo else a.hi
         var carry = 0uL
         for (j in 0 until 2) {
-            val aLo = aw[i] and 0xFFFFFFFFuL
-            val aHi = aw[i] shr 32
-            val bLo = bw[j] and 0xFFFFFFFFuL
-            val bHi = bw[j] shr 32
+            val wordB = if (j == 0) b.lo else b.hi
+            val aLo = wordA and 0xFFFFFFFFuL
+            val aHi = wordA shr 32
+            val bLo = wordB and 0xFFFFFFFFuL
+            val bHi = wordB shr 32
             val ll = aLo * bLo
             val lh = aLo * bHi
             val hl = aHi * bLo
