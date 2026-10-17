@@ -19,7 +19,12 @@ reports the session's propagation work through the caller's existing accounting 
 No scratch propagation state survives a check.
 
 `verifyOpenWitness` checks discrete coverage, declared integer bounds and value sets,
-then pins singleton integer domains before finite checking. It invents no source
+then checks every original relation touching a real coordinate before projecting
+the remaining discrete relations into a singleton-domain finite check. Retained
+factor indices carry captured provider factories into that private point view;
+checked real relations never require a finite propagation route. An unavailable
+real checker remains indeterminate, including cross-domain relations. Both phases
+use the containing cancellation and work allowance. It invents no source
 bounds for open declarations. Arbitrary-width integers decline this finite check
 and require their existing exact theory checker.
 

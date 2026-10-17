@@ -36,6 +36,8 @@ internal class OpenExactNeighborhood(
     private val invocation: () -> EngineInvocation? = { null },
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val basePreparation = preparedSource
+    private val witnessProjections = preparedSource?.factorProjections?.forEngineView(model)
+        ?: model.selectedFactorProjections()
     private var prepared: PreparedSourcePlan? = null
     private var components: PreparedSearchComponents? = null
     private var encodingPreparationWork = 0L
@@ -108,9 +110,9 @@ internal class OpenExactNeighborhood(
             if (sample.exactInts?.any { !it.fitsLong() } == true ||
                 model.factors.any { it is ExactSearchRow || it is EncodedTheoryFactor }
             ) {
-                verifyRealCoordinates(model, sample)
+                verifyRealCoordinates(model, sample, params.timeout or params.cancellation or cancellation)
             } else {
-                verifyOpenWitness(model, sample)
+                verifyOpenWitness(model, sample, params.timeout or params.cancellation or cancellation, witnessProjections)
             }
         } catch (_: CancellationException) {
             return ExactNeighborhoodResult.Undecided

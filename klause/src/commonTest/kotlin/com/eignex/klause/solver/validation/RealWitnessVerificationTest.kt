@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.validation
 
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -7,12 +8,31 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertIs
 
 class RealWitnessVerificationTest {
+    @Test
+    fun `exact real point checks should stop on the containing work allowance`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
+            numRealVars = 3, realLower = doubleArrayOf(0.0, 1.0, 0.0), realUpper = doubleArrayOf(2.0, 3.0, 3.0))
+        val point = Sample(booleanArrayOf(), longArrayOf(), reals = doubleArrayOf(0.0, 1.0, 1.0),
+            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE))
+        var work = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 7L
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+
+        val checked = verifyRealCoordinates(source, point, stop)
+
+        assertIs<Verification.Indeterminate>(checked)
+    }
+
     @Test
     fun `all different should reject wide collisions beside absent or certified real coordinates`() {
         val wide = parseBigInt("18446744073709551616")
