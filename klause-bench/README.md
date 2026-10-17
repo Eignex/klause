@@ -2461,6 +2461,15 @@ compilation saving or outcome acceptance. Full ordinary/private phases, callers,
 compiler roots, runtime, allocation, original-source outcomes and RNG/work
 controls retain their separate acceptance requirements.
 
+Each paired CLI study case retains its recorded child exit, termination and
+unsupported-model label separately from the benchmark wrapper exit. Capture success
+requires well-formed string-valued child statistics with exit `0`, no termination
+or unsupported label, the original source hashes, a successful wrapper and nonempty
+requested JFR and compilation-log files. Unrequested files remain explicitly absent.
+File size does not validate recording contents: `recordingContentsVerified` and
+source-outcome acceptance remain false until their separate complete reviews.
+All original records and failure labels remain retained for those reviews.
+
 ### Mac container measurement capabilities
 
 `bench.profile.CompilationStudyContainerProbe` inspects an existing Docker daemon

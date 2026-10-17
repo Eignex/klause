@@ -83,7 +83,8 @@ internal object CliCompilationStudy {
                 allAttempted, checksCompleted, measurements.size,
                 measurements.isNotEmpty() && measurements.all {
                     it.exit == 0 && it.sourceHashesMatch && it.error == null && !it.interrupted &&
-                        (!it.profile || (it.recordingPresent && it.compilationLogPresent))
+                        it.captureStatus.recordedCliSucceeded &&
+                        it.captureStatus.requestedRecordingFilesNonempty
                 }))
         }
     }
@@ -218,7 +219,9 @@ internal object CliCompilationStudy {
             environment.getValue("JAVA_OPTS"), environment.getValue("KLAUSE_CLI_PREFLIGHT_OPTS"),
             interrupted, failure, recording.isFile,
             File(directory, "hotspot.xml").isFile,
-            listOf("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS").associateWith(environment::getValue))
+            listOf("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS").associateWith(environment::getValue),
+            CompilationStudyCaptureStatus.inspect(record, plan.profile, recording.length(),
+                File(directory, "hotspot.xml").length()))
         Reports.writeJson(File(directory, "measurement.json").path, measurement)
         return measurement
     }
@@ -233,6 +236,7 @@ internal data class CompilationStudyMeasurement(
     val interrupted: Boolean, val error: String?,
     val recordingPresent: Boolean, val compilationLogPresent: Boolean,
     val requestedThreadLimits: Map<String, String>,
+    val captureStatus: CompilationStudyCaptureStatus,
 )
 
 @Serializable
@@ -241,6 +245,7 @@ private data class CompilationStudyCompletion(
     val sourceCheckersCompleted: Boolean,
     val capturedCases: Int,
     val allInvocationCapturesSuccessful: Boolean,
+    val recordingContentsVerified: Boolean = false,
     val sourceOutcomesValidated: Boolean = false,
     val acceptedSavingsCredit: Boolean = false,
 )
