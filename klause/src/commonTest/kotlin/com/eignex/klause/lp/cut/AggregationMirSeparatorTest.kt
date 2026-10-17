@@ -93,6 +93,65 @@ class AggregationMirSeparatorTest {
     }
 
     @Test
+    fun `bound implied half cuts should decline a point outside declared lower bounds`() {
+        val rows = listOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ofLong(-1)), LinearOp.EQ, BigFraction.ZERO),
+        )
+        for (row in rows) {
+            val p = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(row))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, -1))
+
+            val (cuts, _) = separate(p, objective, doubleArrayOf(-0.000002, -0.000002))
+                ?: error("LP columns expected")
+
+            assertTrue(cuts.isEmpty())
+        }
+    }
+
+    @Test
+    fun `bound implied half cuts should use the shifted rhs at nonzero lower bounds`() {
+        val rows = listOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ofLong(-1)), LinearOp.EQ, BigFraction.ZERO),
+        )
+        for (row in rows) {
+            val p = Problem(0, 2, Array(2) { IntDomain(5, 6) }, arrayOf<Factor>(row))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, -1))
+
+            val (cuts, _) = separate(p, objective, doubleArrayOf(4.999998, 4.999998))
+                ?: error("LP columns expected")
+
+            assertTrue(cuts.isEmpty())
+        }
+    }
+
+    @Test
+    fun `bound implied half cuts should leave output capacity for a later useful cut`() {
+        for (exact in listOf(false, true)) {
+            val factors = List<Factor>(16) {
+                if (exact) ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ofLong(-1)), LinearOp.EQ, BigFraction.ZERO)
+                else Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)
+            } + if (exact) {
+                ExactLinear.of(intArrayOf(Term.ofIntVar(2), Term.ofIntVar(3)),
+                    List(2) { BigFraction.ofLong(2) }, LinearOp.LE, BigFraction.ofLong(3))
+            } else Linear(intArrayOf(2, 2), intArrayOf(2, 3), LinearOp.LE, 3)
+            val p = Problem(0, 4, Array(4) { IntDomain(0, 1) }, factors.toTypedArray())
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, -1, 1, -1))
+
+            val (cuts, rel) = separate(p, objective, doubleArrayOf(-0.000002, -0.000002, 0.75, 0.75))
+                ?: error("LP columns expected")
+
+            assertTrue(cuts.any { cut -> cut.rhs == 1L && cut.coeffs.toList() == listOf(1L, 1L) &&
+                cut.cols.map { rel.colVarId[it] }.toSet() == setOf(2, 3) })
+            assertCutsValid(p, cuts, rel)
+        }
+    }
+
+    @Test
     fun `early exact rows should preserve a later ordinary pair cut`() {
         for (exactRows in listOf(0, 48)) {
             val factors = List<Factor>(exactRows) {

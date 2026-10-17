@@ -294,12 +294,14 @@ internal class AggregationMirSeparator : CutSeparator {
         val coeffs = LongArrayList()
         var rhsX = rhsY
         var lhs = 0.0
+        var positiveCoefficient = false
         for (index in agg.usedInternal.indices) {
             if (!ctx.spendSeparationWork()) return null
             if (!agg.usedInternal[index]) continue
             val col = agg.keysInternal[index]
             val aSum = agg.valuesInternal[index]
             val c = aSum.floorDiv(2)
+            if (c > 0L) positiveCoefficient = true
             if (c != 0L) {
                 if (!listGrowth(ctx, cols.size, copies = 2L)) return null
                 cols.add(col)
@@ -309,6 +311,7 @@ internal class AggregationMirSeparator : CutSeparator {
             }
         }
         if (cols.size == 0) return null
+        if (rhsY >= 0L && !positiveCoefficient) return null
         if (lhs <= rhsX.toDouble() + tol) return null // not violated by the LP point
         if (!ctx.spendSeparationWork(2L * cols.size + 1L)) return null
         Cut(cols.toIntArray(), coeffs.toLongArray(), Relation.LE, rhsX, global = true)

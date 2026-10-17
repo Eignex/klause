@@ -147,6 +147,10 @@ equality. Exact singles, ordinary/exact pairs and exact/exact pairs follow in th
 order within the same 16-cut cap. A full ordinary prefix skips the exact scan.
 Equivalent rows with different positive scales can yield different half cuts;
 this projection does not rescale source rows or change objective units.
+In declared-lower-bound shifted coordinates, a candidate with nonpositive rounded
+coefficients and a nonnegative RHS is already implied by nonnegativity. It is
+declined before publication even if the floating LP point violates it, preserving
+output slots for candidates that can strengthen the relaxation.
 
 MIR factor and term visits, normalization, aggregation and storage reservations
 spend the containing root or node token and LP effort ledger. The shared internal
