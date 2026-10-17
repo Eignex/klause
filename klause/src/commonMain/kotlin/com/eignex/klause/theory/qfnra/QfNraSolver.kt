@@ -39,6 +39,9 @@ internal data class QfNraStats(
     val dyadicPreExtractionDeclines: Long? = null,
     val booleanTheoryRegions: Long? = null,
     val booleanTheoryAtoms: Long? = null,
+    val booleanTheoryConstantRefutations: Long? = null,
+    val booleanTheoryResourceRefusals: Long? = null,
+    val lastBooleanTheoryResource: PolynomialResource? = null,
 )
 
 internal enum class QfNraReason { Interrupted, WorkLimit, ResourceLimit }
@@ -122,6 +125,8 @@ internal class QfNraQuery(
             yield(null)
             work.booleanTheoryRegions = 0
             work.booleanTheoryAtoms = 0
+            work.booleanTheoryConstantRefutations = 0
+            work.booleanTheoryResourceRefusals = 0
             val regions = normalized.booleanRegions(arithmetic)
             var incomplete: PolynomialResource? = null
             while (regions.hasNext()) {
@@ -135,7 +140,11 @@ internal class QfNraQuery(
                 val atoms = checkNotNull(work.booleanTheoryAtoms)
                 work.booleanTheoryAtoms = atoms + minOf(region.atoms.size.toLong(), Long.MAX_VALUE - atoms)
                 try {
-                    if (!regionFeasible(normalized, region, emptyMap(), arithmetic, algebraic)) continue
+                    if (!regionFeasible(normalized, region, emptyMap(), arithmetic, algebraic)) {
+                        val constants = checkNotNull(work.booleanTheoryConstantRefutations)
+                        work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
+                        continue
+                    }
                     val polynomials = region.atoms.keys.map {
                         arithmetic.step()
                         normalized.atoms[it].polynomial
@@ -159,6 +168,9 @@ internal class QfNraQuery(
                 } catch (stop: PolynomialResourceLimit) {
                     // An incomplete region can be skipped for SAT search, but withholds source exhaustion.
                     if (incomplete == null) incomplete = stop.resource
+                    val refusals = checkNotNull(work.booleanTheoryResourceRefusals)
+                    work.booleanTheoryResourceRefusals = refusals + minOf(1L, Long.MAX_VALUE - refusals)
+                    work.lastBooleanTheoryResource = stop.resource
                     yield(null)
                 }
             }
@@ -187,6 +199,9 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     var dyadicPreExtraction = false
     var booleanTheoryRegions: Long? = null
     var booleanTheoryAtoms: Long? = null
+    var booleanTheoryConstantRefutations: Long? = null
+    var booleanTheoryResourceRefusals: Long? = null
+    var lastBooleanTheoryResource: PolynomialResource? = null
     private var coupledWorkDeclines: Long = 0
     private var dyadicPreExtractionDeclines: Long = 0
     private var spent: Long = 0
@@ -245,7 +260,8 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     }
     fun snapshot(): QfNraStats = QfNraStats(projectedPolynomials, liftedCells, spent,
         dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines,
-        booleanTheoryRegions, booleanTheoryAtoms)
+        booleanTheoryRegions, booleanTheoryAtoms, booleanTheoryConstantRefutations,
+        booleanTheoryResourceRefusals, lastBooleanTheoryResource)
 }
 
 private const val MAX_WITNESS_WORK = 65_536L

@@ -84,6 +84,8 @@ class PolynomialBooleanRegionsTest {
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(witness.boolValue(0))
         assertEquals(BigFraction.ofLong(3), witness.realValue(0).rational)
+        assertEquals(1L, result.stats.booleanTheoryResourceRefusals)
+        assertEquals(PolynomialResource.MATRIX_CELLS, result.stats.lastBooleanTheoryResource)
     }
 
     @Test

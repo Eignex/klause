@@ -636,6 +636,10 @@ Original real and Boolean counts, fixed source values and the immutable source
 formula remain captured; no region creates finite CP domains or a fresh probe.
 A private counter records issued numeric regions, including constant contradictions;
 another records their selected atom occurrences. Neither counts certified refutations.
+Separate observations count completed constant contradictions and representation
+refusals, retaining the last observed resource kind. That kind describes the last
+instrumented refusal, not an exclusive cause of the whole invocation. These
+observations reuse existing outcomes without another operation, poll or work charge.
 Projection and lifting counts accumulate
 across regions. Invocation snapshots merge observations with saturation, and an
 unvisited complete stage remains absent.

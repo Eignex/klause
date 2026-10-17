@@ -156,6 +156,11 @@ internal class PolynomialTheoryInvocation(
         else sum(left.booleanTheoryRegions ?: 0, right.booleanTheoryRegions ?: 0),
         if (left.booleanTheoryAtoms == null && right.booleanTheoryAtoms == null) null
         else sum(left.booleanTheoryAtoms ?: 0, right.booleanTheoryAtoms ?: 0),
+        if (left.booleanTheoryConstantRefutations == null && right.booleanTheoryConstantRefutations == null) null
+        else sum(left.booleanTheoryConstantRefutations ?: 0, right.booleanTheoryConstantRefutations ?: 0),
+        if (left.booleanTheoryResourceRefusals == null && right.booleanTheoryResourceRefusals == null) null
+        else sum(left.booleanTheoryResourceRefusals ?: 0, right.booleanTheoryResourceRefusals ?: 0),
+        right.lastBooleanTheoryResource ?: left.lastBooleanTheoryResource,
     )
 
     private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
