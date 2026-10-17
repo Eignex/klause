@@ -38,7 +38,7 @@ class JvmSourceDeclarationParserTest {
         val result = parser.inspect("Pick.kt", text, rows::add)
 
         val functions = rows.filter { it["kind"]?.jsonPrimitive?.content == "function" }
-        assertEquals(0, result.syntaxErrors)
+        assertEquals(0, result.syntaxErrors, rows.filter { it["syntaxError"] != JsonNull }.toString())
         assertEquals(listOf("pick", "pick", "local"), functions.map { it.getValue("name").jsonPrimitive.content })
         assertTrue(functions[0]["range"] != functions[1]["range"])
         val localParent = functions[2].getValue("parentIndex").jsonPrimitive.int
@@ -63,7 +63,7 @@ class JvmSourceDeclarationParserTest {
 
         val result = parser.inspect("Render.kt", text, rows::add)
 
-        assertEquals(0, result.syntaxErrors)
+        assertEquals(0, result.syntaxErrors, rows.filter { it["syntaxError"] != JsonNull }.toString())
         assertEquals(listOf("render", "local"), rows.filter { it["kind"]?.jsonPrimitive?.content == "function" }
             .map { it.getValue("name").jsonPrimitive.content })
     }
@@ -95,7 +95,7 @@ class JvmSourceDeclarationParserTest {
 
         val result = parser.inspect("Box.kt", text, rows::add)
 
-        assertEquals(0, result.syntaxErrors)
+        assertEquals(0, result.syntaxErrors, rows.filter { it["syntaxError"] != JsonNull }.toString())
         val kinds = rows.map { it.getValue("kind").jsonPrimitive.content }
         assertTrue(kinds.containsAll(listOf("getter", "setter", "initializer", "lambda")))
         val roles = rows.map { it.getValue("role").jsonPrimitive.content }
@@ -110,7 +110,7 @@ class JvmSourceDeclarationParserTest {
 
         val result = parser.inspect("Unicode.kt", text, rows::add)
 
-        assertEquals(0, result.syntaxErrors)
+        assertEquals(0, result.syntaxErrors, rows.filter { it["syntaxError"] != JsonNull }.toString())
         val function = rows.single { it["kind"]?.jsonPrimitive?.content == "function" }
         val range = function.getValue("range").jsonObject
         assertEquals(2, range.getValue("firstLine").jsonPrimitive.int)
@@ -130,7 +130,7 @@ class JvmSourceDeclarationParserTest {
 
         val result = parser.inspect("Box.java", text, rows::add)
 
-        assertEquals(0, result.syntaxErrors)
+        assertEquals(0, result.syntaxErrors, rows.filter { it["syntaxError"] != JsonNull }.toString())
         assertTrue(rows.map { it.getValue("kind").jsonPrimitive.content }
             .containsAll(listOf("constructor", "method", "lambda", "call")))
     }
