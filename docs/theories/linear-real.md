@@ -187,6 +187,22 @@ reuse completed branch outcomes without additional checks, polls or charges. The
 measure neither elapsed cost nor witness validity, and a completed table can contain
 only declined preferences.
 
+Complete-traversal observations retain the hint producer's registration result when
+registration precedes traversal reporting. They distinguish unsupported numeric
+shape, dimension or activated-row entry limits, invalid activators, absent activated
+comparisons, and interruption at the existing opening, row or publication poll.
+They add no scan, cancellation poll, charge or numerical invocation.
+Prepared-component observations include the opening count, Boolean/integer/real
+dimensions, source-real count, row count and counts of components with private reals
+or disjunctions. These values aggregate across observed components; explicit zero
+is distinct from an absent observation. The complete shared preparation's existing
+row visits also count two-row disjunctions containing an unconditional signed Boolean
+literal and a closed real equality with coefficients `1, -1` and bound zero. This
+identifies a guarded-choice shape, without asserting its frontend origin. The
+inspected-component count distinguishes a completed zero from an uninspected legacy
+opening. Interrupted preparation publishes no component or shape count. These
+observations establish neither an earlier implication nor a source verdict.
+
 ## Implementation
 
 [ExactLinearFragment](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/ExactLinearFragment.kt)

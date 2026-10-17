@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearForm
@@ -46,6 +47,142 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
+    @Test
+    fun `hint admission should retain registration results until complete traversal is observed`() {
+        val variants = listOf(
+            Triple(2, "POINT_HINT_REGISTERED", 4L),
+            Triple(65_535, "POINT_HINT_ENTRIES_DECLINED", 1L),
+            Triple(65_537, "POINT_HINT_DIMENSION_DECLINED", 0L),
+        )
+        for ((booleans, stage, expectedWork) in variants) {
+            var charged = 0L
+            var polls = 0
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean {
+                    polls++
+                    return false
+                }
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+            val stats = SmtStatsSink()
+            val model = Problem(
+                numBoolVars = booleans,
+                intBounds = openBounds(0),
+                numRealVars = 1,
+                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+                factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+
+                val hints = component.partialPointHints(stop)
+                val registrationPolls = polls
+                assertNull(stats.snapshot().completeSearchStages)
+                component.observeCompleteTraversal()
+
+                assertEquals(stage == "POINT_HINT_REGISTERED", hints != null)
+                assertEquals(expectedWork, charged)
+                assertEquals(if (expectedWork == 0L) 0 else if (hints == null) 2 else 3, polls)
+                assertEquals(registrationPolls, polls)
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get(stage))
+            }
+        }
+    }
+
+    @Test
+    fun `stopped hint admission should retain its cancellation boundary and debit`() {
+        val variants = listOf(
+            Triple(1, "POINT_HINT_OPENING_STOPPED", 0L),
+            Triple(2, "POINT_HINT_ROW_STOPPED", 1L),
+            Triple(4, "POINT_HINT_PUBLICATION_STOPPED", 5L),
+        )
+        for ((stopAt, stage, expectedWork) in variants) {
+            var polls = 0
+            var charged = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = ++polls >= stopAt
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(partialModel()).use { component ->
+                component.observeWith(stats)
+
+                assertNull(component.partialPointHints(stop, defaultOpening = true))
+                component.observeCompleteTraversal()
+
+                assertEquals(stopAt, polls)
+                assertEquals(expectedWork, charged)
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get(stage))
+                assertNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_REGISTERED"))
+            }
+        }
+    }
+
+    @Test
+    fun `hint admission should distinguish absent comparisons from unsupported numeric shape`() {
+        val empty = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = emptyArray(),
+        )
+        for ((model, stage) in listOf(
+            partialModel() to "POINT_HINT_NUMERIC_SHAPE_DECLINED",
+            empty to "POINT_HINT_EMPTY",
+        )) {
+            val stats = SmtStatsSink()
+            (if (model === empty) assertNotNull(prepareExactLiraSource(model, Cancellation.Never)).open()
+            else ExactLiraSearchComponent(model)).use { component ->
+                component.observeWith(stats)
+
+                assertNull(component.partialPointHints(Cancellation.Never))
+                component.observeCompleteTraversal()
+
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get(stage))
+                assertEquals(if (model === empty) 0L else null,
+                    stats.snapshot().completeSearchStages?.get("PREPARED_GUARDED_CHOICE_CLAUSES"))
+                assertEquals(false, component.partialPointHintAvailable())
+            }
+        }
+    }
+
+    @Test
+    fun `prepared guard observations should distinguish complete shape from uninspected metadata`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(RealChoice(0, 2, 0, 1)),
+        )
+        val fragment = assertNotNull(model.componentPlan().encodedTheoryFragment(model))
+        val factory = assertNotNull(prepareExactLiraSource(fragment, Cancellation.Never))
+        for (shared in listOf(false, true)) {
+            val stats = SmtStatsSink()
+            repeat(2) {
+                (if (shared) factory.open() else ExactLiraSearchComponent(model)).use { component ->
+                    component.observeWith(stats)
+                    component.observeCompleteTraversal()
+                }
+            }
+            val stages = assertNotNull(stats.snapshot().completeSearchStages)
+            assertEquals(2L, stages["PREPARED_COMPONENTS"])
+            assertEquals(2L, stages["PREPARED_BOOLEANS"])
+            assertEquals(0L, stages["PREPARED_INTEGERS"])
+            assertEquals(6L, stages["PREPARED_REALS"])
+            assertEquals(6L, stages["PREPARED_SOURCE_REALS"])
+            assertEquals(0L, stages["PREPARED_PRIVATE_REAL_COMPONENTS"])
+            assertEquals(2L, stages["PREPARED_DISJUNCTION_COMPONENTS"])
+            assertEquals(if (shared) 2L else null, stages["PREPARED_GUARD_INSPECTED_COMPONENTS"])
+            assertEquals(if (shared) 4L else null, stages["PREPARED_GUARDED_CHOICE_CLAUSES"])
+        }
+    }
+
     @Test
     fun `explicit integer point preparation should decline without charging its caller`() {
         var charged = 0L

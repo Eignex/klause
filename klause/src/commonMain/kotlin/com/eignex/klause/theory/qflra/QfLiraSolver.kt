@@ -222,6 +222,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintValues: IntArray? = null
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
+    private var pointHintAdmission: String? = null
     private var dirty = true
     private var sourceInstalled = false
     private var graphFirst = false
@@ -307,6 +308,21 @@ class ExactLiraSearchComponent private constructor(
         completeTraversalObserved = true
         smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
         observeCompleteStage("OPENING")
+        observeCompleteStage("PREPARED_COMPONENTS")
+        smtStats?.let { stats ->
+            stats.observeCompleteSearchStage("PREPARED_BOOLEANS", model.numBoolVars.toLong())
+            stats.observeCompleteSearchStage("PREPARED_INTEGERS", model.numIntVars.toLong())
+            stats.observeCompleteSearchStage("PREPARED_REALS", model.numRealVars.toLong())
+            stats.observeCompleteSearchStage("PREPARED_SOURCE_REALS", sourceRealCount.toLong())
+            stats.observeCompleteSearchStage("PREPARED_ROWS", preparedRows.size.toLong())
+            stats.observeCompleteSearchStage("PREPARED_PRIVATE_REAL_COMPONENTS", if (hasPrivateReals) 1L else 0L)
+            stats.observeCompleteSearchStage("PREPARED_DISJUNCTION_COMPONENTS", if (hasSourceDisjunctions) 1L else 0L)
+            preparedSource.guardedChoiceClauses?.let { clauses ->
+                stats.observeCompleteSearchStage("PREPARED_GUARD_INSPECTED_COMPONENTS")
+                stats.observeCompleteSearchStage("PREPARED_GUARDED_CHOICE_CLAUSES", clauses.toLong())
+            }
+        }
+        pointHintAdmission?.let(::observeCompleteStage)
     }
 
     internal fun partialPointHints(
@@ -315,10 +331,18 @@ class ExactLiraSearchComponent private constructor(
         defaultGraphSelections: Boolean = false,
     ): Pair<IntArray, SearchCandidateHints>? {
         check(context == null)
-        if (model.numRealVars == 0 && (!defaultOpening || model.numIntVars == 0)) return null
+        if (model.numRealVars == 0 && (!defaultOpening || model.numIntVars == 0)) {
+            observePointHintAdmission("POINT_HINT_NUMERIC_SHAPE_DECLINED")
+            return null
+        }
         if (model.numBoolVars == 0 || model.numBoolVars > MAX_POINT_HINT_ENTRIES ||
-            preparedRows.size > MAX_POINT_HINT_ENTRIES || stop()
+            preparedRows.size > MAX_POINT_HINT_ENTRIES
         ) {
+            observePointHintAdmission("POINT_HINT_DIMENSION_DECLINED")
+            return null
+        }
+        if (stop()) {
+            observePointHintAdmission("POINT_HINT_OPENING_STOPPED")
             return null
         }
         var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
@@ -326,18 +350,35 @@ class ExactLiraSearchComponent private constructor(
         val variables = LinkedHashSet<Int>()
         for (prepared in preparedRows) {
             stop.charge(1)
-            if (stop()) return null
+            if (stop()) {
+                observePointHintAdmission("POINT_HINT_ROW_STOPPED")
+                return null
+            }
             if (prepared.row.activator == LinearRow.ALWAYS) continue
-            if (prepared.row.activator !in bools.indices) return null
+            if (prepared.row.activator !in bools.indices) {
+                observePointHintAdmission("POINT_HINT_ACTIVATOR_DECLINED")
+                return null
+            }
             entries += prepared.row.size.toLong() + 1L
-            if (entries > MAX_POINT_HINT_ENTRIES) return null
+            if (entries > MAX_POINT_HINT_ENTRIES) {
+                observePointHintAdmission("POINT_HINT_ENTRIES_DECLINED")
+                return null
+            }
             rows += prepared
             variables += prepared.row.activator
         }
         stop.charge(rows.size.toLong() + variables.size + 1L)
-        if (stop() || rows.isEmpty()) return null
+        if (stop()) {
+            observePointHintAdmission("POINT_HINT_PUBLICATION_STOPPED")
+            return null
+        }
+        if (rows.isEmpty()) {
+            observePointHintAdmission("POINT_HINT_EMPTY")
+            return null
+        }
         pointHintRows = rows.toList()
         pointHintStop = stop
+        observePointHintAdmission("POINT_HINT_REGISTERED")
         return variables.toIntArray() to SearchCandidateHints { variable ->
             observeCompleteStage("POINT_HINT_CONSULTED")
             if (!partialPointHintAvailable()) {
@@ -363,6 +404,11 @@ class ExactLiraSearchComponent private constructor(
         val current = context ?: return false
         return pointHintValues != null && !dirty && current.decisionLevel == pointHintLevel &&
             !current.cancelled() && !pointHintStop() && !parentStop()
+    }
+
+    private fun observePointHintAdmission(stage: String) {
+        pointHintAdmission = stage
+        observeCompleteStage(stage)
     }
 
     internal fun partialPointHintBool(variable: Int): Boolean? =
@@ -1570,6 +1616,7 @@ private class PreparedExactLiraSource(
     val arithmeticRows: List<LinearRow>,
     val arithmeticVariables: Set<Int>,
     val validated: Boolean,
+    val guardedChoiceClauses: Int? = null,
 )
 
 private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
@@ -1605,11 +1652,14 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
     val preparedRows = ArrayList<PreparedSourceRow>()
     val arithmeticRows = ArrayList<LinearRow>()
     val arithmeticVariables = LinkedHashSet<Int>()
+    var guardedChoiceClauses = 0
     for ((factorIndex, factor) in model.factors.withIndex()) {
         if (!charge(1)) return null
         val form = factor.linearForm
         if (form !is LinearForm.Conjunction && form !is LinearForm.Disjunction) return null
         val forms = ArrayList<ExactRowForm>()
+        var sourceBooleanGuard = false
+        var realChoiceEquality = false
         for ((rowIndex, row) in factor.linearRows.withIndex()) {
             if (!charge(1)) return null
             when (val constants = row.constants) {
@@ -1640,6 +1690,22 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
             if (!charge(4L * row.size + 4L)) return null
             val exact = row.exactForm(model.numRealVars)
             if (stop()) return null
+            if (form is LinearForm.Disjunction && form.rows.size == 2 &&
+                row.activator == LinearRow.ALWAYS && !row.strict
+            ) {
+                val constants = row.constants
+                if (row.size == 1 && Term.isBool(row.ref(0)) && row.relation == LinearOp.GE &&
+                    Lit.variable(Term.lit(row.ref(0))) in 0 until model.numBoolVars &&
+                    constants is IntegralConstants && constants.exactCoeff(0) == BIG_ONE &&
+                    constants.exactBound == BIG_ONE
+                ) sourceBooleanGuard = true
+                if (row.size == 2 && row.relation == LinearOp.EQ && constants is RealConstants &&
+                    Term.isReal(row.ref(0)) && Term.isReal(row.ref(1)) &&
+                    constants.intCoefficients.size == 0 && constants.realCoefficients.size == 2 &&
+                    constants.bound == 0.0 && constants.realCoefficients.at(0) == 1.0 &&
+                    constants.realCoefficients.at(1) == -1.0
+                ) realChoiceEquality = true
+            }
             forms += exact
             preparedRows += PreparedSourceRow(
                 RowAddress(factorIndex, rowIndex), row, exact, booleans.toIntArray(), form is LinearForm.Disjunction,
@@ -1654,12 +1720,13 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
         }
         if (!charge(forms.size.toLong() + 1L)) return null
         exactForms += forms.toList()
+        if (sourceBooleanGuard && realChoiceEquality) guardedChoiceClauses++
     }
     val copies = exactForms.size.toLong() + preparedRows.size + arithmeticRows.size + arithmeticVariables.size + 1L
     if (!charge(copies)) return null
     val source = PreparedExactLiraSource(
         model, exactForms.toList(), preparedRows.toList(), arithmeticRows.toList(), arithmeticVariables.toSet(),
-        validated = true,
+        validated = true, guardedChoiceClauses = guardedChoiceClauses,
     )
     return source.takeUnless { stop() }
 }
