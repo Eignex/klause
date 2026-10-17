@@ -1,5 +1,6 @@
 """Ground MPS witness checks cannot obtain a replacement point or proof from a solver."""
 import contextlib
+import importlib.machinery
 import hashlib
 import json
 import tempfile
@@ -255,6 +256,91 @@ class MpsGroundTest(unittest.TestCase):
                     self.check(source=source)
         with self.assertRaisesRegex(ValueError, 'no complete reported feasible'):
             self.check(feasible=False, finalWitness=None)
+
+
+class MpsArithmeticRuntimeTest(unittest.TestCase):
+    executable = '/usr/bin/python3.13'
+
+    @staticmethod
+    def mapping(path, permissions='r-xp', inode='123'):
+        return '1000-2000 ' + permissions + ' 00000000 08:01 ' + inode + ' ' + path + '\n'
+
+    def test_provider_paths_cover_static_shared_and_stable_abi_interpreters(self):
+        for library in (None, '/usr/lib/libpython3.13.so.1.0', '/usr/lib/libpython3.so'):
+            with self.subTest(library=library):
+                maps = self.mapping(self.executable)
+                if library:
+                    maps += self.mapping(library)
+                self.assertEqual(sorted([self.executable] + ([library] if library else [])),
+                                 worker.python_provider_paths(maps, self.executable, '3.13.7'))
+
+    def test_malformed_ambiguous_or_unbounded_provider_maps_are_declined(self):
+        valid = self.mapping(self.executable)
+        malformed = ('', 'malformed\n', valid + '\n', valid.replace('\n', '\r\n'), valid.replace('1000-2000', '2000-1000'),
+                     valid.replace('r-xp', 'rwxz'), valid.replace('08:01', 'device'),
+                     self.mapping(self.executable, inode='0'), self.mapping(self.executable, 'r--p'),
+                     self.mapping(self.executable + ' (deleted)'), self.mapping(self.executable + r'\040copy'),
+                     self.mapping('/other/python'), valid + self.mapping('/lib/libpython3.12.so'),
+                     valid + self.mapping('/lib/libpython3.13.so (deleted)'),
+                     valid + self.mapping('/lib/libpython-unknown.so'),
+                     valid + ''.join(self.mapping('/lib' + str(i) + '/libpython3.13.so') for i in range(3)),
+                     valid * (worker.MAX_MAP_LINES + 1), 'x' * (worker.MAX_MAP_BYTES + 1))
+        for maps in malformed:
+            with self.subTest(size=len(maps), prefix=maps[:70]), self.assertRaises(AssertionError):
+                worker.python_provider_paths(maps, self.executable, '3.13.7')
+
+    def test_file_identity_hashes_exact_bytes_and_enforces_its_own_cap(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = pathlib.Path(temporary) / 'provider'
+            path.write_bytes(b'provider')
+            self.assertEqual(dict(path=str(path), bytes=8, sha256=hashlib.sha256(b'provider').hexdigest()),
+                             worker.file_identity(path, 8))
+            with self.assertRaises(AssertionError):
+                worker.file_identity(path, 7)
+            path.write_bytes(b'')
+            with self.assertRaises(AssertionError):
+                worker.file_identity(path, 8)
+
+    def test_file_backed_math_requires_its_actual_origin_and_mandatory_source_modules(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = pathlib.Path(temporary) / 'math.so'
+            path.write_bytes(b'math')
+            module = types.SimpleNamespace(__name__='math', __file__=str(path),
+                                           __spec__=types.SimpleNamespace(origin=str(path)))
+            with mock.patch.object(worker, 'math', module):
+                result = worker.arithmetic_runtime()
+                self.assertIsNone(result['builtinMath'])
+                self.assertEqual({'fractions', 'numbers', 'math'}, set(result['modules']))
+                for origin in (None, 'built-in', 'frozen', str(path) + '-missing'):
+                    module.__spec__.origin = origin
+                    with self.subTest(origin=origin), self.assertRaises((AssertionError, FileNotFoundError)):
+                        worker.arithmetic_runtime()
+                module.__spec__.origin = str(path)
+                for name in ('fractions', 'numbers'):
+                    with mock.patch.object(worker, name, types.SimpleNamespace(__name__=name)), \
+                         self.assertRaises(AttributeError):
+                        worker.arithmetic_runtime()
+
+    def test_builtin_math_binds_actual_linux_interpreter_and_mapped_providers(self):
+        module = types.SimpleNamespace(__name__='math', __spec__=types.SimpleNamespace(
+            origin='built-in', loader=importlib.machinery.BuiltinImporter))
+        with mock.patch.object(worker, 'math', module), \
+             mock.patch.object(worker.sys, 'builtin_module_names', worker.sys.builtin_module_names + ('math',)):
+            result = worker.arithmetic_runtime()
+            builtin = result['builtinMath']
+            self.assertEqual({'fractions', 'numbers'}, set(result['modules']))
+            self.assertEqual('built-in', builtin['origin'])
+            self.assertEqual('_frozen_importlib.BuiltinImporter', builtin['loader'])
+            self.assertEqual(hashlib.sha256(builtin['maps'].encode()).hexdigest(), builtin['mapsSha256'])
+            executable = next(row for row in builtin['providers'] if row['path'] == builtin['executablePath'])
+            self.assertEqual(result['pythonExecutableSha256'], executable['sha256'])
+            for origin, loader in (('frozen', importlib.machinery.BuiltinImporter), ('built-in', None)):
+                module.__spec__ = types.SimpleNamespace(origin=origin, loader=loader)
+                with self.subTest(origin=origin, loader=loader), self.assertRaises(AssertionError):
+                    worker.arithmetic_runtime()
+            module.__spec__ = types.SimpleNamespace(origin='built-in', loader=importlib.machinery.BuiltinImporter)
+            with mock.patch.object(worker.sys, 'builtin_module_names', ()), self.assertRaises(AssertionError):
+                worker.arithmetic_runtime()
 
 
 class MpsRuntimeFailureTest(unittest.TestCase):

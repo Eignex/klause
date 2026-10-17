@@ -1181,7 +1181,14 @@ wheel/extracted-file identities, process logs and cleanup receipts accompany it.
 pinned runtime/wheel and extracted-file ledger, successful bounded bootstrap/check
 processes, complete stream bytes/hashes and matching child JSON; missing or mutated
 mandatory custody leaves checking unknown. The arithmetic receipt identifies the
-actual Python interpreter and `fractions`, `numbers` and `math` module bytes.
+actual Python interpreter and mandatory file-backed `fractions` and `numbers`
+module bytes. File-backed `math` retains its module file identity; built-in `math`
+requires its actual `built-in` origin and `BuiltinImporter` loader, the executing
+Linux interpreter and all mapped `libpython` providers. Other or ambiguous origins
+remain unknown. Built-in custody retains bounded `/proc/self/maps` text and its
+hash: at most 256 KiB/4096 lines, with one to three executable provider files,
+each at most 64 MiB (192 MiB total). Module files retain their separate 4 MiB cap.
+Providers are hashed in 64 KiB blocks within the existing check deadline.
 The existing pinned runtime runner provisions a private `z3-solver==4.15.3.0`
 wheel environment on Linux x86-64/glibc, without global installation. Z3 remains a
 shared module/proof-builder and CI-oracle dependency; it is not the ground evaluator. Setup is

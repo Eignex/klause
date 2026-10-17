@@ -4,6 +4,7 @@ import fractions
 import math
 import numbers
 import platform
+import re
 import hashlib
 import importlib.util
 import json
@@ -36,15 +37,101 @@ def bindings(out):
             for name in ('source.mps', 'stdout.txt', 'record.json', 'request.json')}
 
 
+MAX_MAP_BYTES = 262144
+MAX_MAP_LINES = 4096
+MAX_PROVIDERS = 3
+MAX_PROVIDER_BYTES = 67108864
+LIBPYTHON = re.compile(r'libpython(\d+)(?:\.(\d+))?[dmt]*\.so(?:\.\d+)*')
+
+
+def file_identity(path, maximum):
+    path = path.resolve(strict=True)
+    identity = path.stat()
+    size = identity.st_size
+    assert 0 < size <= maximum, 'runtime identity file size outside allowance'
+    result, count = hashlib.sha256(), 0
+    with path.open('rb') as stream:
+        while block := stream.read(min(65536, maximum + 1 - count)):
+            count += len(block)
+            assert count <= maximum, 'runtime identity file grew past allowance'
+            result.update(block)
+    final = path.stat()
+    assert count == size == final.st_size and (identity.st_dev, identity.st_ino, identity.st_mtime_ns) == \
+        (final.st_dev, final.st_ino, final.st_mtime_ns), 'runtime identity file changed'
+    return {'path': str(path), 'bytes': count, 'sha256': result.hexdigest()}
+
+
+def python_provider_paths(maps, executable, version):
+    assert 0 < len(maps.encode('utf-8')) <= MAX_MAP_BYTES, 'runtime maps size outside allowance'
+    assert maps.endswith('\n') and '\r' not in maps, 'unsupported runtime map line endings'
+    lines = maps[:-1].split('\n')
+    assert 0 < len(lines) <= MAX_MAP_LINES, 'runtime maps line count outside allowance'
+    assert executable.startswith('/') and not any(c.isspace() or c == '\\' for c in executable)
+    expected_version = version.split('.')[:2]
+    providers = {executable: False}
+    for line in lines:
+        fields = line.split(None, 5)
+        assert len(fields) in (5, 6), 'malformed runtime mapping'
+        assert re.fullmatch(r'[0-9a-f]{1,16}-[0-9a-f]{1,16}', fields[0]), 'malformed mapping address'
+        start, end = (int(part, 16) for part in fields[0].split('-'))
+        assert start < end, 'invalid mapping interval'
+        assert re.fullmatch(r'[r-][w-][x-][ps]', fields[1]), 'malformed mapping permissions'
+        assert re.fullmatch(r'[0-9a-f]{1,16}', fields[2]), 'malformed mapping offset'
+        assert re.fullmatch(r'[0-9a-f]{1,8}:[0-9a-f]{1,8}', fields[3]), 'malformed mapping device'
+        assert re.fullmatch(r'[0-9]{1,20}', fields[4]), 'malformed mapping inode'
+        if len(fields) == 5:
+            continue
+        path = fields[5]
+        name = pathlib.PurePosixPath(path).name
+        if path == executable or path.startswith(executable + ' ') or name.startswith('libpython'):
+            assert path.startswith('/') and not any(c.isspace() or c == '\\' for c in path), \
+                'unsupported runtime provider path'
+            assert int(fields[4]) > 0, 'runtime provider is not file-backed'
+            if name.startswith('libpython'):
+                match = LIBPYTHON.fullmatch(name)
+                assert match and match[1] == expected_version[0], 'unsupported libpython provider'
+                assert match[2] is None or match[2] == expected_version[1], 'ambiguous libpython version'
+            providers[path] = providers.get(path, False) or 'x' in fields[1]
+    assert 1 <= len(providers) <= MAX_PROVIDERS and all(providers.values()), \
+        'missing ambiguous or non-executable runtime providers'
+    return sorted(providers)
+
+
+def builtin_math_identity():
+    spec = getattr(math, '__spec__', None)
+    origin = getattr(spec, 'origin', None)
+    loader = getattr(spec, 'loader', None)
+    loader_type = loader if isinstance(loader, type) else type(loader)
+    loader_name = loader_type.__module__ + '.' + loader_type.__qualname__
+    assert origin == 'built-in' and math.__name__ in sys.builtin_module_names, 'unsupported math origin'
+    assert loader_name == '_frozen_importlib.BuiltinImporter', 'unsupported builtin math loader'
+    executable = pathlib.Path(sys.executable).resolve(strict=True)
+    assert pathlib.Path('/proc/self/exe').resolve(strict=True) == executable, 'interpreter provider mismatch'
+    with pathlib.Path('/proc/self/maps').open('rb') as stream:
+        raw = stream.read(MAX_MAP_BYTES + 1)
+    assert len(raw) <= MAX_MAP_BYTES, 'runtime maps exceed allowance'
+    maps = raw.decode('utf-8')
+    paths = python_provider_paths(maps, str(executable), platform.python_version())
+    providers = [file_identity(pathlib.Path(path), MAX_PROVIDER_BYTES) for path in paths]
+    assert all(row['path'] == path for row, path in zip(providers, paths)), 'ambiguous provider aliases'
+    return {'origin': origin, 'loader': loader_name, 'executablePath': str(executable),
+            'maps': maps, 'mapsSha256': digest(raw), 'providers': providers}
+
+
 def arithmetic_runtime():
-    modules = {}
-    for module in (fractions, numbers, math):
-        path = pathlib.Path(module.__file__).resolve()
-        raw = path.read_bytes()
-        assert 0 < len(raw) <= 4194304
-        modules[module.__name__] = {'path': str(path), 'bytes': len(raw), 'sha256': digest(raw)}
+    modules = {module.__name__: file_identity(pathlib.Path(module.__file__), 4194304)
+               for module in (fractions, numbers)}
+    builtin = None
+    if getattr(math, '__file__', None):
+        origin = getattr(getattr(math, '__spec__', None), 'origin', None)
+        assert origin not in (None, 'built-in', 'frozen'), 'ambiguous file-backed math origin'
+        assert pathlib.Path(origin).resolve(strict=True) == pathlib.Path(math.__file__).resolve(strict=True)
+        modules['math'] = file_identity(pathlib.Path(math.__file__), 4194304)
+    else:
+        builtin = builtin_math_identity()
     return {'implementation': CHECKER, 'pythonVersion': platform.python_version(),
-            'pythonExecutableSha256': digest(pathlib.Path(sys.executable).read_bytes()), 'modules': modules}
+            'pythonExecutableSha256': file_identity(pathlib.Path(sys.executable), MAX_PROVIDER_BYTES)['sha256'],
+            'modules': modules, 'builtinMath': builtin}
 
 
 def check(out, dependencies):

@@ -31,6 +31,17 @@ internal data class MpsGroundArithmetic(
     val pythonVersion: String,
     val pythonExecutableSha256: String,
     val modules: Map<String, MpsCheckerFile>,
+    val builtinMath: MpsBuiltinMath? = null,
+)
+
+@Serializable
+internal data class MpsBuiltinMath(
+    val origin: String,
+    val loader: String,
+    val executablePath: String,
+    val maps: String,
+    val mapsSha256: String,
+    val providers: List<MpsCheckerFile>,
 )
 
 @Serializable
@@ -70,7 +81,13 @@ internal object MpsSourceReceipt {
         require(arithmetic.implementation == MPS_GROUND_CHECKER)
         require(arithmetic.pythonVersion == runtime.pythonVersion &&
             arithmetic.pythonExecutableSha256 == runtime.pythonExecutableSha256)
-        require(arithmetic.modules.keys == setOf("fractions", "numbers", "math"))
+        val moduleNames = if (arithmetic.builtinMath == null) {
+            setOf("fractions", "numbers", "math")
+        } else {
+            setOf("fractions", "numbers")
+        }
+        require(arithmetic.modules.keys == moduleNames)
+        arithmetic.builtinMath?.let { requireBuiltinMath(it, arithmetic, runtime) }
         require(arithmetic.modules.values.all { file ->
             file.path.startsWith('/') && file.bytes in 1..4_194_304L && digest.matches(file.sha256)
         })
@@ -121,6 +138,54 @@ internal object MpsSourceReceipt {
             require(receipt.witnessCheck ==
                 "all original MPS rows bounds integrality and objective evaluated at supplied point")
         }
+    }
+
+    private fun requireBuiltinMath(
+        builtin: MpsBuiltinMath,
+        arithmetic: MpsGroundArithmetic,
+        runtime: MpsCheckerRuntime,
+    ) {
+        require(builtin.origin == "built-in" && builtin.loader == "_frozen_importlib.BuiltinImporter")
+        val raw = builtin.maps.toByteArray()
+        require(raw.size in 1..262_144 && sha256(raw) == builtin.mapsSha256)
+        val executable = builtin.executablePath
+        require(executable.startsWith('/') && executable.none { it.isWhitespace() || it == '\\' })
+        require(builtin.maps.endsWith('\n') && '\r' !in builtin.maps)
+        val lines = builtin.maps.removeSuffix("\n").split('\n')
+        require(lines.size in 1..4096)
+        val paths = mutableMapOf(executable to false)
+        val version = runtime.pythonVersion.split('.').take(2)
+        for (line in lines) {
+            val fields = line.trimStart().split(Regex("\\s+"), limit = 6)
+            require(fields.size in 5..6)
+            require(Regex("[0-9a-f]{1,16}-[0-9a-f]{1,16}").matches(fields[0]))
+            val interval = fields[0].split('-').map { it.toULong(16) }
+            require(interval[0] < interval[1])
+            require(Regex("[r-][w-][x-][ps]").matches(fields[1]))
+            require(Regex("[0-9a-f]{1,16}").matches(fields[2]))
+            require(Regex("[0-9a-f]{1,8}:[0-9a-f]{1,8}").matches(fields[3]))
+            require(Regex("[0-9]{1,20}").matches(fields[4]))
+            if (fields.size == 5) continue
+            val path = fields[5]
+            val name = path.substringAfterLast('/')
+            if (path == executable || path.startsWith("$executable ") || name.startsWith("libpython")) {
+                require(path.startsWith('/') && path.none { it.isWhitespace() || it == '\\' })
+                require(fields[4].any { it != '0' })
+                if (name.startsWith("libpython")) {
+                    val match = requireNotNull(Regex("libpython([0-9]+)(?:\\.([0-9]+))?[dmt]*" +
+                        "\\.so(?:\\.[0-9]+)*").matchEntire(name))
+                    require(match.groupValues[1] == version[0])
+                    require(match.groupValues[2].isEmpty() || match.groupValues[2] == version[1])
+                }
+                paths[path] = paths.getOrDefault(path, false) || 'x' in fields[1]
+            }
+        }
+        require(paths.size in 1..3 && paths.values.all { it })
+        val providers = builtin.providers
+        require(providers.size == paths.size && providers.map { it.path }.toSet() == paths.keys)
+        require(providers.all { it.bytes in 1..67_108_864L && digest.matches(it.sha256) })
+        require(providers.sumOf { it.bytes } <= 201_326_592L)
+        require(providers.single { it.path == executable }.sha256 == arithmetic.pythonExecutableSha256)
     }
 
     private fun requireProcess(

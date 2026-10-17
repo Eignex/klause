@@ -56,6 +56,98 @@ class MpsSourceValidationTest {
         processLogs = mapOf("bootstrap.stdout" to "", "bootstrap.stderr" to "", "check.stdout" to child,
             "check.stderr" to ""))
 
+    private fun boundReceipt(value: MpsGroundArithmetic): MpsSourceValidation.Receipt {
+        val changed = base.copy(groundArithmetic = value)
+        val log = JsonObject(Reports.json.parseToJsonElement(Reports.json.encodeToString(changed)).jsonObject
+            .filterKeys { it in childFields }).toString() + "\n"
+        val bytes = log.toByteArray()
+        return changed.copy(checkProcess = check.copy(streams = check.streams + ("stdout" to
+            MpsCheckerStream(bytes.size.toLong(), bytes.size.toLong(), true, sha256(bytes)))),
+            processLogs = mapOf("bootstrap.stdout" to "", "bootstrap.stderr" to "", "check.stdout" to log,
+                "check.stderr" to ""))
+    }
+
+    private fun builtinArithmetic(shared: Boolean): MpsGroundArithmetic {
+        val executable = "/usr/bin/python3.13"
+        val library = "/usr/lib/libpython3.13.so.1.0"
+        val maps = "1000-2000 r-xp 00000000 08:01 123 $executable\n" +
+            if (shared) "3000-4000 r-xp 00000000 08:01 124 $library\n" else ""
+        val providers = listOf(MpsCheckerFile(executable, 8_388_608, "a".repeat(64))) +
+            if (shared) listOf(MpsCheckerFile(library, 16_777_216, "b".repeat(64))) else emptyList()
+        return arithmetic.copy(modules = arithmetic.modules - "math", builtinMath = MpsBuiltinMath(
+            "built-in", "_frozen_importlib.BuiltinImporter", executable, maps, sha256(maps.toByteArray()), providers))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `builtin math should bind static or shared interpreter providers larger than source modules`(shared: Boolean) {
+        val bound = boundReceipt(builtinArithmetic(shared))
+
+        val result = MpsSourceValidation.checkerResult(0, Reports.json.encodeToString(bound), record, bindings, tools)
+
+        assertEquals("valid", result.validation.status)
+        assertEquals(record.finalWitness, result.validation.checkedWitness)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["origin", "loader", "missing-fractions", "missing-numbers", "ambiguous-math",
+        "missing-provider", "duplicate-provider", "provider-path", "provider-hash", "provider-bytes",
+        "executable-hash", "maps-hash", "maps-shape", "maps-address", "maps-device", "maps-inode",
+        "maps-version", "maps-deleted", "maps-permissions", "maps-missing-executable", "maps-extra-provider",
+        "executable-path", "child-mismatch"])
+    fun `unsupported builtin math custody should remain unknown with matching child fields`(failure: String) {
+        val original = builtinArithmetic(true)
+        val builtin = requireNotNull(original.builtinMath)
+        val providers = builtin.providers
+        val changedBuiltin = when (failure) {
+            "origin" -> builtin.copy(origin = "frozen")
+            "loader" -> builtin.copy(loader = "unidentified")
+            "missing-provider" -> builtin.copy(providers = providers.drop(1))
+            "duplicate-provider" -> builtin.copy(providers = providers + providers.first())
+            "provider-path" -> builtin.copy(providers = providers.map { it.copy(path = "/other/provider") })
+            "provider-hash" -> builtin.copy(providers = providers.map { it.copy(sha256 = "unhashed") })
+            "provider-bytes" -> builtin.copy(providers = providers.map { it.copy(bytes = 67_108_865) })
+            "executable-hash" -> builtin.copy(providers = providers.map { it.copy(sha256 = "0".repeat(64)) })
+            "maps-hash" -> builtin.copy(mapsSha256 = "0".repeat(64))
+            "executable-path" -> builtin.copy(executablePath = "relative")
+            else -> builtin
+        }
+        val maps = when (failure) {
+            "maps-shape" -> "malformed\n"
+            "maps-address" -> builtin.maps.replace("1000-2000", "2000-1000")
+            "maps-device" -> builtin.maps.replace("08:01", "device")
+            "maps-inode" -> builtin.maps.replace(" 123 ", " 0 ")
+            "maps-version" -> builtin.maps.replace("libpython3.13", "libpython3.12")
+            "maps-deleted" -> builtin.maps.replace("python3.13\n", "python3.13 (deleted)\n")
+            "maps-permissions" -> builtin.maps.replace("r-xp", "r--p")
+            "maps-missing-executable" -> builtin.maps.lineSequence().drop(1).joinToString("\n")
+            "maps-extra-provider" -> builtin.maps + "5000-6000 r-xp 00000000 08:01 125 /lib/libpython3.so\n"
+            else -> changedBuiltin.maps
+        }
+        val math = if (maps != changedBuiltin.maps) {
+            changedBuiltin.copy(maps = maps, mapsSha256 = sha256(maps.toByteArray()))
+        } else {
+            changedBuiltin
+        }
+        val modules = when (failure) {
+            "missing-fractions" -> original.modules - "fractions"
+            "missing-numbers" -> original.modules - "numbers"
+            "ambiguous-math" -> arithmetic.modules
+            else -> original.modules
+        }
+        val changed = original.copy(modules = modules, builtinMath = math)
+        val bound = if (failure == "child-mismatch") {
+            boundReceipt(original).copy(groundArithmetic = original.copy(builtinMath = builtin.copy(loader = "other")))
+        } else {
+            boundReceipt(changed)
+        }
+
+        val result = MpsSourceValidation.checkerResult(0, Reports.json.encodeToString(bound), record, bindings, tools)
+
+        assertEquals("unknown", result.validation.status)
+        assertNull(result.validation.checkedWitness)
+    }
+
     @Test
     fun `a bound ground receipt should retain the literal witness and separate checker timings`() {
         val result = MpsSourceValidation.checkerResult(0, Reports.json.encodeToString(receipt), record, bindings, tools)
