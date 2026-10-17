@@ -398,7 +398,17 @@ class ExactLiraSearchComponent private constructor(
                 observeCompleteStage(if (preference == null) "POINT_HINT_NO_PREFERENCE" else "POINT_HINT_PREFERRED")
                 if (preference == null && defaultOpening && model.numRealVars > 0) {
                     when (cached) {
-                        UNASSIGNED -> observeCompleteStage("POINT_HINT_DEFAULT_UNCOVERED")
+                        UNASSIGNED -> {
+                            observeCompleteStage("POINT_HINT_DEFAULT_UNCOVERED")
+                            if (completeTraversalObserved && smtStats != null) {
+                                val stage = if (arithmeticVariables.contains(variable)) {
+                                    "POINT_HINT_DEFAULT_UNCOVERED_IN_ARITHMETIC_SET"
+                                } else {
+                                    "POINT_HINT_DEFAULT_UNCOVERED_OUTSIDE_ARITHMETIC_SET"
+                                }
+                                observeCompleteStage(stage)
+                            }
+                        }
                         DECLINED_HINT -> observeCompleteStage("POINT_HINT_DEFAULT_DECLINED")
                     }
                 }

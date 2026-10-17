@@ -218,6 +218,20 @@ stage counters add diagnostic map updates, with no additional scan, arithmetic,
 poll, charge or allowance. Their owner label does not imply a complete Boolean
 assignment, and their counts establish neither cost nor witness validity.
 
+Observed uncovered consultations also distinguish membership in the prepared
+component's structural arithmetic dependency set with
+`POINT_HINT_DEFAULT_UNCOVERED_IN_ARITHMETIC_SET` and
+`POINT_HINT_DEFAULT_UNCOVERED_OUTSIDE_ARITHMETIC_SET`. This set includes Boolean
+activators and coefficient references from rows with numeric terms, plus recognized
+numeric-choice guards. It is a conservative structural set over the component's
+prepared rows; it does not follow clause or CP dependencies transitively or test
+current numerical influence. A Boolean outside it can still have a logical
+obligation. The split reads the existing set once after the cache lookup, only for
+an observed default real opening with a stats sink. Its fixed counters and membership
+read add diagnostic overhead, including possible boxing, without a new index,
+scan, arithmetic, stop poll or allowance. Neither category identifies original
+declaration roles, unused variables or source ownership.
+
 Complete-traversal observations retain the hint producer's registration result when
 registration precedes traversal reporting. They distinguish unsupported numeric
 shape, dimension or activated-row entry limits, invalid activators, absent activated

@@ -252,6 +252,8 @@ class QfLiraSolverHintsTest {
                 assertEquals(if (defaultOpening) 1L else 0L, observed.defaultGraphHintReleases)
                 assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_UNCOVERED"))
                 assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_DECLINED"))
+                assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_UNCOVERED_IN_ARITHMETIC_SET"))
+                assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_UNCOVERED_OUTSIDE_ARITHMETIC_SET"))
             }
         }
     }
@@ -308,6 +310,69 @@ class QfLiraSolverHintsTest {
                     val classified = if (complete && defaultOpening) 1L else null
                     assertEquals(classified, stages?.get("POINT_HINT_DEFAULT_UNCOVERED"))
                     assertEquals(classified, stages?.get("POINT_HINT_DEFAULT_DECLINED"))
+                    assertNull(stages?.get("POINT_HINT_DEFAULT_UNCOVERED_IN_ARITHMETIC_SET"))
+                    assertEquals(classified, stages?.get("POINT_HINT_DEFAULT_UNCOVERED_OUTSIDE_ARITHMETIC_SET"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `uncovered hint observations should distinguish arithmetic guards from clause constrained variables`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(
+                RealChoice(Lit.make(0, true), 2, 0, 1),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(1, true))),
+            ),
+        )
+        for (complete in listOf(false, true)) {
+            for (withStats in listOf(false, true)) {
+                var charged = 0L
+                val stop = object : Cancellation {
+                    override fun isCancelled(): Boolean = false
+                    override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                }
+                val stats = SmtStatsSink()
+                model.componentPlan().search(
+                    model, emptyMap(), Long.MAX_VALUE, stop, SearchLearnedDbParams(),
+                    if (withStats) stats else null,
+                ).use { planned ->
+                    val component = assertIs<ExactLiraSearchComponent>(planned.theory)
+                    if (complete) component.observeCompleteTraversal()
+                    assertIs<ComponentResult.Consistent>(planned.session.initialize())
+                    assertNull(planned.session.boolValue(0))
+                    assertNull(planned.session.boolValue(1))
+                    assertNull(planned.session.boolValue(2))
+                    assertTrue(component.partialPointHintAvailable())
+                    val beforeConsultation = charged
+
+                    assertNull(planned.candidateHints.preferredBool(0))
+                    assertNull(planned.candidateHints.preferredBool(2))
+
+                    assertEquals(beforeConsultation, charged)
+                    val stages = stats.snapshot().completeSearchStages
+                    val observed = complete && withStats
+                    assertEquals(if (observed) 2L else null, stages?.get("POINT_HINT_DEFAULT_UNCOVERED"))
+                    assertEquals(if (observed) 1L else null,
+                        stages?.get("POINT_HINT_DEFAULT_UNCOVERED_IN_ARITHMETIC_SET"))
+                    assertEquals(if (observed) 1L else null,
+                        stages?.get("POINT_HINT_DEFAULT_UNCOVERED_OUTSIDE_ARITHMETIC_SET"))
+
+                    assertIs<ComponentResult.Consistent>(
+                        planned.session.push(SearchDecision.Bool(Lit.make(2, false))),
+                    )
+                    assertEquals(true, planned.session.boolValue(1))
+                    planned.session.popTo(0)
+                    assertNull(planned.session.boolValue(1))
+                    assertNull(planned.session.boolValue(2))
                 }
             }
         }
@@ -343,6 +408,8 @@ class QfLiraSolverHintsTest {
                 assertNull(stages?.get("POINT_HINT_NO_PREFERENCE"))
                 assertNull(stages?.get("POINT_HINT_DEFAULT_UNCOVERED"))
                 assertNull(stages?.get("POINT_HINT_DEFAULT_DECLINED"))
+                assertNull(stages?.get("POINT_HINT_DEFAULT_UNCOVERED_IN_ARITHMETIC_SET"))
+                assertNull(stages?.get("POINT_HINT_DEFAULT_UNCOVERED_OUTSIDE_ARITHMETIC_SET"))
             }
         }
     }
@@ -1011,6 +1078,8 @@ class QfLiraSolverHintsTest {
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_NO_PREFERENCE"))
                 assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_UNCOVERED"))
                 assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_DECLINED"))
+                assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_UNCOVERED_IN_ARITHMETIC_SET"))
+                assertNull(observed.completeSearchStages?.get("POINT_HINT_DEFAULT_UNCOVERED_OUTSIDE_ARITHMETIC_SET"))
                 assertEquals(complete, (observed.completeSearchStages?.get("POINT_HINT_LP_CAPTURE") ?: 0L) > 0L)
             }
         }
