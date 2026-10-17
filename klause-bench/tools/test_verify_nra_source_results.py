@@ -190,9 +190,9 @@ class NraSourceCheckTest(unittest.TestCase):
                 check.check_witness(source, witness)
 
     def test_integer_division_checks_euclidean_signs_without_a_solver_query(self):
-        for divisor, quotient in ((3, -3), (-3, 3)):
-            source = '(declare-const a Int) (assert (= (div a ' + str(divisor) + ') ' + str(quotient) + ')) ' \
-                     '(assert (= (mod a ' + str(divisor) + ') 2))'
+        for divisor, quotient in (('3', '(- 3)'), ('(- 3)', '3')):
+            source = '(declare-const a Int) (assert (= (div a ' + divisor + ') ' + quotient + ')) ' \
+                     '(assert (= (mod a ' + divisor + ') 2))'
             with self.subTest(divisor=divisor), \
                     mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
                 result = check.check_witness(source, '((define-fun a () Int (- 7)))')
