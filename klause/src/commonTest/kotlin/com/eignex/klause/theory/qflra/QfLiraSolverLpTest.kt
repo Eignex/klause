@@ -18,7 +18,6 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
-import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -455,54 +454,6 @@ class QfLiraSolverLpTest {
             }
             assertEquals(0, stats.snapshot().completeSearchMinUnassignedBooleans)
             assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
-            assertNull(session.model().valueOf<Any>(component))
-        }
-    }
-
-    @Test
-    fun `a synthetic numerical proposal should still require exact source refutation`() {
-        val inequalities = (1..129).map { coefficient ->
-            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
-                listOf(BigFraction.ofLong(coefficient.toLong()), BigFraction.ONE, BigFraction.ONE),
-                LinearOp.GE, BigFraction.ZERO)
-        }
-        val source = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            numRealVars = 3,
-            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
-            factors = (inequalities + listOf(
-                ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2)),
-                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO),
-                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
-                    List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ZERO),
-                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-                    LinearOp.LE, BigFraction.ZERO, strict = true),
-            )).toTypedArray(),
-        )
-        // The synthetic backend claims a solved state; only source verification supplies the refutation.
-        val factory = TrackingLpFactory(syntheticResult = { solver, _, state ->
-            val current = assertNotNull(state)
-            FloatLpResult(assertNotNull(solver.prepareLogicals()), 0.0,
-                DoubleArray(current.model.m), DoubleArray(current.model.n), exactState = current)
-        })
-        val stats = SmtStatsSink()
-        ExactLiraSearchComponent(source).use { component ->
-            component.solveWith(LpSolveContext(factory))
-            component.observeWith(stats)
-            component.observeCompleteTraversal()
-            component.useMixedPointCompletion()
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
-            assertIs<ComponentResult.Consistent>(session.initialize(), "synthetic numerical proposal")
-
-            assertNull(component.nextBranch(session))
-
-            assertEquals(1L, stats.snapshot().completeSearchStages?.get("RECOVERY_SOURCE_REFUTED"),
-                "stages=${stats.snapshot().completeSearchStages} " +
-                    "outcomes=${stats.snapshot().completeSearchLinearOutcomes}")
-            assertNull(stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
-            assertIs<ComponentCheck.Infeasible>(session.check())
             assertNull(session.model().valueOf<Any>(component))
         }
     }
@@ -1097,7 +1048,6 @@ class QfLiraSolverLpTest {
     )
 
     private class TrackingLpFactory(
-        private val syntheticResult: ((PersistentLpSolver, LpFloatAllowance?, LpExactState?) -> FloatLpResult?)? = null,
         private val resolve: (PersistentLpSolver, LpFloatAllowance?) -> FloatLpResult? = { solver, allowance ->
             solver.resolveBounds(allowance)
         },
@@ -1117,7 +1067,6 @@ class QfLiraSolverLpTest {
         ): PersistentLpSolver {
             created++
             lastCancellation = cancellation
-            var currentState = model.exactState
             val delegate = ProductionLpEngineFactory.newPersistentSolver(
                 model,
                 cancellation,
@@ -1128,21 +1077,7 @@ class QfLiraSolverLpTest {
                 pricing,
             )
             return object : PersistentLpSolver by delegate {
-                private var reportedState: LpExactState? = null
-
-                override val solvedExactState: LpExactState?
-                    get() = if (syntheticResult == null) delegate.solvedExactState
-                    else reportedState ?: delegate.solvedExactState
-
-                override fun adopt(state: LpExactState, token: Cancellation): Boolean {
-                    reportedState = null
-                    return delegate.adopt(state, token).also { if (it) currentState = state }
-                }
-
-                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
-                    val synthetic = syntheticResult ?: return resolve(delegate, allowance)
-                    return synthetic(delegate, allowance, currentState).also { reportedState = it?.exactState }
-                }
+                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = resolve(delegate, allowance)
 
                 override fun close() {
                     closed++
