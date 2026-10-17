@@ -12,7 +12,6 @@ import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -54,13 +53,13 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.parseBigInt
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 /** Compare default and private equivalent encoders through source routing and independent SMT witness checks. */
 object EncoderProviderProfile {
@@ -68,9 +67,11 @@ object EncoderProviderProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all {
+        require(
+            options.keys.all {
             it in setOf("inputs", "repeats", "warmups", "seed", "parser", "entry", "engine", "nodeLimit")
-        })
+        }
+        )
         val repeats = options["repeats"]?.toInt() ?: 3
         val warmups = options["warmups"]?.toInt() ?: 1
         val parser = options["parser"] ?: "source"
@@ -93,33 +94,33 @@ object EncoderProviderProfile {
         require(inputs.isNotEmpty() && inputs.all(File::isFile))
         output.resolve("provenance.json").writeText(
             buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("javaVersion", System.getProperty("java.version"))
-            put("javaOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
-            put("processors", Runtime.getRuntime().availableProcessors())
-            put("parser", "source")
-            put("requestedParser", parser)
-            put("entry", entry)
-            put("engine", engine)
-            put("nodeLimit", nodeLimit)
-            put("seed", seed)
-            put("repeats", repeats)
-            put("warmups", warmups)
-            put(
-                "classpath",
-                buildJsonArray {
-                System.getProperty("java.class.path").split(File.pathSeparator).map(::File)
-                    .filter(File::isFile).forEach { file ->
-                        add(
-                            buildJsonObject {
-                            put("name", file.name)
-                            put("sha256", sha256(file.readBytes()))
-                        }
-                        )
-                    }
-            }
-            )
-        }.toString()
+                put("revision", Reports.readGitSha())
+                put("javaVersion", System.getProperty("java.version"))
+                put("javaOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
+                put("processors", Runtime.getRuntime().availableProcessors())
+                put("parser", "source")
+                put("requestedParser", parser)
+                put("entry", entry)
+                put("engine", engine)
+                put("nodeLimit", nodeLimit)
+                put("seed", seed)
+                put("repeats", repeats)
+                put("warmups", warmups)
+                put(
+                    "classpath",
+                    buildJsonArray {
+                        System.getProperty("java.class.path").split(File.pathSeparator).map(::File)
+                            .filter(File::isFile).forEach { file ->
+                                add(
+                                    buildJsonObject {
+                                        put("name", file.name)
+                                        put("sha256", sha256(file.readBytes()))
+                                    },
+                                )
+                            }
+                    },
+                )
+            }.toString(),
         )
         val checker = SmtStreamChecker(output)
         for ((index, input) in inputs.withIndex()) {
@@ -148,7 +149,9 @@ object EncoderProviderProfile {
                     val started = System.nanoTime()
                     val optimization = if (entry == "source-optimize") {
                         sourceOptimize(problem, engine, seed, stop, providers, nodeLimit)
-                    } else null
+                    } else {
+                        null
+                    }
                     val result = if (optimization != null) {
                         optimizationPoint(optimization)
                     } else if (entry == "source") {
@@ -160,66 +163,86 @@ object EncoderProviderProfile {
                                 .solve(LocalSearchParams(cancellation = stop, randomSeed = seed))
                         }
                     } else {
-                    val route = SourceSetup.prepare(SourceSetupRequest(
-                        problem.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-                        providers = providers, cancellation = stop, boundCancellation = stop,
-                    )).route
-                    when (route) {
-                        is SourceProblemRoute.NativeFormula -> error("factor routing selected a native formula")
-
-                        is SourceProblemRoute.OpenTheory -> {
-                            val execution = OpenTheoryPipeline.execute(
-                                route.request,
-                                TheoryParams(cancellation = stop, randomSeed = seed),
-                                FiniteEngine.BACKTRACK,
-                            )
-                            require(execution is OpenTheoryExecution.Satisfy)
-                            execution.result
-                        }
-
-                        is SourceProblemRoute.PolynomialTheory -> OpenTheoryPipeline.execute(
-                            route.request,
-                            PolynomialTheoryParams(
-                                cancellation = stop,
-                                strategy = PolynomialStrategyParams(
-                                backtrack = BacktrackParams(randomSeed = seed),
-                            )
-                            ),
+                        val route = SourceSetup.prepare(
+                            SourceSetupRequest(
+                            problem.source,
+                            ExecutionOperation.SATISFY,
                             FiniteEngine.BACKTRACK,
-                        ).result
+                            providers = providers,
+                            cancellation = stop,
+                            boundCancellation = stop,
+                        )
+                        ).route
+                        when (route) {
+                            is SourceProblemRoute.NativeFormula -> error("factor routing selected a native formula")
 
-                        is SourceProblemRoute.Finite -> {
-                            val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-                                route.problem, FiniteEngine.BACKTRACK,
-                                presolveConfig = PresolveConfig.NONE, explicitPresolveConfig = true,
-                                solutionSetSensitive = true, cancellation = stop,
-                                preparedPlan = route.preparedPlan,
-                            ))
-                            if (stop()) {
-                                OpenTheoryResult.Unknown(TerminationReason.Timeout, SolveStats.EMPTY, problem.semantics)
-                            } else if (prepared.presolve?.infeasible == true) {
-                                OpenTheoryResult.Unsat(SolveStats.EMPTY, problem.semantics)
-                            } else {
-                                when (val solved = BacktrackSolver(prepared.problem as BakedProblem).solve(
-                                    BacktrackParams(cancellation = stop, randomSeed = seed),
-                                )) {
-                                    is SolveResult.Sat -> OpenTheoryResult.Sat(
-                                        OpenTheoryAssignment.Sampled(prepared.reconstruct(solved.assignment)),
-                                        solved.stats, problem.semantics,
+                            is SourceProblemRoute.OpenTheory -> {
+                                val execution = OpenTheoryPipeline.execute(
+                                    route.request,
+                                    TheoryParams(cancellation = stop, randomSeed = seed),
+                                    FiniteEngine.BACKTRACK,
+                                )
+                                require(execution is OpenTheoryExecution.Satisfy)
+                                execution.result
+                            }
+
+                            is SourceProblemRoute.PolynomialTheory -> OpenTheoryPipeline.execute(
+                                route.request,
+                                PolynomialTheoryParams(
+                                    cancellation = stop,
+                                    strategy = PolynomialStrategyParams(
+                                        backtrack = BacktrackParams(randomSeed = seed),
+                                    ),
+                                ),
+                                FiniteEngine.BACKTRACK,
+                            ).result
+
+                            is SourceProblemRoute.Finite -> {
+                                val prepared = FinitePipeline.prepare(
+                                    FinitePipelineRequest(
+                                    route.problem,
+                                    FiniteEngine.BACKTRACK,
+                                    presolveConfig = PresolveConfig.NONE,
+                                    explicitPresolveConfig = true,
+                                    solutionSetSensitive = true,
+                                    cancellation = stop,
+                                    preparedPlan = route.preparedPlan,
+                                )
+                                )
+                                if (stop()) {
+                                    OpenTheoryResult.Unknown(
+                                        TerminationReason.Timeout, SolveStats.EMPTY, problem.semantics,
                                     )
-                                    is SolveResult.Unsat -> OpenTheoryResult.Unsat(solved.stats, problem.semantics)
-                                    is SolveResult.Unknown -> OpenTheoryResult.Unknown(
-                                        solved.reason, solved.stats, problem.semantics,
+                                } else if (prepared.presolve?.infeasible == true) {
+                                    OpenTheoryResult.Unsat(SolveStats.EMPTY, problem.semantics)
+                                } else {
+                                    when (
+                                        val solved = BacktrackSolver(prepared.problem as BakedProblem).solve(
+                                        BacktrackParams(cancellation = stop, randomSeed = seed),
                                     )
+                                    ) {
+                                        is SolveResult.Sat -> OpenTheoryResult.Sat(
+                                            OpenTheoryAssignment.Sampled(prepared.reconstruct(solved.assignment)),
+                                            solved.stats,
+                                            problem.semantics,
+                                        )
+
+                                        is SolveResult.Unsat -> OpenTheoryResult.Unsat(solved.stats, problem.semantics)
+
+                                        is SolveResult.Unknown -> OpenTheoryResult.Unknown(
+                                            solved.reason,
+                                            solved.stats,
+                                            problem.semantics,
+                                        )
+                                    }
                                 }
                             }
+
+                            SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
+
+                            is SourceProblemRoute.UnsupportedOpen ->
+                                error("unsupported source route: ${route.preparedPlan.decline}")
                         }
-
-                        SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
-
-                        is SourceProblemRoute.UnsupportedOpen ->
-                            error("unsupported source route: ${route.preparedPlan.decline}")
-                    }
                     }
                     val elapsed = System.nanoTime() - started
                     val verdict = when (result) {
@@ -237,47 +260,50 @@ object EncoderProviderProfile {
                     directory.resolve("stdout").writeText(stdout)
                     directory.resolve("measurement.json").writeText(
                         buildJsonObject {
-                        put("revision", Reports.readGitSha())
-                        put("sourceSha256", sha256(bytes))
-                        put("stdoutSha256", sha256(stdout.toByteArray()))
-                        put("mode", if (alternate) "private" else "default")
-                        put("round", round)
-                        put("verdict", verdict)
-                        put("entry", entry)
-                        put("engine", engine)
-                        put("nodeLimit", nodeLimit)
-                        optimization?.let { native ->
-                            put("optimizationVerdict", optimizationKind(native))
-                            put("sourceSense", problem.sense.name)
-                            put("nativeMinimizedValue", when (native) {
-                                is OpenTheoryOptimum.Optimal -> native.value.toString()
-                                is OpenTheoryOptimum.Unbounded -> native.value.toString()
-                                is OpenTheoryOptimum.Bounded -> native.value?.toString()
-                                is OpenTheoryOptimum.Infeasible -> null
-                            })
-                            put("terminationReason", (native as? OpenTheoryOptimum.Bounded)?.reason?.name)
-                        }
-                        put("reportedBackend", result.stats.run.backend)
-                        put("elapsedNs", elapsed)
-                        put("nativeWork", work)
-                        put("installations", installations)
-                        put("seed", seed)
-                        put("timeoutMs", 10000)
-                        put("independentProofCheck", false)
-                    }.toString()
+                            put("revision", Reports.readGitSha())
+                            put("sourceSha256", sha256(bytes))
+                            put("stdoutSha256", sha256(stdout.toByteArray()))
+                            put("mode", if (alternate) "private" else "default")
+                            put("round", round)
+                            put("verdict", verdict)
+                            put("entry", entry)
+                            put("engine", engine)
+                            put("nodeLimit", nodeLimit)
+                            optimization?.let { native ->
+                                put("optimizationVerdict", optimizationKind(native))
+                                put("sourceSense", problem.sense.name)
+                                put(
+                                    "nativeMinimizedValue",
+                                    when (native) {
+                                        is OpenTheoryOptimum.Optimal -> native.value.toString()
+                                        is OpenTheoryOptimum.Unbounded -> native.value.toString()
+                                        is OpenTheoryOptimum.Bounded -> native.value?.toString()
+                                        is OpenTheoryOptimum.Infeasible -> null
+                                    },
+                                )
+                                put("terminationReason", (native as? OpenTheoryOptimum.Bounded)?.reason?.name)
+                            }
+                            put("reportedBackend", result.stats.run.backend)
+                            put("elapsedNs", elapsed)
+                            put("nativeWork", work)
+                            put("installations", installations)
+                            put("seed", seed)
+                            put("timeoutMs", 10000)
+                            put("independentProofCheck", false)
+                        }.toString(),
                     )
                     if (result is OpenTheoryResult.Sat) {
                         check(
                             checker.check(
-                        directory,
-                        source,
-                        interrupted = false,
-                        minimumWitnesses = 1,
-                        provision = true,
-                    )
+                                directory,
+                                source,
+                                interrupted = false,
+                                minimumWitnesses = 1,
+                                provision = true,
+                            ),
                         ) {
-                        "source witness check failed: $directory"
-                    }
+                            "source witness check failed: $directory"
+                        }
                     }
                     println(
                         "source=$index alternate=$alternate round=$round " +
@@ -286,13 +312,15 @@ object EncoderProviderProfile {
                     )
                 }
                 if (entry == "source-optimize") {
-                    output.resolve("$index-comparison-$round.json").writeText(buildJsonObject {
+                    output.resolve("$index-comparison-$round.json").writeText(
+                        buildJsonObject {
                         put("sourceSha256", sha256(bytes))
                         put("round", round)
                         put("sameVerdict", results.distinct().size == 1)
                         put("verdicts", buildJsonArray { results.forEach { add(JsonPrimitive(it)) } })
                         put("independentProofCheck", false)
-                    }.toString())
+                    }.toString()
+                    )
                 } else {
                     check(results.distinct().size == 1) { "encoder modes disagreed for $input round=$round: $results" }
                 }
@@ -314,7 +342,9 @@ object EncoderProviderProfile {
         val spec = requireNotNull(problem.objective)
         val objective = LinearObjective(spec.boolWeights, spec.intCoefficients, spec.constant, spec.realCoefficients)
         val budget = nodeLimit?.let(::NodeBudget)
-        val strategy = if (engine == "cp") BacktrackSolver.source(factorSource(problem)) else {
+        val strategy = if (engine == "cp") {
+            BacktrackSolver.source(factorSource(problem))
+        } else {
             LocalSearchSolver.source(factorSource(problem))
         }
         val execution = strategy.withProjectionProviders(providers).optimizeOpen(
@@ -341,8 +371,11 @@ object EncoderProviderProfile {
 
     private fun optimizationPoint(result: OpenTheoryOptimum): OpenTheoryResult = when (result) {
         is OpenTheoryOptimum.Optimal -> OpenTheoryResult.Sat(result.assignment, result.stats)
+
         is OpenTheoryOptimum.Unbounded -> OpenTheoryResult.Sat(result.witness, result.stats)
+
         is OpenTheoryOptimum.Infeasible -> OpenTheoryResult.Unsat(result.stats)
+
         is OpenTheoryOptimum.Bounded -> result.incumbent?.let { OpenTheoryResult.Sat(it, result.stats) }
             ?: OpenTheoryResult.Unknown(result.reason, result.stats)
     }
@@ -357,96 +390,104 @@ object EncoderProviderProfile {
         }
         val selected = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val descriptor = BuiltInEncoderProvider.select(factor, target)
-            if (!descriptor.enforcesSource) {
-                descriptor
-            } else {
-                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                installations++
-                val result = descriptor.install(view, encoding)
-                encoding.cancellation.charge(1)
-                cancelled = true
-                check(encoding.cancellation()) { "installer cannot observe the containing token" }
-                result
-            }
-            }
-        }
+                val descriptor = BuiltInEncoderProvider.select(factor, target)
+                if (!descriptor.enforcesSource) {
+                    descriptor
+                } else {
+                    Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                        installations++
+                        val result = descriptor.install(view, encoding)
+                        encoding.cancellation.charge(1)
+                        cancelled = true
+                        check(encoding.cancellation()) { "installer cannot observe the containing token" }
+                        result
+                    }
+                }
+            },
         )
-        val route = SourceSetup.prepare(SourceSetupRequest(
-            problem.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-            providers = selected, cancellation = stop, boundCancellation = stop,
-        )).route
+        val route = SourceSetup.prepare(
+            SourceSetupRequest(
+            problem.source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+            providers = selected,
+            cancellation = stop,
+            boundCancellation = stop,
+        )
+        ).route
         val decline = (route as? SourceProblemRoute.UnsupportedOpen)?.preparedPlan?.decline
         if (installations != 0) {
             check(decline == PreparedPlanDecline.RESOURCE) {
-            "interrupted construction was admitted"
-        }
+                "interrupted construction was admitted"
+            }
         }
         directory.resolve("source.smt2").writeBytes(source)
         directory.resolve("measurement.json").writeText(
             buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("sourceSha256", sha256(source))
-            put("nativeWork", work)
-            put("installations", installations)
-            put("outcome", if (installations == 0) "inapplicable" else "resource")
-            put("independentProofCheck", false)
-        }.toString()
+                put("revision", Reports.readGitSha())
+                put("sourceSha256", sha256(source))
+                put("nativeWork", work)
+                put("installations", installations)
+                put("outcome", if (installations == 0) "inapplicable" else "resource")
+                put("independentProofCheck", false)
+            }.toString(),
         )
     }
 
     private fun providers(alternate: Boolean, installed: () -> Unit): FactorProjectionProviders =
         FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val selected = BuiltInEncoderProvider.select(factor, target)
-            if (alternate && target == EncodingTarget.POLYNOMIAL && selected.enforcesSource) {
-                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                    installed()
-                    selected.install(view, encoding)
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (alternate && target == EncodingTarget.POLYNOMIAL && selected.enforcesSource) {
+                    Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                        installed()
+                        selected.install(view, encoding)
+                    }
+                } else if (alternate && target == EncodingTarget.DIFFERENCE) {
+                    Encoder(EncoderSupport.UNSUPPORTED)
+                } else if (!alternate || target != EncodingTarget.LINEAR || !selected.enforcesSource ||
+                    factor.linearForm?.rows?.any { it.activator != LinearRow.ALWAYS } != false
+                ) {
+                    selected
+                } else {
+                    Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                        installed()
+                        val form = requireNotNull(view.linearForm)
+                        val comparisons = form.rows.map { row ->
+                            val private = encoding.realAuxiliary()
+                            val coefficients = List(row.size) { coefficient(row, it) }
+                            val definition = List(row.size) { index ->
+                                EncodingLinearTerm.source(row.ref(index), coefficients[index].negated())
+                            } + EncodingLinearTerm.auxiliary(private, BigFraction.ONE)
+                            encoding.linearFormula(
+                                LinearEncodingFormula.Comparison(
+                                    EncodingAffineExpression(definition),
+                                    LinearOp.EQ,
+                                    BigFraction.ZERO,
+                                ),
+                            )
+                            LinearEncodingFormula.Comparison(
+                                EncodingAffineExpression(
+                                    listOf(
+                                        EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                                    ),
+                                ),
+                                row.relation,
+                                bound(row),
+                                row.strict,
+                            )
+                        }
+                        encoding.linearFormula(
+                            if (form is LinearForm.Disjunction) {
+                                LinearEncodingFormula.Or(comparisons)
+                            } else {
+                                LinearEncodingFormula.And(comparisons)
+                            },
+                        )
+                        null
+                    }
                 }
-            } else if (alternate && target == EncodingTarget.DIFFERENCE) {
-                Encoder(EncoderSupport.UNSUPPORTED)
-            } else if (!alternate || target != EncodingTarget.LINEAR || !selected.enforcesSource ||
-                factor.linearForm?.rows?.any { it.activator != LinearRow.ALWAYS } != false
-            ) {
-                selected
-            } else {
-                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                installed()
-                val form = requireNotNull(view.linearForm)
-                val comparisons = form.rows.map { row ->
-                    val private = encoding.realAuxiliary()
-                    val coefficients = List(row.size) { coefficient(row, it) }
-                    val definition = List(row.size) { index ->
-                        EncodingLinearTerm.source(row.ref(index), coefficients[index].negated())
-                    } + EncodingLinearTerm.auxiliary(private, BigFraction.ONE)
-                    encoding.linearFormula(
-                        LinearEncodingFormula.Comparison(
-                        EncodingAffineExpression(definition),
-                        LinearOp.EQ,
-                        BigFraction.ZERO,
-                    )
-                    )
-                    LinearEncodingFormula.Comparison(
-                        EncodingAffineExpression(
-                            listOf(
-                        EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
-                    )
-                        ),
-                        row.relation, bound(row), row.strict
-                    )
-                }
-                encoding.linearFormula(
-                    if (form is LinearForm.Disjunction) {
-                        LinearEncodingFormula.Or(comparisons)
-                    } else {
-                        LinearEncodingFormula.And(comparisons)
-                    },
-                )
-                null
-            }
-            }
-        }
+            },
         )
 
     private fun coefficient(row: LinearRow, index: Int): BigFraction = when (val constants = row.constants) {
@@ -455,11 +496,11 @@ object EncoderProviderProfile {
         is RealConstants -> requireNotNull(
             BigFraction.ofDouble(
                 if (index < constants.intCoefficients.size) {
-            constants.intCoefficients.at(index)
-        } else {
-            constants.realCoefficients.at(index - constants.intCoefficients.size)
-        }
-            )
+                    constants.intCoefficients.at(index)
+                } else {
+                    constants.realCoefficients.at(index - constants.intCoefficients.size)
+                },
+            ),
         )
     }
 
@@ -481,7 +522,7 @@ object EncoderProviderProfile {
             for ((id, coefficient) in objective.realCoefficients.withIndex()) {
                 if (coefficient != 0.0) {
                     value += requireNotNull(BigFraction.ofDouble(coefficient)) *
-                    rational(assignment.realValue(id))
+                        rational(assignment.realValue(id))
                 }
             }
             append("; objective=$value\n")
@@ -519,8 +560,8 @@ object EncoderProviderProfile {
         command += args
         output.resolve("launcher.json").writeText(
             buildJsonObject {
-            put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
-        }.toString()
+                put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
+            }.toString(),
         )
         val builder = ProcessBuilder(command).inheritIO()
         builder.environment()["KLAUSE_ENCODER_MEASURED_JVM"] = "1"
