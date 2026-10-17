@@ -59,10 +59,11 @@ class SourceExecutionTest {
             )) },
         )))
 
-        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(
-            first.result.nativeSourceMinimum,
-        ).reason)
-        assertEquals(FiniteSolveVerdict.UNKNOWN, assertIs<FiniteSolveOutcome.Completed>(first.result.outcome).verdict)
+        val retained = assertIs<MinimizeResult.BestFound>(first.result.nativeSourceMinimum)
+        assertEquals(TerminationReason.BudgetExhausted, retained.reason)
+        val outcome = assertIs<FiniteSolveOutcome.Completed>(first.result.outcome)
+        assertEquals(FiniteSolveVerdict.BEST_FOUND, outcome.verdict)
+        assertEquals(retained.sample, outcome.bestSample)
         assertIs<MinimizeResult.Optimal>(second.result.nativeSourceMinimum)
         assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(second.result.outcome).verdict)
         assertSame(stopped, first.invocation)
