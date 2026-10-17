@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -21,6 +22,24 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RetainedLinearQueriesTest {
+    @Test
+    fun `retained queries should not renew their containing node allowance`() {
+        val model = Problem(1, 0, emptyArray(), emptyArray())
+        val plan = model.componentPlan()
+        val budget = NodeBudget(1)
+        val queries = RetainedLinearQueries(model, TheoryParams(nodeBudget = budget), null) { stop, _ ->
+            plan.search(model, emptyMap(), cancellation = stop)
+        }
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+
+        queries.use {
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(condition, Cancellation.Never))
+            assertIs<ExactNeighborhoodResult.Undecided>(it.check(condition, Cancellation.Never))
+
+            assertEquals(1L, budget.spent)
+        }
+    }
+
     @Test
     fun `generated center preparation should preserve cancellation and one root opening`() {
         val source = Problem(1, 0, emptyArray(), emptyArray())

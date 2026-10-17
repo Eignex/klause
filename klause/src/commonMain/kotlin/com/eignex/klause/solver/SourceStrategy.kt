@@ -449,12 +449,21 @@ class SourceStrategy internal constructor(
         }
         val stop = polynomial.timeout or polynomial.cancellation or
             theory.timeout or theory.cancellation or selectedStop
-        val backtrack = polynomial.strategy.backtrack.copy(assumptions = assumptions, cancellation = stop)
-        val localSearch = polynomial.strategy.localSearch.copy(assumptions = assumptions, cancellation = stop)
-        val selectedBudget = if (engine == FiniteEngine.BACKTRACK) backtrack.nodeBudget else localSearch.nodeBudget
+        val selectedBudget = if (engine == FiniteEngine.BACKTRACK) {
+            polynomial.strategy.backtrack.nodeBudget
+        } else {
+            polynomial.strategy.localSearch.nodeBudget
+        }
         require(theory.nodeBudget == null || selectedBudget == null || theory.nodeBudget === selectedBudget) {
             "source execution requires one shared node allowance"
         }
+        val budget = selectedBudget ?: theory.nodeBudget
+        val backtrack = polynomial.strategy.backtrack.copy(
+            assumptions = assumptions, cancellation = stop, nodeBudget = budget,
+        )
+        val localSearch = polynomial.strategy.localSearch.copy(
+            assumptions = assumptions, cancellation = stop, nodeBudget = budget,
+        )
         val open = when (engine) {
             FiniteEngine.BACKTRACK -> theory.copy(
                 cancellation = stop,
@@ -463,7 +472,7 @@ class SourceStrategy internal constructor(
                     backtrack.maxDecisions,
                     backtrack.maxInstructions ?: Long.MAX_VALUE,
                 ),
-                nodeBudget = selectedBudget ?: theory.nodeBudget,
+                nodeBudget = budget,
                 randomSeed = backtrack.randomSeed ?: theory.randomSeed,
             )
 
@@ -474,7 +483,7 @@ class SourceStrategy internal constructor(
                     theory.maxInstructions ?: Long.MAX_VALUE,
                     localSearch.maxInstructions ?: Long.MAX_VALUE,
                 ).takeIf { it != Long.MAX_VALUE },
-                nodeBudget = selectedBudget ?: theory.nodeBudget,
+                nodeBudget = budget,
                 randomSeed = localSearch.randomSeed ?: theory.randomSeed,
             )
 
@@ -540,7 +549,7 @@ class SourceStrategy internal constructor(
         private fun supportsLocalHooks(): Boolean = localSearch.initialAssignment == null &&
             localSearch.pooledIncumbents == null && localSearch.lsObjective == null && localSearch.onEvent == null
         fun supportsOpen(engine: FiniteEngine): Boolean = supportsSource() && assumptions.isEmpty && when (engine) {
-            FiniteEngine.BACKTRACK -> backtrack.nodeBudget == null && backtrack.onEvent == null
+            FiniteEngine.BACKTRACK -> backtrack.onEvent == null
             FiniteEngine.LOCAL_SEARCH -> supportsLocalHooks()
             else -> false
         }
