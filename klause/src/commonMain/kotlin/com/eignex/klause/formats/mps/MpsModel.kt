@@ -5,6 +5,8 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.parseBigInt
 
 internal class MpsSourceNumber private constructor(
     private val rational: BigFraction?,
@@ -38,6 +40,12 @@ internal class MpsSourceNumber private constructor(
             return MpsSourceNumber(null, value.toRawBits(), value.toRawBits(), literalBound)
         }
     }
+}
+
+private val MPS_INFINITY_EXACT = BigFraction.of(parseBigInt("100000000000000000000"), BIG_ONE)
+
+internal fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
+    it.literalBound || (it.fraction > MPS_INFINITY_EXACT.negated() && it.fraction < MPS_INFINITY_EXACT)
 }
 
 internal class MpsSourceNumbers(
