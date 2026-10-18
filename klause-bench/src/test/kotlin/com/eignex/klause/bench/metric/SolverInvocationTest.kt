@@ -16,6 +16,49 @@ import kotlinx.serialization.encodeToString
 
 class SolverInvocationTest {
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `successful stderr should remain separate from solver output`(carriageReturn: Boolean) {
+        val ending = if (carriageReturn) "\\r\\n" else "\\n"
+
+        val result = SolverInvocation.invoke(
+            listOf("sh", "-c", "printf '%s$ending' 'prepared model' >&2; printf '%s\\n' '----------'"),
+            SolverInvocation.Dialect.MINIZINC,
+        )
+
+        assertEquals("prepared model\n", result.stderr)
+        assertTrue(result.stderrComplete)
+        assertEquals("----------\n", result.rawOutput)
+        assertEquals(true, result.feasible)
+    }
+
+    @Test
+    fun `oversized stderr should retain an incomplete bounded prefix`() {
+        val result = SolverInvocation.invoke(
+            listOf("sh", "-c", "printf '%20000s' '' >&2; printf '%s\\n' '----------'"),
+            SolverInvocation.Dialect.MINIZINC,
+        )
+
+        val text = assertNotNull(result.stderr)
+        assertTrue(text.isNotEmpty() && text.length <= 16 * 1024)
+        assertTrue(text.all { it == ' ' })
+        assertFalse(result.stderrComplete)
+        assertEquals("----------\n", result.rawOutput)
+    }
+
+    @Test
+    fun `legacy cached results should leave stderr diagnostics unavailable`() {
+        val legacy = """
+            {"feasible":true,"objective":1.0,"timeToBestMs":1,"proven":false,"stats":{},
+             "rawOutput":"----------\n","command":"cli"}
+        """.trimIndent()
+
+        val result = Reports.json.decodeFromString<SolverInvocation.Result>(legacy)
+
+        assertNull(result.stderr)
+        assertFalse(result.stderrComplete)
+    }
+
     @Test
     fun `exact FlatZinc objective comments should override decimal display`() {
         val lines = "_objective = 0.3333333333333333;\n% klause-exact: _objective = 1/3;\n----------"
