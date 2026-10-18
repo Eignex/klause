@@ -244,6 +244,8 @@ def review(catalog, output, scratch):
         reports.append(report)
         report.write({'record': 'schema', 'encoding': 'bytecode-source-bindings-v1',
                       'instructionLinesColumns': ['bci', 'lineEntryIndices'],
+                      'instructionTableLinesColumns': ['bci', 'tables'],
+                      'tableColumns': ['tableIndex', 'lineEntryIndices'],
                       'memberCandidateColumns': ['bytecodeClassOrdinal', 'declarationIndex'],
                       'bytecodeArchiveId': bytecode_item['id'], 'bytecodeReport': bytecode_proof(completion),
                       **{flag: False for flag in DENIED}})
