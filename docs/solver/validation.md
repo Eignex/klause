@@ -9,13 +9,18 @@ admission remain with their existing [evidence](evidence.md) and
 
 ## Finite and open coordinates
 
-`composedFixpoint` creates a private propagation session, seeds the caller's
-assumptions, pins the full Boolean and finite integer point, and checks the selected
-original-source relations. Prepared custom providers retain their selected factories
+`composedFixpoint` creates a private propagation session for the full Boolean and
+finite integer point and checks the selected original-source relations. A complete
+native integer point on a baked model without real coordinates seeds every coordinate
+before the first fixpoint. The point remains that session's private root when caller
+assumptions are applied, so incompatible caller pins still refute the point. Other
+representations retain incremental pinning after the caller's assumptions.
+Prepared custom providers retain their selected factories
 and required original checks. Explicit enforcing peers cover only their assigned
 relations. Rejection refutes the proposed point; it does not refute the source.
 Cancellation or unavailable required checking returns indeterminate. Every exit
-reports the session's propagation work through the caller's existing accounting hook.
+reports the session's propagation work through the caller's existing accounting hook,
+including zero work when point preparation is cancelled before constructing the session.
 No scratch propagation state survives a check.
 
 `verifyOpenWitness` checks discrete coverage, declared integer bounds and value sets,

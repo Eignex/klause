@@ -49,6 +49,7 @@ class PropagationSession private constructor(
     rootConflict: IntArray? = null,
     preparedBuffers: PropagationSessionBuffers? = null,
     preparedMark: PropagationState.LevelMark? = null,
+    initialAssumptions: Assumptions = Assumptions.None,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -79,7 +80,7 @@ class PropagationSession private constructor(
     private val state: PropagationState =
         preparedState ?: PropagationState(
             projection,
-            Assumptions.None,
+            initialAssumptions,
             nativeSat = nativeSat,
             pbLearning = pbLearning,
         ).also {
@@ -172,8 +173,7 @@ class PropagationSession private constructor(
      *  Not sticky — a probe leaves no partial state behind, so a paused arm resumes on this session. */
     internal var probeCancelled: Boolean = false
 
-    /** Set non-null when bake-time propagation proved Unsat with no caller pins involved.
-     *  All session operations short-circuit to this result. */
+    // Initial point pins can refute this root while the underlying model remains feasible.
     private var bakedUnsat: PropagationResult.Unsat? = null
 
     internal val rootWork: Long
@@ -183,7 +183,8 @@ class PropagationSession private constructor(
 
     init {
         val conflict = if (preparedState == null) {
-            state.runToFixpoint(allFactors = true, cancellation = cancellation)
+            if (!state.seeded) state.conflictLevels ?: EmptyIntArray
+            else state.runToFixpoint(allFactors = true, cancellation = cancellation)
         } else {
             check(
                 state.rootFixpointStarted && !state.runCancelled &&
@@ -209,6 +210,13 @@ class PropagationSession private constructor(
     }
 
     internal companion object {
+        // Point pins belong to a disposable verification root, never a reusable search root.
+        fun forPointCheck(problem: BakedProblem, point: Assumptions, cancellation: Cancellation): PropagationSession =
+            PropagationSession(
+                problem, cancellation, PROPAGATION_CANCEL_FLOOR, false, false, PropagationProblem(problem),
+                initialAssumptions = point,
+            )
+
         fun preparation(
             state: PropagationState,
             cancellation: Cancellation,

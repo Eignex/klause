@@ -2,6 +2,7 @@ package com.eignex.klause.solver.validation
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SelectedProjectionChecks
@@ -33,27 +34,25 @@ internal fun <V> composedFixpoint(
     onWork: (Long) -> Unit = {},
 ): Verification<Sample, V> {
     val sample = candidate.assignment
-    val session = PropagationSession(problem, cancellation)
+    val finite = problem as? BakedProblem
+    val point = if (finite != null && problem.numRealVars == 0 && sample.exactInts == null &&
+        sample.numBoolVars == problem.numBoolVars && sample.numIntVars == problem.numIntVars
+    ) {
+        pointPins(sample, cancellation) ?: run {
+            onWork(0L)
+            return Verification.Indeterminate("point preparation cancelled")
+        }
+    } else null
+    val session = if (point != null) PropagationSession.forPointCheck(checkNotNull(finite), point, cancellation)
+    else PropagationSession(problem, cancellation)
     try {
         if (session.isUnsatAtRoot) return Verification.Rejected("root propagation refutes the assignment")
         if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
         if (!assumptions.isEmpty && session.seed(assumptions) is PropagationResult.Unsat) {
             return Verification.Rejected("the assumptions refute the assignment")
         }
-        for (b in 0 until problem.numBoolVars) {
-            if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
-            if (session.pinBool(b, sample.boolValue(b)) is PropagationResult.Unsat) {
-                return Verification.Rejected("bool $b = ${sample.boolValue(b)} conflicts")
-            }
-        }
-        for (v in 0 until problem.numIntVars) {
-            if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
-            if (session.pinInt(v, sample.intValue(v)) is PropagationResult.Unsat) {
-                return Verification.Rejected("int $v = ${sample.intValue(v)} conflicts")
-            }
-        }
-        // Sticky across every fixpoint above: a cut one leaves the state under-propagated, so a
-        // surviving assignment proves nothing.
+        if (point == null) pinPoint(session, sample, cancellation)?.let { return it }
+        // A cut fixpoint leaves the state under-propagated, so a surviving point proves nothing.
         if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
         val checks = session.projection.selection?.let { selection ->
             if (enforcingPeers.isEmpty()) selection.originalChecks
@@ -68,4 +67,42 @@ internal fun <V> composedFixpoint(
     } finally {
         onWork(session.work)
     }
+}
+
+private fun pointPins(sample: Sample, cancellation: Cancellation): Assumptions? {
+    val boolKeys = IntArray(sample.numBoolVars)
+    val boolValues = BooleanArray(sample.numBoolVars)
+    for (id in boolKeys.indices) {
+        if (cancellation()) return null
+        boolKeys[id] = id
+        boolValues[id] = sample.boolValue(id)
+    }
+    val intKeys = IntArray(sample.numIntVars)
+    val intValues = LongArray(sample.numIntVars)
+    for (id in intKeys.indices) {
+        if (cancellation()) return null
+        intKeys[id] = id
+        intValues[id] = sample.intValue(id)
+    }
+    return Assumptions(boolKeys, boolValues, intKeys, intValues)
+}
+
+private fun pinPoint(
+    session: PropagationSession,
+    sample: Sample,
+    cancellation: Cancellation,
+): Verification<Nothing, Nothing>? {
+    for (id in 0 until session.problem.numBoolVars) {
+        if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
+        if (session.pinBool(id, sample.boolValue(id)) is PropagationResult.Unsat) {
+            return Verification.Rejected("bool $id = ${sample.boolValue(id)} conflicts")
+        }
+    }
+    for (id in 0 until session.problem.numIntVars) {
+        if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
+        if (session.pinInt(id, sample.intValue(id)) is PropagationResult.Unsat) {
+            return Verification.Rejected("int $id = ${sample.intValue(id)} conflicts")
+        }
+    }
+    return null
 }
