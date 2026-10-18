@@ -536,6 +536,10 @@ incumbent and immutable result qualification; retained outcomes do not read late
 publication state. The selected finite request contributes its actual cancellation
 and deadline to original-unit publication checking before workers begin; supplying
 those controls through a deferred factory does not leave checking outside its scope.
+Original-linear point evaluation batches unmetered polls over at most 64 declaration,
+row and coefficient visits while retaining each visit's charge. Metered checks poll
+after every debit, and entry, acceptance and rejection poll the containing token
+directly. Batching grants no work, arithmetic or source-acceptance allowance.
 Native numerical execution retains its existing theory-work
 currency and cleanup owner, including when an original-unit callback fails.
 
