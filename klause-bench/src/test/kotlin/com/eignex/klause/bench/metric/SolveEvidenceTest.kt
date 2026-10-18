@@ -1,6 +1,8 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -85,18 +87,17 @@ class SolveEvidenceTest {
         assertEquals("(\n)", witness)
     }
 
-    @Test
-    fun `SMT witness size should be limited by the complete model length`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["", "1"])
+    fun `SMT witness size should be limited by the complete model length`(extra: String) {
         val prefix = "(\n  (define-fun x () Int "
         val suffix = ")\n)"
         val digits = "1".repeat(8 * 1024 * 1024 - prefix.length - suffix.length)
-        for (extra in listOf("", "1")) {
-            val model = "$prefix$digits$extra$suffix"
-            val raw = "sat\n(\n)\n$model\n"
+        val model = "$prefix$digits$extra$suffix"
+        val raw = "sat\n(\n)\n$model\n"
 
-            val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
+        val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
 
-            assertEquals(if (extra.isEmpty()) model else null, witness)
-        }
+        assertEquals(if (extra.isEmpty()) model else null, witness)
     }
 }

@@ -4,9 +4,12 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFiles
 import java.io.File
 import java.nio.file.Files
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertSame
 
 class BenchCacheTest {
 
@@ -101,5 +104,86 @@ class BenchCacheTest {
         )
 
         assertEquals("o 3\ns SATISFIABLE", BenchCache.compact(result).rawOutput)
+    }
+    @ParameterizedTest
+    @ValueSource(ints = [-1, 0])
+    fun `outputs within the character limit should retain the original result`(offset: Int) {
+        val raw = ("v " + "\u00e9 ".repeat(1_024).repeat(4_097)).take(8 * 1024 * 1024 + offset)
+        val result = SolverInvocation.Result(
+            feasible = true,
+            objective = 3.0,
+            timeToBestMs = 1L,
+            proven = false,
+            stats = emptyMap(),
+            rawOutput = raw,
+            command = "",
+        )
+
+        val compacted = BenchCache.compact(result)
+
+        assertSame(result, compacted)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["LF", "CR", "CRLF"])
+    fun `oversized output should normalize retained line endings and preserve trailing empty lines`(ending: String) {
+        val newline = when (ending) {
+            "LF" -> "\n"
+            "CR" -> "\r"
+            else -> "\r\n"
+        }
+        val model = "v " + "1 ".repeat(1_024).repeat(4_097)
+        val raw = listOf(model, "o 3", "", "v", "v\tkeep", "value", " v keep", "c note", "s SATISFIABLE", "")
+            .joinToString(newline)
+        val result = SolverInvocation.Result(
+            feasible = true,
+            objective = 3.0,
+            timeToBestMs = 1L,
+            proven = false,
+            stats = emptyMap(),
+            rawOutput = raw,
+            command = "",
+        )
+
+        val compacted = BenchCache.compact(result)
+
+        assertEquals(result.copy(rawOutput = "o 3\n\nv\nv\tkeep\nvalue\n v keep\nc note\ns SATISFIABLE\n"), compacted)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `an oversized model alone should be dropped with or without a trailing newline`(trailingNewline: Boolean) {
+        val model = ("v " + "1 ".repeat(1_024).repeat(4_097)).take(8 * 1024 * 1024 + 1)
+        val result = SolverInvocation.Result(
+            feasible = true,
+            objective = 3.0,
+            timeToBestMs = 1L,
+            proven = false,
+            stats = emptyMap(),
+            rawOutput = model + if (trailingNewline) "\n" else "",
+            command = "",
+        )
+
+        val compacted = BenchCache.compact(result)
+
+        assertEquals(result.copy(rawOutput = ""), compacted)
+    }
+
+    @Test
+    fun `oversized non-model output should be retained`() {
+        val raw = "c " + "1 ".repeat(1_024).repeat(4_097)
+        val result = SolverInvocation.Result(
+            feasible = true,
+            objective = 3.0,
+            timeToBestMs = 1L,
+            proven = false,
+            stats = emptyMap(),
+            rawOutput = raw,
+            command = "",
+        )
+
+        val compacted = BenchCache.compact(result)
+
+        assertEquals(result, compacted)
     }
 }
