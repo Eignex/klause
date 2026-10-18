@@ -165,6 +165,10 @@ replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see
 them.
 
+Batched integer exclusions construct endpoint reasons before publication. Undo
+logging records the prior state before replacing the domain; publication installs
+endpoint and interior reasons, schedules affected events and then wakes atoms.
+
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,
 suspension or retraction.
