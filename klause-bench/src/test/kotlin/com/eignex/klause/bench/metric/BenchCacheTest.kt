@@ -26,12 +26,17 @@ class BenchCacheTest {
             )) {
                 assertNotEquals(baseline, BenchCache.keyFor(model, null, "klause", budget, changed))
             }
-            for (policy in listOf(PINNED_SOURCE_POLICY, XCSP_SOURCE_POLICY)) {
+            for (policy in listOf(PINNED_SOURCE_POLICY, XCSP_SOURCE_POLICY, MPS_SOURCE_POLICY)) {
                 assertNotEquals(
                     baseline,
                     BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = policy),
                 )
             }
+            assertNotEquals(
+                BenchCache.keyFor(model, null, "klause", budget, build,
+                    validationPolicy = "mps-original-ground-witness-v1"),
+                BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = MPS_SOURCE_POLICY),
+            )
             assertNotEquals(
                 BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = "xcsp3-source-witness-v1"),
                 BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = XCSP_SOURCE_POLICY),
@@ -84,7 +89,7 @@ class BenchCacheTest {
 
     @Test
     fun `an oversized output should keep status and objective lines and drop model lines`() {
-        val model = "v " + "1 ".repeat(5_000_000)
+        val model = "v " + "1 ".repeat(1_024).repeat(4_097)
         val result = SolverInvocation.Result(
             feasible = true,
             objective = 3.0,

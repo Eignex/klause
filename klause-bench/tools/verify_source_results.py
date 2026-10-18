@@ -1,6 +1,7 @@
 """Check source verdicts, exact proofs and MPS tolerance witnesses with original source arithmetic."""
 
 import fractions
+from dataclasses import dataclass
 import hashlib
 import io
 import json
@@ -103,11 +104,27 @@ def rational(value):
     return z3.RealVal(f"{value.numerator}/{value.denominator}")
 
 
-def mps(text, tolerance=False):
+@dataclass(frozen=True)
+class MpsSource:
+    rows: dict
+    coefficients: dict
+    rhs: dict
+    ranges: dict
+    lower: dict
+    upper: dict
+    indicators: dict
+    columns: set
+    integer: set
+    objective_row: object
+    maximize: bool
+
+
+def parse_mps(text, *, ground_source=False):
     section, objective_row, maximize, marker = None, None, False, False
     rows, coefficients, rhs, ranges, lower, upper, indicators = {}, {}, {}, {}, {}, {}, {}
     columns, integer = set(), set()
     vector_names = {}
+    ended = False
     for raw in text.splitlines():
         parts = raw.split()
         if not parts or raw.startswith("*"):
@@ -119,6 +136,7 @@ def mps(text, tolerance=False):
             if section != "NAME" and len(parts) != 1:
                 raise ValueError(f"unsupported inline MPS section {section}")
             if section == "ENDATA":
+                ended = True
                 break
             continue
         if section == "OBJSENSE":
@@ -155,6 +173,13 @@ def mps(text, tolerance=False):
                 assert row not in target
                 target[row] = value
         elif section == "BOUNDS":
+            if ground_source:
+                if len(parts) not in (3, 4):
+                    raise ValueError('unsupported MPS BOUNDS entry')
+                if parts[0] not in ('FR', 'MI', 'PL', 'BV') and len(parts) != 4:
+                    raise ValueError('missing MPS bound value')
+                if parts[2] not in columns:
+                    raise ValueError('BOUNDS references unknown source column')
             kind, vector, column = parts[:3]
             if vector_names.setdefault(section, vector) != vector:
                 raise ValueError("multiple MPS BOUNDS vectors are unsupported")
@@ -183,22 +208,58 @@ def mps(text, tolerance=False):
                 integer.add(column)
         elif section == "INDICATORS":
             assert parts[0] == "IF"
+            if ground_source and (len(parts) != 4 or parts[1] in indicators):
+                raise ValueError('unsupported or duplicate MPS indicator')
             indicators[parts[1]] = (parts[2], parts[3])
         else:
             raise ValueError(f"unsupported MPS data section {section}")
     assert all(row in rows for row in coefficients), "unknown MPS row"
+    if ground_source:
+        if not ended or marker:
+            raise ValueError('incomplete MPS source')
+        if any(row not in rows or rows[row] == 'N' for row in ranges):
+            raise ValueError('unsupported MPS range row')
+        if any(row not in rows for row in rhs):
+            raise ValueError('unknown MPS RHS row')
+        for row, (column, value) in indicators.items():
+            if row not in rows or rows[row] == 'N' or column not in integer or value not in ('0', '1'):
+                raise ValueError('unsupported MPS indicator reference')
+    return MpsSource(rows, coefficients, rhs, ranges, lower, upper, indicators, columns, integer, objective_row, maximize)
+
+
+def mps(text, tolerance=False, absolute_tolerance=fractions.Fraction('1e-7'),
+        relative_tolerance=fractions.Fraction('1e-7'), *, ground_source=False):
+    source = parse_mps(text, ground_source=ground_source)
+    rows = source.rows
+    coefficients = source.coefficients
+    rhs = source.rhs
+    ranges = source.ranges
+    lower = source.lower
+    upper = source.upper
+    indicators = source.indicators
+    columns = source.columns
+    integer = source.integer
+    objective_row = source.objective_row
+    maximize = source.maximize
     variables = {column: (z3.Int(column) if column in integer else z3.Real(column)) for column in columns}
     def slack(bound, magnitude=0):
         if not tolerance:
             return 0
-        scale = rational(max(fractions.Fraction(1), abs(fractions.Fraction(str(bound).replace('D', 'E')))))
-        return rational('1e-7') * z3.If(magnitude > scale, magnitude, scale)
+        scale = rational(abs(fractions.Fraction(str(bound).replace('D', 'E'))))
+        relative = rational(relative_tolerance) * z3.If(magnitude > scale, magnitude, scale)
+        absolute = rational(absolute_tolerance)
+        return z3.If(relative > absolute, relative, absolute)
 
     constraints = []
     for column, variable in variables.items():
         lo, hi = lower.get(column, "0"), upper.get(column)
         if column in integer and column not in lower and column not in upper:
             hi = "1"
+        if ground_source:
+            if lo is not None and abs(fractions.Fraction(lo.replace('D', 'E'))) >= 10 ** 20:
+                lo = None
+            if hi is not None and abs(fractions.Fraction(hi.replace('D', 'E'))) >= 10 ** 20:
+                hi = None
         if lo is not None:
             constraints.append(variable >= rational(lo) - slack(lo))
         if hi is not None:
@@ -210,17 +271,24 @@ def mps(text, tolerance=False):
             summed[column] = summed.get(column, 0) + fractions.Fraction(value.replace('D', 'E'))
         terms_by_row[row] = [rational(value) * variables[column] for column, value in summed.items()]
     activities = {row: z3.Sum(terms) for row, terms in terms_by_row.items()}
+    magnitude_terms = ({row: [rational(value) * variables[column] for column, value in entries]
+                        for row, entries in coefficients.items()} if ground_source and tolerance else terms_by_row)
     for row, kind in rows.items():
         if kind == "N":
             continue
         activity, bound = activities.get(row, z3.RealVal(0)), rational(rhs.get(row, "0"))
         span = fractions.Fraction(ranges[row].replace('D', 'E')) if row in ranges else None
-        magnitude = z3.Sum([z3.Abs(term) for term in terms_by_row.get(row, [])])
+        magnitude = (0 if ground_source and not tolerance else
+                     z3.Sum([z3.Abs(term) for term in magnitude_terms.get(row, [])]))
         assertions = []
         def above(side):
+            if ground_source and abs(fractions.Fraction(str(z3.simplify(side)))) >= 10 ** 20:
+                return z3.BoolVal(True)
             return activity >= side - slack(z3.simplify(side), magnitude)
 
         def below(side):
+            if ground_source and abs(fractions.Fraction(str(z3.simplify(side)))) >= 10 ** 20:
+                return z3.BoolVal(True)
             return activity <= side + slack(z3.simplify(side), magnitude)
 
         if kind in ("E", "G"):
@@ -241,18 +309,23 @@ def mps(text, tolerance=False):
 
 
 def mps_values(witness, variables):
+    integer = {name for name, variable in variables.items() if z3.is_int(variable)}
+    return mps_coordinate_values(witness, variables.keys(), integer)
+
+
+def mps_coordinate_values(witness, columns, integer):
     tokens = witness.split()
     assert tokens and tokens[0] == 'v', "invalid MPS witness"
     values = {}
     for token in tokens[1:]:
         assert token.count('=') == 1, "invalid MPS coordinate"
         name, value = token.split('=')
-        assert name in variables and name not in values, "unknown or duplicate MPS coordinate"
+        assert name in columns and name not in values, "unknown or duplicate MPS coordinate"
         assert re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[+-]?\d+/\d+', value), "invalid MPS value"
         value = fractions.Fraction(value)
-        assert not z3.is_int(variables[name]) or value.denominator == 1, "fractional integer MPS coordinate"
+        assert name not in integer or value.denominator == 1, "fractional integer MPS coordinate"
         values[name] = value
-    assert values.keys() == variables.keys(), "incomplete MPS witness"
+    assert values.keys() == columns, "incomplete MPS witness"
     return values
 
 
@@ -271,6 +344,15 @@ def mps_point(expression, variables, values):
                 substitutions.append((node, z3.IntVal(value.numerator) if z3.is_int(node) else rational(value)))
         else:
             pending.extend(node.children())
+    return z3.simplify(z3.substitute(expression, *substitutions))
+
+
+def mps_substitutions(variables, values):
+    return [(variable, z3.IntVal(values[name].numerator) if z3.is_int(variable) else rational(values[name]))
+            for name, variable in variables.items()]
+
+
+def mps_apply_point(expression, substitutions):
     return z3.simplify(z3.substitute(expression, *substitutions))
 
 
@@ -297,6 +379,147 @@ def mps_objective_matches(objective, variables, values, reported, exact_mode, ex
             except (OverflowError, ValueError):
                 pass
     return False
+
+
+def mps_ground_claim(record, raw_output, exact):
+    """Evaluate only the supplied original-source point; no satisfiability or optimum query."""
+    if type(exact) is not bool:
+        raise ValueError('missing exact/default request policy')
+    if record.get('command') is not None and exact_mode({'record': record}) != exact:
+        raise ValueError('producer command differs from requested exact/default policy')
+    if record.get('feasible') is not True or not isinstance(record.get('finalWitness'), str):
+        raise ValueError('no complete reported feasible MPS witness')
+    for line in raw_output.splitlines():
+        if 'klause-source-semantics:' not in line:
+            continue
+        expected = {'format=MPS', 'numeric=DECIMAL_LITERALS', 'overrides=true',
+                    'unbounded-int-lo=0', 'unbounded-int-hi=1', 'unbounded-real-lo=0',
+                    'unbounded-real-hi=open', 'absolute-tolerance=0', 'relative-tolerance=0'}
+        tokens = line.split('klause-source-semantics:', 1)[1].split()
+        if not exact or len(tokens) != len(expected) or set(tokens) != expected:
+            raise ValueError('overridden source semantics are outside original-file validation')
+    witnesses = [line for line in raw_output.splitlines() if line == 'v' or
+                 (len(line) > 1 and line[0] == 'v' and line[1].isspace())]
+    assert witnesses and witnesses[-1] == record['finalWitness'], 'retained final witness differs from stdout'
+    reported = record.get('exactObjective')
+    if reported is None:
+        reported = record.get('objective')
+    outputs = [line[2:].strip() for line in raw_output.splitlines() if line.startswith('o ')]
+    if record.get('kind') != 'optimize' or reported is None or not outputs:
+        raise ValueError('missing MPS objective custody')
+    assert fractions.Fraction(str(reported)) == fractions.Fraction(outputs[-1]), \
+        'retained objective differs from stdout'
+    return reported
+
+
+def mps_ground_result(exact_feasible, exact):
+    return {'exactFeasible': exact_feasible, 'toleranceAccepted': not exact and not exact_feasible,
+            'sourceTolerance': {'absolute': '0' if exact else '1/10000000',
+                                'relative': '0' if exact else '1/10000000'},
+            'solverSearchQueries': 0, 'proofCertificateChecked': False,
+            'witnessCheck': 'all original MPS rows bounds integrality and objective evaluated at supplied point'}
+
+
+
+def check_mps_z3_ground(text, record, raw_output, exact):
+    reported = mps_ground_claim(record, raw_output, exact)
+    rows, objective, variables, maximize = mps(text, ground_source=True)
+    assert record.get('maximize') is maximize, 'objective orientation differs from source'
+    values = mps_values(record['finalWitness'], variables)
+    substitutions = mps_substitutions(variables, values)
+    point_objective = mps_apply_point(-objective if maximize else objective, substitutions)
+    assert z3.is_true(z3.simplify(point_objective == rational(reported))), \
+        'point objective differs from reported objective'
+    exact_feasible = z3.is_true(mps_apply_point(z3.And(*rows), substitutions))
+    if exact:
+        assert exact_feasible, 'MPS point violates exact original source'
+    elif not exact_feasible:
+        tolerance_rows, _, _, _ = mps(text, tolerance=True, ground_source=True)
+        assert z3.is_true(mps_apply_point(z3.And(*tolerance_rows), substitutions)), \
+            'MPS point exceeds original source tolerance'
+    return mps_ground_result(exact_feasible, exact)
+
+
+def mps_evaluate_point(source, values, exact):
+    numbers = {}
+    def number(text):
+        if text not in numbers:
+            numbers[text] = fractions.Fraction(text.replace('D', 'E'))
+        return numbers[text]
+
+    for entries in source.coefficients.values():
+        for _, text in entries:
+            number(text)
+    for vector in (source.rhs, source.ranges, source.lower, source.upper):
+        for text in vector.values():
+            if text is not None:
+                number(text)
+    tolerance = fractions.Fraction(0 if exact else '1e-7')
+    exact_feasible, accepted = True, True
+    def side(activity, bound, above, magnitude=0):
+        if bound is None or abs(bound) >= 10 ** 20:
+            return True, True
+        gap = activity - bound if above else bound - activity
+        slack = max(tolerance, tolerance * max(abs(bound), magnitude))
+        return gap >= 0, gap >= -slack
+
+    for column in source.columns:
+        lo, hi = source.lower.get(column, '0'), source.upper.get(column)
+        if column in source.integer and column not in source.lower and column not in source.upper:
+            hi = '1'
+        for bound, above in ((lo, True), (hi, False)):
+            nominal, permitted = side(values[column], None if bound is None else number(bound), above)
+            exact_feasible &= nominal
+            accepted &= permitted
+    for row, kind in source.rows.items():
+        if kind == 'N':
+            continue
+        if row in source.indicators:
+            column, enabled = source.indicators[row]
+            if values[column] != number(enabled):
+                continue
+        activity, magnitude = fractions.Fraction(0), fractions.Fraction(0)
+        for column, coefficient in source.coefficients.get(row, ()):
+            term = number(coefficient) * values[column]
+            activity += term
+            magnitude += abs(term)
+        bound = number(source.rhs.get(row, '0'))
+        span = number(source.ranges[row]) if row in source.ranges else None
+        lo = bound if kind in ('E', 'G') else None
+        hi = bound if kind in ('E', 'L') else None
+        if span is not None:
+            if kind == 'L':
+                lo = bound - abs(span)
+            elif kind == 'G':
+                hi = bound + abs(span)
+            elif span < 0:
+                lo = bound + span
+            else:
+                hi = bound + span
+        for endpoint, above in ((lo, True), (hi, False)):
+            nominal, permitted = side(activity, endpoint, above, magnitude)
+            exact_feasible &= nominal
+            accepted &= permitted
+    objective = sum((number(coefficient) * values[column]
+                     for column, coefficient in source.coefficients.get(source.objective_row, ())), fractions.Fraction(0))
+    objective -= number(source.rhs.get(source.objective_row, '0'))
+    return objective, exact_feasible, accepted
+
+
+def check_mps_ground(text, record, raw_output, exact):
+    reported = mps_ground_claim(record, raw_output, exact)
+    source = parse_mps(text, ground_source=True)
+    assert record.get('maximize') is source.maximize, 'objective orientation differs from source'
+    values = mps_coordinate_values(record['finalWitness'], source.columns, source.integer)
+    objective, exact_feasible, accepted = mps_evaluate_point(source, values, exact)
+    assert objective == fractions.Fraction(str(reported)), 'point objective differs from reported objective'
+    if exact:
+        assert exact_feasible, 'MPS point violates exact original source'
+    else:
+        assert accepted, 'MPS point exceeds original source tolerance'
+    return mps_ground_result(exact_feasible, exact)
+
+
 
 
 def source(case, archive, source_root=None):
@@ -513,13 +736,25 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
         reported_objective = record.get("exactObjective")
         if reported_objective is None:
             reported_objective = record.get("objective")
+        is_smt = case["problem"]["suite"] in SMT_SUITES
+        captured_mps = not is_smt and record.get("stats", {}).get("sourcePolicy") == "captured-linear-source"
+        source_tolerance = None
+        if captured_mps:
+            policy = case.get('sourceTolerance')
+            assert isinstance(policy, dict) and policy.keys() == {'absolute', 'relative'}, \
+                'captured MPS source tolerance is absent or incomplete'
+            assert all(isinstance(value, str) for value in policy.values()), \
+                'captured MPS source tolerance requires rational text'
+            source_tolerance = tuple(fractions.Fraction(policy[key]) for key in ('absolute', 'relative'))
+            assert all(value >= 0 for value in source_tolerance), 'negative captured MPS source tolerance'
+            assert not exact or not any(source_tolerance), 'exact MPS request has nonzero captured tolerance'
         source_key = (case["problem"]["suite"], record["problem"], record["gitSha"], record["sourceHashes"]["model"])
         if source_key not in sources:
             sources[source_key] = source(case, archive, source_root)
         text = sources[source_key]
         key = (record["sourceHashes"]["model"], record["kind"], record["feasible"], str(reported_objective),
                record.get("exactObjective") is not None, record["proven"], record.get("maximize"),
-               record.get("finalWitness"), exact, tolerance_optimum,
+               record.get("finalWitness"), exact, tolerance_optimum, source_tolerance,
                record.get("stats", {}).get("lpRootBound") if root_bounds else None,
                record.get("stats", {}).get("lpRootBoundScale") if root_bounds else None)
         if key in cache:
@@ -547,7 +782,6 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
             assert not record["proven"] and reported_objective is None
             result["verdictCheck"] = "no claimed verdict"
         else:
-            is_smt = case["problem"]["suite"] in SMT_SUITES
             if is_smt:
                 parsed = z3.Optimize()
                 parsed.from_string(text)
@@ -562,7 +796,17 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
                 constraints, objective, variables, maximize = mps(text)
                 assert maximize == record["maximize"]
             assert reported_objective is None or objective is not None, "reported objective is absent from source"
-            solver, result['sourceQueryEncoding'], query = source_query_solver(constraints, variables, is_smt, objective)
+            query_constraints = constraints
+            tolerance_rows = None
+            if captured_mps:
+                result['sourceQuerySemantics'] = 'exact source' if exact else 'MPS tolerance acceptance'
+                result['sourceTolerance'] = dict(zip(('absolute', 'relative'), map(str, source_tolerance)))
+                if not exact:
+                    tolerance_rows, _, _, _ = mps(text, tolerance=True, absolute_tolerance=source_tolerance[0],
+                                                relative_tolerance=source_tolerance[1])
+                    query_constraints = tolerance_rows
+            solver, result['sourceQueryEncoding'], query = source_query_solver(
+                query_constraints, variables, is_smt, objective)
             if record["feasible"] is False:
                 assert record["proven"]
                 require_verdict(solver, z3.unsat, record["problem"], 'source infeasibility')
@@ -593,7 +837,7 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
                     result["witness"] = "exact source feasible" if exact_feasible else "not exact source feasible"
                     if reported_objective is not None:
                         assert mps_objective_matches(-objective if maximize else objective, variables, values,
-                                                     reported_objective, exact,
+                                                     reported_objective, exact or captured_mps,
                                                      record.get("exactObjective") is not None,
                                                      witness), "point objective differs from reported objective"
                         result["objectiveCheck"] = "source point objective matches"
@@ -603,7 +847,8 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
                     if exact:
                         assert exact_feasible, record["problem"]
                     else:
-                        tolerance_rows, _, _, _ = mps(text, tolerance=True)
+                        if tolerance_rows is None:
+                            tolerance_rows, _, _, _ = mps(text, tolerance=True)
                         accepted = all(z3.is_true(mps_point(row, variables, values)) for row in tolerance_rows)
                         result["toleranceAccepted"] = accepted
                         assert accepted, "MPS point exceeds source tolerance"

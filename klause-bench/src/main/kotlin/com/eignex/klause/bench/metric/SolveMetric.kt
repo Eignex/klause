@@ -155,7 +155,7 @@ internal object SolveMetric {
         val features = ReferenceStore.load()
         val resultRows = ArrayList<ReferenceEntry>()
         for (entry in entries) {
-            val (rec, raw) = solve(entry, solverId, settings, budget, tag, timestamp, sha)
+            val (rec, raw) = solve(entry, solverId, settings, budget, tag, timestamp, sha, evidenceRoot = outDir)
             raw?.let { File(outDir, flat(entry) + ".out").writeText(it) }
             File(outDir, flat(entry) + ".json").writeText(Reports.json.encodeToString(rec))
             val suite = ReferenceStore.suiteOf(entry.ref)
@@ -203,7 +203,7 @@ internal object SolveMetric {
             referenceRecord(ref, settings, budget, timestamp, sha, referenceSolver, File(dir, "$name.sol"))
         } else {
             runCatching { Runners.resolve(ref, settings.exact) }.fold(
-                { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha) },
+                { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha, evidenceRoot = dir) },
                 { failure -> loadFailureRecord(ref, solverId, settings, budget, timestamp, sha, failure) to null },
             )
         }
@@ -367,6 +367,9 @@ internal object SolveMetric {
         },
         invoke: (ResolvedProblem, String, SolverInvocation.Settings, Budget, Boolean) -> SolverInvocation.Result =
             SolverInvocation::run,
+        evidenceRoot: File = File("output", tag),
+        validateMps: (ProblemRef, SolveRecord, String, Boolean, File) -> MpsSourceValidation.Result =
+            MpsSourceValidation::validate,
     ): Pair<SolveRecord, String?> {
         val optimize = entry.objective != null
         val kind = if (optimize) "optimize" else "satisfy"
@@ -378,11 +381,15 @@ internal object SolveMetric {
             provenance = installedBuild()
             val sourceParams = SourceValidationParams(settings)
             val checkSource = solverId == SolverInvocation.KLAUSE && (entry.hasFloats || sourceParams.requested)
-            require(!sourceParams.requested || entry.ref.format in setOf(Format.MINIZINC, Format.XCSP3)) {
-                "source-validation requires a MiniZinc or XCSP3 source"
+            require(!sourceParams.requested || entry.ref.format in setOf(Format.MINIZINC, Format.XCSP3, Format.MPS)) {
+                "source-validation requires a MiniZinc, XCSP3 or MPS source"
             }
             val policy = if (checkSource) {
-                if (entry.ref.format == Format.XCSP3) XCSP_SOURCE_POLICY else PINNED_SOURCE_POLICY
+                when (entry.ref.format) {
+                    Format.XCSP3 -> XCSP_SOURCE_POLICY
+                    Format.MPS -> MPS_SOURCE_POLICY
+                    else -> PINNED_SOURCE_POLICY
+                }
             } else {
                 REPORTED_RESULT_POLICY
             }
@@ -404,7 +411,12 @@ internal object SolveMetric {
                     sourceOutputSha256 = if (sourceParams.requested) sha256(r.rawOutput.toByteArray()) else null,
                 )
             val checked = if (checkSource) {
-                val validation = if (r.feasible == true) {
+                val mps = if (entry.ref.format == Format.MPS) {
+                    validateMps(entry.ref, reported, r.rawOutput, settings.exact, evidenceRoot)
+                } else {
+                    null
+                }
+                val validation = mps?.validation ?: if (r.feasible == true) {
                     if (entry.ref.format == Format.XCSP3) {
                         Xcsp3SourceValidation.validate(entry.ref, r.rawOutput, r.exactObjective)
                     } else {
@@ -429,7 +441,8 @@ internal object SolveMetric {
                 } else {
                     validation
                 }
-                reported.sourceChecked(boundValidation, entry.floatApproximation)
+                reported.sourceChecked(boundValidation, entry.floatApproximation, witnessOnly = mps != null)
+                    .let { it.copy(stats = it.stats + mps?.stats.orEmpty()) }
             } else {
                 reported
             }
