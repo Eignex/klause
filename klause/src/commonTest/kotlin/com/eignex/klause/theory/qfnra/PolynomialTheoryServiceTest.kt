@@ -16,6 +16,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntegerBound
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
