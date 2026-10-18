@@ -89,7 +89,7 @@ class BenchCacheTest {
 
     @Test
     fun `an oversized output should keep status and objective lines and drop model lines`() {
-        val model = "v " + "1 ".repeat(5_000_000)
+        val model = "v " + "1 ".repeat(1_024).repeat(4_097)
         val result = SolverInvocation.Result(
             feasible = true,
             objective = 3.0,
