@@ -2,6 +2,10 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.pipeline.bindOpenTheoryWork
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
@@ -15,7 +19,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
 
 class SearchSessionTest {
 
@@ -103,9 +106,20 @@ class SearchSessionTest {
         )
         val derivation = SearchSession(listOf(ClauseSearchComponent(clauses)))
         assertIs<ComponentResult.Consistent>(derivation.initialize())
-        assertIs<SearchResult.Satisfied>(derivation.solve(4))
-        val reason = assertNotNull(derivation.reasonFor(0))
-        assertContentEquals(intArrayOf(0), reason.literals)
+        assertIs<ComponentResult.Consistent>(derivation.push(SearchDecision.Bool(1)))
+        val first = assertIs<ComponentResult.Conflict>(derivation.push(SearchDecision.Bool(3)))
+        val firstLearned = assertIs<SearchConflictResolution.Backjump>(
+            derivation.explainedConflict(first.explanation),
+        ).conflict
+        assertContentEquals(intArrayOf(0, 2), firstLearned.guardLiterals.sortedArray())
+        derivation.popTo(firstLearned.decisionLevel)
+        derivation.learn(SearchExplanation(firstLearned.guardLiterals))
+        val second = assertIs<ComponentResult.Conflict>(derivation.propagate())
+        val finalLearned = assertIs<SearchConflictResolution.Backjump>(
+            derivation.explainedConflict(second.explanation),
+        ).conflict
+        assertContentEquals(intArrayOf(0), finalLearned.guardLiterals)
+        val reason = SearchExplanation(finalLearned.guardLiterals)
         var undecided = false
         var propagations = 0
         val peer = object : SearchComponent {
@@ -131,67 +145,89 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `containing stops should prevent queued learned publication`() {
-        val clauses = listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)))
-        val derivation = SearchSession(listOf(ClauseSearchComponent(clauses)))
-        assertIs<ComponentResult.Consistent>(derivation.initialize())
-        val conflict = assertIs<ComponentResult.Conflict>(derivation.push(SearchDecision.Bool(1)))
-        val reason = assertIs<SearchConflictResolution.Backjump>(
-            derivation.explainedConflict(conflict.explanation),
-        ).conflict
-        assertContentEquals(intArrayOf(0), reason.guardLiterals)
-        for (cause in listOf(SearchStopCause.Timeout, SearchStopCause.Cancelled, SearchStopCause.WorkAllowance,
-            SearchStopCause.CheckAllowance, SearchStopCause.DecisionAllowance)) {
-            var token: Cancellation = Cancellation.Never
-            var nativeExhausted = false
-            var checks = 0
-            var decisions = 0
-            var propagations = 0
-            val cancellation = object : Cancellation {
-                override fun isCancelled() = token()
-                override fun deadline() = token.deadline()
-            }
-            val accounting = object : SearchExecutionAccounting {
-                override val exhausted: Boolean get() = nativeExhausted
-                override fun consumeCheck(): Boolean {
-                    checks++
-                    return true
-                }
-                override fun canCommitDecision(): Boolean {
-                    decisions++
-                    return true
-                }
-            }
-            val controls = SearchExecutionControlAdapter(cancellation, accounting)
-            val peer = object : SearchComponent {
-                override fun propagate(context: SearchContext): ComponentResult {
-                    propagations++
-                    return ComponentResult.Consistent
-                }
-            }
-            val session = SearchSession(listOf(ClauseSearchComponent(clauses), peer),
-                maxChecks = 0, executionControls = controls)
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            session.learn(SearchExplanation(reason.guardLiterals))
-            when (cause) {
-                SearchStopCause.Timeout -> token = Cancellation.after((-1).milliseconds)
-                SearchStopCause.Cancelled -> token = Cancellation { true }
-                SearchStopCause.WorkAllowance -> nativeExhausted = true
-                SearchStopCause.CheckAllowance -> assertFalse(session.consumeCheck())
-                SearchStopCause.DecisionAllowance -> session.markDecisionBudgetExhausted()
-                else -> error("unexpected containing stop")
-            }
-            val before = propagations
+    fun `retained learned clauses should survive a root rebuild and repair reset`() {
+        for (guarded in listOf(false, true)) {
+            val prefix = if (guarded) intArrayOf(0, 2) else intArrayOf(0)
+            val b = if (guarded) 2 else 1
+            val clauses = listOf(
+                Clause(prefix + intArrayOf(Lit.make(b, true), Lit.make(b + 1, true))),
+                Clause(prefix + intArrayOf(Lit.make(b, true), Lit.make(b + 1, false))),
+                Clause(prefix + intArrayOf(Lit.make(b, false), Lit.make(b + 2, true))),
+                Clause(prefix + intArrayOf(Lit.make(b, false), Lit.make(b + 2, false))),
+            )
+            val derivation = SearchSession(listOf(ClauseSearchComponent(clauses)))
+            assertIs<ComponentResult.Consistent>(derivation.initialize())
+            assertIs<ComponentResult.Consistent>(derivation.push(SearchDecision.Bool(1)))
+            if (guarded) assertIs<ComponentResult.Consistent>(derivation.push(SearchDecision.Bool(3)))
+            val first = assertIs<ComponentResult.Conflict>(
+                derivation.push(SearchDecision.Bool(Lit.make(b, false))),
+            )
+            val firstLearned = assertIs<SearchConflictResolution.Backjump>(
+                derivation.explainedConflict(first.explanation),
+            ).conflict
+            assertContentEquals(prefix + Lit.make(b, true), firstLearned.guardLiterals.sortedArray())
+            derivation.popTo(firstLearned.decisionLevel)
+            derivation.learn(SearchExplanation(firstLearned.guardLiterals))
+            val second = assertIs<ComponentResult.Conflict>(derivation.propagate())
+            val learned = assertIs<SearchConflictResolution.Backjump>(
+                derivation.explainedConflict(second.explanation),
+            ).conflict
+            assertContentEquals(prefix, learned.guardLiterals.sortedArray())
+            for (bounded in listOf(false, true)) {
+                val native = PropagationSession(Problem(b + 3, 0, emptyArray(), emptyArray()))
+                val cp = CpSearchComponent(native)
+                val session = SearchSession(listOf(cp, ClauseSearchComponent(clauses)))
+                val work = OpenTheoryWorkSink(if (bounded) 1L else Long.MAX_VALUE)
+                session.bindOpenTheoryWork(work)
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                session.learn(SearchExplanation(learned.guardLiterals))
+                assertIs<ComponentResult.Consistent>(session.propagate())
+                var fragment = 0L
+                val run = session.openRun(b + 3, decisionBudget = SearchDecisionBudget { --fragment >= 0L })
+                assertEquals(SearchRunEvent.Indeterminate.Budget, run.next())
+                assertTrue(session.decisionBudgetExhausted())
+                assertEquals(SearchStopCause.DecisionAllowance, session.executionControls.stopCause)
+                val spent = work.spent
+                session.popTo(0)
+                native.reseedFrom(Assumptions.None)
+                cp.rebase()
+                session.resetRootFacts()
+                if (bounded) assertFalse(work.hasAllowance())
 
-            val result = session.propagate()
+                val initialized = session.initialize()
 
-            assertIs<ComponentResult.Indeterminate>(result)
-            assertNull(session.boolValue(0))
-            assertNull(session.reasonFor(0))
-            assertEquals(before, propagations)
-            assertEquals(cause, controls.stopCause)
-            assertEquals(0, checks)
-            assertEquals(0, decisions)
+                assertIs<ComponentResult.Consistent>(initialized)
+                assertEquals(1, session.learnedClauseCount)
+                if (guarded) {
+                    assertNull(session.boolValue(0))
+                    assertNull(session.boolValue(1))
+                } else {
+                    assertEquals(true, session.boolValue(0))
+                    assertContentEquals(prefix, assertNotNull(session.reasonFor(0)).literals)
+                }
+                assertEquals(spent, work.spent)
+                assertTrue(session.decisionBudgetExhausted())
+                fragment = (b + 3).toLong()
+                run.reset()
+                assertTrue(session.decisionBudgetExhausted())
+                if (bounded) {
+                    assertEquals(SearchRunEvent.Indeterminate.Budget, run.next())
+                    assertEquals(spent, work.spent)
+                    assertEquals(SearchStopCause.WorkAllowance, session.executionControls.stopCause)
+                } else {
+                    assertIs<SearchRunEvent.Satisfied>(run.next())
+                    assertTrue(work.spent > spent)
+                    assertTrue(session.decisionBudgetExhausted())
+                    if (guarded) {
+                        assertEquals(false, session.boolValue(0))
+                        assertEquals(true, session.boolValue(1))
+                        assertContentEquals(prefix, assertNotNull(session.reasonFor(1)).literals.sortedArray())
+                    }
+                    for (clause in clauses) assertTrue(clause.literals.any {
+                        session.boolValue(it ushr 1) == (it and 1 == 0)
+                    })
+                }
+            }
         }
     }
 
@@ -222,55 +258,83 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `containing stops observed after a consistent learned phase should leave it undecided`() {
-        val clauses = listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)))
-        val derivation = SearchSession(listOf(ClauseSearchComponent(clauses)))
-        assertIs<ComponentResult.Consistent>(derivation.initialize())
-        val conflict = assertIs<ComponentResult.Conflict>(derivation.push(SearchDecision.Bool(1)))
-        val reason = assertIs<SearchConflictResolution.Backjump>(
-            derivation.explainedConflict(conflict.explanation),
-        ).conflict
-        assertContentEquals(intArrayOf(0), reason.guardLiterals)
-        for (cause in listOf(null, SearchStopCause.WorkAllowance, SearchStopCause.CheckAllowance,
-            SearchStopCause.DecisionAllowance, SearchStopCause.OperationAllowance)) {
-            lateinit var session: SearchSession
-            var armed = false
-            var propagations = 0
-            val cancellation = Cancellation {
-                armed && session.boolValue(0) == true && (cause == null || cause == SearchStopCause.OperationAllowance)
-            }
-            val accounting = object : SearchExecutionAccounting {
-                override val exhausted: Boolean get() = armed && session.boolValue(0) == true &&
-                    cause != null && cause != SearchStopCause.OperationAllowance
-                override val stopCause: SearchStopCause? get() = cause.takeIf { exhausted }
-            }
-            val controls = SearchExecutionControlAdapter(cancellation, accounting)
-            val peer = object : SearchComponent {
-                override fun propagate(context: SearchContext): ComponentResult {
-                    propagations++
+    fun `shared learned clauses should preserve completed fixpoints across slice pauses`() {
+        for (shape in listOf("empty", "unit", "binary")) {
+            val guarded = shape == "binary"
+            val prefix = if (guarded) intArrayOf(0, 2) else intArrayOf(0)
+            val b = if (guarded) 2 else 1
+            val clauses = listOf(
+                Clause(prefix + intArrayOf(Lit.make(b, true), Lit.make(b + 1, true))),
+                Clause(prefix + intArrayOf(Lit.make(b, true), Lit.make(b + 1, false))),
+                Clause(prefix + intArrayOf(Lit.make(b, false), Lit.make(b + 2, true))),
+                Clause(prefix + intArrayOf(Lit.make(b, false), Lit.make(b + 2, false))),
+            )
+            val derivation = SearchSession(listOf(ClauseSearchComponent(clauses)))
+            assertIs<ComponentResult.Consistent>(derivation.initialize())
+            assertIs<ComponentResult.Consistent>(derivation.push(SearchDecision.Bool(1)))
+            if (guarded) assertIs<ComponentResult.Consistent>(derivation.push(SearchDecision.Bool(3)))
+            val first = assertIs<ComponentResult.Conflict>(
+                derivation.push(SearchDecision.Bool(Lit.make(b, false))),
+            )
+            val firstLearned = assertIs<SearchConflictResolution.Backjump>(
+                derivation.explainedConflict(first.explanation),
+            ).conflict
+            assertContentEquals(prefix + Lit.make(b, true), firstLearned.guardLiterals.sortedArray())
+            derivation.popTo(firstLearned.decisionLevel)
+            derivation.learn(SearchExplanation(firstLearned.guardLiterals))
+            val second = assertIs<ComponentResult.Conflict>(derivation.propagate())
+            val learned = assertIs<SearchConflictResolution.Backjump>(
+                derivation.explainedConflict(second.explanation),
+            ).conflict
+            assertContentEquals(prefix, learned.guardLiterals.sortedArray())
+            val native = PropagationSession(Problem(b + 3, 0, emptyArray(), emptyArray()), Cancellation.Never)
+            val cp = CpSearchComponent(native)
+            var sliceExpired = false
+            var firstPause = true
+            val signal = object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    if (firstPause && context.decisionLevel > 0 && decision is SearchDecision.Bool) {
+                        firstPause = false
+                        sliceExpired = true
+                        context.requestCancellationPoll()
+                    }
                     return ComponentResult.Consistent
                 }
             }
-            session = SearchSession(listOf(ClauseSearchComponent(clauses), peer), executionControls = controls)
+            val session = SearchSession(listOf(cp, ClauseSearchComponent(clauses), signal),
+                cancellation = Cancellation { sliceExpired })
             assertIs<ComponentResult.Consistent>(session.initialize())
-            session.learn(SearchExplanation(reason.guardLiterals))
-            if (cause == SearchStopCause.OperationAllowance) controls.reportStop(cause)
-            val before = propagations
-            armed = true
+            if (shape != "empty") {
+                session.learn(SearchExplanation(learned.guardLiterals))
+                assertIs<ComponentResult.Consistent>(session.propagate())
+            }
+            val firstVariable = (0 until b + 3).first { session.boolValue(it) == null }
+            val run = session.openRun(b + 3, lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext) = SearchRunDisposition.Pause
+            })
 
-            val result = session.propagate()
+            val paused = run.next()
 
-            assertIs<ComponentResult.Indeterminate>(result)
-            assertEquals(true, session.boolValue(0))
-            assertContentEquals(intArrayOf(0), assertNotNull(session.reasonFor(0)).literals)
-            assertEquals(before, propagations)
-            assertEquals(cause ?: SearchStopCause.Cancelled, controls.stopCause)
-            assertFalse(session.hasNativeConflictResolver)
+            assertEquals(SearchRunEvent.Paused, paused)
+            assertEquals(false, session.boolValue(firstVariable))
+            assertEquals(if (shape == "empty") 0 else 1, session.learnedClauseCount)
+            if (guarded) {
+                assertEquals(true, session.boolValue(1))
+                assertContentEquals(prefix, assertNotNull(session.reasonFor(1)).literals.sortedArray())
+            }
+            val spent = native.work
+            sliceExpired = false
+            assertIs<SearchRunEvent.Satisfied>(run.next())
+            assertTrue(native.work >= spent)
+            assertNull(session.executionControls.stopCause)
+            for (clause in clauses) assertTrue(clause.literals.any {
+                session.boolValue(it ushr 1) == (it and 1 == 0)
+            })
         }
     }
 
     @Test
-    fun `a stopped shared phase should retain pending semantic delivery for resumption`() {
+    fun `component stops should preserve learned semantic facts for resumption`() {
         lateinit var session: SearchSession
         lateinit var clauses: ClauseSearchComponent
         var literal = -1
@@ -297,6 +361,8 @@ class SearchSessionTest {
                 delivered += decision
                 return ComponentResult.Consistent
             }
+            override fun propagate(context: SearchContext): ComponentResult =
+                if (context.cancelled()) ComponentResult.Indeterminate else ComponentResult.Consistent
         }
         session = SearchSession(listOf(source, peer), atoms = SearchAtomRegistry(2), executionControls = controls)
         assertIs<ComponentResult.Consistent>(session.initialize())
@@ -314,8 +380,9 @@ class SearchSessionTest {
 
         assertEquals(SearchLearnedConflictResult.Indeterminate, interrupted)
         assertEquals(true, session.boolValue(literal ushr 1))
-        assertNull(session.intUpperBound(0))
-        assertEquals(before, delivered.size)
+        assertEquals(-1L, session.intUpperBound(0))
+        assertEquals(1, delivered.count { it == SearchDecision.IntAtMost(0, -1) })
+        assertTrue(delivered.size > before)
         val level = session.decisionLevel
         stopped = false
         session.popTo(level)
@@ -332,7 +399,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `first attachment conflicts should survive an exit stop at the same level`() {
+    fun `initial learned clauses should report contradictions before component stop checks`() {
         for (guarded in listOf(false, true)) {
             val prefix = if (guarded) intArrayOf(0, 2) else intArrayOf(0)
             val b = if (guarded) 2 else 1
@@ -344,35 +411,46 @@ class SearchSessionTest {
             )
             val derivation = SearchSession(listOf(ClauseSearchComponent(clauses)))
             assertIs<ComponentResult.Consistent>(derivation.initialize())
-            assertIs<SearchResult.Satisfied>(derivation.solve(b + 3))
-            val reason = assertNotNull(derivation.reasonFor(if (guarded) 1 else 0))
-            assertContentEquals(prefix, reason.literals.sortedArray())
-            for (stop in listOf("live", "entry", "exit")) {
-                var armed = false
-                var polls = 0
-                val controls = SearchExecutionControlAdapter(Cancellation {
-                    armed && ++polls >= if (stop == "entry") 1 else 3
-                })
-                val session = SearchSession(listOf(ClauseSearchComponent(clauses)), executionControls = controls)
+            assertIs<ComponentResult.Consistent>(derivation.push(SearchDecision.Bool(1)))
+            if (guarded) assertIs<ComponentResult.Consistent>(derivation.push(SearchDecision.Bool(3)))
+            val first = assertIs<ComponentResult.Conflict>(
+                derivation.push(SearchDecision.Bool(Lit.make(b, false))),
+            )
+            val firstLearned = assertIs<SearchConflictResolution.Backjump>(
+                derivation.explainedConflict(first.explanation),
+            ).conflict
+            assertContentEquals(prefix + Lit.make(b, true), firstLearned.guardLiterals.sortedArray())
+            derivation.popTo(firstLearned.decisionLevel)
+            derivation.learn(SearchExplanation(firstLearned.guardLiterals))
+            val second = assertIs<ComponentResult.Conflict>(derivation.propagate())
+            val learned = assertIs<SearchConflictResolution.Backjump>(
+                derivation.explainedConflict(second.explanation),
+            ).conflict
+            assertContentEquals(prefix, learned.guardLiterals.sortedArray())
+            for (stopped in listOf(false, true)) {
+                var cancelled = false
+                var propagations = 0
+                val owner = object : SearchComponent {
+                    override fun propagate(context: SearchContext): ComponentResult {
+                        propagations++
+                        return if (context.cancelled()) ComponentResult.Indeterminate else ComponentResult.Consistent
+                    }
+                }
+                val session = SearchSession(listOf(ClauseSearchComponent(clauses), owner),
+                    cancellation = Cancellation { cancelled })
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
                 if (guarded) assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
-                session.learn(reason)
+                session.learn(SearchExplanation(learned.guardLiterals))
                 val level = session.decisionLevel
-                armed = stop != "live"
+                val before = propagations
+                cancelled = stopped
 
-                val first = session.propagate()
+                val result = session.propagate()
 
-                val result = if (stop == "entry") {
-                    assertIs<ComponentResult.Indeterminate>(first)
-                    armed = false
-                    session.popTo(level)
-                    session.propagate()
-                } else {
-                    first
-                }
-                val attachedConflict = assertIs<ComponentResult.Conflict>(result)
-                assertContentEquals(prefix, assertNotNull(attachedConflict.explanation).literals.sortedArray())
+                val conflict = assertIs<ComponentResult.Conflict>(result)
+                assertContentEquals(prefix, assertNotNull(conflict.explanation).literals.sortedArray())
+                assertEquals(before, propagations)
                 assertEquals(level, session.decisionLevel)
                 assertEquals(false, session.boolValue(0))
                 if (guarded) assertEquals(false, session.boolValue(1))
@@ -380,9 +458,6 @@ class SearchSessionTest {
                 assertEquals(1, session.learnedClauseCount)
                 assertFalse(session.hasNativeConflictResolver)
                 assertFalse(session.explanationIsOwnedElsewhere)
-                armed = false
-                session.popTo(level)
-                assertContentEquals(prefix, assertNotNull(attachedConflict.explanation).literals.sortedArray())
             }
         }
     }

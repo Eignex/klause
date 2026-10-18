@@ -61,20 +61,21 @@ component conflict retains its actual owner and returns before a subsequent shar
 Retraction preserves the metadata needed by a pending native conflict resolution; native
 learned continuations and producer exclusion retain their owners.
 
-The shared phase observes containing stops at entry and exit through existing
-[execution controls](resources.md#component-execution-controls). A stop at entry leaves
-attachments untouched and returns indeterminate. After a live entry, a completed valid
-learned conflict retains its named reason even when the exit observation detects a stop;
-other exit-stopped results are indeterminate. A learned contradiction can precede a
-component that would return indeterminate. Clauses, reasons
-and queued semantic delivery retain their ordinary retraction and resumption lifetimes.
-The kernel has no per-literal stop poll, so the observations supply no hard batch latency
-bound. Local operation allowances and representation declines alone are not containing
-stops. No operation or allowance is acquired, reset or refunded by the boundary.
-Existing diagnostic priority remains unchanged: a retained local allowance can mask raw
-cancellation in its reported cause, and transient observations gain no new cause carrier
-or sticky cancellation state. Final source publication retains its caller's checks; the
-internal conflict rule does not impose one stop priority on every public entry point.
+Shared clause propagation is cooperative and unpolled. Traversal, component and
+invocation owners retain cancellation and quota enforcement through their existing
+[execution controls](resources.md#component-execution-controls). A cooperative slice
+pauses at a traversal decision boundary after the current fixpoint; it does not turn a
+completed component operation into an undecided branch. Native CP propagation retains
+its whole-solve token separately from a traversal slice token. Shared learning neither
+interprets cached per-run diagnostics as a new propagation barrier nor clears them.
+
+Learned closure can finish before a component would consult its token or return
+indeterminate, and a valid learned contradiction retains its named reason. Boolean
+work can therefore precede an owner stop check. The kernel supplies no hard batch
+latency guarantee or universal stop priority. Clauses, reasons and semantic facts retain
+their ordinary retraction and resumption lifetimes. Shared learning acquires, resets
+and refunds no check, decision or native-work allowance. Final source publication
+retains each caller's stop checks, source scope and witness or proof authority.
 
 Watched-clause literal and signature indexes use primitive integer keys;
 clause identifiers and watch-list order remain stable across index growth and rebuilds.

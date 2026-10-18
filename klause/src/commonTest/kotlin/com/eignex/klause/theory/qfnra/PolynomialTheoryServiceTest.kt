@@ -118,7 +118,7 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `an exit stopped learned bound should retain polynomial delivery without publishing a stale point`() {
+    fun `a polynomial owner stop should preserve learned bounds for resumption`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const g Bool) (declare-const b Bool) (declare-const x Real) (declare-const k Real) " +
                 "(assert (= (* x x) k))",
@@ -162,7 +162,7 @@ class PolynomialTheoryServiceTest {
 
             assertEquals(SearchLearnedConflictResult.Indeterminate, result)
             assertEquals(true, session.boolValue(literal ushr 1))
-            assertNull(session.intUpperBound(0))
+            assertEquals(-1L, session.intUpperBound(0))
             assertEquals(spent, invocation.stats.workSpent)
             assertIs<ComponentCheck.Indeterminate>(session.check())
             stopped = false

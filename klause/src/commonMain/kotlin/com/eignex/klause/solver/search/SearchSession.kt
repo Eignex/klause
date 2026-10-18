@@ -877,27 +877,7 @@ class SearchSession(
     private fun propagateLearnedClauses(): ComponentResult {
         conflictOwner = null
         conflictResolver = null
-        if (containingStopObserved()) return ComponentResult.Indeterminate
-        val result = learning.propagate(this, trail.boolTrail)
-        val stopped = containingStopObserved()
-        return when {
-            result is ComponentResult.Conflict -> result
-            stopped -> ComponentResult.Indeterminate
-            else -> result
-        }
-    }
-
-    private fun containingStopObserved(): Boolean {
-        when (executionControls.stopCause) {
-            SearchStopCause.Timeout,
-            SearchStopCause.Cancelled,
-            SearchStopCause.WorkAllowance,
-            SearchStopCause.CheckAllowance,
-            SearchStopCause.DecisionAllowance,
-            -> return true
-            else -> Unit
-        }
-        return checksExhausted || decisionsExhausted || executionControls.exhausted || cancelled()
+        return learning.propagate(this, trail.boolTrail)
     }
 
     override fun truth(literal: Int): Boolean? = literalTruth(literal)
