@@ -82,6 +82,7 @@ internal fun Compiler.Builder.assert(top: SExpr) {
                 // and then force its literal true. A one-argument `=>` is just its argument.
                 h == "=>" && args.size >= 2 -> {
                     val lits = IntArray(args.size) { compileBool(args[it]) }
+                    affineRealTables.implication(lits, trueLitCache)
                     for (k in 0 until lits.size - 1) lits[k] = Lit.negate(lits[k])
                     factors.add(Clause(lits))
                     continue

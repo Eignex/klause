@@ -50,6 +50,7 @@ internal object Compiler {
         internal val intDomains = ArrayList<PresolveDomain>()
         internal val divModTerms = HashMap<SmtDivModKey, Pair<IntComb, IntComb>>()
         internal val realPredicates = SmtRealPredicates(sourceCancellation)
+        internal val affineRealTables = SmtLibAffineRealTables(sourceCancellation)
 
         /** Open `ite`-on-equality chains and the equality atoms their conditions are read from. */
         internal val iteChains = IteChainTable()
@@ -316,6 +317,7 @@ internal object Compiler {
         internal fun buildSource(): SmtLibProblem = build(includeObjective = false)
 
         private fun build(includeObjective: Boolean): SmtLibProblem {
+            affineRealTables.declarations(boolNames.values)
             inferBounds()
             retainDeclarationBounds()
             if (hasOpenProductOperand()) closeProductBounds()
@@ -330,6 +332,7 @@ internal object Compiler {
                 factors, intNames.values, boolNames.values, compiledObjective,
             )
             val objective = compactConditionalColumns(removed, compiledObjective)
+            factors.addAll(affineRealTables.infer())
             val sourceBounds = modelIntBounds()
 
             val model = Problem(
