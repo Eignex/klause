@@ -14,7 +14,9 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -134,6 +136,121 @@ class LinearSourceWitnessTest {
         val source = LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList())
 
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), Cancellation { true })
+
+        assertIs<LinearSourceCheck.Declined>(result)
+    }
+
+    @Test
+    fun `exact rows should retain wide rational coordinates and original objective units`() {
+        val large = parseBigInt("100000000000000000000000000000000000001")
+        val coordinate = BigFraction.of(large, bigIntOf(3))
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false,
+                SemanticRational.of(large, bigIntOf(3)), SemanticRational.of(large, bigIntOf(3)))),
+            listOf(LinearSourceRow(
+                listOf(LinearSourceTerm(0, SemanticRational.ofLong(7)),
+                    LinearSourceTerm(0, SemanticRational.ofLong(-7))),
+                SemanticRational.ZERO, SemanticRational.ZERO,
+            )),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.of(BIG_ONE, bigIntOf(7)))),
+                SemanticRational.of(BIG_ONE, bigIntOf(11))),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                absolute = SemanticRational.ONE, relative = SemanticRational.ONE,
+            )).resolve(),
+        )
+
+        val result = checkLinearSourceWitness(source, listOf(coordinate), Cancellation.Never)
+
+        val witness = assertIs<LinearSourceCheck.Accepted>(result).witness
+        assertTrue(witness.exact)
+        assertEquals(listOf(coordinate), witness.values)
+        assertEquals(BigFraction.of(large, bigIntOf(21)) + BigFraction.of(BIG_ONE, bigIntOf(11)), witness.objective)
+    }
+
+    @Test
+    fun `relative tolerance should retain both sides of canceling original rows`() {
+        for ((lower, upper) in listOf(
+            SemanticRational.ofLong(2) to null,
+            null to SemanticRational.ofLong(-2),
+            SemanticRational.ofLong(2) to SemanticRational.ofLong(2),
+            SemanticRational.ofLong(-2) to SemanticRational.ofLong(-2),
+            SemanticRational.ofLong(2) to SemanticRational.ofLong(3),
+        )) {
+            val source = LinearSourceProblem(
+                listOf(LinearSourceVariable("x", false)),
+                listOf(LinearSourceRow(listOf(
+                    LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(0, SemanticRational.ofLong(-1)),
+                ), lower, upper)),
+                semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                    relative = SemanticRational.of(BIG_ONE, bigIntOf(10)),
+                )).resolve(),
+            )
+
+            val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(10)), Cancellation.Never)
+
+            assertFalse(assertIs<LinearSourceCheck.Accepted>(result).witness.exact)
+        }
+    }
+
+    @Test
+    fun `a tolerant bound should remain inexact after later exact rows`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false, upper = SemanticRational.ONE)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(2))),
+                SemanticRational.ofLong(3), SemanticRational.ofLong(3))),
+            semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                absolute = SemanticRational.of(BIG_ONE, bigIntOf(2)),
+            )).resolve(),
+        )
+
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.of(bigIntOf(3), bigIntOf(2))),
+            Cancellation.Never)
+
+        assertFalse(assertIs<LinearSourceCheck.Accepted>(result).witness.exact)
+    }
+
+    @Test
+    fun `a row outside the available source tolerance should be rejected`() {
+        for (tolerance in listOf(
+            SourceTolerance(),
+            SourceTolerance(absolute = SemanticRational.ONE),
+            SourceTolerance(relative = SemanticRational.of(BIG_ONE, bigIntOf(20))),
+        )) {
+            val source = LinearSourceProblem(
+                listOf(LinearSourceVariable("x", false)),
+                listOf(LinearSourceRow(listOf(
+                    LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(0, SemanticRational.ofLong(-1)),
+                ), lower = SemanticRational.ofLong(2))),
+                semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
+            )
+
+            val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(10)), Cancellation.Never)
+
+            assertIs<LinearSourceCheck.Rejected>(result)
+        }
+    }
+
+    @Test
+    fun `relative row tolerance should stop on the containing work allowance`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false)),
+            listOf(LinearSourceRow(listOf(
+                LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(0, SemanticRational.ofLong(-1)),
+            ), lower = SemanticRational.ONE)),
+            semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                relative = SemanticRational.of(BIG_ONE, bigIntOf(10)),
+            )).resolve(),
+        )
+        var work = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 5L
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(10)), stop)
 
         assertIs<LinearSourceCheck.Declined>(result)
     }

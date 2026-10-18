@@ -94,6 +94,9 @@ of absolute tolerance and relative tolerance times the larger of bound magnitude
 the sum of absolute original term activities. Repeated canceling terms retain their
 individual magnitudes. Inactive indicator rows impose no constraint. Accepted points
 retain exact original objective units and whether nominal relations also hold.
+An exactly satisfied bound or row needs no tolerance arithmetic. A row outside its
+nominal interval computes individual term magnitudes only when relative tolerance
+is nonzero; those additional term visits retain the containing work and stop token.
 Cancellation declines the check. Finite execution installs this check before worker
 admission, after reconstructing source coordinates. Pipeline publication checks native
 points through the same service and retains native conclusions separately from their

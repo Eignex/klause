@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.validation
 
 import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceRow
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
@@ -45,8 +46,7 @@ internal fun checkLinearSourceWitness(
         val scaled = relative * if (boundMagnitude > magnitude) boundMagnitude else magnitude
         return if (absolute > scaled) absolute else scaled
     }
-    fun satisfies(value: BigFraction, lower: BigFraction?, upper: BigFraction?, magnitude: BigFraction): Boolean {
-        if ((lower != null && value < lower) || (upper != null && value > upper)) exact = false
+    fun withinTolerance(value: BigFraction, lower: BigFraction?, upper: BigFraction?, magnitude: BigFraction): Boolean {
         return (lower == null || value >= lower - slack(lower, magnitude)) &&
             (upper == null || value <= upper + slack(upper, magnitude))
     }
@@ -55,8 +55,11 @@ internal fun checkLinearSourceWitness(
         if (stop()) return LinearSourceCheck.Declined
         val value = values[index]
         if (variable.integer && value.den != BIG_ONE) return LinearSourceCheck.Rejected
-        if (!satisfies(value, variable.lower?.fraction(), variable.upper?.fraction(), BigFraction.ZERO)) {
-            return LinearSourceCheck.Rejected
+        val lower = variable.lower?.fraction()
+        val upper = variable.upper?.fraction()
+        if (!withinBounds(value, lower, upper)) {
+            if (!withinTolerance(value, lower, upper, BigFraction.ZERO)) return LinearSourceCheck.Rejected
+            exact = false
         }
     }
     for (row in source.rowValues) {
@@ -66,16 +69,20 @@ internal fun checkLinearSourceWitness(
         val trigger = if (guard?.whenOne == true) BigFraction.ONE else BigFraction.ZERO
         if (guard != null && values[guard.column] != trigger) continue
         var activity = BigFraction.ZERO
-        var magnitude = BigFraction.ZERO
         for (term in row.termValues) {
             stop.charge(1L)
             if (stop()) return LinearSourceCheck.Declined
             val value = term.coefficient.fraction() * values[term.column]
             activity += value
-            magnitude += value.magnitude()
         }
-        if (!satisfies(activity, row.lower?.fraction(), row.upper?.fraction(), magnitude)) {
-            return LinearSourceCheck.Rejected
+        val lower = row.lower?.fraction()
+        val upper = row.upper?.fraction()
+        if (!withinBounds(activity, lower, upper)) {
+            val magnitude = if (relative == BigFraction.ZERO) BigFraction.ZERO else {
+                row.activityMagnitude(values, stop) ?: return LinearSourceCheck.Declined
+            }
+            if (!withinTolerance(activity, lower, upper, magnitude)) return LinearSourceCheck.Rejected
+            exact = false
         }
     }
     val objective = source.objective?.let { objective ->
@@ -92,6 +99,19 @@ internal fun checkLinearSourceWitness(
     } else {
         LinearSourceCheck.Accepted(LinearSourceWitness(source, values, objective, exact))
     }
+}
+
+private fun withinBounds(value: BigFraction, lower: BigFraction?, upper: BigFraction?): Boolean =
+    (lower == null || value >= lower) && (upper == null || value <= upper)
+
+private fun LinearSourceRow.activityMagnitude(values: List<BigFraction>, stop: Cancellation): BigFraction? {
+    var magnitude = BigFraction.ZERO
+    for (term in termValues) {
+        stop.charge(1L)
+        if (stop()) return null
+        magnitude += (term.coefficient.fraction() * values[term.column]).magnitude()
+    }
+    return magnitude
 }
 
 private fun BigFraction.magnitude(): BigFraction = if (this < BigFraction.ZERO) negated() else this
