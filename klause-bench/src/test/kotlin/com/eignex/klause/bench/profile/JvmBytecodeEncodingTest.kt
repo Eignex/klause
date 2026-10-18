@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import java.lang.classfile.ClassFile
+import java.lang.classfile.attribute.SourceDebugExtensionAttribute
 import java.lang.constant.ClassDesc
 import java.lang.constant.ConstantDescs.CD_void
 import java.lang.constant.MethodTypeDesc
@@ -16,6 +17,7 @@ class JvmBytecodeEncodingTest {
     @Test
     fun `column encoding round trips nested symbols instructions and line tables`() {
         val bytes = ClassFile.of().build(ClassDesc.of("EncodingSample")) { builder ->
+            builder.with(SourceDebugExtensionAttribute.of(byteArrayOf(0, -1, 1)))
             builder.withMethodBody("entry", MethodTypeDesc.of(CD_void), ClassFile.ACC_STATIC) {
                 it.lineNumber(17).invokestatic(ClassDesc.of("Absent"), "target", MethodTypeDesc.of(CD_void))
                     .lineNumber(11).return_()
