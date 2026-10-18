@@ -1,14 +1,20 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -97,5 +103,90 @@ class ArmNeedsTest {
         )
 
         assertFalse(composed.any { it.label == "lp-aggressive" })
+    }
+
+    @Test
+    fun `binary packing should recognize ordinary and exact integer capacities`() {
+        val rows = listOf(
+            Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 3),
+            ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                listOf(BigFraction.ofLong(2), BigFraction.ofLong(3)),
+                LinearOp.LE,
+                BigFraction.ofLong(3),
+            ),
+        )
+        for (row in rows) {
+            val model = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(row)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(-4, -5))
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
+
+            assertTrue(facts.binaryPackingObjective)
+        }
+    }
+
+    @Test
+    fun `binary packing should need binary ranges and an item profit objective`() {
+        val profits = LinearObjective(intCoefficients = longArrayOf(-4, -5))
+        for ((upper, objective, expected) in listOf(
+            Triple(1L, profits, true),
+            Triple(5L, profits, false),
+            Triple(1L, LinearObjective(intCoefficients = longArrayOf(4, 5)), false),
+            Triple(1L, LinearObjective(intCoefficients = longArrayOf(-4, 5)), false),
+            Triple(1L, LinearObjective(), false),
+            Triple(1L, null, false),
+        )) {
+            val model = Problem(
+                0, 2, Array(2) { IntDomain(0, upper) },
+                listOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 30)),
+            ).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
+
+            assertEquals(expected, facts.binaryPackingObjective)
+        }
+    }
+
+    @Test
+    fun `other row forms should not claim a binary packing objective`() {
+        val refs = intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1))
+        val wide = BigFraction.of(parseBigInt("18446744073709551617"), BIG_ONE)
+        val cases = listOf<Triple<Factor, Int, Int>>(
+            Triple(Linear(longArrayOf(-2, 3), intArrayOf(0, 1), LinearOp.LE, 3), 0, 0),
+            Triple(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.EQ, 3), 0, 0),
+            Triple(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.NE, 3), 0, 0),
+            Triple(Linear(longArrayOf(2), intArrayOf(0), LinearOp.LE, 3), 0, 0),
+            Triple(Linear(longArrayOf(2, 3), intArrayOf(0, 0), LinearOp.LE, 3), 0, 0),
+            Triple(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, -1), 0, 0),
+            Triple(ExactLinear.of(refs, listOf(wide, wide), LinearOp.LE, wide), 0, 0),
+            Triple(
+                ExactLinear.of(
+                    refs, listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE,
+                    BigFraction.ONE, activator = 0,
+                ),
+                1, 0,
+            ),
+            Triple(
+                ExactLinear.of(
+                    intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE,
+                ),
+                0, 1,
+            ),
+        )
+        for ((row, bools, reals) in cases) {
+            val model = Problem(
+                bools, 2, Array(2) { IntDomain(0, 1) }, listOf(row),
+                numRealVars = reals,
+                realLower = DoubleArray(reals),
+                realUpper = DoubleArray(reals) { 1.0 },
+            ).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(-4, -5))
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
+
+            assertFalse(facts.binaryPackingObjective)
+        }
     }
 }

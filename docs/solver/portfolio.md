@@ -554,6 +554,22 @@ lanes retain their selected recipes.
 
 ### LP arm admission
 
+A curated sequential mixed finite optimization pool uses the default LP recipe
+beside its SAT guard for binary packing with an item-profit objective. Every row
+must be a whole unconditional non-strict integer capacity inequality with nonnegative
+signed-word coefficients and bound, and at least two distinct positively weighted columns. The minimized objective
+has only nonpositive integer coefficients and rewards at least one item; Boolean and
+real coordinates are excluded. Row capability determines this fact for both ordinary
+and exact integer representations.
+
+The recipe occupies the conflict-driven slot and suppresses a separate aggressive
+companion for that packing pool. An expanded pool repositions an existing default LP
+recipe instead of duplicating it. The configured slot count, local-search positions
+and their derived seeds are preserved; the containing allowances remain shared.
+A disabled or unavailable default LP leaves the
+ordinary finite recipe diversity in place. Explicit pools, backtrack edits, annotations,
+smaller pools, parallel and single-engine execution retain their selected recipes.
+
 A curated sequential mixed finite optimization pool with at least six configured
 slots appends an applicable aggressive LP companion for models composed entirely
 of ordinary integer linear rows and an objective over integer coordinates. Existing worker positions

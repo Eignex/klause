@@ -9,6 +9,7 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
@@ -453,6 +454,7 @@ internal object PortfolioComposition {
             scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
             scenario.lsPool != null || scenario.btPool != null || scenario.btEdit != null ||
             scenario.annotationArm != null || arms.lastOrNull()?.label == "lp-default" ||
+            (facts.binaryPackingObjective && arms.any { it.label == "lp-default" }) ||
             arms.any { it.label == "lp-aggressive" }
         ) {
             return null
@@ -479,6 +481,19 @@ internal object PortfolioComposition {
         }
         val conflict = selected.indexOfFirst { it.label == "conflictDriven" }
         if (conflict < 0) return selected
+        if (facts.binaryPackingObjective &&
+            LpConfig.AUTO.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING) &&
+            facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT))
+        ) {
+            val lp = selected.indexOfFirst { it.label == "lp-default" }
+            return selected.toMutableList().also { arms ->
+                arms[conflict] = if (lp >= 0) selected[lp] else BacktrackWorkerConfig(
+                    BacktrackCatalog.byLabel("lp-default").capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+                    scenario.zeroObjectivePricing,
+                )
+                if (lp >= 0) arms[lp] = selected[conflict]
+            }
+        }
         val selector = selected.indexOfFirst { it.label == "selector-switch" }
         // Restart-level heuristic diversity complements the SAT guard when no relaxation worker is available.
         return selected.toMutableList().also { arms ->
