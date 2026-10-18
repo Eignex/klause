@@ -8,7 +8,9 @@ import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.lowering.trueLit
 
 internal fun Compiler.Builder.reifyAnd(literals: List<Int>): Int =
-    retainBooleanDefinition { reifyLogical(literals, conjunction = true) }
+    retainBooleanDefinition { reifyLogical(literals, conjunction = true) }.also { result ->
+        affineRealTables.conjunction(result, literals, trueLitCache)
+    }
 
 internal fun Compiler.Builder.reifyOr(literals: List<Int>): Int =
     retainBooleanDefinition { reifyLogical(literals, conjunction = false) }

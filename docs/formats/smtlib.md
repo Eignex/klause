@@ -64,6 +64,26 @@ The parse-local table retains at most 65,536 coordinate/key entries; other
 comparisons still lower independently. Lookup work charges the source token and
 retains its cancellation. The table carries no solver state or cross-source names.
 
+Source lowering retains optional conjunction cubes over declared Booleans,
+scalar equality meanings and asserted implications. For up to eight Boolean inputs,
+a scalar table must cover every assignment and agree at every overlapping case.
+Every entry is checked against its proposed affine sum. Independently complete
+one-Boolean scalar tables supply real-coordinate channels for those inputs; exact
+denominator clearing then adds an unconditional affine row beside the source
+factors. Missing channels, uncovered assignments, conflicting cases, nonlinear
+tables and unknown guard meanings supply no row. This capture and table pass owns
+one cumulative 65,536-unit allowance under the same parse token.
+Its inputs have signed-word integral values; guarded
+word arithmetic limits derived coefficients and intermediates to 1,024 bits.
+Complete one-input channels are prepared before aggregate tables. Aggregate tables
+are verified and published one at a time, so later optional work cannot withhold a
+completed row. Each table builds one charged literal-to-bit index; captured cases
+share their immutable conjunction cube. Unit scalar coefficients use direct signed
+values instead of integer division, retaining their charged fast path.
+Optional exhaustion retains only completed rows, and containing cancellation still
+aborts parsing. No source Boolean or real coordinate is removed or given a finite
+domain by these deductions.
+
 Boolean lowering folds the library constant and exact literal identities in
 AND, OR and IFF after their children have been lowered. Empty, singleton,
 duplicate and complementary operands retain their full logical meaning without

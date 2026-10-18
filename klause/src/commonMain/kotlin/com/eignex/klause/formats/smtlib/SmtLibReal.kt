@@ -172,7 +172,7 @@ internal fun Compiler.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb)
     if (op == "=") {
         return reifyAnd(
             listOf(reifyRealAtom(d, LinearOp.LE, strict = false), reifyRealAtom(d, LinearOp.GE, strict = false)),
-        )
+        ).also { literal -> affineRealTables.equality(literal, d) }
     }
     val (linOp, strict) = when (op) {
         "<=" -> LinearOp.LE to false
