@@ -136,7 +136,7 @@ its selection. Use `reference=any` in lab specs to preserve frozen membership.
 
 Settings, budgets, non-default solver seeds, parameters and labels distinguish
 configuration directories. Run configurations separately to compare them.
-`param=source-validation=true` opts MiniZinc integer, XCSP3 and MPS runs into independent
+`param=source-validation=true` opts MiniZinc integer, XCSP3, MPS and SMT-LIB runs into independent
 source-witness checking and is consumed by the bench before CLI launch.
 
 The `divmod` suite retains self-authored scalar, affine wide, equivalent linear and
@@ -1158,6 +1158,74 @@ not a source optimum/refutation. `reportedFeasible`, `reportedObjective` and
 `reportedProven` retain the original claims. Integer opt-in also captures stdout
 SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
 Earlier incumbents are unchecked, so attribution is limited to the final objective.
+
+SMT-LIB satisfaction runs opt in with `param=source-validation=true` under policy
+`smt-original-polynomial-claims-v2`. The ordinary CLI runs with its original budget,
+seed and engine; the bench checks the returned claim afterward. Complete SAT models
+use the maintained [polynomial source verifier](#polynomial-source-witness-verifier):
+every declared Bool/Int/Real coordinate, including unused declarations, must be present
+with its exact sort and value. Rational and `root-obj` algebraic coordinates must make
+all original assertions and query assumptions evaluate exactly true. Ground checking
+issues no solver or optimization search query and supplies no optimum or refutation
+credit. Unsupported, incomplete, approximate or invalid models receive no accepted claim.
+
+A reported UNSAT with a normal process exit and a native proof flag permits
+independent checking of the full original source. For Bool/Real polynomial inputs,
+an exact source derivation can establish a contradiction without a solver query.
+Only necessary top-level conjuncts supply premises. Direct affine comparisons give
+strict or closed coordinate bounds; positive sums of nonnegative even monomials
+give closed bounds on their pure-square terms. Integer square-root ceilings and
+Python rational arithmetic enclose those coordinates. Cartesian sign sets or
+closed polynomial intervals must exclude an original required relation. Predicates
+under disjunctions, implications and conditional branches supply no premises.
+
+The bounded derivation recognizes sums of source monomials without distributing
+additive factors, with powers through 64, rational components through 16,384 bits
+and at most 32,768 monomials per predicate. Unsupported or larger forms decline
+this optional check. The receipt retains original assertion indices, the contradiction
+expression hash, its asserted relation and exact source bounds. `sourceValidationDerivationChecked` identifies
+an accepted derivation. If none is established, one independent query receives all
+original assertions and assumptions intact, with the existing 30-second limit.
+Only a checked source contradiction or independent UNSAT result retains the native
+refutation. Neither verifies an exported native certificate:
+`sourceValidationProofChecked` stays false. UNKNOWN is never promoted by an independent
+result. Optimization sources, failed producer exits and unsupported syntax remain unaccepted.
+
+Validated Bool/Real polynomial inputs use Z3's `QF_NRA` solver factory. Signed integer
+numerals remain exact polynomial coefficients. Integer declarations, nonliteral integer
+operations and zero-power terms retain the general SMT factory.
+The original assertions and assumptions are passed intact. Selection occurs once;
+an UNKNOWN result triggers no second factory or query. `sourceValidationReferenceLogic`
+and the bound child receipt identify the selected factory when a query is issued.
+Bounded child stderr breadcrumbs distinguish source parsing, derivation and query
+stages; they provide no acceptance or completed-query accounting.
+
+The isolated worker reuses the reviewed private Linux x86-64/glibc Python/Z3 runtime
+and its fixed wheel hash. Bootstrap has a 30-second/2-GiB cap. Ground checking has
+30 seconds/4 GiB, a 60-second supervisor and a 70-second JVM allowance; refutation
+checking has a 40-second/8-GiB child, a 90-second supervisor and a 100-second JVM
+allowance. Existing bounded termination and drain waits remain additional ceilings;
+the external ordinary-case deadline governs unfinished work. There is no larger retry.
+Sources are limited to 64 MiB, models/stdout to 8 MiB each, producer records/receipts
+to 4 MiB, each tool and raw child stream to 1 MiB. The native checker library is bound
+to its private extracted wheel file and executable mapping; Python module/interpreter
+providers retain the reviewed bounded identity checks.
+
+Adjacent `smt-source-check-*` evidence retains verbatim original source/model/stdout,
+producer record, request, packaged tool hashes, private runtime/provider identities,
+true process exits, all four bootstrap/check streams and cleanup receipts. Input and
+source hashes are checked again before acceptance. A missing, mutated, interrupted,
+overflowed or incomplete receipt withholds the claim. `checkedWitness` and the original
+`finalWitness` remain separate; `reportedFeasible`, objectives and `reportedProven`
+preserve the native report. `independentSourceRefutation` and
+`sourceValidationSolverQueries` distinguish issued queries from ground and derivation checks.
+An incomplete child leaves the observed query count `unknown`; the separate
+`sourceValidationSolverQueryLimit` records the permitted count. The receipt marks
+whether the query count was observed in a complete child result. Saved result statistics
+retain the bounded verbatim native stdout as `sourceValidationProducerStdout`, with
+its producer record and hash, so record-only collectors preserve those bytes.
+Checker setup/check timing stays separate from native solve and incumbent timings.
+Raw cache hits are checked afresh; use `-Dklause.bench.cache=false` for a fresh solve.
 
 MPS runs opt in with `param=source-validation=true` under policy
 `mps-original-rational-ground-witness-v2`. The installed bench uses the maintained independent

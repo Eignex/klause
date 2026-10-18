@@ -376,6 +376,8 @@ internal object SolveMetric {
             MpsSourceValidation::validate,
         validateMpsGzip: (ProblemRef, SolveRecord, String, Boolean, File) -> MpsSourceValidation.Result =
             MpsSourceValidation::validateGzip,
+        validateSmt: (ProblemRef, SolveRecord, String, File) -> SmtSourceValidation.Result =
+            SmtSourceValidation::validate,
     ): Pair<SolveRecord, String?> {
         val optimize = entry.objective != null
         val kind = if (optimize) "optimize" else "satisfy"
@@ -387,8 +389,10 @@ internal object SolveMetric {
             provenance = installedBuild()
             val sourceParams = SourceValidationParams(settings)
             val checkSource = solverId == SolverInvocation.KLAUSE && (entry.hasFloats || sourceParams.requested)
-            require(!sourceParams.requested || entry.ref.format in setOf(Format.MINIZINC, Format.XCSP3, Format.MPS)) {
-                "source-validation requires a MiniZinc, XCSP3 or MPS source"
+            require(!sourceParams.requested || entry.ref.format in setOf(
+                Format.MINIZINC, Format.XCSP3, Format.MPS, Format.SMTLIB,
+            )) {
+                "source-validation requires a MiniZinc, XCSP3, MPS or SMT-LIB source"
             }
             require(!sourceParams.gzip || (solverId == SolverInvocation.KLAUSE && entry.ref.format == Format.MPS)) {
                 "source-validation-gzip requires a Klause MPS source"
@@ -397,6 +401,7 @@ internal object SolveMetric {
                 when (entry.ref.format) {
                     Format.XCSP3 -> XCSP_SOURCE_POLICY
                     Format.MPS -> if (sourceParams.gzip) MPS_GZIP_SOURCE_POLICY else MPS_SOURCE_POLICY
+                    Format.SMTLIB -> SMT_SOURCE_POLICY
                     else -> PINNED_SOURCE_POLICY
                 }
             } else {
@@ -419,7 +424,19 @@ internal object SolveMetric {
                     },
                     sourceOutputSha256 = if (sourceParams.requested) sha256(r.rawOutput.toByteArray()) else null,
                 )
-            val checked = if (checkSource) {
+            val checked = if (checkSource && entry.ref.format == Format.SMTLIB) {
+                val smt = validateSmt(entry.ref, reported, r.rawOutput, evidenceRoot)
+                val bound = if (smt.validation.sourceHashes.isNotEmpty() &&
+                    smt.validation.sourceHashes != reported.sourceHashes
+                ) {
+                    smt.copy(validation = SmtSourceValidation.unknown(
+                        "validation source hashes differ from solve record",
+                    ))
+                } else {
+                    smt
+                }
+                SmtSourceValidation.apply(reported, bound)
+            } else if (checkSource) {
                 val mps = if (entry.ref.format == Format.MPS) {
                     val validate = if (sourceParams.gzip) validateMpsGzip else validateMps
                     validate(entry.ref, reported, r.rawOutput, settings.exact, evidenceRoot)
