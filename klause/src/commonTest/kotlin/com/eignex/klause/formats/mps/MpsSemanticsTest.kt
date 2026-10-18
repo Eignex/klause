@@ -15,6 +15,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
@@ -416,10 +417,15 @@ class MpsSemanticsTest {
     @Test
     fun `cancellation during source checking should withhold a partial witness`() {
         val compiled = Mps.parse("ROWS\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 1\nENDATA").toProblem()
-        var polls = 0
-        val stop = Cancellation { ++polls >= 4 }
+        var charged = 0L
+        val meter = WorkMeter { charged += it }
+        val stop = object : Cancellation {
+            override fun workMeter(): WorkMeter = meter
+            override fun isCancelled(): Boolean = charged >= 3L
+        }
 
         assertFailsWith<MpsLoweringException> { compiled.sourceWitness(listOf(BigFraction.ONE), stop) }
+        assertEquals(3L, charged)
     }
 
     @Test
