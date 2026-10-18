@@ -32,6 +32,7 @@ import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
@@ -46,6 +47,7 @@ import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.lp.sourceDoubleBoundedSplit
 import com.eignex.klause.lp.sourceEqualityRows
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactBasisMetrics
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -194,6 +196,7 @@ class ExactLiraSearchComponent private constructor(
     private val sourceRealCount = model.encodingSourceRealCount
     private val hasPrivateReals = sourceRealCount != model.numRealVars
     private var smtStats: SmtStatsSink? = null
+    private var primaryLpObserver: LpCertificationObserver? = null
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private var unassignedBooleans = model.numBoolVars
     private var completeTraversalObserved = false
@@ -253,13 +256,27 @@ class ExactLiraSearchComponent private constructor(
             solveContext = solveContext,
             cancellation = lpStop,
             certificationObserver = object : LpCertificationObserver {
-                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
-                override fun observeExactInput(accepted: Boolean) = Unit
-                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                    primaryLpObserver?.observe(certifier, success, cost)
+                }
+                override fun observeExactInput(accepted: Boolean) {
+                    primaryLpObserver?.observeExactInput(accepted)
+                }
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
+                    primaryLpObserver?.observeSolve(metrics, component)
+                }
+                override fun observePhase(metrics: LpPhaseMetrics) {
+                    primaryLpObserver?.observePhase(metrics)
+                }
+                override fun observeBasisVerification(metrics: ExactBasisMetrics) {
+                    primaryLpObserver?.observeBasisVerification(metrics)
+                }
                 override fun observeContinuation(metrics: ExactContinuationMetrics) {
+                    primaryLpObserver?.observeContinuation(metrics)
                     smtStats?.observeContinuation(metrics)
                 }
                 override fun observeContinuationRejection(key: String, count: Long) {
+                    primaryLpObserver?.observeContinuationRejection(key, count)
                     smtStats?.observeContinuationRejection(key, count)
                 }
             },
@@ -287,6 +304,11 @@ class ExactLiraSearchComponent private constructor(
 
     internal fun observeWith(stats: SmtStatsSink) {
         smtStats = stats
+    }
+
+    internal fun observePrimaryLpWith(observer: LpCertificationObserver) {
+        check(context == null && primaryLpObserver == null)
+        primaryLpObserver = observer
     }
 
     internal val defaultMixedPointOwner: Boolean

@@ -76,7 +76,12 @@ source rows and before disequality processing. Each side retains its own source
 premise. The first contradictory prefix can produce a conflict; a declined batch
 publishes no new witnesses. Sharing the numerical snapshot retains caller-provided
 per-bound edit accounting and does not change source-row completion markers. Native
-engine work retains the containing operation token and allowance.
+engine work retains the containing operation token and allowance. The complete
+linear opening binds its primary LP observer before shared initialization. Existing
+solve, certification, exact-input, phase and basis events feed the invocation's LP
+statistics, including work before a limit. Fresh openings own separate sinks;
+resuming an opening retains its sink without adding a cumulative snapshot twice.
+Supplementary source-reduction LP work remains separately reported by `smtSourceLp*`.
 The invocation owns asserted scopes,
 integer branches, reduction caches and LP state. Retraction removes scoped premises
 before evidence can be reused. [TheoryParams](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/TheoryParams.kt)
