@@ -229,8 +229,9 @@ class DeclarationIndex:
             seen.add(current)
             if len(seen) > MAX_HIERARCHY:
                 raise ValueError('Complete structural hierarchy exceeds bounds')
-            rows = self.db.execute('''SELECT c.ordinal, c.parents FROM classes c JOIN contexts h
-                ON c.ordinal=h.ordinal WHERE c.name=? AND h.head=? ORDER BY c.ordinal''', (current, head)).fetchall()
+            rows = self.db.execute('''SELECT c.ordinal, c.parents
+                FROM classes c INDEXED BY class_name CROSS JOIN contexts h INDEXED BY context_head
+                WHERE c.name=? AND h.head=? AND c.ordinal=h.ordinal ORDER BY c.ordinal''', (current, head)).fetchall()
             if not rows:
                 missing.append(current)
             for ordinal, parents in rows:

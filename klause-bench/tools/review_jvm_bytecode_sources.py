@@ -11,7 +11,7 @@ import tarfile
 from jvm_bytecode_source_bindings import COLUMNS, DENIED, DeclarationIndex, Symbols, bind_method, expand, origin_key
 from review_jvm_declaration_bindings import MAX_INPUTS, MAX_JSON_BYTES, digest, file_identity, load_json, unique_object
 from review_jvm_source_lines import encode_report_record, expand_report_record
-from review_jvm_source_syntax import Inputs, Report, ReportBudget, write_completion
+from review_jvm_source_syntax import Inputs, Report, ReportBudget, retain_partial_reports, write_completion
 
 MAX_ROW_BYTES = 128 * 1024 * 1024
 MAX_LOGICAL_BYTES = 4 * 1024 ** 3
@@ -137,6 +137,10 @@ def bind_class(index, item, mapping, ordinal, row, metadata):
     if uses != 0 or previous['origin']['classSha256'] != row['classSha256']:
         raise ValueError('Debug entry reuse or original class bytes differ')
     index.db.execute('UPDATE syntax SET uses=1 WHERE context=? AND input=? AND origin=?', key)
+    return bind_previous(index, item, ordinal, row, metadata, source_ordinal, previous)
+
+
+def bind_previous(index, item, ordinal, row, metadata, source_ordinal, previous):
     base = {'bytecodeClassOrdinal': ordinal, 'studySourceHead': item['studySourceHead'],
             'syntaxArchiveId': item['id'], 'syntaxClassOrdinal': source_ordinal,
             'syntaxOrigin': previous['origin'], 'expandedSyntaxRecordSha256': hashlib.sha256(json_bytes(previous)).hexdigest(),
@@ -269,12 +273,7 @@ def review(catalog, output, scratch):
         proof = report.verify()
         inputs.verify_unchanged()
     except BaseException:
-        for report in reports:
-            try:
-                report.close()
-            finally:
-                if report.path.exists():
-                    report.path.rename(report.path.with_name(report.path.name.replace('.jsonl.gz', '.partial.jsonl.gz')))
+        retain_partial_reports(reports, output)
         raise
     finally:
         index.close()
