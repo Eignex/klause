@@ -60,7 +60,10 @@ class CliModeMpsTest {
             deleteOnExit()
         }
         val out = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)))
+            assertEquals(
+                0,
+                runCli(arrayOf("-e", "cp", "-p", "1", "--param", "arms=1", mps.absolutePath)),
+            )
         }
 
         assertTrue("s SATISFIABLE" in out.lines(), out)
@@ -154,7 +157,15 @@ class CliModeMpsTest {
 
         for (exact in listOf(false, true)) {
             val policy = if (exact) arrayOf("--exact") else emptyArray()
-            val kept = capture { assertEquals(0, runCli(arrayOf("-s", "-t", "10000") + policy + mps.absolutePath)) }
+            val kept = capture {
+                assertEquals(
+                    0,
+                    runCli(
+                        arrayOf("-s", "-t", "10000", "-e", "cp", "-p", "1", "--param", "arms=1") +
+                            policy + mps.absolutePath,
+                    ),
+                )
+            }
             val declined = capture {
                 assertEquals(
                     0,

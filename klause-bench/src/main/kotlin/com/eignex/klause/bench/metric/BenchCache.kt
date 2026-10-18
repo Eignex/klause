@@ -68,13 +68,31 @@ internal object BenchCache {
 
     /** [result] with its model lines dropped when its output is too large to keep: a solver can print gigabytes
      *  of `v` lines on a large instance, while the status, objective and statistics lines are what a replay reads. */
-    internal fun compact(result: SolverInvocation.Result): SolverInvocation.Result =
-        if (result.rawOutput.length <= MAX_STORED_OUTPUT_CHARS) {
-            result
-        } else {
-            val kept = result.rawOutput.lineSequence().filterNot { it.startsWith("v ") }
-            result.copy(rawOutput = kept.joinToString("\n"))
+    internal fun compact(result: SolverInvocation.Result): SolverInvocation.Result {
+        val raw = result.rawOutput
+        if (raw.length <= MAX_STORED_OUTPUT_CHARS) return result
+        val kept = StringBuilder()
+        var separator = ""
+        var start = 0
+        var nextLf = raw.indexOf('\n')
+        var nextCr = raw.indexOf('\r')
+        while (true) {
+            val end = minOf(
+                nextLf.takeIf { it >= 0 } ?: raw.length,
+                nextCr.takeIf { it >= 0 } ?: raw.length,
+            )
+            if (!raw.startsWith("v ", start)) {
+                kept.append(separator).append(raw, start, end)
+                separator = "\n"
+            }
+            if (end == raw.length) break
+            start = end + 1
+            if (raw[end] == '\r' && start < raw.length && raw[start] == '\n') start++
+            if (nextLf >= 0 && nextLf < start) nextLf = raw.indexOf('\n', start)
+            if (nextCr >= 0 && nextCr < start) nextCr = raw.indexOf('\r', start)
         }
+        return result.copy(rawOutput = kept.toString())
+    }
 }
 
 private const val MAX_STORED_OUTPUT_CHARS = 8 * 1024 * 1024
