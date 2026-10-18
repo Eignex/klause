@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.LinearSourceConclusion
@@ -48,11 +49,7 @@ internal fun solveLinearSource(
     if (result is SourceExecutionResult.Finite) {
         when (val outcome = result.result.outcome) {
             FiniteSolveOutcome.PreparedOnly -> {
-                val prepared = result.result.preparation.problem
-                errPrintln(
-                    "source preparation: factors ${prepared.numFactors}, ints ${prepared.numIntVars}, " +
-                        "reals ${prepared.numRealVars}",
-                )
+                printFiniteLinearSourcePreparation(result.result.preparation.problem)
                 return
             }
 
@@ -121,6 +118,18 @@ internal fun solveLinearSource(
         lp = stats.lp.mergedWith(solvable.routingLpStats),
     )
     output.onStatistics(sourceStats, stats.run.wallMs + solvable.routingElapsedMs, solutions)
+}
+
+internal fun printFiniteLinearSourcePreparation(problem: Problem) {
+    errPrintln(
+        "source preparation: factors ${problem.numFactors}, ints ${problem.numIntVars}, " +
+            "reals ${problem.numRealVars}",
+    )
+    val groups = problem.factors.indices.groupBy { problem.factors[it]::class.simpleName ?: "?" }
+    for ((name, indices) in groups.entries.sortedBy { it.key }) {
+        val implied = indices.count { problem.impliedFactorMask?.get(it) == true }
+        errPrintln("source preparation factor $name: total=${indices.size}, implied=$implied")
+    }
 }
 
 private fun SourceExecutionResult.linearSourceStats(): SolveStats = when (this) {
