@@ -2,6 +2,9 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearForm
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -42,6 +45,7 @@ internal class ProblemFacts(
     val integerLinear: Boolean = false,
     val booleanObjective: Boolean = false,
     val circuit: Boolean = false,
+    val binaryPackingObjective: Boolean = false,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -65,22 +69,26 @@ internal class ProblemFacts(
             profile: ProblemProfile,
             lpCeiling: LpConfig,
             objective: LinearObjective? = null,
-        ): ProblemFacts = ProblemFacts(
-            profile,
-            binaryIntegers = problem.binaryIntegers,
-            continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
-            integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
-                it is Linear && it.integerConstants != null
-            },
-            booleanObjective = objective?.let {
-                CoreGuidedSearch.eligible(problem, it) &&
-                    it.boolWeightValues.any { weight -> weight != 0L }
-            } == true,
-            circuit = problem.factors.any { it is Circuit },
-            relaxation = { emphasis ->
-                LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
-            },
-        )
+        ): ProblemFacts {
+            val binary = problem.binaryIntegers
+            return ProblemFacts(
+                profile,
+                binaryIntegers = binary,
+                binaryPackingObjective = binary && problem.hasPackingObjective(objective),
+                continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
+                integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
+                    it is Linear && it.integerConstants != null
+                },
+                booleanObjective = objective?.let {
+                    CoreGuidedSearch.eligible(problem, it) &&
+                        it.boolWeightValues.any { weight -> weight != 0L }
+                } == true,
+                circuit = problem.factors.any { it is Circuit },
+                relaxation = { emphasis ->
+                    LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
+                },
+            )
+        }
 
         /** Facts for composing without a model: a [ProblemClass.FiniteCp] model of [kind] that offers every
          *  relaxation, or one of [problemClass]. */
@@ -100,3 +108,30 @@ internal val BakedProblem.binaryIntegers: Boolean
         intBounds.hasLower(it) && intBounds.hasUpper(it) &&
             intBounds.lower(it) >= 0L && intBounds.upper(it) <= 1L
     }
+
+private fun BakedProblem.hasPackingObjective(objective: LinearObjective?): Boolean {
+    if (numBoolVars != 0 || numRealVars != 0 || numIntVars == 0 || objective == null) return false
+    if (objective.boolWeightValues.any { it != 0L } || objective.realCoefficientValues.any { it != 0.0 } ||
+        objective.intCoefficientValues.size > numIntVars ||
+        objective.intCoefficientValues.none { it < 0L } || objective.intCoefficientValues.any { it > 0L }
+    ) {
+        return false
+    }
+    return factors.isNotEmpty() && factors.all { it.isBinaryPackingCapacity() }
+}
+
+private fun Factor.isBinaryPackingCapacity(): Boolean {
+    val form = linearForm as? LinearForm.Conjunction ?: return false
+    val row = form.rows.singleOrNull() ?: return false
+    if (!row.isLongUnconditional || !row.isIntegerOnly || row.relation != LinearOp.LE || row.bound < 0L) return false
+    var firstPositive = -1
+    var coupled = false
+    for (k in 0 until row.size) {
+        val coefficient = row.coeff(k)
+        if (coefficient < 0L) return false
+        if (coefficient > 0L) {
+            if (firstPositive < 0) firstPositive = row.ref(k) else if (row.ref(k) != firstPositive) coupled = true
+        }
+    }
+    return coupled
+}

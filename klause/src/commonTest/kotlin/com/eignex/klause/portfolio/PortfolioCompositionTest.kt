@@ -507,4 +507,73 @@ class PortfolioCompositionTest {
         val annotation = arms.filterIsInstance<BacktrackWorkerConfig>().single { it.label == "annotation" }
         assertSame(budget, annotation.recipe.build(1L, null).nodeBudget)
     }
+
+    @Test
+    fun `binary packing should use one default LP in the existing backtrack slot`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val baseline = PortfolioComposition.compose(scenario, ProblemFacts(profile, binaryIntegers = true) { true })
+        for (ordinary in listOf(false, true)) {
+            val facts = ProblemFacts(
+                profile, binaryIntegers = true, integerLinear = ordinary, binaryPackingObjective = true,
+            ) { true }
+
+            val composed = PortfolioComposition.compose(scenario, facts)
+
+            assertEquals(listOf("satOptimized", "lp-default"), composed.take(2).map { it.label })
+            assertEquals(baseline.drop(2).map { it.label }, composed.drop(2).map { it.label })
+        }
+    }
+
+    @Test
+    fun `expanded binary packing pools should reuse the default LP recipe`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(arms = 24)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val baseline = ProblemFacts(profile, binaryIntegers = true) { true }
+        val packing = ProblemFacts(profile, binaryIntegers = true, binaryPackingObjective = true) { true }
+
+        val composed = PortfolioComposition.compose(scenario, packing)
+
+        assertEquals(listOf("satOptimized", "lp-default"), composed.take(2).map { it.label })
+        assertEquals(1, composed.count { it.label == "lp-default" })
+        assertEquals(PortfolioComposition.compose(scenario, baseline).size, composed.size)
+    }
+
+    @Test
+    fun `binary packing should preserve explicit parallel and disabled LP composition`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val baseline = ProblemFacts(profile, binaryIntegers = true) { true }
+        val packing = ProblemFacts(profile, binaryIntegers = true, binaryPackingObjective = true) { true }
+        for (control in listOf(
+            scenario.copy(cores = 2),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(kind = Kind.CSP),
+            scenario.copy(arms = 5),
+            scenario.copy(lpCeiling = LpConfig.OFF),
+            scenario.copy(btEdit = { it }),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
+            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
+            scenario.copy(annotationArm = BacktrackParams()),
+        )) {
+            assertEquals(
+                PortfolioComposition.compose(control, baseline).map { it.label },
+                PortfolioComposition.compose(control, packing).map { it.label },
+            )
+        }
+    }
+
+    @Test
+    fun `binary packing LP should spend the containing node allowance`() {
+        val budget = NodeBudget(limit = 100)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(nodeBudget = budget)
+        val facts = ProblemFacts(
+            ProblemFacts.assumed(Kind.COP).profile, binaryIntegers = true, binaryPackingObjective = true,
+        ) { true }
+
+        val composed = PortfolioComposition.compose(scenario, facts)
+        val lp = composed.filterIsInstance<BacktrackWorkerConfig>().single { it.label == "lp-default" }
+
+        assertSame(budget, lp.recipe.build(1L, null).nodeBudget)
+    }
 }
