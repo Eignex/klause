@@ -13,6 +13,7 @@ import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
@@ -419,6 +420,7 @@ class OpenTheoryEngine internal constructor(
         var failure: Throwable? = null
         try {
             (planned.theory as? ExactLiraSearchComponent)?.let {
+                it.observePrimaryLpWith(stats.lp.certificationObserver(LpRoute.STANDALONE))
                 it.observeCompleteTraversal()
                 it.useMixedPointCompletion()
             }

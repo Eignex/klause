@@ -45,6 +45,47 @@ import kotlin.test.assertTrue
 class OpenTheorySolverTest {
 
     @Test
+    fun `separate integer linear openings should report their own primary LP work`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int) (declare-const y Int)
+                (assert (= (+ (* 2 x) y) 1))
+                (check-sat)
+            """.trimIndent(),
+        )
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(parsed.model).withPresolve(PresolveConfig.NONE))
+
+        val first = assertIs<OpenTheoryResult.Sat>(engine.solve()).stats.lp
+        val second = assertIs<OpenTheoryResult.Sat>(engine.solve()).stats.lp
+
+        assertTrue(first.standalonePasses.sum > 0)
+        assertEquals(first.standalonePasses.sum, second.standalonePasses.sum)
+        assertTrue(first.phases.any { (key, value) -> key.endsWith("_STANDALONE") && value.calls > 0L })
+        assertTrue(second.phases.any { (key, value) -> key.endsWith("_STANDALONE") && value.calls > 0L })
+    }
+
+    @Test
+    fun `a decision limited integer opening should retain primary LP work before the limit`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const b Bool)
+                (declare-const x Int) (declare-const y Int)
+                (assert (= (+ (* 2 x) y) 1))
+                (check-sat)
+            """.trimIndent(),
+        )
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(parsed.model).withPresolve(PresolveConfig.NONE))
+
+        val result = engine.solve(TheoryParams(maxDecisions = 0))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertTrue(result.stats.lp.standalonePasses.sum > 0)
+        assertTrue(result.stats.lp.phases.any { (key, value) -> key.endsWith("_STANDALONE") && value.calls > 0L })
+    }
+
+    @Test
     fun `a spent node allowance should stop open traversal before a decision`() {
         val openUpper = Bits(1).also { it.set(0) }
         val model = Problem(1, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
