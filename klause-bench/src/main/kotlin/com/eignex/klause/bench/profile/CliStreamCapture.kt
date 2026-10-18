@@ -1,13 +1,18 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.metric.BuildProvenance
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.bench.tools.Profiler
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.PrintStream
 import java.util.Base64
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
@@ -27,21 +32,30 @@ internal object CliStreamCapture {
     fun main(args: Array<String>) {
         val output = File(requireNotNull(System.getenv("OUT")) { "OUT must name the capture directory" })
         output.mkdirs()
-        val checker = SmtStreamChecker(output)
-        if (args.size == 1 && args[0].startsWith("batch64=")) {
+        val requests = if (args.size == 1 && args[0].startsWith("batch64=")) {
             val bytes = Base64.getDecoder().decode(args[0].substringAfter('='))
-            val requests = Json.decodeFromString<List<List<String>>>(bytes.toString(Charsets.UTF_8))
-            require(requests.isNotEmpty()) { "The capture batch is empty" }
+            val decoded = Json.decodeFromString<List<List<String>>>(bytes.toString(Charsets.UTF_8))
+            require(decoded.isNotEmpty()) { "The capture batch is empty" }
             File(output, "requests.json").writeBytes(bytes)
-            for ((index, request) in requests.withIndex()) {
-                val directory = File(output, index.toString()).apply { mkdirs() }
-                try {
-                    run(request.toTypedArray(), directory, checker)
-                } catch (error: Exception) {
-                    Reports.writeJson(File(directory, "failure.json").path, CaptureFailure(error.toString()))
+            decoded
+        } else null
+        val capture = {
+            val checker = SmtStreamChecker(output)
+            if (requests != null) {
+                for ((index, request) in requests.withIndex()) {
+                    val directory = File(output, index.toString()).apply { mkdirs() }
+                    try {
+                        run(request.toTypedArray(), directory, checker)
+                    } catch (error: Exception) {
+                        Reports.writeJson(File(directory, "failure.json").path, CaptureFailure(error.toString()))
+                    }
                 }
-            }
-        } else run(args, output, checker)
+            } else run(args, output, checker)
+        }
+        val profiled = (requests ?: listOf(args.toList())).any { request ->
+            "profileJvm=true" in request.takeWhile { it != "--" }
+        }
+        if (profiled) ProfileCaptureArchive.run(output, capture) else capture()
     }
 
     private fun run(args: Array<String>, output: File, checker: SmtStreamChecker) {
@@ -52,12 +66,14 @@ internal object CliStreamCapture {
             File(output, "planned.json").path,
             CapturePlan(revision, settings.sourceSha256, settings.command, settings.stopAfter,
                 settings.timeoutMs, settings.checkSmt, settings.checkFzn, settings.checkOpb, settings.minimumWitnesses,
-                settings.provisionChecker, provenance),
+                settings.provisionChecker, provenance, settings.childJvmOptions, settings.recording?.path),
         )
         val stdout = File(output, "stdout")
         val stderr = File(output, "stderr")
         val start = System.nanoTime()
-        val process = ProcessBuilder(settings.command).redirectError(stderr).start()
+        val builder = ProcessBuilder(settings.command).redirectError(stderr)
+        settings.childJvmOptions?.let { builder.environment()["KLAUSE_CLI_OPTS"] = it }
+        val process = builder.start()
         val markers = AtomicLong()
         val interruption = AtomicReference<Interruption?>()
         val executor = Executors.newSingleThreadExecutor()
@@ -87,7 +103,9 @@ internal object CliStreamCapture {
             markers = markers.get(), interruption = interruption.get(), readerFailure = failure,
             stdoutSha256 = stdout.takeIf(File::isFile)?.readBytes()?.let(::sha256),
             stderrSha256 = stderr.takeIf(File::isFile)?.readBytes()?.let(::sha256),
+            processId = settings.recording?.let { process.pid() },
         ))
+        settings.recording?.let { summarize(it, output) }
         if (settings.checkSmt) checker.check(output, settings.source, interruption.get() != null,
             settings.minimumWitnesses, settings.provisionChecker)
         if (settings.checkFzn) Reports.writeJson(File(output, "source-check-fzn.json").path,
@@ -98,18 +116,26 @@ internal object CliStreamCapture {
                 settings.minimumWitnesses))
     }
 
-    private fun prepare(args: Array<String>, output: File): CaptureSettings {
+    private fun summarize(recording: File, output: File) {
+        runCatching {
+            check(recording.isFile && recording.length() > 0L) { "Child recording is missing" }
+            PrintStream(File(output, "cli-profile-summary.txt")).use { stream ->
+                Profiler.summarizeCli(recording, stream)
+            }
+        }.onFailure { error ->
+            Reports.writeJson(File(output, "profile-failure.json").path, CaptureFailure(error.toString()))
+        }
+    }
+
+    internal fun prepare(args: Array<String>, output: File): CaptureSettings {
         val separator = args.indexOf("--")
         require(separator >= 0) { "Use capture settings, --, then CLI arguments" }
         val settings = args.take(separator).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(settings.keys.all { it in setOf("input", "text64", "extension", "marker", "stopAfter", "timeoutMs",
-            "checkSmt", "checkFzn", "checkOpb", "minimumWitnesses", "provisionChecker") })
-        val extension = settings["extension"] ?: "smt2"
-        require(extension in setOf("smt2", "fzn", "mps", "opb", "xml"))
-        require((settings["input"] != null) != (settings["text64"] != null)) { "Supply input or text64" }
-        val bytes = settings["input"]?.let { CorpusFiles.open(File(it)).use { source -> source.readBytes() } }
-            ?: Base64.getDecoder().decode(settings.getValue("text64"))
-        val source = File(output, "input.$extension").apply { writeBytes(bytes) }
+        require(settings.keys.all { it in setOf("input", "text64", "suite", "problem", "sha256", "profileJvm",
+            "extension", "marker", "stopAfter", "timeoutMs", "checkSmt", "checkFzn", "checkOpb",
+            "minimumWitnesses", "provisionChecker") })
+        val (source, actual) = captureSource(settings, output)
+        val extension = source.extension
         val stopAfter = settings["stopAfter"]?.toLong() ?: 0L
         val timeoutMs = settings["timeoutMs"]?.toLong() ?: 60_000L
         require(stopAfter >= 0L && timeoutMs > 0L)
@@ -124,8 +150,54 @@ internal object CliStreamCapture {
         require(minimumWitnesses > 0 && (!checkSmt || extension == "smt2"))
         require(!checkFzn || extension == "fzn")
         require(!checkOpb || extension == "opb")
-        return CaptureSettings(command, source, sha256(bytes), marker, stopAfter, timeoutMs,
-            checkSmt, checkFzn, checkOpb, minimumWitnesses, provisionChecker)
+        val profile = settings["profileJvm"]?.toBooleanStrict() ?: false
+        val recording = if (profile) File(output, "cli.jfr").canonicalFile else null
+        val options = recording?.let { profileOptions(System.getenv("KLAUSE_CLI_OPTS").orEmpty(), it) }
+        return CaptureSettings(command, source, actual, marker, stopAfter, timeoutMs,
+            checkSmt, checkFzn, checkOpb, minimumWitnesses, provisionChecker, options, recording)
+    }
+
+    internal fun profileOptions(inherited: String, recording: File): String {
+        require("-XX:StartFlightRecording" !in inherited) { "Child recording is already configured" }
+        require(recording.path.none { it.isWhitespace() || it == ',' }) { "Recording path is not a JVM option" }
+        val option = "-XX:StartFlightRecording=filename=${recording.path},settings=profile,dumponexit=true"
+        return listOf(inherited, option).filter { it.isNotBlank() }.joinToString(" ")
+    }
+
+    private fun captureSource(settings: Map<String, String>, output: File): Pair<File, String> {
+        val catalog = settings["suite"] != null || settings["problem"] != null
+        require(listOf(settings["input"] != null, settings["text64"] != null, catalog).count { it } == 1) {
+            "Supply one input, text64, or catalog source"
+        }
+        val expected = settings["sha256"]
+        require(expected == null || expected.matches(Regex("[0-9a-f]{64}"))) { "A full source hash is required" }
+        val ref = if (catalog) {
+            require(settings["suite"] != null && settings["problem"] != null && expected != null) {
+                "Catalog capture requires suite, problem and sha256"
+            }
+            Catalog.uncapped(settings.getValue("suite")).problems.single { it.name == settings.getValue("problem") }
+                .also { require(it.data == null) { "Capture requires a self-contained source" } }
+        } else null
+        val catalogExtension = when (ref?.format) {
+            null -> null
+            Format.MPS -> "mps"
+            Format.SMTLIB -> "smt2"
+            Format.OPB -> "opb"
+            Format.XCSP3 -> "xml"
+            else -> error("Unsupported capture format: ${ref.format}")
+        }
+        val extension = settings["extension"] ?: catalogExtension ?: "smt2"
+        require(extension in setOf("smt2", "fzn", "mps", "opb", "xml"))
+        require(catalogExtension == null || extension == catalogExtension) { "Catalog source format differs" }
+        val bytes = when {
+            ref != null -> CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readBytes() }
+            settings["input"] != null -> CorpusFiles.open(File(settings.getValue("input"))).use { it.readBytes() }
+            else -> Base64.getDecoder().decode(settings.getValue("text64"))
+        }
+        val actual = sha256(bytes)
+        require(expected == null || actual == expected) { "Original source hash differs" }
+        val source = File(output, "input.$extension").apply { writeBytes(bytes) }
+        return source to actual
     }
 
     private fun capture(
@@ -177,6 +249,7 @@ private data class CapturePlan(
     val stopAfter: Long, val timeoutMs: Long, val checkSmt: Boolean, val checkFzn: Boolean, val checkOpb: Boolean,
     val minimumWitnesses: Int,
     val provisionChecker: Boolean, val build: BuildProvenance,
+    val childJvmOptions: String? = null, val recording: String? = null,
 )
 
 @Serializable
@@ -191,13 +264,15 @@ private data class Interruption(val trigger: String, val elapsedNanos: Long, val
 private data class CaptureResult(
     val exitCode: Int?, val markers: Long, val interruption: Interruption?, val readerFailure: String?,
     val stdoutSha256: String?, val stderrSha256: String?,
+    val processId: Long? = null,
 )
 
-private data class CaptureSettings(
+internal data class CaptureSettings(
     val command: List<String>, val source: File, val sourceSha256: String, val marker: Regex?,
     val stopAfter: Long, val timeoutMs: Long, val checkSmt: Boolean, val checkFzn: Boolean, val checkOpb: Boolean,
     val minimumWitnesses: Int,
     val provisionChecker: Boolean,
+    val childJvmOptions: String?, val recording: File?,
 )
 
 @Serializable

@@ -939,7 +939,7 @@ separately from whole-CLI comparisons and exclude warmup rounds from measurement
 `com.eignex.klause.bench.profile.CliStreamCapture` runs the installed CLI as a subprocess
 and retains original input bytes, build/runtime provenance, command, stdout, stderr,
 and a JSONL arrival record with byte offsets and subprocess liveness. Run it through
-a lab profile job on AWS. Capture settings precede `--`; the remaining arguments go
+a maintained lab profile job. Capture settings precede `--`; the remaining arguments go
 directly to the CLI, followed by the preserved input path. Compressed corpus inputs
 are decoded before their bytes and source hash are preserved. Supply `input=<path>` or
 `text64=<base64 input bytes>`, `extension=smt2|fzn|mps|opb|xml`, and optional
@@ -951,6 +951,21 @@ To capture several cases on one provisioned instance, supply only
 `batch64=<base64 JSON array of capture argument arrays>`. It preserves `requests.json`
 and creates numbered directories for each case. A failed case records `failure.json`
 and does not skip later planned cases.
+
+For a self-contained catalog source, supply `suite=<id>`, `problem=<exact name>` and
+`sha256=<original decoded source hash>` together instead of `input` or `text64`.
+The source format selects the file extension, and a conflicting extension or hash
+is rejected before launching the CLI. Catalog fetching occurs before subprocess timing.
+
+`profileJvm=true` records the actual CLI child to `cli.jfr`, preserving inherited
+`KLAUSE_CLI_OPTS` and the supplied CLI arguments. An already configured child recording
+is rejected. The plan retains the child options and recording path; the capture retains
+the child PID. After the child ends, the existing whole-CLI summarizer writes
+`cli-profile-summary.txt`; a missing recording or failed summary writes
+`profile-failure.json`. Profiled captures use the verified `capture.tar.gz` and
+`capture-manifest.json` transport, including the original source, streams, recording
+and summary. These recordings observe the supplied invocation without a warmup;
+they do not add independent MPS witness validation.
 
 `smoke-corpus/real-finite-domains-v1` supplies sparse disconnected sets, finite products
 and aliases, original Boolean conditions, signed zeros and singleton membership.
