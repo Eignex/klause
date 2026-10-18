@@ -528,6 +528,21 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
         null
     }
 
+    publishIntExclusionBatch(v, d, newDomain, newMin, newMax, antMin, antMax, interior, antecedents)
+    return true
+}
+
+private fun PropagationState.publishIntExclusionBatch(
+    v: Int,
+    d: IntDomain,
+    newDomain: IntDomain,
+    newMin: Long,
+    newMax: Long,
+    antMin: IntArray?,
+    antMax: IntArray?,
+    interior: LongArrayList?,
+    antecedents: IntArray?,
+) {
     if (undoLogging) logIntChange(v) // one record restores the full prior domain + bound atoms
 
     intDomains[v] = newDomain
@@ -558,7 +573,6 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
     if (interior != null) kindMask = kindMask or IntEvent.VALUE_REMOVED_BIT
     markIntDirty(v, kindMask)
     propagateAtomsForExclusionBatch(v, d.min, d.max, antMin, antMax, interior, antecedents)
-    return true
 }
 
 internal fun PropagationState.seedConflictFactor(fid: Int) {

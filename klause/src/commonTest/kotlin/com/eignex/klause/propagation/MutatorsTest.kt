@@ -71,4 +71,27 @@ class MutatorsTest {
             s.atomAntecedentsDerived(eq - s.problem.numBoolVars)?.toList(),
         )
     }
+
+    @Test
+    fun `batch endpoint reasons retain their separate crossed holes`() {
+        val s = freshState(hi = 10)
+        val ge = s.atomVarGe(0, 5)
+        val le = s.atomVarLe(0, 6)
+        s.levelToDecisionVar.add(s.problem.numBoolVars)
+        s.currentLevel = s.levelToDecisionVar.size
+        for (value in longArrayOf(2, 3, 7, 8)) check(s.excludeIntValue(0, value, null))
+        s.levelToDecisionVar.add(s.problem.numBoolVars)
+        s.currentLevel = s.levelToDecisionVar.size
+
+        check(s.excludeIntValues(0, longArrayOf(0, 1, 4, 9, 10), null))
+
+        assertEquals(
+            listOf(Lit.make(s.atomVarEq(0, 2), true), Lit.make(s.atomVarEq(0, 3), true)),
+            s.atomAntecedentsDerived(ge - s.problem.numBoolVars)?.toList(),
+        )
+        assertEquals(
+            listOf(Lit.make(s.atomVarEq(0, 7), true), Lit.make(s.atomVarEq(0, 8), true)),
+            s.atomAntecedentsDerived(le - s.problem.numBoolVars)?.toList(),
+        )
+    }
 }
