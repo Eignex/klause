@@ -14,6 +14,7 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -136,5 +137,125 @@ class LinearSourceWitnessTest {
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), Cancellation { true })
 
         assertIs<LinearSourceCheck.Declined>(result)
+    }
+
+    @Test
+    fun `unmetered point checks should observe cancellation within a bounded source batch`() {
+        val terms = List(128) { LinearSourceTerm(0, SemanticRational.ONE) }
+        val sources = listOf(
+            LinearSourceProblem(List(128) { LinearSourceVariable("x$it", false) }, emptyList()),
+            LinearSourceProblem(
+                listOf(LinearSourceVariable("x", false)),
+                listOf(LinearSourceRow(terms, lower = SemanticRational.ZERO)),
+            ),
+            LinearSourceProblem(
+                listOf(LinearSourceVariable("x", false)), emptyList(), LinearSourceObjective(terms),
+            ),
+        )
+        for (source in sources) {
+            var charged = 0L
+            val stop = object : Cancellation {
+                override fun charge(units: Long) { charged += units }
+                override fun isCancelled(): Boolean = charged > 0L
+            }
+
+            val result = checkLinearSourceWitness(source, List(source.variableValues.size) { BigFraction.ZERO }, stop)
+
+            assertIs<LinearSourceCheck.Declined>(result)
+            assertTrue(charged in 1L..64L)
+        }
+    }
+
+    @Test
+    fun `metered point checks should stop at the first exhausted source visit`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false)),
+            listOf(LinearSourceRow(List(128) { LinearSourceTerm(0, SemanticRational.ONE) })),
+        )
+        var charged = 0L
+        val meter = WorkMeter { charged += it }
+        val stop = object : Cancellation {
+            override fun workMeter(): WorkMeter = meter
+            override fun isCancelled(): Boolean = charged >= 1L
+        }
+
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), stop)
+
+        assertIs<LinearSourceCheck.Declined>(result)
+        assertEquals(1L, charged)
+    }
+
+    @Test
+    fun `a cancelled final short batch should not publish a point`() {
+        val source = LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList())
+        var cancelled = false
+        val stop = object : Cancellation {
+            override fun charge(units: Long) { cancelled = true }
+            override fun isCancelled(): Boolean = cancelled
+        }
+
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), stop)
+
+        assertIs<LinearSourceCheck.Declined>(result)
+    }
+
+    @Test
+    fun `cancellation should precede rejecting a point from a short batch`() {
+        val source = LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList())
+        var cancelled = false
+        val stop = object : Cancellation {
+            override fun charge(units: Long) { cancelled = true }
+            override fun isCancelled(): Boolean = cancelled
+        }
+
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(2).reciprocal()), stop)
+
+        assertIs<LinearSourceCheck.Declined>(result)
+    }
+
+    @Test
+    fun `unmetered point checks should retain every original source work charge`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false)),
+            listOf(LinearSourceRow(List(128) { LinearSourceTerm(0, SemanticRational.ONE) })),
+            LinearSourceObjective(List(2) { LinearSourceTerm(0, SemanticRational.ONE) }),
+        )
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun charge(units: Long) { charged += units }
+            override fun isCancelled(): Boolean = false
+        }
+
+        checkLinearSourceWitness(source, listOf(BigFraction.ZERO), stop)
+
+        assertEquals(132L, charged)
+    }
+
+    @Test
+    fun `unmetered point checks should batch external predicate polls`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false)),
+            listOf(LinearSourceRow(List(128) { LinearSourceTerm(0, SemanticRational.ONE) })),
+        )
+        var polls = 0
+        val stop = Cancellation { polls++; false }
+
+        checkLinearSourceWitness(source, listOf(BigFraction.ZERO), stop)
+
+        assertTrue(polls in 2..8)
+    }
+
+    @Test
+    fun `unmetered point checks should reject a violation beyond the first batch`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false)),
+            listOf(LinearSourceRow(
+                List(128) { LinearSourceTerm(0, SemanticRational.ONE) }, lower = SemanticRational.ONE,
+            )),
+        )
+
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), Cancellation.Never)
+
+        assertIs<LinearSourceCheck.Rejected>(result)
     }
 }

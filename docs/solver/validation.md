@@ -98,6 +98,11 @@ Cancellation declines the check. Finite execution installs this check before wor
 admission, after reconstructing source coordinates. Pipeline publication checks native
 points through the same service and retains native conclusions separately from their
 accepted-source qualification; tolerance acceptance does not transfer nominal proofs.
+Every declaration, row and coefficient visit retains its original work charge.
+Unmetered checks poll cancellation at most every 64 visits, with direct polls at
+entry and before acceptance or rejection. An attached meter retains eager polling
+after every debit. Arithmetic, original term magnitudes and tolerance qualification
+use the same complete source obligations.
 A captured finite acceptance check retains a separate immutable permission for
 floating optimum completion. Zero source tolerance withholds that permission even
 when an extra caller filter accepts a floating point. Reconstruction and worker
