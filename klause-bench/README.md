@@ -3414,7 +3414,11 @@ including private/default/generated helpers, constructors and methods without co
 or debug lines. `instructionLines` contains `[bci, lineEntryIndices]` for every
 instruction. Its predecessor policy chooses the greatest `start_pc` at or before
 the instruction across all original line tables, retaining every entry at that
-position. Duplicate, unordered, non-instruction and out-of-code line points retain
+position. `instructionTableLines` additionally contains `[bci, tables]`, where each
+original table contributes `[tableIndex, lineEntryIndices]` for its own predecessor,
+including an empty list when absent. Both union and individual-table candidates
+remain available without selecting a runtime debugger's table policy.
+Duplicate, unordered, non-instruction and out-of-code line points retain
 their original table/entry indexes and availability annotations. A code prefix
 without a predecessor stays unmatched. Each point references the original syntax
 line-candidate index, retaining all source/node/SMAP alternatives there. These are

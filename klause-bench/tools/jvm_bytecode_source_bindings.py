@@ -68,7 +68,7 @@ def bind_method(method, previous):
     if code is None:
         if previous['originalLineNumberTablesCopiedVerbatim'] is not None:
             raise ValueError('Absent code has debug line tables')
-        return dict(result, codeIdentity=None, lineEntries=[], instructionLines=[])
+        return dict(result, codeIdentity=None, lineEntries=[], instructionLines=[], instructionTableLines=[])
     tables = code['lineNumberTables']
     stripped = [[{key: entry[key] for key in ('startPc', 'lineNumber')} for entry in table] for table in tables]
     if stripped != previous['originalLineNumberTablesCopiedVerbatim']:
@@ -87,6 +87,7 @@ def bind_method(method, previous):
     if end != length:
         raise ValueError('Instruction layout does not cover the code identity')
     points = {}
+    table_points = [{} for _ in tables]
     entries = []
     for table_index, table in enumerate(tables):
         for entry_index, entry in enumerate(table):
@@ -100,16 +101,24 @@ def bind_method(method, previous):
                             'withinCode': pc < length})
             if pc < length:
                 points.setdefault(pc, []).append(position)
+                table_points[table_index].setdefault(pc, []).append(position)
     ordered = sorted(points)
-    positions = []
+    positions, table_positions = [], []
+    table_order = [sorted(points) for points in table_points]
     for instruction in instructions:
         pc = instruction['bci']
         predecessor = bisect_right(ordered, pc) - 1
         indices = [] if predecessor < 0 else points[ordered[predecessor]]
         positions.append([pc, indices])
-    return dict(result, codeIdentity=code['identity'], lineEntries=entries, instructionLines=positions,
+        per_table = []
+        for table_index, order in enumerate(table_order):
+            predecessor = bisect_right(order, pc) - 1
+            per_table.append([table_index, [] if predecessor < 0 else
+                              table_points[table_index][order[predecessor]]])
+        table_positions.append([pc, per_table])
+    return dict(result, codeIdentity=code['identity'], lineEntries=entries, instructionLines=positions, instructionTableLines=table_positions,
                 instructionCount=len(instructions), debugPredecessorPolicy='greatest-start-pc-across-all-tables',
-                debugPredecessorsAreSourceCandidatesOnly=True)
+                debugPredecessorsAreSourceCandidatesOnly=True, runtimeDebugTableSelectionProven=False)
 
 
 class Symbols:

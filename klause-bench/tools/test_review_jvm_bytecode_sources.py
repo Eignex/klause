@@ -35,6 +35,9 @@ class JvmBytecodeSourceBindingsTest(unittest.TestCase):
         result = bindings.bind_method(self.method, self.previous)
 
         self.assertEqual([[0, [1, 2]], [3, [0]]], result['instructionLines'])
+        self.assertEqual([[0, [[0, [1, 2]], [1, []]]], [3, [[0, [0]], [1, [3]]]]],
+                         result['instructionTableLines'])
+        self.assertFalse(result['runtimeDebugTableSelectionProven'])
         self.assertEqual([9, 4, 5, 6, 7], [entry['lineNumber'] for entry in result['lineEntries']])
         self.assertEqual([True, True, True, True, False], [entry['withinCode'] for entry in result['lineEntries']])
         self.assertFalse(result['lineEntries'][3]['instructionBoundary'])
