@@ -3379,3 +3379,70 @@ to 16 MiB, each report row to 128 MiB, and the whole report to 4 GiB logical and
 decline the whole inventory. No JVM class-file verification, virtual/dynamic callee
 selection, generated-body selection, source-phase coverage, physical compiler-root
 accounting, compiler elapsed time or savings is established by this metadata.
+
+### Saved bytecode and source candidate audit
+
+`bench.profile.JvmBytecodeSourceBindings` accepts `catalog=` and `catalog-sha256=`
+for a pinned HTTPS catalog with `schema: 1`. Its `bytecode` entry identifies a
+complete saved bytecode inventory with `id`, `manifest`, `manifestSha256`, `archive`,
+`reportMember` and `completionMember`. Each entry in `syntaxJoins` identifies a
+complete saved syntax/class join with the same archive identities, `reportMember`,
+`coverageMember`, `completionMember`, original `studySourceHead` and `bytecodeInputs`.
+Each input mapping contains `bytecodeInputId` and `syntaxInputId`. Every bytecode
+input/context pair must be mapped, including both original arms of a shared SDK.
+Every original syntax class row must join exactly once; an omitted context or
+unmatched row declines the whole audit.
+
+All members of all input archives are authenticated before report interpretation.
+Every selected gzip report is checked against its compressed and logical byte
+identities and record census. The bytecode schema and inventory end census must
+match the producer completion. The complete node coverage retains its original
+source/node order, including cold and unmatched nodes. The original syntax source
+text, ranges, SMAP payloads and unavailable records remain recoverable through the
+pinned input archives; this audit does not repeat their producer's parser checks.
+
+Class matching requires the original container, entry and class hash. JAR central
+directory indexes must agree. Runtime provider traversal indexes remain separate:
+module, entry and class bytes establish the cross-observer match, while both
+original indexes are retained. Alternate entries and duplicate class names remain
+separate. Every ordered method index, name, descriptor, flags, code presence and
+raw ordered line table must agree before positions are joined.
+
+`bytecode-source-bindings.jsonl.gz` begins with a schema and emits one reversible
+`key-and-string-tables-v1` record per class/context. Every method remains present,
+including private/default/generated helpers, constructors and methods without code
+or debug lines. `instructionLines` contains `[bci, lineEntryIndices]` for every
+instruction. Its predecessor policy chooses the greatest `start_pc` at or before
+the instruction across all original line tables, retaining every entry at that
+position. Duplicate, unordered, non-instruction and out-of-code line points retain
+their original table/entry indexes and availability annotations. A code prefix
+without a predecessor stays unmatched. Each point references the original syntax
+line-candidate index, retaining all source/node/SMAP alternatives there. These are
+conservative debug candidates, without an executed path or semantic-phase claim.
+[The JVM line-table contract](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.7.12)
+describes optional debug positions; it does not establish source ownership.
+
+Every structural class/member pool reference receives all exact-name/descriptor
+declaration candidates in its original study context. Member candidates include
+all declared ancestors without JVM lookup precedence; constructors and class
+initializers stay with their symbolic owner. Missing classes, repeated hierarchy
+names and alternate definitions remain explicit. Bootstrap arguments, method
+handles, dynamic cycles, instruction operands, branch targets and exception
+handlers retain their original pool/BCI indexes in the authenticated bytecode
+report. The audit executes no bootstrap or original class and performs no JVM
+constant resolution. Receiver-dependent dispatch, signature-polymorphic calls,
+reflection and generated bodies remain unbound. Static candidates cannot establish
+[actual JVM resolution or method selection](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.4.3).
+
+The input archive/staging and output report bounds are those of the saved syntax
+join. Each logical input report is bounded to 4 GiB and each row to 128 MiB;
+bytecode traversal admits at most 100,000 classes. The disk declaration/debug index
+is bounded to 8 GiB with a 16 MiB SQLite page cache. One hierarchy admits 100,000
+names and one class admits one million declaration candidates. A weighted lookup
+cache retains at most 4,096 keys and one million candidate references. Whole-report
+failure retains partial output and declines completion. The managed wrapper retains
+sources, runtime provenance, stdout/stderr and exit, then removes owned staging.
+Run actual saved-report interpretation only on the supported profiling worker.
+Source semantic phases, actual loaded/generated bodies, physical compiler roots,
+compiler elapsed costs, solver controls and savings remain separate obligations;
+the corresponding proof flags remain false.
