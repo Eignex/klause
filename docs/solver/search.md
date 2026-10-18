@@ -355,6 +355,9 @@ Variable-array Element groups unsupported result and selected-cell values sharin
 premise into a single immutable domain replacement. The mutation retains individual
 hole reasons and all changed bound, value and fixed-variable wakeups; one trail record
 restores the complete prior domain. Index exclusions retain position-specific reasons.
+Endpoint reason construction precedes batch publication. With undo logging enabled,
+publication records the prior state before replacing the domain, installs endpoint
+and interior reasons, schedules affected event kinds and then wakes atoms.
 
 Unconditional interior carves made without undo logging at position zero retain their
 membership in state-owned interval runs. Their establishment level, null reason and
