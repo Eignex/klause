@@ -347,21 +347,7 @@ def review(catalog, output, scratch):
         report_proofs = [report.verify() for report in reports]
         inputs.verify_unchanged()
     except BaseException:
-        cleanup_errors = []
-        for report in reports:
-            try:
-                report.close()
-            except BaseException as error:
-                cleanup_errors.append({'file': report.path.name, 'operation': 'close',
-                                       'type': type(error).__name__, 'message': str(error)})
-            try:
-                if report.path.exists():
-                    report.path.rename(report.path.with_name(report.path.name.replace('.jsonl.gz', '.partial.jsonl.gz')))
-            except OSError as error:
-                cleanup_errors.append({'file': report.path.name, 'operation': 'retain-partial',
-                                       'type': type(error).__name__, 'message': str(error)})
-        if cleanup_errors:
-            (output / 'report-cleanup-errors.json').write_text(json.dumps(cleanup_errors) + '\n')
+        retain_partial_reports(reports, output)
         raise
     return {'completed': complete, 'classRowsReviewed': total, 'syntaxSources': len(syntax.nodes),
             'syntaxNodes': syntax.node_count, 'syntaxErrors': syntax.errors,
@@ -387,6 +373,25 @@ def review(catalog, output, scratch):
                      'No resolved call, BCI interval, executed/inlined path, actual loader/source selection, generated '
                      'body, semantic phase, physical root, compiler cost, solver outcome or savings is inferred.',
             **{flag: False for flag in (*DENIED, 'symbolResolutionProven')}}
+
+
+
+def retain_partial_reports(reports, output):
+    cleanup_errors = []
+    for report in reports:
+        try:
+            report.close()
+        except BaseException as error:
+            cleanup_errors.append({'file': report.path.name, 'operation': 'close',
+                                   'type': type(error).__name__, 'message': str(error)})
+        try:
+            if report.path.exists():
+                report.path.rename(report.path.with_name(report.path.name.replace('.jsonl.gz', '.partial.jsonl.gz')))
+        except OSError as error:
+            cleanup_errors.append({'file': report.path.name, 'operation': 'retain-partial',
+                                   'type': type(error).__name__, 'message': str(error)})
+    if cleanup_errors:
+        (output / 'report-cleanup-errors.json').write_text(json.dumps(cleanup_errors) + '\n')
 
 
 def write_completion(path, result):

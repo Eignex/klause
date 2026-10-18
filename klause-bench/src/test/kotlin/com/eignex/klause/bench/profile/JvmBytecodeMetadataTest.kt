@@ -1,7 +1,10 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.lang.classfile.ClassFile
+import java.lang.classfile.attribute.SourceDebugExtensionAttribute
 import java.lang.constant.ClassDesc
 import java.lang.constant.ConstantDesc
 import java.lang.constant.ConstantDescs.CD_void
@@ -11,7 +14,9 @@ import java.lang.constant.MethodHandleDesc
 import java.lang.constant.MethodTypeDesc
 import java.lang.invoke.MethodType
 import java.util.ArrayList
+import java.util.Base64
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -19,6 +24,33 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class JvmBytecodeMetadataTest {
+    @ParameterizedTest
+    @ValueSource(
+        strings = ["", "00", "fffe", "c080eda0bdedb880", "534d41500a4578616d706c652e6b740a4b6f746c696e0a2a450a"],
+    )
+    fun `source debug payloads retain their exact bytes`(hex: String) {
+        val contents = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val bytes = ClassFile.of().build(ClassDesc.of("BytecodeSample")) {
+            it.with(SourceDebugExtensionAttribute.of(contents))
+        }
+
+        val metadata = JvmBytecodeMetadataReader.read(bytes)
+
+        assertContentEquals(contents, Base64.getDecoder().decode(metadata.sourceDebugExtensionContentsBase64.single()))
+        assertEquals(CaptureFile(contents.size.toLong(), sha256(contents)),
+            metadata.sourceDebugExtensionIdentities.single())
+    }
+
+    @Test
+    fun `classes without source debug payloads retain an empty inventory`() {
+        val bytes = ClassFile.of().build(ClassDesc.of("BytecodeSample")) {}
+
+        val metadata = JvmBytecodeMetadataReader.read(bytes)
+
+        assertTrue(metadata.sourceDebugExtensionIdentities.isEmpty())
+        assertTrue(metadata.sourceDebugExtensionContentsBase64.isEmpty())
+    }
+
     @Test
     fun `every declared overload constructor and field retains its descriptor`() {
         val type = ArrayList::class.java

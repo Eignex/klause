@@ -509,8 +509,20 @@ val checkJvmBytecodeSources = tasks.register<Exec>("checkJvmBytecodeSources") {
         "tools/test_review_jvm_bytecode_sources.py")
 }
 
+val checkJvmBytecodeSyntax = tasks.register<Exec>("checkJvmBytecodeSyntax") {
+    group = "verification"
+    description = "Test direct whole bytecode/syntax joins across original source contexts."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_jvm_bytecode_syntax.py")
+    inputs.files("tools/review_jvm_bytecode_syntax.py", "tools/review_jvm_bytecode_sources.py",
+        "tools/jvm_bytecode_source_bindings.py", "tools/review_jvm_source_syntax.py", "tools/jvm_source_syntax.py",
+        "tools/jvm_source_line_bindings.py", "tools/jvm_source_debug.py", "tools/review_jvm_source_lines.py",
+        "tools/review_jvm_declaration_bindings.py", "tools/test_review_jvm_bytecode_syntax.py")
+}
+
 tasks.named("check") {
-    dependsOn(checkJvmRecordingContext, checkJvmMethodCosts, checkJvmDeclarationBindings, checkJvmBytecodeSources)
+    dependsOn(checkJvmRecordingContext, checkJvmMethodCosts, checkJvmDeclarationBindings, checkJvmBytecodeSources,
+        checkJvmBytecodeSyntax)
     dependsOn(checkJvmSourceDebug, checkJvmSourceLineBindings, checkJvmSourceLineReports,
         checkJvmSourceSyntax, checkJvmSourceSyntaxReview)
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,

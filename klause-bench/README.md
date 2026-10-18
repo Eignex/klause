@@ -3355,8 +3355,10 @@ exception handlers. Switch order and repeated destinations remain intact. `ret`
 targets stay unresolved. Every original line-table position is retained in order,
 including duplicates and points outside instruction boundaries. These are static
 positions; they do not identify executed branches or intervals owned by a source node.
-Source debug mappings come from the separately retained original class metadata,
-joined by original class-byte identity.
+Source-debug attributes retain their ordered byte identities and Base64 contents,
+including empty, malformed and unsupported payloads. The bytecode parser does not
+interpret them or select a stratum. Older bytecode inventories without these fields
+require their original class/debug metadata; missing fields cannot imply empty payloads.
 
 Every constant-pool slot and bootstrap entry is represented, including unused
 entries, two-slot constants, method handles, method types and dynamic references.
@@ -3450,3 +3452,58 @@ Run actual saved-report interpretation only on the supported profiling worker.
 Source semantic phases, actual loaded/generated bodies, physical compiler roots,
 compiler elapsed costs, solver controls and savings remain separate obligations;
 the corresponding proof flags remain false.
+
+
+### Direct bytecode and syntax audit
+
+`bench.profile.JvmBytecodeSyntaxBindings` accepts the same pinned HTTPS `catalog=`
+and `catalog-sha256=` arguments. Its `schema: 1` catalog contains `bytecode` with
+`id`, `manifest`, `manifestSha256`, `archive`, `reportMember` and `completionMember`.
+Each `syntaxInputs` entry supplies the same archive identities, `reportMember`,
+`sourcesMember`, `completionMember`, `compilerMember` and a unique original
+`studySourceHead`. Every original bytecode study context must have a complete
+syntax input, and every syntax input must be used. CLI, harness and SDK roots retain
+their separate bytecode input identities; a shared SDK is joined in every original
+context declared by its authenticated producer. Study heads are provenance claims,
+without a source revision or loaded-class claim for SDK or dependency classes.
+
+This audit requires bytecode inventories with explicit ordered source-debug byte
+identities and Base64 payloads. It authenticates every member of every archive
+before interpreting any report. Each whole source specification must name its
+original study head. The complete source/parser/UTF16/UTF8/range/line/census checks
+are those of the saved syntax join, with parser version 2.4.10. Source code is
+parsed without compiling or executing it. Empty source package annotations remain
+empty; parsed package agreement is a separate candidate annotation.
+
+Every class and method is joined directly to every overlapping source/debug/syntax
+candidate. Raw line tables retain original entry order and duplicate positions;
+SMAP parsing retains all strata and unsupported/invalid/unavailable payloads.
+The adapter removes the bytecode-specific boundary Boolean only from the legacy
+debug view, retaining it in the complete original bytecode and instruction joins.
+No class, generated helper, overload, source node or failed context is selected by
+observed compiler success or cost. Every instruction retains both union and
+individual-table predecessor candidates from the saved bytecode/source audit.
+
+The output includes `bytecode-source-bindings.jsonl.gz` and, for each original
+source context, `syntax-line-bindings-NNN.jsonl.gz` and
+`syntax-node-line-coverage-NNN.jsonl.gz`. The class reports preserve the reversible
+`key-and-string-tables-v1` encoding. Each bytecode annotation references its emitted
+`syntaxLineReportFile` and class ordinal, then each debug point references the
+complete line/source/node candidates in that report. Node coverage keeps every
+source/node index in its original order, including cold and unmatched nodes. All
+reports share the 4 GiB logical/512 MiB compressed output budget and each entire
+gzip is byte-count/SHA-256 round-trip verified before completion. A failed or
+unavailable context cannot admit a successful prefix. Exceptions retain partial
+reports, while a complete negative traversal retains its entire reports and
+unsuccessful completion. Authenticated inputs must remain byte-identical afterward.
+
+The other whole archive, staging, source, syntax, class, index and candidate limits
+remain those of the preceding audits. Declaration lookup keeps the class-name
+index as its outer loop and probes the original-context index for those class
+ordinals. The explicit order avoids scanning all unrelated contexts for each
+symbol without changing candidate order or lookup semantics; see
+[SQLite join ordering](https://sqlite.org/optoverview.html#manual_control_of_query_plans_using_cross_join).
+Run actual report interpretation only on the supported profiling worker. Static
+source/debug candidates and complete report traversal leave actual loaded/generated
+selection, dispatch, semantic phases, physical compiler roots, compiler costs,
+solver outcome/runtime/allocation/RNG/work controls and savings unproved.

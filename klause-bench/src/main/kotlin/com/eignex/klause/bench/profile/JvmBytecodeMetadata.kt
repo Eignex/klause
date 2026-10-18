@@ -11,6 +11,7 @@ import java.lang.classfile.constantpool.ConstantDynamicEntry
 import java.lang.classfile.constantpool.ConstantPool
 import java.lang.classfile.constantpool.DynamicConstantPoolEntry
 import java.lang.classfile.constantpool.PoolEntry
+import java.util.Base64
 
 internal object JvmBytecodeMetadataReader {
     private const val MAX_CLASS_BYTES = 16 * 1024 * 1024
@@ -48,6 +49,7 @@ internal object JvmBytecodeMetadataReader {
             require(entry.bsmIndex() == index)
             JvmBytecodeBootstrap(index, entry.bootstrapMethod().index(), entry.arguments().map { it.index() })
         }
+        val sourceDebug = model.findAttributes(Attributes.sourceDebugExtension()).map { it.contents() }
         return JvmBytecodeMetadata(
             model.thisClass().asInternalName(), CaptureFile(bytes.size.toLong(), sha256(bytes)),
             model.majorVersion(), model.minorVersion(), model.flags().flagsMask(),
@@ -64,7 +66,9 @@ internal object JvmBytecodeMetadataReader {
                     field.attributes().map { it.attributeName().stringValue() },
                 )
             },
-                methods,
+            methods,
+            sourceDebugExtensionIdentities = sourceDebug.map { CaptureFile(it.size.toLong(), sha256(it)) },
+            sourceDebugExtensionContentsBase64 = sourceDebug.map { Base64.getEncoder().encodeToString(it) },
         )
     }
 
@@ -170,6 +174,8 @@ internal data class JvmBytecodeMetadata(
     val fullSourcePhaseCoverageProven: Boolean = false,
     val compilerElapsedTimeProven: Boolean = false,
     val acceptedSavingsCredit: Boolean = false,
+    val sourceDebugExtensionIdentities: List<CaptureFile> = emptyList(),
+    val sourceDebugExtensionContentsBase64: List<String> = emptyList(),
 )
 
 @Serializable
