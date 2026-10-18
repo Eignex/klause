@@ -32,4 +32,30 @@ class SourceValidationParamsTest {
             SourceValidationParams(SolverInvocation.Settings(params = listOf("source-validation=maybe")))
         }
     }
+    @Test
+    fun `compressed source checking should consume both bench flags`() {
+        val settings = SolverInvocation.Settings(params = listOf("source-validation=true",
+            "source-validation-gzip=true", "bt-arm=satOptimized"))
+
+        val params = SourceValidationParams(settings)
+
+        assertTrue(params.requested)
+        assertTrue(params.gzip)
+        assertEquals(listOf("bt-arm=satOptimized"), params.solverSettings.params)
+    }
+
+    @Test
+    fun `compressed checking should require explicit source validation`() {
+        assertFailsWith<IllegalArgumentException> {
+            SourceValidationParams(SolverInvocation.Settings(params = listOf("source-validation-gzip=true")))
+        }
+    }
+
+    @Test
+    fun `an invalid compression flag should be rejected`() {
+        assertFailsWith<IllegalArgumentException> {
+            SourceValidationParams(SolverInvocation.Settings(params = listOf("source-validation=true",
+                "source-validation-gzip=maybe")))
+        }
+    }
 }
