@@ -1,6 +1,13 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.util.Cancellation
@@ -15,6 +22,49 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModePresolveTest {
+
+    @Test
+    fun `finite linear preparation summaries should partition implied factors by class`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 1)),
+            factors = arrayOf(
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE), LinearOp.LE, BigFraction.ONE),
+            ),
+            impliedFactorMask = booleanArrayOf(true, false, false),
+        )
+
+        val text = captureErr { printFiniteLinearSourcePreparation(problem) }
+
+        assertTrue("source preparation: factors 3, ints 1, reals 0" in text, text)
+        assertTrue("source preparation factor ExactLinear: total=1, implied=0" in text, text)
+        assertTrue("source preparation factor Linear: total=2, implied=1" in text, text)
+    }
+
+    @Test
+    fun `an MPS preparation dry run should retain the returned factor class counts`() {
+        val relative = "klause-bench/smoke-corpus/mps-linear-source-v1/original-decimal-cancellation.mps"
+        val mps = listOf(File(relative), File("../$relative")).first { it.isFile }
+        var output = ""
+
+        val text = captureErr {
+            output = capture {
+                assertEquals(0, runCli(arrayOf("--presolve", "none", "--param", "dry-run-presolve=true",
+                    mps.absolutePath)))
+            }
+        }
+
+        val summary = Regex("source preparation: factors (\\d+), ints (\\d+), reals (\\d+)").find(text)
+        assertTrue(summary != null, text)
+        val counts = Regex("source preparation factor ([^:]+): total=(\\d+), implied=(\\d+)").findAll(text).toList()
+        assertTrue(counts.isNotEmpty(), text)
+        assertEquals(summary.groupValues[1].toInt(), counts.sumOf { it.groupValues[2].toInt() })
+        assertTrue(counts.all { it.groupValues[3].toInt() <= it.groupValues[2].toInt() }, text)
+        assertFalse(output.lineSequence().any { it.startsWith("s ") || it.startsWith("v ") }, output)
+    }
 
     @Test
     fun `an SMT-LIB run should report what presolve did`() {

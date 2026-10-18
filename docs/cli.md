@@ -254,7 +254,10 @@ Solver-control flags are common to **every** mode:
   - preparation diagnostics: `dry-run-presolve=true` returns the selected finite or
     open-linear preparation summary without solution or completion markers. The
     library binds the phase and returns its diagnostics; unsupported native phases
-    decline explicitly. `false` retains ordinary solving.
+    decline explicitly. Finite linear-source summaries include concrete factor-class
+    display names with total and implied counts from the returned model. These counts
+    describe preparation under the diagnostic controls, without establishing row or
+    objective identity, resolved LP policy or search performance. `false` retains ordinary solving.
   - presolve effort (any engine): `presolve-abort-fraction` (finite number in `[0,1]`, default `0.001`),
     `presolve-max-rounds` (nonnegative, default `1` for conservative, `16` for default/aggressive),
     `presolve-probe-per-var` and `presolve-probe-total` (nonnegative propagation-call caps;
