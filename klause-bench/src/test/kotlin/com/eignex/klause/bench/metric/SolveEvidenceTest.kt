@@ -1,6 +1,8 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -85,18 +87,62 @@ class SolveEvidenceTest {
         assertEquals("(\n)", witness)
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["LF", "CR", "CRLF"])
+    fun `SMT line endings should preserve blank lines in the last complete model`(ending: String) {
+        val separator = when (ending) {
+            "CR" -> "\r"
+            "CRLF" -> "\r\n"
+            else -> "\n"
+        }
+        val raw = listOf(
+            "", "sat", "(", ")", "(", "", "", "  (define-fun |wide é𝄞| () Int 2)", "", ")",
+            "", "", "(", "  (define-fun x () Int 3)", "",
+        ).joinToString(separator)
+
+        val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
+
+        assertEquals("(\n\n\n  (define-fun |wide é𝄞| () Int 2)\n\n)", witness)
+    }
+
     @Test
-    fun `SMT witness size should be limited by the complete model length`() {
+    fun `a restarted SMT model should discard its incomplete prefix`() {
+        val raw = "sat\n(\n  discarded\n(\n  (define-fun x () Int 2)\n)\n"
+
+        val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
+
+        assertEquals("(\n  (define-fun x () Int 2)\n)", witness)
+    }
+
+    @Test
+    fun `SMT model delimiters should require standalone lines`() {
+        val raw = "sat\n (\n)\n(\n( \n )\n) \n)\n"
+
+        val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
+
+        assertEquals("(\n( \n )\n) \n)", witness)
+    }
+
+    @Test
+    fun `an unmatched SMT closing line should retain the completed model`() {
+        val raw = "sat\n(\n  (define-fun x () Int 2)\n)\n)\n"
+
+        val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
+
+        assertEquals("(\n  (define-fun x () Int 2)\n)", witness)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["", "1"])
+    fun `SMT witness size should be limited by the complete model length`(extra: String) {
         val prefix = "(\n  (define-fun x () Int "
         val suffix = ")\n)"
         val digits = "1".repeat(8 * 1024 * 1024 - prefix.length - suffix.length)
-        for (extra in listOf("", "1")) {
-            val model = "$prefix$digits$extra$suffix"
-            val raw = "sat\n(\n)\n$model\n"
+        val model = "$prefix$digits$extra$suffix"
+        val raw = "sat\n(\n)\n$model\n"
 
-            val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
+        val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
 
-            assertEquals(if (extra.isEmpty()) model else null, witness)
-        }
+        assertEquals(if (extra.isEmpty()) model else null, witness)
     }
 }
