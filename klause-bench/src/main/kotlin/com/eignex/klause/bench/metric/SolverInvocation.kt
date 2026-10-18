@@ -80,6 +80,8 @@ internal object SolverInvocation {
         /** Subprocess wall-clock duration, including launch and output consumption; null when unavailable. */
         val elapsedMs: Long? = null,
         val exactObjective: String? = null,
+        val stderr: String? = null,
+        val stderrComplete: Boolean = false,
     ) {
         fun referenceElapsedMs(budgetMs: Long): Long = when {
             proven -> solveTimeMs(stats) ?: elapsedMs ?: budgetMs
@@ -313,7 +315,11 @@ internal object SolverInvocation {
             start()
         }
         val stderr = StringBuilder()
-        val drain = Thread { process.errorStream.bufferedReader().forEachLine { stderr.appendLine(it) } }
+        val stderrDrained = AtomicBoolean(false)
+        val drain = Thread {
+            process.errorStream.bufferedReader().forEachLine { stderr.appendLine(it) }
+            stderrDrained.set(true)
+        }
         drain.isDaemon = true
         drain.start()
 
@@ -464,6 +470,7 @@ internal object SolverInvocation {
         stats["exit"] = process.exitValue().toString()
         drain.join(STDERR_DRAIN_WAIT_MS)
         quarantines(stderr.toString())?.let { stats[QUARANTINED] = it }
+        val diagnostics = if (!drain.isAlive && stderrDrained.get()) stderr.toString() else null
         if (cmd.first().substringAfterLast('/') == "klause-cli") {
             System.getenv("KLAUSE_LAB_PROFILE_DIR")?.let { directory ->
                 val recording = File(directory, "cli.jfr")
@@ -491,6 +498,8 @@ internal object SolverInvocation {
             attribution = attribution,
             rawOutput = raw.toString(),
             command = cmd.joinToString(" "),
+            stderr = diagnostics?.take(STDERR_RECORD_CAP),
+            stderrComplete = diagnostics != null && diagnostics.length <= STDERR_RECORD_CAP,
         )
     }
 
@@ -566,6 +575,7 @@ internal object SolverInvocation {
     private const val NANOS_PER_MILLI = 1_000_000L
     private const val GRACE_MILLIS = 30_000L
     private const val STDERR_CAP = 2000
+    private const val STDERR_RECORD_CAP = 16 * 1024
 
     /** How a frontend prefixes a model it declines: `klause mps: ...`, `klause opb: ...`. */
     private const val REFUSAL_PREFIX = "klause "

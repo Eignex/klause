@@ -738,6 +738,13 @@ vendor BLAS, external libraries or MiniZinc compiler. Capture those separately.
 
 ## Saved results
 
+Ordinary subprocess records retain `stderr` as a prefix of at most 16 Ki characters,
+with line endings normalized to newlines. `stderrComplete=true` means the drain
+finished and the whole stream fits in that prefix. Null text or a false flag leaves
+complete diagnostics unavailable, including older cached records. Successful
+preparation-only CLI diagnostics are retained here alongside the separate raw stdout.
+These diagnostics describe preparation and provide no source witness or proof credit.
+
 Ordinary CLI statistics expose `openHintIndexAdmitted`, index decline categories,
 and caller/component consultation and selection counters separately from
 `openHintDraws` and `openHintSteered`. Component usage can be present without a

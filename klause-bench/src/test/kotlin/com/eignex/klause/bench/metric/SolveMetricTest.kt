@@ -72,6 +72,27 @@ class SolveMetricTest {
         assertEquals(hashes, record.sourceHashes)
     }
 
+    @Test
+    fun `source checking should retain complete subprocess diagnostics`() {
+        val mps = ProblemRef("bounded-decimal-constant", Format.MPS,
+            corpus("mps-linear-source-v1/bounded-decimal-constant.mps"), Category.OPTIMIZATION, Expected.Unknown)
+        val entry = ResolvedProblem(mps, lazy { error("source parsing must stay lazy") })
+        val diagnostics = "source preparation: factors 3, ints 1, reals 0\n"
+
+        val (result, _) = SolveMetric.solve(entry, SolverInvocation.KLAUSE,
+            SolverInvocation.Settings(params = listOf("source-validation=true")), Budget(),
+            UUID.randomUUID().toString(), "now", "fixture", installedBuild = { null },
+            invoke = { _, _, _, _, _ ->
+                SolverInvocation.Result(null, null, null, proven = false, stats = emptyMap(), rawOutput = "",
+                    command = "cli", stderr = diagnostics, stderrComplete = true)
+            }, validateMps = { _, _, _, _, _ ->
+                MpsSourceValidation.Result(SourceValidation("unknown", "diagnostic only"))
+            })
+
+        assertEquals(diagnostics, result.stderr)
+        assertEquals(true, result.stderrComplete)
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `MPS checking should select its transport policy without changing native settings`(gzip: Boolean) {

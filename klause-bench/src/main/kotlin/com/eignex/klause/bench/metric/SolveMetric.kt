@@ -107,6 +107,10 @@ internal data class SolveRecord(
     val processTimeToBestMs: Long? = null,
     val exactObjective: String? = null,
     val compilerIdentity: MiniZincCompilerIdentity? = null,
+    /** Normalized subprocess stderr, limited to 16 Ki characters; null when unavailable. */
+    val stderr: String? = null,
+    /** Whether [stderr] contains the whole normalized stream rather than a bounded prefix. */
+    val stderrComplete: Boolean = false,
 )
 
 internal object SolveMetric {
@@ -571,6 +575,8 @@ internal object SolveMetric {
             command = r.command,
             buildProvenance = r.buildProvenance,
             buildFingerprint = r.buildProvenance?.fingerprint,
+            stderr = r.stderr,
+            stderrComplete = r.stderrComplete,
         )
     }
 
