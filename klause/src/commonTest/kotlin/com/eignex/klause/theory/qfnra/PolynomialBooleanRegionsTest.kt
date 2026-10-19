@@ -898,7 +898,7 @@ class PolynomialBooleanRegionsTest {
     }
 
     @Test
-    fun `invocation observations accumulate conditional theory regions`() {
+    fun `invocation observations retain completed regions across compatible witness reuse`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
             "$declarations (declare-const b Bool) (assert (and b (or b (= (+ (* x0 x0) (* x1 x1)) 1))))",
@@ -909,7 +909,8 @@ class PolynomialBooleanRegionsTest {
             assertIs<QfNraResult.Satisfiable>(invocation.check())
             assertIs<QfNraResult.Satisfiable>(invocation.check())
 
-            assertEquals(2L, invocation.stats.booleanTheoryRegions)
+            assertEquals(1L, invocation.stats.booleanTheoryRegions)
+            assertEquals(2L, invocation.queries)
         }
     }
 
