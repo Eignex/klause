@@ -177,12 +177,17 @@ When that estimate exceeds 1,000, required leaf completion builds the current
 pinned source residual and admits a numerical query only if its actual row count
 is at most 1,000. Every source Boolean and integer coordinate must be pinned.
 It does not reuse a root layout or optional cuts on this path.
+`LpLeafRelaxation` stages the selected rows and bounds through immutable exact
+authority before solver construction. Ordinary retained real-leaf solving shares
+that assembly mechanism. An infeasible oversized-root leaf stays local to its
+finite decision prefix and contributes no pooled nogood. Original source point
+validation still gates a witness.
 Source and declaration visits are prepaid to the containing LP work ledger;
 completed row/column/nonzero storage is charged before admission. Cancellation
 retains those charges and withholds the model. `PINNED_REAL_LEAF_ADMISSION`
-distinguishes ready residuals, row-limit declines, unpinned coordinates and
-cancellation. Other native work, precision and witness/proof checks retain their
-existing limits and owners.
+distinguishes ready residuals, row-limit declines, unpinned coordinates, source
+projection declines and cancellation. Other native work, precision and
+witness/proof checks retain their existing limits and owners.
 
 Complete mixed witness recovery can submit a connected real residual to `SourceLp`
 after fixing private integer guesses and reducing source equations. These requests

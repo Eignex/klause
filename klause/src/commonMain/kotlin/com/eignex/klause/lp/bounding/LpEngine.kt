@@ -45,7 +45,9 @@ import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
+import com.eignex.klause.lp.relaxation.LpLeafRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.SessionDomains
 import com.eignex.klause.lp.relaxation.exactLeafResult
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
@@ -659,12 +661,14 @@ internal class LpEngine(
         val visits = problem.numFactors.toLong() + problem.numBoolVars + problem.numIntVars + problem.numRealVars
         noteNodeOverhead(visits * LpNodeOverhead.BUILD)
         leafPinDecline(session)?.let { return declinedLeafAdmission(it) }
+        val assembly = LpLeafRelaxation(problem, relaxer,
+            onBuild = { noteNodeOverhead(it * LpNodeOverhead.BUILD) },
+            onEdit = { noteNodeOverhead(it * LpNodeOverhead.EDIT) })
         val relaxation = try {
-            relaxer.build(session, cancellation = params.cancellation)
+            assembly.build(SessionDomains(session), params.cancellation)
         } catch (_: LpAssemblyCancelled) {
             return declinedLeafAdmission("CANCELLED")
-        }
-        noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.BUILD)
+        } ?: return declinedLeafAdmission(if (params.cancellation()) "CANCELLED" else "SOURCE_DECLINE")
         if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
         if (relaxation.model.m > RESIDUAL_MAX_ROWS) return declinedLeafAdmission("ROW_LIMIT")
         sink.lp.observeRealLeafAdmission("READY")
@@ -736,10 +740,12 @@ internal class LpEngine(
                 // Pool the theory lemma for restart-time registration: the leaf itself just rejects
                 // (the engine backtracks chronologically), and the next restart makes the lemma a
                 // permanent clause pruning the dead region everywhere.
-                val clause = certified.farkasRay
-                    ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
-                    ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
-                    ?: activePremiseClause(relaxation, session)
+                val clause = if (residualOversized) null else {
+                    certified.farkasRay
+                        ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
+                        ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
+                        ?: activePremiseClause(relaxation, session)
+                }
                 if (clause != null) lpNogoods?.add(clause)
                 LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
             }
