@@ -39,7 +39,7 @@ application {
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
     from("tools") {
         include("smt_witness_validation.py", "mps_witness_validation.py",
-            "mps_stdout_gzip.py", "mps_stdout_deflate.py", "mps_stdlib_runtime.py", "verify_nra_source_results.py",
+            "verify_nra_source_results.py",
             "verify_source_results.py", "requirements-source-checks.txt")
         into("smt-witness-validation")
     }
@@ -205,4 +205,56 @@ tasks.register("dumpSchema", JavaExec::class) {
 
 tasks.withType<Test> {
     maxHeapSize = "4g"
+}
+
+val miplibVersion = "1.0.4"
+val miplibArchiveSha256 = "37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9"
+val miplibDirectory = layout.buildDirectory.dir("miplib-solchecker")
+val prepareMpsSolchecker = tasks.register("prepareMpsSolchecker") {
+    group = "build"
+    description = "Fetch the pinned upstream MIPLIB checker (MIT)."
+    inputs.property("version", miplibVersion)
+    inputs.property("sha256", miplibArchiveSha256)
+    outputs.dir(miplibDirectory.map { it.dir("upstream") })
+    doLast {
+        val root = miplibDirectory.get().asFile
+        root.mkdirs()
+        val archive = File(root, "miplib.zip")
+        URI("https://miplib.zib.de/downloads/miplib2017-testscript-v$miplibVersion.zip")
+            .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
+            .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(archive.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        check(hash == miplibArchiveSha256) { "MIPLIB distribution hash differs" }
+        java.util.zip.ZipFile(archive).use { zip ->
+            for (name in listOf("LICENSE", "checker/README", "checker/Makefile",
+                "checker/src/main.cpp", "checker/src/model.cpp", "checker/src/model.h",
+                "checker/src/mpsinput.cpp", "checker/src/mpsinput.h", "checker/src/gmputils.cpp", "checker/src/gmputils.h")) {
+                val target = File(root, "upstream/$name")
+                target.parentFile.mkdirs()
+                zip.getInputStream(checkNotNull(zip.getEntry(name))).use { input -> target.outputStream().use { input.copyTo(it) } }
+            }
+        }
+        check(archive.delete())
+    }
+}
+val miplibBinary = miplibDirectory.map { it.file("solchecker") }
+val compileMpsSolchecker = tasks.register<Exec>("compileMpsSolchecker") {
+    group = "build"
+    description = "Build upstream MIPLIB solchecker with GMP and zlib."
+    dependsOn(prepareMpsSolchecker)
+    inputs.dir(miplibDirectory.map { it.dir("upstream") })
+    outputs.file(miplibBinary)
+    commandLine("c++", "-O2", "-o", miplibBinary.get().asFile.absolutePath,
+        *listOf("main.cpp", "gmputils.cpp", "model.cpp", "mpsinput.cpp").map {
+            miplibDirectory.get().file("upstream/checker/src/$it").asFile.absolutePath
+        }.toTypedArray(), "-lgmp", "-lz")
+}
+tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
+    dependsOn(compileMpsSolchecker)
+    from(miplibBinary) { into("miplib-solchecker") }
+    from(miplibDirectory.map { it.dir("upstream") }) {
+        include("LICENSE", "checker/README", "checker/Makefile", "checker/src/**")
+        into("miplib-solchecker")
+    }
 }
