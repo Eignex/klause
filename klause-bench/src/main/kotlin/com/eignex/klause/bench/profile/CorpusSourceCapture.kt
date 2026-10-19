@@ -241,7 +241,8 @@ internal object CorpusSourceCapture {
                     } }
                 }
                 cleanup("worker reap") {
-                    process.destroyForcibly()
+                    // Destroying an exited Process closes pipes that its readers may still be draining.
+                    if (process.isAlive) process.destroyForcibly()
                     if (process.waitFor(5, TimeUnit.SECONDS)) processReaped.set(true)
                     else cleanupIssues.add("worker is not reaped")
                 }
@@ -378,7 +379,12 @@ internal object CorpusSourceCapture {
         }
         check(exit == 0 && complete && !timedOut && !overflow.get() && !stopping.get() &&
             cleanupIssues.isEmpty() && groupResolved.get() && processReaped.get() && hookRemoved
-        ) { "capture worker did not complete" }
+        ) {
+            "capture worker did not complete: exit=$exit, streamsComplete=$complete, " +
+                "timedOut=$timedOut, overflow=${overflow.get()}, containingStop=${stopping.get()}, " +
+                "groupTerminationEstablished=${groupResolved.get()}, workerReaped=${processReaped.get()}, " +
+                "shutdownHookRemoved=$hookRemoved, cleanupIssues=${cleanupIssues.joinToString()}"
+        }
     }
 
     private fun write(file: File, bytes: ByteArray) {

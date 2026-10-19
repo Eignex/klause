@@ -881,6 +881,9 @@ Python parent has exited. Linux `setsid`, Python 3 and `zstd` are required; Pyth
 runs isolated without provisioning mathematical packages. Cooperative IO and OS
 cleanup can overrun a polling boundary; the containing owner kills the group and
 withholds process completeness on timeout, overflow or interrupted draining.
+Exited workers retain their pipes until the stream readers finish; group cleanup
+still terminates owned descendants. An incomplete capture reports its exit,
+stream completion and cleanup state in the failure message.
 
 Under `$OUT/corpus-source-capture`, each completed payload receives an indexed
 `.smt2` path only after source size/hash and complete decoder exit are checked.
