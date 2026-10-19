@@ -17,7 +17,7 @@ class MpsSolcheckerInputTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["offset", "rational", "wide-number", "exponent", "duplicate-objective", "unknown-row", "section", "trailing"])
+    @ValueSource(strings = ["offset", "rational", "wide-number", "exponent", "duplicate-objective", "marker-crossing", "unknown-row", "section", "trailing"])
     fun `unqualified upstream source features should be declined`(variant: String) {
         val input = when (variant) {
             "offset" -> source.replace("rhs row 1", "rhs obj 1")
@@ -25,6 +25,7 @@ class MpsSolcheckerInputTest {
             "wide-number" -> source.replace("row 1", "row ${"1".repeat(32)}")
             "exponent" -> source.replace("row 1", "row 1e9999")
             "duplicate-objective" -> source.replace(" x obj 1 row 1", " x obj 1 row 1\n x obj 2")
+            "marker-crossing" -> source.replace(" x obj 1 row 1", " x obj 1\n marker 'MARKER' 'INTORG'\n x row 1")
             "unknown-row" -> source.replace(" x obj 1 row 1", " x obj 1 unknown 1")
             "section" -> source.replace("ENDATA", "SOS\nENDATA")
             else -> source + " x obj 2\n"

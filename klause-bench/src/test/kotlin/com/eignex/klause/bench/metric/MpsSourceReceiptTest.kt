@@ -32,12 +32,13 @@ class MpsSourceReceiptTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["partial", "duplicate", "corrupt", "census", "warning", "timeout", "cleanup", "hash"])
+    @ValueSource(strings = ["partial", "duplicate", "corrupt", "census", "warning", "timeout", "cleanup", "hash", "data-limit"])
     fun `incomplete or corrupt output should not establish a check`(variant: String) {
         val output = when (variant) {
             "partial" -> stdout.substringBefore("Maximum violations")
             "duplicate" -> stdout + "Check SOL: Integrality 1 Constraints 1 Objective 1\n"
             "corrupt" -> stdout.replace("Constraints 1", "Constraints true")
+            "data-limit" -> "MIPLIB data limit KiB: 999999999\n" + stdout
             "census" -> stdout.replace("2 vars", "3 vars")
             else -> stdout
         }

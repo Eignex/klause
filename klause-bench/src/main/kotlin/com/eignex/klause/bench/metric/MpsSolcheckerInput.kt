@@ -45,6 +45,7 @@ internal object MpsSolcheckerInput {
                 "COLUMNS" -> {
                     if ("'MARKER'" in fields) {
                         require(fields.size == 3 && fields[1] == "'MARKER'" && fields[2] in setOf("'INTORG'", "'INTEND'"))
+                        column = null
                     } else {
                         require(fields.size == 3 || fields.size == 5)
                         if (column != first) {
