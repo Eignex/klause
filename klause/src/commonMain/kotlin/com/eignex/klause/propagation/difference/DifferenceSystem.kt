@@ -28,16 +28,20 @@ import com.eignex.klause.ir.VarRemap
  * semantics *with* real LS support, so those siblings stay and enforce each row for local search.
  */
 internal class DifferenceSystem(
-    /** Edges over integer variables, with [DifferenceFragment.ZERO] for the constant. */
+    // Endpoints are integer columns or private graph vertices; DifferenceFragment.ZERO is the constant.
     val edges: List<DifferenceEdge>,
-    /** Whether this system is hosted by the Boolean difference-theory pipeline rather than CP. */
-    private val theoryOnly: Boolean = false,
+    // Private arithmetic vertices do not participate in finite integer renumbering.
+    val privateVertices: Boolean = false,
+    // Native equality atoms belong to the receiving propagation state.
+    val indexGuards: Map<Int, DifferenceIndexGuard> = emptyMap(),
 ) : Factor {
 
     override val variables: VarList
 
     init {
         require(edges.isNotEmpty()) { "DifferenceSystem needs at least one edge" }
+        require(indexGuards.keys.all { it in edges.indices && edges[it].guard == DifferenceEdge.ALWAYS })
+        require(indexGuards.values.all { it.variable >= 0 })
         val ints = LinkedHashSet<Int>()
         val bools = LinkedHashSet<Int>()
         for (e in edges) {
@@ -45,8 +49,10 @@ internal class DifferenceSystem(
             if (e.target != DifferenceFragment.ZERO) ints.add(e.target)
             if (e.guard != DifferenceEdge.ALWAYS) bools.add(Lit.variable(e.guard))
         }
+        for (guard in indexGuards.values) ints.add(guard.variable)
         variables = MixedVars(
-            boundInts = if (theoryOnly) IntArray(0) else ints.toIntArray(),
+            boundInts = if (privateVertices) indexGuards.values.map { it.variable }.distinct().toIntArray()
+                else ints.toIntArray(),
             boolVars = bools.toIntArray(),
         )
     }
@@ -54,8 +60,10 @@ internal class DifferenceSystem(
     override fun remap(mapping: VarRemap): Factor = DifferenceSystem(
         edges.map { e ->
             DifferenceEdge(
-                source = if (e.source == DifferenceFragment.ZERO) e.source else mapping.int(e.source),
-                target = if (e.target == DifferenceFragment.ZERO) e.target else mapping.int(e.target),
+                source = if (privateVertices || e.source == DifferenceFragment.ZERO) e.source
+                    else mapping.int(e.source),
+                target = if (privateVertices || e.target == DifferenceFragment.ZERO) e.target
+                    else mapping.int(e.target),
                 bound = e.bound,
                 guard = if (e.guard == DifferenceEdge.ALWAYS) {
                     e.guard
@@ -65,7 +73,10 @@ internal class DifferenceSystem(
                 domainBound = e.domainBound,
             )
         },
-        theoryOnly = theoryOnly,
+        privateVertices = privateVertices,
+        indexGuards = indexGuards.mapValues { (_, guard) ->
+            DifferenceIndexGuard(mapping.int(guard.variable), guard.value)
+        },
     )
 
     /**
@@ -74,13 +85,22 @@ internal class DifferenceSystem(
      * differently, so two systems that differ only there are not interchangeable.
      */
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DIFFERENCE_SYSTEM) {
+        bool(privateVertices)
         int(edges.size)
-        for (e in edges.sortedWith(compareBy({ it.source }, { it.target }, { it.bound }, { it.guard }))) {
+        for ((index, e) in edges.withIndex().sortedWith(
+            compareBy({ it.value.source }, { it.value.target }, { it.value.bound }, { it.value.guard },
+                { indexGuards[it.index]?.variable ?: -1 }, { indexGuards[it.index]?.value ?: 0L }),
+        )) {
             int(e.source)
             int(e.target)
             long(e.bound)
             int(e.guard)
             int(if (e.domainBound) 1 else 0)
+            val selector = indexGuards[index]
+            int(selector?.variable ?: -1)
+            long(selector?.value ?: 0L)
         }
     }
 }
+
+internal data class DifferenceIndexGuard(val variable: Int, val value: Long)

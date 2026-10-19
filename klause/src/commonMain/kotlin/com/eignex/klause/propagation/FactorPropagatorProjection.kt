@@ -68,7 +68,7 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is Cumulative -> cumulativePropagator()
 
-    is DifferenceSystem -> DifferenceSystemPropagator(edges)
+    is DifferenceSystem -> DifferenceSystemPropagator(edges, indexGuards)
 
     is Diffn -> DiffnPropagator(intVars, xs, ys, widths, heights, widthVars, heightVars, nonStrict, n, varSize)
 

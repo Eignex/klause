@@ -397,6 +397,18 @@ deliberately omit CP propagation. Every inert built-in role carries a reason. A 
 family can decline emission under feature, resource or domain gates, and omitted rows
 weaken the relaxation.
 
+Finite preparation can also append a redundant difference system over exact real
+rows and real table selections. Its vertices are private arithmetic coordinates;
+they create no finite real domains. Supported source Boolean guards enter the
+graph directly. Each table index equality is resolved to a native integer atom in
+the receiving propagation state, so a contradictory selection can be excluded
+before all discrete columns are fixed. The ordinary incremental graph retracts
+released edges before asserting current ones. Cycle and path explanations contain
+the active source guards and native index premises. Unsupported rows remain with
+their original owners; a consistent graph supplies no model or completed leaf.
+All original factors, source witness checks and required LP completion remain.
+See [real graph admission](../theories/difference.md#real-graph-admission-and-checks).
+
 Strict increasing chains reject an endpoint that needs a successor above `Long.MAX_VALUE`
 or a predecessor below `Long.MIN_VALUE`. Distinct-value kernel scans compare signed
 bounds directly and keep group initialization separate from legitimate endpoint values.

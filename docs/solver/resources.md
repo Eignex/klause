@@ -126,6 +126,17 @@ committed decisions to that same ledger. Remaining decision capacity is read aga
 each feasibility round; rebuilding a traversal does not renew it. A root witness or
 refutation that needs no decision can survive an exhausted node allowance. Source
 strategies bind one supplied ledger across their finite and arithmetic projections.
+
+Optional finite real-difference preparation charges factor, term, table-entry,
+denominator and edge visits to the containing solve token. One cumulative 65,536
+visit limit and the existing 10,000 real-column envelope bound its retained graph.
+A cancellation or representation decline discards the whole prefix without refund.
+The completed immutable factor retains no preparation token. Each receiving finite
+state resolves table equalities to its own native atoms and uses the existing
+incremental difference propagator, finite propagation currency and 64-head sweep
+bound. It creates no numerical query, theory-check allowance or finite real domain.
+Original arithmetic completion retains its own work and complete-check obligations.
+
 The private clausal primal search and walk also charge that ledger. Their decisions and
 walk instructions are not included in the enclosing arm's `nodes` and `lsMoves`
 counters, so those exported counters alone cannot reconstruct the solve charge. ALNS

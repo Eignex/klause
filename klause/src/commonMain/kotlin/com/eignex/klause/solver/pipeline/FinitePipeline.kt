@@ -7,6 +7,7 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.SourceMapping
+import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -14,6 +15,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.hasActivity
+import com.eignex.klause.solver.withRealDifferenceSystem
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 
@@ -159,7 +161,7 @@ object FinitePipeline {
             request.randomSeed,
             plan.factorProjections,
         )
-        val finiteModel = if (outcome.stats.infeasible) {
+        val bakedModel = if (outcome.stats.infeasible) {
             outcome.problem
         } else {
             val model = if (outcome.changed) outcome.problem else request.problem
@@ -168,6 +170,12 @@ object FinitePipeline {
                 ?: plan.factorProjections.forEngineView(model)
             model.bake(projections, request.solveCancellation)
         }
+        val finiteModel = if (!outcome.stats.infeasible && bakedModel is BakedProblem) {
+            bakedModel.withRealDifferenceSystem(request.solveCancellation)
+        } else bakedModel
+        val mapping = if (finiteModel === bakedModel) outcome.mapping else outcome.mapping.then(
+            SourceMapping(outcome.mapping.target, finiteModel, TransformationGuarantees.IDENTITY),
+        )
         val sameCoordinatesAndFactors = finiteModel.numBoolVars == request.problem.numBoolVars &&
             finiteModel.numIntVars == request.problem.numIntVars &&
             finiteModel.numRealVars == request.problem.numRealVars &&
@@ -192,11 +200,12 @@ object FinitePipeline {
         return FinitePipelinePreparation(
             problem = finiteModel,
             objective = outcome.objective ?: objective,
-            reconstruct = outcome.reconstruct,
+            reconstruct = if (mapping === outcome.mapping) outcome.reconstruct
+                else { sample -> mapping.reconstructFrom(finiteModel, sample) },
             presolve = outcome.stats.takeIf { outcome.changed || it.infeasible || it.lpStats.hasActivity() },
             constructionBakeElapsed = (request.problem as? BakedProblem)?.bakeElapsed ?: Duration.ZERO,
         ).also {
-            it.sourceMapping = outcome.mapping
+            it.sourceMapping = mapping
             it.executionPlan = executionPlan
         }
     }
