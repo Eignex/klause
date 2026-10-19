@@ -138,29 +138,8 @@ internal object MpsSourceValidation {
                         tolerance,
                         "0",
                     )
-                    val command = if (host == "Linux") {
-                        listOf(
-                            "/usr/bin/timeout",
-                            "--signal=KILL",
-                            "30s",
-                            "/usr/bin/prlimit",
-                            "--as=4294967296",
-                            "--fsize=1048576",
-                            "--core=0",
-                            "--",
-                        ) + arguments
-                    } else {
-                        listOf(
-                            "/bin/sh",
-                            "-c",
-                            "baseline=$(ps -o vsz= -p $) && " +
-                                "ulimit -v $((baseline + 4194304)) && ulimit -t 30 && " +
-                                "ulimit -f 1024 && ulimit -c 0 && " +
-                                "printf 'MIPLIB address KiB: %s %s\\n' \"\$baseline\" \"$(ulimit -v)\" && exec \"$@\"",
-                            "miplib-solchecker",
-                        ) + arguments
-                    }
-                    val process = MpsSourceReceipt.run(command, checkDirectory, minOf(30_000, remaining()))
+                    val process = MpsSourceReceipt.run(MpsSourceReceipt.command(host, arguments),
+                        checkDirectory, minOf(30_000, remaining()))
                     processes += process
                     runCatching {
                         MpsSourceReceipt.interpret(
