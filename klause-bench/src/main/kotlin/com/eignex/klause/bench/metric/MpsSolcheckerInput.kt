@@ -2,7 +2,8 @@ package com.eignex.klause.bench.metric
 
 internal object MpsSolcheckerInput {
     private val decimal = Regex("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
-    private val sections = setOf("NAME", "OBJSENSE", "ROWS", "COLUMNS", "RHS", "RANGES", "BOUNDS", "INDICATORS", "ENDATA")
+    private val sections =
+        setOf("NAME", "OBJSENSE", "ROWS", "COLUMNS", "RHS", "RANGES", "BOUNDS", "INDICATORS", "ENDATA")
 
     data class Profile(val maximize: Boolean)
 
@@ -35,6 +36,7 @@ internal object MpsSolcheckerInput {
                     require(fields.size == 1 && first in setOf("MIN", "MAX"))
                     maximize = first == "MAX"
                 }
+
                 "ROWS" -> {
                     require(fields.size == 2 && first in setOf("N", "L", "E", "G") && rows.add(fields[1]))
                     if (first == "N") {
@@ -42,9 +44,12 @@ internal object MpsSolcheckerInput {
                         objective = fields[1]
                     }
                 }
+
                 "COLUMNS" -> {
                     if ("'MARKER'" in fields) {
-                        require(fields.size == 3 && fields[1] == "'MARKER'" && fields[2] in setOf("'INTORG'", "'INTEND'"))
+                        require(
+                            fields.size == 3 && fields[1] == "'MARKER'" && fields[2] in setOf("'INTORG'", "'INTEND'"),
+                        )
                         column = null
                     } else {
                         require(fields.size == 3 || fields.size == 5)
@@ -55,10 +60,15 @@ internal object MpsSolcheckerInput {
                         for (i in 1 until fields.size step 2) {
                             require(fields[i] in rows) { "unknown source row" }
                             requireNumber(fields[i + 1])
-                            if (fields[i] == objective) require(objectiveColumns.add(first)) { "repeated objective coefficient" }
+                            if (fields[i] == objective) {
+                                require(
+                                objectiveColumns.add(first),
+                            ) { "repeated objective coefficient" }
+                            }
                         }
                     }
                 }
+
                 "RHS", "RANGES" -> {
                     require(fields.size == 3 || fields.size == 5) { "unlabelled vectors are unsupported" }
                     for (i in 1 until fields.size step 2) {
@@ -66,12 +76,17 @@ internal object MpsSolcheckerInput {
                         requireNumber(fields[i + 1])
                     }
                 }
+
                 "BOUNDS" -> {
                     require(fields.size in 3..4 && first in setOf("LO", "UP", "FX", "LI", "UI", "FR", "MI", "PL", "BV"))
                     if (fields.size == 4) requireNumber(fields[3])
                 }
-                "INDICATORS" -> require(fields.size == 4 && first == "IF" && fields[3] in setOf("0", "1") &&
-                    fields[1] in rows && indicators.add(fields[1]))
+
+                "INDICATORS" -> require(
+                    fields.size == 4 && first == "IF" && fields[3] in setOf("0", "1") &&
+                    fields[1] in rows && indicators.add(fields[1])
+                )
+
                 else -> error("unsupported MPS record")
             }
         }

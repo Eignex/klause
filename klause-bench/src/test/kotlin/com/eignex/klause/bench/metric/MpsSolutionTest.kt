@@ -7,9 +7,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class MpsSolutionTest {
-    private val record = SolveRecord("fixture", "klause", null, 1, "free", 1, 10_000, "optimize", false,
+    private val record = SolveRecord(
+        "fixture", "klause", null, 1, "free", 1, 10_000, "optimize", false,
         true, 0.125, 1, proven = true, gitSha = "test", timestamp = "test", command = "cli --exact",
-        finalWitness = "v x=1/8", exactObjective = "1/8")
+        finalWitness = "v x=1/8", exactObjective = "1/8",
+    )
 
     @Test
     fun `terminating rational coordinates should convert without rounding`() {

@@ -5,10 +5,10 @@ import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
-import java.io.File
-import java.nio.file.Files
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import java.io.File
+import java.nio.file.Files
 
 internal const val MPS_SOURCE_POLICY = "mps-miplib2017-point-v1"
 internal const val MPS_GZIP_SOURCE_POLICY = "mps-miplib2017-point-gzip-v1"
@@ -65,7 +65,11 @@ internal object MpsSourceValidation {
             val out = Files.createTempDirectory(evidenceRoot.toPath(), "mps-source-check-").toFile()
             directory = out
             fun remaining() = 70_000 - (System.nanoTime() - started) / 1_000_000
-            fun active() { check(remaining() > 0 && !Thread.currentThread().isInterrupted) { "checker cancelled or timed out" } }
+            fun active() {
+                check(
+                remaining() > 0 && !Thread.currentThread().isInterrupted,
+            ) { "checker cancelled or timed out" }
+            }
             active()
             val source = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
             check(source.size <= MAX_SOURCE_BYTES) { "original source exceeds checker limit" }
@@ -78,23 +82,43 @@ internal object MpsSourceValidation {
             check(record.sourceOutputSha256 == sha256(decoded)) { "producer stdout hash differs" }
             val policy = if (gzip) MPS_GZIP_SOURCE_POLICY else MPS_SOURCE_POLICY
             check(record.validationPolicy == policy) { "producer validation policy differs" }
-            val wire = if (gzip) MpsStdoutGzip.encode(decoded) { remaining() <= 0 || Thread.currentThread().isInterrupted }
-                else decoded.also { check(it.size <= MpsStdoutGzip.MAX_WIRE_BYTES) { "stdout exceeds checker limit" } }
+            val wire = if (gzip) {
+                MpsStdoutGzip.encode(
+                decoded,
+            ) { remaining() <= 0 || Thread.currentThread().isInterrupted }
+            } else {
+                decoded.also { check(it.size <= MpsStdoutGzip.MAX_WIRE_BYTES) { "stdout exceeds checker limit" } }
+            }
             val producer = Reports.json.encodeToString(record).toByteArray()
             check(producer.size <= MAX_RECORD_BYTES) { "producer record exceeds checker limit" }
             val solution = MpsSolution.convert(record, raw, exact).toByteArray()
-            val inputs = mapOf("source.mps" to source, (if (gzip) "stdout.txt.gz" else "stdout.txt") to wire,
-                "record.json" to producer, "point.sol" to solution,
-                "request.txt" to "policy=$policy\nlinear=${if (exact) "0" else "1e-7"}\nintegrality=0\nobjective=0\n".toByteArray())
+            val inputs = mapOf(
+                "source.mps" to source,
+                (if (gzip) "stdout.txt.gz" else "stdout.txt") to wire,
+                "record.json" to producer,
+                "point.sol" to solution,
+                "request.txt" to
+                    "policy=$policy\nlinear=${if (exact) "0" else "1e-7"}\nintegrality=0\nobjective=0\n".toByteArray(),
+            )
             for ((name, bytes) in inputs) File(out, name).writeBytes(bytes)
             val bindings = inputs.mapValues { sha256(it.value) } + ("decodedStdout" to sha256(decoded))
-            captured = mapOf("sourceValidationProducerRecordJson" to producer.decodeToString(),
+            captured = mapOf(
+                "sourceValidationProducerRecordJson" to producer.decodeToString(),
                 "sourceValidationRecordSha256" to sha256(producer),
-                "sourceValidationSourceIdentityJson" to Reports.json.encodeToString(sourceIdentity(ref.source) + mapOf(
-                    "problem" to ref.name, "catalogRevision" to record.gitSha.orEmpty(), "sourceSha256" to sha256(source))))
+                "sourceValidationSourceIdentityJson" to Reports.json.encodeToString(
+                    sourceIdentity(ref.source) + mapOf(
+                    "problem" to ref.name,
+                    "catalogRevision" to record.gitSha.orEmpty(),
+                    "sourceSha256" to sha256(source),
+                )
+                ),
+            )
             active()
             val binaryBytes = resource("solchecker", 16 * 1024 * 1024)
-            val binary = File(out, "solchecker").apply { writeBytes(binaryBytes); check(setExecutable(true, true)) }
+            val binary = File(out, "solchecker").apply {
+                writeBytes(binaryBytes)
+                check(setExecutable(true, true))
+            }
             File(out, "LICENSE").writeBytes(resource("LICENSE", 65_536))
             active()
             val setupMs = (System.nanoTime() - started) / 1_000_000
@@ -111,10 +135,9 @@ internal object MpsSourceValidation {
                         listOf("/usr/bin/timeout", "--signal=KILL", "30s", "/usr/bin/prlimit",
                             "--as=4294967296", "--fsize=1048576", "--core=0", "--") + arguments
                     } else {
-                        listOf("/bin/sh", "-c", "data=$(ulimit -H -d) && " +
-                            "if [ \"\$data\" = unlimited ] || [ \"\$data\" -gt 524288 ]; then data=524288; fi && " +
-                            "ulimit -S -d \"\$data\" && ulimit -t 30 && ulimit -f 1024 && ulimit -c 0 && " +
-                            "printf 'MIPLIB data limit KiB: %s\\n' \"$(ulimit -S -d)\" && exec \"$@\"",
+                        listOf("/bin/sh", "-c", "baseline=$(ps -o vsz= -p $$) && " +
+                            "ulimit -v $((baseline + 4194304)) && ulimit -t 30 && ulimit -f 1024 && ulimit -c 0 && " +
+                            "printf 'MIPLIB address KiB: %s %s\\n' \"\$baseline\" \"$(ulimit -v)\" && exec \"$@\"",
                             "miplib-solchecker") + arguments
                     }
                     val process = MpsSourceReceipt.run(command, checkDirectory, minOf(30_000, remaining()))
@@ -128,16 +151,18 @@ internal object MpsSourceValidation {
                 check(unchanged && removed) { "checker executable changed or cleanup failed" }
             }
             active()
-            check(inputs.all { (name, bytes) -> File(out, name).readBytes().contentEquals(bytes) }) { "checker inputs changed" }
+            check(inputs.all { (name, bytes) -> File(out, name).readBytes().contentEquals(bytes) }) {
+                "checker inputs changed"
+            }
             check(SolveEvidence.sourceHashes(ref) == record.sourceHashes) { "original source changed during checking" }
             val nominal = verdicts.first()
             val accepted = verdicts.last()
             val complete = nominal != null && accepted != null
-            val valid = complete && accepted!!.integral && accepted.feasible && nominal!!.objective
+            val valid = complete && accepted.integral && accepted.feasible && nominal.objective
             val exactFeasible = nominal?.let { it.integral && it.feasible }
             val status = if (!complete) "unknown" else if (valid) "valid" else "invalid"
             val receipt = Receipt(MPS_GROUND_CHECKER, policy, bindings, sha256(binaryBytes), ARCHIVE_SHA256,
-                if (host == "Linux") "linux-address-space-v1" else "darwin-data-cpu-v1",
+                if (host == "Linux") "linux-address-space-v1" else "darwin-address-space-v1",
                 processes, status, exactFeasible, if (valid) exactFeasible == false else null)
             val json = Reports.json.encodeToString(receipt)
             File(out, "result.json").writeText(json)
@@ -149,7 +174,8 @@ internal object MpsSourceValidation {
                 checkedWitness = record.finalWitness.takeIf { status == "valid" }, checker = MPS_GROUND_CHECKER)
             Result(validation, captured + mapOf("sourceValidationReceiptJson" to json,
                 "sourceValidationReceiptSha256" to sha256(json.toByteArray()),
-                "sourceValidationSetupMs" to setupMs.toString(), "sourceValidationCheckMs" to processes.sumOf { it.elapsedMs }.toString(),
+                "sourceValidationSetupMs" to setupMs.toString(),
+                "sourceValidationCheckMs" to processes.sumOf { it.elapsedMs }.toString(),
                 "sourceValidationSolverQueries" to "0", "sourceValidationProofChecked" to "false",
                 "sourceValidationBinarySha256" to receipt.binarySha256,
                 "sourceValidationArchiveSha256" to receipt.archiveSha256))
@@ -168,12 +194,27 @@ internal object MpsSourceValidation {
 
     private fun sourceIdentity(source: ProblemSource): Map<String, String> = when (source) {
         is ProblemSource.Vendored -> mapOf("kind" to "vendored", "path" to source.workspaceRelPath)
-        is ProblemSource.External -> mapOf("kind" to "external", "collection" to source.collection.id,
-            "url" to source.collection.url, "path" to source.relPath)
-        is ProblemSource.ExternalIndexed -> mapOf("kind" to "indexed", "collection" to source.collection.id,
-            "url" to source.collection.url, "index" to source.index.toString(), "extension" to source.ext)
-        is ProblemSource.MpsFeasibility -> mapOf("kind" to "mps-feasibility",
-            "source" to Reports.json.encodeToString(sourceIdentity(source.source)))
+
+        is ProblemSource.External -> mapOf(
+            "kind" to "external",
+            "collection" to source.collection.id,
+            "url" to source.collection.url,
+            "path" to source.relPath,
+        )
+
+        is ProblemSource.ExternalIndexed -> mapOf(
+            "kind" to "indexed",
+            "collection" to source.collection.id,
+            "url" to source.collection.url,
+            "index" to source.index.toString(),
+            "extension" to source.ext,
+        )
+
+        is ProblemSource.MpsFeasibility -> mapOf(
+            "kind" to "mps-feasibility",
+            "source" to Reports.json.encodeToString(sourceIdentity(source.source)),
+        )
+
         is ProblemSource.InCode -> error("MPS checking requires original file bytes")
     }
 }
