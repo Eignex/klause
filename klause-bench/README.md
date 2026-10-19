@@ -930,10 +930,11 @@ solver; a declined point receives no validation credit. Equal numeric tolerances
 do not establish equal acceptance policies.
 
 The adapter screens known upstream reader limitations without evaluating rows.
-Supported source records use named vectors, one objective row, consecutive column
-blocks, unique objective coefficients and decimal tokens of at most 31 characters
+Supported source records use one named vector per section without repeated row
+entries, one objective row, consecutive column blocks, unique objective coefficients and decimal tokens of at most 31 characters
 with exponents between -128 and 128. RANGES, integer markers, bounds and indicators
-are delegated to MIPLIB. Objective RHS offsets, nonterminating rational coordinates,
+are delegated to MIPLIB. BV must be its column's sole bound record. Lower bounds after an UP record, objective RHS
+offsets, nonterminating rational coordinates,
 rational source tokens, longer numbers, inline section data, multiple free rows,
 unsupported sections and semantics overrides remain unverified. Terminating rational
 coordinates convert exactly to supported decimal SOL tokens. No custom parser or
@@ -950,7 +951,8 @@ incumbent timing. The policy separates raw-solve cache entries; cached points ar
 checked afresh.
 
 Each native invocation has a 30-second JVM wall deadline and disabled core dumps.
-Linux uses a 4 GiB address-space limit and 1 MiB per output file; GNU timeout also
+Linux uses a 4 GiB address-space limit, 30-second CPU backstop and 1 MiB per output
+file; GNU timeout also
 bounds wall time if its JVM owner is lost. macOS adds 4 GiB to the pre-exec shell
 virtual-size baseline and applies the
 result as an absolute address-space limit, retaining both numbers in stdout.

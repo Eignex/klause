@@ -72,13 +72,21 @@ class MpsSourceReceiptTest {
         assertTrue(process.cleanupComplete)
     }
 
-    @Test
-    fun `deadline should terminate and reap an owned checker`() {
-        val process = MpsSourceReceipt.run(listOf("/bin/sleep", "60"), directory, 50)
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `deadline should terminate and reap an owned checker`(nested: Boolean) {
+        val command = if (nested) listOf("/bin/sh", "-c", "sleep 60 & echo \$!; wait")
+            else listOf("/bin/sleep", "60")
+
+        val process = MpsSourceReceipt.run(command, directory, 100)
 
         assertEquals("timeout", process.stop)
         assertTrue(process.cleanupComplete)
         assertFalse(ProcessHandle.of(process.pid).map { it.isAlive }.orElse(false))
+        if (nested) {
+            val child = process.stdout.trim().toLong()
+            assertFalse(ProcessHandle.of(child).map { it.isAlive }.orElse(false))
+        }
     }
 
     @Test

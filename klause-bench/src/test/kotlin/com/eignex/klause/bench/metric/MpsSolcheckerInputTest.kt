@@ -38,7 +38,7 @@ class MpsSolcheckerInputTest {
     @ValueSource(
         strings = [
             "offset", "rational", "wide-number", "exponent", "duplicate-objective", "marker-crossing",
-            "unknown-row", "section", "trailing",
+            "unknown-row", "section", "trailing", "vectors", "ranges", "bound-order", "binary-bounds",
         ],
     )
     fun `unqualified upstream source features should be declined`(variant: String) {
@@ -50,6 +50,10 @@ class MpsSolcheckerInputTest {
             "duplicate-objective" -> source.replace(" x obj 1 row 1", " x obj 1 row 1\n x obj 2")
             "marker-crossing" -> source.replace(" x obj 1 row 1", " x obj 1\n marker 'MARKER' 'INTORG'\n x row 1")
             "unknown-row" -> source.replace(" x obj 1 row 1", " x obj 1 unknown 1")
+            "vectors" -> source.replace("ENDATA", " other row 2\nENDATA")
+            "ranges" -> source.replace("ENDATA", "RANGES\n rng row 3\n rng row -2\nENDATA")
+            "bound-order" -> source.replace("ENDATA", "BOUNDS\n UP b x 1\n LO b x 0\nENDATA")
+            "binary-bounds" -> source.replace("ENDATA", "BOUNDS\n BV b x\n LO b x 0\nENDATA")
             "section" -> source.replace("ENDATA", "SOS\nENDATA")
             else -> source + " x obj 2\n"
         }
