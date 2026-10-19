@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -75,9 +76,11 @@ internal class PolynomialWorkerAdapter(
 
     private fun backtrackParams(): BacktrackParams = params.backtrack.withAssumptions(params.assumptions).copy(
         cancellation = params.backtrack.cancellation or cancellation,
-        valueSelector = PolynomialWitnessValues(params.backtrack.valueSelector, SearchCandidateHints { variable ->
-            invocation.preferredBool(variable, params.backtrack.cancellation or cancellation)
-        }),
+        valueSelector = params.backtrack.valueSelector.let { values ->
+            if (values is SolutionGuided) values else PolynomialWitnessValues(values, SearchCandidateHints { variable ->
+                invocation.preferredBool(variable, params.backtrack.cancellation or cancellation)
+            })
+        },
         componentFactory = {
             params.backtrack.componentFactory?.invoke().orEmpty() + PolynomialSearchComponent(
                 model.service, invocation, model.integerColumns,
