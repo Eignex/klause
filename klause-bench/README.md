@@ -884,110 +884,78 @@ The main stops starting models after two minutes; individual checks retain the
 ordinary 35-second process limit. Source checking supplies no native solver,
 UNSAT, optimization or performance credit.
 
+### MPS independent point validation
+
 MPS runs opt in with `param=source-validation=true` under policy
-`mps-original-rational-ground-witness-v2`. The installed bench uses the maintained independent
-Python MPS parser in `verify_source_results.py`, shared with its symbolic proof
-builder. The `python-fractions-mps-ground-v1` checker evaluates the supplied point
-with exact `Fraction` arithmetic.
-It checks the literal final stdout point against every original row, bound,
-indicator and integrality declaration, and recomputes the original objective and
-sense. Parsing and direct evaluation each run once, retaining every separate source
-term for tolerance magnitudes. Ground evaluation constructs no symbolic model or
-substitution graph. Default runs permit original MPS absolute/relative tolerances of `1e-7`;
-`exact=true` requires zero slack. Tolerance magnitudes include cancellation between
-separate original terms. Text bounds at or beyond magnitude `1e20` are open
-for columns and each row side, including derived range endpoints; affine objective
-constants remain literal. Original-file declaration defaults apply; unsupported
-semantics overrides, syntax and incomplete points leave checking unknown.
+`mps-miplib2017-point-v1`. The bench invokes the established
+[MIPLIB solchecker 1.0.4](https://miplib.zib.de/download.html), with its own original-MPS
+reader and GMP rational evaluator. No solver query, repair, optimum check or
+infeasibility certificate is performed. Only an accepted supplied point receives
+feasibility and objective credit. Native proof claims remain uncredited; original
+claims remain in the `reported*` fields.
 
-Each check writes original source bytes, stdout, final witness and the complete
-producer record under an adjacent `mps-source-check-*` directory, with SHA-256
-bindings in `result.json`. The saved solve record also retains exact producer-record
-JSON, source retrieval identity and the complete receipt JSON in
-`sourceValidationProducerRecordJson`, `sourceValidationSourceIdentityJson` and
-`sourceValidationReceiptJson`. Literal final coordinates/objective and source/stdout
-hashes remain in the ordinary record. This preserves checker custody when ordinary
-workers return only that record; preserve hash-matching original sources separately
-for later inspection. Packaged checker/requirements hashes, interpreter/provider identities,
-process logs and cleanup receipts accompany it. Valid/invalid receipts require successful
-bounded bootstrap/check processes, complete stream bytes/hashes and matching child JSON;
-missing or mutated mandatory custody leaves checking unknown.
-The standard-library runtime supports CPython on Linux x86-64/AArch64 and macOS
-x86-64/Arm64. Bootstrap and checking independently bind the actual `Py_GetVersion`
-address through `dladdr`, hash its executable image and the interpreter executable,
-and retain the actual `ctypes` and `_ctypes` module identities. Both process receipts
-must agree on those identities. Interpreter/provider files retain their 64 MiB per-file
-and 192 MiB total bounds; module files retain their 4 MiB cap.
-The arithmetic receipt identifies mandatory file-backed `fractions` and `numbers`
-module bytes. File-backed `math` retains its actual module origin and file identity;
-built-in `math` requires its actual `built-in` origin, `BuiltinImporter` loader and
-bounded Linux interpreter/provider mapping ledger. Unsupported origins remain unknown.
-The ground import mode of `verify_source_results.py` loads no symbolic solver; its
-original `Fraction` point evaluator remains the same evaluator used by source checks.
-Symbolic proof tooling and the independent CI oracle retain the pinned Z3 dependency.
-The ordinary ground runtime downloads no wheel and performs no global installation.
-Setup is
-bounded to 30 seconds/2 GiB, point checking to 30 seconds/4 GiB, and the worker to
-60 seconds. The JVM reserves a 70-second allowance across preparation and waiting,
-plus at most two five-second termination/reaping waits. With the solver's existing
-40-second watchdog and two-second stderr drain for a feasible ten-second run, this
-leaves 18 seconds for source/receipt I/O inside the ordinary 140-second case deadline.
-The external deadline still governs incomplete work. Sources over 64 MiB, solver stdout over 8 MiB,
-producer records/receipts over 4 MiB and checker streams over 1 MiB remain unchecked.
-Private runtime directories are removed after checking. Missing dependencies,
-timeout, incomplete output, changed custody or failed cleanup cannot yield valid
-credit.
-Linux child processes use absolute kernel address-space limits. On macOS the
-kernel limit adds the same 2 GiB or 4 GiB allowance to the recorded pre-exec VM
-baseline, which includes Darwin's shared mappings. The receipt retains the worker
-PID, baseline virtual/resident bytes and actual absolute kernel limit. Each child
-verifies its PID, phase and inherited soft/hard limits, reapplies that limit after
-exec and checks it before processing inputs. Missing, contradictory or unavailable memory control leaves checking
-unknown. The private MPS adapter retains the shared process-group, stream and
-deadline owner without changing the SMT runner.
-The solve record retains at most 64 KiB of supervisor output as base64, its prefix
-hash, full file byte count and completeness flag so startup failures remain
-diagnosable when only the record is returned. This diagnostic supplies no validation
-credit.
+The build downloads the official `miplib2017-testscript-v1.0.4.zip`, pinned to
+SHA-256 `37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9`.
+It extracts only the checker C++ sources, README, Makefile and MIT license, compiles
+the unchanged upstream main with GMP and zlib, and packages those files and the
+binary in the non-published bench artifact. The optional converter is not extracted.
+Building requires a C++ compiler and GMP/zlib development packages. Invocation
+currently requires Linux, GNU `timeout` and `prlimit`; other hosts remain unverified.
 
-For long incumbent histories, also pass `param=source-validation-gzip=true` to
-select `mps-original-rational-ground-gzip-witness-v1`. Both flags belong to the
-bench and are removed before invoking the Klause CLI. This policy accepts only
-Klause MPS runs with explicit source validation and separates cache entries.
-The legacy policy retains its 8 MiB raw-stdout cap. The gzip policy losslessly
-compresses the complete stdout, admitting at most 8 MiB compressed and 64 MiB
-decoded bytes, with an 8 MiB limit per physical line and retained checking envelope.
-Compression polls the same 70-second JVM allowance; setup, ground checking and
-outer case deadlines retain the limits above. Exceeding any bound leaves checking
-unknown rather than selecting a shorter successful history.
+The adapter translates the retained final stdout point into SOL variable/value
+lines and `=obj=`. Duplicate or malformed coordinates are declined. MIPLIB's model
+variable census must equal the number of supplied unique coordinates, and any
+unexpected-variable diagnostic declines the result. Together these checks require
+every original variable exactly once, including unconstrained variables. The
+source sense, final witness, exact reported objective and full stdout must agree
+with the producer record. A successful exit alone supplies no credit: complete
+`Integrality`, `Constraints` and `Objective` results must all pass.
 
-The child consumes every gzip member to EOF, checks its CRC, decoded byte count
-and full-stream SHA-256 against the producer, and retains every source-semantics
-declaration plus the literal final witness and objective lines. The unchanged
-ground evaluator checks this envelope against all original source obligations.
-Malformed, truncated or mismatched streams cannot earn credit. `stdoutTransport`
-binds compressed, decoded and envelope byte counts/hashes and complete decoding
-into the matching child and supervisor receipts. Decoder custody binds the packaged Python RFC 1951/1952 implementation to the
-same interpreter receipt. It checks stored, fixed-Huffman and dynamic-Huffman blocks,
-back-reference distances, every member CRC and size, optional header CRCs, complete
-EOF and all existing transport bounds. It uses no native compression or CRC fallback.
-The decoder file hash must match the packaged tool ledger. Legacy native-zlib receipts
-remain subject to their explicit module and Linux provider-ledger validation.
-These are independent
-transport obligations and do not add search or proof credit. Older failed records
-are not reclassified by selecting this policy for fresh runs.
+An exact pass uses explicit zero linear and integrality tolerances. A default run
+also performs a pass with linear tolerance `1e-7` and integrality tolerance zero;
+objective equality must pass the zero-tolerance run. The receipt distinguishes
+`exactFeasible` and `toleranceAccepted`. This version adopts upstream MIPLIB
+acceptance, which differs from the solver's source-tolerance policy. Upstream
+1.0.4 scales a row side by
+`max(1, positiveActivity, negativeActivity, abs(side))`, with the negative sum
+retaining its sign; bounds use `max(1, abs(bound), abs(value))`. It uses finite
+`1e20` sentinels for open sides. These checks can decline points accepted by the
+solver; a declined point receives no validation credit. Equal numeric tolerances
+do not establish equal acceptance policies.
 
-MPS ground checking performs no satisfiability search, repairs, replacement-point
-construction, optimum query or refutation check. Only a valid witness retains
-feasibility/objective credit; unknown/invalid checks and reported UNSAT claims
-become undecided. All proof claims remain uncredited. Original claims stay in
-`reportedFeasible`, `reportedObjective`, `reportedExactObjective` and
-`reportedProven`, and `checkedWitness` is separate from `finalWitness`.
-`sourceValidationSetupMs` and `sourceValidationCheckMs` are outside the solver
-budget and elapsed/incumbent times. `sourceValidationReceiptSha256` binds the
-retained receipt JSON to the saved result. The validation policy separates raw solve
-cache entries; a raw cache hit still checks its retained point afresh and does not
-reuse acceptance. The offline verifier's proof path is unchanged.
+The adapter screens known upstream reader limitations without evaluating rows.
+Supported source records use named vectors, one objective row, consecutive column
+blocks, unique objective coefficients and decimal tokens of at most 31 characters
+with exponents between -128 and 128. RANGES, integer markers, bounds and indicators
+are delegated to MIPLIB. Objective RHS offsets, nonterminating rational coordinates,
+rational source tokens, longer numbers, inline section data, multiple free rows,
+unsupported sections and semantics overrides remain unverified. Terminating rational
+coordinates convert exactly to supported decimal SOL tokens. No custom parser or
+mathematical checker supplies a fallback.
+
+Each check retains original source, complete stdout, producer JSON, SOL, request,
+upstream license, process logs and receipt in an adjacent `mps-source-check-*`
+directory. SHA-256 bindings cover all inputs; the receipt identifies the upstream
+archive and actual executable bytes, command, PID, exit, stream hashes and cleanup.
+The executable is removed after checking. Input/source changes or incomplete checks
+withhold credit. The saved result retains producer-record JSON, source retrieval
+identity and complete receipt JSON with its hash. Timing stays outside solver and
+incumbent timing. The policy separates raw-solve cache entries; cached points are
+checked afresh.
+
+Each native invocation has a 30-second wall deadline, 4 GiB address-space limit,
+1 MiB per output file and disabled core dumps. The JVM has a 70-second preparation
+and checking allowance, terminates owned descendants on cancellation and reaps its
+child within five seconds. GNU timeout also bounds native work if its JVM owner is
+lost. Unsupported resource controls cannot earn credit. Source input is limited to
+64 MiB, producer records to 4 MiB and ordinary stdout to 8 MiB.
+
+`param=source-validation-gzip=true` selects `mps-miplib2017-point-gzip-v1`.
+The JVM retains losslessly compressed stdout, with an 8 MiB compressed and 64 MiB
+decoded limit. SOL conversion reads the complete original producer stdout before
+compression; the checker consumes SOL rather than decoding stdout. Receipt bindings
+retain both transport and original stdout hashes. The flag requires explicit MPS
+source validation and is removed before invoking the solver.
 
 XCSP3 integer runs opt in with `param=source-validation=true`. The installed bench
 includes the independent `org.xcsp:xcsp3-tools:2.5` `SolutionChecker`, also used by
