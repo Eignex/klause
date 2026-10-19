@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.metric
 
+import kotlinx.serialization.Serializable
 import java.io.File
 import java.util.concurrent.TimeUnit
-import kotlinx.serialization.Serializable
 
 @Serializable
 internal data class MpsNativeProcess(
@@ -32,8 +32,10 @@ internal object MpsSourceReceipt {
         require(process.stderr.lineSequence().all { it.isEmpty() || it.startsWith("Failed ") ||
             it.startsWith("                ") })
         val output = process.stdout.lines().filter { it.isNotEmpty() }
-        val lines = if (output.firstOrNull()?.startsWith("MIPLIB data limit KiB: ") == true) {
-            require(output.first().removePrefix("MIPLIB data limit KiB: ").toLong() in 1..524_288)
+        val lines = if (output.firstOrNull()?.startsWith("MIPLIB address KiB: ") == true) {
+            val limits = output.first().removePrefix("MIPLIB address KiB: ")
+                .trim().split(Regex("\\s+")).map { it.toLong() }
+            require(limits.size == 2 && limits[0] in 1..4_294_967_296L && limits[1] == limits[0] + 4_194_304)
             output.drop(1)
         } else {
             output
@@ -101,7 +103,9 @@ internal object MpsSourceReceipt {
         }
         val out = stdout.inputStream().use { it.readNBytes(1_048_577) }.decodeToString(throwOnInvalidSequence = true)
         val err = stderr.inputStream().use { it.readNBytes(1_048_577) }.decodeToString(throwOnInvalidSequence = true)
-        return MpsNativeProcess(command, process.pid(), if (cleanup) process.exitValue() else null, reason, cleanup,
-            (System.nanoTime() - started) / 1_000_000, out, err, sha256(out.toByteArray()), sha256(err.toByteArray()))
+        return MpsNativeProcess(
+            command, process.pid(), if (cleanup) process.exitValue() else null, reason, cleanup,
+            (System.nanoTime() - started) / 1_000_000, out, err, sha256(out.toByteArray()), sha256(err.toByteArray()),
+        )
     }
 }

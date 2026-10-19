@@ -1,10 +1,10 @@
 package com.eignex.klause.bench.metric
 
-import java.io.File
-import java.util.concurrent.atomic.AtomicReference
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,7 +24,13 @@ class MpsSourceReceiptTest {
     @ValueSource(strings = ["Integrality", "Constraints", "Objective"])
     fun `successful exit should not admit failed checker booleans`(field: String) {
         val output = stdout.replace("$field 1", "$field 0")
-        val process = MpsNativeProcess(emptyList(), 1, 0, null, true, 1, output, "", sha256(output.toByteArray()), sha256(byteArrayOf()))
+        val process = MpsNativeProcess(
+            emptyList(), 1, 0, null, true, 1, output, "",
+            sha256(
+            output.toByteArray(),
+        ),
+            sha256(byteArrayOf())
+        )
 
         val result = MpsSourceReceipt.interpret(process, 2, "0")
 
@@ -32,20 +38,24 @@ class MpsSourceReceiptTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["partial", "duplicate", "corrupt", "census", "warning", "timeout", "cleanup", "hash", "data-limit"])
+    @ValueSource(
+        strings = ["partial", "duplicate", "corrupt", "census", "warning", "timeout", "cleanup", "hash", "data-limit"],
+    )
     fun `incomplete or corrupt output should not establish a check`(variant: String) {
         val output = when (variant) {
             "partial" -> stdout.substringBefore("Maximum violations")
             "duplicate" -> stdout + "Check SOL: Integrality 1 Constraints 1 Objective 1\n"
             "corrupt" -> stdout.replace("Constraints 1", "Constraints true")
-            "data-limit" -> "MIPLIB data limit KiB: 999999999\n" + stdout
+            "data-limit" -> "MIPLIB address KiB: 1 1\n" + stdout
             "census" -> stdout.replace("2 vars", "3 vars")
             else -> stdout
         }
         val error = if (variant == "warning") "unexpected variable<x> in solution file\n" else ""
-        val process = MpsNativeProcess(emptyList(), 1, 0, if (variant == "timeout") "timeout" else null,
+        val process = MpsNativeProcess(
+            emptyList(), 1, 0, if (variant == "timeout") "timeout" else null,
             variant != "cleanup", 1, output, error,
-            if (variant == "hash") "wrong" else sha256(output.toByteArray()), sha256(error.toByteArray()))
+            if (variant == "hash") "wrong" else sha256(output.toByteArray()), sha256(error.toByteArray()),
+        )
 
         assertFailsWith<IllegalArgumentException> { MpsSourceReceipt.interpret(process, 2, "0") }
     }
@@ -65,7 +75,13 @@ class MpsSourceReceiptTest {
         val worker = Thread { result.set(MpsSourceReceipt.run(listOf("/bin/sleep", "60"), directory)) }
         worker.start()
         val until = System.nanoTime() + 5_000_000_000
-        while (!File(directory, "checker.stdout").exists() && worker.isAlive && System.nanoTime() < until) Thread.yield()
+        while (!File(
+                directory,
+                "checker.stdout",
+            ).exists() && worker.isAlive && System.nanoTime() < until
+        ) {
+                Thread.yield()
+            }
         worker.interrupt()
         worker.join(6000)
 

@@ -1,13 +1,16 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.Format
 import java.math.BigDecimal
 import java.math.BigInteger
 
 internal object MpsSolution {
     private val number = Regex("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?|[+-]?[0-9]+/[0-9]+")
-    private val sourceSemantics = setOf("format=MPS", "numeric=DECIMAL_LITERALS", "overrides=true",
+    private val sourceSemantics = setOf(
+        "format=MPS", "numeric=DECIMAL_LITERALS", "overrides=true",
         "unbounded-int-lo=0", "unbounded-int-hi=1", "unbounded-real-lo=0", "unbounded-real-hi=open",
-        "absolute-tolerance=0", "relative-tolerance=0")
+        "absolute-tolerance=0", "relative-tolerance=0",
+    )
 
     fun convert(record: SolveRecord, raw: String, exact: Boolean): String {
         require(record.feasible == true && record.kind == "optimize") { "no feasible objective-bearing point" }
@@ -21,7 +24,7 @@ internal object MpsSolution {
             }
         }
         val witness = requireNotNull(record.finalWitness)
-        require(SolveEvidence.finalWitness(com.eignex.klause.bench.catalog.Format.MPS, raw) == witness) {
+        require(SolveEvidence.finalWitness(Format.MPS, raw) == witness) {
             "retained point differs from stdout"
         }
         val objective = requireNotNull(raw.lineSequence().lastOrNull { it.startsWith("o ") })
@@ -35,8 +38,10 @@ internal object MpsSolution {
             require(tokens.first() == "v")
             for (token in tokens.drop(1)) {
                 val parts = token.split('=')
-                require(parts.size == 2 && parts[0].isNotEmpty() && parts[0].length < 256 &&
-                    !parts[0].startsWith('=') && seen.add(parts[0])) { "duplicate or malformed coordinate" }
+                require(
+                    parts.size == 2 && parts[0].isNotEmpty() && parts[0].length < 256 &&
+                    !parts[0].startsWith('=') && seen.add(parts[0])
+                ) { "duplicate or malformed coordinate" }
                 appendLine("${parts[0]} ${decimal(parts[1])}")
             }
         }
