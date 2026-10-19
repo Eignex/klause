@@ -64,9 +64,9 @@ class OwnedWitnessProcessTest(unittest.TestCase):
         worker.ACTIVE, worker.STOPPED, worker.PARENT, worker.DEADLINE = self.previous
         self.directory.cleanup()
 
-    def run_child(self, code, prefix):
+    def run_child(self, code, prefix, resident_memory=False):
         return worker.owned([sys.executable, '-I', '-c', code], self.out / prefix,
-                            self.directory.name, 5, 2147483648)
+                            self.directory.name, 5, 2147483648, resident_memory=resident_memory)
 
     def test_true_child_exit_and_complete_raw_streams_are_preserved(self):
         for exit_code in (0, 7):
@@ -88,6 +88,17 @@ class OwnedWitnessProcessTest(unittest.TestCase):
                 self.assertIsNone(worker.ACTIVE)
                 self.assertEqual(threading.active_count(), self.threads)
 
+    def test_address_space_control_remains_the_default_for_darwin_callers(self):
+        with mock.patch.object(worker.platform, 'system', return_value='Darwin'), \
+                mock.patch.object(worker, 'darwin_resident_bytes', side_effect=AssertionError):
+            result = self.run_child("import resource; print(*resource.getrlimit(resource.RLIMIT_AS))", 'default-as')
+
+        self.assertEqual(result['exit'], 0)
+        self.assertTrue(result['complete'])
+        self.assertEqual(result['addressSpaceBytes'], 2147483648)
+        self.assertNotIn('residentMemory', result)
+        self.assertEqual((self.out / 'default-as.stdout').read_text().strip(), '2147483648 2147483648')
+
     def test_darwin_final_kernel_peak_rejects_excesses_between_live_samples(self):
         wait4 = os.wait4
         limit = 2147483648
@@ -98,7 +109,7 @@ class OwnedWitnessProcessTest(unittest.TestCase):
             with self.subTest(peak=peak), mock.patch.object(worker.platform, 'system', return_value='Darwin'), \
                     mock.patch.object(worker, 'darwin_resident_bytes', return_value=100), \
                     mock.patch.object(worker.os, 'wait4', side_effect=reap):
-                result = self.run_child("print('bounded')", 'darwin-peak-' + str(index))
+                result = self.run_child("print('bounded')", 'darwin-peak-' + str(index), resident_memory=True)
             memory = result['residentMemory']
             self.assertEqual(result['exit'], 0)
             self.assertEqual(result['addressSpaceBytes'], 0)
@@ -114,7 +125,7 @@ class OwnedWitnessProcessTest(unittest.TestCase):
             sample = mock.Mock(return_value=2147483649) if failure == 'excess' else mock.Mock(side_effect=OSError())
             with self.subTest(failure=failure), mock.patch.object(worker.platform, 'system', return_value='Darwin'), \
                     mock.patch.object(worker, 'darwin_resident_bytes', sample):
-                result = self.run_child("import time; time.sleep(60)", 'darwin-stop-' + failure)
+                result = self.run_child("import time; time.sleep(60)", 'darwin-stop-' + failure, resident_memory=True)
             self.assertFalse(result['complete'])
             self.assertNotEqual(result['exit'], 0)
             self.assertTrue(result['residentMemory']['exceeded'] or result['residentMemory']['error'] is not None)
