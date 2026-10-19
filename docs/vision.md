@@ -37,6 +37,42 @@ Subsystem pages describe current guarantees; linked issues track residual work.
 |---|---|---|
 | Factor retention and composed reasoning | Frontends can decompose relations before mechanism selection; theory assembly and routing have specialized admission paths. | [Encoder foundation #2850](https://github.com/Eignex/klause/issues/2850) and [format migrations #2841](https://github.com/Eignex/klause/issues/2841) track implementation of the [factor and ownership requirements](#high-level-factors-and-composed-reasoning). |
 | Independent proof export | Exact numerical checks and supported source derivations are in memory. | [Proof-file support](#independently-checkable-proof-files) and a separate checker for entire original-source claims remain target capabilities. |
+| Format semantics and automatic setup | Formats declare [typed source semantics](model.md#typed-source-semantics) that caller overrides replace before lowering. [Source setup](api.md#source-setup) selects and dispatches the route for DIMACS, WCNF, OPB, XCSP3, FlatZinc, SMT-LIB and source strategies. | MPS and legacy typed compatibility entries retain their own execution surfaces, and SMT-LIB admission still chooses its source representation, short of [one automatic setup](#format-semantics-caller-settings-and-automatic-setup) for every entry point. [Epic #3043](https://github.com/Eignex/klause/issues/3043) tracks the remainder. |
+
+## Format semantics, caller settings and automatic setup
+
+The path from a source to a running solver has one seam: a frontend produces a
+source model with declared semantics, and the library selects how to solve it.
+Three layers determine the effective setup, applied in order.
+
+1. **Format semantics.** Each format declares the defaults its syntax implies as
+   explicit, typed data carried with the source model. Examples are numeric
+   authority (exact rationals for SMT-LIB; decimal rows checked under a published
+   tolerance for MPS; binary64 floats with a bounded grid for unranged FlatZinc
+   floats), the reading of undeclared ranges, and absent optional values. These defaults
+   describe the declared solution set and result qualification. They select no
+   engine, theory, route or solver-motivated lowering.
+2. **Caller settings.** Library parameters and CLI flags override individual
+   semantic defaults. An override names the semantic it changes, means the same
+   thing for every format with that semantic, and is rejected where it has no
+   meaning instead of being silently ignored. Results carry the qualification of
+   the effective semantics, so an override that approximates or bounds the source
+   cannot be published as an exact source claim.
+3. **Automatic setup.** One library entry receives the source model, its effective
+   semantics, the requested operation and the caller's strategy and resource
+   settings. From the retained factors and their capabilities it selects the route,
+   theory composition, engines and portfolio: the strongest available complete
+   mechanism, paired with local search as [shared breadth](#shared-model-breadth)
+   requires. An explicit engine or arm request narrows that selection without
+   bypassing admission. The setup owns fallbacks, such as heuristic search where no
+   complete procedure admits a fragment, and the authority rules of
+   [results and completeness](#results-and-completeness).
+
+Frontends parse, lower to the [strongest factors](#high-level-factors-and-composed-reasoning),
+attach semantics and render results. They do not prove bounds, choose between
+lowerings by solver capability, build theory-specific requests or interpret engine
+names. The CLI and library callers reach the same setup with the same inputs, so a
+model receives the same route and portfolio whichever entry point submits it.
 
 ## Shared model breadth
 

@@ -27,6 +27,12 @@ the implemented architecture.
 4. Source checks and applicable proof checks admit witnesses, bounds and terminal
    verdicts. Frontends render the result; they do not invoke concrete theories.
 
+Between steps 1 and 2, frontends declare [typed source semantics](model.md#typed-source-semantics),
+caller overrides replace them before lowering, and [source setup](api.md#source-setup)
+selects the route, theories, engines and portfolio. MPS and legacy typed entries keep
+their own execution surfaces; [format semantics and automatic setup](vision.md#format-semantics-caller-settings-and-automatic-setup)
+defines the target contract.
+
 [Input semantics](formats.md) owns source lowering and route qualifications.
 [Presolve](solver/presolve.md) owns reconstruction. [Model ownership](model.md)
 separates source data, engine views and published assignments.
