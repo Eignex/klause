@@ -172,6 +172,18 @@ completion solves the selected relation directly. An unfixed index contributes
 only the range relaxation; complete arithmetic consumers install its equivalent
 guarded formula. The original real coordinates remain the witness authority.
 
+The optional per-node real filter uses a root estimate of real-bearing factors.
+When that estimate exceeds 1,000, required leaf completion builds the current
+pinned source residual and admits a numerical query only if its actual row count
+is at most 1,000. Every source Boolean and integer coordinate must be pinned.
+It does not reuse a root layout or optional cuts on this path.
+Source and declaration visits are prepaid to the containing LP work ledger;
+completed row/column/nonzero storage is charged before admission. Cancellation
+retains those charges and withholds the model. `PINNED_REAL_LEAF_ADMISSION`
+distinguishes ready residuals, row-limit declines, unpinned coordinates and
+cancellation. Other native work, precision and witness/proof checks retain their
+existing limits and owners.
+
 Complete mixed witness recovery can submit a connected real residual to `SourceLp`
 after fixing private integer guesses and reducing source equations. These requests
 share the exact-linear reduction owner's existing `SourceLpBudget` and small-model

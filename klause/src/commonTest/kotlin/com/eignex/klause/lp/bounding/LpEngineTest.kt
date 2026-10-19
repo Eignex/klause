@@ -2,11 +2,14 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
@@ -18,14 +21,20 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.tightenOpenIntBounds
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -64,6 +73,132 @@ class LpEngineTest {
             val result = engine.leafCertify(session)
 
             assertEquals(LpVerdict.INFEASIBLE, result.verdict, "LP evidence: ${sink.snapshot().lp}")
+        }
+    }
+
+    @Test
+    fun `a small pinned real residual should complete above the root factor estimate`() {
+        val problem = Problem(1, 0, emptyArray(), Array(1001) { row ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ofLong(row + 1L), activator = 0)
+        }, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val session = PropagationSession(problem)
+        assertIs<PropagationResult.Implied>(session.pinBool(0, false))
+        val sink = SolveStatsSink(backend = "pinned-real-leaf")
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)), sink)
+        assertTrue(engine.residualOversized)
+
+        val leaf = engine.use { it.leafCertify(session) }
+
+        assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+        val point = Sample(booleanArrayOf(false), longArrayOf(), leaf.reals,
+            exactReals = assertNotNull(leaf.exactReals))
+        assertIs<Verification.Accepted>(verifyRealCoordinates(problem, point))
+        assertEquals(1L, sink.snapshot().lp.phases["PINNED_REAL_LEAF_ADMISSION"]?.outcomes?.get("READY"))
+    }
+
+    @Test
+    fun `an active real residual above the row cap should not open a native solver`() {
+        val problem = Problem(0, 0, emptyArray(), Array(1001) { row ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ofLong(row + 1L))
+        }, numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink(backend = "pinned-real-row-cap")
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)), sink,
+            LpSolveContext(engineFactory = factory))
+
+        val leaf = engine.use { it.leafCertify(PropagationSession(problem)) }
+
+        assertEquals(LpVerdict.INDETERMINATE, leaf.verdict)
+        assertTrue(factory.calls.isEmpty())
+        assertEquals(1L, sink.snapshot().lp.phases["PINNED_REAL_LEAF_ADMISSION"]?.outcomes?.get("ROW_LIMIT"))
+    }
+
+    @Test
+    fun `unpinned discrete coordinates should withhold oversized-root real completion`() {
+        for (openInteger in listOf(false, true)) {
+            val problem = Problem(if (openInteger) 1 else 2, if (openInteger) 1 else 0,
+                if (openInteger) arrayOf(IntDomain(0, 1)) else emptyArray(), Array(1001) { row ->
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                        LinearOp.EQ, BigFraction.ofLong(row + 1L), activator = 0)
+                }, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+            val session = PropagationSession(problem)
+            assertIs<PropagationResult.Implied>(session.pinBool(0, false))
+            val factory = RecordingLpEngineFactory()
+            val sink = SolveStatsSink(backend = "unpinned-real-leaf")
+            val engine = LpEngine(problem, LinearObjective(),
+                LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)), sink,
+                LpSolveContext(engineFactory = factory))
+
+            val leaf = engine.use { it.leafCertify(session) }
+
+            assertEquals(LpVerdict.INDETERMINATE, leaf.verdict)
+            assertTrue(factory.calls.isEmpty())
+            assertEquals(1L, sink.snapshot().lp.phases["PINNED_REAL_LEAF_ADMISSION"]?.outcomes?.get("UNPINNED"))
+        }
+    }
+
+    @Test
+    fun `stopped pinned assembly should retain its construction charge without a native solve`() {
+        val problem = Problem(1, 0, emptyArray(), Array(1001) { row ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ofLong(row + 1L), activator = 0)
+        }, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val session = PropagationSession(problem)
+        assertIs<PropagationResult.Implied>(session.pinBool(0, false))
+        var stopped = false
+        var armed = false
+        var work = 0L
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink(backend = "stopped-pinned-real-leaf")
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true),
+                cancellation = Cancellation { stopped }), sink, LpSolveContext(engineFactory = factory),
+            containingWork = { units ->
+                work += units
+                if (armed) stopped = true
+            })
+        val before = work
+        armed = true
+
+        val leaf = engine.use { it.leafCertify(session) }
+
+        assertEquals(LpVerdict.INDETERMINATE, leaf.verdict)
+        assertTrue(work > before)
+        assertTrue(factory.calls.isEmpty())
+        assertEquals(1L, sink.snapshot().lp.phases["PINNED_REAL_LEAF_ADMISSION"]?.outcomes?.get("CANCELLED"))
+    }
+
+    @Test
+    fun `pinned real leaf assembly should follow each table selection across siblings`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), Array<Factor>(1002) { row ->
+            if (row == 1001) RealElement(0, 1, doubleArrayOf(2.0, 3.0), indexOffset = 0)
+            else ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ofLong(row + 1L), activator = 0)
+        }, numRealVars = 2, realLower = doubleArrayOf(0.0, Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(0.0, Double.POSITIVE_INFINITY))
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+            SolveStatsSink(backend = "pinned-real-siblings"))
+
+        engine.use {
+            for (index in listOf(0L, 1L, 0L)) {
+                val session = PropagationSession(problem)
+                assertIs<PropagationResult.Implied>(session.pinBool(0, false))
+                assertIs<PropagationResult.Implied>(session.pinInt(0, index))
+
+                val leaf = it.leafCertify(session)
+
+                assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+                val point = Sample(booleanArrayOf(false), longArrayOf(index), leaf.reals,
+                    exactReals = assertNotNull(leaf.exactReals))
+                assertIs<Verification.Accepted>(verifyRealCoordinates(problem, point))
+                assertEquals(BigFraction.ofLong(index + 2L), point.exactReals?.get(1))
+            }
         }
     }
 
