@@ -1231,7 +1231,7 @@ or macOS 13+ on arm64/x86-64. Bootstrap has 30 seconds and a 2-GiB memory budget
 Ground checking has 30 seconds/4 GiB, a 60-second supervisor and a 70-second JVM
 allowance; refutation checking has a 40-second/8-GiB child, a 90-second supervisor
 and a 100-second JVM allowance. Linux enforces the memory budget with `RLIMIT_AS`.
-macOS monitors the child's resident set through `proc_pidinfo` every 50 ms and
+SMT supervision selects resident-memory accounting explicitly on macOS. It monitors the child's resident set through `proc_pidinfo` every 50 ms and
 terminates an observed excess. It separately collects the kernel's per-child
 `wait4` peak in bytes; acceptance requires the complete peak and every observed
 sample to fit the budget, including short-lived peaks between samples. This is

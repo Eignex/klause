@@ -133,12 +133,12 @@ def darwin_resident_bytes(pid):
     return int(task.resident_size)
 
 
-def owned(command, prefix, cwd, timeout, memory):
+def owned(command, prefix, cwd, timeout, memory, resident_memory=False):
     global ACTIVE
     if stopped() or threading.active_count() != 1 or ACTIVE is not None:
         raise RuntimeError('owner stopped or drain still active')
     started = time.monotonic_ns()
-    darwin = platform.system() == 'Darwin'
+    darwin = platform.system() == 'Darwin' and resident_memory
     memory_usage = {'method': 'darwin-proc-taskinfo-wait4-v1', 'limitBytes': memory,
                     'samplePeakBytes': 0, 'kernelPeakBytes': 0, 'samples': 0,
                     'complete': False, 'exceeded': False, 'error': None} if darwin else None

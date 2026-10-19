@@ -557,7 +557,8 @@ def supervise(out, expected, tools, parent):
         start = time.monotonic_ns()
         try:
             bootstrap = runner.owned([sys.executable, '-I', str(out / 'tools/smt_witness_validation.py'),
-                'bootstrap', str(out), str(dependencies)], out / 'bootstrap', working, 30, 2147483648)
+                'bootstrap', str(out), str(dependencies)], out / 'bootstrap', working, 30, 2147483648,
+                resident_memory=True)
         finally:
             result['setupMs'] = (time.monotonic_ns() - start) // 1000000
         resident = bootstrap.pop('residentMemory', None)
@@ -571,7 +572,8 @@ def supervise(out, expected, tools, parent):
         try:
             process = runner.owned([sys.executable, '-I', str(out / 'tools/smt_source_validation.py'),
                 'check', str(out), str(dependencies)], out / 'check', working,
-                30 if scope == GROUND else 40, 4294967296 if scope == GROUND else 8589934592)
+                30 if scope == GROUND else 40, 4294967296 if scope == GROUND else 8589934592,
+                resident_memory=True)
         finally:
             result['checkMs'] = (time.monotonic_ns() - start) // 1000000
         resident = process.pop('residentMemory', None)
