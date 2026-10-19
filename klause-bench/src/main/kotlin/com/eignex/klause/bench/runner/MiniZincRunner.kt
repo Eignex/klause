@@ -119,9 +119,16 @@ internal class MiniZincRunner(
         try {
             val finished = proc.waitFor(timeoutSec.toLong(), TimeUnit.SECONDS)
             if (!finished) {
-                proc.destroyForcibly()
-                tmp.delete()
-                error("minizinc compile timed out after ${timeoutSec}s for ${mzn.name}")
+                proc.destroyForcibly().waitFor()
+                throw MiniZincCompileFailure(
+                    proc.exitValue(),
+                    "minizinc compile timed out after ${timeoutSec}s for ${mzn.name}\n${log.readText()}".trimEnd(),
+                    MiniZincCompatibility.compiler,
+                    cmd,
+                    System.nanoTime() - start,
+                    sourceHashes,
+                    timeoutSec = timeoutSec,
+                )
             }
             val output = log.readText()
             check(
