@@ -202,6 +202,42 @@ class LpEngineTest {
         }
     }
 
+    @Test
+    fun `a refuted pinned real leaf should leave a feasible sibling available`() {
+        val problem = Problem(2, 0, emptyArray(), Array<Factor>(1003) { row ->
+            when (row) {
+                1001 -> ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ZERO)
+                1002 -> ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.GE, BigFraction.ONE, activator = 1)
+                else -> ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.EQ, BigFraction.ofLong(row + 1L), activator = 0)
+            }
+        }, numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+            SolveStatsSink(backend = "pinned-real-refuted-sibling"))
+
+        engine.use {
+            for (truth in listOf(true, false)) {
+                val session = PropagationSession(problem)
+                assertIs<PropagationResult.Implied>(session.pinBool(0, false))
+                assertIs<PropagationResult.Implied>(session.pinBool(1, truth))
+
+                val leaf = it.leafCertify(session)
+
+                if (truth) assertEquals(LpVerdict.INFEASIBLE, leaf.verdict)
+                else {
+                    assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+                    val point = Sample(booleanArrayOf(false, false), longArrayOf(), leaf.reals,
+                        exactReals = assertNotNull(leaf.exactReals))
+                    assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
+                }
+            }
+        }
+    }
+
     private val decline = LpCertificationPolicy { _, _ -> false }
 
     private fun boundedProblem(): Problem = Problem(
