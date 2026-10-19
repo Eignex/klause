@@ -900,7 +900,8 @@ It extracts only the checker C++ sources, README, Makefile and MIT license, comp
 the unchanged upstream main with GMP and zlib, and packages those files and the
 binary in the non-published bench artifact. The optional converter is not extracted.
 Building requires a C++ compiler and GMP/zlib development packages. Invocation
-currently requires Linux, GNU `timeout` and `prlimit`; other hosts remain unverified.
+supports Linux with GNU `timeout`/`prlimit` and macOS with the system shell limits.
+Other hosts remain unverified.
 
 The adapter translates the retained final stdout point into SOL variable/value
 lines and `=obj=`. Duplicate or malformed coordinates are declined. MIPLIB's model
@@ -943,11 +944,15 @@ identity and complete receipt JSON with its hash. Timing stays outside solver an
 incumbent timing. The policy separates raw-solve cache entries; cached points are
 checked afresh.
 
-Each native invocation has a 30-second wall deadline, 4 GiB address-space limit,
-1 MiB per output file and disabled core dumps. The JVM has a 70-second preparation
-and checking allowance, terminates owned descendants on cancellation and reaps its
-child within five seconds. GNU timeout also bounds native work if its JVM owner is
-lost. Unsupported resource controls cannot earn credit. Source input is limited to
+Each native invocation has a 30-second JVM wall deadline and disabled core dumps.
+Linux uses a 4 GiB address-space limit and 1 MiB per output file; GNU timeout also
+bounds wall time if its JVM owner is lost. macOS uses a 4 GiB data-segment limit,
+30-second CPU limit and 1 MiB file limit through the system shell. Its data limit
+is not an address-space or resident-memory guarantee, and owner loss leaves a CPU
+bound rather than an independent wall bound. Receipts name the actual resource
+policy. The JVM has a 70-second preparation/checking allowance, terminates owned
+descendants on cancellation and reaps its child within five seconds. Failed limit
+setup cannot earn credit. Source input is limited to
 64 MiB, producer records to 4 MiB and ordinary stdout to 8 MiB.
 
 `param=source-validation-gzip=true` selects `mps-miplib2017-point-gzip-v1`.

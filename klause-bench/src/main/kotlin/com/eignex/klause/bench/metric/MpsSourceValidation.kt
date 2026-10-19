@@ -29,6 +29,7 @@ internal object MpsSourceValidation {
         val bindings: Map<String, String>,
         val binarySha256: String,
         val archiveSha256: String,
+        val resourcePolicy: String,
         val processes: List<MpsNativeProcess>,
         val status: String,
         val exactFeasible: Boolean?,
@@ -69,7 +70,8 @@ internal object MpsSourceValidation {
             val source = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
             check(source.size <= MAX_SOURCE_BYTES) { "original source exceeds checker limit" }
             check(record.sourceHashes == mapOf("model" to sha256(source))) { "original source hash changed" }
-            check(System.getProperty("os.name") == "Linux") { "MIPLIB invocation requires Linux resource controls" }
+            val host = System.getProperty("os.name")
+            check(host == "Linux" || host == "Mac OS X") { "unsupported MIPLIB resource controls" }
             val profile = MpsSolcheckerInput.qualify(source.decodeToString(throwOnInvalidSequence = true))
             check(profile.maximize == record.maximize) { "source objective sense differs" }
             val decoded = raw.toByteArray()
@@ -103,10 +105,16 @@ internal object MpsSourceValidation {
                 tolerances.mapIndexed { index, tolerance ->
                     active()
                     val checkDirectory = File(out, "check-$index").apply { check(mkdir()) }
-                    val process = MpsSourceReceipt.run(listOf("/usr/bin/timeout", "--signal=KILL", "30s",
-                        "/usr/bin/prlimit", "--as=4294967296", "--fsize=1048576", "--core=0", "--",
-                        binary.absolutePath, File(out, "source.mps").absolutePath,
-                        File(out, "point.sol").absolutePath, tolerance, "0"), checkDirectory, minOf(30_000, remaining()))
+                    val arguments = listOf(binary.absolutePath, File(out, "source.mps").absolutePath,
+                        File(out, "point.sol").absolutePath, tolerance, "0")
+                    val command = if (host == "Linux") {
+                        listOf("/usr/bin/timeout", "--signal=KILL", "30s", "/usr/bin/prlimit",
+                            "--as=4294967296", "--fsize=1048576", "--core=0", "--") + arguments
+                    } else {
+                        listOf("/bin/sh", "-c", "ulimit -d 4194304 && ulimit -t 30 && ulimit -f 2048 && " +
+                            "ulimit -c 0 && exec \"$@\"", "miplib-solchecker") + arguments
+                    }
+                    val process = MpsSourceReceipt.run(command, checkDirectory, minOf(30_000, remaining()))
                     processes += process
                     runCatching { MpsSourceReceipt.interpret(process, coordinates,
                         if (tolerance == "0") "0" else "1/10000000") }.getOrNull()
@@ -126,6 +134,7 @@ internal object MpsSourceValidation {
             val exactFeasible = nominal?.let { it.integral && it.feasible }
             val status = if (!complete) "unknown" else if (valid) "valid" else "invalid"
             val receipt = Receipt(MPS_GROUND_CHECKER, policy, bindings, sha256(binaryBytes), ARCHIVE_SHA256,
+                if (host == "Linux") "linux-address-space-v1" else "darwin-data-cpu-v1",
                 processes, status, exactFeasible, if (valid) exactFeasible == false else null)
             val json = Reports.json.encodeToString(receipt)
             File(out, "result.json").writeText(json)

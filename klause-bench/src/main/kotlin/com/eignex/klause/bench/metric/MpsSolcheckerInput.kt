@@ -16,6 +16,7 @@ internal object MpsSolcheckerInput {
         val columns = mutableSetOf<String>()
         val objectiveColumns = mutableSetOf<String>()
         val rows = mutableSetOf<String>()
+        val indicators = mutableSetOf<String>()
         for (line in source.lineSequence()) {
             require(line.length < 1023 && line.all { it == '\t' || it.code in 32..126 }) { "unsupported MPS line" }
             if (line.isBlank() || line.startsWith('*')) continue
@@ -68,7 +69,8 @@ internal object MpsSolcheckerInput {
                     require(fields.size in 3..4 && first in setOf("LO", "UP", "FX", "LI", "UI", "FR", "MI", "PL", "BV"))
                     if (fields.size == 4) requireNumber(fields[3])
                 }
-                "INDICATORS" -> require(fields.size == 4 && first == "IF" && fields[3] in setOf("0", "1"))
+                "INDICATORS" -> require(fields.size == 4 && first == "IF" && fields[3] in setOf("0", "1") &&
+                    fields[1] in rows && indicators.add(fields[1]))
                 else -> error("unsupported MPS record")
             }
         }
