@@ -87,6 +87,10 @@ paired opposite, non-strict source equations. Bounded sparse elimination retains
 free-coordinate guesses and reconstructs pivot values. If that guess fails full-row
 validation, the same retained pivots reduce the remaining inequalities. A supported
 difference residual can complete the free real coordinates before pivot reconstruction.
+The kernel distinguishes exact row contradiction from representation or resource
+decline. This guessed-integer caller treats both as failed point attempts; neither
+can refute the source model. Only a complete exact [pure-real](linear-real.md)
+source conjunction can consume the kernel's negative result as a local refutation.
 A general residual is partitioned by connected real coordinates. Each component
 uses the difference checker when supported; other components can request exact points
 through the existing [source LP owner](../lp/architecture.md), sharing the reduction

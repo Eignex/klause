@@ -1321,6 +1321,20 @@ class ExactLiraSearchComponent private constructor(
                 observeCompleteStage("RECOVERY_NO_FLOAT")
             }
         }
+        if (candidate == null && model.numIntVars == 0 && !model.semantics.isApproximate &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy && !operationStop()
+        ) {
+            observeCompleteStage("PURE_REAL_EQUALITY_ATTEMPT")
+            val rows = agreementSourceRows(context)
+            if (rows != null && equalityRowsRefute(model.numRealVars, rows, lpStop, ::observeCompleteStage) &&
+                !operationStop()
+            ) {
+                outcome = ComponentCheck.Infeasible()
+                smtStats?.observeConflict(null)
+                observeCompleteStage("PURE_REAL_EQUALITY_REFUTED")
+                return null
+            }
+        }
         if (candidate == null || operationStop()) {
             outcome = ComponentCheck.Indeterminate
             return null

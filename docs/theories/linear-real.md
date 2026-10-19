@@ -85,6 +85,17 @@ Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
 Strict infeasibility requires a completed strict-feasibility check, not failure to
 find a positive margin within a budget.
 
+At a complete exact pure-real leaf under production certification, a missing LP
+point can also trigger source equality elimination. Paired opposite closed rows
+provide equations. An inconsistent equation combination, or a source inequality
+reduced to a false constant, refutes only the current Boolean and private-branch
+prefix. This path supplies no learned clause or numerical certificate. Unpaired
+rows, unsupported input and interrupted arithmetic retain an indeterminate result.
+The sparse repair kernel keeps its 65,536-entry and 4,096-bit limits and charges
+the current complete-check operation; it creates no LP query or renewed allowance.
+The [mixed point recovery](linear-mixed.md) caller retains witness-only authority
+for its private integer guesses.
+
 Open real objectives with complete affine source capture use `RationalTheoryDescent`'s
 retained linear authority invocation. Shared Boolean traversal, exact source bounds,
 attained witnesses, strict approach paths and feasible improving rays determine its
