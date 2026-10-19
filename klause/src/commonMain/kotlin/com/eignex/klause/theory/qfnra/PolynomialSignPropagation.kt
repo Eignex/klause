@@ -15,6 +15,13 @@ internal fun preparePolynomialSignRefutation(
     atoms: List<PolynomialAtom>,
     realCount: Int,
     arithmetic: PolynomialArithmetic,
+): Iterator<Boolean?> = preparePolynomialSignPropagation(atoms, realCount, arithmetic, null)
+
+internal fun preparePolynomialSignPropagation(
+    atoms: List<PolynomialAtom>,
+    realCount: Int,
+    arithmetic: PolynomialArithmetic,
+    onDomains: ((PolynomialSignDomains) -> Unit)?,
 ): Iterator<Boolean?> = sequence {
     val domains = IntArray(realCount) { arithmetic.step(); ALL_SIGNS }
     val adjacent = Array(realCount) { arithmetic.step(); ArrayList<Int>() }
@@ -39,7 +46,7 @@ internal fun preparePolynomialSignRefutation(
         val index = pending.removeFirst()
         queued[index] = false
         val constraint = constraints[index]
-        if (possibleSigns(constraint, domains, arithmetic) and constraint.allowed == 0) {
+        if (possibleSigns(constraint.terms, domains, arithmetic) and constraint.allowed == 0) {
             arithmetic.step()
             yield(true)
             return@sequence
@@ -51,7 +58,7 @@ internal fun preparePolynomialSignRefutation(
             for (sign in listOf(NEGATIVE_SIGN, ZERO_SIGN, POSITIVE_SIGN)) {
                 arithmetic.step()
                 if (previous and sign != 0 &&
-                    possibleSigns(constraint, domains, arithmetic, variable, sign) and constraint.allowed == 0
+                    possibleSigns(constraint.terms, domains, arithmetic, variable, sign) and constraint.allowed == 0
                 ) restricted = restricted and sign.inv()
             }
             if (restricted == 0) {
@@ -72,20 +79,34 @@ internal fun preparePolynomialSignRefutation(
         yield(null)
     }
     arithmetic.step()
+    onDomains?.invoke(PolynomialSignDomains(domains))
     yield(false)
 }.iterator()
+
+internal class PolynomialSignDomains(private val domains: IntArray) {
+    fun truth(atom: PolynomialAtom, arithmetic: PolynomialArithmetic): Boolean? {
+        arithmetic.step()
+        val signs = possibleSigns(atom.polynomial.terms, domains, arithmetic)
+        val allowed = relationSigns(atom.relation)
+        return when {
+            signs and allowed == 0 -> false
+            signs and allowed.inv() == 0 -> true
+            else -> null
+        }
+    }
+}
 
 private class SignConstraint(val terms: List<PolynomialTerm>, val variables: List<Int>, val allowed: Int)
 
 private fun possibleSigns(
-    constraint: SignConstraint,
+    terms: List<PolynomialTerm>,
     domains: IntArray,
     arithmetic: PolynomialArithmetic,
     fixedVariable: Int = -1,
     fixedSign: Int = 0,
 ): Int {
     var sum = ZERO_SIGN
-    for (term in constraint.terms) {
+    for (term in terms) {
         arithmetic.step()
         var product = if (term.coefficient.signum() > 0) POSITIVE_SIGN else NEGATIVE_SIGN
         for (variable in term.monomial.variables) {
