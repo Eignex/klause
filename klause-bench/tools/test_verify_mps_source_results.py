@@ -400,6 +400,68 @@ class MpsStdlibRuntimeTest(unittest.TestCase):
         self.assertEqual(0, checked['solverSearchQueries'])
         self.assertFalse(checked['proofCertificateChecked'])
 
+    def test_darwin_growth_limit_records_and_verifies_the_actual_kernel_limit(self):
+        baseline, resident = 549755813888, 67108864
+        for memory in (2147483648, 4294967296):
+            with self.subTest(allowance=memory), tempfile.TemporaryDirectory() as directory:
+                phase = 'bootstrap' if memory == 2147483648 else 'check'
+                path = pathlib.Path(directory) / (phase + '.memory.json')
+                limit = baseline + memory
+                with mock.patch.object(stdlib_runtime, 'task_memory', return_value=(baseline, resident)), \
+                     mock.patch.object(stdlib_runtime.resource, 'setrlimit') as setting, \
+                     mock.patch.object(stdlib_runtime.resource, 'getrlimit', return_value=(limit, limit)):
+                    stdlib_runtime.set_growth_limit(path, phase, memory)
+                setting.assert_called_once_with(stdlib_runtime.resource.RLIMIT_AS, (limit, limit))
+                control = json.loads(path.read_text())
+                self.assertEqual(memory, control['allowanceBytes'])
+                self.assertEqual(baseline, control['baselineVirtualBytes'])
+                self.assertEqual(limit, control['addressSpaceLimitBytes'])
+                self.assertFalse(control['postExecVerified'])
+
+    def test_darwin_child_rejects_changed_kernel_limits_or_process_binding(self):
+        baseline, resident, memory = 549755813888, 67108864, 2147483648
+        limit = baseline + memory
+        for failure in ('valid', 'pid', 'phase', 'allowance', 'kernel', 'virtual', 'resident'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
+                out = pathlib.Path(directory)
+                path = out / 'bootstrap.memory.json'
+                with mock.patch.object(stdlib_runtime, 'task_memory', return_value=(baseline, resident)), \
+                     mock.patch.object(stdlib_runtime.resource, 'setrlimit'), \
+                     mock.patch.object(stdlib_runtime.resource, 'getrlimit', return_value=(limit, limit)):
+                    stdlib_runtime.set_growth_limit(path, 'bootstrap', memory)
+                control = json.loads(path.read_text())
+                if failure == 'pid':
+                    control['pid'] += 1
+                if failure == 'phase':
+                    control['phase'] = 'check'
+                if failure == 'allowance':
+                    control['allowanceBytes'] += 1
+                path.write_text(json.dumps(control))
+                limits = (limit, limit + 1) if failure == 'kernel' else (limit, limit)
+                size = (limit + 1, resident) if failure == 'virtual' else (baseline, memory + 1) \
+                    if failure == 'resident' else (baseline, resident)
+                with mock.patch.object(stdlib_runtime.resource, 'getrlimit', return_value=limits), \
+                     mock.patch.object(stdlib_runtime, 'task_memory', return_value=size):
+                    if failure == 'valid':
+                        stdlib_runtime.verify_growth_limit(out, 'bootstrap')
+                        self.assertTrue(json.loads(path.read_text())['postExecVerified'])
+                    else:
+                        with self.assertRaises(AssertionError):
+                            stdlib_runtime.verify_growth_limit(out, 'bootstrap')
+                        self.assertFalse(json.loads(path.read_text())['postExecVerified'])
+
+    def test_darwin_owner_restores_the_private_runner_after_child_start_failure(self):
+        original = stdlib_runtime.resource
+        runner = types.SimpleNamespace(resource=original, owned=mock.Mock(side_effect=RuntimeError('start failed')))
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(stdlib_runtime, 'sys', types.SimpleNamespace(platform='darwin')):
+            prefix = pathlib.Path(directory) / 'bootstrap'
+            with self.assertRaisesRegex(RuntimeError, 'start failed'):
+                stdlib_runtime.owned(runner, ['python3', '-I', 'worker.py', 'bootstrap'],
+                                     prefix, directory, 30, 2147483648)
+            self.assertIs(original, runner.resource)
+            self.assertFalse(prefix.with_suffix('.memory.json').exists())
+
 
 if __name__ == '__main__':
     unittest.main()
