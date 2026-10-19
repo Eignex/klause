@@ -256,7 +256,8 @@ val compileMpsSolchecker = tasks.register<Exec>("compileMpsSolchecker") {
     dependsOn(prepareMpsSolchecker)
     inputs.dir(miplibDirectory.map { it.dir("upstream") })
     outputs.file(miplibBinary)
-    commandLine("c++", "-O2", "-o", miplibBinary.get().asFile.absolutePath,
+    commandLine("c++", "-O2", "-I/opt/homebrew/include", "-L/opt/homebrew/lib",
+        "-I/usr/local/include", "-L/usr/local/lib", "-o", miplibBinary.get().asFile.absolutePath,
         *listOf("main.cpp", "gmputils.cpp", "model.cpp", "mpsinput.cpp").map {
             miplibDirectory.get().file("upstream/checker/src/$it").asFile.absolutePath
         }.toTypedArray(), "-lgmp", "-lz")
