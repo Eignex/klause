@@ -11,6 +11,39 @@ import verify_nra_source_results as checker
 
 
 class SmtSourceClaimsTest(unittest.TestCase):
+    def test_macos_loader_binds_the_interpreter_and_versioned_python_framework(self):
+        executable = '/python/bin/python3'
+        framework = '/python/Python.framework/Versions/3.14/Python'
+        for machine, cpu in [('arm64', 0x100000c), ('x86_64', 0x1000007)]:
+            images = [dict(path=path, address=format(index + 1, 'x'), magic='feedfacf', cpuType=cpu)
+                      for index, path in enumerate([executable, framework, '/private/z3/lib/libz3.dylib'])]
+
+            with self.subTest(machine=machine):
+                providers = worker.darwin_provider_paths(images, executable, '3.14.0', machine)
+
+                self.assertEqual(set(providers), {executable, framework})
+
+    def test_macos_loader_declines_missing_foreign_or_mismatched_python_providers(self):
+        executable = '/python/bin/python3'
+        for failure in ['missing', 'version', 'cpu', 'header', 'address', 'duplicate']:
+            images = [dict(path=path, address=format(index + 1, 'x'), magic='feedfacf', cpuType=0x100000c)
+                      for index, path in enumerate([executable, '/python/Python.framework/Versions/3.14/Python'])]
+            if failure == 'missing':
+                images = images[1:]
+            elif failure == 'version':
+                images[1]['path'] = '/python/Python.framework/Versions/3.13/Python'
+            elif failure == 'cpu':
+                images[1]['cpuType'] = 0x1000007
+            elif failure == 'header':
+                images[1]['magic'] = 'feedface'
+            elif failure == 'address':
+                images[1]['address'] = '0'
+            else:
+                images[1]['address'] = images[0]['address']
+
+            with self.subTest(failure=failure), self.assertRaises(AssertionError):
+                worker.darwin_provider_paths(images, executable, '3.14.0', 'arm64')
+
     def test_ground_exact_coordinates_and_assumptions_do_not_issue_queries(self):
         source = ('(declare-const b Bool)(declare-const x Real)(declare-const i Int)'
                   '(declare-const unused Real)(assert (= (* x x) 2))'

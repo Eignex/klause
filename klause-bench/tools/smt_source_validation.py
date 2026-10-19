@@ -1,12 +1,15 @@
 """Bounded ordinary SMT source-claim checking with a private independent runtime."""
 import atexit
+import ctypes
 import fractions
+import importlib.machinery
 import importlib.metadata
 import json
 import math
 import numbers
 import pathlib
 import platform
+import re
 import signal
 import sys
 import tempfile
@@ -371,6 +374,56 @@ def source_derivation(variables, constraints):
     return None
 
 
+def darwin_images():
+    loader = ctypes.CDLL(None)
+    count = loader._dyld_image_count
+    count.argtypes, count.restype = [], ctypes.c_uint32
+    name = loader._dyld_get_image_name
+    name.argtypes, name.restype = [ctypes.c_uint32], ctypes.c_char_p
+    header = loader._dyld_get_image_header
+    header.argtypes, header.restype = [ctypes.c_uint32], ctypes.c_void_p
+    size = count()
+    assert 0 < size <= 4096
+    images = []
+    for index in range(size):
+        path, address = name(index), header(index)
+        assert path and address and len(path) <= 4096
+        path = str(pathlib.Path(path.decode('utf-8')).resolve())
+        words = ctypes.cast(address, ctypes.POINTER(ctypes.c_uint32))
+        images.append({'path': path, 'address': format(address, 'x'),
+                       'magic': format(words[0], 'x'), 'cpuType': words[1]})
+    raw = ''.join(json.dumps(row, sort_keys=True, separators=(',', ':')) + '\n' for row in images)
+    assert 0 < len(raw.encode('utf-8')) <= 262144
+    return images, raw
+
+
+def darwin_provider_paths(images, executable, version, machine):
+    cpu = {'arm64': 0x100000c, 'x86_64': 0x1000007}[machine]
+    expected = '.'.join(version.split('.')[:2])
+    selected = set()
+    assert 0 < len(images) <= 4096
+    assert images[0]['path'] == executable
+    addresses = set()
+    for row in images:
+        assert set(row) == {'path', 'address', 'magic', 'cpuType'}
+        assert row['magic'] == 'feedfacf' and row['cpuType'] == cpu
+        assert re.fullmatch(r'[0-9a-f]{1,16}', row['address']) and int(row['address'], 16) > 0
+        assert row['address'] not in addresses
+        addresses.add(row['address'])
+        path = row['path']
+        name = pathlib.PurePosixPath(path).name
+        python = name.startswith('libpython') or (name == 'Python' and '/Python.framework/' in path)
+        if path != executable and not python:
+            continue
+        assert path.startswith('/') and not any(c.isspace() or c == '\\' for c in path)
+        if python and path != executable:
+            assert re.fullmatch(r'libpython' + re.escape(expected) + r'[dmt]*\.dylib', name) or \
+                re.search(r'/Python\.framework/Versions/' + re.escape(expected) + r'[dmt]*/Python$', path)
+        selected.add(path)
+    assert executable in selected and 0 < len(selected) <= 3
+    return sorted(selected)
+
+
 def runtime_identity(out, dependencies, helper):
     import z3
     runtime = json.loads((out / 'bootstrap.json').read_bytes())
@@ -381,27 +434,46 @@ def runtime_identity(out, dependencies, helper):
         assert path.stat().st_size == row['bytes'] and (helper.file_identity(
             path, 100663296)['sha256'] if row['bytes'] else helper.digest(b'')) == row['sha256']
     executable = pathlib.Path(sys.executable).resolve(strict=True)
-    assert pathlib.Path('/proc/self/exe').resolve(strict=True) == executable
-    with pathlib.Path('/proc/self/maps').open('rb') as stream:
-        raw_maps = stream.read(262145)
-    assert len(raw_maps) <= 262144
-    maps = raw_maps.decode('utf-8')
-    providers = helper.python_provider_paths(maps, str(executable), platform.python_version())
-    library = dependencies.resolve() / 'z3/lib/libz3.so'
-    native_paths = set()
-    for line in maps.splitlines():
-        fields = line.split(None, 5)
-        if len(fields) == 6 and 'libz3' in pathlib.PurePosixPath(fields[5]).name:
-            assert fields[5] == str(library) and int(fields[4]) > 0
-            if 'x' in fields[1]:
-                native_paths.add(fields[5])
-    assert native_paths == {str(library)}, 'missing or foreign native checker provider'
+    darwin = platform.system() == 'Darwin'
+    if darwin:
+        images, maps = darwin_images()
+        providers = darwin_provider_paths(images, str(executable), platform.python_version(), platform.machine())
+        libraries = [row for row in images if 'libz3' in pathlib.PurePosixPath(row['path']).name]
+        assert len(libraries) == 1, 'missing or foreign native checker provider'
+        loaded = libraries[0]
+        assert loaded['magic'] == 'feedfacf' and loaded['cpuType'] == {'arm64': 0x100000c, 'x86_64': 0x1000007}[platform.machine()]
+        library = pathlib.Path(loaded['path'])
+        assert library in [dependencies.resolve() / ('z3/lib/' + name)
+                           for name in ('libz3.dylib', 'libz3.4.15.dylib')]
+        raw_maps = maps.encode('utf-8')
+    else:
+        assert platform.system() == 'Linux'
+        assert pathlib.Path('/proc/self/exe').resolve(strict=True) == executable
+        with pathlib.Path('/proc/self/maps').open('rb') as stream:
+            raw_maps = stream.read(262145)
+        assert len(raw_maps) <= 262144
+        maps = raw_maps.decode('utf-8')
+        providers = helper.python_provider_paths(maps, str(executable), platform.python_version())
+        library = dependencies.resolve() / 'z3/lib/libz3.so'
+        native_paths = set()
+        for line in maps.splitlines():
+            fields = line.split(None, 5)
+            if len(fields) == 6 and 'libz3' in pathlib.PurePosixPath(fields[5]).name:
+                assert fields[5] == str(library) and int(fields[4]) > 0
+                if 'x' in fields[1]:
+                    native_paths.add(fields[5])
+        assert native_paths == {str(library)}, 'missing or foreign native checker provider'
     modules = {module.__name__: helper.file_identity(pathlib.Path(module.__file__), 4194304)
                for module in (fractions, numbers)}
     builtin = None
     if getattr(math, '__file__', None):
         assert pathlib.Path(math.__spec__.origin).resolve(strict=True) == pathlib.Path(math.__file__).resolve(strict=True)
         modules['math'] = helper.file_identity(pathlib.Path(math.__file__), 4194304)
+    elif darwin:
+        assert math.__spec__.origin == 'built-in' and math.__spec__.loader is importlib.machinery.BuiltinImporter
+        builtin = {'origin': 'built-in', 'loader': '_frozen_importlib.BuiltinImporter',
+                   'executablePath': str(executable), 'maps': maps, 'mapsSha256': helper.digest(raw_maps),
+                   'providers': [helper.file_identity(pathlib.Path(p), 67108864) for p in providers]}
     else:
         builtin = helper.builtin_math_identity()
     arithmetic = {'implementation': 'smt-exact-source-arithmetic-v2', 'pythonVersion': platform.python_version(),
@@ -410,6 +482,8 @@ def runtime_identity(out, dependencies, helper):
     native = {'executablePath': str(executable), 'maps': maps, 'mapsSha256': helper.digest(raw_maps),
               'library': helper.file_identity(library, 100663296),
               'pythonProviders': [helper.file_identity(pathlib.Path(p), 67108864) for p in providers]}
+    if darwin:
+        native.update(platform='Darwin', systemVersion=platform.mac_ver()[0], mappingKind='dyld-images-v1')
     return arithmetic, native
 
 
@@ -463,12 +537,13 @@ def supervise(out, expected, tools, parent):
               'setupMs': 0, 'checkMs': 0, 'cleanupComplete': False}
     runner.save(out / 'result.json', result)
     scratch = tempfile.TemporaryDirectory(prefix='smt-source-runtime-')
-    dependencies = pathlib.Path(scratch.name) / 'dependencies'
+    working = str(pathlib.Path(scratch.name).resolve(strict=True))
+    dependencies = pathlib.Path(working) / 'dependencies'
     try:
         start = time.monotonic_ns()
         try:
             bootstrap = runner.owned([sys.executable, '-I', str(out / 'tools/smt_witness_validation.py'),
-                'bootstrap', str(out), str(dependencies)], out / 'bootstrap', scratch.name, 30, 2147483648)
+                'bootstrap', str(out), str(dependencies)], out / 'bootstrap', working, 30, 2147483648)
         finally:
             result['setupMs'] = (time.monotonic_ns() - start) // 1000000
         result['bootstrapProcess'] = bootstrap
@@ -478,7 +553,7 @@ def supervise(out, expected, tools, parent):
         start = time.monotonic_ns()
         try:
             process = runner.owned([sys.executable, '-I', str(out / 'tools/smt_source_validation.py'),
-                'check', str(out), str(dependencies)], out / 'check', scratch.name,
+                'check', str(out), str(dependencies)], out / 'check', working,
                 30 if scope == GROUND else 40, 4294967296 if scope == GROUND else 8589934592)
         finally:
             result['checkMs'] = (time.monotonic_ns() - start) // 1000000

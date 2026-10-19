@@ -15,6 +15,39 @@ import smt_witness_validation as worker
 @unittest.skipUnless(sys.platform.startswith('linux') and hasattr(signal, 'pthread_sigmask'),
                      'Linux owned process required')
 class OwnedWitnessProcessTest(unittest.TestCase):
+    def test_private_runtime_selects_the_pinned_platform_native_wheel(self):
+        cases = [
+            ('Linux', 'x86_64', ('glibc', '2.17'), '', worker.WHEEL,
+             'a9afd9ceb290482097474d43f08415bcc1874f433189d1449f6c1508e9c68384', 29056003),
+            ('Darwin', 'arm64', ('', ''), '13.0.0', 'z3_solver-4.15.3.0-py3-none-macosx_13_0_arm64.whl',
+             '65335aab295ded7c0ce27c85556067087a87052389ff160777d1a1d48ef0d74f', 36882388),
+            ('Darwin', 'x86_64', ('', ''), '26.0.1', 'z3_solver-4.15.3.0-py3-none-macosx_13_0_x86_64.whl',
+             '3e62e93adff2def3537ff1ca67c3d58a6ca6d1944e0b5e774f88627b199d50e7', 39637842),
+        ]
+        for system, machine, libc, version, name, sha, size in cases:
+            with self.subTest(system=system, machine=machine), mock.patch.multiple(worker.platform,
+                    system=lambda: system, machine=lambda: machine, libc_ver=lambda: libc,
+                    mac_ver=lambda: (version, ('', '', ''), machine)):
+                selected = worker.pinned_wheel()
+            self.assertEqual(selected[0], name)
+            self.assertTrue(selected[1].startswith('https://files.pythonhosted.org/packages/'))
+            self.assertTrue(selected[1].endswith('/' + name))
+            self.assertEqual(selected[2:], (sha, size, libc))
+
+    def test_unsupported_platforms_decline_private_runtime_provisioning(self):
+        for system, machine, libc, version in [
+                ('Linux', 'aarch64', ('glibc', '2.39'), ''),
+                ('Linux', 'x86_64', ('musl', '1.2'), ''),
+                ('Linux', 'x86_64', ('glibc', '2.16'), ''),
+                ('Darwin', 'arm64', ('', ''), '12.0.0'),
+                ('Darwin', 'unknown', ('', ''), '13.0.0'),
+                ('Windows', 'AMD64', ('', ''), '')]:
+            with self.subTest(system=system, machine=machine, version=version), mock.patch.multiple(worker.platform,
+                    system=lambda: system, machine=lambda: machine, libc_ver=lambda: libc,
+                    mac_ver=lambda: (version, ('', '', ''), machine)):
+                with self.assertRaises((AssertionError, KeyError)):
+                    worker.pinned_wheel()
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory(prefix='owned-witness-test-')
         self.out = pathlib.Path(self.directory.name)

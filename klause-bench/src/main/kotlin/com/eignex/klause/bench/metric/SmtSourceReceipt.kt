@@ -4,6 +4,7 @@ import com.eignex.klause.bench.report.Reports
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 internal data class SmtNativeRuntime(
@@ -12,6 +13,9 @@ internal data class SmtNativeRuntime(
     val mapsSha256: String,
     val library: MpsCheckerFile,
     val pythonProviders: List<MpsCheckerFile>,
+    val platform: String = "Linux",
+    val systemVersion: String? = null,
+    val mappingKind: String = "linux-proc-maps-v1",
 )
 
 @Serializable
@@ -39,11 +43,30 @@ internal object SmtSourceReceipt {
         "b9/0b/f15168475e5493ea44fa3c5e642903f05d2b870db71ad05662ed87a06976/" +
         "z3_solver-4.15.3.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
     private val digest = Regex("[0-9a-f]{64}")
+    private val macWheels = mapOf(
+        "arm64" to Triple(
+            36_882_388L,
+            "65335aab295ded7c0ce27c85556067087a87052389ff160777d1a1d48ef0d74f",
+            "https://files.pythonhosted.org/packages/" +
+                "63/45/dd8e9d7500faa05eafa589cc8f0f0b982ce575d51b455d62dab8e19dd571/" +
+                "z3_solver-4.15.3.0-py3-none-macosx_13_0_arm64.whl",
+        ),
+        "x86_64" to Triple(
+            39_637_842L,
+            "3e62e93adff2def3537ff1ca67c3d58a6ca6d1944e0b5e774f88627b199d50e7",
+            "https://files.pythonhosted.org/packages/" +
+                "54/9e/a11186061d9fead8be43bad7c75055585694124b2ccdd896ef249fe5824f/" +
+                "z3_solver-4.15.3.0-py3-none-macosx_13_0_x86_64.whl",
+        ),
+    )
 
     fun requireComplete(receipt: SmtSourceValidation.Receipt, json: JsonObject) {
         require(receipt.solverQueryCountObserved)
         val runtime = requireNotNull(receipt.runtime)
         val arithmetic = requireNotNull(receipt.groundArithmetic)
+        val native = requireNotNull(receipt.nativeRuntime)
+        require(native.platform in setOf("Linux", "Darwin"))
+        val darwin = native.platform == "Darwin"
         require(arithmetic.implementation == "smt-exact-source-arithmetic-v2")
         require(
             arithmetic.pythonVersion == runtime.pythonVersion &&
@@ -55,22 +78,37 @@ internal object SmtSourceReceipt {
             setOf("fractions", "numbers")
         }
         require(arithmetic.modules.keys == moduleNames)
-        arithmetic.builtinMath?.let { requireBuiltinMath(it, arithmetic, runtime) }
+        arithmetic.builtinMath?.let {
+            if (darwin) requireDarwinPython(it, arithmetic, runtime) else requireBuiltinMath(it, arithmetic, runtime)
+        }
         require(
             arithmetic.modules.values.all { file ->
             file.path.startsWith('/') && file.bytes in 1..4_194_304L && digest.matches(file.sha256)
         }
         )
         require(runtime.packageVersion == "4.15.3.0" && runtime.checkerVersion == "4.15.3")
-        require(runtime.machine == "x86_64" && !runtime.globalInstallationPerformed)
-        require(runtime.wheelBytes == 29_056_003L && runtime.wheelSha256 == WHEEL_SHA && runtime.wheelUrl == WHEEL_URL)
+        require(!runtime.globalInstallationPerformed)
+        if (darwin) {
+            require(native.mappingKind == "dyld-images-v1")
+            val version = requireNotNull(native.systemVersion).split('.').map { it.toInt() }
+            require(version.size in 2..3 && version[0] >= 13 && version.all { it >= 0 })
+            val wheel = requireNotNull(macWheels[runtime.machine])
+            require(runtime.wheelBytes == wheel.first && runtime.wheelSha256 == wheel.second &&
+                runtime.wheelUrl == wheel.third)
+            require(runtime.libc == listOf("", ""))
+        } else {
+            require(native.mappingKind == "linux-proc-maps-v1" && native.systemVersion == null)
+            require(runtime.machine == "x86_64")
+            require(runtime.wheelBytes == 29_056_003L && runtime.wheelSha256 == WHEEL_SHA &&
+                runtime.wheelUrl == WHEEL_URL)
+            require(runtime.libc.size == 2 && runtime.libc[0] == "glibc")
+            val libc = runtime.libc[1].split('.').map { it.toInt() }
+            require(libc.size >= 2 && (libc[0] > 2 || (libc[0] == 2 && libc[1] >= 17)))
+        }
         require(digest.matches(runtime.metadataSha256) && digest.matches(runtime.pythonExecutableSha256))
         val python = runtime.pythonVersion.split('.').map { it.toInt() }
         require(python.size == 3 && (python[0] > 3 || (python[0] == 3 && python[1] >= 9)))
         require(runtime.pythonExecutable.startsWith('/'))
-        require(runtime.libc.size == 2 && runtime.libc[0] == "glibc")
-        val libc = runtime.libc[1].split('.').map { it.toInt() }
-        require(libc.size >= 2 && (libc[0] > 2 || (libc[0] == 2 && libc[1] >= 17)))
         val files = runtime.extractedFiles
         require(files.size in 1..512 && files.map { it.path }.distinct().size == files.size)
         require(
@@ -81,7 +119,8 @@ internal object SmtSourceReceipt {
         }
         )
         require(files.sumOf { it.bytes } <= 134_217_728L)
-        require(files.any { it.path == "z3/__init__.py" } && files.any { it.path.endsWith("/libz3.so") })
+        require(files.any { it.path == "z3/__init__.py" })
+        require(files.any { it.path == if (darwin) "z3/lib/libz3.dylib" else "z3/lib/libz3.so" })
         val bootstrap = requireNotNull(receipt.bootstrapProcess)
         val check = requireNotNull(receipt.checkProcess)
         val logs = requireNotNull(receipt.processLogs)
@@ -120,9 +159,10 @@ internal object SmtSourceReceipt {
         )
         require(child.keys == fields && fields.all { child[it] == json[it] })
         receipt.sourceDerivation?.let { requireDerivation(it) }
-        val native = requireNotNull(receipt.nativeRuntime)
         val library = native.library
-        val relative = "z3/lib/libz3.so"
+        val relative = library.path.removePrefix(check.command[5] + "/")
+        val libraries = if (darwin) setOf("z3/lib/libz3.dylib", "z3/lib/libz3.4.15.dylib") else setOf("z3/lib/libz3.so")
+        require(relative in libraries)
         require(library.path == check.command[5] + "/" + relative)
         val extracted = files.single { it.path == relative }
         require(library.bytes == extracted.bytes && library.sha256 == extracted.sha256)
@@ -135,13 +175,74 @@ internal object SmtSourceReceipt {
             native.mapsSha256,
             native.pythonProviders,
         )
-        requireBuiltinMath(providers, arithmetic, runtime)
-        val nativeLines = native.maps.removeSuffix(
-            "\n",
-        ).split('\n').map { it.trimStart().split(Regex("\\s+"), limit = 6) }
-            .filter { it.size == 6 && "libz3" in it[5].substringAfterLast('/') }
-        require(nativeLines.isNotEmpty() && nativeLines.all { it[5] == library.path && it[4].any { c -> c != '0' } })
-        require(nativeLines.any { 'x' in it[1] })
+        if (darwin) {
+            requireDarwinPython(providers, arithmetic, runtime)
+            val nativePaths = darwinImagePaths(native.maps, native.mapsSha256, runtime.machine)
+                .filter { "libz3" in it.substringAfterLast('/') }
+            require(nativePaths == listOf(library.path))
+        } else {
+            requireBuiltinMath(providers, arithmetic, runtime)
+            val nativeLines = native.maps.removeSuffix("\n").split('\n')
+                .map { it.trimStart().split(Regex("\\s+"), limit = 6) }
+                .filter { it.size == 6 && "libz3" in it[5].substringAfterLast('/') }
+            require(nativeLines.isNotEmpty() && nativeLines.all {
+                it[5] == library.path && it[4].any { c -> c != '0' }
+            })
+            require(nativeLines.any { 'x' in it[1] })
+        }
+    }
+
+    private fun darwinImagePaths(maps: String, hash: String, machine: String): List<String> {
+        val bytes = maps.toByteArray()
+        require(bytes.size in 1..262_144 && sha256(bytes) == hash && maps.endsWith('\n') && '\r' !in maps)
+        val lines = maps.removeSuffix("\n").split('\n')
+        require(lines.size in 1..4096)
+        val cpu = when (machine) {
+            "arm64" -> 0x100000cL
+            "x86_64" -> 0x1000007L
+            else -> error("unsupported CPU")
+        }
+        val addresses = mutableSetOf<String>()
+        return lines.map { line ->
+            val row = Reports.json.parseToJsonElement(line).jsonObject
+            require(row.keys == setOf("path", "address", "magic", "cpuType"))
+            require(row.getValue("magic").jsonPrimitive.content == "feedfacf")
+            val cpuType = row.getValue("cpuType").jsonPrimitive
+            require(!cpuType.isString && cpuType.content.toLong() == cpu)
+            val address = row.getValue("address").jsonPrimitive.content
+            require(Regex("[0-9a-f]{1,16}").matches(address) && address.toULong(16) > 0uL && addresses.add(address))
+            row.getValue("path").jsonPrimitive.content.also { path ->
+                require(path.length in 1..4096 && path.startsWith('/') && path.none { it == '\n' || it == '\r' })
+            }
+        }
+    }
+
+    private fun requireDarwinPython(
+        builtin: MpsBuiltinModule,
+        arithmetic: MpsGroundArithmetic,
+        runtime: MpsCheckerRuntime,
+    ) {
+        require(builtin.origin == "built-in" && builtin.loader == "_frozen_importlib.BuiltinImporter")
+        val paths = darwinImagePaths(builtin.maps, builtin.mapsSha256, runtime.machine)
+        val executable = builtin.executablePath
+        require(paths.first() == executable)
+        require(executable.startsWith('/') && executable.none { it.isWhitespace() || it == '\\' })
+        val version = Regex.escape(runtime.pythonVersion.split('.').take(2).joinToString("."))
+        val selected = paths.filter { path ->
+            val name = path.substringAfterLast('/')
+            val python = name.startsWith("libpython") || (name == "Python" && "/Python.framework/" in path)
+            if (python && path != executable) {
+                require(Regex("libpython$version[dmt]*\\.dylib").matches(name) ||
+                    Regex("/Python\\.framework/Versions/$version[dmt]*/Python$").containsMatchIn(path))
+            }
+            path == executable || python
+        }.toSet()
+        val providers = builtin.providers
+        require(selected.size in 1..3 && providers.size == selected.size &&
+            providers.map { it.path }.toSet() == selected)
+        require(providers.all { it.bytes in 1..67_108_864L && digest.matches(it.sha256) })
+        require(providers.sumOf { it.bytes } <= 201_326_592L)
+        require(providers.single { it.path == executable }.sha256 == arithmetic.pythonExecutableSha256)
     }
 
     private fun requireDerivation(derivation: SmtSourceDerivation) {

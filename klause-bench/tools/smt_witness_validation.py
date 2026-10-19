@@ -25,6 +25,14 @@ WHEEL_URL = ('https://files.pythonhosted.org/packages/'
              'b9/0b/f15168475e5493ea44fa3c5e642903f05d2b870db71ad05662ed87a06976/' + WHEEL)
 WHEEL_SHA = 'a9afd9ceb290482097474d43f08415bcc1874f433189d1449f6c1508e9c68384'
 WHEEL_BYTES = 29056003
+MAC_WHEELS = {
+    'arm64': ('z3_solver-4.15.3.0-py3-none-macosx_13_0_arm64.whl',
+              'https://files.pythonhosted.org/packages/63/45/dd8e9d7500faa05eafa589cc8f0f0b982ce575d51b455d62dab8e19dd571/',
+              '65335aab295ded7c0ce27c85556067087a87052389ff160777d1a1d48ef0d74f', 36882388),
+    'x86_64': ('z3_solver-4.15.3.0-py3-none-macosx_13_0_x86_64.whl',
+               'https://files.pythonhosted.org/packages/54/9e/a11186061d9fead8be43bad7c75055585694124b2ccdd896ef249fe5824f/',
+               '3e62e93adff2def3537ff1ca67c3d58a6ca6d1944e0b5e774f88627b199d50e7', 39637842),
+}
 MAX_OUTPUT = 1048576
 MAX_METADATA = 4194304
 MAX_EXPANDED = 134217728
@@ -213,11 +221,20 @@ def download(opener, url, path, maximum):
     return path.read_bytes() if maximum == MAX_METADATA else None
 
 
-def bootstrap(out, dependencies):
+def pinned_wheel():
+    if platform.system() == 'Darwin':
+        assert tuple(map(int, platform.mac_ver()[0].split('.')[:2])) >= (13, 0)
+        name, prefix, sha, size = MAC_WHEELS[platform.machine()]
+        return name, prefix + name, sha, size, ('', '')
     assert platform.system() == 'Linux' and platform.machine() == 'x86_64'
+    libc = platform.libc_ver()
+    assert libc[0] == 'glibc' and tuple(map(int, libc[1].split('.')[:2])) >= (2, 17)
+    return WHEEL, WHEEL_URL, WHEEL_SHA, WHEEL_BYTES, libc
+
+
+def bootstrap(out, dependencies):
     assert sys.version_info >= (3, 9)
-    libc, version = platform.libc_ver()
-    assert libc == 'glibc' and tuple(map(int, version.split('.')[:2])) >= (2, 17)
+    wheel_name, wheel_url, wheel_sha, wheel_bytes, libc = pinned_wheel()
     assert (out / 'tools/requirements-source-checks.txt').read_bytes() == b'z3-solver==4.15.3.0\n'
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -228,15 +245,15 @@ def bootstrap(out, dependencies):
     metadata = json.loads(metadata_raw)
     assert metadata['info']['version'] == VERSION
     assert metadata['info']['requires_dist'] == ['importlib-resources; python_version < "3.9"']
-    matches = [row for row in metadata['urls'] if row['filename'] == WHEEL]
+    matches = [row for row in metadata['urls'] if row['filename'] == wheel_name]
     assert len(matches) == 1
     row = matches[0]
-    assert row['url'] == WHEEL_URL and row['digests']['sha256'] == WHEEL_SHA
-    assert row['size'] == WHEEL_BYTES and row['packagetype'] == 'bdist_wheel' and not row['yanked']
-    wheel = out / WHEEL
-    download(opener, WHEEL_URL, wheel, WHEEL_BYTES)
+    assert row['url'] == wheel_url and row['digests']['sha256'] == wheel_sha
+    assert row['size'] == wheel_bytes and row['packagetype'] == 'bdist_wheel' and not row['yanked']
+    wheel = out / wheel_name
+    download(opener, wheel_url, wheel, wheel_bytes)
     count = wheel.stat().st_size
-    assert count == WHEEL_BYTES and file_digest(wheel) == WHEEL_SHA
+    assert count == wheel_bytes and file_digest(wheel) == wheel_sha
     dependencies.mkdir()
     ledger = []
     with zipfile.ZipFile(wheel) as archive:
@@ -270,8 +287,8 @@ def bootstrap(out, dependencies):
     assert importlib.metadata.version('z3-solver') == VERSION and z3.get_version_string() == '4.15.3'
     result = {'pythonVersion':platform.python_version(), 'pythonExecutable':sys.executable,
         'pythonExecutableSha256':file_digest(pathlib.Path(sys.executable)), 'machine':platform.machine(),
-        'libc':[libc,version], 'packageVersion':VERSION, 'checkerVersion':z3.get_version_string(),
-        'wheelBytes':count, 'wheelSha256':WHEEL_SHA, 'wheelUrl':WHEEL_URL,
+        'libc':list(libc), 'packageVersion':VERSION, 'checkerVersion':z3.get_version_string(),
+        'wheelBytes':count, 'wheelSha256':wheel_sha, 'wheelUrl':wheel_url,
         'metadataSha256':digest(metadata_raw), 'extractedFiles':ledger, 'globalInstallationPerformed':False}
     save(out / 'bootstrap.json', result)
     return result
