@@ -28,6 +28,7 @@ internal data class MpsGzipRuntime(
     val mapsSha256: String,
     val nativeProviders: List<MpsCheckerFile>,
     val builtinZlib: MpsBuiltinModule? = null,
+    val implementation: String = "python-zlib-gzip-v1",
 )
 
 internal object MpsStdoutReceipt {
@@ -49,6 +50,7 @@ internal object MpsStdoutReceipt {
         require(transport.decodedSha256 == record.sourceOutputSha256 && digest.matches(transport.decodedSha256))
         require(transport.envelopeBytes in 1..8_388_608L && digest.matches(transport.envelopeSha256))
         val decoder = transport.decoderRuntime
+        require(decoder.implementation == "python-zlib-gzip-v1")
         require(decoder.pythonVersion == runtime.pythonVersion &&
             decoder.pythonExecutableSha256 == runtime.pythonExecutableSha256)
         val moduleNames = if (decoder.builtinZlib == null) {

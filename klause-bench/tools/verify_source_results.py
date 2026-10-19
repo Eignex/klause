@@ -12,7 +12,9 @@ import shlex
 import tarfile
 import urllib.request
 
-import z3
+# Ground-only imports keep rational point evaluation independent of a solver runtime.
+if __name__ != 'mps_ground_only':
+    import z3
 
 
 SMT_CORPUS_SUITES = frozenset(("smtlib-qfidl", "smtlib-qflia", "smtlib-qflira", "smtlib-qflra", "smtlib-qfrdl"))

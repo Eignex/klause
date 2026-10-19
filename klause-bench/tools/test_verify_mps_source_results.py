@@ -13,6 +13,7 @@ from unittest import mock
 import z3
 import verify_source_results as verifier
 import mps_witness_validation as worker
+import mps_stdlib_runtime as stdlib_runtime
 
 
 class MpsGroundTest(unittest.TestCase):
@@ -372,6 +373,32 @@ class MpsRuntimeFailureTest(unittest.TestCase):
                 self.assertEqual(1, runner.owned.call_count)
                 self.assertEqual(0, checked['solverSearchQueries'])
                 self.assertFalse(checked['proofCertificateChecked'])
+
+
+class MpsStdlibRuntimeTest(unittest.TestCase):
+    def test_stdlib_identity_binds_the_actual_interpreter_symbol_and_runtime_files(self):
+        runtime = stdlib_runtime.identity(worker.file_identity)
+        self.assertEqual('cpython-stdlib-ground-v1', runtime['implementation'])
+        self.assertEqual({'ctypes', '_ctypes'}, set(runtime['modules']))
+        self.assertIn(runtime['interpreterSymbol'], ('Py_GetVersion', '_Py_GetVersion'))
+        self.assertFalse(runtime['globalInstallationPerformed'])
+        for file in (runtime['executable'], runtime['interpreterImage'], *runtime['modules'].values()):
+            self.assertEqual(hashlib.sha256(pathlib.Path(file['path']).read_bytes()).hexdigest(), file['sha256'])
+
+    def test_ground_import_checks_original_points_without_importing_a_symbolic_solver(self):
+        utility = pathlib.Path(worker.__file__).with_name('verify_source_results.py')
+        original = __import__
+        def importing(name, *args, **kwargs):
+            if name == 'z3' or name.startswith('z3.'):
+                raise AssertionError('symbolic import forbidden')
+            return original(name, *args, **kwargs)
+        with mock.patch('builtins.__import__', side_effect=importing):
+            verifier = worker.load(utility, 'mps_ground_only')
+            record = dict(feasible=True, finalWitness='v x=1 z=0', kind='optimize', exactObjective='1', maximize=False)
+            checked = verifier.check_mps_ground(MpsGroundTest.source, record, 'o 1\nv x=1 z=0\n', False)
+        self.assertTrue(checked['exactFeasible'])
+        self.assertEqual(0, checked['solverSearchQueries'])
+        self.assertFalse(checked['proofCertificateChecked'])
 
 
 if __name__ == '__main__':

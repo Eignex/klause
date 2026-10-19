@@ -15,7 +15,8 @@ import tempfile
 import time
 
 TOOLS = {'mps_witness_validation.py', 'smt_witness_validation.py',
-         'verify_nra_source_results.py', 'verify_source_results.py', 'requirements-source-checks.txt'}
+         'verify_nra_source_results.py', 'verify_source_results.py', 'requirements-source-checks.txt',
+         'mps_stdlib_runtime.py', 'mps_stdout_deflate.py'}
 SCOPE = 'ground-original-mps-witness'
 CHECKER = 'python-fractions-mps-ground-v1'
 
@@ -151,12 +152,21 @@ def arithmetic_runtime():
 
 
 def check(out, dependencies):
-    sys.path.insert(0, str(dependencies))
-    import importlib.metadata
-    import z3
-    assert pathlib.Path(z3.__file__).resolve().is_relative_to(dependencies.resolve())
-    assert importlib.metadata.version('z3-solver') == '4.15.3.0' and z3.get_version_string() == '4.15.3'
-    verifier = load(out / 'tools/verify_source_results.py', 'verify_source_results')
+    portable = (out / 'stdlib-bootstrap.json').is_file()
+    runtime = None
+    if portable:
+        provider = load(out / 'tools/mps_stdlib_runtime.py', 'mps_stdlib_runtime')
+        runtime = provider.identity(file_identity)
+        assert runtime == json.loads((out / 'stdlib-bootstrap.json').read_bytes())
+        verifier = load(out / 'tools/verify_source_results.py', 'mps_ground_only')
+        assert 'z3' not in sys.modules and not hasattr(verifier, 'z3')
+    else:
+        sys.path.insert(0, str(dependencies))
+        import importlib.metadata
+        import z3
+        assert pathlib.Path(z3.__file__).resolve().is_relative_to(dependencies.resolve())
+        assert importlib.metadata.version('z3-solver') == '4.15.3.0' and z3.get_version_string() == '4.15.3'
+        verifier = load(out / 'tools/verify_source_results.py', 'verify_source_results')
     record = json.loads((out / 'record.json').read_bytes())
     source = (out / 'source.mps').read_bytes()
     request = request_policy(out)
@@ -164,15 +174,26 @@ def check(out, dependencies):
     transport = None
     if 'stdoutEncoding' in request:
         assert record['validationPolicy'] == 'mps-original-rational-ground-gzip-witness-v1'
-        decoder = load(out / 'tools/mps_stdout_gzip.py', 'mps_stdout_gzip')
+        name = 'mps_stdout_deflate' if portable else 'mps_stdout_gzip'
+        decoder = load(out / ('tools/' + name + '.py'), name)
         raw, transport = decoder.envelope(out / 'stdout.txt.gz', record['sourceOutputSha256'], request['decodedBytes'])
-        transport['decoderRuntime'] = decoder.runtime_identity(file_identity, builtin_module_identity)
+        if portable:
+            transport['decoderRuntime'] = {'implementation': 'python-deflate-gzip-v1',
+                'pythonVersion': runtime['pythonVersion'],
+                'pythonExecutableSha256': runtime['executable']['sha256'],
+                'modules': {'mps_stdout_deflate': file_identity(out / 'tools/mps_stdout_deflate.py', 4194304)},
+                'zlibVersion': '', 'zlibRuntimeVersion': '', 'maps': '',
+                'mapsSha256': digest(b''), 'nativeProviders': [], 'builtinZlib': None}
+        else:
+            transport['decoderRuntime'] = decoder.runtime_identity(file_identity, builtin_module_identity)
     else:
         raw = (out / 'stdout.txt').read_bytes().decode('utf-8')
         assert record['sourceOutputSha256'] == digest(raw.encode('utf-8'))
     result = {'status': 'unknown', 'reason': 'source checking incomplete', 'scope': SCOPE,
               'bindings': bindings(out), 'solverSearchQueries': 0, 'proofCertificateChecked': False,
               'checkedWitness': None, 'checker': CHECKER, 'groundArithmetic': arithmetic_runtime()}
+    if portable:
+        result['stdlibRuntime'] = runtime
     if transport is not None:
         result['stdoutTransport'] = transport
     try:
@@ -182,7 +203,7 @@ def check(out, dependencies):
                       checkedWitness=record['finalWitness'])
     except AssertionError as error:
         result.update(status='invalid', reason=str(error)[:500])
-    except (ValueError, KeyError, TypeError, UnicodeError, RuntimeError, ZeroDivisionError, OverflowError, z3.Z3Exception) as error:
+    except (ValueError, KeyError, TypeError, UnicodeError, RuntimeError, ZeroDivisionError, OverflowError) as error:
         result.update(reason='unsupported source or witness: ' + str(error)[:400])
     print(json.dumps(result))
 
@@ -204,12 +225,13 @@ def supervise(out, expected, tools, parent):
               'proofCertificateChecked': False, 'checkedWitness': None,
               'setupMs': 0, 'checkMs': 0, 'cleanupComplete': False}
     runner.save(out / 'result.json', result)
+    executable = str(pathlib.Path(sys.executable).resolve(strict=True))
     scratch = tempfile.TemporaryDirectory(prefix='mps-witness-runtime-')
     dependencies = pathlib.Path(scratch.name) / 'dependencies'
     try:
         start = time.monotonic_ns()
         try:
-            bootstrap = runner.owned([sys.executable, '-I', str(out / 'tools/smt_witness_validation.py'),
+            bootstrap = runner.owned([executable, '-I', str(out / 'tools/mps_witness_validation.py'),
                                      'bootstrap', str(out), str(dependencies)], out / 'bootstrap', scratch.name,
                                      30, 2147483648)
         finally:
@@ -218,10 +240,10 @@ def supervise(out, expected, tools, parent):
         if (bootstrap['exit'] != 0 or not bootstrap['complete'] or bootstrap['timedOut']
                 or bootstrap['overflow'] or bootstrap['parentStop']):
             raise RuntimeError('pinned checker setup incomplete')
-        result['runtime'] = json.loads((out / 'bootstrap.json').read_bytes())
+        result['stdlibRuntime'] = json.loads((out / 'stdlib-bootstrap.json').read_bytes())
         start = time.monotonic_ns()
         try:
-            process = runner.owned([sys.executable, '-I', str(out / 'tools/mps_witness_validation.py'),
+            process = runner.owned([executable, '-I', str(out / 'tools/mps_witness_validation.py'),
                                    'check', str(out), str(dependencies)], out / 'check', scratch.name,
                                    30, 4294967296)
         finally:
@@ -231,6 +253,7 @@ def supervise(out, expected, tools, parent):
                 or process['overflow'] or process['parentStop']):
             raise RuntimeError('ground checker process incomplete')
         checked = json.loads((out / 'check.stdout').read_bytes())
+        assert checked['stdlibRuntime'] == result['stdlibRuntime']
         assert checked['bindings'] == expected and checked['solverSearchQueries'] == 0
         assert checked['proofCertificateChecked'] is False and checked['scope'] == SCOPE
         assert checked['status'] in ('valid', 'invalid', 'unknown')
@@ -261,6 +284,10 @@ if __name__ == '__main__':
     if sys.argv[1] == 'supervise':
         raise SystemExit(supervise(pathlib.Path(sys.argv[2]), json.loads(sys.argv[3]),
                                    json.loads(sys.argv[4]), int(sys.argv[5])))
+    elif sys.argv[1] == 'bootstrap':
+        out = pathlib.Path(sys.argv[2])
+        runtime = load(out / 'tools/mps_stdlib_runtime.py', 'mps_stdlib_runtime')
+        runtime.bootstrap(out, sys.modules[__name__])
     elif sys.argv[1] == 'check':
         check(pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3]))
     else:

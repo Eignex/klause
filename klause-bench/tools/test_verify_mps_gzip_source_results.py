@@ -15,6 +15,9 @@ import mps_stdout_gzip as transport
 import verify_source_results as verifier
 import mps_witness_validation as worker
 import z3
+import zlib
+import os
+import mps_stdout_deflate as portable
 
 
 class MpsGzipStdoutTest(unittest.TestCase):
@@ -258,6 +261,122 @@ class MpsGzipStdoutTest(unittest.TestCase):
             origin='built-in', loader=importlib.machinery.BuiltinImporter))
         with mock.patch.object(transport, 'gzip', module), self.assertRaises(AssertionError):
             transport.runtime_identity(worker.file_identity, worker.builtin_module_identity)
+
+
+    def test_stdlib_supervisor_checks_a_compressed_original_point_without_provisioning_dependencies(self):
+        raw = b'% progress\n' * 40_000 + b'o 1/8\nv I=0 X=1/10\n'
+        source = self.fixture.read_bytes()
+        record = dict(feasible=True, finalWitness='v I=0 X=1/10', kind='optimize',
+                      exactObjective='1/8', maximize=False, command='cli',
+                      validationPolicy='mps-original-rational-ground-gzip-witness-v1',
+                      sourceHashes={'model': hashlib.sha256(source).hexdigest()},
+                      sourceOutputSha256=hashlib.sha256(raw).hexdigest())
+        with tempfile.TemporaryDirectory() as directory:
+            out = pathlib.Path(directory)
+            (out / 'tools').mkdir()
+            names = worker.TOOLS | {'mps_stdout_gzip.py'}
+            tools = {}
+            for name in names:
+                content = pathlib.Path(worker.__file__).with_name(name).read_bytes()
+                (out / 'tools' / name).write_bytes(content)
+                tools[name] = hashlib.sha256(content).hexdigest()
+            (out / 'tools.json').write_text(json.dumps(tools))
+            (out / 'source.mps').write_bytes(source)
+            (out / 'stdout.txt.gz').write_bytes(gzip.compress(raw, mtime=0))
+            (out / 'record.json').write_text(json.dumps(record))
+            (out / 'request.json').write_text(json.dumps(dict(exact=False, stdoutEncoding='gzip', decodedBytes=len(raw))))
+
+            worker.supervise(out, worker.bindings(out), tools, os.getppid())
+
+            checked = json.loads((out / 'result.json').read_text())
+            self.assertEqual('valid', checked['status'], checked.get('reason'))
+            self.assertEqual(record['finalWitness'], checked['checkedWitness'])
+            self.assertTrue(checked['cleanupComplete'])
+            self.assertEqual(0, checked['solverSearchQueries'])
+            self.assertFalse(checked['proofCertificateChecked'])
+            self.assertNotIn('runtime', checked)
+            self.assertEqual('cpython-stdlib-ground-v1', checked['stdlibRuntime']['implementation'])
+            self.assertEqual('python-deflate-gzip-v1', checked['stdoutTransport']['decoderRuntime']['implementation'])
+            for phase, memory in (('bootstrap', 2147483648), ('check', 4294967296)):
+                process = checked[phase + 'Process']
+                self.assertTrue(process['complete'])
+                self.assertEqual(0, process['exit'])
+                self.assertEqual(30, process['timeoutSeconds'])
+                self.assertEqual(memory, process['addressSpaceBytes'])
+
+
+class MpsPortableGzipTest(unittest.TestCase):
+    def test_portable_decoding_matches_native_gzip_for_stored_fixed_and_dynamic_blocks(self):
+        raw_cases = (b'', b'o 1/8\nv I=0 X=1/10\n', bytes(range(256)) * 300,
+                     b'% progress\n' * 40_000 + b'o 1/8\nv I=0 X=1/10\n')
+        for raw in raw_cases:
+            for level, strategy in ((0, zlib.Z_DEFAULT_STRATEGY), (6, zlib.Z_FIXED),
+                                    (1, zlib.Z_DEFAULT_STRATEGY), (9, zlib.Z_DEFAULT_STRATEGY)):
+                with self.subTest(bytes=len(raw), level=level, strategy=strategy):
+                    encoder = zlib.compressobj(level, zlib.DEFLATED, 31, strategy=strategy)
+                    compressed = encoder.compress(raw) + encoder.flush()
+                    self.assertEqual(gzip.decompress(compressed), portable.decode(compressed))
+
+    def test_portable_decoding_checks_every_member_and_its_crc_and_size(self):
+        members = [gzip.compress(raw, mtime=0) for raw in (b'first\n', b'', b'last\n')]
+        self.assertEqual(b'first\nlast\n', portable.decode(b''.join(members)))
+        for index in range(len(members)):
+            for offset in (-8, -4):
+                changed = bytearray(members[index])
+                changed[offset] ^= 1
+                with self.subTest(member=index, field=offset), self.assertRaises(ValueError):
+                    portable.decode(b''.join(members[:index] + [changed] + members[index + 1:]))
+
+    def test_portable_decoding_rejects_truncation_reserved_blocks_and_trailing_data(self):
+        compressed = gzip.compress(b'o 1\nv x=1\n', mtime=0)
+        for size in range(len(compressed)):
+            with self.subTest(truncated=size), self.assertRaises(ValueError):
+                portable.decode(compressed[:size])
+        for suffix in (b'x', b'\0', b'\x1f\x8b'):
+            with self.subTest(suffix=suffix), self.assertRaises(ValueError):
+                portable.decode(compressed + suffix)
+        changed = bytearray(compressed)
+        changed[10] = (changed[10] & ~7) | 7
+        with self.assertRaisesRegex(ValueError, 'reserved deflate block'):
+            portable.decode(changed)
+
+    def test_portable_decoding_applies_the_decoded_limit_across_member_boundaries(self):
+        member = gzip.compress(b'x' * 32, mtime=0)
+        self.assertEqual(b'x' * 64, portable.decode(member + member, maximum=64))
+        for maximum in (0, 31, 63):
+            with self.subTest(maximum=maximum), self.assertRaises(ValueError):
+                portable.decode(member + member, maximum=maximum)
+
+    def test_portable_decoding_verifies_optional_header_fields_and_header_crc(self):
+        compressed = gzip.compress(b'point', mtime=0)
+        header = compressed[:3] + bytes([30]) + compressed[4:10] + b'\x03\0abcname\0comment\0'
+        encoded = header + (portable.crc32(header) & 65535).to_bytes(2, 'little') + compressed[10:]
+        self.assertEqual(b'point', portable.decode(encoded))
+        changed = bytearray(encoded)
+        changed[len(header)] ^= 1
+        with self.assertRaisesRegex(ValueError, 'header CRC'):
+            portable.decode(changed)
+
+    def test_portable_envelope_matches_existing_transport_and_preserves_physical_line_limit(self):
+        raw = b'% old\no 1\nv x=0\n% klause-source-semantics: test\no 2\nv x=1\n'
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / 'stdout.gz'
+            path.write_bytes(gzip.compress(raw, mtime=0))
+            arguments = (path, hashlib.sha256(raw).hexdigest(), len(raw))
+            self.assertEqual(transport.envelope(*arguments), portable.envelope(*arguments))
+            raw = b'a\r' * 16 + b'\n'
+            path.write_bytes(gzip.compress(raw, mtime=0))
+            with mock.patch.object(portable, 'MAX_LINE_BYTES', 16), self.assertRaisesRegex(ValueError, 'stdout line'):
+                portable.envelope(path, hashlib.sha256(raw).hexdigest(), len(raw))
+
+    def test_portable_decoding_uses_no_native_compression_or_crc_fallback(self):
+        raw = b'% progress\n' * 20_000
+        compressed = gzip.compress(raw, mtime=0)
+        with contextlib.ExitStack() as guards:
+            for name in ('decompress', 'decompressobj', 'crc32'):
+                guards.enter_context(mock.patch.object(zlib, name, side_effect=AssertionError('native fallback')))
+            guards.enter_context(mock.patch.object(gzip, 'decompress', side_effect=AssertionError('native fallback')))
+            self.assertEqual(raw, portable.decode(compressed))
 
 
 if __name__ == '__main__':

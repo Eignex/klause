@@ -388,4 +388,76 @@ class MpsSourceValidationTest {
         assertEquals(if (failure == "valid") "valid" else "unknown", result.validation.status)
         assertEquals(record.finalWitness.takeIf { failure == "valid" }, result.validation.checkedWitness)
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["valid-linux-raw", "valid-darwin-raw", "valid-linux-gzip", "valid-darwin-gzip",
+        "platform", "image-hash", "image-size", "symbol", "module", "bootstrap-child", "bootstrap-command",
+        "check-command", "memory", "child", "query", "proof", "tolerance", "decoder", "decoder-hash",
+        "decoder-path", "wire", "decoded", "native-borrow"])
+    fun `stdlib receipts should bind interpreter processes and complete portable transport`(variant: String) {
+        val gzip = !variant.endsWith("-raw")
+        val platform = if (variant.contains("linux")) "linux" else "darwin"
+        val portable = MpsStdlibRuntime("cpython-stdlib-ground-v1", "3.14.8", platform, if (platform == "linux") "x86_64" else "arm64",
+            MpsCheckerFile(runtime.pythonExecutable, 100, runtime.pythonExecutableSha256),
+            MpsCheckerFile("/runtime/Python", 100, "b".repeat(64)), "Py_GetVersion",
+            mapOf("ctypes" to MpsCheckerFile("/stdlib/ctypes.py", 100, "c".repeat(64)),
+                "_ctypes" to MpsCheckerFile("/stdlib/_ctypes.so", 100, "d".repeat(64))), false)
+        val changed = when (variant) {
+            "platform" -> portable.copy(platform = "unknown")
+            "image-hash" -> portable.copy(interpreterImage = portable.interpreterImage.copy(sha256 = "missing"))
+            "image-size" -> portable.copy(interpreterImage = portable.interpreterImage.copy(bytes = 67_108_865))
+            "symbol" -> portable.copy(interpreterSymbol = "other")
+            "module" -> portable.copy(modules = portable.modules - "_ctypes")
+            else -> portable
+        }
+        val decoderFile = MpsCheckerFile("/owned/case/tools/mps_stdout_deflate.py", 100, "e".repeat(64))
+        val decoder = MpsGzipRuntime(changed.pythonVersion, changed.executable.sha256,
+            mapOf("mps_stdout_deflate" to decoderFile), "", "", "", sha256(byteArrayOf()), emptyList(),
+            implementation = "python-deflate-gzip-v1")
+        val changedDecoder = when (variant) {
+            "decoder" -> decoder.copy(implementation = "python-zlib-gzip-v1")
+            "decoder-hash" -> decoder.copy(modules = mapOf("mps_stdout_deflate" to decoderFile.copy(sha256 = "f".repeat(64))))
+            "decoder-path" -> decoder.copy(modules = mapOf("mps_stdout_deflate" to decoderFile.copy(path = "/other/decoder.py")))
+            "native-borrow" -> decoder.copy(nativeProviders = listOf(decoderFile))
+            else -> decoder
+        }
+        val transport = MpsStdoutTransport("gzip", if (variant == "wire") 129 else 128,
+            if (variant == "decoded") 9_000_001 else 9_000_000, "e".repeat(64), "f".repeat(64),
+            32, "a".repeat(64), true, changedDecoder)
+        val expectedBindings = if (gzip) bindings - "stdout.txt" + ("stdout.txt.gz" to transport.wireSha256) else bindings
+        val producer = record.copy(validationPolicy = if (gzip) MPS_GZIP_SOURCE_POLICY else MPS_SOURCE_POLICY,
+            sourceOutputSha256 = transport.decodedSha256)
+        val value = base.copy(runtime = null, stdlibRuntime = changed, bindings = expectedBindings,
+            toolHashes = tools + ("mps_stdout_deflate.py" to decoderFile.sha256),
+            groundArithmetic = arithmetic.copy(pythonVersion = changed.pythonVersion),
+            stdoutTransport = transport.takeIf { gzip },
+            solverSearchQueries = if (variant == "query") 1 else 0,
+            proofCertificateChecked = variant == "proof",
+            sourceTolerance = if (variant == "tolerance") mapOf("absolute" to "1", "relative" to "1") else base.sourceTolerance)
+        val log = JsonObject(Reports.json.parseToJsonElement(Reports.json.encodeToString(value)).jsonObject
+            .filterKeys { it in childFields + "stdlibRuntime" + if (gzip) setOf("stdoutTransport") else emptySet() }).toString() + "\n"
+        val setupLog = Reports.json.encodeToString(if (variant == "bootstrap-child") portable.copy(machine = "x86_64") else changed) + "\n"
+        val setupBytes = setupLog.toByteArray()
+        val bytes = log.toByteArray()
+        val setup = bootstrap.copy(command = bootstrap.command.toMutableList().apply {
+            this[2] = "/owned/case/tools/mps_witness_validation.py"
+            if (variant == "bootstrap-command") this[2] = "/other/bootstrap.py"
+        }, streams = bootstrap.streams + ("stdout" to MpsCheckerStream(setupBytes.size.toLong(), setupBytes.size.toLong(),
+            true, sha256(setupBytes))))
+        val checked = check.copy(command = check.command.toMutableList().apply {
+            if (variant == "check-command") this[2] = "/other/check.py"
+        }, addressSpaceBytes = if (variant == "memory") 2_147_483_648 else 4_294_967_296,
+            streams = check.streams + ("stdout" to MpsCheckerStream(bytes.size.toLong(), bytes.size.toLong(), true, sha256(bytes))))
+        val bound = value.copy(bootstrapProcess = setup, checkProcess = checked,
+            processLogs = mapOf("bootstrap.stdout" to setupLog, "bootstrap.stderr" to "", "check.stdout" to log,
+                "check.stderr" to ""), stdlibRuntime = if (variant == "child") changed.copy(machine = "x86_64") else changed)
+        val packaged = tools + ("mps_stdout_deflate.py" to decoderFile.sha256)
+
+        val result = MpsSourceValidation.checkerResult(0, Reports.json.encodeToString(bound), producer,
+            expectedBindings, packaged, gzip = MpsGzipExpectation(128, 9_000_000).takeIf { gzip })
+
+        assertEquals(if (variant.startsWith("valid-")) "valid" else "unknown", result.validation.status)
+        assertEquals(record.finalWitness.takeIf { variant.startsWith("valid-") }, result.validation.checkedWitness)
+    }
+
 }
