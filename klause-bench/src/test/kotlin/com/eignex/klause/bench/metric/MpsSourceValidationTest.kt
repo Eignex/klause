@@ -12,11 +12,11 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.File
-import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.Test
 
 class MpsSourceValidationTest {
     @TempDir
@@ -168,6 +168,31 @@ class MpsSourceValidationTest {
         val result = MpsSourceValidation.validate(ref, record, raw, true, directory)
 
         assertEquals(expected, result.validation.status, result.validation.reason)
+    }
+
+    @Test
+    fun `omitted source name should retain original byte custody`() {
+        val ref = ProblemRef(
+            "wide-bounded-mixed", Format.MPS,
+            ProblemSource.Vendored("klause-bench/smoke-corpus/mps-linear-source-v1/wide-bounded-mixed.mps"),
+            Category.OPTIMIZATION, Expected.Unknown,
+        )
+        val raw = "o 1\nv I=1 X=1\n"
+        val record = SolveRecord(
+            ref.name, "klause", null, 1, "free", 1, 10_000, "optimize", false,
+            true, 1.0, 1, proven = true, gitSha = "test", timestamp = "test", command = "cli --exact",
+            validationPolicy = MPS_SOURCE_POLICY, sourceHashes = SolveEvidence.sourceHashes(ref),
+            sourceOutputSha256 = sha256(raw.toByteArray()), finalWitness = "v I=1 X=1", exactObjective = "1",
+        )
+
+        val result = MpsSourceValidation.validate(ref, record, raw, true, directory)
+
+        assertEquals("valid", result.validation.status, result.validation.reason)
+        val receipt = Reports.json.decodeFromString<MpsSourceValidation.Receipt>(
+            result.stats.getValue("sourceValidationReceiptJson"),
+        )
+        assertEquals(listOf("NAME"), receipt.insertedHeaders)
+        assertEquals(record.sourceHashes.getValue("model"), receipt.bindings.getValue("source.mps"))
     }
 
     @Test

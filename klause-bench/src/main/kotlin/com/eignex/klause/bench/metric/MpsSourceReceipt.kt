@@ -29,8 +29,12 @@ internal object MpsSourceReceipt {
         require(process.stderrSha256 == sha256(process.stderr.toByteArray()))
         require(process.stdout.toByteArray().size <= 1_048_576 && process.stderr.toByteArray().size <= 1_048_576)
         require(process.elapsedMs in 0..60_000)
-        require(process.stderr.lineSequence().all { it.isEmpty() || it.startsWith("Failed ") ||
-            it.startsWith("                ") })
+        require(
+            process.stderr.lineSequence().all {
+            it.isEmpty() || it.startsWith("Failed ") ||
+                it.startsWith("                ")
+        }
+        )
         val output = process.stdout.lines().filter { it.isNotEmpty() }
         val lines = if (output.firstOrNull()?.startsWith("MIPLIB address KiB: ") == true) {
             val limits = output.first().removePrefix("MIPLIB address KiB: ")

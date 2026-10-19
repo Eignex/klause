@@ -903,6 +903,10 @@ Building requires a C++ compiler and GMP/zlib development packages. Invocation
 supports Linux with GNU `timeout`/`prlimit` and macOS with the system shell limits.
 Other hosts remain unverified.
 
+The adapter inserts a neutral `NAME` header or an empty `RHS` section when the
+original omits those optional headers required by MIPLIB. All original data
+records remain verbatim; the receipt names inserted headers and binds both the
+original `source.mps` and actual `checker.mps` bytes. No numerical values change.
 The adapter translates the retained final stdout point into SOL variable/value
 lines and `=obj=`. Duplicate or malformed coordinates are declined. MIPLIB's model
 variable census must equal the number of supplied unique coordinates, and any

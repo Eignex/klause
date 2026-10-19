@@ -40,7 +40,7 @@ internal object MpsSolution {
                 val parts = token.split('=')
                 require(
                     parts.size == 2 && parts[0].isNotEmpty() && parts[0].length < 256 &&
-                    !parts[0].startsWith('=') && seen.add(parts[0])
+                        !parts[0].startsWith('=') && seen.add(parts[0]),
                 ) { "duplicate or malformed coordinate" }
                 appendLine("${parts[0]} ${decimal(parts[1])}")
             }
