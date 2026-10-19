@@ -12,7 +12,6 @@ import com.eignex.klause.propagation.lazyReasonSlots
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.abs
 
@@ -20,22 +19,6 @@ internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongA
     var sum = 0L
     for (i in vars.indices) sum += coeffs[i] * state.assignment.intValue(vars[i])
     state.longPayload[factorId] = sum
-}
-
-/**
- * O(1) coefficient lookup over `vars`/`coeffs` for the LS linear invariants: a var→index map built
- * once per invariant. Move scoring queries a coefficient per candidate move per containing row, so
- * a per-query row scan turns ultra-wide rows (tens of thousands of terms) into deadline-starving
- * move picks; the map makes each query constant work. A variable outside the row yields 0,
- * so callers may ask about any variable.
- */
-internal class LinearCoeffIndex(private val coeffs: LongArray, vars: IntArray) {
-    private val index = IntIntMap.build(vars, IntArray(vars.size) { it }, absent = -1)
-
-    fun coeffOf(intVar: Int): Long {
-        val i = index[intVar]
-        return if (i < 0) 0L else coeffs[i]
-    }
 }
 
 /**
