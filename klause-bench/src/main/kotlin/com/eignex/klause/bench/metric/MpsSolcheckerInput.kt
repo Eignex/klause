@@ -7,7 +7,7 @@ internal object MpsSolcheckerInput {
 
     data class Profile(val maximize: Boolean, val text: String, val insertedHeaders: List<String>)
 
-    // This screens upstream reader limitations; it constructs no model or mathematical obligations.
+    // The upstream reader needs a restricted input profile to preserve source obligations.
     fun qualify(source: String): Profile {
         var section = ""
         var objective: String? = null
@@ -20,6 +20,9 @@ internal object MpsSolcheckerInput {
         val objectiveColumns = mutableSetOf<String>()
         val rows = mutableSetOf<String>()
         val indicators = mutableSetOf<String>()
+        val vectors = mutableMapOf<String, String>()
+        val vectorRows = mutableMapOf<String, MutableSet<String>>()
+        val boundKinds = mutableMapOf<String, MutableSet<String>>()
         for (line in source.lineSequence()) {
             require(line.length < 1023 && line.all { it == '\t' || it.code in 32..126 }) { "unsupported MPS line" }
             if (line.isBlank() || line.startsWith('*')) continue
@@ -75,14 +78,25 @@ internal object MpsSolcheckerInput {
 
                 "RHS", "RANGES" -> {
                     require(fields.size == 3 || fields.size == 5) { "unlabelled vectors are unsupported" }
+                    require(vectors.getOrPut(section) { first } == first) { "multiple vectors are unsupported" }
                     for (i in 1 until fields.size step 2) {
                         require(fields[i] in rows && fields[i] != objective) { "objective RHS offsets are unsupported" }
+                        require(vectorRows.getOrPut(section) { mutableSetOf() }.add(fields[i])) {
+                            "repeated vector rows are unsupported"
+                        }
                         requireNumber(fields[i + 1])
                     }
                 }
 
                 "BOUNDS" -> {
                     require(fields.size in 3..4 && first in setOf("LO", "UP", "FX", "LI", "UI", "FR", "MI", "PL", "BV"))
+                    require(vectors.getOrPut(section) { fields[1] } == fields[1]) { "multiple bound vectors" }
+                    val kinds = boundKinds.getOrPut(fields[2]) { mutableSetOf() }
+                    require((first != "BV" || kinds.isEmpty()) && "BV" !in kinds) { "mixed binary bounds" }
+                    require(first !in setOf("LO", "LI", "MI") || "UP" !in kinds) {
+                        "lower bounds following upper bounds are unsupported"
+                    }
+                    kinds += first
                     if (fields.size == 4) requireNumber(fields[3])
                 }
 

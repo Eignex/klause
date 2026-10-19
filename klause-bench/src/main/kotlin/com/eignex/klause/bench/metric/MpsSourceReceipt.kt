@@ -26,7 +26,7 @@ internal object MpsSourceReceipt {
     fun command(host: String, arguments: List<String>): List<String> = when (host) {
         "Linux" -> listOf(
             "/usr/bin/timeout", "--signal=KILL", "30s", "/usr/bin/prlimit",
-            "--as=4294967296", "--fsize=1048576", "--core=0", "--",
+            "--as=4294967296", "--cpu=30", "--fsize=1048576", "--core=0", "--",
         ) + arguments
 
         "Mac OS X" -> listOf(
@@ -80,7 +80,9 @@ internal object MpsSourceReceipt {
         val started = System.nanoTime()
         val gate = Any()
         var active: Process? = null
-        val shutdown = Thread { synchronized(gate) { active?.destroyForcibly() } }
+        val shutdown = Thread {
+            synchronized(gate) { active?.let { process -> runCatching { stop(process) } } }
+        }
         Runtime.getRuntime().addShutdownHook(shutdown)
         var reason: String? = null
         var cleanup = false
@@ -109,9 +111,7 @@ internal object MpsSourceReceipt {
             } finally {
                 val interrupted = Thread.interrupted()
                 try {
-                    process.descendants().use { children -> children.forEach { it.destroyForcibly() } }
-                    if (process.isAlive) process.destroyForcibly()
-                    cleanup = process.waitFor(5, TimeUnit.SECONDS) && !process.isAlive
+                    cleanup = stop(process)
                 } finally {
                     if (interrupted) Thread.currentThread().interrupt()
                 }
@@ -129,5 +129,17 @@ internal object MpsSourceReceipt {
             command, process.pid(), if (cleanup) process.exitValue() else null, reason, cleanup,
             (System.nanoTime() - started) / 1_000_000, out, err, sha256(out.toByteArray()), sha256(err.toByteArray()),
         )
+    }
+
+    private fun stop(process: Process): Boolean {
+        val deadline = System.nanoTime() + 5_000_000_000
+        val children = process.descendants().use { it.toList() }
+        if (process.isAlive) process.destroy()
+        children.forEach { it.destroyForcibly() }
+        if (!process.waitFor(1, TimeUnit.SECONDS)) process.destroyForcibly()
+        val remaining = ((deadline - System.nanoTime()) / 1_000_000).coerceAtLeast(1)
+        val reaped = process.waitFor(remaining, TimeUnit.MILLISECONDS)
+        while (children.any { it.isAlive } && System.nanoTime() < deadline) Thread.sleep(10)
+        return reaped && !process.isAlive && children.none { it.isAlive }
     }
 }

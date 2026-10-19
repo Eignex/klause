@@ -196,6 +196,27 @@ class MpsSourceValidationTest {
     }
 
     @Test
+    fun `mixed binary bounds should not credit a point outside the original upper bound`() {
+        val ref = ProblemRef(
+            "mixed-bounds", Format.MPS,
+            ProblemSource.Vendored("klause-bench/src/test/resources/mps-solchecker/binary-mixed-bounds.mps"),
+            Category.OPTIMIZATION, Expected.Unknown,
+        )
+        val raw = "o 2\nv I=2\n"
+        val record = SolveRecord(
+            ref.name, "klause", null, 1, "free", 1, 10_000, "optimize", false,
+            true, 2.0, 1, proven = true, gitSha = "test", timestamp = "test", command = "cli --exact",
+            validationPolicy = MPS_SOURCE_POLICY, sourceHashes = SolveEvidence.sourceHashes(ref),
+            sourceOutputSha256 = sha256(raw.toByteArray()), finalWitness = "v I=2", exactObjective = "2",
+        )
+
+        val result = MpsSourceValidation.validate(ref, record, raw, true, directory)
+
+        assertEquals("unknown", result.validation.status)
+        assertNull(result.validation.checkedWitness)
+    }
+
+    @Test
     fun `source hash changes should withhold checked witness`() {
         val ref = ProblemRef(
             "fixture",
