@@ -16,8 +16,34 @@ internal fun refutePolynomialConsequences(
     maximumBits: Int,
 ): Boolean {
     val atoms = formula.conjunctiveAtoms(arithmetic, maximumAtoms) ?: return false
-    return PolynomialConsequenceRefutation(arithmetic, maximumTerms, maximumBits).refutes(atoms)
+    return PolynomialConsequenceRefutation(arithmetic, maximumTerms, maximumBits).prepare(atoms)
+        .asSequence().filterNotNull().single()
 }
+
+internal fun preparePolynomialConsequenceRefutation(
+    atoms: List<PolynomialAtom>,
+    arithmetic: PolynomialArithmetic,
+): Iterator<Boolean?> = sequence {
+    var maximumTerms = 0
+    var maximumBits = 1
+    for (atom in atoms) {
+        arithmetic.step()
+        val terms = atom.polynomial.terms
+        if (terms.size > Int.MAX_VALUE - maximumTerms) {
+            yield(false)
+            return@sequence
+        }
+        maximumTerms += terms.size
+        for (term in terms) {
+            arithmetic.step()
+            maximumBits = maxOf(maximumBits, term.coefficient.num.magnitudeBitLength(),
+                term.coefficient.den.magnitudeBitLength())
+        }
+        yield(null)
+    }
+    // The proof copy retains the input's term, degree and coefficient sizes; declines leave CAD's rows intact.
+    yieldAll(PolynomialConsequenceRefutation(arithmetic, maximumTerms, maximumBits).prepare(atoms).asSequence())
+}.iterator()
 
 private class PolynomialConsequenceRefutation(
     private val arithmetic: PolynomialArithmetic,
@@ -27,8 +53,11 @@ private class PolynomialConsequenceRefutation(
     private val signs = HashMap<Int, Int>()
     private val inputDegrees = HashMap<Int, Int>()
 
-    fun refutes(atoms: List<PolynomialAtom>): Boolean {
-        if (!admitted(atoms, captureDegrees = true)) return false
+    fun prepare(atoms: List<PolynomialAtom>): Iterator<Boolean?> = sequence {
+        if (!admitted(atoms, captureDegrees = true)) {
+            yield(false)
+            return@sequence
+        }
         for (atom in atoms) {
             arithmetic.step()
             val term = atom.polynomial.terms.singleOrNull() ?: continue
@@ -37,8 +66,12 @@ private class PolynomialConsequenceRefutation(
             val allowed = relationSigns(atom.relation)
             val required = if (term.coefficient.signum() > 0) allowed else negate(allowed)
             val restricted = (signs[variable] ?: ALL) and required
-            if (restricted == 0) return true
+            if (restricted == 0) {
+                yield(true)
+                return@sequence
+            }
             signs[variable] = restricted
+            yield(null)
         }
         var rows = atoms
         val usedVariables = HashSet<Int>()
@@ -49,32 +82,46 @@ private class PolynomialConsequenceRefutation(
                 stripped.add(if (row.relation == PolynomialRelation.EQ) {
                     PolynomialAtom(stripNonzero(row.polynomial), row.relation)
                 } else row)
+                yield(null)
             }
-            if (!admitted(stripped)) return false
+            if (!admitted(stripped)) break
             for (row in stripped) {
                 arithmetic.step()
-                if (refutes(row)) return true
+                if (refutes(row)) {
+                    yield(true)
+                    return@sequence
+                }
+                yield(null)
             }
-            val pivot = pivot(stripped, usedVariables) ?: return false
-            val replacement = replacement(stripped[pivot.row].polynomial, pivot.term) ?: return false
+            val pivot = pivot(stripped, usedVariables) ?: break
+            val replacement = replacement(stripped[pivot.row].polynomial, pivot.term) ?: break
             val updated = ArrayList<PolynomialAtom>()
             var count = 0
             for ((index, row) in stripped.withIndex()) {
                 arithmetic.step()
                 // Only consequences are refuted; a dropped defining row never accepts a model.
                 if (index == pivot.row) continue
-                val polynomial = rewrite(row.polynomial, pivot, replacement, maximumTerms - count) ?: return false
+                val polynomial = rewrite(row.polynomial, pivot, replacement, maximumTerms - count)
+                if (polynomial == null) {
+                    yield(false)
+                    return@sequence
+                }
                 val terms = polynomial.terms
-                if (terms.size > maximumTerms - count) return false
+                if (terms.size > maximumTerms - count) {
+                    yield(false)
+                    return@sequence
+                }
                 count += terms.size
                 updated.add(PolynomialAtom(polynomial, row.relation))
+                yield(null)
             }
-            if (!admitted(updated)) return false
+            if (!admitted(updated)) break
             arithmetic.step()
             usedVariables.add(pivot.variable)
             rows = updated
         }
-    }
+        yield(false)
+    }.iterator()
 
     private fun admitted(atoms: List<PolynomialAtom>, captureDegrees: Boolean = false): Boolean {
         var count = 0

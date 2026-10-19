@@ -678,12 +678,19 @@ available. Ordinary levels use Collins projection. The component reads the
 projection operations and coordinate order.
 The theory does not materialize finite CP domains or depend on the linear engines.
 
-Each complete Boolean region first substitutes its total required-equation graph
+Each complete Boolean region intersects the allowed signs of exactly rationally
+proportional selected polynomials. Negative scalars reverse the sign orientation;
+retained rows keep the first representative's coefficients. An empty intersection
+refutes the region, while coincident weak bounds supply an equality. Constant rows
+are checked exactly. No variable factor is divided out, so zero fibres remain.
+These equivalent conjunctions supply total required-equation graph
 sections using the same graph-selection primitive as projection, preserving every
 remaining predicate's relation. Satisfied zero predicates are discharged; false zero
 predicates remain contradictions. Completed graphs use the existing section counter,
 including graphs completed before a later interruption or representation decline.
-The region then applies exact affine inequality elimination to the exposed constraints.
+After graph closure, sign intersection repeats on the rewritten rows; any exposed
+required equations resume graph elimination. Each such repeat either removes rows
+or ends this closure. The region then applies exact affine inequality elimination to the exposed constraints.
 A coordinate qualifies only when every occurrence is a pure linear monomial with a
 nonzero rational coefficient in an inequality. Occurrences in equalities,
 disequalities, powers or variable coefficients retain that coordinate for CAD.
@@ -737,6 +744,19 @@ inconsistent. An empty sign set refutes only that Boolean region. Zero fibres an
 mixed-sign cancellation remain admitted. This complete proof pass shares the
 query's native work and cancellation owner; it does not re-enter the bounded
 witness probe or alter its original admission and attempt limits.
+
+After total graph elimination, a complete region can derive private equality
+consequences and weighted binomial-square sign enclosures. The same exact row
+mechanism used in the bounded prefix cancels common monomials only when this
+region's unary signs exclude zero, then rewrites divisible monomials by selected
+required equalities. These proof copies retain the reduced input's total term
+count, coordinate degrees and maximum coefficient numerator/denominator bit sizes.
+A growth decline preserves the original rows for affine reduction and CAD.
+Dropped defining rows weaken only the proof copy; they supply no witness or
+reconstruction rule. A completed sign contradiction rejects only this region.
+Preparation retains its rows across slices and polls and charges the containing
+arithmetic owner. It starts no optional probe, creates no allowance or source
+bounds, and exports no proof artifact. Incomplete preparation supplies no refutation.
 
 After graph and affine reduction, each complete region can also supply necessary
 closed rational magnitude bounds. In an oriented sum of nonnegative even

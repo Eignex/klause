@@ -69,7 +69,23 @@ internal class PolynomialAffineReduction private constructor(
             }
             val fibres = ArrayList<AffineFibre>()
             var inconsistent = false
+            var normalizeConjunction = true
+            var graphChanges = false
             while (true) {
+                if (normalizeConjunction) {
+                    val preparation = preparePolynomialConjunction(current, arithmetic)
+                    var conjunction: PolynomialConjunction? = null
+                    while (conjunction == null) {
+                        conjunction = preparation.next()
+                        if (conjunction == null) yield(null)
+                    }
+                    inconsistent = conjunction.inconsistent
+                    val changed = conjunction.changed
+                    current = conjunction.atoms
+                    if (inconsistent || (!changed && graphChanges)) break
+                    normalizeConjunction = false
+                    graphChanges = false
+                }
                 val equations = current.mapNotNull { atom ->
                     arithmetic.step()
                     if (atom.relation == PolynomialRelation.EQ) atom.polynomial else null
@@ -79,7 +95,11 @@ internal class PolynomialAffineReduction private constructor(
                     break
                 }
                 val graph = equationalSection(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
-                    ?: break
+                if (graph == null) {
+                    if (!graphChanges) break
+                    normalizeConjunction = true
+                    continue
+                }
                 val rewritten = ArrayList<PolynomialAtom>()
                 for (atom in current) {
                     arithmetic.step()
@@ -93,8 +113,18 @@ internal class PolynomialAffineReduction private constructor(
                 arithmetic.step()
                 fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
                 current = rewritten
+                graphChanges = true
                 onGraph?.invoke()
                 yield(null)
+            }
+            if (!inconsistent) {
+                val consequenceChecking = preparePolynomialConsequenceRefutation(current, arithmetic)
+                var consequenceConflict: Boolean? = null
+                while (consequenceConflict == null) {
+                    consequenceConflict = consequenceChecking.next()
+                    if (consequenceConflict == null) yield(null)
+                }
+                inconsistent = consequenceConflict
             }
             while (!inconsistent) {
                 val variable = affineCoordinate(current, realCount, arithmetic)
