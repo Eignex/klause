@@ -901,7 +901,8 @@ the unchanged upstream main with GMP and zlib, and packages those files and the
 binary in the non-published bench artifact. The optional converter is not extracted.
 Building requires a C++ compiler and GMP/zlib development packages. Invocation
 supports Linux with GNU `timeout`/`prlimit` and macOS with the system shell limits.
-Other hosts remain unverified.
+Other hosts remain unverified. The packaged executable targets the build host;
+rebuild the bench when changing OS or architecture.
 
 The adapter inserts a neutral `NAME` header or an empty `RHS` section when the
 original omits those optional headers required by MIPLIB. All original data

@@ -61,6 +61,18 @@ class MpsSourceReceiptTest {
     }
 
     @Test
+    fun `Darwin resource wrapper should execute its supplied command`() {
+        val command = MpsSourceReceipt.command("Mac OS X", listOf("/bin/echo", "checked argument with spaces"))
+
+        val process = MpsSourceReceipt.run(command, directory)
+
+        assertEquals(0, process.exit, process.stderr)
+        assertTrue(process.stdout.startsWith("MIPLIB address KiB: "))
+        assertTrue(process.stdout.endsWith("checked argument with spaces\n"))
+        assertTrue(process.cleanupComplete)
+    }
+
+    @Test
     fun `deadline should terminate and reap an owned checker`() {
         val process = MpsSourceReceipt.run(listOf("/bin/sleep", "60"), directory, 50)
 

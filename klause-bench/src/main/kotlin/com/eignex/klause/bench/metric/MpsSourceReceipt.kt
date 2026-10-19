@@ -23,6 +23,24 @@ internal object MpsSourceReceipt {
 
     data class Verdict(val integral: Boolean, val feasible: Boolean, val objective: Boolean)
 
+    fun command(host: String, arguments: List<String>): List<String> = when (host) {
+        "Linux" -> listOf(
+            "/usr/bin/timeout", "--signal=KILL", "30s", "/usr/bin/prlimit",
+            "--as=4294967296", "--fsize=1048576", "--core=0", "--",
+        ) + arguments
+
+        "Mac OS X" -> listOf(
+            "/bin/sh", "-c",
+            "baseline=$(ps -o vsz= -p \$\$) && " +
+                "ulimit -v $((baseline + 4194304)) && ulimit -t 30 && " +
+                "ulimit -f 1024 && ulimit -c 0 && " +
+                "printf 'MIPLIB address KiB: %s %s\\n' \"\$baseline\" \"$(ulimit -v)\" && exec \"$@\"",
+            "miplib-solchecker",
+        ) + arguments
+
+        else -> error("unsupported MIPLIB resource controls")
+    }
+
     fun interpret(process: MpsNativeProcess, coordinates: Int, linear: String): Verdict {
         require(process.exit == 0 && process.stop == null && process.cleanupComplete)
         require(process.stdoutSha256 == sha256(process.stdout.toByteArray()))
