@@ -15,7 +15,7 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-internal const val MZN_COMPATIBILITY_POLICY = "minizinc-compile-compatibility-v1"
+internal const val MZN_COMPATIBILITY_POLICY = "minizinc-compile-compatibility-v2"
 
 @Serializable
 internal data class MiniZincCompilerIdentity(
@@ -37,10 +37,24 @@ internal class MiniZincCompileFailure(
     val command: List<String>,
     val elapsedNs: Long,
     val sourceHashes: Map<String, String>,
-) : IllegalArgumentException("minizinc compile failed (exit $exitCode): ${diagnostic.take(4000)}") {
-    val incompatibility: String? = if (exitCode == 1) classify(diagnostic) else null
+    /** Set when the compiler was killed after this many seconds instead of exiting on its own. */
+    val timeoutSec: Int? = null,
+) : IllegalArgumentException(
+    if (timeoutSec != null) {
+        diagnostic.take(4000)
+    } else {
+        "minizinc compile failed (exit $exitCode): ${diagnostic.take(4000)}"
+    },
+) {
+    val incompatibility: String? = when {
+        timeoutSec != null -> COMPILE_TIMEOUT
+        exitCode == 1 -> classify(diagnostic)
+        else -> null
+    }
 
     companion object {
+        const val COMPILE_TIMEOUT = "compile-timeout"
+
         fun classify(diagnostic: String): String? = when {
             "Error: type error:" in diagnostic -> "type-error"
             "Error: syntax error" in diagnostic -> "syntax-error"
@@ -70,17 +84,19 @@ internal object MiniZincCompatibility {
         )
     }
 
-    fun exclusion(ref: ProblemRef): MiniZincCompileFailure? = try {
-        // Compile original bytes without invoking a solver or trusting an earlier compilation.
-        MiniZincRunner().compileFzn(ref, fresh = true)
+    // Compile original bytes without invoking a solver or trusting an earlier compilation.
+    private val freshCompile: (ProblemRef) -> Unit = { MiniZincRunner().compileFzn(it, fresh = true) }
+
+    fun exclusion(ref: ProblemRef, compile: (ProblemRef) -> Unit = freshCompile): MiniZincCompileFailure? = try {
+        compile(ref)
         null
     } catch (failure: MiniZincCompileFailure) {
         if (failure.incompatibility == null) throw failure
         failure
     }
 
-    fun admit(suite: String, ref: ProblemRef): Boolean {
-        val failure = exclusion(ref) ?: return true
+    fun admit(suite: String, ref: ProblemRef, compile: (ProblemRef) -> Unit = freshCompile): Boolean {
+        val failure = exclusion(ref, compile) ?: return true
         System.err.println(
             buildJsonObject {
                 put("suite", suite)
@@ -91,6 +107,7 @@ internal object MiniZincCompatibility {
                 put("diagnostic", failure.diagnostic.take(4000))
                 put("compilerExit", failure.exitCode)
                 put("compilerElapsedNs", failure.elapsedNs)
+                failure.timeoutSec?.let { put("compilerTimeoutSec", it) }
                 put("compilerCommand", Reports.json.encodeToJsonElement(failure.command))
                 put("sourceHashes", Reports.json.encodeToJsonElement(failure.sourceHashes))
                 put("compilerIdentity", Reports.json.encodeToJsonElement(failure.compiler))
