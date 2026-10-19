@@ -97,6 +97,8 @@ def verify_growth_limit(out, mode):
     limit = value['baselineVirtualBytes'] + memory
     assert value['addressSpaceLimitBytes'] == limit
     assert resource.getrlimit(resource.RLIMIT_AS) == (limit, limit)
+    resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
+    assert resource.getrlimit(resource.RLIMIT_AS) == (limit, limit)
     virtual, resident = task_memory()
     assert virtual <= limit and resident <= memory
     value.update(postExecVerified=True, postExecVirtualBytes=virtual, postExecResidentBytes=resident)

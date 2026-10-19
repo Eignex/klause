@@ -1302,8 +1302,8 @@ Linux child processes use absolute kernel address-space limits. On macOS the
 kernel limit adds the same 2 GiB or 4 GiB allowance to the recorded pre-exec VM
 baseline, which includes Darwin's shared mappings. The receipt retains the worker
 PID, baseline virtual/resident bytes and actual absolute kernel limit. Each child
-verifies its PID, phase and inherited soft/hard limits after exec before checking
-inputs; missing, contradictory or unavailable memory control leaves checking
+verifies its PID, phase and inherited soft/hard limits, reapplies that limit after
+exec and checks it before processing inputs. Missing, contradictory or unavailable memory control leaves checking
 unknown. The private MPS adapter retains the shared process-group, stream and
 deadline owner without changing the SMT runner.
 The solve record retains at most 64 KiB of supervisor output as base64, its prefix
