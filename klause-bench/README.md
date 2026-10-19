@@ -1226,8 +1226,8 @@ and the bound child receipt identify the selected factory when a query is issued
 Bounded child stderr breadcrumbs distinguish source parsing, derivation and query
 stages; they provide no acceptance or completed-query accounting.
 
-The isolated worker reuses the reviewed private Linux x86-64/glibc Python/Z3 runtime
-and its fixed wheel hash. Bootstrap has a 30-second/2-GiB cap. Ground checking has
+The isolated worker selects a fixed-hash Z3 4.15.3.0 wheel for Linux x86-64/glibc
+or macOS 13+ on arm64/x86-64. Bootstrap has a 30-second/2-GiB cap. Ground checking has
 30 seconds/4 GiB, a 60-second supervisor and a 70-second JVM allowance; refutation
 checking has a 40-second/8-GiB child, a 90-second supervisor and a 100-second JVM
 allowance. Existing bounded termination and drain waits remain additional ceilings;
@@ -1235,7 +1235,11 @@ the external ordinary-case deadline governs unfinished work. There is no larger 
 Sources are limited to 64 MiB, models/stdout to 8 MiB each, producer records/receipts
 to 4 MiB, each tool and raw child stream to 1 MiB. The native checker library is bound
 to its private extracted wheel file and executable mapping; Python module/interpreter
-providers retain the reviewed bounded identity checks.
+providers retain the reviewed bounded identity checks. Linux reads executable
+`/proc` mappings; macOS records dyld image addresses, Mach-O headers and CPU types,
+binding the interpreter, versioned Python framework or dylib, and private Z3 library
+to their file identities. Foreign libraries, unsupported platforms or unavailable
+resource limits withhold acceptance.
 
 Adjacent `smt-source-check-*` evidence retains verbatim original source/model/stdout,
 producer record, request, packaged tool hashes, private runtime/provider identities,

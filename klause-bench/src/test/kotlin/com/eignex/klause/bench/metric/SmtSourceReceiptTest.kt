@@ -5,6 +5,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -97,9 +98,9 @@ class SmtSourceReceiptTest {
         ),
     )
 
-    private fun receipt(producer: SolveRecord = record): SmtSourceValidation.Receipt {
+    private fun receipt(producer: SolveRecord = record, machine: String? = null): SmtSourceValidation.Receipt {
         val refutation = producer.feasible == false
-        return SmtSourceValidation.Receipt(
+        val result = SmtSourceValidation.Receipt(
             "valid", "checked", requireNotNull(SmtSourceValidation.eligible(producer)),
             bindings(producer), tools, if (refutation) 1 else 0, false, true, producer.finalWitness, SMT_CHECKER,
             2, 2, runtime, arithmetic, bootstrap,
@@ -108,6 +109,33 @@ class SmtSourceReceiptTest {
             solverQueryCountObserved = true,
             referenceLogic = if (refutation) "QF_NRA" else null,
         )
+        if (machine == null) return result
+        val arm = machine == "arm64"
+        require(arm || machine == "x86_64")
+        val wheel = if (arm) {
+            "63/45/dd8e9d7500faa05eafa589cc8f0f0b982ce575d51b455d62dab8e19dd571/"
+        } else {
+            "54/9e/a11186061d9fead8be43bad7c75055585694124b2ccdd896ef249fe5824f/"
+        }
+        val macRuntime = runtime.copy(
+            machine = machine, libc = listOf("", ""), wheelBytes = if (arm) 36_882_388L else 39_637_842L,
+            wheelSha256 = if (arm) "65335aab295ded7c0ce27c85556067087a87052389ff160777d1a1d48ef0d74f"
+                else "3e62e93adff2def3537ff1ca67c3d58a6ca6d1944e0b5e774f88627b199d50e7",
+            wheelUrl = "https://files.pythonhosted.org/packages/" + wheel +
+                "z3_solver-4.15.3.0-py3-none-macosx_13_0_$machine.whl",
+            extractedFiles = runtime.extractedFiles.map { it.copy(path = it.path.replace(".so", ".dylib")) },
+        )
+        val framework = "/Library/Frameworks/Python.framework/Versions/3.13/Python"
+        val library = native.library.copy(path = native.library.path.replace(".so", ".dylib"))
+        val cpu = if (arm) 0x100000c else 0x1000007
+        val images = listOf(runtime.pythonExecutable, framework, library.path).mapIndexed { index, path ->
+            """{"path":"$path","address":"${(index + 1) * 1000}","magic":"feedfacf","cpuType":$cpu}"""
+        }.joinToString("\n", postfix = "\n")
+        return result.copy(runtime = macRuntime, nativeRuntime = native.copy(
+            library = library, maps = images, mapsSha256 = sha256(images.toByteArray()),
+            pythonProviders = native.pythonProviders + MpsCheckerFile(framework, 100, "f".repeat(64)),
+            platform = "Darwin", systemVersion = "13.0.0", mappingKind = "dyld-images-v1",
+        ))
     }
 
     private fun bind(value: SmtSourceValidation.Receipt): String {
@@ -132,6 +160,33 @@ class SmtSourceReceiptTest {
             ),
         )
         return Reports.json.encodeToString(bound)
+    }
+
+    @ParameterizedTest
+    @CsvSource("arm64,ground,false", "arm64,ground,true", "arm64,SMT,false", "arm64,SMT,true",
+        "x86_64,ground,false", "x86_64,ground,true", "x86_64,SMT,false", "x86_64,SMT,true")
+    fun `macOS receipts should retain checked claims with pinned loaded providers`(
+        machine: String,
+        logic: String,
+        builtin: Boolean,
+    ) {
+        val refutation = logic != "ground"
+        val producer = if (refutation) record.copy(feasible = false, proven = true, finalWitness = null) else record
+        val original = receipt(producer, machine)
+        val macNative = requireNotNull(original.nativeRuntime)
+        val math = if (builtin) arithmetic.copy(modules = arithmetic.modules - "math", builtinMath = MpsBuiltinModule(
+            "built-in", "_frozen_importlib.BuiltinImporter", macNative.executablePath,
+            macNative.maps, macNative.mapsSha256, macNative.pythonProviders,
+        )) else arithmetic
+        val receipt = original.copy(groundArithmetic = math, referenceLogic = logic.takeIf { refutation })
+
+        val result = SmtSourceValidation.checkerResult(0, bind(receipt), producer, bindings(producer), tools)
+        val published = SmtSourceValidation.apply(producer, result)
+
+        assertEquals("valid", result.validation.status)
+        assertEquals(producer.feasible, published.feasible)
+        assertEquals(refutation, published.proven)
+        assertEquals(if (refutation) "1" else "0", result.stats["sourceValidationSolverQueries"])
     }
 
     @ParameterizedTest
@@ -236,10 +291,14 @@ class SmtSourceReceiptTest {
             "package", "runtime", "module", "provider", "native-hash", "native-path", "maps", "maps-hash",
             "argv", "exit", "timeout", "overflow", "parent", "streams", "memory", "deadline", "timing", "child",
             "logic", "derivation",
+            "mac-wheel", "mac-cpu", "mac-version", "mac-provider", "mac-native-path", "mac-maps-hash",
+            "mac-memory", "mac-runtime-kind", "mac-framework-version", "mac-duplicate-header",
         ],
     )
     fun `incomplete or mismatched receipt custody should withhold acceptance`(failure: String) {
-        val original = receipt()
+        val original = receipt(machine = "arm64".takeIf { failure.startsWith("mac-") })
+        val macRuntime = requireNotNull(original.runtime)
+        val macNative = requireNotNull(original.nativeRuntime)
         val changed = when (failure) {
             "queries" -> original.copy(solverSearchQueries = 1)
 
@@ -301,6 +360,33 @@ class SmtSourceReceiptTest {
             "deadline" -> original.copy(checkProcess = check.copy(timeoutSeconds = 31))
 
             "timing" -> original.copy(checkMs = 70_001)
+
+            "mac-wheel" -> original.copy(runtime = macRuntime.copy(wheelSha256 = runtime.wheelSha256))
+
+            "mac-cpu" -> original.copy(runtime = macRuntime.copy(machine = "x86_64"))
+
+            "mac-version" -> original.copy(nativeRuntime = macNative.copy(systemVersion = "12.0.0"))
+
+            "mac-provider" -> original.copy(nativeRuntime = macNative.copy(pythonProviders = emptyList()))
+
+            "mac-native-path" -> original.copy(nativeRuntime = macNative.copy(
+                library = macNative.library.copy(path = "/global/libz3.dylib")))
+
+            "mac-maps-hash" -> original.copy(nativeRuntime = macNative.copy(mapsSha256 = "f".repeat(64)))
+
+            "mac-memory" -> original.copy(checkProcess = check.copy(addressSpaceBytes = 1))
+
+            "mac-runtime-kind" -> original.copy(nativeRuntime = macNative.copy(mappingKind = "linux-proc-maps-v1"))
+
+            "mac-framework-version" -> {
+                val maps = macNative.maps.replace("Versions/3.13", "Versions/3.12")
+                original.copy(nativeRuntime = macNative.copy(maps = maps, mapsSha256 = sha256(maps.toByteArray())))
+            }
+
+            "mac-duplicate-header" -> {
+                val maps = macNative.maps.replace("\"address\":\"2000\"", "\"address\":\"1000\"")
+                original.copy(nativeRuntime = macNative.copy(maps = maps, mapsSha256 = sha256(maps.toByteArray())))
+            }
 
             else -> original
         }
