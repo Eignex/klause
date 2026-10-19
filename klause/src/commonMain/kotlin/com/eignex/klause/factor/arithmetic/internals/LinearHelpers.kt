@@ -535,6 +535,8 @@ internal fun propagateLinearBounds(
     var sumHi = 0L
     var loOverflow = false
     var hiOverflow = false
+    var maxTermWidth = 0L
+    var termWidthOverflow = false
     for (i in 0 until n) {
         state.work++
         val d = state.intDomains[vars[i]]
@@ -546,6 +548,10 @@ internal fun propagateLinearBounds(
         val b = c * d.max
         val lo = if (a <= b) a else b
         val hi = if (a <= b) b else a
+        if (!termWidthOverflow) {
+            termWidthOverflow = subOverflows(hi, lo)
+            if (!termWidthOverflow && hi - lo > maxTermWidth) maxTermWidth = hi - lo
+        }
         loOverflow = loOverflow || addOverflows(sumLo, lo)
         hiOverflow = hiOverflow || addOverflows(sumHi, hi)
         sumLo += lo
@@ -572,6 +578,17 @@ internal fun propagateLinearBounds(
     if (op == LinearOp.NE) {
         if (loOverflow || hiOverflow) return true
         return excludeNotEqualValues(state, coeffs, vars, bound, sumLo, sumHi, extraLit, includeExtraLit, rootFact)
+    }
+    if (!loOverflow && !hiOverflow && !termWidthOverflow) {
+        val loSlackCoversTerms = op == LinearOp.GE ||
+            (!subOverflows(bound, sumLo) && bound - sumLo >= maxTermWidth)
+        val hiSlackCoversTerms = op == LinearOp.LE ||
+            (!subOverflows(sumHi, bound) && sumHi - bound >= maxTermWidth)
+        // Every term can span its full activity range without tightening. Retain the pass's visit debits.
+        if (loSlackCoversTerms && hiSlackCoversTerms) {
+            for (i in vars.indices) state.work++
+            return true
+        }
     }
     return tightenLinearTerms(
         state,
