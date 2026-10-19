@@ -12,6 +12,10 @@ internal class PolynomialBooleanSigns(
     private val state: PolynomialBooleanPropagation,
     private val arithmetic: PolynomialArithmetic,
 ) {
+    private val inferred = LinkedHashSet<Int>()
+    private val premises = ArrayList<Int>()
+    private var completed = false
+
     fun prepare(): Iterator<Boolean?> = sequence {
         var realCount = 0
         for (atom in atoms) for (variable in atom.polynomial.variables) {
@@ -43,13 +47,40 @@ internal class PolynomialBooleanSigns(
                 if (node !is FormulaNode.Atom || state.value(index) != UNASSIGNED) continue
                 val truth = checkNotNull(domains).truth(atoms[node.atom], arithmetic) ?: continue
                 check(state.assign(index, if (truth) TRUE else FALSE))
+                arithmetic.step()
+                inferred.add(index)
                 yield(null)
             }
             if (state.trailSize == mark) break
         }
+        for ((index, node) in nodes.withIndex()) {
+            arithmetic.step()
+            if (node is FormulaNode.Atom && state.value(index) != UNASSIGNED && index !in inferred) {
+                premises.add(index)
+            }
+        }
         arithmetic.step()
+        completed = true
         yield(true)
     }.iterator()
+
+    fun expand(visited: BooleanArray) {
+        check(completed)
+        var required = false
+        for (index in inferred) {
+            arithmetic.step()
+            if (visited[index]) required = true
+        }
+        if (!required) return
+        for (index in inferred) {
+            arithmetic.step()
+            visited[index] = false
+        }
+        for (index in premises) {
+            arithmetic.step()
+            visited[index] = true
+        }
+    }
 
     private fun requirements(): List<PolynomialAtom> {
         val required = ArrayList<PolynomialAtom>()

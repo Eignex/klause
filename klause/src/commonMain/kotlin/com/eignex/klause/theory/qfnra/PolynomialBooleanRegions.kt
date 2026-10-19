@@ -15,10 +15,11 @@ internal class PolynomialBooleanRegions(
 ) {
     private val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
     private val exclusions = ArrayList<List<Literal>>()
+    private val signs = PolynomialBooleanSigns(nodes, atoms, state, arithmetic)
 
     fun prepare(): Iterator<PolynomialBooleanRegion?> = sequence<PolynomialBooleanRegion?> {
         if (!initialize()) return@sequence
-        for (ready in PolynomialBooleanSigns(nodes, atoms, state, arithmetic).prepare()) {
+        for (ready in signs.prepare()) {
             if (ready == false) return@sequence
             if (ready == null) yield(null)
         }
@@ -152,6 +153,7 @@ internal class PolynomialBooleanRegions(
                 else -> Unit
             }
         }
+        signs.expand(visited)
         val atoms = LinkedHashMap<Int, Boolean>()
         val bools = LinkedHashMap<Int, Boolean>()
         val literals = ArrayList<Literal>()

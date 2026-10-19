@@ -640,8 +640,14 @@ cancellation, and nonnegative powers retain zero. Boolean propagation can expose
 further required rows; fresh sign domains repeat to closure under the same native
 owner. Contradiction refutes the conditioned formula; unresolved signs supply no
 fact. These initial consequences remain valid across every region's backtracking.
-Another conditioned query constructs fresh domains and facts. Interrupted work
-publishes no region or verdict and refunds no charge. This preparation changes no
+Another conditioned query constructs fresh domains and facts. When a captured
+Boolean proof uses inferred numeric truths, its region substitutes the initial
+required numeric premises for those inferred leaves. Premises exposed by later
+Boolean fixpoints join the same private support. Their sign consequences remain
+transitive; inferred leaves add no projection boundaries of their own. Captured
+exclusions retain the expanded premise cube. Original source point checking still
+includes every predicate. Interrupted work publishes no region or verdict and
+refunds no charge. This preparation changes no
 optional admission, probe, point-generation or representation allowance.
 
 Decisions visit source Boolean leaves before numeric

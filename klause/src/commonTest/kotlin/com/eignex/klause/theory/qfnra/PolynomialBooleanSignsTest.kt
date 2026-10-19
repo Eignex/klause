@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -13,6 +14,36 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialBooleanSignsTest {
+    @Test
+    fun `globally true numeric alternatives need no projection boundaries`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) (assert (or b (>= (+ (* x0 x0) (* x1 x1)) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Satisfiable>(result)
+        assertEquals(0L, result.stats.projectedPolynomials)
+    }
+
+    @Test
+    fun `captured sign consequences retain the numeric premises needed for source truth`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const b Bool) " +
+                "(assert (and (> x 0) (= y (* x x)) (= b (> y 0))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val region = formula.booleanRegions(arithmetic).asSequence().filterNotNull().single()
+
+        assertEquals(mapOf(0 to true), region.bools)
+        assertEquals(setOf(0, 1), region.atoms.keys)
+        assertTrue(region.atoms.values.all { it })
+    }
+
     @Test
     fun `required polynomial definitions resolve their Boolean sign before regions`() {
         val source = SmtLibPolynomial.parse(
