@@ -2,9 +2,9 @@ package com.eignex.klause.bench.metric
 
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
-import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.Test
 
 class MpsSolutionTest {
     private val record = SolveRecord(

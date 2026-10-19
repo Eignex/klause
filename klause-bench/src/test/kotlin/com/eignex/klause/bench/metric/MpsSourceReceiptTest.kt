@@ -5,12 +5,12 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.test.Test
 
 class MpsSourceReceiptTest {
     @TempDir
@@ -27,9 +27,9 @@ class MpsSourceReceiptTest {
         val process = MpsNativeProcess(
             emptyList(), 1, 0, null, true, 1, output, "",
             sha256(
-            output.toByteArray(),
-        ),
-            sha256(byteArrayOf())
+                output.toByteArray(),
+            ),
+            sha256(byteArrayOf()),
         )
 
         val result = MpsSourceReceipt.interpret(process, 2, "0")
@@ -80,8 +80,8 @@ class MpsSourceReceiptTest {
                 "checker.stdout",
             ).exists() && worker.isAlive && System.nanoTime() < until
         ) {
-                Thread.yield()
-            }
+            Thread.yield()
+        }
         worker.interrupt()
         worker.join(6000)
 

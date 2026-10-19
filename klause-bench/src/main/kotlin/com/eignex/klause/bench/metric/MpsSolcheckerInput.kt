@@ -5,7 +5,7 @@ internal object MpsSolcheckerInput {
     private val sections =
         setOf("NAME", "OBJSENSE", "ROWS", "COLUMNS", "RHS", "RANGES", "BOUNDS", "INDICATORS", "ENDATA")
 
-    data class Profile(val maximize: Boolean)
+    data class Profile(val maximize: Boolean, val text: String, val insertedHeaders: List<String>)
 
     // This screens upstream reader limitations; it constructs no model or mathematical obligations.
     fun qualify(source: String): Profile {
@@ -13,6 +13,8 @@ internal object MpsSolcheckerInput {
         var objective: String? = null
         var maximize = false
         var ended = false
+        var named = false
+        var rhs = false
         var column: String? = null
         val columns = mutableSetOf<String>()
         val objectiveColumns = mutableSetOf<String>()
@@ -28,6 +30,8 @@ internal object MpsSolcheckerInput {
                 require(first in sections && (first == "NAME" || fields.size == 1)) { "unsupported MPS section" }
                 section = first
                 ended = first == "ENDATA"
+                named = named || first == "NAME"
+                rhs = rhs || first == "RHS"
                 continue
             }
             require(fields.all { it.length < 256 && '$' !in it }) { "unsupported MPS field" }
@@ -62,8 +66,8 @@ internal object MpsSolcheckerInput {
                             requireNumber(fields[i + 1])
                             if (fields[i] == objective) {
                                 require(
-                                objectiveColumns.add(first),
-                            ) { "repeated objective coefficient" }
+                                    objectiveColumns.add(first),
+                                ) { "repeated objective coefficient" }
                             }
                         }
                     }
@@ -84,14 +88,26 @@ internal object MpsSolcheckerInput {
 
                 "INDICATORS" -> require(
                     fields.size == 4 && first == "IF" && fields[3] in setOf("0", "1") &&
-                    fields[1] in rows && indicators.add(fields[1])
+                        fields[1] in rows && indicators.add(fields[1]),
                 )
 
                 else -> error("unsupported MPS record")
             }
         }
         require(ended && objective != null) { "incomplete MPS source" }
-        return Profile(maximize)
+        val headers = mutableListOf<String>()
+        var text = source
+        if (!named) {
+            text = "NAME KLAUSE_SOURCE_CHECK\n$text"
+            headers += "NAME"
+        }
+        if (!rhs) {
+            val position = requireNotNull(Regex("(?m)^(RANGES|BOUNDS|INDICATORS|ENDATA)[ \\t]*\\r?$").find(text))
+                .range.first
+            text = text.substring(0, position) + "RHS\n" + text.substring(position)
+            headers += "RHS"
+        }
+        return Profile(maximize, text, headers)
     }
 
     fun requireNumber(text: String) {
