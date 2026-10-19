@@ -75,8 +75,9 @@ internal object MpsStdlibReceipt {
         val fields = setOf("status", "reason", "scope", "bindings", "solverSearchQueries",
             "proofCertificateChecked", "checkedWitness", "checker", "groundArithmetic", "stdlibRuntime") +
             (if (gzip != null) setOf("stdoutTransport") else emptySet()) +
-            if (receipt.status == "valid") setOf("exactFeasible", "toleranceAccepted", "sourceTolerance", "witnessCheck")
-            else emptySet()
+            if (receipt.status == "valid") {
+                setOf("exactFeasible", "toleranceAccepted", "sourceTolerance", "witnessCheck")
+            } else emptySet()
         require(child.keys == fields && fields.all { child[it] == json[it] })
         if (receipt.status == "valid") {
             val exactFeasible = requireNotNull(receipt.exactFeasible)

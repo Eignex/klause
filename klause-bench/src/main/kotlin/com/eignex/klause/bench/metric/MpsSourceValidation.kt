@@ -7,6 +7,7 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import java.io.File
 import java.nio.file.Files
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.Serializable
@@ -144,7 +145,20 @@ internal object MpsSourceValidation {
             }
             File(out, "tools.json").writeText(Reports.json.encodeToString(hashes))
             val remainingMs = 70_000 - (System.nanoTime() - started) / 1_000_000
-            val exit = run(out, tools, bindings, hashes, remainingMs)
+            val exit = try {
+                run(out, tools, bindings, hashes, remainingMs)
+            } finally {
+                val log = File(out, "supervisor.log")
+                if (log.isFile) {
+                    val prefix = log.inputStream().use { it.readNBytes(65_536) }
+                    captured = captured + mapOf(
+                        "sourceValidationSupervisorLogBase64" to Base64.getEncoder().encodeToString(prefix),
+                        "sourceValidationSupervisorLogPrefixSha256" to sha256(prefix),
+                        "sourceValidationSupervisorLogFileBytes" to log.length().toString(),
+                        "sourceValidationSupervisorLogComplete" to (prefix.size.toLong() == log.length()).toString(),
+                    )
+                }
+            }
             val receiptFile = File(out, "result.json")
             val bytes = receiptFile.inputStream().use { it.readNBytes(MAX_RESULT_BYTES + 1) }
             check(bytes.size <= MAX_RESULT_BYTES) { "checker receipt exceeds limit" }
