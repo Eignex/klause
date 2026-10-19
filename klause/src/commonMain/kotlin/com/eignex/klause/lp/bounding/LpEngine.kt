@@ -649,9 +649,44 @@ internal class LpEngine(
     }
     private var residualAuxVars: IntArray = EmptyIntArray
 
-    /** Whether the residual real model exceeds the per-node exact row cap. */
+    /** Whether the root real-factor estimate exceeds the per-node residual row cap. */
     var residualOversized: Boolean = false
         private set
+
+    private fun leafRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
+        if (!residualOversized) return nodeRelaxation(relaxer, session)
+        if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
+        val visits = problem.numFactors.toLong() + problem.numBoolVars + problem.numIntVars + problem.numRealVars
+        noteNodeOverhead(visits * LpNodeOverhead.BUILD)
+        leafPinDecline(session)?.let { return declinedLeafAdmission(it) }
+        val relaxation = try {
+            relaxer.build(session, cancellation = params.cancellation)
+        } catch (_: LpAssemblyCancelled) {
+            return declinedLeafAdmission("CANCELLED")
+        }
+        noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.BUILD)
+        if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
+        if (relaxation.model.m > RESIDUAL_MAX_ROWS) return declinedLeafAdmission("ROW_LIMIT")
+        sink.lp.observeRealLeafAdmission("READY")
+        return relaxation
+    }
+
+    private fun leafPinDecline(session: PropagationSession): String? {
+        for (variable in 0 until problem.numBoolVars) {
+            if (params.cancellation()) return "CANCELLED"
+            if (session.boolValue(variable) == null) return "UNPINNED"
+        }
+        for (variable in 0 until problem.numIntVars) {
+            if (params.cancellation()) return "CANCELLED"
+            if (!session.intDomain(variable).isFixed) return "UNPINNED"
+        }
+        return if (params.cancellation()) "CANCELLED" else null
+    }
+
+    private fun declinedLeafAdmission(outcome: String): LpRelaxation? {
+        sink.lp.observeRealLeafAdmission(outcome)
+        return null
+    }
 
     /** The asserting LP backjump clause derived during the last [pruneNode], or null. */
     fun lastBackjump(): Learned? = lpBackjump
@@ -669,10 +704,9 @@ internal class LpEngine(
     fun leafCertify(session: PropagationSession, toleranceCheck: ((Sample) -> Boolean)? = null): LeafRealResult {
         requireOpen()
         lpBackjump = null
-        if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxer = selectedSourceRelaxation ?: lpRelaxer
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-        val relaxation = nodeRelaxation(relaxer, session)
+        val relaxation = leafRelaxation(relaxer, session)
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
