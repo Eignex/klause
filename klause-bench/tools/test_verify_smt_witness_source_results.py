@@ -99,6 +99,77 @@ class OwnedWitnessProcessTest(unittest.TestCase):
         self.assertNotIn('residentMemory', result)
         self.assertEqual((self.out / 'default-as.stdout').read_text().strip(), '2147483648 2147483648')
 
+    def test_group_signals_end_before_the_leader_is_reaped_or_released(self):
+        killpg, wait4 = os.killpg, os.wait4
+        for resident in (False, True):
+            state = {'reaped': False, 'process': None, 'signals': 0}
+            def kill(pid, signum):
+                self.assertFalse(state['reaped'], 'released group identity was signalled')
+                observed = os.waitid(os.P_PID, pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+                self.assertIsNotNone(observed, 'exited leader was already reaped')
+                state['process'] = worker.ACTIVE
+                state['signals'] += 1
+                return killpg(pid, signum)
+            def reap(pid, options):
+                result = wait4(pid, options)
+                if result[0]:
+                    state['reaped'] = True
+                return result
+            with self.subTest(resident=resident), \
+                    mock.patch.object(worker.platform, 'system', return_value='Darwin' if resident else 'Linux'), \
+                    mock.patch.object(worker, 'darwin_resident_bytes', return_value=100), \
+                    mock.patch.object(worker.os, 'killpg', side_effect=kill), \
+                    mock.patch.object(worker.os, 'wait4', side_effect=reap):
+                result = self.run_child("print('done'); raise SystemExit(7)", 'group-lifetime-' + str(resident),
+                                        resident_memory=resident)
+                worker.kill_group(state['process'])
+            self.assertEqual(result['exit'], 7)
+            self.assertTrue(result['complete'])
+            self.assertEqual(state['signals'], 1)
+            self.assertTrue(state['reaped'])
+            self.assertIsNone(worker.ACTIVE)
+
+    def test_missing_non_reaping_observation_declines_before_spawning(self):
+        with mock.patch.object(worker.os, 'waitid', None), mock.patch.object(worker.subprocess, 'Popen') as spawn:
+            with self.assertRaisesRegex(RuntimeError, 'non-reaping child observation unavailable'):
+                self.run_child("print('not allowed')", 'missing-waitid')
+        spawn.assert_not_called()
+        self.assertIsNone(worker.ACTIVE)
+
+    def test_darwin_permission_denial_requires_a_sole_exited_group_leader(self):
+        for index, sole in enumerate((False, True)):
+            with self.subTest(sole=sole), mock.patch.object(worker.platform, 'system', return_value='Darwin'), \
+                    mock.patch.object(worker, 'darwin_resident_bytes', return_value=100), \
+                    mock.patch.object(worker.os, 'killpg', side_effect=PermissionError('not signalable')), \
+                    mock.patch.object(worker, 'darwin_exited_leader_only', return_value=sole) as inspect:
+                if sole:
+                    result = self.run_child("print('done')", 'group-permission-' + str(index), resident_memory=True)
+                    self.assertEqual(result['exit'], 0)
+                    self.assertTrue(result['complete'])
+                else:
+                    with self.assertRaises(PermissionError):
+                        self.run_child("print('done')", 'group-permission-' + str(index), resident_memory=True)
+                inspect.assert_called()
+            self.assertIsNone(worker.ACTIVE)
+
+    def test_darwin_group_inspection_declines_live_foreign_extra_or_incomplete_membership(self):
+        process = types.SimpleNamespace(pid=12345)
+        for exited, pids, error in [(True, [12345], 0), (False, [12345], 0), (True, [], 0),
+                                    (True, [12346], 0), (True, [12345, 12346], 0), (True, [12345], 1)]:
+            def list_members(kind, pid, buffer, size):
+                self.assertEqual(kind, worker.PROC_PGRP_ONLY)
+                self.assertEqual(pid, process.pid)
+                self.assertEqual(size, 2 * worker.ctypes.sizeof(worker.ctypes.c_int))
+                for index, member in enumerate(pids):
+                    buffer[index] = member
+                return 0 if error else len(pids) * worker.ctypes.sizeof(worker.ctypes.c_int)
+            library = types.SimpleNamespace(proc_listpids=mock.Mock(side_effect=list_members))
+            observed = types.SimpleNamespace(si_pid=process.pid) if exited else None
+            with self.subTest(exited=exited, pids=pids, error=error), \
+                    mock.patch.object(worker.os, 'waitid', return_value=observed), \
+                    mock.patch.object(worker.ctypes, 'CDLL', return_value=library):
+                self.assertEqual(worker.darwin_exited_leader_only(process), exited and pids == [12345] and not error)
+
     def test_darwin_final_kernel_peak_rejects_excesses_between_live_samples(self):
         wait4 = os.wait4
         limit = 2147483648
@@ -175,6 +246,34 @@ class OwnedWitnessProcessTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'owner stopped'):
                 self.run_child("print('not allowed')", 'after-stop')
             self.assertFalse((self.out / 'after-stop.stdout').exists())
+        finally:
+            if marker.exists():
+                try:
+                    os.kill(int(marker.read_text()), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+
+    def test_natural_leader_exit_still_kills_descendants_and_drains_their_pipes(self):
+        marker = self.out / 'orphan.pid'
+        code = ("import pathlib, subprocess, sys; "
+                "child = subprocess.Popen([sys.executable, '-I', '-c', 'import time; time.sleep(60)']); "
+                "pathlib.Path(" + repr(str(marker)) + ").write_text(str(child.pid)); sys.exit(7)")
+        try:
+            result = self.run_child(code, 'natural-exit')
+
+            self.assertEqual(result['exit'], 7)
+            self.assertTrue(result['complete'])
+            self.assertFalse(result['timedOut'])
+            self.assertIsNone(result['parentStop'])
+            status = pathlib.Path('/proc') / marker.read_text() / 'stat'
+            try:
+                state = status.read_text().split()[2]
+            except FileNotFoundError:
+                pass
+            else:
+                self.assertEqual(state, 'Z', 'descendant remains running')
+            self.assertIsNone(worker.ACTIVE)
+            self.assertEqual(threading.active_count(), self.threads)
         finally:
             if marker.exists():
                 try:

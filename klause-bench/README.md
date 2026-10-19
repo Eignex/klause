@@ -1228,7 +1228,8 @@ Bounded child stderr breadcrumbs distinguish source parsing, derivation and quer
 stages; they provide no acceptance or completed-query accounting.
 
 The isolated worker selects a fixed-hash Z3 4.15.3.0 wheel for Linux x86-64/glibc
-or macOS 13+ on arm64/x86-64. Bootstrap has 30 seconds and a 2-GiB memory budget.
+or macOS 13+ on arm64/x86-64. macOS requires Python 3.13+ for non-reaping child
+observation. Bootstrap has 30 seconds and a 2-GiB memory budget.
 Ground checking has 30 seconds/4 GiB, a 60-second supervisor and a 70-second JVM
 allowance; refutation checking has a 40-second/8-GiB child, a 90-second supervisor
 and a 100-second JVM allowance. Linux enforces the memory budget with `RLIMIT_AS`.
@@ -1239,6 +1240,15 @@ sample to fit the budget, including short-lived peaks between samples. This is
 resident-memory accounting, not a macOS address-space limit: shared mappings can
 already exceed that limit before checker initialization. Existing bounded termination and drain waits remain additional ceilings;
 the external ordinary-case deadline governs unfinished work. There is no larger retry.
+Child termination is observed with `waitid(WNOWAIT)` before the process group is
+closed. The waitable leader retains the group identity until the final reap;
+stream callbacks and signal handlers cannot signal that owner after its release.
+On macOS, an `EPERM` from group signalling is accepted only when non-reaping exit
+observation and a complete bounded group-membership read identify the exited
+leader as the group's sole member. Additional members or unavailable inspection
+withhold cleanup credit.
+Cleanup failures retain their diagnostics and available process logs in an incomplete
+receipt, even when the child had returned a valid claim.
 Sources are limited to 64 MiB, models/stdout to 8 MiB each, producer records/receipts
 to 4 MiB, each tool and raw child stream to 1 MiB. The native checker library is bound
 to its private extracted wheel file and executable mapping; Python module/interpreter

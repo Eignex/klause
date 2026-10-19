@@ -589,15 +589,23 @@ def supervise(out, expected, tools, parent):
     except (OSError, AssertionError, RuntimeError, ValueError, KeyError, TypeError) as error:
         result.update(status='unknown', reason=str(error)[:500], checkedWitness=None)
     finally:
-        runner.release()
+        cleanup_errors = []
+        try:
+            runner.release()
+        except (OSError, RuntimeError) as error:
+            cleanup_errors.append({'phase': 'process', 'type': type(error).__name__, 'message': str(error)[:500]})
         result['processLogs'] = {}
         for prefix in ('bootstrap', 'check'):
             for stream in ('stdout', 'stderr'):
                 path = out / (prefix + '.' + stream)
                 if path.is_file():
                     result['processLogs'][path.name] = path.read_bytes().decode('utf-8', errors='replace')
-        scratch.cleanup()
-        result['cleanupComplete'] = not pathlib.Path(scratch.name).exists()
+        try:
+            scratch.cleanup()
+        except OSError as error:
+            cleanup_errors.append({'phase': 'scratch', 'type': type(error).__name__, 'message': str(error)[:500]})
+        result['cleanupErrors'] = cleanup_errors
+        result['cleanupComplete'] = not cleanup_errors and runner.ACTIVE is None and not pathlib.Path(scratch.name).exists()
         if (not result['cleanupComplete'] or runner.stopped() or bindings(out) != expected
                 or any(runner.file_digest(out / 'tools' / name) != value for name, value in tools.items())):
             result.update(status='unknown', reason='checker custody or cleanup incomplete', checkedWitness=None)
