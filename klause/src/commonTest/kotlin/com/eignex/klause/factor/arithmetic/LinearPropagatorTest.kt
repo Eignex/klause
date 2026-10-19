@@ -23,6 +23,86 @@ import kotlin.test.assertTrue
 
 class LinearPropagatorTest {
     @Test
+    fun `linear slack should retain bounds when every term can span its activity range`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE, LinearOp.EQ)) {
+            for ((coefficients, domains, bound) in listOf(
+                Triple(longArrayOf(1, 1, 1), Array(3) { IntDomain(0, 3) }, 3L),
+                Triple(longArrayOf(2, -3, 0), arrayOf(IntDomain(0, 3), IntDomain(0, 2), IntDomain(-5, -5)), 0L),
+            )) {
+                val expected = domains.map { it.min to it.max }
+                val state = PropagationState(
+                    Problem(0, 3, domains, arrayOf(Linear(coefficients, intArrayOf(0, 1, 2), op, bound))),
+                    Assumptions.None,
+                )
+
+                val consistent = state.factorAt(0).propagate(state, 0)
+
+                assertTrue(consistent)
+                assertEquals(expected, state.intDomains.map { it.min to it.max })
+            }
+        }
+    }
+
+    @Test
+    fun `linear slack boundaries should retain required bound tightenings`() {
+        for ((op, raiseMinimum) in listOf(
+            LinearOp.LE to true, LinearOp.EQ to true, LinearOp.GE to false, LinearOp.EQ to false,
+        )) {
+            val state = PropagationState(
+                Problem(
+                    0, 2, Array(2) { IntDomain(0, 3) },
+                    arrayOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), op, 3L)),
+                ),
+                Assumptions.None,
+            )
+            if (raiseMinimum) assertTrue(state.tightenIntMin(0, 1)) else assertTrue(state.tightenIntMax(0, 2))
+
+            val consistent = state.factorAt(0).propagate(state, 0)
+
+            assertTrue(consistent)
+            assertEquals(if (raiseMinimum) 0L to 2L else 1L to 3L, state.intDomains[1].min to state.intDomains[1].max)
+        }
+    }
+
+    @Test
+    fun `overflowing linear term spans should retain endpoint pruning`() {
+        for ((op, bound) in listOf(LinearOp.LE to Long.MIN_VALUE, LinearOp.GE to Long.MAX_VALUE)) {
+            val state = PropagationState(
+                Problem(
+                    0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+                    arrayOf(Linear(longArrayOf(1), intArrayOf(0), op, bound)),
+                ),
+                Assumptions.None,
+            )
+
+            val consistent = state.factorAt(0).propagate(state, 0)
+
+            assertTrue(consistent)
+            assertEquals(bound to bound, state.intDomains[0].min to state.intDomains[0].max)
+        }
+    }
+
+    @Test
+    fun `nonbinding linear bounds should retain their coefficient visit charges`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE, LinearOp.EQ)) {
+            val state = PropagationState(
+                Problem(
+                    0, 3, Array(3) { IntDomain(0, 3) },
+                    arrayOf(Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), op, 3L)),
+                ),
+                Assumptions.None,
+            )
+            val propagator = state.factorAt(0)
+            val before = state.work
+
+            val consistent = propagator.propagate(state, 0)
+
+            assertTrue(consistent)
+            assertEquals(6L, state.work - before)
+        }
+    }
+
+    @Test
     fun `signed linear rows should retain implications beside bounds that already hold`() {
         for (op in listOf(LinearOp.LE, LinearOp.EQ)) {
             for (direction in listOf(-1L, 1L)) {

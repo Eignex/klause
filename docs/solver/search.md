@@ -527,7 +527,10 @@ retains eager and memo hits in the caller. A marker builder combines extended
 premises or asks its factor for historical literals before the caller checks and
 memoizes the completed reason. Linear bound propagation
 constructs a reason only when the proposed bound tightens the live domain; unchanged
-bounds skip eager explanations and lazy payload allocation. Single-variable equality and
+bounds skip eager explanations and lazy payload allocation. A finite integer row can
+omit bound calculations when each relevant row slack covers every term's full activity
+range. Checked ranges and sums guard this shortcut, and the omitted pass retains each
+coefficient visit's work debit. Single-variable equality and
 disequality indicators over root domains contained in `{0, 1}` propagate as direct
 channels: an indicator fixes its integer value, and a fixed integer pins the indicator.
 Wider domains retain the general linear propagator.
