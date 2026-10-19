@@ -42,7 +42,7 @@ forwarded to the bench JVM. Keep the CLI distribution and runtime fixed during a
 | `select [filters]` | Emit instance identities as JSON lines; `features=true` adds structural features |
 | `solve [filters]` | Run one configuration over the selection |
 | `solve-one suite=<id> problem=<name> [filters] [out=<dir>]` | Run one selected identity and save a case record |
-| `validate-solution suite=<id> problem=<name> output=<path>` | Check saved MiniZinc or XCSP3 output without solving again |
+| `validate-solution suite=<id> problem=<name> output=<path>` | Check saved MiniZinc, XCSP3 or SMT output without solving again |
 | `provenance out=<path>` | Capture installed-build and runtime identities |
 | `corpus status`, `corpus gc`, `corpus compress [path]` | Inspect, evict or compress fetched collections |
 | `mine [by=config\|suite\|family\|format\|category\|kind] <cases.json> ...` | Report portfolio holder share, set cover, work and rewards; retain quarantined cases |
@@ -57,10 +57,7 @@ Optional `nodeLimit` supplies the finite invocation's shared decision/move allow
 `work` retains its arithmetic meaning. `openBoundProof=false` declines only optional
 bound closure. Measurements retain these controls, original/working coordinate
 counts and the actual scheduled worker labels and segments.
-`cases.json` can be replayed by `SourceRecordCheck` against those original bytes.
-Source replay installs the Python venv package on Linux; macOS lab hosts use their
-existing `python3` venv support. Checker dependencies remain isolated in the job's
-captured environment. The supplied neutral descriptor is a caller construction, not a certified MPS
+The supplied neutral descriptor is a caller construction, not a certified MPS
 translation. Point/reference agreement does not verify exported native certificates
 or establish accepted-set completeness. Run through the maintained lab client at
 a pushed revision with `host=auto`; retain the actual host/runtime provenance.
@@ -147,8 +144,7 @@ XCSP3 runs use `param=source-validation=true` for original-source witness checki
 `mps-linear-source-v1` retains self-authored decimal mixed rows, enabled/disabled
 indicators, shared contradictions, constant objectives, bound closure, wide numbers
 and duplicate decimal terms. Compare default and `exact=true` configurations at
-pinned revisions. Use `SourceRecordCheck` with `captureSources=true` for independent
-original-decimal validation; this fixture suite requires hash-named source bytes.
+pinned revisions; this fixture suite requires hash-named source bytes.
 Reference agreement does not verify an exported solver proof certificate.
 
 `bench.profile.LpCertificationAdmissionProfile` measures exact basis verification and
@@ -272,18 +268,6 @@ wall time and verdict to `$OUT/timings.json`; without arguments it times `opb-co
   suite=dimacs-core problem=random3sat-50-200 repeats=3 timeout=10000
 ```
 
-`bench.profile.SearchSelectionProfile` compares default selection with all six
-Boolean/finite/arithmetic category priorities on an original satisfaction SMT source.
-Pass `source64=<base64 source>` and `finite=<bounded integer name>`; optional
-`repeats=3 warmups=1` control alternating policy rounds. An independent finite
-proposal splits that source column while exact linear arithmetic owns source checks.
-The source must have a complete linear plan without CP-owned factors; shared
-Boolean clause and cardinality participants retain their checks and propagation.
-Each opening uses a ten-second token. Original bytes, decision traces, timing,
-runtime/artifact hashes and raw exact models remain in `$OUT`. The existing pinned
-SMT stream checker validates every complete witness outside the measured span.
-These instrumented policy diagnostics provide no independent refutation proof and
-stay separate from ordinary CLI cost comparisons.
 
 `bench.profile.NValueNeighborhoodProfile` obtains a CP incumbent, then measures bounded
 structured proposals for each original NValue factor with per-move definitions disabled
@@ -360,65 +344,6 @@ deadline's remaining time. It records the first refused row and any existing
 complementary names under the unchanged registry limit. This is isolated naming
 demand: it neither captures the actual rebound fragment nor reproduces earlier
 component registrations, initializes a solver, or proves the opening's refusal cause.
-
-`bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
-explicit registered linear peers over original real, wide-integer, strict and guarded
-sources. Pass `repeats=N warmups=N cases=<comma-separated names>`; defaults are three
-measured rounds and one warmup. The launcher starts a measured JVM with `-Xmx3g`,
-Serial GC and one active processor, retaining its command and actual runtime options.
-Modes alternate in each round in that JVM.
-Each fresh invocation has a ten-second deadline and retains source/output hashes,
-exact immutable witnesses, native work charges, attempted complete checks (including
-a refused check), stop cause and runtime/library provenance under `$OUT`. SAT streams
-are independently checked against the original SMT source after timing. The zero-check
-control must remain unknown; conflicting source equations are analytic UNSAT controls
-and do not receive an independent proof check. JFR and construction are included in
-these diagnostic timings; they are not ordinary CLI throughput measurements.
-
-`bench.profile.EncoderProviderProfile` runs caller-supplied factor-admitted SMT files
-through normal source routing with default and private equivalent linear encoders.
-Pass `inputs=<comma-separated repository-relative or absolute paths> repeats=N warmups=N seed=N`.
-The profile uses `SmtLib.parse` and shared source setup. The `parser=admission`
-and `parser=factor` options are aliases for that same source entry. Mechanism
-probes require an original factor source, including representable bounded mixed products.
-`entry=source engine=cp|ls` instead calls the public source-strategy satisfaction
-facade with the same selected providers, containing token and seed. This mode rejects
-objectives and records its actual native backend beside the requested entry and engine;
-`entry=pipeline engine=cp` retains the direct pipeline comparison. Compare matched
-revisions and check the recorded backend to distinguish finite and open controls.
-`entry=source-optimize engine=cp|ls` calls the public affine source optimizer with
-the original objective and direction. Both source facade entries accept `nodeLimit=N`
-for one shared decision/move ledger. `binding=selected` supplies it through the native
-strategy and common theory controls; `binding=common` supplies it through only the
-common controls. Captures record the actual ledger limit and spend, open decisions
-and native backend. Captures retain the native optimization verdict, minimized
-exact incumbent value and interruption cause separately from the rendered SMT point.
-The SMT replay checks points and objectives; global optimum, ray and refutation
-claims require separate original-source checking. Optimization captures retain each
-encoder verdict and a per-source comparison, including UNKNOWN differences caused
-by admission or bounded work; verdict equality supplies no proof verification.
-The finite in-process SMT adapter checks its finite factor-source precondition
-before preparing lazily through shared setup. It disables optional bound-closing
-deductions; other sources use the CLI adapter.
-Source preparation declines remain explicit diagnostic UNKNOWN records with no
-native execution work or optimization certificate. Source preparation refutations
-are labelled separately from a native optimization result.
-The original source bytes remain the checking authority. Constant nonzero integer
-`div`/`mod` are checked with their original Euclidean SMT semantics; variable and zero
-divisors decline independent checking. Each input also interrupts
-a real selected installation through its caller token and records the resource decline;
-inputs with no applicable installer record that control as inapplicable.
-The private mode constrains scoped real auxiliaries with exact affine definitions and
-retains conjunction/disjunction structure; guarded rows keep their selected built-in
-encoding. Modes alternate in a measured JVM with one active processor, Serial GC and
-`-Xmx3g`, under a fresh ten-second deadline per invocation. The profile retains original
-source/output hashes, installation counts, charged native work, elapsed construction
-and execution time, source revision and runtime/classpath hashes. Each SAT stream is
-independently checked against the original source after measurement; UNSAT agreement
-supplies no independent proof verification. Run the committed profile with `host=auto`
-through the documented lab client and wait for capacity. These component/provider measurements include preparation
-and differ from ordinary whole-CLI timings; pair them with matched source-checked CLI
-controls before claiming end-to-end parity.
 
 `bench.profile.ExecutionOptionsProfile` compares legacy request parsing, captured frontend
 options and directly typed options while repeatedly resolving the same portfolio settings.
@@ -504,12 +429,6 @@ explicit unknown label. These paths supply sampled context for collection or
 runtime self-samples, not exact elapsed cost or a causal explanation. Summarization
 runs after subprocess timing and does not change the CLI recording configuration.
 
-`CliStreamCapture` with `checkSmt=true` checks complete satisfaction models against
-all original SMT assertions. Optimization streams also require each model's exact
-original objective and strict improvement in the declared direction. Satisfaction
-checking supplies no objective or proof claim. Checker failures remain separate from
-a successful solver exit; inspect the saved checker execution and output before
-counting a source case as accepted.
 
 ## Catalog and corpus
 
@@ -828,135 +747,7 @@ The profile retains original bytes/hashes, installed build and loaded classpath
 hashes, runtime/options, child process exit, measurements and every incumbent in
 `cases.json`. Each record is a witness-only publication, independent of the native
 terminal result recorded in `measurements.json`; no native proof is captured.
-Check every first and final witness/objective with `SourceRecordCheck`, supplying
-the retained hash-named sources and `witnessOnly=true`. Report prepared API evidence
-separately from whole-CLI comparisons and exclude warmup rounds from measurements.
 
-### CLI stream capture
-
-`com.eignex.klause.bench.profile.CliStreamCapture` runs the installed CLI as a subprocess
-and retains original input bytes, build/runtime provenance, command, stdout, stderr,
-and a JSONL arrival record with byte offsets and subprocess liveness. Run it through
-a maintained lab profile job. Capture settings precede `--`; the remaining arguments go
-directly to the CLI, followed by the preserved input path. Compressed corpus inputs
-are decoded before their bytes and source hash are preserved. Supply `input=<path>` or
-`text64=<base64 input bytes>`, `extension=smt2|fzn|mps|opb|xml`, and optional
-`timeoutMs=60000`. `marker=<whole-line regex>` counts completed output records;
-`stopAfter=2` forcibly terminates the subprocess after the second matching line while
-it is alive. Omitting `stopAfter` captures a normal completion. For example, SMT models
-end with a line matching `\)`, and FlatZinc solutions end with `----------`.
-To capture several cases on one provisioned instance, supply only
-`batch64=<base64 JSON array of capture argument arrays>`. It preserves `requests.json`
-and creates numbered directories for each case. A failed case records `failure.json`
-and does not skip later planned cases.
-
-For a self-contained catalog source, supply `suite=<id>`, `problem=<exact name>` and
-`sha256=<original decoded source hash>` together instead of `input` or `text64`.
-The source format selects the file extension, and a conflicting extension or hash
-is rejected before launching the CLI. Catalog fetching occurs before subprocess timing.
-
-`profileJvm=true` records the actual CLI child to `cli.jfr`, preserving inherited
-`KLAUSE_CLI_OPTS` and the supplied CLI arguments. An already configured child recording
-is rejected. The plan retains the child options and recording path; the capture retains
-the child PID. After the child ends, the existing whole-CLI summarizer writes
-`cli-profile-summary.txt`; a missing recording or failed summary writes
-`profile-failure.json`. Profiled captures use the verified `capture.tar.gz` and
-`capture-manifest.json` transport, including the original source, streams, recording
-and summary. These recordings observe the supplied invocation without a warmup;
-they do not add independent MPS witness validation.
-
-`smoke-corpus/real-finite-domains-v1` supplies sparse disconnected sets, finite products
-and aliases, original Boolean conditions, signed zeros and singleton membership.
-The six satisfiable inputs support `checkFzn=true` original-source witness checks.
-`empty-intersection.fzn` is a separate contradictory-source observation; absence of
-a witness does not independently certify its refutation.
-
-`planned.json` records the requested input and settings before launch. `capture.json`
-records exit, marker count, interruption trigger, reader failure, and output hashes;
-`arrivals.jsonl` preserves all observed lines, including terminal metadata. Marker counts
-and subprocess liveness establish output timing. Independently check each retained
-witness and exact objective against the preserved original input before treating it as
-accepted arithmetic progress. This tool does not verify source semantics or proofs.
-
-[verify_stream_source_results.py](tools/verify_stream_source_results.py) checks every
-complete SMT model and its preceding exact cost against one original optimization
-query, using the existing exact polynomial source checker. It requires strict
-improvement in the original direction and rejects duplicate final publication.
-Run `python3 klause-bench/tools/verify_stream_source_results.py input.smt2 stdout`
-with the pinned [source-check requirements](tools/requirements-source-checks.txt).
-For a hard interruption, add `--interrupted --minimum-witnesses 2`; incomplete trailing
-output is retained as truncation, while a terminal optimization status is rejected.
-These checks establish witness feasibility and objective values; they do not certify
-terminal proof claims. Native numeric absolute-value terms are evaluated exactly
-against each published point, including arbitrary-width integer magnitudes.
-`checkSmt=true` runs this check after each captured SMT case on the same profile
-instance. `minimumWitnesses=2` requires two complete checked models. The capture tool
-creates an isolated Python environment using the pinned requirements, and retains
-the checker commands, exits, stdout/stderr, timeout outcomes, Python identity, package
-versions, and checker source hashes. `provisionChecker=true` additionally permits
-installing `python3-venv` with `sudo apt-get` when the image lacks it. Checking and
-provisioning happen outside the CLI solve budget. A failed setup is recorded once;
-later cases still capture output and record their unavailable checker outcome.
-`checkFzn=true` checks every complete FlatZinc publication with the existing independent
-flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome in
-`source-check-fzn.json`. Satisfaction publications retain their source assertions
-without an objective cost; optimization publications require exact cost consistency
-and strict improvement in the original direction. An exact `_objective` coordinate
-annotation supplies the cost when its display is rounded; the displayed helper must
-agree with its binary64 approximation, and a separate objective comment must agree
-exactly. It uses authoritative coordinate comments when supplied and
-checks binary integer/float extrema, integer array extrema, and constant or variable
-integer/Boolean/set array selection directly from the original predicates. Integer
-`all_different_int` compares exact integral values, including values beyond binary64 precision.
-`alldifferent_except_0` omits only exact zeroes before comparing distinct values.
-Redundant and symmetry wrappers, including `fzn_` spellings, require their original
-Boolean argument to hold; malformed arity or non-Boolean arguments leave validation
-unknown. Boolean channels check exact zero/one values; conjunction/disjunction
-folds retain repeated and empty arrays. Integer set membership and its reification
-check original set values. Set values use normalized integer intervals for equality and source-universe bounds, without
-enumerating ranges. Index bounds and repeated entries retain their source meaning.
-It checks the preceding `% objective=` cost or finite `_objective` field against the
-original solve objective. When both are present, their exact values must agree. Its source scope
-is `flatzinc-binary64`, as described under source validation below. Interrupted
-captures reject verdict markers and terminal `optimizationStatus` comments, including
-unattained boundaries; these belong after invocation completion. Integer `int_div`
-and `int_mod` checks use exact truncating arithmetic and reject zero divisors,
-including word-boundary cases without wraparound.
-`checkOpb=true` checks complete PB-competition `v` publications directly against
-original OPB/WBO text using arbitrary-width integral arithmetic. Repeated and
-complementary literals, conjunction products, hard comparisons, source minimization
-terms and soft penalties/top retain their original units. The preceding final `o`
-cost must match the checked model; missing coordinates or unsupported syntax do not
-receive valid credit. Results are retained in `source-check-opb.json` with scope
-`opb-integral`. This is a witness check; a terminal optimum or infeasibility marker
-receives no proof credit. Interrupted captures cannot carry terminal status.
-`com.eignex.klause.bench.profile.OpbStreamChecker` accepts the same saved-record
-array described below, verifies original byte hashes and retains checking outcomes
-without invoking the CLI.
-
-`com.eignex.klause.bench.profile.SmtStreamReplay` checks saved SMT output through a
-lab profile without invoking the CLI again. Its one argument is a base64 JSON array
-of records containing `sourceRevision`, original `source` and `stdout` text, and
-their `sourceSha256`/`stdoutSha256`; optional `interrupted` and `minimumWitnesses`
-use the stream checker's controls. It verifies byte hashes before checking each
-record, preserves the original solver revision separately from checker provenance,
-and retains an outcome for every supplied record. Replay does not relabel the
-original solve or establish its output timing.
-For exact function sources, append `checker=functions` as the second profile argument.
-That mode checks every completed original SMT publication through the existing rational
-and symbolic function ground evaluator, including declaration sorts and function domains.
-Unsupported algebraic carriers or symbolic identities remain unavailable. Optimization
-metadata is rejected by this satisfaction witness checker; it supplies no refutation,
-optimality or exported-proof credit and performs no solver search queries. Source,
-output, checker and runtime hashes retain the same replay custody.
-`com.eignex.klause.bench.profile.FznStreamChecker` accepts the same saved-record
-array for FlatZinc output. It retains original bytes and source-check results,
-including failures, without invoking the CLI. These replays check witness and
-objective semantics; terminal proof claims require their separate evidence checks.
-For larger captures, pass `gzip64=<base64 gzip bytes>` and `sha256=<expanded digest>`
-instead of the single raw base64 argument. The compressed envelope preserves the exact
-record bytes while keeping the launch command small. Its inline encoding is limited
-to 96 KiB and expansion to 64 MiB, matching the saved-source bundle transport limits.
 
 ### SMT reference records
 
@@ -998,29 +789,6 @@ a witness or proof marker does not establish a zero process exit.
 
 ## Source validation
 
-### Exact source probes
-
-`com.eignex.klause.bench.profile.NraSourceCheck` checks actual saved SMT records through
-`tools/verify_nra_source_results.py`. Pass `input=<base64 UTF-8 JSON array>`; each entry
-retains `source`, its SHA-256 `hash`, `feasible`, actual `witness` and producer metadata.
-The bundle checker rejects changed source bytes, ground-checks complete exact witnesses,
-compares refutations with separate queries and leaves incomplete verdicts without claims.
-Its `python` interpreter must have the pinned `tools/requirements-source-checks.txt`
-dependencies. Checking outputs remain outside the repository; retain interpreter and
-dependency identities alongside the original inputs, producer revisions and reports.
-`preparePython=true` explicitly provisions the pinned checker environment on an owned
-Ubuntu analysis instance; its installation and runtime identity log stays under `$OUT`.
-
-`checker=transcendental` checks a saved bundle with `sources` and `results` arrays in
-the `TranscendentalSourceProbe` schema. It uses the independent rational/symbolic
-ground checker, requires original source hashes, and reports unsupported witnesses
-separately. Its parser shares the pinned Z3 dependency; use `preparePython=true` on
-an analysis instance without the checker environment. This mode checks no UNSAT proof.
-
-These entry points can run as committed-code lab profiles with explicit AWS host,
-one machine and one parallel command. Use the lab client with
-`LAB_URL=https://lab.eignex.com` for submission, status, remote access and retrieval.
-Build/test/lint gates remain in GitHub CI.
 
 MiniZinc float runs independently check the final complete witness; integer runs
 opt in with `param=source-validation=true`. The cache retains paired FlatZinc/DZN
@@ -1052,96 +820,69 @@ SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
 Earlier incumbents are unchecked, so attribution is limited to the final objective.
 
 SMT-LIB satisfaction runs opt in with `param=source-validation=true` under policy
-`smt-original-polynomial-claims-v3`. The ordinary CLI runs with its original budget,
-seed and engine; the bench checks the returned claim afterward. Complete SAT models
-use the maintained [polynomial source verifier](#polynomial-source-witness-verifier):
-every declared Bool/Int/Real coordinate, including unused declarations, must be present
-with its exact sort and value. Rational and `root-obj` algebraic coordinates must make
-all original assertions and query assumptions evaluate exactly true. Ground checking
-issues no solver or optimization search query and supplies no optimum or refutation
-credit. Unsupported, incomplete, approximate or invalid models receive no accepted claim.
+`smt-external-original-claims-v1`. The CLI retains its original budget, seed and
+engine. The bench invokes established external tools after the native solve;
+there is no internal mathematical checker or custom fallback.
 
-A reported UNSAT with a normal process exit and a native proof flag permits
-independent checking of the full original source. For Bool/Real polynomial inputs,
-an exact source derivation can establish a contradiction without a solver query.
-Only necessary top-level conjuncts supply premises. Direct affine comparisons give
-strict or closed coordinate bounds; positive sums of nonnegative even monomials
-give closed bounds on their pure-square terms. Integer square-root ceilings and
-Python rational arithmetic enclose those coordinates. Cartesian sign sets or
-closed polynomial intervals must exclude an original required relation. Predicates
-under disjunctions, implications and conditional branches supply no premises.
+The adapter downloads hash-pinned upstream Dolmen 0.10 and Z3 4.15.3 releases
+into the check's private directory when no executable is configured. It removes
+those executables after checking and does not change host installations. Published
+Dolmen binaries cover Linux x86-64 and macOS ARM64; the macOS asset named
+`dolmen-macos-amd64` contains an ARM64 executable and requires the host's GMP library
+at `/opt/homebrew/opt/gmp/lib/libgmp.10.dylib`. Other platforms need a configured
+Dolmen executable. Z3 release selection covers Linux/macOS x86-64 and ARM64.
 
-The bounded derivation recognizes sums of source monomials without distributing
-additive factors, with powers through 64, rational components through 16,384 bits
-and at most 32,768 monomials per predicate. Unsupported or larger forms decline
-this optional check. The receipt retains original assertion indices, the contradiction
-expression hash, its asserted relation and exact source bounds. `sourceValidationDerivationChecked` identifies
-an accepted derivation. If none is established, one independent query receives all
-original assertions and assumptions intact, with the existing 30-second limit.
-Only a checked source contradiction or independent UNSAT result retains the native
-refutation. Neither verifies an exported native certificate:
-`sourceValidationProofChecked` stays false. UNKNOWN is never promoted by an independent
-result. Optimization sources, failed producer exits and unsupported syntax remain unaccepted.
+Set `KLAUSE_DOLMEN` to an absolute Dolmen executable path and
+`KLAUSE_DOLMEN_SHA256` to its SHA-256 to override the downloaded release.
+SAT checking passes the complete original
+source unchanged and supplies `sat` followed by the exact final printed model on
+stdin. Dolmen receives `--check-model=true --strict=false --report-style=minimal
+--warn=-all --time=30s --size=4G`. Only a clean successful check accepts the model.
+Algebraic syntax must be supported by the selected Dolmen build; `root-obj` is not
+rewritten by the adapter. The [competition Dolmen build](https://github.com/SMT-COMP/dolmen)
+uses external algebraic arithmetic, while upstream release coverage differs.
+A build's existence does not establish compatibility with a particular saved model.
 
-Validated Bool/Real polynomial inputs use Z3's `QF_NRA` solver factory. Signed integer
-numerals remain exact polynomial coefficients. Integer declarations, nonliteral integer
-operations and zero-power terms retain the general SMT factory.
-The original assertions and assumptions are passed intact. Selection occurs once;
-an UNKNOWN result triggers no second factory or query. `sourceValidationReferenceLogic`
-and the bound child receipt identify the selected factory when a query is issued.
-Bounded child stderr breadcrumbs distinguish source parsing, derivation and query
-stages; they provide no acceptance or completed-query accounting.
+Set `KLAUSE_Z3` and `KLAUSE_Z3_SHA256` to override the independent native UNSAT comparison tool.
+The Z3 CLI receives the complete unchanged source with `-smt2 -T:30 -memory:4096`.
+One complete `unsat` answer can retain an already reported native refutation;
+SAT, UNKNOWN, multiple answers and incomplete output cannot. This compares results
+and does not check a native proof certificate. Independent checking never promotes
+a native UNKNOWN or establishes an optimum.
 
-The isolated worker selects a fixed-hash Z3 4.15.3.0 wheel for Linux x86-64/glibc
-or macOS 13+ on arm64/x86-64. macOS requires Python 3.13+ for non-reaping child
-observation. Bootstrap has 30 seconds and a 2-GiB memory budget.
-Ground checking has 30 seconds/4 GiB, a 60-second supervisor and a 70-second JVM
-allowance; refutation checking has a 40-second/8-GiB child, a 90-second supervisor
-and a 100-second JVM allowance. Linux enforces the memory budget with `RLIMIT_AS`.
-SMT supervision selects resident-memory accounting explicitly on macOS. It monitors the child's resident set through `proc_pidinfo` every 50 ms and
-terminates an observed excess. It separately collects the kernel's per-child
-`wait4` peak in bytes; acceptance requires the complete peak and every observed
-sample to fit the budget, including short-lived peaks between samples. This is
-resident-memory accounting, not a macOS address-space limit: shared mappings can
-already exceed that limit before checker initialization. Existing bounded termination and drain waits remain additional ceilings;
-the external ordinary-case deadline governs unfinished work. There is no larger retry.
-Child termination is observed with `waitid(WNOWAIT)` before the process group is
-closed. The waitable leader retains the group identity until the final reap;
-stream callbacks and signal handlers cannot signal that owner after its release.
-On macOS, an `EPERM` from group signalling is accepted only when non-reaping exit
-observation and a complete bounded group-membership read identify the exited
-leader as the group's sole member. Additional members or unavailable inspection
-withhold cleanup credit.
-Cleanup failures retain their diagnostics and available process logs in an incomplete
-receipt, even when the child had returned a valid claim.
-Exceptional exits retain bounded joins for both stream readers after process release,
-including when release raises; an unfinished reader prevents another owned child.
-Sources are limited to 64 MiB, models/stdout to 8 MiB each, producer records/receipts
-to 4 MiB, each tool and raw child stream to 1 MiB. The native checker library is bound
-to its private extracted wheel file and executable mapping; Python module/interpreter
-providers retain the reviewed bounded identity checks. Linux reads executable
-`/proc` mappings; macOS records dyld image addresses, Mach-O headers and CPU types,
-binding the invoked executable, loaded interpreter, versioned Python framework or
-dylib, and private Z3 library to their file identities. Framework launchers bind
-the invoked wrapper and app-bundle interpreter to the same loaded versioned
-framework; an unrelated executable or missing framework withholds acceptance. Foreign libraries, unsupported platforms or unavailable
-resource custody withholds acceptance.
+Saved SMT claims use `validate-solution suite=<id> problem=<name> output=<stdout>
+record=<producer.json> out=<evidence directory>`. Preserve the original producer
+record, including its recorded validation policy. The replay receipt identifies the
+current external policy separately. Optional `checker=<absolute executable>` and
+`checker-sha256=<digest>` select a job-private Dolmen binary for SAT or Z3 for UNSAT;
+otherwise the configured environment or pinned release supplies the tool. Replay checks the catalog
+source hash and exact retained model/output without invoking the native solver.
 
-Adjacent `smt-source-check-*` evidence retains verbatim original source/model/stdout,
-producer record, request, packaged tool hashes, private runtime/provider identities,
-true process exits, all four bootstrap/check streams and cleanup receipts. Input and
-source hashes are checked again before acceptance. A missing, mutated, interrupted,
-overflowed or incomplete receipt withholds the claim. `checkedWitness` and the original
-`finalWitness` remain separate; `reportedFeasible`, objectives and `reportedProven`
-preserve the native report. `independentSourceRefutation` and
-`sourceValidationSolverQueries` distinguish issued queries from ground and derivation checks.
-An incomplete child leaves the observed query count `unknown`; the separate
-`sourceValidationSolverQueryLimit` records the permitted count. The receipt marks
-whether the query count was observed in a complete child result. Saved result statistics
-retain the bounded verbatim native stdout as `sourceValidationProducerStdout`, with
-its producer record and hash, so record-only collectors preserve those bytes.
-Checker setup/check timing stays separate from native solve and incumbent timings.
+Unavailable tools, unsupported input, timeout, interruption, changed bytes or
+incomplete cleanup leave the claim unverified. Release downloads are bounded to
+64 MiB and 30 seconds of observed elapsed time, with finite connection/read timeouts.
+Extracted executables are bounded to 128 MiB. Executables are checked against their
+hash before and after use; receipts retain release URLs and archive digests. Adjacent `smt-source-check-*` directories retain original
+source/model/stdout, the producer record, the exact tool response input and a receipt
+binding those bytes to the executable hash, command, true exit, timing and raw streams.
+Linux bounds address space and output file size; macOS bounds CPU and output file size.
+The tools also enforce their own memory and time limits. The JVM allows 35 seconds
+for the process and bounded cleanup; output streams are each limited to 1 MiB.
+Checker time is separate from native solve and incumbent time. SAT checks issue no
+solver query; incomplete reference output leaves the completed query count unknown.
 Raw cache hits are checked afresh; use `-Dklause.bench.cache=false` for a fresh solve.
+
+`bench.profile.SmtSourceReplay` delegates a complete set of saved SAT models to
+the same Dolmen adapter without running Klause. Supply `input64=<base64 zstd JSON>`
+and `sha256=<compressed digest>`. Schema 1 contains `sources` metadata and `models`
+with catalog `suite`/`problem`, exact `producerJson`/`stdout`, source/model hashes,
+and preserved producer `bindings`. Each model uses the complete unchanged catalog
+source and printed model. The replay records tool startup, per-model receipts and
+a final complete/partial summary; non-SAT source markers stay outside Dolmen's
+model-checking scope. Requests are limited to 128 KiB encoded/16 MiB expanded.
+The main stops starting models after two minutes; individual checks retain the
+ordinary 35-second process limit. Source checking supplies no native solver,
+UNSAT, optimization or performance credit.
 
 MPS runs opt in with `param=source-validation=true` under policy
 `mps-original-rational-ground-witness-v2`. The installed bench uses the maintained independent
@@ -1321,285 +1062,6 @@ The lab's executed revision and setup identity belong with these results;
 Acceptance certifies source feasibility and objective values, not optimality or
 infeasibility proofs.
 
-### Offline source verifier
-
-[verify_source_results.py](tools/verify_source_results.py) checks `mps-core`,
-`smtlib-core`, `miplib3`, `miplib2003`, `miplib2017` and the SMT corpus suites `smtlib-qfidl`, `smtlib-qflia`,
-`smtlib-qflira`, `smtlib-qflra` and `smtlib-qfrdl` against original sources using exact arithmetic.
-Vendored inputs are retrieved at the recorded revision; original MIPLIB3 inputs
-are retrieved separately. All source hashes must match. `--source-root` instead
-reads original uncompressed inputs named `<sourceHashes.model>.txt` from a supplied
-directory, allowing the same checks without network retrieval. MIPLIB 2003, 2010,
-2017 and OR-Library MPS records require this hash-matched source directory and use the same exact
-row, integrality, objective and source-tolerance checks.
-The five SMT corpus suites require this directory and their hash-matched original
-bytes; they do not fetch a source by corpus path. Other suites are declined.
-
-```sh
-python3 -m pip install -r klause-bench/tools/requirements-source-checks.txt
-python3 klause-bench/tools/verify_source_results.py /path/to/cases.json \
-  --source-root /path/to/original-sources --records-root /path/to/raw-job \
-  --output /path/to/source-checks.json
-```
-
-`bench.profile.SourceRecordCheck` runs this verifier on saved records through a
-lab analysis profile without rerunning the solver. Pass `bundle=<https URL>` and
-`sha256=<compressed SHA-256>` for a gzip JSON object containing `cases` (the case
-array) and `sources` (original source SHA-256 keys with base64 original bytes).
-For small saved-record bundles, `input64=<base64 gzip bytes>` replaces `bundle`;
-the encoded input is capped at 96 KiB and the compressed `sha256` remains required.
-Each `sources` value is base64 original bytes or an object with `gzip64` holding
-base64 gzip bytes. Decompression preserves the original source hash and caps the
-combined uncompressed sources at 64 MiB.
-`rootBounds=true` additionally checks each recorded `lpRootBound` against the
-unchanged original MPS constraints and objective, in minimized source units.
-MPS statistics retain the positive integer `lpRootBoundScale` used by lowering.
-The checker reads the exact binary64 bound from its round-trip decimal, divides
-by that scale exactly, retains integrality, and requires the strict better-objective query to be unsatisfiable.
-Missing bounds or source scales stay unavailable; nonfinite bounds, counterexamples and unknown
-queries fail. This independent source query verifies no native bound certificate
-and establishes no witness or attainment. Use records with unrounded root-bound
-statistics; older four-decimal output can overstate the bound. The standalone
-verifier exposes the same opt-in check as `--root-bounds`.
-With `catalog=true`, missing sources are resolved through the maintained corpus
-catalog on the analysis host and must match each record's original model hash.
-This permits record-only bundles for fetched collections without redistributing
-their inputs. Resolved suite/name identities are retained in `catalog-sources.json`.
-It first creates a private environment with `python3 -m venv`. If creation fails,
-it attempts the Linux `python3-venv` bootstrap through `sudo apt-get` and retries.
-It checks bundle/source identities, provisions the pinned checker dependencies,
-and retains checker logs, versions and a checked prefix on failure under `$OUT`.
-Original unknown records retain their no-claim outcome; reference agreement does
-not independently verify an exported proof.
-For a separate point check, `witnessOnly=true` forwards `--witness-only` to the
-verifier. Every record must contain a reported feasible witness. The report preserves
-`reportedProven`, marks `verificationScope=witness-only` and
-`proofCertificateChecked=false`, and omits optimality checks. The default still
-requires independent optimality and infeasibility queries.
-
-Inputs can be JSON, gzip or xz; `--records-root` selects `cases/<index>/record.json`
-instead of embedded records. SMT models must cover source sorts and satisfy all
-original constraints. MPS points must cover every column with integral integer
-coordinates; missing, duplicate, unknown and nonfinite coordinates fail checking.
-For a complete SMT witness, the verifier pins every declared source variable and
-requires SAT under the original constraints; this also establishes source feasibility.
-Complete exact MPS witnesses establish source feasibility by direct row evaluation;
-absent or inexact witnesses retain the unpinned source query. Optimality and
-infeasibility still require their independent source queries.
-Witness pins enter an incremental scope only when later optimality queries need
-the original unpinned constraints.
-SMT records without a witness retain an unpinned source feasibility query. Query
-failures identify the problem, expected and returned verdicts, and any UNKNOWN reason.
-`--progress /path/to/checked-prefix.jsonl` flushes each completed record, including
-cache matches. A failed batch retains this checked prefix without claiming the remaining
-records passed; the final JSON output is written only after the whole batch succeeds.
-Each solver query has a 120-second allowance; source parsing and witness construction
-are outside that query allowance and require an enclosing job budget.
-Exact MPS queries use Z3's finite-domain solver when every original integer
-column has normalized zero/one bounds and nonzero objective weights are uniform.
-Unequal objective weights retain the original arithmetic query. An exact pseudo-Boolean representation
-preserves each source predicate and objective comparison, clearing rational
-coefficient denominators and handling strict thresholds on the integer lattice.
-Unsupported expressions or weights beyond the pseudo-Boolean API width keep the
-general solver, as do mixed, continuous and wider integer sources. Reports retain
-this query choice; UNKNOWN still fails checking.
-The recorded command's `--exact` flag requires exact source feasibility; its absence
-selects default MPS checking even when the arm name ends in `-exact`. Legacy records
-without a command use that arm suffix. Default MPS `toleranceAccepted`
-is separate from exact feasibility, using [scaled source tolerance](../docs/formats/mps.md).
-Original rational coefficients/printed values avoid binary64 row overflow.
-
-MPS objectives retain source coefficients, sense and RHS offsets. Default exact
-objective text must match either the printed decimal point or its shortest-decimal
-binary64 coordinates; numeric fallback permits only binary64 rounding. Exact-mode
-points/objectives require exact equality. Rounded default points can be nonexact
-while the original source remains feasible.
-
-Claimed SAT/UNSAT require matching exact source verdicts. A proven finite optimum
-needs a feasible source objective and exclusion of every strictly better objective.
-An exactly checked complete MPS point with that exact objective establishes attainment
-without rediscovering it through a satisfiability search. Strict improvement exclusion
-still requires its independent source query.
-Tolerance acceptance cannot justify either optimum or infeasibility. Unknown
-records make no proof claim. Unbounded claims and unsupported constructs decline.
-Records marked `stats.sourcePolicy=captured-linear-source` carry accepted-source
-claims and require case-level `sourceTolerance` with `absolute` and `relative`
-rational text from the captured request. Their MPS infeasibility and strict-improvement
-queries use the same configured tolerance-accepted constraints as point checking;
-exact requests require zero metadata and use the nominal source. Reports identify
-this scope and policy in `sourceQuerySemantics` and `sourceTolerance`, and
-cached nominal checks cannot supply an accepted-source proof. Other MPS records
-retain their nominal-source proof scope. These checks establish individual source
-claims, without verifying exported native certificates or general completeness.
-An explicit default-MPS `tolerance-optimum` retains its source point, objective
-and scaled-tolerance checks separately. It receives no exact-source optimality
-credit; native tolerance-certificate verification is unavailable from saved records.
-This marker cannot weaken exact-mode or SMT checking.
-MPS `ENDATA` ends the source model; later records, including appended branching
-priorities, do not contribute constraints, bounds or objectives. Unsupported MPS
-sections before `ENDATA`, unsupported bounds, distinct RHS/range/bound vectors and SMT
-function/sort declarations are rejected rather than guessed. The verifier is
-independent of paired timing analysis and Klause's internal certificates.
-
-[verify_boolean_source_results.py](tools/verify_boolean_source_results.py) checks
-`DIMACS`, `WCNF` and polynomial `OPB`/WBO records against original source bytes in that same
-hash-named directory. It accepts complete signed-literal assignments, OPB variable
-names and WCNF bitstrings. Clauses, hard weights, Boolean integrality and integer
-objectives use exact arithmetic. WBO checks evaluate weighted soft-relation
-violations and enforce the strict soft-top ceiling on that violation cost. UTF-8
-comments preserve original byte hashes.
-OPB products use Boolean conjunction, including complemented and repeated literals,
-in constraints, objectives and weighted soft relations. OPB bodies can omit the
-variable-count comment; their range is inferred from every product literal.
-Malformed terms and unsupported syntax are declined.
-
-```sh
-python3 klause-bench/tools/verify_boolean_source_results.py /path/to/cases.json \
-  --source-root /path/to/original-sources --records-root /path/to/raw-job \
-  --output /path/to/boolean-source-checks.json
-```
-
-The checker independently excludes better source objectives or refutes source
-constraints using the pinned Z3 dependency with a ten-second limit. A recognized
-pigeonhole subformula can establish a refutation directly. Timeout leaves proof
-checking unknown; a feasible point receives no optimum credit without that check.
-The exact `coreGuidedLowerBound` statistic is checked by excluding source objectives
-below that floor, including records without an incumbent. `checkedLowerBound` records
-only a completed independent check; an undecided floor uses `boundCheck=unknown`.
-Floor telemetry and floor checking do not establish an optimum without a matching witness.
-Errors are recorded per case and make the command exit unsuccessfully. The checker
-supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
-Pass `checker=boolean` to the saved-record `SourceRecordCheck` lab profile to run
-this checker against the same hash-pinned `cases`/`sources` bundle. Its retained
-source checks, runtime/package versions, checker hashes and process log distinguish
-verified witnesses/objectives, independently checked proofs and unknown proof queries.
-With `captureSources=true`, omitted source payloads are resolved through the current
-corpus catalog and retained only when their original-byte hashes match the saved
-records. The source capture records resolved identities and licenses. This option
-performs source IO and independent checking without rerunning the solver.
-
-### Exact function source controls
-
-`com.eignex.klause.bench.profile.TranscendentalSourceProbe` runs original SMT-LIB
-function sources through the shared satisfaction dispatcher. Its `sources` argument
-is a JSON array of `{name, text}` objects. `controls` lists `ENGINE:cores` selections;
-`seeds`, `repeats`, `work`, `timeout` and optional `cancel-work` pin the repeated
-controls. Alternating control order reduces order effects. Run the committed main
-through the lab client on a pinned revision; it writes `sources.json`,
-`results.json`, payload hashes and runtime settings to `$OUT`. Retain the job's
-revision/build/dependency hashes with those files. JFR profile times are diagnostic
-costs, not ordinary benchmark throughput.
-
-Check saved points against their captured source text with
-`tools/verify_transcendental_source_results.py <sources.json> <results.json>`.
-The independent ground checker uses exact rational arithmetic and explicit symbolic
-exp/log and pi identities, validates integer/Boolean declarations and strict source
-assertions, and rejects undefined log terms even under Boolean negation/disjunction.
-Conditionals check only the selected branch. Algebraic-root carriers and unsupported
-symbolic comparisons report unavailable; they are never rounded or accepted by
-residual. This checker does not verify refutations, optimization claims or exported
-proofs. Preserve unknown/decline records and check cancellation charges and portfolio
-arm segments separately from mathematical witness acceptance.
-
-The exact ground function checker retains lexical helper closures and parallel
-`let` bindings. Function `distinct` checks exact operand values and repeated roles;
-uncertified symbolic comparisons remain unavailable.
-
-### Ground witness profile
-
-`com.eignex.klause.bench.profile.SmtWitnessValidation` evaluates retained complete
-named Int/Real/Bool polynomial SMT models against their original source bytes.
-Submit a trusted committed profile main through the configured lab client, with
-`machines: 1`, `parallel: 1` and an outer timeout of at least 1,200 seconds. The
-single `request64=<base64>` argument encodes canonical compact UTF-8 JSON. Serialize
-this shape compactly, without whitespace or duplicate keys, before base64 encoding:
-
-```json
-{
-  "schema": "smt-ground-witness-request-v1",
-  "cases": [{
-    "id": "input-0",
-    "source": {"bytes": N, "sha256": "<hash>", "base64": "<original bytes>"},
-    "model": {"bytes": M, "sha256": "<hash>", "base64": "<complete model bytes>"}
-  }]
-}
-```
-
-Replace `N` and `M` with integer byte counts. Requests allow at most 16 distinct
-case IDs and 48 KiB for the complete encoded request. Raw source and model payloads
-are bounded to 32 KiB. A payload may add `"encoding":"gzip"` and encode gzip bytes
-in `base64`, while `bytes` and `sha256` describe its original uncompressed bytes.
-A gzip source is bounded to 4 MiB after inflation; a gzip model is bounded to 32 KiB.
-Payload base64 is capped at 48 KiB. Validation never drops coordinates or rewrites
-a source/model to fit these bounds. Inflation stops at the declared size
-plus one byte. Unknown encodings, noncanonical base64, truncated or corrupt gzip
-streams and original byte/hash mismatches are refused before child execution.
-No catalog scan, solver call or reference search
-runs. The main retains the verbatim inputs and packaged checker identities under
-`$OUT/smt-witness-validation`, then provisions the SHA-256-pinned Z3 4.15.3.0
-Python wheel in a private Linux x86-64 runtime without global installation.
-
-Each ground child calls only the maintained `check_witness` function, with a
-30-second watchdog and 16 GiB address-space limit. The containing supervisor has
-a 1,100-second deadline; setup, raw streams, true process exits, stopped/overflow
-coverage and cleanup are retained. `summary.json` distinguishes accepted, rejected,
-unavailable and not-reached cases. A failed batch preserves its accepted prefix;
-missing, unsupported or interrupted models receive no accepted source claim.
-JFR is part of profile execution, so validation timing is not ordinary solve timing.
-Ground acceptance establishes only the supplied original-source model, not an UNSAT
-proof, optimization claim, reference latency or a current solver performance gap.
-
-### Polynomial source witness verifier
-
-[verify_nra_source_results.py](tools/verify_nra_source_results.py) independently
-checks complete named Int/Real/Bool models against an original polynomial SMT source,
-including native numeric absolute-value terms.
-It reconstructs rational coordinates and `root-obj` algebraic coordinates using the
-pinned Z3 dependency, pins every source variable, and requires every
-original assertion and Boolean query assumption to evaluate exactly to true.
-Source serialization quotes identifiers beginning with a minus sign and digit,
-preserving their symbol identity for dependency parsing. Quoted numeral symbols
-remain distinct from numeral literals. Original source bytes retain their recorded
-hash; model-coordinate numeral decoding uses its separate scalar grammar.
-Constant positive integer powers are serialized as shared multiplication expressions,
-preserving integer helper result sorts. Fresh lexical bindings avoid source names;
-zero powers retain the dependency's partial-power interpretation. Original source
-hashes remain unchanged.
-Algebraic coordinates use integer defining polynomials and one-based distinct
-ordered real-root indices. Approximate decimal coordinates do not establish exact
-irrational equalities. Missing, duplicate, unknown or sort-mismatched coordinates
-are rejected. Integer coordinates must be integral and retain arbitrary precision.
-Other nonpolynomial, optimization and incremental sources decline.
-
-The ground witness route permits one auxiliary `/0` model definition with two
-Real arguments and a Real result when that name is not a source coordinate.
-Source admission requires every division denominator to be a nonzero rational
-constant, so the division completion cannot affect any checked assertion. Its
-body is not installed in the checking model. All original coordinates remain
-required; duplicate or other auxiliary definitions are rejected. Scalar model
-reading without that source admission remains strict.
-
-```sh
-python3 klause-bench/tools/verify_nra_source_results.py original.smt2 --witness model.smt2
-python3 klause-bench/tools/verify_nra_source_results.py original.smt2 --expected unsat
-```
-
-`--witness` uses exact ground algebraic evaluation without a solver search query.
-All declared Int, Real and Bool coordinates, including unused ones, must occur in
-the supplied model. The checker registers those exact values once in an explicit
-model and evaluates every original assertion with model completion disabled.
-It rejects a false or unevaluated assertion at its original index; it does not
-invent missing coordinates. Source S-expressions are rendered iteratively to
-preserve their tokens and spacing at deep nesting. Assertions containing a zero
-power retain exact substitution and simplification, so undefined `0^0` cannot
-receive an arbitrary model value.
-`--expected` separately compares a bounded reference verdict and records
-`proofCertificateChecked=false`; agreement does not constitute proof-certificate
-validation. Query timeout or a reference disagreement fails the comparison. Output
-records the original UTF-8 source SHA-256 and exact checker version. Use the same
-pinned requirements as the offline source verifier. Builds and checker regressions
-run through the existing build gate; remote experiments retain original sources,
-complete models, runtime identities and checking results outside the repository.
 
 ## Comparing configurations
 
@@ -1957,9 +1419,3 @@ and timing probes do not run as part of ordinary repository checks; follow the
 product controls, including an unrelated finite distinctness constraint and an
 excluded integer value. Run CP/LS with default and exact modes; the harness records
 the original MiniZinc source check separately from compiled FlatZinc semantics.
-
-`SourceRecordCheck` also accepts `checker=minizinc` for saved MiniZinc records. It
-checks source hashes and pins the retained DZN assignments into the original model
-using the recorded compiler configuration. It records this original-source result
-separately from checking exact-coordinate comments against compiled FlatZinc.
-

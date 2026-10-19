@@ -18,8 +18,10 @@ import com.eignex.klause.bench.metric.ReferenceSolve
 import com.eignex.klause.bench.metric.ReferenceStore
 import com.eignex.klause.bench.metric.ResultCredit
 import com.eignex.klause.bench.metric.ScipReference
+import com.eignex.klause.bench.metric.SmtSourceValidation
 import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.metric.SolveMetric
+import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.metric.Xcsp3SourceValidation
@@ -36,17 +38,18 @@ import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 import java.io.File
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 /**
  * Benchmark command dispatcher for solving, references, selection, result credit and corpus
@@ -273,14 +276,39 @@ object BenchCli {
         val fields = args.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val suite = requireNotNull(fields["suite"]) { "validate-solution needs suite=<id>" }
         val name = requireNotNull(fields["problem"]) { "validate-solution needs problem=<name>" }
-        val output = File(requireNotNull(fields["output"]) { "validate-solution needs output=<file>" }).readText()
+        val outputFile = File(requireNotNull(fields["output"]) { "validate-solution needs output=<file>" })
         val ref = Catalog.uncapped(suite).problems.singleOrNull { it.name == name }
             ?: error("no problem '$name' in suite '$suite'")
+        val output = if (ref.format == Format.SMTLIB) {
+            val bytes = outputFile.inputStream().use { it.readNBytes(8 * 1024 * 1024 + 1) }
+            require(bytes.size <= 8 * 1024 * 1024) { "producer stdout exceeds checker limit" }
+            bytes.decodeToString(throwOnInvalidSequence = true)
+        } else outputFile.readText()
+        if (ref.format == Format.SMTLIB) {
+            val recordFile = File(requireNotNull(fields["record"]) { "SMT validation needs record=<producer JSON>" })
+            val bytes = recordFile.inputStream().use { it.readNBytes(4 * 1024 * 1024 + 1) }
+            require(bytes.size <= 4 * 1024 * 1024) { "producer record exceeds checker limit" }
+            val record = Reports.json.decodeFromString<SolveRecord>(bytes.decodeToString(throwOnInvalidSequence = true))
+            require(record.problem == ref.name) { "producer problem identity differs" }
+            require(("checker" in fields) == ("checker-sha256" in fields)) {
+                "checker and checker-sha256 must be supplied together"
+            }
+            val checker = fields["checker"]?.let {
+                SmtSourceValidation.Tool(File(it), requireNotNull(fields["checker-sha256"]))
+            }
+            val result = SmtSourceValidation.validateSaved(ref, record, output,
+                File(fields["out"] ?: "output/source-validation"), checker, bytes)
+            println(buildJsonObject {
+                put("validation", Reports.json.encodeToJsonElement(result.validation))
+                put("stats", Reports.json.encodeToJsonElement(result.stats))
+            })
+            return
+        }
         if (ref.format == Format.XCSP3) {
             println(Reports.json.encodeToString(Xcsp3SourceValidation.validate(ref, output)))
             return
         }
-        require(ref.format == Format.MINIZINC) { "source validation requires a MiniZinc or XCSP3 model" }
+        require(ref.format == Format.MINIZINC) { "source validation requires a MiniZinc, XCSP3 or SMT model" }
         val candidate = MiniZincSourceValidation.candidate(output).orEmpty()
         val objective = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);")
             .find(MiniZincSourceValidation.exactCoordinates(output) ?: candidate)

@@ -34,7 +34,7 @@ internal object XcspWitnessReplay {
                 require(sha256(witness.readBytes()) == record.witnessSha256) { "Original witness hash differs" }
                 check(directory, source, witness, record.objective)
             } catch (error: Exception) {
-                Reports.writeJson(File(directory, "failure.json").path, ReplayFailure(error.toString()))
+                Reports.writeJson(File(directory, "failure.json").path, mapOf("error" to error.toString()))
             }
         }
     }
