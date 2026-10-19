@@ -224,6 +224,14 @@ password on every call: the client reads it from `~/.config/klause-lab/password`
 ./deploy/lab fetch 123 /absolute/path/to/klause-evidence/campaigns/lp-ceiling/raw
 ```
 
+Submit one experiment per question, covering all its problems; never split it into
+batches. The lab bounds runtime itself (per-case timeouts, profile time limits) and
+places work on the Mac or AWS by queue pressure, so impose no wall-clock caps of your
+own and do not cancel a job to keep it short. Follow a long job with `lab wait <id>`
+run in the background; `lab cases <id>` shows partial results while it runs. The lab
+refuses (409) a submission whose arms, seeds and repeats match a queued or running
+experiment's and that differs only in name, description or problems.
+
 Replace `123` with the returned job ID. `lab cases` prints a tabular summary;
 the HTTP `GET /experiments/<id>/cases` endpoint supplies the JSON array consumed by
 `tools/analyze_lab.py` and `bench mine`. `lab fetch` downloads records and raw
