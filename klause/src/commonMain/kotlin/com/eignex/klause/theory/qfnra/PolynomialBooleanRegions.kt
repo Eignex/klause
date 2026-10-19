@@ -18,6 +18,10 @@ internal class PolynomialBooleanRegions(
 
     fun prepare(): Iterator<PolynomialBooleanRegion?> = sequence<PolynomialBooleanRegion?> {
         if (!initialize()) return@sequence
+        for (ready in PolynomialBooleanSigns(nodes, atoms, state, arithmetic).prepare()) {
+            if (ready == false) return@sequence
+            if (ready == null) yield(null)
+        }
         while (true) {
             arithmetic.step()
             if (!propagate()) {

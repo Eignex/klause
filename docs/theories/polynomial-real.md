@@ -631,6 +631,19 @@ and their negations. These facts remain on the initial trail across region chang
 another conditioned query constructs its own facts. They do not select a real point
 or reopen the optional probe.
 
+Before the first region decision, a private sign fixpoint uses only the initial
+Boolean trail's required numeric predicates. Exact sign overapproximations flow
+through their polynomial definitions and source bounds. A completed, nonconflicting
+fixpoint can force an unassigned predicate true when every possible sign satisfies
+its relation, or false when none does. Opposite signed terms retain every possible
+cancellation, and nonnegative powers retain zero. Boolean propagation can expose
+further required rows; fresh sign domains repeat to closure under the same native
+owner. Contradiction refutes the conditioned formula; unresolved signs supply no
+fact. These initial consequences remain valid across every region's backtracking.
+Another conditioned query constructs fresh domains and facts. Interrupted work
+publishes no region or verdict and refunds no charge. This preparation changes no
+optional admission, probe, point-generation or representation allowance.
+
 Decisions visit source Boolean leaves before numeric
 leaves, trying false before true. The bounded optional refuter retains its original
 admission and charged traversal; complete region enumeration does not call it with
