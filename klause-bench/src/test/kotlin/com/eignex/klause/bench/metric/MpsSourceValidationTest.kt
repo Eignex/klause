@@ -95,6 +95,34 @@ class MpsSourceValidationTest {
         assertNull(result.validation.checkedWitness)
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "ranges|v X=5/2|2.5|valid",
+        "ranges|v X=1|1|invalid",
+        "wide|v X=9007199254740993|9007199254740993|valid",
+        "indicator|v I=0 X=0|0|valid",
+        "indicator|v I=1 X=0|0|invalid",
+        "indicator|v I=1 X=2|2|valid",
+        "marker|v I=1|1|valid",
+        "marker|v I=2|2|invalid",
+    ])
+    fun `qualified source features should be checked by upstream MIPLIB`(
+        fixture: String, point: String, objective: String, expected: String,
+    ) {
+        val ref = ProblemRef(fixture, Format.MPS,
+            ProblemSource.Vendored("klause-bench/src/test/resources/mps-solchecker/$fixture.mps"),
+            Category.OPTIMIZATION, Expected.Unknown)
+        val raw = "o $objective\n$point\n"
+        val record = SolveRecord(fixture, "klause", null, 1, "free", 1, 10_000, "optimize", false,
+            true, objective.toDouble(), 1, proven = true, gitSha = "test", timestamp = "test", command = "cli --exact",
+            validationPolicy = MPS_SOURCE_POLICY, sourceHashes = SolveEvidence.sourceHashes(ref),
+            sourceOutputSha256 = sha256(raw.toByteArray()), finalWitness = point, exactObjective = objective)
+
+        val result = MpsSourceValidation.validate(ref, record, raw, true, directory)
+
+        assertEquals(expected, result.validation.status, result.validation.reason)
+    }
+
     @Test
     fun `source hash changes should withhold checked witness`() {
         val ref = ProblemRef("fixture", Format.MPS, ProblemSource.Vendored("klause-bench/smoke-corpus/mps/blend-tiny.mps"),
