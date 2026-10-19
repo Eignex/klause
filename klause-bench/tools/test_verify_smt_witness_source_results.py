@@ -6,6 +6,7 @@ import sys
 import tempfile
 import threading
 import time
+import types
 import unittest
 from unittest import mock
 
@@ -86,6 +87,39 @@ class OwnedWitnessProcessTest(unittest.TestCase):
                     self.assertEqual(result['streams'][name]['sha256'], hashlib.sha256(raw).hexdigest())
                 self.assertIsNone(worker.ACTIVE)
                 self.assertEqual(threading.active_count(), self.threads)
+
+    def test_darwin_final_kernel_peak_rejects_excesses_between_live_samples(self):
+        wait4 = os.wait4
+        limit = 2147483648
+        for index, peak in enumerate([limit - 1, limit, limit + 1, 0]):
+            def reap(pid, options):
+                child, status, usage = wait4(pid, options)
+                return child, status, types.SimpleNamespace(ru_maxrss=peak) if child else usage
+            with self.subTest(peak=peak), mock.patch.object(worker.platform, 'system', return_value='Darwin'), \
+                    mock.patch.object(worker, 'darwin_resident_bytes', return_value=100), \
+                    mock.patch.object(worker.os, 'wait4', side_effect=reap):
+                result = self.run_child("print('bounded')", 'darwin-peak-' + str(index))
+            memory = result['residentMemory']
+            self.assertEqual(result['exit'], 0)
+            self.assertEqual(result['addressSpaceBytes'], 0)
+            self.assertEqual(memory['limitBytes'], limit)
+            self.assertEqual(memory['kernelPeakBytes'], peak)
+            self.assertEqual(result['complete'], 0 < peak <= limit)
+            self.assertEqual(memory['exceeded'], peak > limit)
+            self.assertIsNone(worker.ACTIVE)
+            self.assertEqual(threading.active_count(), self.threads)
+
+    def test_darwin_live_memory_excess_or_unreadable_measurement_stops_the_child(self):
+        for failure in ['excess', 'unreadable']:
+            sample = mock.Mock(return_value=2147483649) if failure == 'excess' else mock.Mock(side_effect=OSError())
+            with self.subTest(failure=failure), mock.patch.object(worker.platform, 'system', return_value='Darwin'), \
+                    mock.patch.object(worker, 'darwin_resident_bytes', sample):
+                result = self.run_child("import time; time.sleep(60)", 'darwin-stop-' + failure)
+            self.assertFalse(result['complete'])
+            self.assertNotEqual(result['exit'], 0)
+            self.assertTrue(result['residentMemory']['exceeded'] or result['residentMemory']['error'] is not None)
+            self.assertIsNone(worker.ACTIVE)
+            self.assertEqual(threading.active_count(), self.threads)
 
     def test_output_overflow_retains_the_bounded_prefix_and_withholds_completeness(self):
         code = "import sys; sys.stdout.write('x' * " + str(worker.MAX_OUTPUT + 1) + "); sys.stdout.flush()"

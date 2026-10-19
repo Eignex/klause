@@ -14,7 +14,7 @@ import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-internal const val SMT_SOURCE_POLICY = "smt-original-polynomial-claims-v2"
+internal const val SMT_SOURCE_POLICY = "smt-original-polynomial-claims-v3"
 internal const val SMT_CHECKER = "smt-original-claims-v2"
 
 internal object SmtSourceValidation {
@@ -57,6 +57,7 @@ internal object SmtSourceValidation {
         val solverQueryCountObserved: Boolean = false,
         val referenceLogic: String? = null,
         val sourceDerivation: SmtSourceDerivation? = null,
+        val residentMemory: Map<String, SmtResidentMemory>? = null,
     )
 
     fun unknown(reason: String): SourceValidation = SourceValidation(

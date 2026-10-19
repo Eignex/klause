@@ -131,7 +131,15 @@ class SmtSourceReceiptTest {
         val images = listOf(runtime.pythonExecutable, framework, library.path).mapIndexed { index, path ->
             """{"path":"$path","address":"${(index + 1) * 1000}","magic":"feedfacf","cpuType":$cpu}"""
         }.joinToString("\n", postfix = "\n")
-        return result.copy(runtime = macRuntime, nativeRuntime = native.copy(
+        val memory = mapOf(
+            "bootstrap" to 2_147_483_648L,
+            "check" to if (refutation) 8_589_934_592L else 4_294_967_296L,
+        ).mapValues { (_, limit) ->
+            SmtResidentMemory("darwin-proc-taskinfo-wait4-v1", limit, 100, 200, 1, true, false, null)
+        }
+        return result.copy(runtime = macRuntime, residentMemory = memory,
+            bootstrapProcess = requireNotNull(result.bootstrapProcess).copy(addressSpaceBytes = 0),
+            checkProcess = requireNotNull(result.checkProcess).copy(addressSpaceBytes = 0), nativeRuntime = native.copy(
             library = library, maps = images, mapsSha256 = sha256(images.toByteArray()),
             pythonProviders = native.pythonProviders + MpsCheckerFile(framework, 100, "f".repeat(64)),
             platform = "Darwin", systemVersion = "13.0.0", mappingKind = "dyld-images-v1",
@@ -293,6 +301,8 @@ class SmtSourceReceiptTest {
             "logic", "derivation",
             "mac-wheel", "mac-cpu", "mac-version", "mac-provider", "mac-native-path", "mac-maps-hash",
             "mac-memory", "mac-runtime-kind", "mac-framework-version", "mac-duplicate-header",
+            "mac-rss-missing", "mac-rss-limit", "mac-rss-peak", "mac-rss-complete", "mac-rss-exceeded",
+            "mac-rss-method", "mac-rss-error", "mac-rss-sample", "mac-rss-zero", "linux-rss",
         ],
     )
     fun `incomplete or mismatched receipt custody should withhold acceptance`(failure: String) {
@@ -375,6 +385,26 @@ class SmtSourceReceiptTest {
             "mac-maps-hash" -> original.copy(nativeRuntime = macNative.copy(mapsSha256 = "f".repeat(64)))
 
             "mac-memory" -> original.copy(checkProcess = check.copy(addressSpaceBytes = 1))
+
+            "mac-rss-missing" -> original.copy(residentMemory = null)
+
+            "linux-rss" -> original.copy(residentMemory = receipt(machine = "arm64").residentMemory)
+
+            "mac-rss-limit", "mac-rss-peak", "mac-rss-complete", "mac-rss-exceeded", "mac-rss-method",
+            "mac-rss-error", "mac-rss-sample", "mac-rss-zero" -> original.copy(
+                residentMemory = requireNotNull(original.residentMemory).mapValues { (name, memory) ->
+                    if (name != "check") memory else when (failure) {
+                        "mac-rss-limit" -> memory.copy(limitBytes = memory.limitBytes + 1)
+                        "mac-rss-peak" -> memory.copy(kernelPeakBytes = memory.limitBytes + 1)
+                        "mac-rss-complete" -> memory.copy(complete = false)
+                        "mac-rss-exceeded" -> memory.copy(exceeded = true)
+                        "mac-rss-method" -> memory.copy(method = "linux-address-space")
+                        "mac-rss-error" -> memory.copy(error = "unreadable")
+                        "mac-rss-sample" -> memory.copy(samplePeakBytes = memory.kernelPeakBytes + 1)
+                        else -> memory.copy(kernelPeakBytes = 0)
+                    }
+                },
+            )
 
             "mac-runtime-kind" -> original.copy(nativeRuntime = macNative.copy(mappingKind = "linux-proc-maps-v1"))
 

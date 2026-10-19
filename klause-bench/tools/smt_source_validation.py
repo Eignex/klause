@@ -546,6 +546,9 @@ def supervise(out, expected, tools, parent):
                 'bootstrap', str(out), str(dependencies)], out / 'bootstrap', working, 30, 2147483648)
         finally:
             result['setupMs'] = (time.monotonic_ns() - start) // 1000000
+        resident = bootstrap.pop('residentMemory', None)
+        if resident is not None:
+            result.setdefault('residentMemory', {})['bootstrap'] = resident
         result['bootstrapProcess'] = bootstrap
         assert bootstrap['exit'] == 0 and bootstrap['complete'] and not any(
             bootstrap[k] for k in ('timedOut', 'overflow', 'parentStop')), 'pinned checker setup incomplete'
@@ -557,6 +560,9 @@ def supervise(out, expected, tools, parent):
                 30 if scope == GROUND else 40, 4294967296 if scope == GROUND else 8589934592)
         finally:
             result['checkMs'] = (time.monotonic_ns() - start) // 1000000
+        resident = process.pop('residentMemory', None)
+        if resident is not None:
+            result.setdefault('residentMemory', {})['check'] = resident
         result['checkProcess'] = process
         assert process['exit'] == 0 and process['complete'] and not any(
             process[k] for k in ('timedOut', 'overflow', 'parentStop')), 'checker process incomplete'

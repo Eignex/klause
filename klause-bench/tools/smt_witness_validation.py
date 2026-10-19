@@ -1,5 +1,7 @@
 """Bounded private runtime and ground-only original-source witness evaluation."""
 import atexit
+import ctypes
+import errno
 import hashlib
 import http.client
 import importlib.metadata
@@ -44,6 +46,7 @@ STOPPED = None
 PARENT = None
 DEADLINE = None
 SIGNALS = {signal.SIGTERM, signal.SIGINT}
+PROC_PIDTASKINFO = 4
 
 
 def digest(raw):
@@ -106,23 +109,67 @@ def interrupt(signum, frame):
     kill_group(ACTIVE)
 
 
+class DarwinTaskInfo(ctypes.Structure):
+    _fields_ = [(name, ctypes.c_uint64) for name in (
+        'virtual_size', 'resident_size', 'total_user', 'total_system', 'threads_user', 'threads_system',
+    )] + [(name, ctypes.c_int32) for name in (
+        'policy', 'faults', 'pageins', 'cow_faults', 'messages_sent', 'messages_received',
+        'syscalls_mach', 'syscalls_unix', 'csw', 'threadnum', 'numrunning', 'priority',
+    )]
+
+
+def darwin_resident_bytes(pid):
+    library = ctypes.CDLL('/usr/lib/libproc.dylib', use_errno=True)
+    info = library.proc_pidinfo
+    info.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int]
+    info.restype = ctypes.c_int
+    task = DarwinTaskInfo()
+    size = ctypes.sizeof(task)
+    observed = info(pid, PROC_PIDTASKINFO, 0, ctypes.byref(task), size)
+    if observed == 0 and ctypes.get_errno() == errno.ESRCH:
+        return None
+    if observed != size:
+        raise OSError('incomplete Darwin process memory observation')
+    return int(task.resident_size)
+
+
 def owned(command, prefix, cwd, timeout, memory):
     global ACTIVE
     if stopped() or threading.active_count() != 1 or ACTIVE is not None:
         raise RuntimeError('owner stopped or drain still active')
     started = time.monotonic_ns()
+    darwin = platform.system() == 'Darwin'
+    memory_usage = {'method': 'darwin-proc-taskinfo-wait4-v1', 'limitBytes': memory,
+                    'samplePeakBytes': 0, 'kernelPeakBytes': 0, 'samples': 0,
+                    'complete': False, 'exceeded': False, 'error': None} if darwin else None
     previous = signal.pthread_sigmask(signal.SIG_BLOCK, SIGNALS)
     try:
         if stopped():
             raise RuntimeError('owner stopped')
         def child():
             signal.pthread_sigmask(signal.SIG_SETMASK, previous)
-            resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
+            if not darwin:
+                resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
         ACTIVE = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, preexec_fn=child)
     finally:
         signal.pthread_sigmask(signal.SIG_SETMASK, previous)
     process = ACTIVE
+    def poll():
+        if not darwin:
+            return process.poll()
+        if process.returncode is None:
+            pid, status, usage = os.wait4(process.pid, os.WNOHANG)
+            if pid:
+                process.returncode = os.waitstatus_to_exitcode(status)
+                peak = usage.ru_maxrss
+                if isinstance(peak, int) and peak > 0:
+                    memory_usage['kernelPeakBytes'] = peak
+                    memory_usage['exceeded'] |= peak > memory
+                else:
+                    memory_usage['error'] = 'missing final kernel memory peak'
+                memory_usage['complete'] = memory_usage['error'] is None
+        return process.returncode
     state = {'stdout': {'bytes': 0, 'observedBytes': 0, 'complete': False},
              'stderr': {'bytes': 0, 'observedBytes': 0, 'complete': False}}
     overflow = threading.Event()
@@ -156,16 +203,39 @@ def owned(command, prefix, cwd, timeout, memory):
     timed_out = False
     try:
         expiry = min(time.monotonic() + timeout, DEADLINE)
-        while process.poll() is None:
+        while poll() is None:
+            if darwin:
+                try:
+                    rss = darwin_resident_bytes(process.pid)
+                    if rss is None:
+                        if poll() is not None:
+                            break
+                        raise OSError('missing Darwin process memory observation')
+                    assert isinstance(rss, int) and rss >= 0
+                    memory_usage['samples'] += 1
+                    memory_usage['samplePeakBytes'] = max(memory_usage['samplePeakBytes'], rss)
+                    memory_usage['exceeded'] |= rss > memory
+                except (OSError, AssertionError, ValueError) as error:
+                    memory_usage['error'] = type(error).__name__
+                if memory_usage['exceeded'] or memory_usage['error'] is not None:
+                    kill_group(process)
+                    break
             if stopped() or overflow.is_set() or time.monotonic() >= expiry:
                 timed_out = time.monotonic() >= expiry
                 kill_group(process)
                 break
             time.sleep(0.05)
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            kill_group(process)
+        if darwin:
+            reap_deadline = time.monotonic() + 5
+            while poll() is None and time.monotonic() < reap_deadline:
+                time.sleep(0.01)
+            if process.returncode is None:
+                kill_group(process)
+        else:
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                kill_group(process)
         # Descendants can keep pipes open after their parent exits.
         kill_group(process)
         for thread in threads:
@@ -175,10 +245,13 @@ def owned(command, prefix, cwd, timeout, memory):
             row['sha256'] = file_digest(path) if path.exists() else None
         complete = all(not thread.is_alive() for thread in threads) and all(
             row['complete'] and 'error' not in row for row in state.values())
-        result = {'command': command, 'cwd': str(cwd), 'exit': process.poll(),
+        result = {'command': command, 'cwd': str(cwd), 'exit': poll(),
                   'timedOut': timed_out, 'overflow': overflow.is_set(), 'parentStop': STOPPED,
                   'streams': state, 'complete': complete, 'processWallNs': time.monotonic_ns() - started,
-                  'addressSpaceBytes': memory, 'timeoutSeconds': timeout}
+                  'addressSpaceBytes': 0 if darwin else memory, 'timeoutSeconds': timeout}
+        if darwin:
+            result['residentMemory'] = memory_usage
+            result['complete'] &= memory_usage['complete'] and not memory_usage['exceeded']
         save(pathlib.Path(str(prefix) + '.process.json'), result)
         return result
     finally:

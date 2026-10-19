@@ -1186,7 +1186,7 @@ SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
 Earlier incumbents are unchecked, so attribution is limited to the final objective.
 
 SMT-LIB satisfaction runs opt in with `param=source-validation=true` under policy
-`smt-original-polynomial-claims-v2`. The ordinary CLI runs with its original budget,
+`smt-original-polynomial-claims-v3`. The ordinary CLI runs with its original budget,
 seed and engine; the bench checks the returned claim afterward. Complete SAT models
 use the maintained [polynomial source verifier](#polynomial-source-witness-verifier):
 every declared Bool/Int/Real coordinate, including unused declarations, must be present
@@ -1227,10 +1227,16 @@ Bounded child stderr breadcrumbs distinguish source parsing, derivation and quer
 stages; they provide no acceptance or completed-query accounting.
 
 The isolated worker selects a fixed-hash Z3 4.15.3.0 wheel for Linux x86-64/glibc
-or macOS 13+ on arm64/x86-64. Bootstrap has a 30-second/2-GiB cap. Ground checking has
-30 seconds/4 GiB, a 60-second supervisor and a 70-second JVM allowance; refutation
-checking has a 40-second/8-GiB child, a 90-second supervisor and a 100-second JVM
-allowance. Existing bounded termination and drain waits remain additional ceilings;
+or macOS 13+ on arm64/x86-64. Bootstrap has 30 seconds and a 2-GiB memory budget.
+Ground checking has 30 seconds/4 GiB, a 60-second supervisor and a 70-second JVM
+allowance; refutation checking has a 40-second/8-GiB child, a 90-second supervisor
+and a 100-second JVM allowance. Linux enforces the memory budget with `RLIMIT_AS`.
+macOS monitors the child's resident set through `proc_pidinfo` every 50 ms and
+terminates an observed excess. It separately collects the kernel's per-child
+`wait4` peak in bytes; acceptance requires the complete peak and every observed
+sample to fit the budget, including short-lived peaks between samples. This is
+resident-memory accounting, not a macOS address-space limit: shared mappings can
+already exceed that limit before checker initialization. Existing bounded termination and drain waits remain additional ceilings;
 the external ordinary-case deadline governs unfinished work. There is no larger retry.
 Sources are limited to 64 MiB, models/stdout to 8 MiB each, producer records/receipts
 to 4 MiB, each tool and raw child stream to 1 MiB. The native checker library is bound
@@ -1239,7 +1245,7 @@ providers retain the reviewed bounded identity checks. Linux reads executable
 `/proc` mappings; macOS records dyld image addresses, Mach-O headers and CPU types,
 binding the interpreter, versioned Python framework or dylib, and private Z3 library
 to their file identities. Foreign libraries, unsupported platforms or unavailable
-resource limits withhold acceptance.
+resource custody withholds acceptance.
 
 Adjacent `smt-source-check-*` evidence retains verbatim original source/model/stdout,
 producer record, request, packaged tool hashes, private runtime/provider identities,
