@@ -115,13 +115,6 @@ Packages below are under `com.eignex.klause` in
 
 Dependencies point from policy to mechanism. In particular, enlarging the engine's
 closed dependency list couples reusable numerical work to model policy.
-[checkArchitecture](../scripts/check_architecture.py) checks production sources in every
-platform source set without compiling Kotlin. It enforces the closed numerical and
-IR lists, caller-independent lowering, frontend/compiler/theory separation, the
-pipeline's neutral metadata, caller-independent [source validation](solver/validation.md)
-and the prohibition on finite-domain state in open theories. Imports, aliases,
-wildcard imports and qualified executable references are checked; comments and literal text are excluded. Compiler resolution and
-consumer behavior remain the responsibility of the JVM/native gates.
 [LpDeclineDisciplineTest](../klause/src/jvmTest/kotlin/com/eignex/klause/lp/LpDeclineDisciplineTest.kt)
 checks proof-decline behavior at engine consumers.
 
