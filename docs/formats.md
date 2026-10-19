@@ -26,6 +26,12 @@ of a nonlinear source relation. Original source checks still govern publication.
 
 ## Numeric authority and execution selection
 
+Each row states the format's default semantics. Formats declare them as
+[typed source semantics](model.md#typed-source-semantics) that caller overrides
+replace before lowering, and [source setup](api.md#source-setup) consumes them
+under the [shared contract](vision.md#format-semantics-caller-settings-and-automatic-setup).
+MPS retains its own execution surface.
+
 | Source | Numeric authority and ownership |
 |---|---|
 | Library IR and schema DSL | Declared integers, binary64 rational real coefficients and explicit exact objective coefficients remain source data. Source strategies prove available bounds before selecting completion; raw prepared-plan capture preserves its source identity without solving. |
