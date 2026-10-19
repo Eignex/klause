@@ -151,6 +151,9 @@ class OwnedWitnessProcessTest(unittest.TestCase):
                         self.run_child("print('done')", 'group-permission-' + str(index), resident_memory=True)
                 inspect.assert_called()
             self.assertIsNone(worker.ACTIVE)
+            self.assertEqual(threading.active_count(), self.threads)
+            for name in ('stdout', 'stderr'):
+                self.assertTrue((self.out / ('group-permission-' + str(index) + '.' + name)).exists())
 
     def test_darwin_group_inspection_declines_live_foreign_extra_or_incomplete_membership(self):
         process = types.SimpleNamespace(pid=12345)
