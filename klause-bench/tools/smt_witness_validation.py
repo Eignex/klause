@@ -294,7 +294,11 @@ def owned(command, prefix, cwd, timeout, memory, resident_memory=False):
         save(pathlib.Path(str(prefix) + '.process.json'), result)
         return result
     finally:
-        release()
+        try:
+            release()
+        finally:
+            for thread in threads:
+                thread.join(timeout=2)
 
 
 def download(opener, url, path, maximum):

@@ -1253,6 +1253,8 @@ leader as the group's sole member. Additional members or unavailable inspection
 withhold cleanup credit.
 Cleanup failures retain their diagnostics and available process logs in an incomplete
 receipt, even when the child had returned a valid claim.
+Exceptional exits retain bounded joins for both stream readers after process release,
+including when release raises; an unfinished reader prevents another owned child.
 Sources are limited to 64 MiB, models/stdout to 8 MiB each, producer records/receipts
 to 4 MiB, each tool and raw child stream to 1 MiB. The native checker library is bound
 to its private extracted wheel file and executable mapping; Python module/interpreter
