@@ -1478,3 +1478,51 @@ and timing probes do not run as part of ordinary repository checks; follow the
 product controls, including an unrelated finite distinctness constraint and an
 excluded integer value. Run CP/LS with default and exact modes; the harness records
 the original MiniZinc source check separately from compiled FlatZinc semantics.
+
+### Saved compiler and source audit links
+
+`bench.profile.JvmSourceCompilerLinks` accepts pinned HTTPS `catalog=` and
+`catalog-sha256=` arguments. Its schema 1 catalog retains the whole original
+`signatureInput`, `auditInput`, `bindingInputs`, `observationInputs`, `requirements`
+and ordered `targetNames`, adding one `descriptorInput`. The descriptor input
+identifies its `completionMember`, `catalogMember` and every archive member.
+Every original catalog field, target requirement, static/source context and formal
+target disposition must agree with that completed producer. Compiler observations
+cannot select or reduce the source scope.
+
+The Kotlin reader authenticates all members of all inputs before report
+interpretation. Catalogs, manifests and requirements admit at most 16 MiB each.
+Producer completions admit the producer's 128 MiB payload plus its final newline;
+a completion exceeding 16 MiB is not catalog metadata. Both kinds reject duplicate
+keys and invalid UTF-8, retaining unknown fields. The complete archive set and
+staged members each admit at most 2 GiB, with eight inputs, 100,000 members per
+archive and 512 MiB per member. Logical reports admit 4 GiB each and 128 MiB per
+record. No successful prefix can replace a complete report, gzip identity or census.
+
+Every original compiler/XML declaration candidate links to its whole source class
+audit and, where present, the ordered formal-method check. The compact original
+candidate record, ordinal and byte identity remain in the output. Version 3
+candidate reports require every context reference, original binding order, proof
+default and final census; version 2 records retain their original values. Missing
+formal alternatives and unavailable method order remain distinct uncredited
+dispositions. A whole audit reference retains the complete formal alternatives
+without duplicating those bodies in every observation.
+
+The unpublished benchmark module uses
+[Apache Commons Compress](https://commons.apache.org/proper/commons-compress/)
+for tar input and [SQLite JDBC](https://github.com/xerial/sqlite-jdbc) for bounded
+disk indexes. Each index admits at most 8 GiB with a 16 MiB page cache. Closed
+candidate indexes are removed after their arm; the wrapper removes owned input
+staging after child termination and preserves sources, provenance, process status,
+stdout/stderr and output. All output reports share the 4 GiB logical/512 MiB
+compressed allowance and require a complete byte-count/SHA-256 gzip round trip.
+
+One monotonic 180-second wrapper budget covers review and capture. Review leaves
+30 seconds for archiving; a child exceeding its remaining review allowance is
+terminated and cannot admit completion. Capture commands share the remaining
+wrapper allowance. Queue waiting precedes this budget. Run actual saved-report
+interpretation through the maintained normal queue on a supported lab worker.
+This reader launches no original target, compiler, solver or mathematical checker.
+Semantic phase coverage, loaded/generated selection, physical compiler roots,
+compiler elapsed costs, solver outcomes/runtime/allocation/RNG/work controls and
+savings remain unproved; all corresponding proof flags stay false.

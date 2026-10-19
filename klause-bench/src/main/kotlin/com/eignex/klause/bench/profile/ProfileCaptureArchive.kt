@@ -14,15 +14,19 @@ import java.util.concurrent.TimeUnit
 internal object ProfileCaptureArchive {
     private const val TRANSFER_MINUTES = 10L
 
-    fun run(out: File? = null, action: () -> Unit) {
+    fun run(out: File? = null, action: () -> Unit) = capture(out, null, action)
+
+    fun run(out: File? = null, budget: ProfileRunBudget, action: () -> Unit) = capture(out, budget, action)
+
+    private fun capture(out: File?, budget: ProfileRunBudget?, action: () -> Unit) {
         val result = runCatching(action)
-        val archive = runCatching { write(out ?: File(requireNotNull(System.getenv("OUT")))) }
+        val archive = runCatching { write(out ?: File(requireNotNull(System.getenv("OUT"))), budget) }
         result.exceptionOrNull()?.let { original -> archive.exceptionOrNull()?.let(original::addSuppressed) }
         result.getOrThrow()
         archive.getOrThrow()
     }
 
-    private fun write(out: File) {
+    private fun write(out: File, budget: ProfileRunBudget?) {
         val stage = Files.createTempDirectory(out.parentFile.toPath(), "klause-capture-").toFile()
         val verification = Files.createTempDirectory(out.parentFile.toPath(), "klause-capture-verify-").toFile()
         val archive = File(out, "capture.tar.gz")
@@ -30,15 +34,22 @@ internal object ProfileCaptureArchive {
         val children = out.listFiles().orEmpty().filter { it.name != "profile.jfr" }
         val temporary = File(stage, "capture.tar.gz")
         val packed = runCatching {
-            val files = manifest(out, children)
-            val inputs = if (children.isEmpty()) listOf("--files-from=/dev/null") else
+            budget?.remainingMillis()
+            val files = manifest(out, children, budget)
+            val inputs = if (children.isEmpty()) {
+                listOf("--files-from=/dev/null")
+            } else {
                 listOf("--") + children.map { it.name }
-            command(out, "capture-pack", listOf("tar", "-C", out.path, "-czf", temporary.path) + inputs)
-            command(out, "capture-verify", listOf("tar", "-C", verification.path, "-xzf", temporary.path))
-            check(manifest(verification) == files) { "Compressed capture changed a file" }
+            }
+            command(out, "capture-pack", listOf("tar", "-C", out.path, "-czf", temporary.path) + inputs, budget)
+            command(out, "capture-verify", listOf("tar", "-C", verification.path, "-xzf", temporary.path), budget)
+            check(manifest(verification, budget = budget) == files) { "Compressed capture changed a file" }
             Files.move(temporary.toPath(), archive.toPath())
-            File(out, "capture-manifest.json").writeText(Reports.json.encodeToString(
-                CaptureManifest(sha256(archive), archive.length(), files)))
+            File(out, "capture-manifest.json").writeText(
+                Reports.json.encodeToString(
+                CaptureManifest(sha256(archive, budget), archive.length(), files),
+            )
+            )
             for (child in children) check(child.deleteRecursively()) { "Cannot remove verified capture staging" }
         }
         stage.deleteRecursively()
@@ -46,34 +57,49 @@ internal object ProfileCaptureArchive {
         packed.getOrThrow()
     }
 
-    private fun manifest(directory: File, children: List<File> = listOf(directory)): Map<String, CaptureFile> =
-        children.asSequence().flatMap { child ->
-            child.walkTopDown().onEnter {
-                check(!Files.isSymbolicLink(it.toPath())) { "Capture contains a symbolic link" }
-                true
-            }
-        }.filter {
+    private fun manifest(
+        directory: File,
+        children: List<File> = listOf(directory),
+        budget: ProfileRunBudget? = null,
+    ): Map<String, CaptureFile> = children.asSequence().flatMap { child ->
+        child.walkTopDown().onEnter {
             check(!Files.isSymbolicLink(it.toPath())) { "Capture contains a symbolic link" }
-            it.isFile
-        }.sortedBy { it.relativeTo(directory).invariantSeparatorsPath }
+            true
+        }
+    }.filter {
+        check(!Files.isSymbolicLink(it.toPath())) { "Capture contains a symbolic link" }
+        it.isFile
+    }.sortedBy { it.relativeTo(directory).invariantSeparatorsPath }
         .associate {
-            it.relativeTo(directory).invariantSeparatorsPath to CaptureFile(it.length(), sha256(it))
+            it.relativeTo(directory).invariantSeparatorsPath to CaptureFile(it.length(), sha256(it, budget))
         }
 
-    private fun sha256(file: File): String {
+    private fun sha256(file: File, budget: ProfileRunBudget?): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        DigestInputStream(file.inputStream(), digest).use { it.transferTo(OutputStream.nullOutputStream()) }
+        DigestInputStream(file.inputStream(), digest).use { input ->
+            if (budget == null) {
+                input.transferTo(OutputStream.nullOutputStream())
+            } else {
+                val buffer = ByteArray(64 * 1024)
+                while (input.read(buffer) >= 0) budget.remainingMillis()
+            }
+        }
         return digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it) }
     }
 
-    private fun command(out: File, name: String, arguments: List<String>) {
+    private fun command(out: File, name: String, arguments: List<String>, budget: ProfileRunBudget?) {
+        val waitMillis = budget?.remainingMillis() ?: TimeUnit.MINUTES.toMillis(TRANSFER_MINUTES)
         val process = ProcessBuilder(arguments).redirectOutput(File(out, "$name.stdout"))
             .redirectError(File(out, "$name.stderr")).start()
-        if (!process.waitFor(TRANSFER_MINUTES, TimeUnit.MINUTES)) {
-            process.destroyForcibly().waitFor()
-            error("Capture command timed out: $name")
+        try {
+            check(process.waitFor(waitMillis, TimeUnit.MILLISECONDS)) { "Capture command timed out: $name" }
+            check(process.exitValue() == 0) { "Capture command failed: $name" }
+        } finally {
+            if (process.isAlive) {
+                process.descendants().use { children -> children.forEach { it.destroyForcibly() } }
+                process.destroyForcibly().waitFor()
+            }
         }
-        check(process.exitValue() == 0) { "Capture command failed: $name" }
     }
 }
 

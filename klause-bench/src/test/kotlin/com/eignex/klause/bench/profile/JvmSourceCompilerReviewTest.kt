@@ -1,0 +1,170 @@
+package com.eignex.klause.bench.profile
+
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
+import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import java.io.File
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+
+class JvmSourceCompilerReviewTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["complete", "missing-end", "late-class", "wrong-target"])
+    fun `a whole source audit requires its final obligations after every original class`(
+        variant: String,
+        @TempDir out: File,
+    ) {
+        val targets = JsonArray(listOf(buildJsonObject { put("unknown", "retained") }))
+        val context = buildJsonObject {
+            put("bindingInputId", "binding")
+            put("studySourceHead", "head")
+            put("report", "audit.jsonl.gz")
+            put("allOriginalClassRowsReviewed", 1)
+            put("targetDispositions", targets)
+        }
+        val audit = JvmSavedReport(File(out, "audit.jsonl.gz"), JvmSavedReportBudget())
+        audit.write(
+            buildJsonObject {
+            put("record", "schema")
+            put("encoding", "source-formal-descriptor-audit-v3")
+            put("bindingInputId", "binding")
+            put("studySourceHead", "head")
+        }
+        )
+        audit.write(
+            buildJsonObject {
+            put("record", "formal-inventory-reference")
+            put("report", "source-formal-descriptor-coverage.jsonl.gz")
+        }
+        )
+        val row = buildJsonObject {
+            put("record", "class-audit")
+            put("originalSyntaxClassOrdinal", 0)
+            put("internalName", "sample/Cold")
+            put("originalClassOrigin", JsonObject(emptyMap()))
+            put("originalMethodIndexOrder", JsonArray(emptyList()))
+            put("noFormalAlternativeMethodIndexes", JsonArray(emptyList()))
+            put("allOriginalMethodFormalChecks", JsonArray(emptyList()))
+        }
+        audit.write(row)
+        if (variant != "missing-end") {
+            audit.write(
+                buildJsonObject {
+            put("record", "source-obligations")
+            put("targets", if (variant == "wrong-target") JsonArray(emptyList()) else targets)
+        }
+            )
+        }
+        if (variant == "late-class") audit.write(row)
+        val formal = JvmSavedReport(File(out, "source-formal-descriptor-coverage.jsonl.gz"), JvmSavedReportBudget())
+        formal.write(buildJsonObject { put("record", "schema") })
+        val completion = buildJsonObject { put("reports", JsonArray(listOf(audit.verify(), formal.verify()))) }
+        val paths = out.listFiles().orEmpty().filter { it.name.endsWith(".gz") }.associateBy { it.name }
+        val descriptor = buildJsonObject { put("completionMember", "completion.json") }
+        JvmSourceCompilerIndex(File(out, "index.sqlite")).use { index ->
+            if (variant == "complete") {
+                JvmSourceCompilerReview.indexAudits(index, descriptor, paths, completion, listOf(context))
+            } else {
+                assertFailsWith<IllegalArgumentException> {
+                    JvmSourceCompilerReview.indexAudits(index, descriptor, paths, completion, listOf(context))
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["complete", "target", "context", "input", "semantic", "credit", "catalog"])
+    fun `catalog admission requires the whole original source obligation universe`(variant: String) {
+        val requirement = JvmSavedJson.parse(
+            """{
+            "issueTarget":"pick","contexts":{"original":{"originalStudyHead":"head"}},
+            "unknown":{"cold":[false,null]}
+        }"""
+        ).jsonObject
+        val requirements = buildJsonObject { put("targets", JsonArray(listOf(requirement))) }
+        val items = (0..4).map { index ->
+            buildJsonObject {
+                put("id", index.toString())
+                put("members", JsonArray(emptyList()))
+            }
+        }
+        val names = JsonArray(listOf(JsonPrimitive("pick")))
+        val original = buildJsonObject {
+            put("schema", 1)
+            put("targetNames", names)
+            put("signatureInput", items[0])
+            put("auditInput", items[1])
+            put("bindingInputs", JsonArray(listOf(items[2])))
+            put("observationInputs", JsonArray(items.drop(3)))
+            put("requirements", buildJsonObject { put("sha256", "f".repeat(64)) })
+        }
+        val catalog = JsonObject(original + ("descriptorInput" to buildJsonObject { put("id", "descriptor") }))
+        val context = buildJsonObject {
+            put("bindingInputId", "2")
+            put("studySourceHead", "head")
+            put("targetDispositions", JsonArray(listOf(buildJsonObject { put("originalRequirement", requirement) })))
+        }
+        val formalTargets = JsonArray(listOf(buildJsonObject { put("issueTarget", "pick") }))
+        val formalContext = JsonObject(context + ("targetDispositions" to formalTargets))
+        val completion = buildJsonObject {
+            put("completed", true)
+            put("allAuthenticatedInputsByteIdenticalAfterReview", true)
+            put("allOriginalFormalSignaturesAndUnmatchedDeclarationsRetained", true)
+            put("compilerObservationsUsedToSelectSourceScope", false)
+            put("wholeOriginalTargetNames", names)
+            put(
+                "inputArchiveProofs",
+                JsonArray(
+                    items.map { item ->
+                buildJsonObject {
+                    put("inputCatalogEntryCopiedVerbatim", item)
+                    put("allArchiveMembersAuthenticatedBeforeInterpretation", true)
+                }
+            }
+                )
+            )
+            put("sourceContextAudits", JsonArray(listOf(context)))
+            put("sourceFormalDescriptorDispositions", JsonArray(listOf(formalContext)))
+            SOURCE_PROOF_FLAGS.forEach { put(it, false) }
+        }
+        var candidate = catalog
+        var producer = completion
+        when (variant) {
+            "target" -> candidate = JsonObject(candidate + ("targetNames" to JsonArray(emptyList())))
+
+            "context" -> producer = JsonObject(producer + ("sourceContextAudits" to JsonArray(emptyList())))
+
+            "input" -> producer = JsonObject(producer + ("inputArchiveProofs" to JsonArray(emptyList())))
+
+            "semantic" -> producer = JsonObject(
+                producer + (
+                    "sourceContextAudits" to JsonArray(
+                        listOf(
+                JsonObject(context + ("targetDispositions" to JsonArray(emptyList()))),
+            )
+                    )
+                )
+            )
+
+            "credit" -> producer = JsonObject(producer + ("acceptedSavingsCredit" to JsonPrimitive(true)))
+
+            "catalog" -> candidate = JsonObject(candidate + ("unknown" to JsonPrimitive("changed")))
+        }
+
+        if (variant == "complete") {
+            val actual = JvmSourceCompilerReview.validateCatalog(candidate, requirements, original, producer)
+
+            assertEquals(listOf(context), actual)
+        } else {
+            assertFailsWith<IllegalArgumentException> {
+                JvmSourceCompilerReview.validateCatalog(candidate, requirements, original, producer)
+            }
+        }
+    }
+}

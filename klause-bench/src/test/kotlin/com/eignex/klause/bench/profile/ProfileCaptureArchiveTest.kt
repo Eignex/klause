@@ -10,6 +10,26 @@ import kotlin.test.assertTrue
 
 class ProfileCaptureArchiveTest {
     @Test
+    fun `an exhausted archive budget retains the uncaptured raw output`() {
+        val out = Files.createTempDirectory("profile-budget-test-").toFile()
+        var now = 0L
+        val budget = ProfileRunBudget { now }
+        try {
+            assertFailsWith<IllegalStateException> {
+                ProfileCaptureArchive.run(out, budget) {
+                    out.resolve("record.txt").writeText("raw\r\n")
+                    now = 180_000_000_000L
+                }
+            }
+
+            assertEquals("raw\r\n", out.resolve("record.txt").readText())
+            assertFalse(out.resolve("capture.tar.gz").exists())
+        } finally {
+            out.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `compressed capture should preserve exact raw bytes`() {
         val out = Files.createTempDirectory("profile-capture-test-").toFile()
         try {
