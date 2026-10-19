@@ -52,7 +52,10 @@ private const val HUB_REFUTATION_FAILED = -1
  * Scott Cotton and Oded Maler, "Fast and Flexible Difference Constraint Propagation for DPLL(T)",
  * SAT 2006, LNCS 4121, https://doi.org/10.1007/11814948_19.
  */
-internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propagator {
+internal class DifferenceSystemPropagator(
+    edges: List<DifferenceEdge>,
+    private val indexGuards: Map<Int, DifferenceIndexGuard> = emptyMap(),
+) : Propagator {
 
     private val guards: IntArray
     private val tail: IntArray
@@ -85,7 +88,14 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      * every fire, and a potential feasible for a set stays feasible for any subset of it, so a backtrack
      * leaves the structure correct without any undo.
      */
-    private class Session(numVertices: Int, tail: IntArray, head: IntArray, bound: LongArray, hub: BooleanArray) {
+    private class Session(
+        numVertices: Int,
+        tail: IntArray,
+        head: IntArray,
+        bound: LongArray,
+        hub: BooleanArray,
+        val guards: IntArray,
+    ) {
         val graph = IncrementalDifferenceGraph(numVertices, tail, head, bound, hub)
         val pending = IntArrayList()
         val pendingTails = IntArrayList()
@@ -164,7 +174,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         val counts = IntArray(nodes.size + 2)
         var guarded = 0
         for (i in guards.indices) {
-            if (guards[i] == DifferenceEdge.ALWAYS) continue
+            if (guards[i] == DifferenceEdge.ALWAYS && i !in indexGuards) continue
             counts[head[i] + 1]++
             guarded++
         }
@@ -173,7 +183,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         bucketEdge = IntArray(guarded)
         val fill = counts.copyOf()
         for (i in guards.indices) {
-            if (guards[i] == DifferenceEdge.ALWAYS) continue
+            if (guards[i] == DifferenceEdge.ALWAYS && i !in indexGuards) continue
             bucketEdge[fill[head[i]]++] = i
         }
         val vertices = IntArrayList()
@@ -220,7 +230,8 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val session = (state.refPayload[factorId] as? Session)
-            ?: Session(numVertices, tail, head, bound, hub).also { state.refPayload[factorId] = it }
+            ?: Session(numVertices, tail, head, bound, hub, resolveGuards(state))
+                .also { state.refPayload[factorId] = it }
         session.reason = null
         val graph = session.graph
         if (!graph.usable) return true
@@ -261,11 +272,20 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         return refuteOpenEdges(state, session)
     }
 
+    private fun resolveGuards(state: PropagationState): IntArray {
+        if (indexGuards.isEmpty()) return guards
+        return guards.copyOf().also { resolved ->
+            for ((edge, selector) in indexGuards) {
+                resolved[edge] = Lit.make(state.atomVarEq(selector.variable, selector.value), true)
+            }
+        }
+    }
+
     // The scans over every edge are separate methods so each compiles apart from the rest of the fixpoint step.
     private fun retractReleasedEdges(state: PropagationState, session: Session) {
         val graph = session.graph
-        for (e in guards.indices) {
-            if (!graph.isActive(e) || asserted(state, e)) continue
+        for (e in session.guards.indices) {
+            if (!graph.isActive(e) || asserted(state, session, e)) continue
             graph.retract(e)
             session.retractedSinceSweep = true
         }
@@ -274,21 +294,21 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
     // Assert every edge that newly holds; false on the first that closes a negative cycle.
     private fun assertHeldEdges(state: PropagationState, session: Session): Boolean {
         val graph = session.graph
-        for (e in guards.indices) {
-            if (graph.isActive(e) || !asserted(state, e)) continue
+        for (e in session.guards.indices) {
+            if (graph.isActive(e) || !asserted(state, session, e)) continue
             val cycle = graph.assertEdge(e)
             session.assertVersion++
             session.newTails.add(tail[e])
             if (cycle == null) continue
-            session.reason = blockingClause(cycle)
+            session.reason = blockingClause(session, cycle)
             return false
         }
         return true
     }
 
     /** Whether edge [e] currently holds, so it belongs in the graph. */
-    private fun asserted(state: PropagationState, e: Int): Boolean =
-        guards[e] == DifferenceEdge.ALWAYS || state.litTrue(guards[e])
+    private fun asserted(state: PropagationState, session: Session, e: Int): Boolean =
+        session.guards[e] == DifferenceEdge.ALWAYS || state.litTrue(session.guards[e])
 
     /**
      * Falsify the guard of every open edge the asserted system already contradicts. Edge `x → y` of
@@ -318,7 +338,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         session.pendingTails.clear()
         for (i in bucketStart[v] until bucketStart[v + 1]) {
             val e = bucketEdge[i]
-            if (graph.isActive(e) || state.litTruth(guards[e]) != null) continue
+            if (graph.isActive(e) || state.litTruth(session.guards[e]) != null) continue
             session.pending.add(e)
             session.pendingTails.add(tail[e])
         }
@@ -332,10 +352,10 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         var open = 0
         for (k in 0 until session.pending.size) {
             val e = session.pending[k]
-            if (state.litTruth(guards[e]) != null) continue
+            if (state.litTruth(session.guards[e]) != null) continue
             if (closesNegativeCycle(hubDistance(graph, v, tail[e]), bound[e])) {
                 val route = graph.pathToZeroFrom(v) + graph.pathFromZeroTo(tail[e])
-                if (!refute(state, session, e, blockingClause(route))) return HUB_REFUTATION_FAILED
+                if (!refute(state, session, e, blockingClause(session, route))) return HUB_REFUTATION_FAILED
                 continue
             }
             open++
@@ -348,17 +368,17 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         graph.shortestPathsFrom(v, session.pendingTails.toIntArray())
         for (k in 0 until session.pending.size) {
             val e = session.pending[k]
-            if (state.litTruth(guards[e]) != null) continue // an earlier refutation in this sweep decided it
+            if (state.litTruth(session.guards[e]) != null) continue // an earlier refutation in this sweep decided it
             val d = graph.distanceTo(tail[e])
             if (!closesNegativeCycle(d, bound[e])) continue
-            if (!refute(state, session, e, blockingClause(graph.pathTo(tail[e])))) return false
+            if (!refute(state, session, e, blockingClause(session, graph.pathTo(tail[e])))) return false
         }
         return true
     }
 
     /** Pin edge [e]'s guard false, explained by [antecedents] — the guards on whatever refuted it. */
     private fun refute(state: PropagationState, session: Session, e: Int, antecedents: IntArray): Boolean {
-        val lit = Lit.negate(guards[e])
+        val lit = Lit.negate(session.guards[e])
         if (state.pinLit(lit, antecedents)) return true
         session.reason = antecedents + lit
         return false
@@ -370,12 +390,12 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      * requires of a seed. An all-unconditional set has no guards and yields the empty clause, which says
      * the system is unsatisfiable outright.
      */
-    private fun blockingClause(edges: IntArray): IntArray {
+    private fun blockingClause(session: Session, edges: IntArray): IntArray {
         // Guard order is the edge order, and an edge set is small, so a linear membership check
         // costs less than a hash set and keeps the emitted clause deterministic.
         val lits = IntArrayList(edges.size)
         for (e in edges) {
-            val g = guards[e]
+            val g = session.guards[e]
             if (g == DifferenceEdge.ALWAYS) continue
             val negated = Lit.negate(g)
             if (!lits.contains(negated)) lits.add(negated)

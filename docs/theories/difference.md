@@ -173,6 +173,32 @@ defines source coverage and numerical admission.
 
 ## Real graph admission and checks
 
+Finite preparation installs an optional redundant graph from real-only `ExactLinear`
+rows with one term or two opposite coefficients, and from `RealElement` selections.
+Wide coefficients, disequalities and other unsupported rows are omitted. Both signs
+of a reified inequality retain their exact strictness; a reified equality contributes
+only its positive conjunction. Constant table entries use their exact binary64 value.
+An index equality guards both sides of each selected table equality. Declared finite
+real bounds are immutable premises. Omission weakens deduction without changing the
+source model or its mandatory complete checks.
+At least one supported row or table selection must contribute an edge; declared
+bounds alone do not install a helper after source relations have been eliminated.
+Approximate source semantics retain their arithmetic owner without this exact graph.
+Appending the helper extends the retained source mapping by an identity stage to
+the augmented execution model, preserving reconstruction and heuristic coordinates.
+
+Preparation clears rational edge denominators with one common multiple, then scales
+by two more than the declared real-column count and subtracts one for each strict
+edge. Integral nonzero cycle sums dominate the strict contributions, while a zero
+cycle containing a strict edge becomes negative. Failure to fit the conservative
+word-arithmetic envelope discards the optional graph. Its vertices are private to
+this existential relaxation and do not participate in finite integer renumbering.
+Only source Boolean and table-index coordinates are shared. The incremental
+propagator owns per-state native index atoms, graph activity, potentials and reasons;
+no native atom id is retained in the immutable source factor or shared across arms.
+It can publish conflicts and exclusions, never source real coordinates or positive
+coverage. [Search](../solver/search.md) owns the receiving finite fixpoint.
+
 The real difference component uses a difference graph when every arithmetic row is a
 one-column bound or a two-column difference with a rational normalized bound. Boolean
 guards select active edges. Preparation clears denominators using a checked positive
