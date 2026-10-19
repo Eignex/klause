@@ -66,11 +66,11 @@ class LinearPropagatorTest {
 
     @Test
     fun `overflowing linear term spans should retain endpoint pruning`() {
-        for ((op, bound) in listOf(LinearOp.LE to Long.MIN_VALUE, LinearOp.GE to Long.MAX_VALUE)) {
+        for ((op, endpoint) in listOf(LinearOp.LE to -1L, LinearOp.GE to 1L)) {
             val state = PropagationState(
                 Problem(
-                    0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
-                    arrayOf(Linear(longArrayOf(1), intArrayOf(0), op, bound)),
+                    0, 1, arrayOf(IntDomain(-1, 1)),
+                    arrayOf(Linear(longArrayOf(Long.MAX_VALUE), intArrayOf(0), op, Long.MAX_VALUE * endpoint)),
                 ),
                 Assumptions.None,
             )
@@ -78,7 +78,7 @@ class LinearPropagatorTest {
             val consistent = state.factorAt(0).propagate(state, 0)
 
             assertTrue(consistent)
-            assertEquals(bound to bound, state.intDomains[0].min to state.intDomains[0].max)
+            assertEquals(endpoint to endpoint, state.intDomains[0].min to state.intDomains[0].max)
         }
     }
 
