@@ -15,7 +15,7 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-internal const val MZN_COMPATIBILITY_POLICY = "minizinc-compile-compatibility-v2"
+internal const val MZN_COMPATIBILITY_POLICY = "minizinc-compile-compatibility-v3"
 
 @Serializable
 internal data class MiniZincCompilerIdentity(
@@ -46,20 +46,37 @@ internal class MiniZincCompileFailure(
         "minizinc compile failed (exit $exitCode): ${diagnostic.take(4000)}"
     },
 ) {
+    /** The source-level reason the compiler rejected this model/data, or null for an infrastructure fault. */
     val incompatibility: String? = when {
         timeoutSec != null -> COMPILE_TIMEOUT
-        exitCode == 1 -> classify(diagnostic)
-        else -> null
+        infrastructure(exitCode, diagnostic) -> null
+        else -> classify(diagnostic)
     }
 
     companion object {
         const val COMPILE_TIMEOUT = "compile-timeout"
 
-        fun classify(diagnostic: String): String? = when {
+        /** Faults of the environment rather than the source: the compiler died on a signal (crash or OOM kill),
+         *  ran out of memory, could not open a file, or could not load its solver configuration. */
+        fun infrastructure(exitCode: Int, diagnostic: String): Boolean =
+            exitCode !in 1 until 128 || INFRASTRUCTURE.any { it in diagnostic }
+
+        private val INFRASTRUCTURE = listOf(
+            "cannot open file",
+            "out of memory",
+            "std::bad_alloc",
+            "Config exception",
+        )
+
+        /** Best-effort reason for a source-level compile rejection; `compile-error` when no kind is recognised. */
+        fun classify(diagnostic: String): String = when {
             "Error: type error:" in diagnostic -> "type-error"
             "Error: syntax error" in diagnostic -> "syntax-error"
             "Error: evaluation error: Index set mismatch" in diagnostic -> "index-set-mismatch"
-            else -> null
+            "result of evaluation is undefined" in diagnostic -> "undefined-evaluation"
+            "assertion failed" in diagnostic.lowercase() -> "assertion"
+            "not supported" in diagnostic || "unsupported" in diagnostic.lowercase() -> "unsupported"
+            else -> "compile-error"
         }
     }
 }

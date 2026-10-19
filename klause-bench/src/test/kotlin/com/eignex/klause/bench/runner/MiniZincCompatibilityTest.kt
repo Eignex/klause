@@ -60,10 +60,20 @@ class MiniZincCompatibilityTest {
     }
 
     @Test
-    fun `unclassified compile failures should still stop admission`() {
+    fun `generic compile failures should exclude the source`() {
+        val rejected = failure(1, "Error: result of evaluation is undefined: maximum of empty set is undefined")
+
+        assertEquals("undefined-evaluation", MiniZincCompatibility.exclusion(ref) { throw rejected }?.incompatibility)
+    }
+
+    @Test
+    fun `infrastructure failures should stop admission`() {
         val crash = failure(139, "compiler crashed with signal 11")
+        val missing = failure(1, "Error: cannot open file 'klause/globals.mzn'")
 
         assertFailsWith<MiniZincCompileFailure> { MiniZincCompatibility.exclusion(ref) { throw crash } }
+        assertFailsWith<MiniZincCompileFailure> { MiniZincCompatibility.exclusion(ref) { throw missing } }
+        assertFailsWith<IllegalStateException> { MiniZincCompatibility.exclusion(ref) { error("corpus missing") } }
     }
 
     @ParameterizedTest
@@ -90,14 +100,38 @@ class MiniZincCompatibilityTest {
     @ParameterizedTest
     @ValueSource(
         strings = [
-            "Error: cannot open file 'missing.mzn'",
-            "Error: evaluation error: out of memory",
-            "compiler crashed with signal 11",
-            "compiler timed out",
+            "Error: result of evaluation is undefined: maximum of empty set is undefined",
+            "Error: evaluation error: Assertion failed: n must be positive",
+            "Error: flattening error: set of float is not supported",
         ],
     )
-    fun `infrastructure and unclassified failures should not quarantine a source`(diagnostic: String) {
-        assertNull(MiniZincCompileFailure.classify(diagnostic))
+    fun `recognised compile rejections should get their own reason`(diagnostic: String) {
+        val reason = MiniZincCompileFailure.classify(diagnostic)
+        assertEquals(
+            when {
+                "undefined" in diagnostic -> "undefined-evaluation"
+                "Assertion" in diagnostic -> "assertion"
+                else -> "unsupported"
+            },
+            reason,
+        )
+    }
+
+    @Test
+    fun `unrecognised compile rejections should be generic compile errors`() {
+        assertEquals("compile-error", failure(1, "Error: something new went wrong").incompatibility)
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "Error: cannot open file 'missing.mzn'",
+            "Error: evaluation error: out of memory",
+            "Config exception: no solver with tag klause found",
+        ],
+    )
+    fun `infrastructure failures should not quarantine a source`(diagnostic: String) {
+        assertNull(failure(1, diagnostic).incompatibility)
     }
 
     @Test

@@ -652,11 +652,15 @@ annotation does not compile, before caps.
 `mzn-bench-compatible-v1` is a separate installed-compiler compatibility selection.
 It discovers depot-placement sources as well, then compiles the original model/data
 with the installed MiniZinc compiler and Klause globals before filling family and
-suite caps. Type/syntax errors, array index-set mismatches and compiles exceeding
-`klause.bench.mzn.timeoutSec` (default 60s, reason `compile-timeout`, recorded with
-`compilerTimeoutSec`) exclude only the identity checked. Compilable siblings remain
-eligible. Missing files, crashes and unclassified errors stop selection; they cannot
-establish source incompatibility. Compilation uses seed 1 and never invokes a solver. Checks run only
+suite caps. Any source-level rejection, where the compiler exits nonzero with a
+diagnostic, excludes only the identity checked, with a best-effort reason:
+`type-error`, `syntax-error`, `index-set-mismatch`, `undefined-evaluation`,
+`assertion`, `unsupported`, otherwise `compile-error`. Compiles exceeding
+`klause.bench.mzn.timeoutSec` (default 60s) are excluded as `compile-timeout`, recorded
+with `compilerTimeoutSec`. Compilable siblings remain eligible. Infrastructure faults
+stop selection: a missing or unexecutable compiler, missing corpus files or solver
+library, unreadable solver configuration, I/O errors, out-of-memory and compiler
+deaths by signal; they cannot establish source incompatibility. Compilation uses seed 1 and never invokes a solver. Checks run only
 on candidates reached while filling a family cap, after source-kind filtering;
 seeded ordering remains deterministic. Compatibility preparation precedes sharding. Catalogue `suite` selection applies
 its admission policy before provider property/default caps as well. Raw identity
@@ -665,7 +669,7 @@ property caps for compatibility suites, retaining every original identity.
 
 `select` emits excluded identities as JSON lines on stderr with the reason,
 diagnostic, compiler exit, original model/data hashes and compiler/library identity.
-Selected JSON lines carry `selectionPolicy=minizinc-compile-compatibility-v2` and
+Selected JSON lines carry `selectionPolicy=minizinc-compile-compatibility-v3` and
 that identity. It includes the compiler version and binary hash, standard and
 Klause library tree hashes, solver configuration hash and compiler seed. Selection
 can change with any of these identities or source bytes; retain the actual selected
