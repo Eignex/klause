@@ -94,7 +94,7 @@ class LpEngineTest {
         assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
         val point = Sample(booleanArrayOf(false), longArrayOf(), leaf.reals,
             exactReals = assertNotNull(leaf.exactReals))
-        assertIs<Verification.Accepted>(verifyRealCoordinates(problem, point))
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
         assertEquals(1L, sink.snapshot().lp.phases["PINNED_REAL_LEAF_ADMISSION"]?.outcomes?.get("READY"))
     }
 
@@ -196,7 +196,7 @@ class LpEngineTest {
                 assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
                 val point = Sample(booleanArrayOf(false), longArrayOf(index), leaf.reals,
                     exactReals = assertNotNull(leaf.exactReals))
-                assertIs<Verification.Accepted>(verifyRealCoordinates(problem, point))
+                assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
                 assertEquals(BigFraction.ofLong(index + 2L), point.exactReals?.get(1))
             }
         }
