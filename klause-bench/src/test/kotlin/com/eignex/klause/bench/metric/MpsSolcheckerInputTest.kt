@@ -16,6 +16,18 @@ class MpsSolcheckerInputTest {
         assertEquals(true, profile.maximize)
     }
 
+    @Test
+    fun `source admission should stop when its allowance is exhausted`() {
+        val input = source.replace("ROWS", "UNSUPPORTED")
+        var checkpoints = 0
+
+        assertFailsWith<IllegalStateException> {
+            MpsSolcheckerInput.qualify(input) { ++checkpoints == 2 }
+        }
+
+        assertEquals(2, checkpoints)
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["NAME", "RHS", "both"])
     fun `omitted optional headers should preserve every original data record`(omitted: String) {

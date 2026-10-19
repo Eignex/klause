@@ -77,7 +77,9 @@ internal object MpsSourceValidation {
             check(record.sourceHashes == mapOf("model" to sha256(source))) { "original source hash changed" }
             val host = System.getProperty("os.name")
             check(host == "Linux" || host == "Mac OS X") { "unsupported MIPLIB resource controls" }
-            val profile = MpsSolcheckerInput.qualify(source.decodeToString(throwOnInvalidSequence = true))
+            val profile = MpsSolcheckerInput.qualify(source.decodeToString(throwOnInvalidSequence = true)) {
+                remaining() <= 0 || Thread.currentThread().isInterrupted
+            }
             check(profile.maximize == record.maximize) { "source objective sense differs" }
             val decoded = raw.toByteArray()
             check(record.sourceOutputSha256 == sha256(decoded)) { "producer stdout hash differs" }

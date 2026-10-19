@@ -8,7 +8,7 @@ internal object MpsSolcheckerInput {
     data class Profile(val maximize: Boolean, val text: String, val insertedHeaders: List<String>)
 
     // The upstream reader needs a restricted input profile to preserve source obligations.
-    fun qualify(source: String): Profile {
+    fun qualify(source: String, cancelled: () -> Boolean = { false }): Profile {
         var section = ""
         var objective: String? = null
         var maximize = false
@@ -24,6 +24,7 @@ internal object MpsSolcheckerInput {
         val vectorRows = mutableMapOf<String, MutableSet<String>>()
         val boundKinds = mutableMapOf<String, MutableSet<String>>()
         for (line in source.lineSequence()) {
+            check(!cancelled()) { "MPS admission allowance exhausted" }
             require(line.length < 1023 && line.all { it == '\t' || it.code in 32..126 }) { "unsupported MPS line" }
             if (line.isBlank() || line.startsWith('*')) continue
             require(!ended) { "records after ENDATA are unsupported" }
@@ -121,6 +122,7 @@ internal object MpsSolcheckerInput {
             text = text.substring(0, position) + "RHS\n" + text.substring(position)
             headers += "RHS"
         }
+        check(!cancelled()) { "MPS admission allowance exhausted" }
         return Profile(maximize, text, headers)
     }
 
