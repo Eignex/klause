@@ -1277,29 +1277,32 @@ JSON, source retrieval identity and the complete receipt JSON in
 `sourceValidationReceiptJson`. Literal final coordinates/objective and source/stdout
 hashes remain in the ordinary record. This preserves checker custody when ordinary
 workers return only that record; preserve hash-matching original sources separately
-for later inspection. Packaged checker/requirements hashes, interpreter and pinned
-wheel/extracted-file identities, process logs and cleanup receipts accompany it. Valid/invalid receipts require the
-pinned runtime/wheel and extracted-file ledger, successful bounded bootstrap/check
-processes, complete stream bytes/hashes and matching child JSON; missing or mutated
-mandatory custody leaves checking unknown. The arithmetic receipt identifies the
-actual Python interpreter and mandatory file-backed `fractions` and `numbers`
-module bytes. File-backed `math` retains its module file identity; built-in `math`
-requires its actual `built-in` origin and `BuiltinImporter` loader, the executing
-Linux interpreter and all mapped `libpython` providers. Other or ambiguous origins
-remain unknown. Built-in custody retains bounded `/proc/self/maps` text and its
-hash: at most 256 KiB/4096 lines, with one to three executable provider files,
-each at most 64 MiB (192 MiB total). Module files retain their separate 4 MiB cap.
-Providers are hashed in 64 KiB blocks within the existing check deadline.
-The existing pinned runtime runner provisions a private `z3-solver==4.15.3.0`
-wheel environment on Linux x86-64/glibc, without global installation. Z3 remains a
-shared module/proof-builder and CI-oracle dependency; it is not the ground evaluator. Setup is
+for later inspection. Packaged checker/requirements hashes, interpreter/provider identities,
+process logs and cleanup receipts accompany it. Valid/invalid receipts require successful
+bounded bootstrap/check processes, complete stream bytes/hashes and matching child JSON;
+missing or mutated mandatory custody leaves checking unknown.
+The standard-library runtime supports CPython on Linux x86-64/AArch64 and macOS
+x86-64/Arm64. Bootstrap and checking independently bind the actual `Py_GetVersion`
+address through `dladdr`, hash its executable image and the interpreter executable,
+and retain the actual `ctypes` and `_ctypes` module identities. Both process receipts
+must agree on those identities. Interpreter/provider files retain their 64 MiB per-file
+and 192 MiB total bounds; module files retain their 4 MiB cap.
+The arithmetic receipt identifies mandatory file-backed `fractions` and `numbers`
+module bytes. File-backed `math` retains its actual module origin and file identity;
+built-in `math` requires its actual `built-in` origin, `BuiltinImporter` loader and
+bounded Linux interpreter/provider mapping ledger. Unsupported origins remain unknown.
+The ground import mode of `verify_source_results.py` loads no symbolic solver; its
+original `Fraction` point evaluator remains the same evaluator used by source checks.
+Symbolic proof tooling and the independent CI oracle retain the pinned Z3 dependency.
+The ordinary ground runtime downloads no wheel and performs no global installation.
+Setup is
 bounded to 30 seconds/2 GiB, point checking to 30 seconds/4 GiB, and the worker to
 60 seconds. The JVM reserves a 70-second allowance across preparation and waiting,
 plus at most two five-second termination/reaping waits. With the solver's existing
 40-second watchdog and two-second stderr drain for a feasible ten-second run, this
 leaves 18 seconds for source/receipt I/O inside the ordinary 140-second case deadline.
 The external deadline still governs incomplete work. Sources over 64 MiB, solver stdout over 8 MiB,
-producer records/receipts over 4 MiB and checker streams over 1 MiB remain unchecked. Private dependencies are removed after checking. Missing dependencies,
+producer records/receipts over 4 MiB and checker streams over 1 MiB remain unchecked. Private runtime directories are removed after checking. Missing dependencies,
 timeout, incomplete output, changed custody or failed cleanup cannot yield valid
 credit.
 
@@ -1320,14 +1323,13 @@ declaration plus the literal final witness and objective lines. The unchanged
 ground evaluator checks this envelope against all original source obligations.
 Malformed, truncated or mismatched streams cannot earn credit. `stdoutTransport`
 binds compressed, decoded and envelope byte counts/hashes and complete decoding
-into the matching child and supervisor receipts. Decoder custody retains actual
-interpreter, `gzip` and `_compression` module files, compile/runtime zlib versions
-and bounded Linux mapping evidence for all file-backed `libz` providers. File-backed
-`zlib` retains its actual module file; built-in `zlib` requires its `built-in` origin,
-`BuiltinImporter` loader, executing interpreter and mapped `libpython` provider
-ledger, using the same identity checks as built-in `math`. Missing or ambiguous
-provider custody leaves checking unknown.
-Mapping and provider bounds match arithmetic custody above. These are independent
+into the matching child and supervisor receipts. Decoder custody binds the packaged Python RFC 1951/1952 implementation to the
+same interpreter receipt. It checks stored, fixed-Huffman and dynamic-Huffman blocks,
+back-reference distances, every member CRC and size, optional header CRCs, complete
+EOF and all existing transport bounds. It uses no native compression or CRC fallback.
+The decoder file hash must match the packaged tool ledger. Legacy native-zlib receipts
+remain subject to their explicit module and Linux provider-ledger validation.
+These are independent
 transport obligations and do not add search or proof credit. Older failed records
 are not reclassified by selecting this policy for fresh runs.
 

@@ -191,7 +191,7 @@ internal object MpsSourceReceipt {
         require(providers.single { it.path == executable }.sha256 == executableSha256)
     }
 
-    private fun requireProcess(
+    fun requireProcess(
         process: MpsCheckerProcess,
         logs: Map<String, String>,
         mode: String,

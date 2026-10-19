@@ -544,7 +544,7 @@ tasks.named("check") {
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
     from("tools") {
         include("smt_source_validation.py", "smt_witness_validation.py", "mps_witness_validation.py",
-            "mps_stdout_gzip.py", "verify_nra_source_results.py",
+            "mps_stdout_gzip.py", "mps_stdout_deflate.py", "mps_stdlib_runtime.py", "verify_nra_source_results.py",
             "verify_source_results.py", "requirements-source-checks.txt")
         into("smt-witness-validation")
     }

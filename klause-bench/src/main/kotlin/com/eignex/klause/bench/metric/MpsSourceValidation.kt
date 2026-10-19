@@ -25,7 +25,8 @@ internal object MpsSourceValidation {
     private const val MAX_SOURCE_BYTES = 64 * 1024 * 1024
     private const val MAX_RESULT_BYTES = 4 * 1024 * 1024
     private val names = listOf("mps_witness_validation.py", "smt_witness_validation.py",
-        "verify_nra_source_results.py", "verify_source_results.py", "requirements-source-checks.txt")
+        "verify_nra_source_results.py", "verify_source_results.py", "requirements-source-checks.txt",
+        "mps_stdlib_runtime.py", "mps_stdout_deflate.py")
 
     internal data class Result(val validation: SourceValidation, val stats: Map<String, String> = emptyMap())
 
@@ -53,6 +54,7 @@ internal object MpsSourceValidation {
         val sourceTolerance: Map<String, String>? = null,
         val witnessCheck: String? = null,
         val stdoutTransport: MpsStdoutTransport? = null,
+        val stdlibRuntime: MpsStdlibRuntime? = null,
     )
 
     fun unknown(reason: String): SourceValidation = SourceValidation("unknown", reason, scope = SCOPE)
@@ -193,12 +195,17 @@ internal object MpsSourceValidation {
         check(receipt.setupMs >= 0 && receipt.checkMs >= 0)
         if (receipt.status != "unknown") {
             check((gzip != null) == (receipt.stdoutTransport != null))
-            gzip?.let {
-                MpsStdoutReceipt.requireComplete(requireNotNull(receipt.stdoutTransport), it, record, bindings,
-                    requireNotNull(receipt.runtime))
+            if (receipt.stdlibRuntime != null) {
+                MpsStdlibReceipt.requireComplete(receipt, Reports.json.parseToJsonElement(json).jsonObject,
+                    record, bindings, tools, exact, gzip)
+            } else {
+                gzip?.let {
+                    MpsStdoutReceipt.requireComplete(requireNotNull(receipt.stdoutTransport), it, record, bindings,
+                        requireNotNull(receipt.runtime))
+                }
+                MpsSourceReceipt.requireComplete(receipt, Reports.json.parseToJsonElement(json).jsonObject, exact,
+                    gzip = gzip != null)
             }
-            MpsSourceReceipt.requireComplete(receipt, Reports.json.parseToJsonElement(json).jsonObject, exact,
-                gzip = gzip != null)
         }
         check(receipt.status != "valid" || (record.feasible == true && record.finalWitness != null &&
             receipt.checkedWitness == record.finalWitness && receipt.checker == MPS_GROUND_CHECKER))
