@@ -56,6 +56,9 @@ lookups store their arrays on one owner, shared with the projection. Compact key
 use offset arrays; sparse ranges use primitive probing with storage bounded by entry
 count. Duplicate keys retain their last payload, while occurrence indexes separately
 account for aliased positions. These lookups allocate no mutable per-worker cache.
+Uniform integer-linear coefficients use a membership bitset when its word count
+fits the number of row entries. Missing coordinates retain coefficient zero;
+wider key spans and nonuniform coefficients retain the primitive position map.
 
 Resumable handles retain
 private initialization cursors for state buffers,
