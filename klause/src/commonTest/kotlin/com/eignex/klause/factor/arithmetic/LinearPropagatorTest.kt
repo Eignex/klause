@@ -66,11 +66,16 @@ class LinearPropagatorTest {
 
     @Test
     fun `overflowing linear term spans should retain endpoint pruning`() {
-        for ((op, endpoint) in listOf(LinearOp.LE to -1L, LinearOp.GE to 1L)) {
+        for ((comparison, domain, coefficient) in listOf(
+            Triple(LinearOp.LE to Long.MIN_VALUE, IntDomain(Long.MIN_VALUE, Long.MAX_VALUE), 1L),
+            Triple(LinearOp.LE to -1L, IntDomain(-1, 1), Long.MAX_VALUE),
+            Triple(LinearOp.GE to 1L, IntDomain(-1, 1), Long.MAX_VALUE),
+        )) {
+            val (op, endpoint) = comparison
             val state = PropagationState(
                 Problem(
-                    0, 1, arrayOf(IntDomain(-1, 1)),
-                    arrayOf(Linear(longArrayOf(Long.MAX_VALUE), intArrayOf(0), op, Long.MAX_VALUE * endpoint)),
+                    0, 1, arrayOf(domain),
+                    arrayOf(Linear(longArrayOf(coefficient), intArrayOf(0), op, coefficient * endpoint)),
                 ),
                 Assumptions.None,
             )
