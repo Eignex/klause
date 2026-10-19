@@ -455,6 +455,14 @@ pivots, time and admitted-scalar history. Separate identity admission cannot
 refund those costs or expose an old proof on failure. Charge setup, failed
 attempts, precision restarts and cleanup; counters saturate rather than wrap.
 
+Exact continuation evaluates each tableau row over the current nonbasic seats with
+nonzero values. Each evaluation captures their ascending column indices once;
+strict epsilon seats have a separate capture. A pivot, import or later evaluation
+cannot reuse an earlier capture. Lane-owned scratch storage is charged before
+allocation, and capture, row and retained term visits spend the same continuation
+work allowance. Skipped basic and zero seats incur no repeated row visits. Exact
+arithmetic order, source-point checks and certificate authority retain their owners.
+
 Every certifier accounts for its model passes either through basis/continuation
 metrics or its own meter. Cheap exact arithmetic charges operand word-length
 squared. Scaling-view construction/refresh/fallback is a preparation phase
