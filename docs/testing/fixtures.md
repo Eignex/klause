@@ -134,17 +134,6 @@ See the [benchmark reference workflow](../../klause-bench/README.md#klause-lab)
 for image preparation, replay and the distinction between source witnesses and
 native proof claims.
 
-## MPS source verifier
-
-The MPS source-verifier regressions in
-[`test_verify_source_results.py`](../../klause-bench/tools/test_verify_source_results.py)
-include a two-row projection of MIPLIB 3 `egout`: flow rows `031` and `033`, their
-original cost coefficients and fixed source decimals. Rounded coordinates exercise
-the source tolerance contract; the fixture retains no generated solve records.
-The complete source is fetched by the catalog/verifier from the
-[MIPLIB 3 archive](https://miplib2010.zib.de/miplib3/miplib3.tar.gz), with model hash
-`351ed046eb56e07662b3c2dba35800f5d2cee3fac18c1bd7fbc8dea4a0dcd8db`.
-
 ## Measurement storage
 
 The self-authored Apache-2.0 [objective-cli-v1 manifest](../../klause-bench/smoke-corpus/objective-cli-v1/manifest.json)

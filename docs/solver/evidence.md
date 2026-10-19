@@ -313,10 +313,10 @@ owns admission and transport; [LP certification](../lp/certification.md) owns nu
 evidence; [presolve](presolve.md) owns reconstruction and transformation guarantees.
 
 Independent acceptance checks the original source bytes and declared semantics,
-with separately retained caller conditions and actual claims. The committed
-[benchmark source checkers](../../klause-bench/README.md#offline-source-verifier)
-check their supported affine and quadratic subsets; runtime provenance and engine
-completion remain separate from mathematical verification. Missing retained inputs
+with separately retained caller conditions and actual claims.
+[Benchmark source validation](../../klause-bench/README.md#source-validation) owns
+checker admission and retained receipts for each supported format. Runtime
+provenance and engine completion remain separate from mathematical verification. Missing retained inputs
 or checker reports cannot supply that acceptance.
 
 [Admission evidence](../evidence/source-scoped-derivations.md) records the supported

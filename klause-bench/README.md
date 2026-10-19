@@ -11,7 +11,7 @@ Commands run from the repository root unless shown otherwise.
 | Run or select cases | [Build](#build-and-run), [selection](#selection-and-named-sets), [corpus](#catalog-and-corpus) |
 | Run remote experiments or regression schedules | [Klause-lab](#klause-lab) |
 | Identify and compare measurements | [Provenance](#installed-build-provenance), [records](#saved-results), [comparisons](#comparing-configurations) |
-| Check source claims | [Validation](#source-validation), [offline verifier](#offline-source-verifier) |
+| Check source claims | [Validation](#source-validation) |
 | Investigate cost | [Profiling](#profiling), [focused probes](#focused-probes), [LP replay](../docs/lp/replay.md) |
 
 ## Build and run
@@ -231,7 +231,7 @@ experiment's and that differs only in name, description or problems.
 Replace `123` with the returned job ID. `lab cases` prints a tabular summary;
 the HTTP `GET /experiments/<id>/cases` endpoint supplies the JSON array consumed by
 `bench mine`. `lab fetch` downloads records and raw
-outputs, including `cases/<index>/record.json` for the offline source verifier.
+outputs, including `cases/<index>/record.json`.
 `lab compare` links experiments; `lab schedule`, `reschedule`, `schedules` and
 `check` manage regression runs under the lab's operations guide.
 
@@ -1046,6 +1046,40 @@ Acceptance certifies source feasibility and objective values, not optimality or
 infeasibility proofs.
 
 
+### Boolean source verifier
+
+[verify_boolean_source_results.py](tools/verify_boolean_source_results.py) checks
+`DIMACS`, `WCNF` and polynomial `OPB`/WBO records against original source bytes in
+`<sourceHashes.model>.txt` files in the supplied directory. It accepts complete
+signed-literal assignments, OPB variable
+names and WCNF bitstrings. Clauses, hard weights, Boolean integrality and integer
+objectives use exact arithmetic. WBO checks evaluate weighted soft-relation
+violations and enforce the strict soft-top ceiling on that violation cost. UTF-8
+comments preserve original byte hashes.
+OPB products use Boolean conjunction, including complemented and repeated literals,
+in constraints, objectives and weighted soft relations. OPB bodies can omit the
+variable-count comment; their range is inferred from every product literal.
+Malformed terms and unsupported syntax are declined.
+
+```sh
+python3 -m pip install -r klause-bench/tools/requirements-source-checks.txt
+python3 klause-bench/tools/verify_boolean_source_results.py /path/to/cases.json \
+  --source-root /path/to/original-sources --records-root /path/to/raw-job \
+  --output /path/to/boolean-source-checks.json
+```
+
+The checker independently excludes better source objectives or refutes source
+constraints using the pinned Z3 dependency with a ten-second limit. A recognized
+pigeonhole subformula can establish a refutation directly. Timeout leaves proof
+checking unknown; a feasible point receives no optimum credit without that check.
+The exact `coreGuidedLowerBound` statistic is checked by excluding source objectives
+below that floor, including records without an incumbent. `checkedLowerBound` records
+only a completed independent check; an undecided floor uses `boundCheck=unknown`.
+Floor telemetry and floor checking do not establish an optimum without a matching witness.
+Errors are recorded per case and make the command exit unsuccessfully. The checker
+supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
+
+
 ## Comparing configurations
 
 Run separate configurations over frozen membership, hashes, settings, proof
@@ -1315,9 +1349,9 @@ and do not change source witness checks or confer residual optimality.
 repair through its private solve context. Its default is false. It retains the
 existing repair, arithmetic and containing-work limits and still requires exact
 row and coordinate verification; a repaired point supplies no optimum proof.
-`cases.json` uses the maintained offline source-verifier record format; `sources/`
-contains its hash-named original bytes. Independently check it with
-`verify_source_results.py --source-root <sources> --witness-only` on the analysis host.
+`cases.json` retains supplied points and source hashes; `sources/` contains the
+original bytes. Independent validation uses the established MIPLIB checker under
+the [MPS input and receipt contract](#mps-independent-point-validation).
 Returned points retain their exact-source or configured source-tolerance guarantee;
 exact requests reject tolerance-only points. Original objective values are recomputed
 from source numbers and returned coordinates, including tolerance witnesses. The
