@@ -287,7 +287,8 @@ algebraic scalars remain independent of that lifecycle.
 The finite polynomial worker exposes Boolean values from that completed witness
 through `SearchCandidateHints`. Its value-selector adapter reorders only a complete
 two-sided Boolean split; variable choice, integer values, saved phases and both
-alternatives retain their owners. Hint reads spend the same invocation allowance and
+alternatives retain their owners. Explicit solution-guided selectors retain their
+incumbent import path without this adapter. Hint reads spend the same invocation allowance and
 poll the containing cancellation. They create no new point, probe or check allowance.
 Ordinary finite propagation, complete fixed-coordinate checks and source publication
 remain required even when every preferred value agrees with the retained witness.
