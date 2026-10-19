@@ -305,7 +305,7 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `Boolean preferences should share the invocation meter and close lifetime`() {
+    fun `Boolean preferences should share the invocation meter`() {
         val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         var charges = 0L
@@ -322,7 +322,6 @@ class PolynomialTheoryServiceTest {
 
         assertEquals(true, preferred)
         assertEquals(invocation.stats.workSpent, charges)
-        assertNull(invocation.preferredBool(0, Cancellation.Never))
     }
 
 
@@ -348,4 +347,15 @@ class PolynomialTheoryServiceTest {
         }
     }
 
+
+    @Test
+    fun `closed invocation should discard Boolean witness preferences`() {
+        val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
+        val invocation = PolynomialTheoryService(source.formula, source.boolCount, source.realCount).invocation()
+        assertIs<QfNraResult.Satisfiable>(invocation.check())
+
+        invocation.close()
+
+        assertNull(invocation.preferredBool(0, Cancellation.Never))
+    }
 }
