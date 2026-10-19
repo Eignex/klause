@@ -440,7 +440,8 @@ class MpsStdlibRuntimeTest(unittest.TestCase):
                 limits = (limit, limit + 1) if failure == 'kernel' else (limit, limit)
                 size = (limit + 1, resident) if failure == 'virtual' else (baseline, memory + 1) \
                     if failure == 'resident' else (baseline, resident)
-                with mock.patch.object(stdlib_runtime.resource, 'getrlimit', return_value=limits), \
+                with mock.patch.object(stdlib_runtime.resource, 'setrlimit'), \
+                     mock.patch.object(stdlib_runtime.resource, 'getrlimit', return_value=limits), \
                      mock.patch.object(stdlib_runtime, 'task_memory', return_value=size):
                     if failure == 'valid':
                         stdlib_runtime.verify_growth_limit(out, 'bootstrap')
