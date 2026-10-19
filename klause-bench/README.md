@@ -931,9 +931,10 @@ do not establish equal acceptance policies.
 
 The adapter screens known upstream reader limitations without evaluating rows.
 Supported source records use one named vector per section without repeated row
-entries, one objective row, consecutive column blocks, unique objective coefficients and decimal tokens of at most 31 characters
-with exponents between -128 and 128. RANGES, integer markers, bounds and indicators
-are delegated to MIPLIB. BV must be its column's sole bound record. Lower bounds after an UP record, objective RHS
+entries, one objective row, consecutive column blocks, unique objective coefficients
+and decimal tokens of at most 31 characters with exponents between -128 and 128.
+RANGES, integer markers, bounds and indicators are delegated to MIPLIB. BV must be
+its column's sole bound record. Lower bounds after an UP record, objective RHS
 offsets, nonterminating rational coordinates,
 rational source tokens, longer numbers, inline section data, multiple free rows,
 unsupported sections and semantics overrides remain unverified. Terminating rational
@@ -952,18 +953,17 @@ checked afresh.
 
 Each native invocation has a 30-second JVM wall deadline and disabled core dumps.
 Linux uses a 4 GiB address-space limit, 30-second CPU backstop and 1 MiB per output
-file; GNU timeout also
-bounds wall time if its JVM owner is lost. macOS adds 4 GiB to the pre-exec shell
-virtual-size baseline and applies the
-result as an absolute address-space limit, retaining both numbers in stdout.
+file; GNU timeout also bounds wall time if its JVM owner is lost. macOS adds 4 GiB
+to the pre-exec shell virtual-size baseline and applies the result as an absolute
+address-space limit, retaining both numbers in stdout.
 It also uses a 30-second CPU limit and at most 1 MiB per file through the system
 shell. The shell baseline includes Darwin shared mappings; it is not a native
 post-exec resident-memory measurement. Owner loss leaves a CPU bound rather than
-an independent wall bound. Receipts name the actual resource
-policy. The JVM has a 70-second preparation/checking allowance, terminates owned
+an independent wall bound. Receipts name the actual resource policy. The JVM has a
+70-second preparation/checking allowance, terminates owned
 descendants on cancellation and reaps its child within five seconds. Failed limit
-setup cannot earn credit. Source input is limited to
-64 MiB, producer records to 4 MiB and ordinary stdout to 8 MiB.
+setup cannot earn credit. Source input is limited to 64 MiB, producer records to
+4 MiB and ordinary stdout to 8 MiB.
 
 `param=source-validation-gzip=true` selects `mps-miplib2017-point-gzip-v1`.
 The JVM retains losslessly compressed stdout, with an 8 MiB compressed and 64 MiB
