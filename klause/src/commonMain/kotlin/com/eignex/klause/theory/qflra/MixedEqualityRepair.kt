@@ -175,7 +175,8 @@ internal class MixedEqualityRepair(
             for (pivot in pivots.indices) {
                 val coefficient = coefficients[pivot] ?: continue
                 val equation = pivots[pivot] ?: continue
-                val scale = work.quotient(coefficient, equation.coefficients.first()) ?: return EqualityResidual.Declined
+                val scale = work.quotient(coefficient, equation.coefficients.first())
+                    ?: return EqualityResidual.Declined
                 coefficients.remove(pivot)
                 bound = work.subtractProduct(bound, scale, equation.rhs) ?: return EqualityResidual.Declined
                 for (index in 1 until equation.columns.size) {
