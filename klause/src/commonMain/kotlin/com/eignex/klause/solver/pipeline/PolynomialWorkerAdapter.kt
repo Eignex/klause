@@ -27,6 +27,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.FiniteFactorEnforcement
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialSearchComponent
@@ -74,6 +75,9 @@ internal class PolynomialWorkerAdapter(
 
     private fun backtrackParams(): BacktrackParams = params.backtrack.withAssumptions(params.assumptions).copy(
         cancellation = params.backtrack.cancellation or cancellation,
+        valueSelector = PolynomialWitnessValues(params.backtrack.valueSelector, SearchCandidateHints { variable ->
+            invocation.preferredBool(variable, params.backtrack.cancellation or cancellation)
+        }),
         componentFactory = {
             params.backtrack.componentFactory?.invoke().orEmpty() + PolynomialSearchComponent(
                 model.service, invocation, model.integerColumns,

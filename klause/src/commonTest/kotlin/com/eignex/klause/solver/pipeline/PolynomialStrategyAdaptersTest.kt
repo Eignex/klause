@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
@@ -330,4 +331,26 @@ class PolynomialStrategyAdaptersTest {
         assertIs<OpenTheoryResult.Sat>(result)
         assertTrue(result.stats.portfolio.arms.isEmpty())
     }
+
+    @Test
+    fun `Boolean traversal should complete using its retained polynomial root witness`() {
+        val formula = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
+        val source = Problem(
+            1, 0, emptyArray(), arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)),
+            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0),
+        )
+        val shared = assertNotNull(SharedPolynomialModel.assemble(source, formula.formula))
+        val initial = shared.service.invocation().use { it.check().stats.workSpent }
+
+        shared.service.invocation(QfNraParams(maximumWork = initial + 10)).use { invocation ->
+            val params = PolynomialStrategyParams(backtrack = BacktrackParams(valueSelector = IndomainMin))
+            val result = PolynomialWorkerAdapter(
+                shared, invocation, params,
+                EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source)), Cancellation.Never,
+            ).solve(FiniteEngine.BACKTRACK)
+
+            assertTrue(assertIs<SolveResult.Sat>(result).assignment.boolValue(0))
+        }
+    }
+
 }
