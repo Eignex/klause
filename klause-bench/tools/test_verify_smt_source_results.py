@@ -2,6 +2,7 @@ import hashlib
 import json
 import pathlib
 import tempfile
+import types
 import unittest
 from unittest import mock
 
@@ -11,6 +12,44 @@ import verify_nra_source_results as checker
 
 
 class SmtSourceClaimsTest(unittest.TestCase):
+    def test_cleanup_failure_preserves_diagnostics_and_withholds_a_valid_child_claim(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = pathlib.Path(temporary)
+            (out / 'tools').mkdir()
+            tools = {}
+            for name in worker.TOOLS:
+                raw = name.encode()
+                (out / 'tools' / name).write_bytes(raw)
+                tools[name] = hashlib.sha256(raw).hexdigest()
+            for name in ('source.smt2', 'stdout.txt', 'model.smt2', 'record.json'):
+                (out / name).write_text('{}')
+            (out / 'request.json').write_text(json.dumps({'scope': worker.GROUND}))
+            (out / 'tools.json').write_text(json.dumps(tools))
+            expected = worker.bindings(out)
+            (out / 'bootstrap.json').write_text('{}')
+            checked = dict(bindings=expected, scope=worker.GROUND, status='valid',
+                           proofCertificateChecked=False, checkedWitness='checked model',
+                           solverSearchQueries=0, solverQueryCountObserved=True)
+            (out / 'check.stdout').write_text(json.dumps(checked))
+            process = dict(exit=0, complete=True, timedOut=False, overflow=False, parentStop=None)
+            runner = types.SimpleNamespace(SIGNALS=set(), ACTIVE=None,
+                release=mock.Mock(side_effect=PermissionError('group cleanup denied')), stopped=lambda: False,
+                file_digest=lambda path: hashlib.sha256(path.read_bytes()).hexdigest(),
+                save=lambda path, value: path.write_text(json.dumps(value)), owned=mock.Mock(return_value=process))
+
+            with mock.patch.object(worker, 'load', return_value=runner), mock.patch.object(worker.atexit, 'register'):
+                worker.supervise(out, expected, tools, 123)
+
+            result = json.loads((out / 'result.json').read_text())
+            self.assertEqual(result['status'], 'unknown')
+            self.assertIsNone(result['checkedWitness'])
+            self.assertFalse(result['cleanupComplete'])
+            self.assertEqual(result['cleanupErrors'],
+                             [{'phase': 'process', 'type': 'PermissionError', 'message': 'group cleanup denied'}])
+            self.assertEqual(result['processLogs']['check.stdout'], json.dumps(checked))
+            self.assertEqual(result['bootstrapProcess']['exit'], 0)
+            self.assertEqual(result['checkProcess']['exit'], 0)
+
     def test_macos_loader_binds_the_interpreter_and_versioned_python_framework(self):
         executable = '/python/bin/python3'
         framework = '/python/Python.framework/Versions/3.14/Python'

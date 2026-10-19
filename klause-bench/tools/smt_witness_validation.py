@@ -42,11 +42,13 @@ MAX_EXPANDED_FILE = 100663296
 TOOLS = {'smt_witness_validation.py', 'verify_nra_source_results.py',
          'verify_source_results.py', 'requirements-source-checks.txt'}
 ACTIVE = None
+GROUP_LOCK = threading.RLock()
 STOPPED = None
 PARENT = None
 DEADLINE = None
 SIGNALS = {signal.SIGTERM, signal.SIGINT}
 PROC_PIDTASKINFO = 4
+PROC_PGRP_ONLY = 2
 
 
 def digest(raw):
@@ -74,23 +76,52 @@ def save(path, value):
 
 
 def kill_group(process):
-    if process is not None:
+    with GROUP_LOCK:
+        if process is None or ACTIVE is not process:
+            return
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+        except PermissionError:
+            if platform.system() != 'Darwin' or not darwin_exited_leader_only(process):
+                raise
+
+
+def darwin_exited_leader_only(process):
+    observed = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+    if observed is None or observed.si_pid != process.pid:
+        return False
+    library = ctypes.CDLL('/usr/lib/libproc.dylib', use_errno=True)
+    members = library.proc_listpids
+    members.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_int]
+    members.restype = ctypes.c_int
+    pids = (ctypes.c_int * 2)()
+    size = members(PROC_PGRP_ONLY, process.pid, pids, ctypes.sizeof(pids))
+    if size != ctypes.sizeof(ctypes.c_int):
+        return False
+    return pids[0] == process.pid
 
 
 def release():
     global ACTIVE
-    process = ACTIVE
-    if process is not None:
-        kill_group(process)
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            pass
-        ACTIVE = None
+    previous = signal.pthread_sigmask(signal.SIG_BLOCK, SIGNALS)
+    try:
+        with GROUP_LOCK:
+            process = ACTIVE
+            if process is not None:
+                try:
+                    kill_group(process)
+                finally:
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired as error:
+                        raise RuntimeError('child reap incomplete') from error
+                    finally:
+                        if process.returncode is not None:
+                            ACTIVE = None
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous)
 
 
 def stopped():
@@ -137,6 +168,8 @@ def owned(command, prefix, cwd, timeout, memory, resident_memory=False):
     global ACTIVE
     if stopped() or threading.active_count() != 1 or ACTIVE is not None:
         raise RuntimeError('owner stopped or drain still active')
+    if not callable(getattr(os, 'waitid', None)) or not hasattr(os, 'WNOWAIT'):
+        raise RuntimeError('non-reaping child observation unavailable')
     started = time.monotonic_ns()
     darwin = platform.system() == 'Darwin' and resident_memory
     memory_usage = {'method': 'darwin-proc-taskinfo-wait4-v1', 'limitBytes': memory,
@@ -156,20 +189,16 @@ def owned(command, prefix, cwd, timeout, memory, resident_memory=False):
         signal.pthread_sigmask(signal.SIG_SETMASK, previous)
     process = ACTIVE
     def poll():
-        if not darwin:
-            return process.poll()
-        if process.returncode is None:
-            pid, status, usage = os.wait4(process.pid, os.WNOHANG)
-            if pid:
-                process.returncode = os.waitstatus_to_exitcode(status)
-                peak = usage.ru_maxrss
-                if isinstance(peak, int) and peak > 0:
-                    memory_usage['kernelPeakBytes'] = peak
-                    memory_usage['exceeded'] |= peak > memory
-                else:
-                    memory_usage['error'] = 'missing final kernel memory peak'
-                memory_usage['complete'] = memory_usage['error'] is None
-        return process.returncode
+        if process.returncode is not None:
+            return process.returncode
+        observed = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        if observed is None:
+            return None
+        if observed.si_code == os.CLD_EXITED:
+            return observed.si_status
+        if observed.si_code in (os.CLD_KILLED, os.CLD_DUMPED):
+            return -observed.si_status
+        raise RuntimeError('unexpected child observation')
     state = {'stdout': {'bytes': 0, 'observedBytes': 0, 'complete': False},
              'stderr': {'bytes': 0, 'observedBytes': 0, 'complete': False}}
     overflow = threading.Event()
@@ -225,19 +254,29 @@ def owned(command, prefix, cwd, timeout, memory, resident_memory=False):
                 kill_group(process)
                 break
             time.sleep(0.05)
-        if darwin:
-            reap_deadline = time.monotonic() + 5
-            while poll() is None and time.monotonic() < reap_deadline:
-                time.sleep(0.01)
-            if process.returncode is None:
-                kill_group(process)
-        else:
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                kill_group(process)
-        # Descendants can keep pipes open after their parent exits.
+        # The waitable leader pins the group identity while descendants release their pipes.
         kill_group(process)
+        reap_deadline = time.monotonic() + 5
+        while poll() is None and time.monotonic() < reap_deadline:
+            time.sleep(0.01)
+        previous = signal.pthread_sigmask(signal.SIG_BLOCK, SIGNALS)
+        try:
+            with GROUP_LOCK:
+                pid, status, usage = os.wait4(process.pid, os.WNOHANG)
+                if pid != process.pid:
+                    raise RuntimeError('child reap incomplete')
+                process.returncode = os.waitstatus_to_exitcode(status)
+                ACTIVE = None
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous)
+        if darwin:
+            peak = usage.ru_maxrss
+            if isinstance(peak, int) and peak > 0:
+                memory_usage['kernelPeakBytes'] = peak
+                memory_usage['exceeded'] |= peak > memory
+            else:
+                memory_usage['error'] = 'missing final kernel memory peak'
+            memory_usage['complete'] = memory_usage['error'] is None
         for thread in threads:
             thread.join(timeout=2)
         for row, name in [(state['stdout'], 'stdout'), (state['stderr'], 'stderr')]:
