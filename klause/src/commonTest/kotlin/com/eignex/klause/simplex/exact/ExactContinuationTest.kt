@@ -388,6 +388,77 @@ class ExactContinuationTest {
     }
 
     @Test
+    fun `sparse imported equations should preserve unused fixed coordinates in either precision`() {
+        for (wide in listOf(false, true)) {
+            val scale = if (wide) BigFraction.of(BIG_ONE shl 180, BIG_ONE) else BigFraction.ONE
+            val two = BigFraction.ofLong(2)
+            val input = ExactContinuationInput(
+                listOf(listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
+                    listOf(1 to BigFraction.ONE, 2 to BigFraction.ONE), listOf(2 to BigFraction.ONE), emptyList()),
+                listOf(BigFraction.ofLong(3) * scale, BigFraction.ofLong(5) * scale, BigFraction.ofLong(7) * scale),
+                listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, two,
+                    BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO),
+                listOf(null, null, null, two, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO),
+                listOf(0, 1, 2),
+                List(7) { if (it < 3) ContinuationStatus.BASIC else ContinuationStatus.FIXED },
+            )
+
+            val result = ExactContinuation(input).resume()
+
+            assertEquals(listOf(BigFraction.ofLong(3) * scale, two * scale, BigFraction.ofLong(5) * scale,
+                two, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO), result.values)
+            assertNull(result.ray)
+        }
+    }
+
+    @Test
+    fun `independent strict rows should retain their interior equations`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE),
+                listOf(1 to BigFraction.ONE), listOf(1 to BigFraction.ONE)),
+            List(2) { BigFraction.ONE },
+            List(6) { BigFraction.ZERO },
+            List(6) { if (it < 4) BigFraction.ONE else BigFraction.ZERO },
+            listOf(1, 3),
+            listOf(ContinuationStatus.LOWER, ContinuationStatus.BASIC, ContinuationStatus.UPPER,
+                ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED),
+            lowerStrict = listOf(true, false, false, false, false, false),
+            upperStrict = listOf(false, false, true, false, false, false),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        val point = assertNotNull(result.values)
+        assertTrue(point[0] > BigFraction.ZERO && point[0] <= BigFraction.ONE)
+        assertTrue(point[2] >= BigFraction.ZERO && point[2] < BigFraction.ONE)
+        assertEquals(BigFraction.ONE, point[0] + point[1])
+        assertEquals(BigFraction.ONE, point[2] + point[3])
+        assertNull(result.ray)
+    }
+
+    @Test
+    fun `inconsistent sparse equations should retain an exact cancelling ray`() {
+        val two = BigFraction.ofLong(2)
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ZERO, BigFraction.ONE),
+            listOf(null, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(null, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(0, 3),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.FIXED,
+                ContinuationStatus.FIXED, ContinuationStatus.BASIC),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        val ray = assertNotNull(result.ray)
+        assertEquals(2, ray.size)
+        assertEquals(BigFraction.ZERO, ray[0] + ray[1])
+        assertTrue(!ray[1].isZero)
+        assertNull(result.values)
+    }
+
+    @Test
     fun `resource ceilings should decline without certifying a candidate`() {
         val input = ExactContinuationInput(
             listOf(listOf(0 to BigFraction.ONE)),

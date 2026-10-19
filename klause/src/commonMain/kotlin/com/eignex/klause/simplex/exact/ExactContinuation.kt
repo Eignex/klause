@@ -558,6 +558,7 @@ private class RationalContinuationLane<F>(
             for (index in 0 until count) {
                 budget.step()
                 val j = nonzeroColumns[index]
+                if (ops.isZero(table[row][j])) continue
                 value = subtract(value, multiply(table[row][j], seats[j], budget), budget)
             }
             result[headings[row]] = value
@@ -576,6 +577,7 @@ private class RationalContinuationLane<F>(
             for (index in 0 until count) {
                 budget.step()
                 val j = nonzeroColumns[index]
+                if (ops.isZero(table[row][j])) continue
                 value = subtract(value, multiply(table[row][j], epsilon[j], budget), budget)
             }
             result[headings[row]] = value
@@ -651,10 +653,20 @@ private class RationalContinuationLane<F>(
         budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L)
         val next = table.map { it.toMutableList() }
         val inverse = reciprocal(table[row][enter], budget)
-        for (j in 0 until width) next[row][j] = multiply(table[row][j], inverse, budget)
+        for (j in 0 until width) {
+            if (ops.isZero(table[row][j])) {
+                budget.step()
+                continue
+            }
+            next[row][j] = multiply(table[row][j], inverse, budget)
+        }
         for (i in headings.indices) {
             if (i == row || ops.isZero(table[i][enter])) continue
             for (j in 0 until width) {
+                if (ops.isZero(next[row][j])) {
+                    budget.step()
+                    continue
+                }
                 next[i][j] = subtract(table[i][j], multiply(table[i][enter], next[row][j], budget), budget)
             }
         }

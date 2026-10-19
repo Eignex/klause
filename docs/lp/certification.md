@@ -462,6 +462,9 @@ cannot reuse an earlier capture. Lane-owned scratch storage is charged before
 allocation, and capture, row and retained term visits spend the same continuation
 work allowance. Skipped basic and zero seats incur no repeated row visits. Exact
 arithmetic order, source-point checks and certificate authority retain their owners.
+Row evaluation omits zero tableau coefficients. Pivot normalization and row updates
+also omit zero products while retaining visited-cell work and cancellation checks.
+The tableau copy, scalar admission history and cumulative limits remain charged.
 
 Every certifier accounts for its model passes either through basis/continuation
 metrics or its own meter. Cheap exact arithmetic charges operand word-length
