@@ -100,7 +100,7 @@ source snapshot remains unchanged. Distinctness retains its ordered numeric oper
 query normalization constructs exact disequalities for every pair under that same
 arithmetic allowance, without publishing a partial normalized formula.
 Each `PolynomialTheoryInvocation` owns a cumulative native work allowance
-across fresh conditioned checks. Boolean pins and rational lower/upper bounds are
+across conditioned checks. Boolean pins and rational lower/upper bounds are
 conjoined within the counted arithmetic scope. Query construction, normalization,
 CAD, exact witness capture and the final verdict poll share cancellation and allocation
 limits. Closing the invocation rejects further queries; captured scalar witnesses
@@ -112,7 +112,7 @@ A query over an unfixed integer interval is a real relaxation: its exact refutat
 can reject the finite branch, while its witness cannot accept that branch. Complete
 checks require every mapped integer and Boolean to be fixed. Conflicts without a
 clause explanation remain chronological and cannot enter learned-clause exchange.
-Retraction invalidates query results; the containing invocation allowance persists.
+Retraction invalidates the adapter's current result; the containing invocation allowance persists.
 Optimization installs additional component factories before its first shared
 check. Finite LP primal proposals and transferred initial candidates remain
 withheld until those components complete their source checks.
@@ -276,9 +276,21 @@ See [resource allowances](../solver/resources.md) for the containing scope.
 
 A conditioned polynomial service invocation retains its native allowance across
 queries. Each query captures its own Boolean pins and exact rational bounds and owns
-fresh traversal state. Retraction discards the adapter's current result; it does not
-refund work. The scope owner closes the invocation after search, while published
+fresh traversal state when no retained witness applies. A completed immutable native
+witness remains private to the invocation. Boolean-only conditions can reuse it after
+a charged scan checks every pin and the final stop poll completes. Conflicting pins
+and supplied numeric bounds require fresh traversal; no refutation is reused across
+conditions. Compatibility scans retain their spent native work on mismatch, stop or
+close. Retraction discards the adapter's current result; it does not refund work. The scope owner closes the invocation after search, while published
 algebraic scalars remain independent of that lifecycle.
+
+The finite polynomial worker exposes Boolean values from that completed witness
+through `SearchCandidateHints`. Its value-selector adapter reorders only a complete
+two-sided Boolean split; variable choice, integer values, saved phases and both
+alternatives retain their owners. Hint reads spend the same invocation allowance and
+poll the containing cancellation. They create no new point, probe or check allowance.
+Ordinary finite propagation, complete fixed-coordinate checks and source publication
+remain required even when every preferred value agrees with the retained witness.
 
 ### Public controls and accounting
 

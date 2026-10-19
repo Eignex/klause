@@ -1,5 +1,7 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
@@ -77,7 +79,8 @@ internal class PolynomialTheoryInvocation(
     private var closed = false
     private var active = false
     private var completedStats = QfNraStats(0, 0, 0)
-    private var pending: QfNraQuery? = null
+    private var pending: PolynomialRetainedQuery? = null
+    private var witness: QfNraAssignment? = null
     val stats: QfNraStats get() = pending?.stats?.let { combine(completedStats, it) } ?: completedStats
     var lastUnknown: QfNraResult.Unknown? = null
         private set
@@ -101,9 +104,10 @@ internal class PolynomialTheoryInvocation(
         check(!active) { "polynomial invocation has an active query" }
         active = true
         val remaining = params.maximumWork?.let { (it - completedStats.workSpent).coerceAtLeast(0) }
-        val query = QfNraQuery(formula, boolCount, realCount,
+        val query = PolynomialRetainedQuery(formula, boolCount, realCount,
             params.copy(cancellation = params.cancellation or cancellation, maximumWork = remaining),
-            PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper))
+            PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper),
+            witness.takeIf { condition.lower.isEmpty() && condition.upper.isEmpty() })
         pending = query
         queries = sum(queries, 1)
         return object : Iterator<QfNraResult?> {
@@ -117,6 +121,7 @@ internal class PolynomialTheoryInvocation(
                     val result = query.next()
                     if (result != null) {
                         completedStats = combine(completedStats, result.stats)
+                        if (result is QfNraResult.Satisfiable) witness = result.assignment
                         lastUnknown = result as? QfNraResult.Unknown
                         finished = true
                         pending = null
@@ -134,38 +139,112 @@ internal class PolynomialTheoryInvocation(
         }
     }
 
+    fun preferredBool(variable: Int, cancellation: Cancellation): Boolean? {
+        if (closed || active || variable !in 0 until boolCount) return null
+        val point = witness ?: return null
+        val remaining = params.maximumWork?.let { (it - completedStats.workSpent).coerceAtLeast(0) }
+        val work = QfNraWork(params.copy(cancellation = params.cancellation or cancellation, maximumWork = remaining))
+        return try {
+            PolynomialArithmetic(work, params.polynomialLimits).step()
+            point.boolValue(variable)
+        } catch (_: PolynomialInterrupted) {
+            null
+        } finally {
+            completedStats = combine(completedStats, work.snapshot())
+        }
+    }
+
     override fun close() {
         pending?.let { completedStats = combine(completedStats, it.stats) }
         pending = null
         active = false
+        witness = null
         closed = true
     }
+}
 
-    private fun combine(left: QfNraStats, right: QfNraStats): QfNraStats = QfNraStats(
-        sum(left.projectedPolynomials, right.projectedPolynomials),
-        sum(left.liftedCells, right.liftedCells), sum(left.workSpent, right.workSpent),
-        if (left.dyadicAttempts == null && right.dyadicAttempts == null) null
-        else sum(left.dyadicAttempts ?: 0, right.dyadicAttempts ?: 0),
-        if (left.dyadicBases == null && right.dyadicBases == null) null
-        else sum(left.dyadicBases ?: 0, right.dyadicBases ?: 0),
-        if (left.coupledWorkDeclines == null && right.coupledWorkDeclines == null) null
-        else sum(left.coupledWorkDeclines ?: 0, right.coupledWorkDeclines ?: 0),
-        if (left.dyadicPreExtractionDeclines == null && right.dyadicPreExtractionDeclines == null) null
-        else sum(left.dyadicPreExtractionDeclines ?: 0, right.dyadicPreExtractionDeclines ?: 0),
-        if (left.booleanTheoryRegions == null && right.booleanTheoryRegions == null) null
-        else sum(left.booleanTheoryRegions ?: 0, right.booleanTheoryRegions ?: 0),
-        if (left.booleanTheoryAtoms == null && right.booleanTheoryAtoms == null) null
-        else sum(left.booleanTheoryAtoms ?: 0, right.booleanTheoryAtoms ?: 0),
-        if (left.booleanTheoryConstantRefutations == null && right.booleanTheoryConstantRefutations == null) null
-        else sum(left.booleanTheoryConstantRefutations ?: 0, right.booleanTheoryConstantRefutations ?: 0),
-        if (left.booleanTheoryResourceRefusals == null && right.booleanTheoryResourceRefusals == null) null
-        else sum(left.booleanTheoryResourceRefusals ?: 0, right.booleanTheoryResourceRefusals ?: 0),
-        right.lastBooleanTheoryResource ?: left.lastBooleanTheoryResource,
-        if (left.equationalSections == null && right.equationalSections == null) null
-        else sum(left.equationalSections ?: 0, right.equationalSections ?: 0),
-        if (left.equationalRootLevels == null && right.equationalRootLevels == null) null
-        else sum(left.equationalRootLevels ?: 0, right.equationalRootLevels ?: 0),
-    )
+private fun combine(left: QfNraStats, right: QfNraStats): QfNraStats = QfNraStats(
+    sum(left.projectedPolynomials, right.projectedPolynomials),
+    sum(left.liftedCells, right.liftedCells), sum(left.workSpent, right.workSpent),
+    if (left.dyadicAttempts == null && right.dyadicAttempts == null) null
+    else sum(left.dyadicAttempts ?: 0, right.dyadicAttempts ?: 0),
+    if (left.dyadicBases == null && right.dyadicBases == null) null
+    else sum(left.dyadicBases ?: 0, right.dyadicBases ?: 0),
+    if (left.coupledWorkDeclines == null && right.coupledWorkDeclines == null) null
+    else sum(left.coupledWorkDeclines ?: 0, right.coupledWorkDeclines ?: 0),
+    if (left.dyadicPreExtractionDeclines == null && right.dyadicPreExtractionDeclines == null) null
+    else sum(left.dyadicPreExtractionDeclines ?: 0, right.dyadicPreExtractionDeclines ?: 0),
+    if (left.booleanTheoryRegions == null && right.booleanTheoryRegions == null) null
+    else sum(left.booleanTheoryRegions ?: 0, right.booleanTheoryRegions ?: 0),
+    if (left.booleanTheoryAtoms == null && right.booleanTheoryAtoms == null) null
+    else sum(left.booleanTheoryAtoms ?: 0, right.booleanTheoryAtoms ?: 0),
+    if (left.booleanTheoryConstantRefutations == null && right.booleanTheoryConstantRefutations == null) null
+    else sum(left.booleanTheoryConstantRefutations ?: 0, right.booleanTheoryConstantRefutations ?: 0),
+    if (left.booleanTheoryResourceRefusals == null && right.booleanTheoryResourceRefusals == null) null
+    else sum(left.booleanTheoryResourceRefusals ?: 0, right.booleanTheoryResourceRefusals ?: 0),
+    right.lastBooleanTheoryResource ?: left.lastBooleanTheoryResource,
+    if (left.equationalSections == null && right.equationalSections == null) null
+    else sum(left.equationalSections ?: 0, right.equationalSections ?: 0),
+    if (left.equationalRootLevels == null && right.equationalRootLevels == null) null
+    else sum(left.equationalRootLevels ?: 0, right.equationalRootLevels ?: 0),
+)
 
-    private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
+private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
+
+private class PolynomialRetainedQuery(
+    formula: PolynomialRealFormula,
+    boolCount: Int,
+    realCount: Int,
+    params: QfNraParams,
+    condition: PolynomialCondition,
+    witness: QfNraAssignment?,
+) {
+    private val work = QfNraWork(params)
+    private var query: QfNraQuery? = null
+    val stats: QfNraStats get() = query?.stats?.let { combine(work.snapshot(), it) } ?: work.snapshot()
+    private val preparation = sequence<QfNraResult?> {
+        if (witness != null) {
+            val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
+            try {
+                arithmetic.step()
+                var compatible = true
+                for ((id, value) in condition.bools) {
+                    arithmetic.step()
+                    require(id in 0 until boolCount) { "conditioned Boolean id out of range" }
+                    if (witness.boolValue(id) != value) compatible = false
+                }
+                arithmetic.step()
+                if (compatible) {
+                    yield(QfNraResult.Satisfiable(witness, work.snapshot()))
+                    return@sequence
+                }
+            } catch (_: PolynomialInterrupted) {
+                val reason = if (work.limitReached) QfNraReason.WorkLimit else QfNraReason.Interrupted
+                yield(QfNraResult.Unknown(reason, work.snapshot()))
+                return@sequence
+            }
+        }
+        val remaining = params.maximumWork?.let { (it - work.snapshot().workSpent).coerceAtLeast(0) }
+        val native = QfNraQuery(formula, boolCount, realCount, params.copy(maximumWork = remaining), condition)
+        query = native
+        while (true) {
+            when (val result = native.next()) {
+                null -> yield(null)
+                is QfNraResult.Satisfiable -> {
+                    yield(result.copy(stats = stats))
+                    return@sequence
+                }
+                is QfNraResult.Unsatisfiable -> {
+                    yield(result.copy(stats = stats))
+                    return@sequence
+                }
+                is QfNraResult.Unknown -> {
+                    yield(result.copy(stats = stats))
+                    return@sequence
+                }
+            }
+        }
+    }.iterator()
+
+    fun next(): QfNraResult? = preparation.next()
 }

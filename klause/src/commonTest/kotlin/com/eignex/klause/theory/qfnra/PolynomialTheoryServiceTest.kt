@@ -222,4 +222,130 @@ class PolynomialTheoryServiceTest {
         }
         service.invocation().use { assertIs<QfNraResult.Satisfiable>(it.check()) }
     }
+
+    @Test
+    fun `compatible Boolean conditions should reuse a witness within the remaining allowance`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const b Bool) (declare-const x Real) (assert b) (assert (= (* x x) 2))",
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val initial = service.invocation().use { it.check().stats.workSpent }
+
+        service.invocation(QfNraParams(maximumWork = initial + 10)).use { invocation ->
+            assertIs<QfNraResult.Satisfiable>(invocation.check())
+            val repeated = invocation.check(PolynomialCondition(bools = mapOf(0 to true)))
+
+            assertTrue(assertIs<QfNraResult.Satisfiable>(repeated).assignment.boolValue(0))
+            assertEquals(0L, repeated.stats.projectedPolynomials)
+            assertEquals(initial + repeated.stats.workSpent, invocation.stats.workSpent)
+            assertEquals(2L, invocation.queries)
+        }
+    }
+
+    @Test
+    fun `incompatible Boolean conditions should still refute the current branch`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const b Bool) (declare-const x Real) (assert (or b (= (* x x) (- 1))))",
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+
+        service.invocation().use { invocation ->
+            assertIs<QfNraResult.Satisfiable>(invocation.check())
+            val contradictory = invocation.check(PolynomialCondition(bools = mapOf(0 to false)))
+            val retracted = invocation.check()
+
+            assertIs<QfNraResult.Unsatisfiable>(contradictory)
+            assertTrue(assertIs<QfNraResult.Satisfiable>(retracted).assignment.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `numeric bounds should require a fresh check after a retained witness`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (assert (>= x 0)) (assert (= (* x x) 1))",
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+
+        service.invocation().use { invocation ->
+            assertIs<QfNraResult.Satisfiable>(invocation.check())
+            val result = invocation.check(PolynomialCondition(lower = mapOf(0 to BigFraction.ofLong(2))))
+
+            assertIs<QfNraResult.Unsatisfiable>(result)
+        }
+    }
+
+    @Test
+    fun `retained witness compatibility should respect the final native work poll`() {
+        val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val initial = service.invocation().use { it.check().stats.workSpent }
+
+        service.invocation(QfNraParams(maximumWork = initial + 3)).use { invocation ->
+            assertIs<QfNraResult.Satisfiable>(invocation.check())
+            val result = invocation.check(PolynomialCondition(bools = mapOf(0 to true)))
+
+            assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
+            assertEquals(initial + 3, invocation.stats.workSpent)
+        }
+    }
+
+    @Test
+    fun `cancelled retained witness check should leave a later query available`() {
+        val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+
+        service.invocation().use { invocation ->
+            assertIs<QfNraResult.Satisfiable>(invocation.check())
+            val cancelled = invocation.check(cancellation = Cancellation { true })
+            val resumed = invocation.check()
+
+            assertEquals(QfNraReason.Interrupted, assertIs<QfNraResult.Unknown>(cancelled).reason)
+            assertTrue(assertIs<QfNraResult.Satisfiable>(resumed).assignment.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `Boolean preferences should share the invocation meter and close lifetime`() {
+        val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        var charges = 0L
+        val meter = object : Cancellation, WorkMeter {
+            override fun isCancelled() = false
+            override fun workMeter(): WorkMeter = this
+            override fun charge(units: Long) { charges += units }
+        }
+        val invocation = service.invocation(QfNraParams(cancellation = meter))
+        assertIs<QfNraResult.Satisfiable>(invocation.check())
+
+        val preferred = invocation.preferredBool(0, Cancellation.Never)
+        invocation.close()
+
+        assertEquals(true, preferred)
+        assertEquals(invocation.stats.workSpent, charges)
+        assertNull(invocation.preferredBool(0, Cancellation.Never))
+    }
+
+
+    @Test
+    fun `cancellation at retained witness publication should withhold the result`() {
+        val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        var charges = 0L
+        var stopAt = Long.MAX_VALUE
+        val token = object : Cancellation, WorkMeter {
+            override fun isCancelled() = charges >= stopAt
+            override fun workMeter(): WorkMeter = this
+            override fun charge(units: Long) { charges += units }
+        }
+
+        service.invocation(QfNraParams(cancellation = token)).use { invocation ->
+            assertIs<QfNraResult.Satisfiable>(invocation.check())
+            stopAt = charges + 3
+            val result = invocation.check(PolynomialCondition(bools = mapOf(0 to true)))
+
+            assertEquals(QfNraReason.Interrupted, assertIs<QfNraResult.Unknown>(result).reason)
+            assertEquals(charges, invocation.stats.workSpent)
+        }
+    }
+
 }
