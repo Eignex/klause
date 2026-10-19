@@ -46,6 +46,7 @@ internal class ProblemFacts(
     val booleanObjective: Boolean = false,
     val circuit: Boolean = false,
     val binaryPackingObjective: Boolean = false,
+    val binaryEqualityObjective: Boolean = false,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -75,6 +76,7 @@ internal class ProblemFacts(
                 profile,
                 binaryIntegers = binary,
                 binaryPackingObjective = binary && problem.hasPackingObjective(objective),
+                binaryEqualityObjective = binary && problem.hasBinaryEqualityObjective(objective),
                 continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
                 integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
                     it is Linear && it.integerConstants != null
@@ -134,4 +136,20 @@ private fun Factor.isBinaryPackingCapacity(): Boolean {
         }
     }
     return coupled
+}
+
+private fun BakedProblem.hasBinaryEqualityObjective(objective: LinearObjective?): Boolean {
+    if (numBoolVars != 0 || numRealVars != 0 || numIntVars == 0 || objective == null) return false
+    if (objective.boolWeightValues.any { it != 0L } || objective.realCoefficientValues.any { it != 0.0 } ||
+        objective.intCoefficientValues.size > numIntVars ||
+        objective.intCoefficientValues.none { it > 0L } || objective.intCoefficientValues.any { it < 0L }
+    ) {
+        return false
+    }
+    return factors.isNotEmpty() && factors.all { factor ->
+        val form = factor.linearForm as? LinearForm.Conjunction ?: return@all false
+        form.rows.isNotEmpty() && form.rows.all { row ->
+            row.isLongUnconditional && row.isIntegerOnly && row.relation == LinearOp.EQ
+        }
+    }
 }

@@ -576,4 +576,56 @@ class PortfolioCompositionTest {
 
         assertSame(budget, lp.recipe.build(1L, null).nodeBudget)
     }
+
+    @Test
+    fun `binary equality objectives should preserve existing worker positions with an LP companion`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val baseline = PortfolioComposition.compose(scenario, ProblemFacts(profile, binaryIntegers = true) { true })
+        val facts = ProblemFacts(profile, binaryIntegers = true, binaryEqualityObjective = true) { true }
+
+        val composed = PortfolioComposition.compose(scenario, facts)
+
+        assertEquals(baseline.map { it.label } + "lp-aggressive", composed.map { it.label })
+    }
+
+    @Test
+    fun `binary equality objectives should preserve explicit parallel and disabled LP composition`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        for (control in listOf(
+            scenario.copy(cores = 2),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(kind = Kind.CSP),
+            scenario.copy(arms = 5),
+            scenario.copy(lpCeiling = LpConfig.OFF),
+            scenario.copy(btEdit = { it }),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
+            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
+            scenario.copy(annotationArm = BacktrackParams()),
+        )) {
+            val available = control.lpCeiling != LpConfig.OFF
+            val baseline = ProblemFacts(profile, binaryIntegers = true) { available }
+            val equality = ProblemFacts(profile, binaryIntegers = true, binaryEqualityObjective = true) { available }
+
+            assertEquals(
+                PortfolioComposition.compose(control, baseline).map { it.label },
+                PortfolioComposition.compose(control, equality).map { it.label },
+            )
+        }
+    }
+
+    @Test
+    fun `binary equality LP should spend the containing node allowance`() {
+        val budget = NodeBudget(limit = 100)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(nodeBudget = budget)
+        val facts = ProblemFacts(
+            ProblemFacts.assumed(Kind.COP).profile, binaryIntegers = true, binaryEqualityObjective = true,
+        ) { true }
+
+        val composed = PortfolioComposition.compose(scenario, facts)
+        val lp = composed.filterIsInstance<BacktrackWorkerConfig>().single { it.label == "lp-aggressive" }
+
+        assertSame(budget, lp.recipe.build(1L, null).nodeBudget)
+    }
 }
