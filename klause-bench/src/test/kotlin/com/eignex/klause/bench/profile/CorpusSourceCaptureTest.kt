@@ -73,6 +73,26 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
+    fun `short lived source workers should drain both streams before cleanup returns`() {
+        repeat(20) {
+            val out = Files.createTempDirectory("source-short-worker-test-").toFile()
+            try {
+                val command = listOf("/usr/bin/setsid", "/bin/sh", "-c",
+                    "printf 'raw\\r\\n'; printf 'diagnostic\\r\\n' >&2")
+
+                CorpusSourceCapture.execute(command, out)
+
+                assertEquals("raw\r\n", out.resolve("worker.stdout").readText())
+                assertEquals("diagnostic\r\n", out.resolve("worker.stderr").readText())
+                val receipt = Json.parseToJsonElement(out.resolve("worker-process.json").readText()).jsonObject
+                assertEquals("true", receipt.getValue("streamsComplete").jsonPrimitive.content)
+            } finally {
+                out.deleteRecursively()
+            }
+        }
+    }
+
+    @Test
     fun `worker overflow should retain a bounded prefix and stop the owned group`() {
         val out = Files.createTempDirectory("source-overflow-test-").toFile()
         try {
