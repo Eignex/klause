@@ -741,7 +741,7 @@ class QfNraSolverProposalTest {
 
         val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(0L, refuted.stats.dyadicAttempts)
-        assertTrue(checkNotNull(refuted.stats.booleanTheoryRegions) > 0)
+        assertEquals(0L, refuted.stats.booleanTheoryRegions)
     }
 
     @Test
