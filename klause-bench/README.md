@@ -1302,8 +1302,13 @@ plus at most two five-second termination/reaping waits. With the solver's existi
 40-second watchdog and two-second stderr drain for a feasible ten-second run, this
 leaves 18 seconds for source/receipt I/O inside the ordinary 140-second case deadline.
 The external deadline still governs incomplete work. Sources over 64 MiB, solver stdout over 8 MiB,
-producer records/receipts over 4 MiB and checker streams over 1 MiB remain unchecked. Private runtime directories are removed after checking. Missing dependencies,
+producer records/receipts over 4 MiB and checker streams over 1 MiB remain unchecked.
+Private runtime directories are removed after checking. Missing dependencies,
 timeout, incomplete output, changed custody or failed cleanup cannot yield valid
+credit.
+The solve record retains at most 64 KiB of supervisor output as base64, its prefix
+hash, full file byte count and completeness flag so startup failures remain
+diagnosable when only the record is returned. This diagnostic supplies no validation
 credit.
 
 For long incumbent histories, also pass `param=source-validation-gzip=true` to
