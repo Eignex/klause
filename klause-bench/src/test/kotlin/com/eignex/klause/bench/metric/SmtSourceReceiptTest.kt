@@ -98,7 +98,11 @@ class SmtSourceReceiptTest {
         ),
     )
 
-    private fun receipt(producer: SolveRecord = record, machine: String? = null): SmtSourceValidation.Receipt {
+    private fun receipt(
+        producer: SolveRecord = record,
+        machine: String? = null,
+        launcher: Boolean = false,
+    ): SmtSourceValidation.Receipt {
         val refutation = producer.feasible == false
         val result = SmtSourceValidation.Receipt(
             "valid", "checked", requireNotNull(SmtSourceValidation.eligible(producer)),
@@ -117,18 +121,22 @@ class SmtSourceReceiptTest {
         } else {
             "54/9e/a11186061d9fead8be43bad7c75055585694124b2ccdd896ef249fe5824f/"
         }
+        val framework = "/Library/Frameworks/Python.framework/Versions/3.13/Python"
+        val invoked = if (launcher) framework.removeSuffix("/Python") + "/bin/python3.13" else runtime.pythonExecutable
+        val loaded = if (launcher) framework.removeSuffix("/Python") +
+            "/Resources/Python.app/Contents/MacOS/Python" else invoked
         val macRuntime = runtime.copy(
-            machine = machine, libc = listOf("", ""), wheelBytes = if (arm) 36_882_388L else 39_637_842L,
+            pythonExecutable = invoked, machine = machine, libc = listOf("", ""),
+            wheelBytes = if (arm) 36_882_388L else 39_637_842L,
             wheelSha256 = if (arm) "65335aab295ded7c0ce27c85556067087a87052389ff160777d1a1d48ef0d74f"
                 else "3e62e93adff2def3537ff1ca67c3d58a6ca6d1944e0b5e774f88627b199d50e7",
             wheelUrl = "https://files.pythonhosted.org/packages/" + wheel +
                 "z3_solver-4.15.3.0-py3-none-macosx_13_0_$machine.whl",
             extractedFiles = runtime.extractedFiles.map { it.copy(path = it.path.replace(".so", ".dylib")) },
         )
-        val framework = "/Library/Frameworks/Python.framework/Versions/3.13/Python"
         val library = native.library.copy(path = native.library.path.replace(".so", ".dylib"))
         val cpu = if (arm) 0x100000c else 0x1000007
-        val images = listOf(runtime.pythonExecutable, framework, library.path).mapIndexed { index, path ->
+        val images = listOf(loaded, framework, library.path).mapIndexed { index, path ->
             """{"path":"$path","address":"${(index + 1) * 1000}","magic":"feedfacf","cpuType":$cpu}"""
         }.joinToString("\n", postfix = "\n")
         val memory = mapOf(
@@ -137,11 +145,20 @@ class SmtSourceReceiptTest {
         ).mapValues { (_, limit) ->
             SmtResidentMemory("darwin-proc-taskinfo-wait4-v1", limit, 100, 200, 1, true, false, null)
         }
+        val launcherFiles = listOfNotNull(
+            MpsCheckerFile(invoked, 100, runtime.pythonExecutableSha256),
+            MpsCheckerFile(loaded, 100, "b".repeat(64)).takeIf { launcher },
+            MpsCheckerFile(framework, 100, "f".repeat(64)),
+        )
         return result.copy(runtime = macRuntime, residentMemory = memory,
-            bootstrapProcess = requireNotNull(result.bootstrapProcess).copy(addressSpaceBytes = 0),
-            checkProcess = requireNotNull(result.checkProcess).copy(addressSpaceBytes = 0), nativeRuntime = native.copy(
-            library = library, maps = images, mapsSha256 = sha256(images.toByteArray()),
-            pythonProviders = native.pythonProviders + MpsCheckerFile(framework, 100, "f".repeat(64)),
+            bootstrapProcess = requireNotNull(result.bootstrapProcess).copy(addressSpaceBytes = 0,
+                command = bootstrap.command.mapIndexed { index, value -> if (index == 0) invoked else value }),
+            checkProcess = requireNotNull(result.checkProcess).let { process ->
+                process.copy(addressSpaceBytes = 0,
+                    command = process.command.mapIndexed { index, value -> if (index == 0) invoked else value })
+            }, nativeRuntime = native.copy(
+            executablePath = invoked, library = library, maps = images, mapsSha256 = sha256(images.toByteArray()),
+            pythonProviders = launcherFiles,
             platform = "Darwin", systemVersion = "13.0.0", mappingKind = "dyld-images-v1",
         ))
     }
@@ -171,16 +188,21 @@ class SmtSourceReceiptTest {
     }
 
     @ParameterizedTest
-    @CsvSource("arm64,ground,false", "arm64,ground,true", "arm64,SMT,false", "arm64,SMT,true",
-        "x86_64,ground,false", "x86_64,ground,true", "x86_64,SMT,false", "x86_64,SMT,true")
+    @CsvSource(
+        "arm64,ground,false,false", "arm64,ground,true,false", "arm64,SMT,false,false", "arm64,SMT,true,false",
+        "x86_64,ground,false,false", "x86_64,ground,true,false", "x86_64,SMT,false,false", "x86_64,SMT,true,false",
+        "arm64,ground,false,true", "arm64,ground,true,true", "arm64,SMT,false,true", "arm64,SMT,true,true",
+        "x86_64,ground,false,true", "x86_64,ground,true,true", "x86_64,SMT,false,true", "x86_64,SMT,true,true",
+    )
     fun `macOS receipts should retain checked claims with pinned loaded providers`(
         machine: String,
         logic: String,
         builtin: Boolean,
+        launcher: Boolean,
     ) {
         val refutation = logic != "ground"
         val producer = if (refutation) record.copy(feasible = false, proven = true, finalWitness = null) else record
-        val original = receipt(producer, machine)
+        val original = receipt(producer, machine, launcher)
         val macNative = requireNotNull(original.nativeRuntime)
         val math = if (builtin) arithmetic.copy(modules = arithmetic.modules - "math", builtinMath = MpsBuiltinModule(
             "built-in", "_frozen_importlib.BuiltinImporter", macNative.executablePath,
@@ -303,10 +325,12 @@ class SmtSourceReceiptTest {
             "mac-memory", "mac-runtime-kind", "mac-framework-version", "mac-duplicate-header",
             "mac-rss-missing", "mac-rss-limit", "mac-rss-peak", "mac-rss-complete", "mac-rss-exceeded",
             "mac-rss-method", "mac-rss-error", "mac-rss-sample", "mac-rss-zero", "linux-rss",
+            "mac-launcher-path", "mac-launcher-main", "mac-launcher-framework", "mac-launcher-provider",
         ],
     )
     fun `incomplete or mismatched receipt custody should withhold acceptance`(failure: String) {
-        val original = receipt(machine = "arm64".takeIf { failure.startsWith("mac-") })
+        val original = receipt(machine = "arm64".takeIf { failure.startsWith("mac-") },
+            launcher = failure.startsWith("mac-launcher-"))
         val macRuntime = requireNotNull(original.runtime)
         val macNative = requireNotNull(original.nativeRuntime)
         val changed = when (failure) {
@@ -385,6 +409,19 @@ class SmtSourceReceiptTest {
             "mac-maps-hash" -> original.copy(nativeRuntime = macNative.copy(mapsSha256 = "f".repeat(64)))
 
             "mac-memory" -> original.copy(checkProcess = check.copy(addressSpaceBytes = 1))
+
+            "mac-launcher-path" -> original.copy(nativeRuntime = macNative.copy(executablePath = "/else/python3.13"))
+
+            "mac-launcher-provider" -> original.copy(nativeRuntime = macNative.copy(
+                pythonProviders = macNative.pythonProviders.filter { "Python.app" !in it.path },
+            ))
+
+            "mac-launcher-main", "mac-launcher-framework" -> {
+                val maps = if (failure == "mac-launcher-main") {
+                    macNative.maps.replace("/Resources/Python.app/Contents/MacOS/Python", "/foreign/Python")
+                } else macNative.maps.replace("/Versions/3.13/Python", "/Versions/3.12/Python")
+                original.copy(nativeRuntime = macNative.copy(maps = maps, mapsSha256 = sha256(maps.toByteArray())))
+            }
 
             "mac-rss-missing" -> original.copy(residentMemory = null)
 

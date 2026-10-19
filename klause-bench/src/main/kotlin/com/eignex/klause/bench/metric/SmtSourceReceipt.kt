@@ -241,18 +241,32 @@ internal object SmtSourceReceipt {
         require(builtin.origin == "built-in" && builtin.loader == "_frozen_importlib.BuiltinImporter")
         val paths = darwinImagePaths(builtin.maps, builtin.mapsSha256, runtime.machine)
         val executable = builtin.executablePath
-        require(paths.first() == executable)
+        val loaded = paths.first()
         require(executable.startsWith('/') && executable.none { it.isWhitespace() || it == '\\' })
         val version = Regex.escape(runtime.pythonVersion.split('.').take(2).joinToString("."))
+        if (loaded != executable) {
+            val suffix = "/Resources/Python.app/Contents/MacOS/Python"
+            require(loaded.endsWith(suffix))
+            val framework = loaded.removeSuffix(suffix)
+            require(Regex("/Python\\.framework/Versions/$version[dmt]*$").containsMatchIn(framework))
+            require("$framework/Python" in paths)
+            val directories = mutableSetOf("$framework/bin")
+            if ("/Frameworks/Python.framework/" in framework) {
+                directories += framework.substringBefore("/Frameworks/Python.framework/") + "/bin"
+            }
+            require(executable.substringBeforeLast('/') in directories)
+            val major = Regex.escape(runtime.pythonVersion.substringBefore('.'))
+            require(Regex("python(?:$version|$major)[dmt]*").matches(executable.substringAfterLast('/')))
+        }
         val selected = paths.filter { path ->
             val name = path.substringAfterLast('/')
             val python = name.startsWith("libpython") || (name == "Python" && "/Python.framework/" in path)
-            if (python && path != executable) {
+            if (python && path != executable && path != loaded) {
                 require(Regex("libpython$version[dmt]*\\.dylib").matches(name) ||
                     Regex("/Python\\.framework/Versions/$version[dmt]*/Python$").containsMatchIn(path))
             }
-            path == executable || python
-        }.toSet()
+            path == executable || path == loaded || python
+        }.toSet() + executable
         val providers = builtin.providers
         require(selected.size in 1..3 && providers.size == selected.size &&
             providers.map { it.path }.toSet() == selected)

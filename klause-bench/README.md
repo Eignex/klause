@@ -1243,8 +1243,10 @@ to 4 MiB, each tool and raw child stream to 1 MiB. The native checker library is
 to its private extracted wheel file and executable mapping; Python module/interpreter
 providers retain the reviewed bounded identity checks. Linux reads executable
 `/proc` mappings; macOS records dyld image addresses, Mach-O headers and CPU types,
-binding the interpreter, versioned Python framework or dylib, and private Z3 library
-to their file identities. Foreign libraries, unsupported platforms or unavailable
+binding the invoked executable, loaded interpreter, versioned Python framework or
+dylib, and private Z3 library to their file identities. Framework launchers bind
+the invoked wrapper and app-bundle interpreter to the same loaded versioned
+framework; an unrelated executable or missing framework withholds acceptance. Foreign libraries, unsupported platforms or unavailable
 resource custody withholds acceptance.
 
 Adjacent `smt-source-check-*` evidence retains verbatim original source/model/stdout,

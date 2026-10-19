@@ -23,6 +23,36 @@ class SmtSourceClaimsTest(unittest.TestCase):
 
                 self.assertEqual(set(providers), {executable, framework})
 
+    def test_macos_framework_launcher_binds_invocation_interpreter_and_framework(self):
+        framework = '/package/Frameworks/Python.framework/Versions/3.14'
+        loaded = framework + '/Resources/Python.app/Contents/MacOS/Python'
+        for directory in [framework + '/bin', '/package/bin']:
+            executable = directory + '/python3.14'
+            images = [dict(path=path, address=format(index + 1, 'x'), magic='feedfacf', cpuType=0x100000c)
+                      for index, path in enumerate([loaded, framework + '/Python', '/private/z3/lib/libz3.dylib'])]
+            with self.subTest(directory=directory):
+                providers = worker.darwin_provider_paths(images, executable, '3.14.8', 'arm64')
+            self.assertEqual(set(providers), {executable, loaded, framework + '/Python'})
+
+    def test_macos_framework_launcher_declines_foreign_paths_and_missing_framework(self):
+        framework = '/package/Frameworks/Python.framework/Versions/3.14'
+        loaded = framework + '/Resources/Python.app/Contents/MacOS/Python'
+        for failure in ['invoked-path', 'invoked-version', 'loaded-path', 'framework']:
+            executable = framework + '/bin/python3.14'
+            paths = [loaded, framework + '/Python']
+            if failure == 'invoked-path':
+                executable = '/else/bin/python3.14'
+            elif failure == 'invoked-version':
+                executable = framework + '/bin/python3.13'
+            elif failure == 'loaded-path':
+                paths[0] = framework + '/foreign/Python'
+            else:
+                paths = [loaded]
+            images = [dict(path=path, address=format(index + 1, 'x'), magic='feedfacf', cpuType=0x100000c)
+                      for index, path in enumerate(paths)]
+            with self.subTest(failure=failure), self.assertRaises(AssertionError):
+                worker.darwin_provider_paths(images, executable, '3.14.8', 'arm64')
+
     def test_macos_loader_declines_missing_foreign_or_mismatched_python_providers(self):
         executable = '/python/bin/python3'
         for failure in ['missing', 'version', 'cpu', 'header', 'address', 'duplicate']:

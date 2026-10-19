@@ -400,9 +400,22 @@ def darwin_images():
 def darwin_provider_paths(images, executable, version, machine):
     cpu = {'arm64': 0x100000c, 'x86_64': 0x1000007}[machine]
     expected = '.'.join(version.split('.')[:2])
-    selected = set()
+    selected = {executable}
+    assert executable.startswith('/') and not any(c.isspace() or c == '\\' for c in executable)
     assert 0 < len(images) <= 4096
-    assert images[0]['path'] == executable
+    loaded = images[0]['path']
+    if loaded != executable:
+        suffix = '/Resources/Python.app/Contents/MacOS/Python'
+        assert loaded.endswith(suffix)
+        framework = loaded[:-len(suffix)]
+        assert re.search(r'/Python\.framework/Versions/' + re.escape(expected) + r'[dmt]*$', framework)
+        assert framework + '/Python' in [row['path'] for row in images]
+        directories = {framework + '/bin'}
+        if '/Frameworks/Python.framework/' in framework:
+            directories.add(framework.split('/Frameworks/Python.framework/', 1)[0] + '/bin')
+        invoked = pathlib.PurePosixPath(executable)
+        assert str(invoked.parent) in directories
+        assert re.fullmatch(r'python(?:' + re.escape(expected) + '|' + re.escape(version.split('.')[0]) + r')[dmt]*', invoked.name)
     addresses = set()
     for row in images:
         assert set(row) == {'path', 'address', 'magic', 'cpuType'}
@@ -413,10 +426,10 @@ def darwin_provider_paths(images, executable, version, machine):
         path = row['path']
         name = pathlib.PurePosixPath(path).name
         python = name.startswith('libpython') or (name == 'Python' and '/Python.framework/' in path)
-        if path != executable and not python:
+        if path not in (executable, loaded) and not python:
             continue
         assert path.startswith('/') and not any(c.isspace() or c == '\\' for c in path)
-        if python and path != executable:
+        if python and path not in (executable, loaded):
             assert re.fullmatch(r'libpython' + re.escape(expected) + r'[dmt]*\.dylib', name) or \
                 re.search(r'/Python\.framework/Versions/' + re.escape(expected) + r'[dmt]*/Python$', path)
         selected.add(path)
@@ -437,6 +450,7 @@ def runtime_identity(out, dependencies, helper):
     darwin = platform.system() == 'Darwin'
     if darwin:
         images, maps = darwin_images()
+        (out / 'native-images.jsonl').write_text(maps)
         providers = darwin_provider_paths(images, str(executable), platform.python_version(), platform.machine())
         libraries = [row for row in images if 'libz3' in pathlib.PurePosixPath(row['path']).name]
         assert len(libraries) == 1, 'missing or foreign native checker provider'
