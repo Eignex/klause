@@ -946,7 +946,8 @@ checked afresh.
 
 Each native invocation has a 30-second JVM wall deadline and disabled core dumps.
 Linux uses a 4 GiB address-space limit and 1 MiB per output file; GNU timeout also
-bounds wall time if its JVM owner is lost. macOS uses a 4 GiB data-segment limit,
+bounds wall time if its JVM owner is lost. macOS caps the data-segment soft limit at the lesser of its inherited hard limit
+and 512 MiB, retaining the applied limit in stdout. It also uses a
 30-second CPU limit and 1 MiB file limit through the system shell. Its data limit
 is not an address-space or resident-memory guarantee, and owner loss leaves a CPU
 bound rather than an independent wall bound. Receipts name the actual resource

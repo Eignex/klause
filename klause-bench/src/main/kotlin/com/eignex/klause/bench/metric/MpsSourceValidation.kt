@@ -111,8 +111,11 @@ internal object MpsSourceValidation {
                         listOf("/usr/bin/timeout", "--signal=KILL", "30s", "/usr/bin/prlimit",
                             "--as=4294967296", "--fsize=1048576", "--core=0", "--") + arguments
                     } else {
-                        listOf("/bin/sh", "-c", "ulimit -d 4194304 && ulimit -t 30 && ulimit -f 2048 && " +
-                            "ulimit -c 0 && exec \"$@\"", "miplib-solchecker") + arguments
+                        listOf("/bin/sh", "-c", "data=$(ulimit -H -d) && " +
+                            "if [ \"\$data\" = unlimited ] || [ \"\$data\" -gt 524288 ]; then data=524288; fi && " +
+                            "ulimit -S -d \"\$data\" && ulimit -t 30 && ulimit -f 1024 && ulimit -c 0 && " +
+                            "printf 'MIPLIB data limit KiB: %s\\n' \"$(ulimit -S -d)\" && exec \"$@\"",
+                            "miplib-solchecker") + arguments
                     }
                     val process = MpsSourceReceipt.run(command, checkDirectory, minOf(30_000, remaining()))
                     processes += process

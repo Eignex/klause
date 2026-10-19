@@ -31,7 +31,13 @@ internal object MpsSourceReceipt {
         require(process.elapsedMs in 0..60_000)
         require(process.stderr.lineSequence().all { it.isEmpty() || it.startsWith("Failed ") ||
             it.startsWith("                ") })
-        val lines = process.stdout.lines().filter { it.isNotEmpty() }
+        val output = process.stdout.lines().filter { it.isNotEmpty() }
+        val lines = if (output.firstOrNull()?.startsWith("MIPLIB data limit KiB: ") == true) {
+            require(output.first().removePrefix("MIPLIB data limit KiB: ").toLong() in 1..524_288)
+            output.drop(1)
+        } else {
+            output
+        }
         require(lines.size == 9 && lines[0] == "Read MPS: 1" && lines[2] == "Read SOL: 1")
         val census = requireNotNull(Regex("MIP has ([0-9]+) vars and ([0-9]+) constraints").matchEntire(lines[1]))
         require(census.groupValues[1].toInt() == coordinates) { "incomplete source point" }
