@@ -450,7 +450,8 @@ internal object PortfolioComposition {
         facts: ProblemFacts,
         arms: List<WorkerConfig>,
     ): BacktrackWorkerConfig? {
-        if (!facts.integerLinear || facts.continuousObjective || scenario.cores != 1 ||
+        if ((!facts.integerLinear && !facts.binaryEqualityObjective) ||
+            facts.continuousObjective || scenario.cores != 1 ||
             scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
             scenario.lsPool != null || scenario.btPool != null || scenario.btEdit != null ||
             scenario.annotationArm != null || arms.lastOrNull()?.label == "lp-default" ||

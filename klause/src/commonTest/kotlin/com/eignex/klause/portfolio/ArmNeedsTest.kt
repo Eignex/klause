@@ -189,4 +189,115 @@ class ArmNeedsTest {
             assertFalse(facts.binaryPackingObjective)
         }
     }
+
+    @Test
+    fun `binary equality objectives should recognize ordinary and exact rows`() {
+        val rows = listOf(
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
+            ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE,
+            ),
+            ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                List(2) { BigFraction.ofLong(2).reciprocal() },
+                LinearOp.EQ, BigFraction.ofLong(2).reciprocal(),
+            ),
+        )
+        for (row in rows) {
+            val model = Problem(
+                0, 3, Array(3) { IntDomain(0, 1) },
+                listOf(row, Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0)),
+            ).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(2, 3, 4))
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
+
+            assertTrue(facts.binaryEqualityObjective)
+        }
+    }
+
+    @Test
+    fun `binary equality objectives should need binary ranges and nonnegative costs`() {
+        val costs = LinearObjective(intCoefficients = longArrayOf(4, 5))
+        for ((upper, objective, expected) in listOf(
+            Triple(1L, costs, true),
+            Triple(5L, costs, false),
+            Triple(1L, LinearObjective(intCoefficients = longArrayOf(-4, -5)), false),
+            Triple(1L, LinearObjective(intCoefficients = longArrayOf(-4, 5)), false),
+            Triple(1L, LinearObjective(), false),
+            Triple(1L, null, false),
+        )) {
+            val model = Problem(
+                0, 2, Array(2) { IntDomain(0, upper) },
+                listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1)),
+            ).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
+
+            assertEquals(expected, facts.binaryEqualityObjective)
+        }
+    }
+
+    @Test
+    fun `other row forms should not claim a binary equality objective`() {
+        val refs = intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1))
+        val wide = BigFraction.of(parseBigInt("18446744073709551617"), BIG_ONE)
+        val cases = listOf<Triple<Factor?, Int, Int>>(
+            Triple(null, 0, 0),
+            Triple(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1), 0, 0),
+            Triple(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1), 0, 0),
+            Triple(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.NE, 1), 0, 0),
+            Triple(ExactLinear.of(refs, listOf(wide, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE), 0, 0),
+            Triple(
+                ExactLinear.of(
+                    refs, listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ,
+                    BigFraction.ONE, activator = 0,
+                ),
+                1, 0,
+            ),
+            Triple(
+                ExactLinear.of(
+                    intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE,
+                ),
+                0, 1,
+            ),
+        )
+        for ((row, bools, reals) in cases) {
+            val model = Problem(
+                bools, 2, Array(2) { IntDomain(0, 1) }, listOfNotNull(row),
+                numRealVars = reals,
+                realLower = DoubleArray(reals),
+                realUpper = DoubleArray(reals) { 1.0 },
+            ).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(4, 5))
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
+
+            assertFalse(facts.binaryEqualityObjective)
+        }
+    }
+
+    @Test
+    fun `binary equality eligibility should cover every factor`() {
+        val model = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(
+                ExactLinear.of(
+                    intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                    List(2) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ONE,
+                ),
+                ExactLinear.of(
+                    intArrayOf(Term.ofIntVar(1), Term.ofIntVar(2)),
+                    List(2) { BigFraction.ONE }, LinearOp.GE, BigFraction.ONE,
+                ),
+            ),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(2, 3, 4))
+
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
+
+        assertFalse(facts.binaryEqualityObjective)
+    }
 }

@@ -572,7 +572,11 @@ smaller pools, parallel and single-engine execution retain their selected recipe
 
 A curated sequential mixed finite optimization pool with at least six configured
 slots appends an applicable aggressive LP companion for models composed entirely
-of ordinary integer linear rows and an objective over integer coordinates. Existing worker positions
+of ordinary integer linear rows and an objective over integer coordinates. A pure
+binary equality model with a nonnegative, nonconstant integer objective admits the same companion
+through complete unconditional signed-word equality views, including exact factors.
+Inequalities, real or Boolean coordinates, conditional rows and wide views do not
+enter through that structural gate. Existing worker positions
 and seeds remain stable. Size and technique ceilings control applicability; assembled
 column integrality and source mapping control cut work. The companion also runs
 under a cuts-off ceiling, allowing separation to vary without removing its bound
