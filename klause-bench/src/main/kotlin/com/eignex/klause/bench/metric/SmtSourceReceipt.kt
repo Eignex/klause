@@ -19,6 +19,18 @@ internal data class SmtNativeRuntime(
 )
 
 @Serializable
+internal data class SmtResidentMemory(
+    val method: String,
+    val limitBytes: Long,
+    val samplePeakBytes: Long,
+    val kernelPeakBytes: Long,
+    val samples: Long,
+    val complete: Boolean,
+    val exceeded: Boolean,
+    val error: String?,
+)
+
+@Serializable
 internal data class SmtSourceBound(
     val lower: String?,
     val lowerOpen: Boolean,
@@ -67,6 +79,8 @@ internal object SmtSourceReceipt {
         val native = requireNotNull(receipt.nativeRuntime)
         require(native.platform in setOf("Linux", "Darwin"))
         val darwin = native.platform == "Darwin"
+        val residentMemory = receipt.residentMemory
+        if (darwin) require(residentMemory?.keys == setOf("bootstrap", "check")) else require(residentMemory == null)
         require(arithmetic.implementation == "smt-exact-source-arithmetic-v2")
         require(
             arithmetic.pythonVersion == runtime.pythonVersion &&
@@ -135,6 +149,7 @@ internal object SmtSourceReceipt {
             runtime.pythonExecutable,
             2_147_483_648L,
             30,
+            residentMemory?.getValue("bootstrap"),
         )
         requireProcess(
             check,
@@ -144,6 +159,7 @@ internal object SmtSourceReceipt {
             runtime.pythonExecutable,
             if (ground) 4_294_967_296L else 8_589_934_592L,
             if (ground) 30 else 40,
+            residentMemory?.getValue("check"),
         )
         require(bootstrap.cwd == check.cwd && bootstrap.command.takeLast(2) == check.command.takeLast(2))
         require(receipt.setupMs >= bootstrap.processWallNs / 1_000_000 && receipt.setupMs <= 40_000)
@@ -325,9 +341,20 @@ internal object SmtSourceReceipt {
         python: String,
         memory: Long,
         timeout: Int,
+        resident: SmtResidentMemory?,
     ) {
         require(process.exit == 0 && process.complete && !process.timedOut && !process.overflow)
-        require(process.parentStop == null && process.addressSpaceBytes == memory && process.timeoutSeconds == timeout)
+        require(process.parentStop == null && process.timeoutSeconds == timeout)
+        if (resident == null) {
+            require(process.addressSpaceBytes == memory)
+        } else {
+            require(process.addressSpaceBytes == 0L && resident.limitBytes == memory)
+            require(resident.method == "darwin-proc-taskinfo-wait4-v1")
+            require(resident.complete && !resident.exceeded && resident.error == null)
+            require(resident.kernelPeakBytes in 1..memory && resident.samples in 0..20_000)
+            require(resident.samplePeakBytes in 0..resident.kernelPeakBytes)
+            require(resident.samples != 0L || resident.samplePeakBytes == 0L)
+        }
         require(process.processWallNs in 1..((timeout + 10L) * 1_000_000_000L))
         val command = process.command
         require(command.size == 6 && command[0] == python && command[1] == "-I" && command[3] == mode)
