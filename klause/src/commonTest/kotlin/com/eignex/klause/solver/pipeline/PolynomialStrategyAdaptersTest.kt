@@ -335,7 +335,7 @@ class PolynomialStrategyAdaptersTest {
     @Test
     fun `Boolean traversal should complete using its retained polynomial root witness`() {
         val request = SmtLibPolynomial.parse(
-            "(declare-const b Bool) (declare-const x Real) (assert b) (assert (= (* x x) 2))",
+            "(declare-const b Bool) (declare-const x Real) (assert (or b (= (* x x) (- 1))))",
         ).realSource().pipelineRequest()
         val shared = request.resolvedModel()
         val initial = shared.service.invocation().use { it.check().stats.workSpent }
