@@ -215,6 +215,7 @@ def supervise(out, expected, tools, parent):
     assert json.loads((out / 'tools.json').read_bytes()) == tools
     assert all(digest((out / 'tools' / name).read_bytes()) == value for name, value in tools.items())
     runner = load(out / 'tools/smt_witness_validation.py', 'smt_witness_validation')
+    provider = load(out / 'tools/mps_stdlib_runtime.py', 'mps_stdlib_runtime')
     runner.PARENT = parent
     runner.DEADLINE = time.monotonic() + 60
     for signum in runner.SIGNALS:
@@ -231,7 +232,7 @@ def supervise(out, expected, tools, parent):
     try:
         start = time.monotonic_ns()
         try:
-            bootstrap = runner.owned([executable, '-I', str(out / 'tools/mps_witness_validation.py'),
+            bootstrap = provider.owned(runner, [executable, '-I', str(out / 'tools/mps_witness_validation.py'),
                                      'bootstrap', str(out), str(dependencies)], out / 'bootstrap', scratch.name,
                                      30, 2147483648)
         finally:
@@ -243,7 +244,7 @@ def supervise(out, expected, tools, parent):
         result['stdlibRuntime'] = json.loads((out / 'stdlib-bootstrap.json').read_bytes())
         start = time.monotonic_ns()
         try:
-            process = runner.owned([executable, '-I', str(out / 'tools/mps_witness_validation.py'),
+            process = provider.owned(runner, [executable, '-I', str(out / 'tools/mps_witness_validation.py'),
                                    'check', str(out), str(dependencies)], out / 'check', scratch.name,
                                    30, 4294967296)
         finally:
@@ -281,6 +282,10 @@ def supervise(out, expected, tools, parent):
 
 
 if __name__ == '__main__':
+    if sys.platform == 'darwin' and sys.argv[1] in ('bootstrap', 'check'):
+        out = pathlib.Path(sys.argv[2])
+        provider = load(out / 'tools/mps_stdlib_runtime.py', 'mps_stdlib_runtime')
+        provider.verify_growth_limit(out, sys.argv[1])
     if sys.argv[1] == 'supervise':
         raise SystemExit(supervise(pathlib.Path(sys.argv[2]), json.loads(sys.argv[3]),
                                    json.loads(sys.argv[4]), int(sys.argv[5])))

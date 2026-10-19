@@ -62,9 +62,9 @@ internal object MpsStdlibReceipt {
         val logs = requireNotNull(receipt.processLogs)
         require(logs.keys == setOf("bootstrap.stdout", "bootstrap.stderr", "check.stdout", "check.stderr"))
         MpsSourceReceipt.requireProcess(bootstrap, logs, "bootstrap", "mps_witness_validation.py",
-            runtime.executable.path, 2_147_483_648L)
+            runtime.executable.path, 2_147_483_648L, allowAddressSpaceGrowth = runtime.platform == "darwin")
         MpsSourceReceipt.requireProcess(check, logs, "check", "mps_witness_validation.py",
-            runtime.executable.path, 4_294_967_296L)
+            runtime.executable.path, 4_294_967_296L, allowAddressSpaceGrowth = runtime.platform == "darwin")
         require(bootstrap.cwd == check.cwd && bootstrap.command.takeLast(2) == check.command.takeLast(2))
         require(Reports.json.parseToJsonElement(logs.getValue("bootstrap.stdout")) ==
             Reports.json.parseToJsonElement(Reports.json.encodeToString(runtime)))

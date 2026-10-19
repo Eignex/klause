@@ -54,6 +54,20 @@ internal data class MpsCheckerStream(
 )
 
 @Serializable
+internal data class MpsCheckerMemory(
+    val mode: String,
+    val phase: String,
+    val pid: Long,
+    val allowanceBytes: Long,
+    val baselineVirtualBytes: Long,
+    val baselineResidentBytes: Long,
+    val addressSpaceLimitBytes: Long,
+    val postExecVerified: Boolean,
+    val postExecVirtualBytes: Long,
+    val postExecResidentBytes: Long,
+)
+
+@Serializable
 internal data class MpsCheckerProcess(
     val command: List<String>,
     val cwd: String,
@@ -66,6 +80,8 @@ internal data class MpsCheckerProcess(
     val processWallNs: Long,
     val addressSpaceBytes: Long,
     val timeoutSeconds: Int,
+    val pid: Long? = null,
+    val memoryControl: MpsCheckerMemory? = null,
 )
 
 internal object MpsSourceReceipt {
@@ -198,9 +214,24 @@ internal object MpsSourceReceipt {
         script: String,
         python: String,
         memory: Long,
+        allowAddressSpaceGrowth: Boolean = false,
     ) {
         require(process.exit == 0 && process.complete && !process.timedOut && !process.overflow)
-        require(process.parentStop == null && process.addressSpaceBytes == memory && process.timeoutSeconds == 30)
+        require(process.parentStop == null && process.timeoutSeconds == 30)
+        if (allowAddressSpaceGrowth) {
+            val control = requireNotNull(process.memoryControl)
+            require(control.mode == "darwin-address-space-growth-v1" && control.phase == mode)
+            require(control.pid > 0 && process.pid == control.pid)
+            require(control.allowanceBytes == memory)
+            require(control.baselineResidentBytes in 1..memory)
+            require(control.baselineVirtualBytes in control.baselineResidentBytes..4_398_046_511_104L)
+            require(control.addressSpaceLimitBytes == control.baselineVirtualBytes + memory)
+            require(process.addressSpaceBytes == control.addressSpaceLimitBytes && control.postExecVerified)
+            require(control.postExecResidentBytes in 1..memory)
+            require(control.postExecVirtualBytes in control.postExecResidentBytes..control.addressSpaceLimitBytes)
+        } else {
+            require(process.memoryControl == null && process.addressSpaceBytes == memory)
+        }
         require(process.processWallNs in 1..40_000_000_000L)
         val command = process.command
         require(command.size == 6 && command[0] == python && command[1] == "-I" && command[3] == mode)

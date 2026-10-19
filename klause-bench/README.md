@@ -1306,6 +1306,14 @@ producer records/receipts over 4 MiB and checker streams over 1 MiB remain unche
 Private runtime directories are removed after checking. Missing dependencies,
 timeout, incomplete output, changed custody or failed cleanup cannot yield valid
 credit.
+Linux child processes use absolute kernel address-space limits. On macOS the
+kernel limit adds the same 2 GiB or 4 GiB allowance to the recorded pre-exec VM
+baseline, which includes Darwin's shared mappings. The receipt retains the worker
+PID, baseline virtual/resident bytes and actual absolute kernel limit. Each child
+verifies its PID, phase and inherited soft/hard limits after exec before checking
+inputs; missing, contradictory or unavailable memory control leaves checking
+unknown. The private MPS adapter retains the shared process-group, stream and
+deadline owner without changing the SMT runner.
 The solve record retains at most 64 KiB of supervisor output as base64, its prefix
 hash, full file byte count and completeness flag so startup failures remain
 diagnosable when only the record is returned. This diagnostic supplies no validation

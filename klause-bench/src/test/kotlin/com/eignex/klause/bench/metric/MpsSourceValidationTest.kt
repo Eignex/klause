@@ -393,7 +393,9 @@ class MpsSourceValidationTest {
     @ValueSource(strings = ["valid-linux-raw", "valid-darwin-raw", "valid-linux-gzip", "valid-darwin-gzip",
         "platform", "image-hash", "image-size", "symbol", "module", "bootstrap-child", "bootstrap-command",
         "check-command", "memory", "child", "query", "proof", "tolerance", "decoder", "decoder-hash",
-        "decoder-path", "wire", "decoded", "native-borrow"])
+        "decoder-path", "wire", "decoded", "native-borrow", "growth-allowance", "growth-baseline",
+        "growth-limit", "growth-postexec", "growth-pid", "growth-phase", "growth-resident", "growth-missing",
+        "growth-linux"])
     fun `stdlib receipts should bind interpreter processes and complete portable transport`(variant: String) {
         val gzip = !variant.endsWith("-raw")
         val platform = if (variant.contains("linux")) "linux" else "darwin"
@@ -448,14 +450,35 @@ class MpsSourceValidationTest {
         val setupLog = Reports.json.encodeToString(setupValue) + "\n"
         val setupBytes = setupLog.toByteArray()
         val bytes = log.toByteArray()
-        val setup = bootstrap.copy(command = bootstrap.command.toMutableList().apply {
+        val memories = listOf("bootstrap" to 2_147_483_648L, "check" to 4_294_967_296L).associate { (phase, size) ->
+            val baseline = 549_755_813_888L
+            val control = MpsCheckerMemory("darwin-address-space-growth-v1", phase, 123, size,
+                baseline, 67_108_864, baseline + size, true, baseline + 67_108_864, 67_108_864)
+            val altered = when (variant) {
+                "growth-allowance" -> control.copy(allowanceBytes = size / 2)
+                "growth-baseline" -> control.copy(baselineVirtualBytes = 0)
+                "growth-limit" -> control.copy(addressSpaceLimitBytes = baseline + size + 1)
+                "growth-postexec" -> control.copy(postExecVerified = false)
+                "growth-pid" -> control.copy(pid = 0)
+                "growth-phase" -> control.copy(phase = "other")
+                "growth-resident" -> control.copy(postExecResidentBytes = size + 1)
+                else -> control
+            }
+            phase to altered.takeIf { variant != "growth-missing" &&
+                (platform == "darwin" || variant == "growth-linux") }
+        }
+        val setup = bootstrap.copy(addressSpaceBytes = memories["bootstrap"]?.addressSpaceLimitBytes ?: 2_147_483_648L,
+            pid = memories["bootstrap"]?.pid, memoryControl = memories["bootstrap"],
+            command = bootstrap.command.toMutableList().apply {
             this[2] = "/owned/case/tools/mps_witness_validation.py"
             if (variant == "bootstrap-command") this[2] = "/other/bootstrap.py"
         }, streams = bootstrap.streams + ("stdout" to MpsCheckerStream(
             setupBytes.size.toLong(), setupBytes.size.toLong(), true, sha256(setupBytes))))
         val checked = check.copy(command = check.command.toMutableList().apply {
             if (variant == "check-command") this[2] = "/other/check.py"
-        }, addressSpaceBytes = if (variant == "memory") 2_147_483_648 else 4_294_967_296,
+        }, addressSpaceBytes = if (variant == "memory") 2_147_483_648L else
+            memories["check"]?.addressSpaceLimitBytes ?: 4_294_967_296L,
+            pid = memories["check"]?.pid, memoryControl = memories["check"],
             streams = check.streams + ("stdout" to MpsCheckerStream(
                 bytes.size.toLong(), bytes.size.toLong(), true, sha256(bytes))))
         val reportedRuntime = if (variant == "child") changed.copy(machine = "x86_64") else changed
