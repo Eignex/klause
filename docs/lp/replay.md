@@ -1,12 +1,11 @@
 # LP capture and replay
 
-These opt-in tools isolate numerical basis operations and LP consumer lifetimes.
+These opt-in tools isolate numerical basis operations.
 Capture records a bounded operation stream; verification checks its identities
 and residuals; replay or paired comparisons measure that recorded work. A kernel
 trace does not establish correctness or performance of an entire source solve.
 
-Use the basis corpus for numerical regressions, the owner-lifecycle comparator for
-retained versus rebuilt consumer state, and dense comparisons for basis selection.
+Use the basis corpus for numerical regressions and dense comparisons for basis selection.
 [LP architecture](architecture.md) owns implementation contracts;
 [benchmark workflows](../../klause-bench/README.md) owns full solve measurements.
 
@@ -99,48 +98,6 @@ directly. MPS and MiniZinc traces use the production LP-relaxation assembly. SMT
 this harness. This capture route is distinct from a production theory event stream. Boolean SMT branches and objectives
 decline instead of being silently selected or relaxed. See [fixture provenance](../testing/fixtures.md) for source identities,
 redistribution terms, hashes and exclusions.
-
-## CP LP owner lifecycle comparison
-
-`klause-bench/scripts/lp-lifecycle/` contains an opt-in retained-versus-fresh comparator for a captured CP
-consumer trace. It compiles against `:klause`'s internal JVM test API through its init script;
-ordinary bench runs and tests do not load it. The source is the two-integer problem
-`x,y ∈ [-3,7]`, `x+y >= 1`, minimizing `2x+y+5`. One root and four
-push/push/pop/push/pop cycles must reproduce the frozen 21-state trace SHA-256
-`a2913b8157272acf0f0244dc8cc2ba81d4b4802e3a99a63eec09425d76f6d4e4`.
-The trace hashes each observed source-bound tuple and its effective exact LP model,
-independent of retained trail revision history.
-
-```
-./gradlew -I klause-bench/scripts/lp-lifecycle/lp-lifecycle.init.gradle :klause:lpLifecycleComparison --max-workers=2 > /tmp/lp-lifecycle.log
-python3 klause-bench/scripts/lp-lifecycle/check_lifecycle.py /tmp/lp-lifecycle.log > /tmp/lp-lifecycle-summary.json
-python3 -m unittest discover -s klause-bench/scripts/lp-lifecycle -p 'test_*.py'
-```
-
-The retained arm builds one original `Problem`, CP session and LP engine, then applies each bound
-decision or pop to that session. The fresh arm starts from the same original `Problem` for each state,
-replays that state's source decisions, builds its relaxation through `nodeRelaxation`, solves through
-`solveNode`, certifies directly and closes the engine. Both arms pay for source assembly through the
-same consumer methods. The recorded phases are setup, CP transition or reconstruction, relaxation
-assembly, `solveNode`, direct certification and disposal. `solveNode` includes projection/import and
-float solve; its subphases have no separate external timing seam. Model fingerprinting, output and
-independent checking are outside phase timing. The checker verifies every original-coordinate exact
-witness, objective constant and lower bound with a vertex oracle, plus state/model equality, paired
-counts and closed owners. It rejects missing records rather than turning them into zero work.
-
-Cold setup and transition include constructing a new CP session and replaying its decision prefix;
-retained setup and transition update the live session. The complete total therefore measures that
-whole-consumer reconstruction policy. It does not isolate the benefit of LP basis retention. Direct
-`certifyLpResult` measures source proof without the rest of `lpBoundAndFix` (pruning, cuts and
-explanations), so this diagnostic does not represent a full search run.
-
-The comparison factory fixes the effective LP work allowance at 1,000,000 for both arms (including
-retained `resolveBounds`) while preserving the production solver route, refactor cap, pricing and
-cancellation. The factory reports requested pre-normalization limits too. This is a bounded diagnostic
-configuration, not a production policy change. Java current-thread allocation counts exclude native
-allocation and may be unavailable. Elapsed totals are paired in alternating arm order with one warmup;
-they are descriptive on a shared host. The committed `.kbtrace` corpus records basis operations, not
-complete CP consumer states, so it cannot substitute for this lifecycle comparison. Full search performance requires separate consumer measurements.
 
 ## Dense selection comparison
 

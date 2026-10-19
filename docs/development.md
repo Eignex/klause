@@ -108,16 +108,6 @@ The default build targets JVM and Linux x64. Releases opt into Linux arm64 and
 macOS arm64 with `-Ptargets.full`. Native tests and documentation checks run in
 CI. Benchmarks, capture and timing tools are opt-in; see [benchmarking](../klause-bench/README.md).
 
-## Package boundary check
-
-`python3 scripts/check_architecture.py` checks documented outbound dependencies across
-production Kotlin source sets. `python3 scripts/test_check_architecture.py` checks the
-checker itself. `./gradlew checkArchitecture` runs both without compiling Kotlin,
-and every module's `check` depends on it. Python 3 is required for this check.
-The checker is lexical; JVM/native compilation and consumer tests validate symbol
-resolution and module visibility. [System architecture](architecture.md) defines
-the enforced ownership rules.
-
 ## Tests
 
 Unit tests define focused behavior and subsystem contracts: parsing and lowering,

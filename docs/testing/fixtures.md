@@ -58,8 +58,6 @@ by the `mzn-smoke` suite. They are not duplicated in the smoke corpus.
 
 The width-`n` component-split matrix is `nI + 11^T` with RHS `2n`, giving exact
 solution `x = 1`. The linked MiniZinc control adds a redundant row joining blocks.
-Regenerate using
-[generate.py](../../klause-bench/scripts/lp-component-split/generate.py).
 These fixtures are explicit experiments rather than CI smoke selection.
 
 ## Polynomial-real SMT fixtures
