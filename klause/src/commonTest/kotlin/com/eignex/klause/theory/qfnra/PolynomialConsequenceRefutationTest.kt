@@ -11,9 +11,157 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialConsequenceRefutationTest {
+    @Test
+    fun `complete consequences combine nonzero equations and weighted squares beyond probe dimensions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (declare-const a Real) (declare-const b Real) (declare-const w Real)
+            (declare-const u Real) (declare-const x Real)
+            (assert (and (> a 0) (> b 0) (= (* a (- w (* x x))) 0)
+              (= (+ (* a w) (* b u) (- (* a x x))) 0)
+              (= (+ a (* x x) (* (- 2) x) 1 u) 0)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 100_000))
+
+        val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(0L, refuted.stats.dyadicAttempts)
+        assertEquals(0L, refuted.stats.projectedPolynomials)
+        assertTrue(checkNotNull(refuted.stats.booleanTheoryRegions) > 0)
+    }
+
+    @Test
+    fun `complete square consequences retain the feasible zero factor branch`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (declare-const a Real) (declare-const b Real) (declare-const w Real)
+            (declare-const u Real) (declare-const x Real)
+            (assert (and (> a 0) (>= b 0) (= (* a (- w (* x x))) 0)
+              (= (+ (* a w) (* b u) (- (* a x x))) 0)
+              (= (+ a (* x x) (* (- 2) x) 1 u) 0)))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, Int.MAX_VALUE))
+
+        val refuted = preparePolynomialConsequenceRefutation(atoms, arithmetic)
+            .asSequence().filterNotNull().single()
+
+        assertFalse(refuted)
+    }
+
+    @Test
+    fun `complete consequences keep guarded equation alternatives separate`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (assert (or (and (> x0 0) (= (* x0 x1) 0) (> x1 0)) (= x1 1)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 100_000))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.ONE, witness.realValue(1).rational)
+        assertEquals(source.realCount, witness.realCount)
+    }
+
+    @Test
+    fun `a complete proof growth decline withholds its private consequence`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) " +
+                "(assert (= x (+ y 1))) (assert (= (* x x) (- y)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, Int.MAX_VALUE))
+
+        val refuted = preparePolynomialConsequenceRefutation(atoms, arithmetic)
+            .asSequence().filterNotNull().single()
+
+        assertFalse(refuted)
+    }
+
+    @Test
+    fun `complete consequence preparation observes cancellation after suspension`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (assert (and (= x (+ y 1)) (= y (+ x 1))))",
+        )
+        val normalization = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, normalization)
+        val atoms = assertNotNull(formula.conjunctiveAtoms(normalization, Int.MAX_VALUE))
+        var stopped = false
+        val pending = preparePolynomialConsequenceRefutation(atoms, PolynomialArithmetic(Cancellation { stopped }))
+        assertNull(pending.next())
+
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { pending.asSequence().filterNotNull().single() }
+    }
+
+    @Test
+    fun `containing work exhaustion withholds a complete region consequence`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (assert (and (> x0 0) (> x1 0) (= (* x0 (- x2 (* x4 x4))) 0)
+              (= (+ (* x0 x2) (* x1 x3) (- (* x0 x4 x4))) 0)
+              (= (+ x0 (* x4 x4) (* (- 2) x4) 1 x3) 0)))
+            """.trimIndent(),
+        )
+        val completed = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, source.boolCount,
+            source.realCount, QfNraParams(maximumWork = 100_000)))
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+
+        assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
+    }
+
+    @Test
+    fun `complete weighted square reasoning refutes coupled positive polynomial equations`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val a = "(* 64 alpha b (^ r 7))"
+        val t = "(* theta (+ (^ r 8) 1))"
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (declare-const delta Real) (declare-const alpha Real) (declare-const mu Real)
+            (declare-const lambda Real) (declare-const theta Real) (declare-const gamma Real)
+            (declare-const v Real) (declare-const r Real) (declare-const b Real)
+            (assert (and (> delta 0) (> alpha 0) (> mu 0) (> theta 0) (> gamma 0) (> v 0) (> r 0) (> b 0)
+              (= (* theta (- gamma (* b (+ (^ r 8) 1)))) 0)
+              (= (+ (* gamma mu) (* lambda b) (- v)) 0)
+              (= (+ (* 8 alpha (- gamma (* b (+ (^ r 8) 1)))) (* delta (- v r))) 0)
+              (= (+ (* $a $a) (* $a delta $t) (* 2 $a delta) (* 2 $a $t) $a
+                    (* (+ delta 1) (+ delta $t) (+ 1 $t))
+                    (- (* 8 delta lambda theta b (^ r 7)))) 0)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 1_000_000))
+
+        val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(0L, refuted.stats.dyadicAttempts)
+        assertEquals(0L, refuted.stats.projectedPolynomials)
+    }
+
     @Test
     fun `nonzero equality factors and square remainders refute together`() {
         val source = SmtLibPolynomial.parse(
