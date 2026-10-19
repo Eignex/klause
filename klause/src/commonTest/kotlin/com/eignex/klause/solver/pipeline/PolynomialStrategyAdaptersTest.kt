@@ -334,23 +334,20 @@ class PolynomialStrategyAdaptersTest {
 
     @Test
     fun `Boolean traversal should complete using its retained polynomial root witness`() {
-        val formula = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
-        val source = Problem(
-            1, 0, emptyArray(), arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)),
-            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0),
-        )
-        val shared = assertNotNull(SharedPolynomialModel.assemble(source, formula.formula))
+        val request = SmtLibPolynomial.parse(
+            "(declare-const b Bool) (declare-const x Real) (assert b) (assert (= (* x x) 2))",
+        ).realSource().pipelineRequest()
+        val shared = request.resolvedModel()
         val initial = shared.service.invocation().use { it.check().stats.workSpent }
 
         shared.service.invocation(QfNraParams(maximumWork = initial + 10)).use { invocation ->
             val params = PolynomialStrategyParams(backtrack = BacktrackParams(valueSelector = IndomainMin))
             val result = PolynomialWorkerAdapter(
                 shared, invocation, params,
-                EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source)), Cancellation.Never,
+                EngineInvocation(request.preparedPlan, ModelIdentity.of(shared.source)), Cancellation.Never,
             ).solve(FiniteEngine.BACKTRACK)
 
             assertTrue(assertIs<SolveResult.Sat>(result).assignment.boolValue(0))
         }
     }
-
 }
