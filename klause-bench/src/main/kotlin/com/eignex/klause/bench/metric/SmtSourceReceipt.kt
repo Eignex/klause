@@ -1,385 +1,81 @@
 package com.eignex.klause.bench.metric
 
-import com.eignex.klause.bench.report.Reports
+import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
-internal data class SmtNativeRuntime(
-    val executablePath: String,
-    val maps: String,
-    val mapsSha256: String,
-    val library: MpsCheckerFile,
-    val pythonProviders: List<MpsCheckerFile>,
-    val platform: String = "Linux",
-    val systemVersion: String? = null,
-    val mappingKind: String = "linux-proc-maps-v1",
-)
-
-@Serializable
-internal data class SmtResidentMemory(
-    val method: String,
-    val limitBytes: Long,
-    val samplePeakBytes: Long,
-    val kernelPeakBytes: Long,
-    val samples: Long,
-    val complete: Boolean,
-    val exceeded: Boolean,
-    val error: String?,
-)
-
-@Serializable
-internal data class SmtSourceBound(
-    val lower: String?,
-    val lowerOpen: Boolean,
-    val upper: String?,
-    val upperOpen: Boolean,
-)
-
-@Serializable
-internal data class SmtSourceDerivation(
-    val kind: String,
-    val method: String,
-    val assertions: List<Int>,
-    val contradictionAssertion: Int,
-    val relation: String,
-    val expressionSha256: String,
-    val bounds: Map<String, SmtSourceBound>,
+internal data class SmtToolProcess(
+    val command: List<String>,
+    val exit: Int?,
+    val elapsedMs: Long,
+    val timedOut: Boolean,
+    val cleanupComplete: Boolean,
+    val stdout: String,
+    val stderr: String,
 )
 
 internal object SmtSourceReceipt {
-    private const val WHEEL_SHA = "a9afd9ceb290482097474d43f08415bcc1874f433189d1449f6c1508e9c68384"
-    private const val WHEEL_URL = "https://files.pythonhosted.org/packages/" +
-        "b9/0b/f15168475e5493ea44fa3c5e642903f05d2b870db71ad05662ed87a06976/" +
-        "z3_solver-4.15.3.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-    private val digest = Regex("[0-9a-f]{64}")
-    private val macWheels = mapOf(
-        "arm64" to Triple(
-            36_882_388L,
-            "65335aab295ded7c0ce27c85556067087a87052389ff160777d1a1d48ef0d74f",
-            "https://files.pythonhosted.org/packages/" +
-                "63/45/dd8e9d7500faa05eafa589cc8f0f0b982ce575d51b455d62dab8e19dd571/" +
-                "z3_solver-4.15.3.0-py3-none-macosx_13_0_arm64.whl",
-        ),
-        "x86_64" to Triple(
-            39_637_842L,
-            "3e62e93adff2def3537ff1ca67c3d58a6ca6d1944e0b5e774f88627b199d50e7",
-            "https://files.pythonhosted.org/packages/" +
-                "54/9e/a11186061d9fead8be43bad7c75055585694124b2ccdd896ef249fe5824f/" +
-                "z3_solver-4.15.3.0-py3-none-macosx_13_0_x86_64.whl",
-        ),
-    )
+    private const val MAX_LOG_BYTES = 1024 * 1024
 
-    fun requireComplete(receipt: SmtSourceValidation.Receipt, json: JsonObject) {
-        require(receipt.solverQueryCountObserved)
-        val runtime = requireNotNull(receipt.runtime)
-        val arithmetic = requireNotNull(receipt.groundArithmetic)
-        val native = requireNotNull(receipt.nativeRuntime)
-        require(native.platform in setOf("Linux", "Darwin"))
-        val darwin = native.platform == "Darwin"
-        val residentMemory = receipt.residentMemory
-        if (darwin) require(residentMemory?.keys == setOf("bootstrap", "check")) else require(residentMemory == null)
-        require(arithmetic.implementation == "smt-exact-source-arithmetic-v2")
-        require(
-            arithmetic.pythonVersion == runtime.pythonVersion &&
-                arithmetic.pythonExecutableSha256 == runtime.pythonExecutableSha256,
-        )
-        val moduleNames = if (arithmetic.builtinMath == null) {
-            setOf("fractions", "numbers", "math")
-        } else {
-            setOf("fractions", "numbers")
-        }
-        require(arithmetic.modules.keys == moduleNames)
-        arithmetic.builtinMath?.let {
-            if (darwin) requireDarwinPython(it, arithmetic, runtime) else requireBuiltinMath(it, arithmetic, runtime)
-        }
-        require(
-            arithmetic.modules.values.all { file ->
-            file.path.startsWith('/') && file.bytes in 1..4_194_304L && digest.matches(file.sha256)
-        }
-        )
-        require(runtime.packageVersion == "4.15.3.0" && runtime.checkerVersion == "4.15.3")
-        require(!runtime.globalInstallationPerformed)
-        if (darwin) {
-            require(native.mappingKind == "dyld-images-v1")
-            val version = requireNotNull(native.systemVersion).split('.').map { it.toInt() }
-            require(version.size in 2..3 && version[0] >= 13 && version.all { it >= 0 })
-            val wheel = requireNotNull(macWheels[runtime.machine])
-            require(runtime.wheelBytes == wheel.first && runtime.wheelSha256 == wheel.second &&
-                runtime.wheelUrl == wheel.third)
-            require(runtime.libc == listOf("", ""))
-        } else {
-            require(native.mappingKind == "linux-proc-maps-v1" && native.systemVersion == null)
-            require(runtime.machine == "x86_64")
-            require(runtime.wheelBytes == 29_056_003L && runtime.wheelSha256 == WHEEL_SHA &&
-                runtime.wheelUrl == WHEEL_URL)
-            require(runtime.libc.size == 2 && runtime.libc[0] == "glibc")
-            val libc = runtime.libc[1].split('.').map { it.toInt() }
-            require(libc.size >= 2 && (libc[0] > 2 || (libc[0] == 2 && libc[1] >= 17)))
-        }
-        require(digest.matches(runtime.metadataSha256) && digest.matches(runtime.pythonExecutableSha256))
-        val python = runtime.pythonVersion.split('.').map { it.toInt() }
-        require(python.size == 3 && (python[0] > 3 || (python[0] == 3 && python[1] >= 9)))
-        require(runtime.pythonExecutable.startsWith('/'))
-        val files = runtime.extractedFiles
-        require(files.size in 1..512 && files.map { it.path }.distinct().size == files.size)
-        require(
-            files.all { file ->
-            file.path.isNotEmpty() && !file.path.startsWith('/') && '\\' !in file.path &&
-                file.path.split('/').all { it.isNotEmpty() && it != "." && it != ".." } &&
-                file.bytes in 0..100_663_296L && digest.matches(file.sha256)
-        }
-        )
-        require(files.sumOf { it.bytes } <= 134_217_728L)
-        require(files.any { it.path == "z3/__init__.py" })
-        require(files.any { it.path == if (darwin) "z3/lib/libz3.dylib" else "z3/lib/libz3.so" })
-        val bootstrap = requireNotNull(receipt.bootstrapProcess)
-        val check = requireNotNull(receipt.checkProcess)
-        val logs = requireNotNull(receipt.processLogs)
-        require(logs.keys == setOf("bootstrap.stdout", "bootstrap.stderr", "check.stdout", "check.stderr"))
-        val ground = receipt.scope == SmtSourceValidation.GROUND
-        require(receipt.scope in setOf(SmtSourceValidation.GROUND, SmtSourceValidation.REFUTATION))
-        requireProcess(
-            bootstrap,
-            logs,
-            "bootstrap",
-            "smt_witness_validation.py",
-            runtime.pythonExecutable,
-            2_147_483_648L,
-            30,
-            residentMemory?.getValue("bootstrap"),
-        )
-        requireProcess(
-            check,
-            logs,
-            "check",
-            "smt_source_validation.py",
-            runtime.pythonExecutable,
-            if (ground) 4_294_967_296L else 8_589_934_592L,
-            if (ground) 30 else 40,
-            residentMemory?.getValue("check"),
-        )
-        require(bootstrap.cwd == check.cwd && bootstrap.command.takeLast(2) == check.command.takeLast(2))
-        require(receipt.setupMs >= bootstrap.processWallNs / 1_000_000 && receipt.setupMs <= 40_000)
-        require(
-            receipt.checkMs >= check.processWallNs / 1_000_000 && receipt.checkMs <= (if (ground) 40_000 else 50_000),
-        )
-        require(receipt.setupMs + receipt.checkMs <= (if (ground) 70_000 else 100_000))
-        val child = Reports.json.parseToJsonElement(logs.getValue("check.stdout")).jsonObject
-        val fields = setOf(
-            "status", "reason", "scope", "bindings", "solverSearchQueries",
-            "proofCertificateChecked", "checkedWitness", "checker", "groundArithmetic", "nativeRuntime",
-            "referenceComparison", "solverQueryCountObserved", "referenceLogic", "sourceDerivation",
-        )
-        require(child.keys == fields && fields.all { child[it] == json[it] })
-        receipt.sourceDerivation?.let { requireDerivation(it) }
-        val library = native.library
-        val relative = library.path.removePrefix(check.command[5] + "/")
-        val libraries = if (darwin) setOf("z3/lib/libz3.dylib", "z3/lib/libz3.4.15.dylib") else setOf("z3/lib/libz3.so")
-        require(relative in libraries)
-        require(library.path == check.command[5] + "/" + relative)
-        val extracted = files.single { it.path == relative }
-        require(library.bytes == extracted.bytes && library.sha256 == extracted.sha256)
-        require(library.bytes in 1..100_663_296L && digest.matches(library.sha256))
-        val providers = MpsBuiltinModule(
-            "built-in",
-            "_frozen_importlib.BuiltinImporter",
-            native.executablePath,
-            native.maps,
-            native.mapsSha256,
-            native.pythonProviders,
-        )
-        if (darwin) {
-            requireDarwinPython(providers, arithmetic, runtime)
-            val nativePaths = darwinImagePaths(native.maps, native.mapsSha256, runtime.machine)
-                .filter { "libz3" in it.substringAfterLast('/') }
-            require(nativePaths == listOf(library.path))
-        } else {
-            requireBuiltinMath(providers, arithmetic, runtime)
-            val nativeLines = native.maps.removeSuffix("\n").split('\n')
-                .map { it.trimStart().split(Regex("\\s+"), limit = 6) }
-                .filter { it.size == 6 && "libz3" in it[5].substringAfterLast('/') }
-            require(nativeLines.isNotEmpty() && nativeLines.all {
-                it[5] == library.path && it[4].any { c -> c != '0' }
-            })
-            require(nativeLines.any { 'x' in it[1] })
-        }
-    }
+    fun run(arguments: List<String>, input: File, directory: File, timeoutMs: Long): SmtToolProcess {
+        require(timeoutMs in 1..35_000)
+        val command = when (System.getProperty("os.name")) {
+            "Linux" -> listOf("/usr/bin/timeout", "--signal=KILL", "30s", "/usr/bin/prlimit",
+                "--as=4294967296", "--fsize=1048576", "--core=0", "--") + arguments
 
-    private fun darwinImagePaths(maps: String, hash: String, machine: String): List<String> {
-        val bytes = maps.toByteArray()
-        require(bytes.size in 1..262_144 && sha256(bytes) == hash && maps.endsWith('\n') && '\r' !in maps)
-        val lines = maps.removeSuffix("\n").split('\n')
-        require(lines.size in 1..4096)
-        val cpu = when (machine) {
-            "arm64" -> 0x100000cL
-            "x86_64" -> 0x1000007L
-            else -> error("unsupported CPU")
+            "Mac OS X" -> listOf("/bin/sh", "-c",
+                "ulimit -t 30 && ulimit -f 1024 && ulimit -c 0 && exec \"\$@\"", "smt-source-tool") + arguments
+
+            else -> error("unsupported SMT checker resource controls")
         }
-        val addresses = mutableSetOf<String>()
-        return lines.map { line ->
-            val row = Reports.json.parseToJsonElement(line).jsonObject
-            require(row.keys == setOf("path", "address", "magic", "cpuType"))
-            require(row.getValue("magic").jsonPrimitive.content == "feedfacf")
-            val cpuType = row.getValue("cpuType").jsonPrimitive
-            require(!cpuType.isString && cpuType.content.toLong() == cpu)
-            val address = row.getValue("address").jsonPrimitive.content
-            require(Regex("[0-9a-f]{1,16}").matches(address) && address.toULong(16) > 0uL && addresses.add(address))
-            row.getValue("path").jsonPrimitive.content.also { path ->
-                require(path.length in 1..4096 && path.startsWith('/') && path.none { it == '\n' || it == '\r' })
+        val stdout = File(directory, "check.stdout")
+        val stderr = File(directory, "check.stderr")
+        val started = System.nanoTime()
+        var process: Process? = null
+        var exit: Int? = null
+        var timedOut = false
+        var cleanupComplete = false
+        val gate = Any()
+        var stopping = false
+        val shutdown = Thread {
+            synchronized(gate) {
+                stopping = true
+                process?.let(::stop)
             }
         }
-    }
-
-    private fun requireDarwinPython(
-        builtin: MpsBuiltinModule,
-        arithmetic: MpsGroundArithmetic,
-        runtime: MpsCheckerRuntime,
-    ) {
-        require(builtin.origin == "built-in" && builtin.loader == "_frozen_importlib.BuiltinImporter")
-        val paths = darwinImagePaths(builtin.maps, builtin.mapsSha256, runtime.machine)
-        val executable = builtin.executablePath
-        val loaded = paths.first()
-        require(executable.startsWith('/') && executable.none { it.isWhitespace() || it == '\\' })
-        val version = Regex.escape(runtime.pythonVersion.split('.').take(2).joinToString("."))
-        if (loaded != executable) {
-            val suffix = "/Resources/Python.app/Contents/MacOS/Python"
-            require(loaded.endsWith(suffix))
-            val framework = loaded.removeSuffix(suffix)
-            require(Regex("/Python\\.framework/Versions/$version[dmt]*$").containsMatchIn(framework))
-            require("$framework/Python" in paths)
-            val directories = mutableSetOf("$framework/bin")
-            if ("/Frameworks/Python.framework/" in framework) {
-                directories += framework.substringBefore("/Frameworks/Python.framework/") + "/bin"
+        Runtime.getRuntime().addShutdownHook(shutdown)
+        try {
+            val child = synchronized(gate) {
+                check(!stopping && !Thread.currentThread().isInterrupted) { "checker cancelled" }
+                ProcessBuilder(command).directory(directory).redirectInput(input)
+                    .redirectOutput(stdout).redirectError(stderr).start().also { process = it }
             }
-            require(executable.substringBeforeLast('/') in directories)
-            val major = Regex.escape(runtime.pythonVersion.substringBefore('.'))
-            require(Regex("python(?:$version|$major)[dmt]*").matches(executable.substringAfterLast('/')))
-        }
-        val selected = paths.filter { path ->
-            val name = path.substringAfterLast('/')
-            val python = name.startsWith("libpython") || (name == "Python" && "/Python.framework/" in path)
-            if (python && path != executable && path != loaded) {
-                require(Regex("libpython$version[dmt]*\\.dylib").matches(name) ||
-                    Regex("/Python\\.framework/Versions/$version[dmt]*/Python$").containsMatchIn(path))
-            }
-            path == executable || path == loaded || python
-        }.toSet() + executable
-        val providers = builtin.providers
-        require(selected.size in 1..3 && providers.size == selected.size &&
-            providers.map { it.path }.toSet() == selected)
-        require(providers.all { it.bytes in 1..67_108_864L && digest.matches(it.sha256) })
-        require(providers.sumOf { it.bytes } <= 201_326_592L)
-        require(providers.single { it.path == executable }.sha256 == arithmetic.pythonExecutableSha256)
-    }
-
-    private fun requireDerivation(derivation: SmtSourceDerivation) {
-        require(derivation.kind == "source-polynomial-enclosure-v1")
-        require(derivation.method in setOf("empty-source-bounds", "source-signs", "source-interval"))
-        require(derivation.assertions.isNotEmpty() && derivation.assertions.all { it >= 0 })
-        require(derivation.assertions == derivation.assertions.distinct().sorted())
-        require(derivation.contradictionAssertion in derivation.assertions)
-        require(derivation.relation in setOf("eq", "ne", "lt", "le", "gt", "ge"))
-        require(digest.matches(derivation.expressionSha256))
-        val rational = Regex("(?:0|-?[1-9][0-9]*)(?:/[1-9][0-9]*)?")
-        for ((name, bound) in derivation.bounds) {
-            require(name.isNotEmpty())
-            require(bound.lower != null || bound.upper != null)
-            require(!bound.lowerOpen || bound.lower != null)
-            require(!bound.upperOpen || bound.upper != null)
-            for (value in listOfNotNull(bound.lower, bound.upper)) {
-                require(value.length <= 65_536 && rational.matches(value))
+            if (child.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) exit = child.exitValue() else timedOut = true
+        } finally {
+            synchronized(gate) {
+                cleanupComplete = process?.let(::stop) ?: true
+                runCatching { Runtime.getRuntime().removeShutdownHook(shutdown) }
             }
         }
+        fun read(file: File): String {
+            val bytes = file.inputStream().use { it.readNBytes(MAX_LOG_BYTES + 1) }
+            check(bytes.size < MAX_LOG_BYTES) { "checker output reached its limit" }
+            return bytes.decodeToString(throwOnInvalidSequence = true)
+        }
+        return SmtToolProcess(command, exit, (System.nanoTime() - started) / 1_000_000,
+            timedOut, cleanupComplete, read(stdout), read(stderr))
     }
 
-    private fun requireBuiltinMath(
-        builtin: MpsBuiltinModule,
-        arithmetic: MpsGroundArithmetic,
-        runtime: MpsCheckerRuntime,
-    ) {
-        require(builtin.origin == "built-in" && builtin.loader == "_frozen_importlib.BuiltinImporter")
-        val raw = builtin.maps.toByteArray()
-        require(raw.size in 1..262_144 && sha256(raw) == builtin.mapsSha256)
-        val executable = builtin.executablePath
-        require(executable.startsWith('/') && executable.none { it.isWhitespace() || it == '\\' })
-        require(builtin.maps.endsWith('\n') && '\r' !in builtin.maps)
-        val lines = builtin.maps.removeSuffix("\n").split('\n')
-        require(lines.size in 1..4096)
-        val paths = mutableMapOf(executable to false)
-        val version = runtime.pythonVersion.split('.').take(2)
-        for (line in lines) {
-            val fields = line.trimStart().split(Regex("\\s+"), limit = 6)
-            require(fields.size in 5..6)
-            require(Regex("[0-9a-f]{1,16}-[0-9a-f]{1,16}").matches(fields[0]))
-            val interval = fields[0].split('-').map { it.toULong(16) }
-            require(interval[0] < interval[1])
-            require(Regex("[r-][w-][x-][ps]").matches(fields[1]))
-            require(Regex("[0-9a-f]{1,16}").matches(fields[2]))
-            require(Regex("[0-9a-f]{1,8}:[0-9a-f]{1,8}").matches(fields[3]))
-            require(Regex("[0-9]{1,20}").matches(fields[4]))
-            if (fields.size == 5) continue
-            val path = fields[5]
-            val name = path.substringAfterLast('/')
-            if (path == executable || path.startsWith("$executable ") || name.startsWith("libpython")) {
-                require(path.startsWith('/') && path.none { it.isWhitespace() || it == '\\' })
-                require(fields[4].any { it != '0' })
-                if (name.startsWith("libpython")) {
-                    val match = requireNotNull(
-                        Regex(
-                        "libpython([0-9]+)(?:\\.([0-9]+))?[dmt]*" +
-                            "\\.so(?:\\.[0-9]+)*",
-                    ).matchEntire(name)
-                    )
-                    require(match.groupValues[1] == version[0])
-                    require(match.groupValues[2].isEmpty() || match.groupValues[2] == version[1])
-                }
-                paths[path] = paths.getOrDefault(path, false) || 'x' in fields[1]
-            }
-        }
-        require(paths.size in 1..3 && paths.values.all { it })
-        val providers = builtin.providers
-        require(providers.size == paths.size && providers.map { it.path }.toSet() == paths.keys)
-        require(providers.all { it.bytes in 1..67_108_864L && digest.matches(it.sha256) })
-        require(providers.sumOf { it.bytes } <= 201_326_592L)
-        require(providers.single { it.path == executable }.sha256 == arithmetic.pythonExecutableSha256)
-    }
-
-    private fun requireProcess(
-        process: MpsCheckerProcess,
-        logs: Map<String, String>,
-        mode: String,
-        script: String,
-        python: String,
-        memory: Long,
-        timeout: Int,
-        resident: SmtResidentMemory?,
-    ) {
-        require(process.exit == 0 && process.complete && !process.timedOut && !process.overflow)
-        require(process.parentStop == null && process.timeoutSeconds == timeout)
-        if (resident == null) {
-            require(process.addressSpaceBytes == memory)
-        } else {
-            require(process.addressSpaceBytes == 0L && resident.limitBytes == memory)
-            require(resident.method == "darwin-proc-taskinfo-wait4-v1")
-            require(resident.complete && !resident.exceeded && resident.error == null)
-            require(resident.kernelPeakBytes in 1..memory && resident.samples in 0..20_000)
-            require(resident.samplePeakBytes in 0..resident.kernelPeakBytes)
-            require(resident.samples != 0L || resident.samplePeakBytes == 0L)
-        }
-        require(process.processWallNs in 1..((timeout + 10L) * 1_000_000_000L))
-        val command = process.command
-        require(command.size == 6 && command[0] == python && command[1] == "-I" && command[3] == mode)
-        require(command[2] == command[4] + "/tools/" + script)
-        require(command[5] == process.cwd + "/dependencies" && process.cwd.startsWith('/'))
-        require(process.streams.keys == setOf("stdout", "stderr"))
-        for ((name, stream) in process.streams) {
-            val bytes = logs.getValue("$mode.$name").toByteArray()
-            require(stream.complete && stream.error == null && stream.bytes in 0..1_048_576L)
-            require(stream.observedBytes == stream.bytes && stream.bytes == bytes.size.toLong())
-            require(stream.sha256 == sha256(bytes))
+    private fun stop(process: Process): Boolean {
+        val interrupted = Thread.interrupted()
+        return try {
+            val children = process.descendants().use { it.toList() }
+            children.asReversed().forEach { it.destroyForcibly() }
+            if (process.isAlive) process.destroyForcibly()
+            process.waitFor(5, TimeUnit.SECONDS) && children.none { it.isAlive }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt()
         }
     }
 }
