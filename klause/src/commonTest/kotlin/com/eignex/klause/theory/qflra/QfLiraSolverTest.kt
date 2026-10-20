@@ -16,6 +16,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
+import com.eignex.klause.ir.constsOf
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
@@ -26,6 +27,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModelKey
+import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -50,6 +52,150 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `source assertions should wake on the last activator or signed Boolean input`() {
+        val row = TaggedLinearRow(
+            intArrayOf(Term.ofIntVar(0), Term.ofLit(Lit.make(1, false))),
+            IntegerConstants(UnitConsts(2), 0L),
+            LinearOp.LE,
+            activator = 0,
+        )
+        val declaration = object : Factor by ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(row))
+        }
+        val source = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(),
+            factors = arrayOf(declaration, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
+        )
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        for (order in listOf(listOf(0, 1), listOf(1, 0))) {
+            prepared.open().use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(
+                    session.push(SearchDecision.Bool(Lit.make(order.first(), order.first() == 0))),
+                )
+
+                val result = session.push(SearchDecision.Bool(Lit.make(order.last(), order.last() == 0)))
+
+                assertIs<ComponentResult.Conflict>(result)
+                assertNull(session.boolValue(2))
+            }
+        }
+    }
+
+    @Test
+    fun `named disjunct polarities should wait for signed Boolean terms`() {
+        val rows = listOf(
+            TaggedLinearRow(
+                intArrayOf(Term.ofIntVar(0), Term.ofLit(Lit.make(0, false))),
+                IntegerConstants(UnitConsts(2), 1L),
+                LinearOp.GE,
+            ),
+            TaggedLinearRow(
+                intArrayOf(Term.ofIntVar(0), Term.ofLit(Lit.make(0, false))),
+                IntegerConstants(constsOf(longArrayOf(1, -1)), 1L),
+                LinearOp.GE,
+            ),
+        )
+        val declaration = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0) {
+            override val linearForm: LinearForm = LinearForm.Disjunction(rows)
+        }
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(declaration, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
+        )
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        for (holds in listOf(true, false)) {
+            prepared.open().use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+                val branches = assertNotNull(component.nextBranch(session))
+                val selected = if (holds) branches.first() else branches.last()
+                session.popTo(0)
+                assertIs<ComponentResult.Consistent>(session.push(selected))
+
+                val result = session.push(SearchDecision.Bool(Lit.make(0, false)))
+
+                if (holds) {
+                    assertIs<ComponentResult.Consistent>(result)
+                    assertIs<ComponentCheck.Feasible>(component.check(session))
+                    val witness = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component))
+                    assertEquals(BIG_ZERO, witness.ints.single())
+                    assertEquals(false, witness.bools.single())
+                } else {
+                    assertIs<ComponentResult.Conflict>(result)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `disequality sides should follow source bound branches across siblings and restart`() {
+        val source = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.NE, 0.0),
+            ),
+        )
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        prepared.open().use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val side = assertNotNull(SourceBoundAtom.rationalSplit(
+                session, listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO,
+            ))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side.positive)))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            assertTrue(assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.single() < BigFraction.ZERO)
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side.negative)))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            assertTrue(assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.single() > BigFraction.ZERO)
+
+            assertIs<ComponentResult.Consistent>(session.restart())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side.positive)))
+
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            assertTrue(assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.single() < BigFraction.ZERO)
+        }
+    }
+
+    @Test
+    fun `every metered source preparation prefix should withhold its factory`() {
+        val source = partialModel()
+        var fullCharge = 0L
+        val fullMeter = WorkMeter { fullCharge += it }
+        val live = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = fullMeter
+        }
+        assertNotNull(prepareExactLiraSource(source, live))
+        assertTrue(fullCharge > 0L)
+        for (allowance in 1L..fullCharge) {
+            var charged = 0L
+            val meter = WorkMeter { charged += it }
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = charged >= allowance
+                override fun workMeter(): WorkMeter = meter
+            }
+
+            assertNull(prepareExactLiraSource(source, stop))
+
+            assertTrue(charged >= allowance)
+            val stoppedCharge = charged
+            assertNull(prepareExactLiraSource(source, stop))
+            assertEquals(stoppedCharge, charged)
+        }
+    }
+
     @Test
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")

@@ -210,6 +210,10 @@ class ExactLiraSearchComponent private constructor(
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
+    private val sourceRowIndex = preparedSource.rowIndex
+    private val pendingSourceRows = mutableSetOf<Int>()
+    private val activeDisequalityRows = mutableSetOf<Int>()
+    private var sourceRowsInitialized = false
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
@@ -490,6 +494,9 @@ class ExactLiraSearchComponent private constructor(
         pollContextStop = solveStop != null && solveStop !== contextStop
         beginOperation()
         return try {
+            if (completeTraversalObserved) {
+                observeCompleteStage(if (sourceRowIndex == null) "SOURCE_ROW_FULL_SCAN_ONLY" else "SOURCE_ROW_INDEX_PRESENT")
+            }
             graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
             if (graphFirst) smtStats?.observeRealGraphOpening()
@@ -903,6 +910,7 @@ class ExactLiraSearchComponent private constructor(
                 }
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
+                enqueueSourceRows(variable)
                 node = node.copy(
                     retainedReduction = null,
                     disequalityDirections = emptyMap(),
@@ -928,6 +936,7 @@ class ExactLiraSearchComponent private constructor(
                             rowAssertions = node.rowAssertions + (disjunct.address to payload),
                             retainedReduction = null,
                         )
+                        enqueueSourceRow(disjunct.address)
                         nodesByLevel.put(context.decisionLevel, node)
                         return ComponentResult.Consistent
                     }
@@ -987,10 +996,59 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
+    private fun enqueueSourceRows(variable: Int) {
+        val index = sourceRowIndex ?: return
+        for (offset in index.booleanOffsets[variable] until index.booleanOffsets[variable + 1]) {
+            operationStop.charge(1L)
+            if (operationStop()) {
+                sourceRowsInitialized = false
+                return
+            }
+            pendingSourceRows += index.rows[offset]
+        }
+    }
+
+    private fun enqueueSourceRow(address: RowAddress) {
+        val index = sourceRowIndex ?: return
+        operationStop.charge(1L)
+        if (operationStop()) {
+            sourceRowsInitialized = false
+            return
+        }
+        pendingSourceRows += index.factorOffsets[address.factor] + address.row
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
+        val indexed = sourceRowIndex != null && context.decisionLevel > 0 && sourceRowsInitialized
+        val rows: Iterable<Int> = if (indexed) {
+            operationStop.charge(32L * (pendingSourceRows.size + activeDisequalityRows.size + 1L))
+            if (operationStop()) return false
+            (pendingSourceRows + activeDisequalityRows).sorted()
+        } else preparedRows.indices
+        if (completeTraversalObserved) {
+            observeCompleteStage(if (indexed) "SOURCE_ROW_INDEXED_PASS" else "SOURCE_ROW_FULL_PASS")
+            smtStats?.observeCompleteSearchStage("SOURCE_ROW_CANDIDATES", preparedRows.size.toLong())
+        }
+        var visited = 0L
+        try {
+            return assertSourceRows(context, rows) { visited++ }
+        } finally {
+            if (completeTraversalObserved) smtStats?.observeCompleteSearchStage("SOURCE_ROW_VISITED", visited)
+        }
+    }
+
+    private inline fun assertSourceRows(
+        context: SearchContext,
+        rows: Iterable<Int>,
+        visit: () -> Unit,
+    ): Boolean {
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
-        for ((index, prepared) in preparedRows.withIndex()) {
+        for (index in rows) {
+            visit()
+            if (operationStop()) return false
+            val prepared = preparedRows[index]
+            activeDisequalityRows -= index
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
             if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
@@ -1005,6 +1063,7 @@ class ExactLiraSearchComponent private constructor(
             if (asserted != null) leaves += SearchAtomPremise.Asserted(SearchDecision.Theory(asserted))
             val premise = SearchAtomPremise.All(leaves)
             if (comparison.op == LinearOp.NE) {
+                if (sourceRowIndex != null) activeDisequalityRows += index
                 disequalities += Triple(address, comparison, premise)
             } else {
                 if (!system.assertComparison(comparison, null, premise)) return false
@@ -1022,6 +1081,9 @@ class ExactLiraSearchComponent private constructor(
         }
         if (!assertDisequalities(disequalities)) return false
         nodesByLevel.put(context.decisionLevel, node)
+        if (operationStop()) return false
+        pendingSourceRows.clear()
+        sourceRowsInitialized = true
         return true
     }
 
@@ -1490,17 +1552,25 @@ class ExactLiraSearchComponent private constructor(
 
     private fun retractSource(decisionLevel: Int) {
         for (index in sourceAssertionLevels.indices) {
-            if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
+            if (sourceAssertionLevels[index] > decisionLevel) {
+                sourceAssertionLevels[index] = -1
+                if (sourceRowIndex != null) enqueueSourceRow(preparedRows[index].address)
+            }
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
                 if (completeTraversalObserved) unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
+                enqueueSourceRows(variable)
             }
         }
         nodesByLevel.removeKeysAbove(decisionLevel)
+        val previousAssertions = node.rowAssertions
         node = nodesByLevel.valueAtMaxKey() ?: root
+        for ((address, asserted) in previousAssertions) {
+            if (node.rowAssertions[address] != asserted) enqueueSourceRow(address)
+        }
         assignment = null
         outcome = null
         candidate = null
@@ -1552,8 +1622,66 @@ private class PreparedExactLiraSource(
     val preparedRows: List<PreparedSourceRow>,
     val arithmeticRows: List<LinearRow>,
     val arithmeticVariables: Set<Int>,
+    val rowIndex: PreparedSourceRowIndex?,
     val validated: Boolean,
 )
+
+private class PreparedSourceRowIndex(
+    val factorOffsets: IntArray,
+    val booleanOffsets: IntArray,
+    val rows: IntArray,
+)
+
+private fun prepareSourceRowIndex(
+    model: Problem,
+    forms: List<List<ExactRowForm>>,
+    rows: List<PreparedSourceRow>,
+    stop: Cancellation,
+): PreparedSourceRowIndex? {
+    if (forms.size != model.numFactors) return null
+    var entries = 4L * (model.numBoolVars.toLong() + model.numFactors + 1L) + 16L * rows.size
+    if (entries > MAX_SOURCE_ROW_INDEX_ENTRIES) return null
+    stop.charge(2L * model.numBoolVars + model.numFactors + 1L)
+    if (stop()) return null
+    val counts = IntArray(model.numBoolVars)
+    var links = 0
+    for (row in rows) {
+        stop.charge(1L)
+        if (stop()) return null
+        for (variable in row.booleans) {
+            stop.charge(1L)
+            if (stop() || variable !in counts.indices) return null
+            entries += 2L
+            if (entries > MAX_SOURCE_ROW_INDEX_ENTRIES) return null
+            counts[variable]++
+            links++
+        }
+    }
+    stop.charge(2L * model.numBoolVars + model.numFactors + links + 1L)
+    if (stop()) return null
+    val offsets = IntArray(model.numBoolVars + 1)
+    for (variable in counts.indices) {
+        if (stop()) return null
+        offsets[variable + 1] = offsets[variable] + counts[variable]
+    }
+    val positions = offsets.copyOf(model.numBoolVars)
+    val incidences = IntArray(links)
+    for ((index, row) in rows.withIndex()) {
+        stop.charge(row.booleans.size.toLong() + 1L)
+        if (stop()) return null
+        for (variable in row.booleans) incidences[positions[variable]++] = index
+    }
+    val factorOffsets = IntArray(model.numFactors)
+    var offset = 0
+    for (factor in forms.indices) {
+        stop.charge(1L)
+        if (stop() || forms[factor].size > rows.size - offset) return null
+        factorOffsets[factor] = offset
+        offset += forms[factor].size
+    }
+    if (offset != rows.size || stop()) return null
+    return PreparedSourceRowIndex(factorOffsets, offsets, incidences)
+}
 
 private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
     val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
@@ -1573,7 +1701,8 @@ private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
     }
     val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
     return PreparedExactLiraSource(
-        model, exactForms, preparedRows, arithmeticRows, arithmeticVariables, validated = false,
+        model, exactForms, preparedRows, arithmeticRows, arithmeticVariables,
+        prepareSourceRowIndex(model, exactForms, preparedRows, Cancellation.Never), validated = false,
     )
 }
 
@@ -1638,16 +1767,19 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
         if (!charge(forms.size.toLong() + 1L)) return null
         exactForms += forms.toList()
     }
+    val rowIndex = prepareSourceRowIndex(model, exactForms, preparedRows, stop)
+    if (stop()) return null
     val copies = exactForms.size.toLong() + preparedRows.size + arithmeticRows.size + arithmeticVariables.size + 1L
     if (!charge(copies)) return null
     val source = PreparedExactLiraSource(
         model, exactForms.toList(), preparedRows.toList(), arithmeticRows.toList(), arithmeticVariables.toSet(),
-        validated = true,
+        rowIndex, validated = true,
     )
     return source.takeUnless { stop() }
 }
 
 private const val UNASSIGNED = -1
+private const val MAX_SOURCE_ROW_INDEX_ENTRIES = 1_048_576L
 private const val DECLINED_HINT = -2
 private const val MAX_POINT_HINT_ENTRIES = 65_536
 private const val MAX_POINT_HINT_BITS = 4096

@@ -120,8 +120,15 @@ claims while preserving checked incumbents.
 
 ### State and resources
 
-Immutable row addresses, forms and Boolean dependencies can be shared by fresh
-components over one canonical fragment. `prepareExactLiraSource` returns an opaque
+Immutable row addresses, forms and Boolean incidence can be shared by fresh
+components over one canonical fragment. Non-root assertion passes visit pending
+rows in source order and reconsider active disequalities when bounds change.
+Each opening owns its pending and disequality sets; retraction requeues revoked
+assertions and dependencies. Initial and root passes visit the complete source,
+preserving substitution through root-fixed columns. Optional incidence storage is
+bounded to 1,048,576 bookkeeping entries; a representation decline retains the
+complete scan. Its construction and use charge the containing operation.
+`prepareExactLiraSource` returns an opaque
 factory only after complete, uncancelled preparation; each opening binds fresh
 callbacks, cancellation and mutable arithmetic owners. Scoped assertions, graph
 potentials, LP bases and candidates remain invocation-owned. Optional hint storage
