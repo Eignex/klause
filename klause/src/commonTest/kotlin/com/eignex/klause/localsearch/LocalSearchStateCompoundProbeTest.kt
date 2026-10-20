@@ -171,6 +171,25 @@ class LocalSearchStateCompoundProbeTest {
     )
 
     @Test
+    fun `compound grading should preserve the next search random draw`() {
+        for (case in cases) {
+            val baked = case.problem.bake()
+            val state = LocalSearchState(baked, Random(7))
+            val sibling = LocalSearchState(baked, Random(7))
+            state.restart()
+            sibling.restart()
+            val move = assertNotNull(randomCompound(case.problem, state, Random(13)), case.name)
+
+            state.netDelta(move)
+            state.breakScore(move)
+            state.makeScore(move)
+            state.weightedNetDelta(move)
+
+            assertEquals(sibling.rng.nextLong(), state.rng.nextLong(), case.name)
+        }
+    }
+
+    @Test
     fun `definition input scores should include the propagated assignment`() {
         val problem = Problem(
             numBoolVars = 2,

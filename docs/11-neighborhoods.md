@@ -24,6 +24,12 @@ objective from the same probe, rejecting a hard violation before valuing the
 objective. Probes record no activity or best-cost observations, and weighted probes
 rescan only factors whose degrees change, in the order a full scan would use.
 
+The probe transaction owns coordinate snapshots, forward application, capture and
+restoration. Result grading runs after capture and before restoration, with the
+same probe ownership active while it reads break/make counts, weighted degrees,
+objective deltas and optional neighborhood refinements. Grading failure follows
+the transaction's ordinary cleanup before another move can start.
+
 `ArgminJump` builds coordinated integer targets and maintained-Boolean inverse
 repairs through the generic move sink before comparing their complete weighted
 deltas. Each sampled coordinate contributes at most one strict improvement over

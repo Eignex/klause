@@ -23,6 +23,7 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -1247,33 +1248,10 @@ class LocalSearchState private constructor(
             apply(move, affected)
             capture?.invoke()
             breakProbeActive = false
-            var breakCount = 0
-            var makeCount = 0
-            var newlyViolated = 0
-            for (i in 0 until probeTouchedList.size) {
-                val fid = probeTouchedList[i]
-                val degree = factorDegree[fid]
-                if (degree > 0 && !probeWasViolated[fid]) newlyViolated++
-                if (degBefore != null) {
-                    val before = degBefore[fid]
-                    if (degree > before) breakCount++
-                    if (degree < before) makeCount++
-                }
-            }
-            val delta = cost - oldCost
-            val weighted = if (weights.allocated) weightedDegreeDelta(checkNotNull(degBefore)) else delta.toDouble()
-            val objectiveDelta = when {
-                feasibleObjective && cost > 0L -> Double.POSITIVE_INFINITY
-                objective is LinearObjective -> probeLinearObjectiveDelta(objective)
-                objective is FunctionalObjective ->
-                    (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble()
-                objective == null -> 0.0
-                else -> objective.evaluate(assignment) - oldObjective
-            }
-            val breaks = if (move is Move.Compound) newlyViolated else breakCount
-            val cumulativeDelta = if (refineCumulative) cumulativeFractionDelta(weightedResidual) else 0.0
-            val elementRepairs = elementEligibility?.let { elementPreservingRepairs(it) }
-            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta, elementRepairs)
+            return gradeProbe(
+                move, objective, refineCumulative, weightedResidual, elementEligibility, feasibleObjective,
+                oldCost, oldExactObjective, oldObjective, degBefore,
+            )
         } finally {
             breakProbeActive = false
             restoreProbeCoordinates()
@@ -1282,6 +1260,48 @@ class LocalSearchState private constructor(
             activityTracking = oldTracking
             bestCostSeen = oldBestCost
         }
+    }
+
+    @Suppress("LongParameterList")
+    private fun gradeProbe(
+        move: Move,
+        objective: Objective?,
+        refineCumulative: Boolean,
+        weightedResidual: Boolean,
+        elementEligibility: MoveSink?,
+        feasibleObjective: Boolean,
+        oldCost: Long,
+        oldExactObjective: BigInt?,
+        oldObjective: Double,
+        degBefore: IntArray?,
+    ): MoveEval {
+        var breakCount = 0
+        var makeCount = 0
+        var newlyViolated = 0
+        for (i in 0 until probeTouchedList.size) {
+            val fid = probeTouchedList[i]
+            val degree = factorDegree[fid]
+            if (degree > 0 && !probeWasViolated[fid]) newlyViolated++
+            if (degBefore != null) {
+                val before = degBefore[fid]
+                if (degree > before) breakCount++
+                if (degree < before) makeCount++
+            }
+        }
+        val delta = cost - oldCost
+        val weighted = if (weights.allocated) weightedDegreeDelta(checkNotNull(degBefore)) else delta.toDouble()
+        val objectiveDelta = when {
+            feasibleObjective && cost > 0L -> Double.POSITIVE_INFINITY
+            objective is LinearObjective -> probeLinearObjectiveDelta(objective)
+            objective is FunctionalObjective ->
+                (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble()
+            objective == null -> 0.0
+            else -> objective.evaluate(assignment) - oldObjective
+        }
+        val breaks = if (move is Move.Compound) newlyViolated else breakCount
+        val cumulativeDelta = if (refineCumulative) cumulativeFractionDelta(weightedResidual) else 0.0
+        val elementRepairs = elementEligibility?.let { elementPreservingRepairs(it) }
+        return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta, elementRepairs)
     }
 
     private fun probeLinearObjectiveDelta(objective: LinearObjective): Double {
