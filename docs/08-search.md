@@ -218,8 +218,11 @@ never source-completion authority.
 
 Branching receives each conflict's full variable and factor attribution, including
 implication-graph variables of learned conflicts: VSIDS bumps each implicated
-variable once, and CHB rewards each attributed variable. Successful fixpoints deliver
-new deductions to propagation-aware selectors. Phase saving captures values before
+variable once, and CHB rewards each attributed variable.
+Native analysis of required real completion conflicts supplies the same variable
+feedback before its learned consequence is applied, counting the failed leaf once.
+Successful fixpoints deliver new deductions to propagation-aware selectors. Phase
+saving captures values before
 retraction, so propagated as well as decided polarities survive backjumps and
 restarts. Dom/wdeg failure weights belong to the solve and survive restarts; fresh
 selectors isolate solves that share a projection.

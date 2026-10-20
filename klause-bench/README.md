@@ -664,6 +664,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PINNED_REAL_LEAF_COMPACTION_ROOT` | Stored rows before and after private compaction, under unchanged numerical admission |
 | `lpPhase_PINNED_REAL_LEAF_EXPLANATION_ROOT` | Source-mapped compacted conflict: `POOLED`, `DECLINED` or `NOT_POOLED` |
 | `lpPhase_PINNED_REAL_LEAF_EXPLANATION_DECLINE_ROOT` | Refused row provenance, source scope, bound premise, referenced-prefix storage or literal truth |
+| `lpPhase_PINNED_REAL_LEAF_HANDOFF_ROOT` | Required real conflict resolution: `NO_CLAUSE`, `BACKJUMP`, `EXHAUSTED` or `CHRONOLOGICAL` |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Pinned-leaf shape outcomes use `N` for structural columns, `M` for stored rows,

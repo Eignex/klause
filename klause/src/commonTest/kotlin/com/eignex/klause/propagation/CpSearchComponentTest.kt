@@ -43,6 +43,8 @@ class CpSearchComponentTest {
         assertIs<ComponentResult.Consistent>(shared.initialize())
         assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(4, 1)))
         val clause = intArrayOf(native.equalityLit(0, 1, positive = false))
+        var observed: PropagationResult.Unsat? = null
+        cp.externalConflictObserver = { observed = it }
 
         val resolution = assertIs<SearchConflictResolution.Backjump>(cp.resolveClause(clause, shared))
         shared.popTo(resolution.conflict.decisionLevel)
@@ -52,6 +54,7 @@ class CpSearchComponentTest {
         assertEquals(0L, native.intDomain(0).min)
         assertEquals(0L, native.intDomain(0).max)
         assertEquals(0L, shared.intUpperBound(4))
+        assertContentEquals(intArrayOf(0), assertNotNull(observed).conflictInts)
     }
 
     @Test
@@ -61,11 +64,14 @@ class CpSearchComponentTest {
         val shared = SearchSession(listOf(cp))
         assertIs<ComponentResult.Consistent>(shared.initialize())
         assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(0, 1)))
+        var notifications = 0
+        cp.externalConflictObserver = { notifications++ }
 
         val resolution = cp.resolveClause(intArrayOf(native.equalityLit(0, 0, positive = false)), shared)
 
         assertEquals(SearchConflictResolution.Chronological, resolution)
         assertEquals(1L, native.intDomain(0).min)
+        assertEquals(0, notifications)
     }
 
     @Test
@@ -77,13 +83,17 @@ class CpSearchComponentTest {
         assertIs<ComponentResult.Consistent>(shared.initialize())
         assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(0, 1)))
         val clause = intArrayOf(native.equalityLit(0, 1, positive = false))
+        var notifications = 0
+        cp.externalConflictObserver = { notifications++ }
         cancelled = true
 
         val resolution = cp.resolveClause(clause, shared)
 
         assertEquals(SearchConflictResolution.Chronological, resolution)
+        assertEquals(0, notifications)
         cancelled = false
         assertIs<SearchConflictResolution.Backjump>(cp.resolveClause(clause, shared))
+        assertEquals(1, notifications)
     }
 
     @Test

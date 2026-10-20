@@ -2,6 +2,8 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -24,6 +26,8 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.BranchingConflict
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -32,6 +36,31 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class BacktrackSolverRealTest {
+    @Test
+    fun `required real conflicts should notify the native variable selector`() {
+        val source = Problem(2, 0, emptyArray(), Array(1002) { row ->
+            if (row == 0) ExactLinear.of(IntArray(3) { Term.ofRealVar(it) },
+                List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ZERO, activator = 0)
+            else ExactLinear.of(IntArray(3) { Term.ofRealVar(it) },
+                List(3) { BigFraction.ONE }, LinearOp.GE, BigFraction.ONE)
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val reported = ArrayList<Set<Int>>()
+        val selector = object : VariableSelector by InputOrder {
+            override fun fresh(): VariableSelector = this
+            override fun onConflict(varRef: VarRef?, conflict: BranchingConflict) {
+                if (varRef == null) reported += conflict.bools.toSet()
+            }
+        }
+
+        val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 1,
+            variableSelector = selector, valueSelector = IndomainMax))
+
+        assertIs<SolveResult.Sat>(result)
+        assertEquals(listOf(setOf(0)), reported)
+        assertEquals(1L, result.stats.search.fails.sum.toLong())
+    }
+
     @Test
     fun `required real completion should learn its compacted source conflict and preserve a sibling`() {
         val source = Problem(2, 0, emptyArray(), Array(1002) { row ->

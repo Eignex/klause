@@ -418,6 +418,7 @@ private class CpSatisfactionTraversalPolicy(
     ).also {
         cp.propagationObserver = it::onPropagation
         cp.cascadeConflictObserver = it::onCascadeConflict
+        cp.externalConflictObserver = it::onExternalConflict
     }
 
     override val solveParams = SearchSolveParams(
@@ -552,6 +553,10 @@ internal class BacktrackBrancher(
 
     fun onCascadeConflict(conflict: PropagationResult.Unsat) {
         sink?.search?.observeFail()
+        onExternalConflict(conflict)
+    }
+
+    fun onExternalConflict(conflict: PropagationResult.Unsat) {
         variables.onConflict(null, BranchingConflict(conflict.conflictBools, conflict.conflictInts))
         phase.onConflictTick()
     }
@@ -768,7 +773,7 @@ private class ResidualRealComponent(
     private val problem: Problem,
     private val cp: CpSearchComponent,
     params: BacktrackParams,
-    sink: SolveStatsSink?,
+    private val sink: SolveStatsSink?,
     solveContext: LpSolveContext,
 ) : SearchConflictResolver,
     LpSearchResource {
@@ -853,9 +858,20 @@ private class ResidualRealComponent(
     }
 
     override fun resolveConflict(context: SearchContext): SearchConflictResolution {
-        val clause = conflictClause ?: return SearchConflictResolution.Chronological
+        val clause = conflictClause
         conflictClause = null
-        return cp.resolveClause(clause, context)
+        if (clause == null) {
+            sink?.lp?.observePrimalPhase("PINNED_REAL_LEAF_HANDOFF", "NO_CLAUSE", 0L)
+            return SearchConflictResolution.Chronological
+        }
+        val result = cp.resolveClause(clause, context)
+        val outcome = when (result) {
+            is SearchConflictResolution.Backjump -> "BACKJUMP"
+            SearchConflictResolution.Exhausted -> "EXHAUSTED"
+            SearchConflictResolution.Chronological -> "CHRONOLOGICAL"
+        }
+        sink?.lp?.observePrimalPhase("PINNED_REAL_LEAF_HANDOFF", outcome, 0L)
+        return result
     }
 
     override fun onRestart(context: SearchContext) {
