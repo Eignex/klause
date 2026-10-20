@@ -49,6 +49,7 @@ Specialised solvers such as CP-SAT, Z3 and Gurobi are mature and usually faster 
 - Every LP result is checked in exact rational arithmetic before it counts, whether it is a feasible point, an objective bound, an infeasibility proof or an unbounded ray. A result that fails the check is never used as a proof.
 - LP bounds and conflicts are explained by the source constraints, so they feed conflict learning the same way propagation does.
 - Strict inequalities are handled exactly, as SMT linear arithmetic requires.
+- Exact mode extends this to floating-point formats. FlatZinc floats stay continuous variables instead of a grid, MPS models are solved with zero tolerance, and every reported point satisfies the source constraints exactly.
 
 Compared with the others:
 
