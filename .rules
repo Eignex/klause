@@ -10,6 +10,17 @@ Kotlin Multiplatform constraint solver.
 - Additional non-published Gradle modules are allowed, such as `klause-bench`.
   Explicitly disable publication for them (`eignexPublish { publish.set(false) }`).
 
+## Allowed languages
+
+- Kotlin for all solver, library, CLI and bench code; Gradle Kotlin DSL for builds.
+- Bash for glue scripts that chain standard tools (`curl`, `tar`, `jq`, `bc`, `sha256sum`), under
+  `klause-bench/output/` or a module's `scripts/`. Prefer a short script to a new `klause-bench`
+  subcommand, and delete an unused tool instead of porting it.
+- MiniZinc for the `klause-mzn-lib` library and test models; Dockerfiles only to wrap external
+  reference solvers.
+- No Python anywhere: not in sources, tests, resources, Gradle tasks or CI. Reference images that
+  need another language live in klause-lab.
+
 ## PR validation
 
 Opening and pushing a PR does not require a local `./gradlew check lintDocs` gate.
