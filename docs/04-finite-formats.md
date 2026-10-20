@@ -152,7 +152,8 @@ model that reconstructs the original MiniZinc variables. The frontend preserves
 source names, output annotations and constraints, and records whether each float
 component uses exact arithmetic or a finite approximation.
 
-A grid result never establishes an exact source optimum or refutation.
+A selected grid reports optima and refutations under the declared finite-grid
+semantics; these claims do not establish a continuous-source optimum or refutation.
 
 ### Declared semantics and caller ranges
 
@@ -262,7 +263,9 @@ membership or a product.
 In the compatibility view, a component that needs approximation or has more than
 4,096 finite alternatives uses integer buckets. Bucketed search decides a finite
 grid: it may miss solutions between grid points, and rounding can produce
-candidates that violate the source. Grid relations (`GridArrayMinMax`, `GridAbs`,
+candidates that violate continuous-source equations. FlatZinc publishes those
+candidates as grid witnesses, and completed search reports the grid optimum or
+refutation. Grid relations (`GridArrayMinMax`, `GridAbs`,
 `GridProduct`, `GridPower`) keep their step, origin and nearest-bucket rounding.
 
 `--exact` preserves continuous variables and open bounds, routes linear
@@ -289,8 +292,14 @@ by `3/72057594037927936`. The rational product violates the bound and substituti
 Exact rational coordinates are emitted as `% klause-exact:` comments beside
 MiniZinc-compatible decimal assignments. Mixed exact/grid witnesses add
 `% klause-coordinate:` and `% klause-float-component:` comments with each grid
-point's binary64 value and approximation reason; these certify nothing. Grid
-completion suppresses optimum markers and turns grid refutation into unknown.
+point's binary64 value and approximation reason. With a selected finite grid,
+`==========` reports a grid optimum or completed satisfaction search, and
+`=====UNSATISFIABLE=====` reports a grid refutation. The
+`% klause-float-claim:` comment scopes these claims to the declared finite grid,
+and `% klause-grid-verdict:` retains the native grid verdict. Rounded grid witnesses
+need not satisfy continuous-source equations. Incomplete optimization keeps its
+incumbent without an optimum marker; an unresolved search remains UNKNOWN.
+Caller declaration-range overrides still withhold default-source completion claims.
 
 `OznApplier` renders bindings through the parsed `.ozn` output model with signed
 64-bit integers. `array1d` through `array6d` keep contiguous index sets and

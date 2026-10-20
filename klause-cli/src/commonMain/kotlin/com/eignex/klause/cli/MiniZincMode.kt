@@ -138,9 +138,6 @@ internal class MiniZincOutput(
     private val sourceSemantics: EffectiveSourceSemantics? = null,
 ) : OutputProtocol {
     private var context: VerdictContext = VerdictContext()
-    private var nativeGridSeen = false
-    private var pointPublished = false
-    private val checkedGridPoints: Boolean get() = nativeGridSeen && pointPublished
     private val integerScopeChanged = sourceSemantics?.let {
         it.declared.undeclaredIntegers != it.effective.undeclaredIntegers
     } == true
@@ -172,19 +169,16 @@ internal class MiniZincOutput(
     }
 
     override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
-        pointPublished = true
         // `writeFlatZincSolution` / `OznApplier.render` already include the per-solution
         // `----------` terminator; objective is carried in the rendered text.
         print(rendered)
     }
 
     override fun onExactSolution(rendered: String, objective: BigFraction) {
-        pointPublished = true
         print(rendered)
     }
 
     override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
-        pointPublished = true
         println("% objective=${arithmeticObjectiveText(objective)}")
         print(rendered)
         flushCliOutput()
@@ -217,9 +211,7 @@ internal class MiniZincOutput(
 
     override fun onComplete(verdict: Verdict) {
         if (floatApproximation) {
-            val pointScope = if (checkedGridPoints) "original source points checked"
-                else "source witness check required"
-            println("% klause-float-claim: grid search; $pointScope; no global source proof")
+            println("% klause-float-claim: declared finite grid; no global continuous-source proof")
         }
         if (integerScopeChanged) {
             println("% klause-source-claim: caller integer bounds; no default-source proof")
@@ -227,7 +219,9 @@ internal class MiniZincOutput(
         if (realScopeChanged) {
             println("% klause-source-claim: caller real bounds; no default-source proof")
         }
-        when (flatZincSourceVerdict(verdict, floatApproximation || declarationScopeChanged)) {
+        val qualified = flatZincSourceVerdict(verdict, declarationScopeChanged ||
+            (floatApproximation && verdict == Verdict.UNBOUNDED))
+        when (qualified) {
             Verdict.SATISFIABLE, Verdict.OPTIMAL -> println("==========")
 
             // Incumbents already streamed; printing `==========` would falsely claim optimality.
@@ -242,7 +236,6 @@ internal class MiniZincOutput(
             Verdict.UNKNOWN -> {
                 println("=====UNKNOWN=====")
                 val cause = when {
-                    floatApproximation -> "grid search cannot prove the source model"
                     integerScopeChanged -> "caller integer bounds changed source scope"
                     realScopeChanged -> "caller real bounds changed source scope"
                     else -> context.softVerdictCause()
@@ -253,7 +246,6 @@ internal class MiniZincOutput(
     }
 
     override fun onNativeGridOutcome(result: NativeGridOutcome) {
-        nativeGridSeen = true
         val outcome = result.outcome as? FiniteSolveOutcome.Completed ?: return
         println("% klause-grid-verdict: ${outcome.verdict}; scope=private-grid")
         println("% klause-grid-solutions: ${outcome.solutions}")

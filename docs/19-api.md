@@ -79,8 +79,11 @@ described under [source definition materialization](10-local-search.md#source-de
 
 `PreparedSourceInvocation` retains the selected route, source plan and operation
 admission. When preparation selects a private float grid, `FiniteSolveResult.outcome`
-reports only source-qualified points and claims and `nativeGridOutcome` keeps the
-grid's own outcome. An interrupted preparation returns `Declined` with its stop reason.
+reports source-qualified points and claims unless the consumer declares grid
+semantics. FlatZinc declares that scope, recorded by
+`SourceFloatProjection.declaredGridSemantics`, and reports grid witnesses, optima
+and refutations. `nativeGridOutcome` keeps the grid's own outcome in either case.
+An interrupted preparation returns `Declined` with its stop reason.
 
 `SourceSetup.execute(SourceExecutionRequest(invocation, ...))` dispatches the
 captured operation. `ExecutionOptions` resolves a seed and a `NodeBudget` (`auto`,

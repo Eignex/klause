@@ -17,6 +17,7 @@ internal class FloatGridPublication(
     private var accepted = 0L
     private var best: Sample? = null
     private var bestObjective: BigFraction? = null
+    private var lastChecked: Sample? = null
 
     fun onSample(native: Sample) {
         accept(native)?.let(callbacks.onSample)
@@ -34,15 +35,22 @@ internal class FloatGridPublication(
         val mapping = binding.projection.mapping
         mapping.requireOwner(binding.consumer)
         val sample = mapping.reconstruct(binding.projection.problem, native, cancellation) ?: return null
-        val verdict = verifyProjectedSourceWitness(binding.projection.mapping.source, binding.sourceChecker, sample,
-            cancellation, toleranceCheck)
-        if (verdict !is Verification.Accepted || cancellation()) return null
+        if (binding.consumer.declaredGridSemantics) {
+            // The finite engine checks rounded grid relations, which can violate exact source equations.
+            if (toleranceCheck?.invoke(sample) == false || cancellation()) return null
+        } else {
+            val verdict = verifyProjectedSourceWitness(binding.projection.mapping.source, binding.sourceChecker, sample,
+                cancellation, toleranceCheck)
+            if (verdict !is Verification.Accepted || cancellation()) return null
+        }
         val objective = binding.objective?.let {
             cancellation.charge(it.native.boolWeightValues.size.toLong() + it.native.intCoefficientValues.size)
             if (cancellation()) return null
             it.sourceValue(it.native.evaluateLong(native), maximize = false)
         }
         val previous = bestObjective
+        if (cancellation()) return null
+        lastChecked = native
         if (previous != null && objective != null &&
             (if (binding.metadata.maximize) objective <= previous else objective >= previous)
         ) return null
@@ -64,7 +72,11 @@ internal class FloatGridPublication(
         val qualified = if (native is FiniteSolveOutcome.Completed) {
             FiniteSolveOutcome.Completed(
                 when {
+                    binding.consumer.declaredGridSemantics && native.verdict == FiniteSolveVerdict.UNSAT ->
+                        FiniteSolveVerdict.UNSAT
                     accepted == 0L -> FiniteSolveVerdict.UNKNOWN
+                    binding.consumer.declaredGridSemantics && native.verdict == FiniteSolveVerdict.OPTIMAL &&
+                        native.bestSample != null && lastChecked === native.bestSample -> FiniteSolveVerdict.OPTIMAL
                     binding.objective != null -> FiniteSolveVerdict.BEST_FOUND
                     else -> FiniteSolveVerdict.SAT
                 },

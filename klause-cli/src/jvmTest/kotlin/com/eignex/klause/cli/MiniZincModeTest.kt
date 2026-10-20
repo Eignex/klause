@@ -1,5 +1,10 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.flatzinc.linearObjective
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.prepareFiniteCompatibility
+import com.eignex.klause.formats.flatzinc.sourceAttachment
+import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -71,6 +76,44 @@ class MiniZincModeTest(private val direction: String) {
             System.setOut(previous)
             source.delete()
         }
+    }
+
+    @Test
+    fun `declared nonlinear grid optimization should report its optimum in original units`() {
+        val program = parseFlatZinc("var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; " +
+            "constraint float_le(x,0.75); constraint float_times(x,x,y); solve $direction y;", floatBuckets = 5)
+        val maximize = direction == "maximize"
+        val objective = assertNotNull(program.sourceProgram.linearObjective())
+        val normalized = if (maximize) objective.negated() else objective
+        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED, normalized, maximize = maximize))
+        assertTrue(assertNotNull(invocation.floatProjection).declaredGridSemantics)
+        val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it, true) },
+            null, continuousObjectiveValue = { normalized.evaluateExact(it).toDouble() })
+        val common = CommonOptions().apply {
+            engine = "fixed"
+            parallel = 1
+            randomSeed = 17
+        }
+        val bytes = ByteArrayOutputStream()
+        val previous = System.out
+        val stream = PrintStream(bytes)
+
+        try {
+            System.setOut(stream)
+            SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true))
+        } finally {
+            System.setOut(previous)
+            stream.close()
+        }
+
+        val text = bytes.toString(Charsets.UTF_8.name())
+        val expected = if (maximize) "0.5" else "0.0"
+        assertTrue("_objective = $expected;" in text.lines(), text)
+        assertTrue("==========" in text.lines(), text)
+        assertTrue("klause-grid-verdict: OPTIMAL" in text, text)
+        assertTrue("declared finite grid" in text, text)
+        assertFalse("=====UNKNOWN=====" in text.lines(), text)
     }
 
     @Test
