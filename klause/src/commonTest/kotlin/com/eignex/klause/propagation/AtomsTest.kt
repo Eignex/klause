@@ -115,6 +115,26 @@ class AtomsTest {
     }
 
     @Test
+    fun `a batch bound should cite its premise and only earlier crossed holes`() {
+        val s = freshState(numVars = 1, hi = 9, numBoolVars = 2)
+        assertTrue(s.pinBoolAsDecision(0, true))
+        val earlierReason = intArrayOf(Lit.make(0, false))
+        assertTrue(s.excludeIntValue(0, 1, earlierReason))
+        assertTrue(s.excludeIntValue(0, 8, earlierReason))
+        assertTrue(s.pinBoolAsDecision(1, true))
+        val batchReason = intArrayOf(Lit.make(1, false))
+
+        assertTrue(s.excludeIntValues(0, longArrayOf(0, 4, 9), batchReason))
+
+        for ((atom, hole) in listOf(s.atomVarGe(0, 2) to 1L, s.atomVarLe(0, 7) to 8L)) {
+            assertEquals(
+                listOf(Lit.make(1, false), Lit.make(s.atomVarEq(0, hole), true)),
+                s.atomAntecedentsDerived(atom - s.problem.numBoolVars)?.toList(),
+            )
+        }
+    }
+
+    @Test
     fun `adjacent unconditional root holes should retain an earlier conditional carve reason`() {
         val s = freshState(numVars = 2, hi = 9)
         s.undoLogging = false

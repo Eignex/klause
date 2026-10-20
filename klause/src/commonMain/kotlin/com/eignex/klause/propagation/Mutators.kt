@@ -493,16 +493,7 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
     val newMin = newDomain.min
     val newMax = newDomain.max
 
-    // Interior carves (strictly inside the surviving span); the rest land on a moved endpoint.
-    var interior: LongArrayList? = null
-    var excluded = 0
-    for (i in values.indices) {
-        val value = values[i]
-        if (value !in d) continue
-        excluded++
-        if (value in newMin..newMax) (interior ?: LongArrayList().also { interior = it }).add(value)
-    }
-    if (currentFactor >= 0) propagations += excluded
+    val interior = collectIntExclusionInteriors(values, d, newMin, newMax)
 
     val root = rootDomains[v]
     val antMin = if (newMin != d.min) {
@@ -528,16 +519,51 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
         null
     }
 
+    publishIntExclusionBatch(v, d, newDomain, newMin, newMax, antMin, antMax, interior, antecedents)
+    return true
+}
+
+private fun PropagationState.collectIntExclusionInteriors(
+    values: LongArray,
+    prior: IntDomain,
+    newMin: Long,
+    newMax: Long,
+): LongArrayList? {
+    // Interior carves (strictly inside the surviving span); the rest land on a moved endpoint.
+    var interior: LongArrayList? = null
+    var excluded = 0
+    for (i in values.indices) {
+        val value = values[i]
+        if (value !in prior) continue
+        excluded++
+        if (value in newMin..newMax) (interior ?: LongArrayList().also { interior = it }).add(value)
+    }
+    if (currentFactor >= 0) propagations += excluded
+    return interior
+}
+
+@Suppress("LongParameterList")
+private fun PropagationState.publishIntExclusionBatch(
+    v: Int,
+    prior: IntDomain,
+    newDomain: IntDomain,
+    newMin: Long,
+    newMax: Long,
+    antMin: IntArray?,
+    antMax: IntArray?,
+    interior: LongArrayList?,
+    antecedents: IntArray?,
+) {
     if (undoLogging) logIntChange(v) // one record restores the full prior domain + bound atoms
 
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
-    if (newMin != d.min) {
+    if (newMin != prior.min) {
         intMinLevel[v] = currentLevel
         intMinReason[v] = currentFactor
         intMinAntecedents[v] = antMin
     }
-    if (newMax != d.max) {
+    if (newMax != prior.max) {
         intMaxLevel[v] = currentLevel
         intMaxReason[v] = currentFactor
         intMaxAntecedents[v] = antMax
@@ -553,12 +579,11 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
     // subscribed to LB_RAISED / UB_LOWERED, dropped from this var's occurrence-list wakeup) wake.
     // A missing kind bit would silently drop that wake.
     var kindMask = 0
-    if (newMin != d.min) kindMask = kindMask or IntEvent.LB_RAISED_BIT
-    if (newMax != d.max) kindMask = kindMask or IntEvent.UB_LOWERED_BIT
+    if (newMin != prior.min) kindMask = kindMask or IntEvent.LB_RAISED_BIT
+    if (newMax != prior.max) kindMask = kindMask or IntEvent.UB_LOWERED_BIT
     if (interior != null) kindMask = kindMask or IntEvent.VALUE_REMOVED_BIT
     markIntDirty(v, kindMask)
-    propagateAtomsForExclusionBatch(v, d.min, d.max, antMin, antMax, interior, antecedents)
-    return true
+    propagateAtomsForExclusionBatch(v, prior.min, prior.max, antMin, antMax, interior, antecedents)
 }
 
 internal fun PropagationState.seedConflictFactor(fid: Int) {
