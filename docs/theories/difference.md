@@ -114,6 +114,14 @@ a complete graph check. Final original-source checks retain witness authority.
 Once the original Boolean skeleton is settled, graph feasibility supplies its
 arithmetic completion without further relative decisions.
 
+The general linear-real component can use a fully admitted necessary subset of
+difference rows only to prove a negative cycle. Valid unsupported general rows
+contribute no graph edge; malformed or stopped input withholds the proof. A
+feasible subset supplies no point or full-source verdict. The linear-real owner
+retains all original source premises, including equations used in reduction; the
+internal graph's unguarded clause is not a source explanation. See
+[linear-real proof authority](linear-real.md#results-and-proof-authority).
+
 ## Results and proof authority
 
 Completed graph feasibility supplies an integer potential sample or a rational

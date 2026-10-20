@@ -97,12 +97,17 @@ reduced to a false constant, or a completed negative cycle in an entirely admitt
 reduced difference residual refutes only the current Boolean and private-branch
 prefix. A completed proof retains both original directions of every paired equation
 and the source inequality reduced to a false constant, when present. A residual
-residual refutation conservatively retains every original input row; an internal
+refutation conservatively retains every original input row; an internal
 unguarded cycle cannot become a root source clause. Once source Booleans are all
 assigned, a residual outside the difference fragment can compact its surviving
 coordinates and partition them into independent components. General components
-reuse the reduction owner's source-LP allowance with unchanged small-model
-admission. Only completed exact infeasibility refutes the current prefix; points
+first check a fully admitted necessary difference subset for a negative cycle;
+unsupported general rows supply no graph edges, and a feasible subset supplies no
+point or source verdict. Before a general component requests the reduction owner's
+source-LP allowance, an oversized row set can merge positively proportional
+inequalities by their strongest exact endpoint. Equal endpoints retain strictness.
+The unchanged small-model admission uses the remaining row count. Only completed
+exact infeasibility refutes the current prefix; points
 from this negative-only check are discarded. Every input row is admitted before
 any component can supply a refutation. Feasible or incomplete component checks
 retain the ordinary LP route. The same row

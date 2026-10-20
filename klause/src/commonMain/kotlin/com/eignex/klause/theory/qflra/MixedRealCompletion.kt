@@ -27,7 +27,7 @@ internal fun refuteRealResidualComponents(
 ): Boolean {
     if (budget.context.certificationPolicy !== ProductionLpCertificationPolicy) return false
     onStage?.invoke("PURE_REAL_EQUALITY_GENERAL_ATTEMPT")
-    val result = solveRealComponents(columns, rows, budget, stop, onStage)
+    val result = solveRealComponents(columns, rows, budget, stop, onStage, negativeOnly = true)
     if (stop() || result !== RealComponents.Refuted) return false
     onStage?.invoke("PURE_REAL_EQUALITY_GENERAL_REFUTED")
     return !stop()
@@ -45,6 +45,7 @@ private fun solveRealComponents(
     budget: SourceLpBudget,
     stop: Cancellation,
     onStage: ((String) -> Unit)?,
+    negativeOnly: Boolean = false,
 ): RealComponents {
     if (columns < 0 || columns.toLong() * columns > 65536L || rows.size > 65536) return RealComponents.Declined
     stop.charge(4L * columns + rows.size + 1L)
@@ -81,7 +82,7 @@ private fun solveRealComponents(
     val compact = normalized.map { row ->
         ExactRationalInequality(row.columns.map { local[it] }.toIntArray(), row.coefficients, row.rhs, row.strict)
     }
-    val result = solveCompactRealComponents(original.size, compact, budget, stop, onStage)
+    val result = solveCompactRealComponents(original.size, compact, budget, stop, onStage, negativeOnly)
     if (stop() || result !is RealComponents.Point) return if (stop()) RealComponents.Declined else result
     stop.charge(2L * columns + original.size)
     if (stop()) return RealComponents.Declined
@@ -96,6 +97,7 @@ private fun solveCompactRealComponents(
     budget: SourceLpBudget,
     stop: Cancellation,
     onStage: ((String) -> Unit)?,
+    negativeOnly: Boolean,
 ): RealComponents {
     // Each parent can change at most once per union; the batch covers all compressed walks.
     stop.charge(8L * columns * columns + columns)
@@ -144,12 +146,28 @@ private fun solveCompactRealComponents(
             }
         } else {
             onStage?.invoke("RECOVERY_REAL_COMPONENT_SHAPE_${component.size}_${localRows.size}")
-            if (!budget.admitsDimensions(component.size, localRows.size.toLong())) {
+            if (negativeOnly) {
+                onStage?.invoke("PURE_REAL_EQUALITY_SUBSET_GRAPH_ATTEMPT")
+                val refuted = RealDifferenceSystem.refutesSubset(component.size, localRows, stop)
+                if (stop()) return RealComponents.Declined
+                if (refuted) {
+                    onStage?.invoke("PURE_REAL_EQUALITY_SUBSET_GRAPH_REFUTED")
+                    return if (stop()) RealComponents.Declined else RealComponents.Refuted
+                }
+            }
+            val admittedRows = if (budget.admitsDimensions(component.size, localRows.size.toLong())) localRows else {
+                onStage?.invoke("RECOVERY_REAL_COMPONENT_COMPACTION_ATTEMPT")
+                compactRealRows(localRows, stop)?.also {
+                    onStage?.invoke("RECOVERY_REAL_COMPONENT_COMPACT_${localRows.size}_TO_${it.size}")
+                } ?: return RealComponents.Declined
+            }
+            if (stop()) return RealComponents.Declined
+            if (!budget.admitsDimensions(component.size, admittedRows.size.toLong())) {
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_DIMENSION")
                 return RealComponents.Declined
             }
             onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_REQUEST")
-            val result = SourceLp(localRows, component.size, budget).use { owner -> owner.solve(stop) }
+            val result = SourceLp(admittedRows, component.size, budget).use { owner -> owner.solve(stop) }
             if (stop()) return RealComponents.Declined
             if (result?.verdict == LpVerdict.INFEASIBLE &&
                 budget.context.certificationPolicy === ProductionLpCertificationPolicy
@@ -165,4 +183,29 @@ private fun solveCompactRealComponents(
     if (stop()) return RealComponents.Declined
     onStage?.invoke("RECOVERY_REAL_COMPONENTS_POINT")
     return if (stop()) RealComponents.Declined else RealComponents.Point(point)
+}
+
+private fun compactRealRows(
+    rows: List<ExactRationalInequality>,
+    stop: Cancellation,
+): List<ExactRationalInequality>? {
+    val work = MixedPointArithmetic(stop)
+    val directions = LinkedHashMap<List<Pair<Int, BigFraction>>, ExactRationalInequality>()
+    for (row in rows) {
+        stop.charge(8L * row.columns.size + 4L)
+        if (stop()) return null
+        val first = row.coefficients.firstOrNull()?.takeUnless { it.isZero } ?: return null
+        val scale = if (first.signum() < 0) first.negated() else first
+        val coefficients = row.coefficients.map { work.quotient(it, scale) ?: return null }
+        val rhs = work.quotient(row.rhs, scale) ?: return null
+        val key = row.columns.indices.map { row.columns[it] to coefficients[it] }
+        val previous = directions[key]
+        val stronger = previous == null ||
+            (work.subtractProduct(rhs, BigFraction.ONE, previous.rhs) ?: return null).let {
+                it.signum() < 0 || (it.isZero && row.strict && !previous.strict)
+            }
+        if (stronger) directions[key] = ExactRationalInequality(row.columns, coefficients, rhs, row.strict)
+    }
+    stop.charge(directions.size.toLong() + 1L)
+    return if (stop()) null else directions.values.toList()
 }

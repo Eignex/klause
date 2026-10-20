@@ -857,7 +857,12 @@ refutations. With source Booleans complete, general residual components can reus
 the reduction owner's source-LP budget after compacting surviving coordinates.
 Their completed exact refutations retain all original input-row premises;
 `PURE_REAL_EQUALITY_GENERAL_*` distinguishes attempts and accepted negative results.
-Feasible or incomplete component checks retain the primary LP fallback. These
+Its complete-Boolean negative path can refute a fully admitted necessary difference
+subset; `PURE_REAL_EQUALITY_SUBSET_GRAPH_*` identifies those attempts and refutations.
+No subset point or unguarded internal clause is exported. Oversized general row
+sets can merge positively proportional directions by their strongest endpoint
+before the same source-LP dimension guard. `RECOVERY_REAL_COMPONENT_COMPACT_<before>_TO_<after>`
+records a completed compaction. Feasible or incomplete component checks retain the primary LP fallback. These
 observations do not export numerical certificates or establish whole-source exhaustion. Real
 component observations identify graph checks, source-LP dimension declines and requests,
 and points returned across every component. `RECOVERY_REAL_COMPONENT_SHAPE_<columns>_<rows>`

@@ -103,7 +103,10 @@ by connectivity. Returned points restore every original coordinate position.
 Each component
 uses the difference checker when supported; other components can request exact points
 through the existing [source LP owner](../lp/architecture.md), sharing the reduction
-owner's operation allowance and unchanged small-model admission. Without equation
+owner's operation allowance and unchanged small-model admission. An oversized
+component can first merge positively proportional inequalities by their strongest
+exact bound, retaining strictness at equal endpoints. Its admitted point must still
+satisfy every original residual row after coordinate reconstruction. Without equation
 repair, an entirely supported real difference graph can also complete the integer
 guesses. The full rows,
 strictness, integrality and source reconstruction still gate acceptance. Failed or
