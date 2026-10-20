@@ -46,15 +46,23 @@ class MiniZincModeExactGlobalsTest(
             val value = (if (verdict == "refutation") 0 else 1) + if (coupling == "algebraic") 1 else 0
             if (coupling == "finite") "constraint int_eq(x,$value);" else "constraint float_eq(r,$value.0);"
         }
-        val objective = if (coupling == "finite") "x" else "y"
+        val objective = if (coupling == "linear") "y" else "x"
         val solve = if (verdict == "optimum") "minimize $objective" else "satisfy"
         val source = File.createTempFile("exact-global", ".fzn").apply {
-            val sets = if (global in flatZincSetGlobalCases) "var set of 1..1: s; var set of 1..1: t; " +
-                "var bool: b; var bool: c; " else ""
-            writeText("var 0..2: x :: output_var; var 1..3: v; var 1..2: d; " +
-                "var 1..2: two; var 0..1: z; " +
-                sets + realDeclarations +
-                "constraint int_plus(x,1,v); constraint int_eq(d,1); " +
+            val roles = listOf("v", "d", "two", "z", "s", "t", "b", "c")
+                .filter { Regex("\\b$it\\b").containsMatchIn(global.second) || it == bridge && coupling == "algebraic" }
+            val declarations = roles.joinToString(" ") {
+                when (it) {
+                    "v" -> "var 1..3: v;"
+                    "d", "two" -> "var 1..2: $it;"
+                    "z" -> "var 0..1: z;"
+                    "s", "t" -> "var set of 1..1: $it;"
+                    else -> "var bool: $it;"
+                }
+            }
+            val definitions = (if ("v" in roles) "constraint int_plus(x,1,v); " else "") +
+                if ("d" in roles) "constraint int_eq(d,1); " else ""
+            writeText("var 0..2: x :: output_var; $declarations $realDeclarations $definitions " +
                 "constraint ${global.second}; $realConstraints $pin solve $solve;")
         }
         val common = CommonOptions().apply {
@@ -92,9 +100,10 @@ class MiniZincModeExactGlobalsTest(
             assertEquals("x = 1;", output.lineSequence().lastOrNull { it.startsWith("x = ") }, output)
             if (coupling != "finite") {
                 val exact = output.lineSequence().lastOrNull { it.startsWith("% klause-exact: y = ") }
-                if (coupling == "algebraic") {
+                if (coupling == "algebraic" || coupling == "polynomial" && exact != "% klause-exact: y = 1;") {
                     assertTrue(assertNotNull(exact, output).startsWith("% klause-exact: y = root("), output)
-                    assertEquals("% klause-exact: r = 2;",
+                    val image = if (coupling == "algebraic") 2 else 1
+                    assertEquals("% klause-exact: r = $image;",
                         output.lineSequence().lastOrNull { it.startsWith("% klause-exact: r = ") }, output)
                 } else {
                     val value = if (coupling == "linear") "1/3" else "1"
