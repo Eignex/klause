@@ -270,7 +270,8 @@ refutation. Grid relations (`GridArrayMinMax`, `GridAbs`,
 
 `--exact` preserves continuous variables and open bounds, routes linear
 satisfaction through the shared real/mixed theory and requires exact certification
-for continuous objectives. Overflow during lowering and integer constants that
+for continuous objectives. It never selects a grid; unsupported exact models
+decline. Overflow during lowering and integer constants that
 binary64 cannot represent decline with a diagnostic.
 
 #### Rounded FlatZinc bounds
