@@ -581,6 +581,13 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (probeRoute == LpRoute.NODE) solves.update(1.0)
     }
 
+    fun observeRealLeafAdmission(outcome: String) {
+        val key = "PINNED_REAL_LEAF_ADMISSION"
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(
+            LpPhaseStats(calls = 1L, outcomes = mapOf(outcome to 1L)),
+        )
+    }
+
     /** Route-specific engine cost. The pivot, work, warm-start and refactor totals are node-only,
      * so their denominator ([solves]) always names the same route. */
     fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics) {

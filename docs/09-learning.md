@@ -46,6 +46,10 @@ pool admits each row tightening as an implication in the persistent CP session, 
 survives undo and propagates in sibling branches. These clauses assume no incumbent
 cutoff. See
 [LP consumer contracts](17-linear-programming.md#consumers-explanations-and-cuts).
+A complete-check conflict retains its producing resolver until conflict handling
+consumes it. Required real-leaf clauses use native CP first-UIP, preserving integer
+order atoms and native/shared level mappings through learning and backjump imports.
+Native integer atoms are never interpreted as shared Boolean IDs.
 
 ## Conflict analysis
 

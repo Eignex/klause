@@ -660,7 +660,17 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_<phase>_<route>_Calls`, `_Nanos`, outcomes | Completed attempts, including declines; acceptance includes dual recovery/cleanup and overlaps other phases |
 | `lpPhase_PRIMAL_ROUNDING_ROOT`, `lpPhase_PRIMAL_PUMP_ROUND_ROOT`, `lpPhase_PRIMAL_PROPOSAL_ROOT` | Discrete proposals and completion/admission outcomes; inclusive timing overlaps solve and verification phases |
 | `lpPhase_PRIMAL_LP_PRIMAL_ROOT`, `lpPhase_PRIMAL_LP_DUAL_ROOT` | Root LP point availability and termination before rounding; stopped iterates supply no primal target |
+| `lpPhase_PINNED_REAL_LEAF_SHAPE_ROOT` | First fresh pinned residual's bounded matrix shape before numerical admission |
+| `lpPhase_PINNED_REAL_LEAF_COMPACTION_ROOT` | Stored rows before and after private compaction, under unchanged numerical admission |
+| `lpPhase_PINNED_REAL_LEAF_EXPLANATION_ROOT` | Source-mapped compacted conflict: `POOLED`, `DECLINED` or `NOT_POOLED` |
+| `lpPhase_PINNED_REAL_LEAF_EXPLANATION_DECLINE_ROOT` | Refused row provenance, source scope, bound premise, referenced-prefix storage or literal truth |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
+
+Pinned-leaf shape outcomes use `N` for structural columns, `M` for stored rows,
+`A` for active rows and `F` for fixed columns. After fixed terms are omitted,
+`Z`, `S` and `P` count zero-, one- and two-term rows; `U` and `D` count distinct
+and repeated coefficient vectors up to sign. Bounds and RHS values are excluded
+from grouping. This paid, bounded observation creates no numerical query or proof.
 
 Exact values take precedence over numeric fallbacks; malformed exact values earn
 no objective credit. `best-found`, plain `sat` and unbounded witnesses earn no

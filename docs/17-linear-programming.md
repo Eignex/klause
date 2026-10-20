@@ -119,6 +119,25 @@ are consumed, and a failed guess supplies no conflict or bound. Real array selec
 emits index-range rows on every build, and a fixed index adds its equality with both
 index premises. In every case the original source rows decide publication.
 
+When the root real-factor estimate exceeds 1,000, required finite completion builds
+a fresh selected residual only after every Boolean and integer is pinned. Under
+exact production certification, a zero-objective residual can substitute fixed
+structural coordinates and merge equal or opposite expressions into strict
+intervals before the unchanged 1,000-row numerical admission. Structural columns,
+origins and original row IDs remain mapped. Construction and projection share the
+containing work ledger, with 10,000 rows and columns, 65,536 sparse or premise units
+and 4,096-bit scalar admission.
+
+A compacted refutation maps its support to the original rows and cites their
+validity premises and both bounds of touched structural columns. A freshness
+snapshot retains at most 4,096 finite coordinates referenced by structural columns
+or original row premises; its size is independent of unrelated source coordinates.
+Source identity and captured pins must still match, and every emitted literal must
+be false in the live session. Unsupported source scopes, bounds, storage or
+cancellation withhold the explanation. Required completion forwards a complete
+source clause to native CP conflict analysis; the private nogood pool is a separate
+consumer. Original-source checks still gate every published witness.
+
 ## Bound trail and warm state
 
 [LpBoundTrail](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpBoundTrail.kt)

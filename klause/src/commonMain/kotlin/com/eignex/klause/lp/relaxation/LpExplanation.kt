@@ -276,48 +276,60 @@ internal object LpExplanation {
         relaxation: LpRelaxation,
         rows: IntArray,
         session: PropagationSession,
+        onDecline: ((String) -> Unit)? = null,
     ): Boolean {
-        val model = relaxation.model
-        if (model.exactState == null && (model.rowGlobal.size != model.m || model.rowPremises.size != model.m)) {
+        fun declined(reason: String): Boolean {
+            onDecline?.invoke(reason)
             return false
         }
+        val model = relaxation.model
+        if (model.exactState == null && (model.rowGlobal.size != model.m || model.rowPremises.size != model.m)) {
+            return declined("ROW_LAYOUT")
+        }
         for (r in rows) {
-            if (r !in 0 until model.m || model.exactState?.rows?.row(r)?.active == false) return false
+            if (r !in 0 until model.m || model.exactState?.rows?.row(r)?.active == false) return declined("ROW_STATE")
             if (model.exactState?.model?.row(r)?.global ?: model.rowGlobal[r]) continue
             val source = relaxation.sourceMap?.parent(r)
             if (source != null) {
-                if (source.model !== session.problem || source.assumptions.isNotEmpty()) return false
+                if (source.model !== session.problem) return declined("SOURCE_IDENTITY")
+                if (source.assumptions.isNotEmpty()) return declined("SOURCE_ASSUMPTIONS")
                 for (fact in source.facts) {
-                    if (!fact.global && !addSourcePremise(lits, seen, fact.premise, session)) return false
+                    if (!fact.global && !addSourcePremise(lits, seen, fact.premise, session)) {
+                        return declined("SOURCE_FACT_${fact.premise::class.simpleName}")
+                    }
                 }
                 continue
             }
             if (model.exactState != null) {
-                val premises = model.exactState.model.row(r).premises ?: return false
+                val premises = model.exactState.model.row(r).premises ?: return declined("ROW_ORIGIN")
                 for (bound in premises.boundEntries()) {
                     val premise = CutPremise.Bound(
                         CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, bound.variable) to BigFraction.ONE)),
                         bound.upper, bound.threshold.value,
                     )
-                    if (!addSourcePremise(lits, seen, premise, session)) return false
+                    if (!addSourcePremise(lits, seen, premise, session)) return declined("BOUND_PREMISE")
                 }
                 for (literal in premises.literalEntries()) {
-                    if (!addSourcePremise(lits, seen, CutPremise.Literal(literal), session)) return false
+                    if (!addSourcePremise(lits, seen, CutPremise.Literal(literal), session)) {
+                        return declined("LITERAL_PREMISE")
+                    }
                 }
                 continue
             }
-            val prem = model.rowPremises[r] ?: return false
-            if (prem.vars.size != prem.isUpper.size || prem.vars.size != prem.thresholds.size) return false
+            val prem = model.rowPremises[r] ?: return declined("ROW_ORIGIN")
+            if (prem.vars.size != prem.isUpper.size || prem.vars.size != prem.thresholds.size) {
+                return declined("ROW_LAYOUT")
+            }
             for (k in prem.vars.indices) {
-                if (prem.vars[k] !in 0 until session.problem.numIntVars) return false
+                if (prem.vars[k] !in 0 until session.problem.numIntVars) return declined("BOUND_PREMISE")
                 val premise = CutPremise.Bound(
                     CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, prem.vars[k]) to BigFraction.ONE)),
                     prem.isUpper[k], BigFraction.ofLong(prem.thresholds[k]),
                 )
-                if (!addSourcePremise(lits, seen, premise, session)) return false
+                if (!addSourcePremise(lits, seen, premise, session)) return declined("BOUND_PREMISE")
             }
             for (bl in prem.boolLits) {
-                if (!addSourcePremise(lits, seen, CutPremise.Literal(bl), session)) return false
+                if (!addSourcePremise(lits, seen, CutPremise.Literal(bl), session)) return declined("LITERAL_PREMISE")
             }
         }
         return true
