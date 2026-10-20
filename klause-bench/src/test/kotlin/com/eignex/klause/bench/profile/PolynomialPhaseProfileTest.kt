@@ -7,6 +7,52 @@ import kotlin.test.assertTrue
 
 class PolynomialPhaseProfileTest {
     @Test
+    fun `pipeline dimensions distinguish declarations from product lowering coordinates`() {
+        val source = "(declare-const x Real) (assert (= (* x x) 2))"
+
+        val trace = PolynomialPhaseProfile.pipeline(source, timeoutMs = 10_000)
+
+        val shape = requireNotNull(trace.sourceShape)
+        assertEquals("POLYNOMIAL", shape.preparedKind)
+        assertEquals(1, shape.declaredReals)
+        assertEquals(0, shape.declaredBooleans)
+        val modelReals = requireNotNull(shape.modelReals)
+        assertTrue(modelReals > shape.declaredReals)
+        assertTrue(requireNotNull(shape.modelBooleans) > shape.declaredBooleans)
+        assertTrue(requireNotNull(shape.theoryReals) >= modelReals)
+        assertEquals(shape.modelBooleans, shape.theoryBooleans)
+        assertEquals("Sat", trace.result)
+    }
+
+    @Test
+    fun `pipeline tracing preserves a linear control without polynomial attribution`() {
+        val source = "(declare-const x Real) (assert (> x 0))"
+
+        val trace = PolynomialPhaseProfile.pipeline(source, timeoutMs = 10_000)
+
+        val shape = requireNotNull(trace.sourceShape)
+        assertEquals(1, shape.declaredReals)
+        assertEquals(1, shape.modelReals)
+        assertNull(shape.theoryReals)
+        assertNull(shape.theoryBooleans)
+        assertEquals("not a polynomial execution", trace.nativeStats)
+        assertEquals("Sat", trace.result)
+    }
+
+    @Test
+    fun `a preparation refutation retains declaration dimensions without a theory query`() {
+        val source = "(declare-const x Real) (assert false)"
+
+        val trace = PolynomialPhaseProfile.pipeline(source, timeoutMs = 10_000)
+
+        val shape = requireNotNull(trace.sourceShape)
+        assertEquals("SourceRefuted", trace.result)
+        assertEquals(1, shape.declaredReals)
+        assertNull(shape.theoryReals)
+        assertEquals("not started", trace.nativeStats)
+    }
+
+    @Test
     fun `a negated conjunction declines conjunctive guidance after normalization`() {
         val source = """
             (declare-const x Real)
