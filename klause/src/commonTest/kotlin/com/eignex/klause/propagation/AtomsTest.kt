@@ -34,6 +34,18 @@ class AtomsTest {
     }
 
     @Test
+    fun `repeated atom lookups should retain their literal identity`() {
+        val s = freshState(numVars = 2, hi = 9, numBoolVars = 2)
+        val expected = listOf(s.atomVarGe(0, 3), s.atomVarLe(0, 2), s.atomVarEq(0, 3))
+        s.atomVarGe(0, 7)
+        s.atomVarEq(1, 3)
+
+        val actual = listOf(s.atomVarGe(0, 3), s.atomVarLe(0, 2), s.atomVarEq(0, 3))
+
+        assertEquals(expected, actual)
+    }
+
+    @Test
     fun `a bound literal at the live endpoint should cite the move that established it`() {
         val s = freshState(numVars = 2, hi = 9, numBoolVars = 1)
         val premise = intArrayOf(Lit.make(0, false))

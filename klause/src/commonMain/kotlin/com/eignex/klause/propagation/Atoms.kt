@@ -90,6 +90,10 @@ internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: 
         val existing = byVar.find(kind, threshold)
         if (existing >= 0) return problem.numBoolVars + existing
     }
+    return createAtom(intVar, kind, threshold, byVar)
+}
+
+private fun PropagationState.createAtom(intVar: Int, kind: AtomKind, threshold: Long, byVar: VarAtomIndex?): Int {
     val id = atoms.intVar.size
     atoms.intVar.add(intVar)
     atoms.kind.add(kind)

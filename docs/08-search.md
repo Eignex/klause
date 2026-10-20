@@ -165,6 +165,10 @@ replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see
 them.
 
+Bound atoms reuse a per-variable threshold index. A cache miss initializes an
+undetermined atom and its watcher slots before indexing it and queuing channeling
+clauses. Looking up an existing atom publishes neither another atom nor new clauses.
+
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,
 suspension or retraction.
