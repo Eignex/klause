@@ -139,7 +139,8 @@ class BacktrackSolverRealTest {
     @Test
     fun `a leaf no theory could decide should report unknown rather than unsat`() {
         val rows = Array<Factor>(1001) { row ->
-            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, (row + 1).toDouble()), intArrayOf(0, 1), LinearOp.LE, 5L)
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, (row + 1).toDouble()),
+                intArrayOf(0, 1), LinearOp.LE, 5L)
         }
         val p = Problem(
             numBoolVars = 0,
