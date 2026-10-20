@@ -20,6 +20,35 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `a compacted general refutation should retain only the used equation dependencies`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnUpper(3, BigFraction.ofLong(7)), exactColumnLower(3, BigFraction.ofLong(7)),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        ) + List(129) {
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ofLong(10))
+        }
+        val budget = SourceLpBudget(maxOperations = 1)
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { support = it },
+            refutesGeneral = { columns, residual, token, cite ->
+                refuteRealResidualComponents(columns, residual, budget, token, onSupport = cite)
+            })
+
+        assertTrue(refuted)
+        assertEquals(setOf(0, 1, 4, 5), assertNotNull(support).toSet())
+        assertEquals(1, budget.operations)
+        val sibling = rows.filterIndexed { index, _ -> index != 5 }
+        assertTrue(listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ofLong(7))
+            .satisfiesSourceRows(sibling))
+    }
+
+    @Test
     fun `a reduced cycle should exclude retained rows outside the cycle`() {
         for (general in listOf(false, true)) {
             val rows = listOf(
@@ -39,8 +68,8 @@ class MixedEqualityRepairTest {
             var support: IntArray? = null
 
             val refuted = equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { support = it },
-                refutesGeneral = { columns, residual, token ->
-                    refuteRealResidualComponents(columns, residual, budget, token)
+                refutesGeneral = { columns, residual, token, cite ->
+                    refuteRealResidualComponents(columns, residual, budget, token, onSupport = cite)
                 })
 
             assertTrue(refuted)
@@ -65,12 +94,12 @@ class MixedEqualityRepairTest {
 
         val refuted = equalityRowsRefute(4, rows, Cancellation { cancelled },
             onStage = { if (it == "PURE_REAL_EQUALITY_SUBSET_GRAPH_REFUTED") cancelled = true },
-            onSupport = { support = it }, refutesGeneral = { _, _, _ -> false })
+            onSupport = { support = it }, refutesGeneral = { _, _, _, _ -> false })
 
         assertFalse(refuted)
         assertNull(support)
         assertTrue(equalityRowsRefute(4, rows, Cancellation.Never,
-            refutesGeneral = { _, _, _ -> false }))
+            refutesGeneral = { _, _, _, _ -> false }))
     }
 
     @Test
@@ -169,8 +198,8 @@ class MixedEqualityRepairTest {
         var support: IntArray? = null
 
         val refuted = equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { support = it },
-            refutesGeneral = { columns, residual, token ->
-                refuteRealResidualComponents(columns, residual, budget, token)
+            refutesGeneral = { columns, residual, token, cite ->
+                refuteRealResidualComponents(columns, residual, budget, token, onSupport = cite)
             })
 
         assertTrue(refuted)
@@ -211,8 +240,8 @@ class MixedEqualityRepairTest {
             var support: IntArray? = null
 
             val refuted = equalityRowsRefute(3, rows, Cancellation.Never, onSupport = { support = it },
-                refutesGeneral = { columns, residual, token ->
-                    refuteRealResidualComponents(columns, residual, budget, token)
+                refutesGeneral = { columns, residual, token, cite ->
+                    refuteRealResidualComponents(columns, residual, budget, token, onSupport = cite)
                 })
 
             assertTrue(refuted)

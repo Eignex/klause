@@ -59,6 +59,49 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `a compacted general conflict should exclude weaker guards and preserve a source sibling`() {
+        val rows = listOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.MINUS_ONE },
+                LinearOp.LE, BigFraction.MINUS_ONE),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(4)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ofLong(7), activator = 3),
+        ) + List(129) {
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ofLong(10), activator = 2)
+        }
+        val source = Problem(4, 0, emptyArray(), Array<Factor>(rows.size) { rows[it] }, numRealVars = 5,
+            realLower = DoubleArray(5) { if (it == 3) 0.0 else Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(5) { if (it == 3) 0.0 else Double.POSITIVE_INFINITY })
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        for (variable in listOf(2, 3, 0)) {
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+        }
+        solves = 0
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+            assertNotNull(conflict.explanation).literals.toSet())
+        assertEquals(0, solves)
+        session.popTo(3)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+        assertIs<SearchResult.Satisfied>(session.solve(0))
+    }
+
+    @Test
     fun `a necessary real path should propagate through Boolean peers and retract its conditions`() {
         val source = Problem(4, 0, emptyArray(), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),

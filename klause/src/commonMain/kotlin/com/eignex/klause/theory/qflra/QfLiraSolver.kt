@@ -734,9 +734,9 @@ class ExactLiraSearchComponent private constructor(
         if (operationStop()) return ComponentCheck.Indeterminate
         val snapshot = reduction.refutationRows(bools, node, lpStop)
         var support: IntArray? = null
-        val general: ((Int, List<ExactRationalInequality>, Cancellation) -> Boolean)? =
-            if (bools.any { it == UNASSIGNED }) null else { columns, rows, token ->
-                reduction.refuteReals(columns, rows, token, ::observeCompleteStage)
+        val general: ((Int, List<ExactRationalInequality>, Cancellation, (IntArray) -> Unit) -> Boolean)? =
+            if (bools.any { it == UNASSIGNED }) null else { columns, rows, token, onSupport ->
+                reduction.refuteReals(columns, rows, token, ::observeCompleteStage, onSupport)
             }
         val refuted = snapshot != null && equalityRowsRefute(model.numRealVars, snapshot.rows,
             lpStop, ::observeCompleteStage,
@@ -1950,7 +1950,8 @@ private class ExactLiraReductionCache(
         rows: List<ExactRationalInequality>,
         stop: Cancellation,
         onStage: (String) -> Unit,
-    ): Boolean = refuteRealResidualComponents(columns, rows, budget, stop, onStage)
+        onSupport: (IntArray) -> Unit,
+    ): Boolean = refuteRealResidualComponents(columns, rows, budget, stop, onStage, onSupport)
 
     fun reduce(
         bools: IntArray,

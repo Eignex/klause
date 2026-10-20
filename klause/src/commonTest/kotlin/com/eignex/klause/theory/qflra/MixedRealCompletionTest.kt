@@ -14,6 +14,77 @@ import kotlin.test.assertTrue
 
 class MixedRealCompletionTest {
     @Test
+    fun `compacted component support should omit weaker rows and preserve a feasible sibling`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(), emptyList(), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(2), listOf(BigFraction.ONE), BigFraction.ofLong(7)),
+        ) + List(129) { index ->
+            val scale = index + 1L
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ofLong(2L * scale), BigFraction.ofLong(scale)), BigFraction.ofLong(10L * scale))
+        } + listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ofLong(2), BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ofLong(-2), BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget(maxOperations = 1)
+        var support: IntArray? = null
+
+        val refuted = refuteRealResidualComponents(3, rows, budget, Cancellation.Never,
+            onSupport = { support = it })
+
+        assertTrue(refuted)
+        assertEquals(setOf(131, 132), assertNotNull(support).toSet())
+        assertEquals(1, budget.operations)
+        assertTrue(refuteRealResidualComponents(3, assertNotNull(support).map(rows::get),
+            SourceLpBudget(maxOperations = 1), Cancellation.Never))
+        val sibling = rows.dropLast(1)
+        val point = assertNotNull(completeMixedRealComponents(3, sibling, SourceLpBudget(), Cancellation.Never))
+        assertTrue(point.satisfiesSourceRows(sibling))
+    }
+
+    @Test
+    fun `strict compacted support should retain its original parent in either tie order`() {
+        for (strictIndex in listOf(0, 128)) {
+            val rows = List(129) { index ->
+                val scale = index + 1L
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.ofLong(-2L * scale), BigFraction.ofLong(-scale)),
+                    BigFraction.ZERO, strict = index == strictIndex)
+            } + ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ofLong(2), BigFraction.ONE), BigFraction.ZERO)
+            var support: IntArray? = null
+
+            val refuted = refuteRealResidualComponents(2, rows, SourceLpBudget(), Cancellation.Never,
+                onSupport = { support = it })
+
+            assertTrue(refuted)
+            assertEquals(setOf(strictIndex, 129), assertNotNull(support).toSet())
+            val sibling = rows.filterIndexed { index, _ -> index != strictIndex }
+            val point = assertNotNull(completeMixedRealComponents(2, sibling, SourceLpBudget(), Cancellation.Never))
+            assertTrue(point.satisfiesSourceRows(sibling))
+        }
+    }
+
+    @Test
+    fun `false constant support should retain its original row after discarded tautologies`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(), emptyList(), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ofLong(7)),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ZERO), BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget()
+        var support: IntArray? = null
+
+        val refuted = refuteRealResidualComponents(2, rows, budget, Cancellation.Never, onSupport = { support = it })
+
+        assertTrue(refuted)
+        assertEquals(setOf(2), assertNotNull(support).toSet())
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
     fun `scaled repeated rows should fit the existing source dimension limit`() {
         val rows = List(194) { row ->
             val scale = row + 1L
@@ -132,11 +203,14 @@ class MixedRealCompletionTest {
                 listOf(BigFraction.ofLong(-2), BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
         )
         var cancelled = false
+        var support: IntArray? = null
 
         val refuted = refuteRealResidualComponents(2, rows, SourceLpBudget(), Cancellation { cancelled },
-            onStage = { if (it == "PURE_REAL_EQUALITY_GENERAL_REFUTED") cancelled = true })
+            onStage = { if (it == "PURE_REAL_EQUALITY_GENERAL_REFUTED") cancelled = true },
+            onSupport = { support = it })
 
         assertFalse(refuted)
+        assertNull(support)
         assertTrue(refuteRealResidualComponents(2, rows, SourceLpBudget(), Cancellation.Never))
     }
 

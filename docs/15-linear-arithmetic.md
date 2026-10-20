@@ -156,6 +156,12 @@ negative authority. A bounded dependency graph reconstructs the original rows us
 by equation pivots and retained residual rows; discarded tautologies add no premises.
 A reduced difference cycle cites only its cycle rows and their pivot dependencies,
 including when general residual rows accompany the necessary difference subset.
+General component refutations retain original row IDs through coordinate remapping
+and proportional-row compaction, keeping the actual strongest parent and its
+strictness. Certified row and slack-bound support selects the residual rows whose
+pivot dependencies explain the conflict; unavailable support keeps every admitted
+row of the refuting component. Unrelated components and weaker parallel rows add
+no proof condition.
 This negative check can reject a selected prefix while unrelated Boolean choices
 remain open; rows with unknown conditions stay outside the subset.
 An internal unguarded cycle is not a source clause. Unknown source choices,

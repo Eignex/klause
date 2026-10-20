@@ -33,7 +33,7 @@ internal fun equalityRowsRefute(
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
     onSupport: ((IntArray) -> Unit)? = null,
-    refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation) -> Boolean)? = null,
+    refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation, (IntArray) -> Unit) -> Boolean)? = null,
 ): Boolean {
     val support = if (onSupport != null) IntArrayList() else null
     val proofs = if (onSupport != null) EqualityRowSupport(rows.size, stop) else null
@@ -103,7 +103,7 @@ private fun refutesDifferenceResidual(
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
     onStage: ((String) -> Unit)?,
-    refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation) -> Boolean)?,
+    refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation, (IntArray) -> Unit) -> Boolean)?,
     onSupport: (IntArray) -> Unit,
 ): Boolean {
     val graph = RealDifferenceSystem.prepareRows(columns, rows, stop)
@@ -116,7 +116,7 @@ private fun refutesDifferenceResidual(
             return !stop()
         }
         if (stop()) return false
-        return refutesGeneral?.invoke(columns, rows, stop) == true && !stop()
+        return refutesGeneral?.invoke(columns, rows, stop, onSupport) == true && !stop()
     }
     onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_ATTEMPT")
     val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
