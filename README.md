@@ -33,6 +33,20 @@ Specialised solvers such as CP-SAT, Z3 and HiGHS are mature and usually faster o
 - **Compared with HiGHS**, which solves LP and MIP in floating point, Klause certifies LP results in exact rational arithmetic before using them as proofs, and combines MIP with propagation and local search.
 - **Compared with all three**, Klause is written in Kotlin and bundles no native solver library, so it runs wherever Kotlin Multiplatform does.
 
+## The LP engine
+
+- Klause has its own revised simplex written in Kotlin: a floating-point dual simplex with Devex pricing, sparse LU factorization and Forrest-Tomlin updates.
+- The LP lives inside search. Bound changes and backtracking update the same warm basis instead of starting a new solve at every node.
+- Every LP result is checked in exact rational arithmetic before it counts, whether it is a feasible point, an objective bound, an infeasibility proof or an unbounded ray. A result that fails the check is never used as a proof.
+- LP bounds and conflicts are explained by the source constraints, so they feed conflict learning the same way propagation does.
+- Strict inequalities are handled exactly, as SMT linear arithmetic requires.
+
+Compared with the others:
+
+- **HiGHS** solves in floating point and accepts results within tolerances. Klause also solves in floating point for speed, but publishes only results it has certified exactly.
+- **Z3** runs its simplex in exact rational arithmetic throughout. Klause does the heavy work in floating point and spends exact arithmetic only on certification.
+- **CP-SAT** also runs an LP inside its search, but over integer variables only. Klause's LP carries continuous columns too, so the same engine serves MIP, CP relaxations and real arithmetic.
+
 ## Documentation
 
 User documentation is at [eignex.com/docs/klause](https://eignex.com/docs/klause/). The internal developer documentation is a book; start at its [table of contents](docs/README.md).
