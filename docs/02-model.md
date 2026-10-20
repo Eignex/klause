@@ -207,6 +207,9 @@ and live pins remain scoped premises.
 
 ### Weighted Boolean relations
 
+`Clause` retains a disjunction of source literals. Its polynomial encoder emits
+that Boolean structure directly, without private numeric indicator coordinates.
+
 `PseudoBoolean` and `ReifiedPseudoBoolean` retain exact integral coefficients,
 literal polarity, repetitions, comparison and right-hand side; the reified form
 keeps both directions of equivalence. Both expose the relation as a tagged

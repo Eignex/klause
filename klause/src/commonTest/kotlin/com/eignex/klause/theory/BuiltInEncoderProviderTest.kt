@@ -2,17 +2,21 @@ package com.eignex.klause.theory
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
@@ -22,6 +26,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.theory.qfnra.PolynomialFormula
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
@@ -32,6 +37,46 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BuiltInEncoderProviderTest {
+    @Test
+    fun `polynomial clauses preserve literal polarity and aliases`() {
+        for (literals in listOf(intArrayOf(0), intArrayOf(1), intArrayOf(0, 3),
+            intArrayOf(0, 2, 4), intArrayOf(0, 0, 3), intArrayOf(0, 1))) {
+            val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.GE, BigFraction.ZERO, activator = 0),
+                Clause(literals),
+            ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+            val model = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
+            for (mask in 0 until 8) {
+                val bools = IntArray(3) { id -> (mask ushr id) and 1 }
+                val point = if (bools[0] == PolynomialFormula.TRUE) 1L else -1L
+
+                val truth = truthAt(model.service.formula, mapOf(0 to point), bools)
+
+                val expected = literals.any { Lit.evaluate(it, bools[Lit.variable(it)] == PolynomialFormula.TRUE) }
+                assertEquals(if (expected) PolynomialFormula.TRUE else PolynomialFormula.FALSE, truth,
+                    "${literals.toList()} $mask")
+            }
+        }
+    }
+
+    @Test
+    fun `polynomial clauses retain Boolean source ownership without numeric auxiliaries`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.GE, BigFraction.ZERO, activator = 0),
+            Clause(intArrayOf(0, 3, 4)),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+
+        val model = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
+        val clause = model.encodingAttributions.single { it.sourceFactorIndex == 1 }
+
+        assertEquals(1, model.service.realCount)
+        assertEquals(listOf(SourceBoolId(0), SourceBoolId(1), SourceBoolId(2)), clause.booleans)
+        assertTrue(clause.auxiliaries.isEmpty())
+        assertEquals(listOf(1), model.finiteFactorIndices)
+    }
+
     @Test
     fun `remapped polynomial products should preserve every source role`() {
         val original = ContinuousProduct(2, 3, 4)
@@ -287,7 +332,7 @@ class BuiltInEncoderProviderTest {
         }
     }
 
-    private fun truthAt(formula: PolynomialRealFormula, fixed: Map<Int, Long>): Int {
+    private fun truthAt(formula: PolynomialRealFormula, fixed: Map<Int, Long>, bools: IntArray = intArrayOf()): Int {
         val arithmetic = PolynomialArithmetic()
         val exact = fixed.mapValues { BigFraction.ofLong(it.value) }
         val normalized = PolynomialFormula.normalize(formula, arithmetic, exact)
@@ -297,6 +342,6 @@ class BuiltInEncoderProviderTest {
             val sign = coefficient.compareTo(BigFraction.ZERO)
             if (atom.holds(sign)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
         }.toIntArray()
-        return normalized.truth(intArrayOf(), signs, arithmetic)
+        return normalized.truth(bools, signs, arithmetic)
     }
 }

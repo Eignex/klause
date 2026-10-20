@@ -15,6 +15,7 @@ import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.WideDivMod
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.table.Element
@@ -24,13 +25,16 @@ import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.polynomialRow
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.hasCompleteDifferenceCoverage
 import com.eignex.klause.solver.pipeline.ExactSearchRow
@@ -43,6 +47,16 @@ object BuiltInEncoderProvider : EncoderProvider {
     private val relaxation = Encoder(EncoderSupport.RELAXATION_ONLY)
     private val nativeLinear = Encoder(EncoderSupport.DIRECT, installer = ::installLinear)
     private val equivalentLinear = Encoder(EncoderSupport.EQUIVALENT, installer = ::installLinear)
+    private val polynomialClause = Encoder(EncoderSupport.DIRECT) { view, encoding ->
+        view as Clause
+        val literals = view.literals.map { literal ->
+            encoding.cancellation.polynomialSourceCheckpoint(1)
+            val variable = PolynomialRealFormula.BooleanVariable(SourceBoolId(Lit.variable(literal)))
+            if (Lit.isPositive(literal)) variable else PolynomialRealFormula.Not(variable)
+        }
+        encoding.polynomial(PolynomialRealFormula.Or(literals))
+        null
+    }
     private val polynomialRows = Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
         val form = checkNotNull(view.linearForm)
         val rows = form.rows.map { polynomialRow(it,
@@ -63,6 +77,7 @@ object BuiltInEncoderProvider : EncoderProvider {
 
     override fun select(factor: Factor, target: EncodingTarget): Encoder = when {
         target !in EncodingTarget.entries -> unsupported
+        target == EncodingTarget.POLYNOMIAL && factor is Clause -> polynomialClause
         factor is AllDifferent -> when (target) {
             EncodingTarget.LINEAR -> AllDifferentEncoder.linear
             EncodingTarget.POLYNOMIAL -> AllDifferentEncoder.polynomial
