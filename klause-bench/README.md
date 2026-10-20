@@ -1296,6 +1296,13 @@ Pipeline caller charges include source/search preparation and are separate from
 the native arithmetic snapshot. This mode does not render a CLI model or independently
 validate a source witness. Keep ordinary CLI records for publication/control evidence.
 
+`pipeline=both` records the pipeline trace and the separate direct gate/query traces
+for every source in the same profile invocation. Each producer retains its existing
+containing deadline; the complete paired question must fit one whole profile allowance.
+Use the captured dimensions, internal counters and terminal stacks to distinguish
+representations and stopped operations. Paired diagnostic timings establish no
+default-route performance gain, and direct results supply no shared-source acceptance.
+
 ### Table profiling
 
 ```sh

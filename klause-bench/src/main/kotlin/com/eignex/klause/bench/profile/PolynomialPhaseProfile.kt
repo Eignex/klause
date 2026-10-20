@@ -13,6 +13,7 @@ import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
@@ -40,8 +41,9 @@ internal object PolynomialPhaseProfile {
         require(args.size in 1..3 && args[0].startsWith("request64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs") })
-        require(options["pipeline"] == null || options["pipeline"] == "true")
-        val pipelineMode = options["pipeline"] == "true"
+        require(options["pipeline"] == null || options["pipeline"] in setOf("true", "both"))
+        val pipelineMode = options["pipeline"] != null
+        val directMode = options["pipeline"] != "true"
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
         require(timeoutMs > 0)
         val encoded = args[0].substringAfter('=')
@@ -64,7 +66,8 @@ internal object PolynomialPhaseProfile {
             "containingTimeoutMs" to timeoutMs.toString(),
             "maximumWork" to "null",
             "representationLimits" to "default",
-            "route" to if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
+            "route" to if (pipelineMode && directMode) "paired direct query and default MIXED pipeline/P1/seed3"
+                else if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
                 else "direct normalized QfNraQuery; separate gate inspection",
         )))
         val access = PhaseAccess()
@@ -78,7 +81,8 @@ internal object PolynomialPhaseProfile {
             val text = bytes.decodeToString()
             if (pipelineMode) {
                 directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text, timeoutMs)))
-            } else {
+            }
+            if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
                     Json.encodeToString(access.measure(text, timeoutMs = timeoutMs)),
@@ -130,10 +134,10 @@ internal object PolynomialPhaseProfile {
             )
         }
         if (completed is SourceExecutionResult.Linear) {
-            val execution = completed.result
-            return PipelinePhaseTrace(execution.result.javaClass.simpleName,
-                (execution.result as? OpenTheoryResult.Unknown)?.reason?.toString(), null, null,
-                "not a polynomial execution", execution.result.stats.toString(),
+            val execution = checkNotNull(completed.result as? OpenTheoryExecution.Satisfy).result
+            return PipelinePhaseTrace(execution.javaClass.simpleName,
+                (execution as? OpenTheoryResult.Unknown)?.reason?.toString(), null, null,
+                "not a polynomial execution", execution.stats.toString(),
                 preparedCharges, observation.charges - preparedCharges, observation.stack, shape)
         }
         val execution = (completed as? SourceExecutionResult.Polynomial)?.result
