@@ -130,7 +130,9 @@ internal fun recoverSparseBasisPoint(model: LpModel, basis: Basis, meter: Refine
         val solved = factors.solve(rows.map { it.rhs }, limits = meter.basisLimits().factor, cancellation = meter.token)
         meter.completed(solved.stats.work, solved.stats.allocationBytes)
         when (solved) {
-            is RationalBasisSolve.Solved -> columns.forEachIndexed { index, column -> seats[column] = solved.values[index] }
+            is RationalBasisSolve.Solved -> columns.forEachIndexed { index, column ->
+                seats[column] = solved.values[index]
+            }
             is RationalBasisSolve.Declined -> return basisPointDeclined(solved.reason, peeled, core, meter)
         }
     }

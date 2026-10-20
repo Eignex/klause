@@ -32,10 +32,12 @@ class SparseBasisPointTest {
     @Test
     fun `a long triangular structural basis should peel nonunit pivots exactly`() {
         val builder = LpBuilder()
-        val columns = IntArray(130) { builder.addRealVar(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY) }
+        val columns = IntArray(130) { builder.addRealVar(0.0, 2.0) }
         builder.addRealRow(intArrayOf(columns[0]), doubleArrayOf(2.0), Relation.EQ, 2.0)
         for (index in 1 until columns.size) {
-            builder.addRealRow(intArrayOf(columns[index], columns[index - 1]), doubleArrayOf(2.0, -1.0), Relation.EQ, 1.0)
+            builder.addRealRow(
+                intArrayOf(columns[index], columns[index - 1]), doubleArrayOf(2.0, -1.0), Relation.EQ, 1.0,
+            )
         }
         val model = builder.build(Sense.MINIMIZE)
         val statuses = Array(model.numVars) { if (it < model.n) VarStatus.BASIC else VarStatus.FIXED }
@@ -176,7 +178,7 @@ class SparseBasisPointTest {
     @Test
     fun `resource limits should stop sparse basis recovery without a point`() {
         val builder = LpBuilder()
-        val x = builder.addRealVar(0.0, Double.POSITIVE_INFINITY)
+        val x = builder.addRealVar(0.0, 1e50)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 1e40)
         val model = builder.build(Sense.MINIMIZE)
         val basis = Basis(intArrayOf(x), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
@@ -274,5 +276,29 @@ class SparseBasisPointTest {
         assertEquals(listOf(BigFraction.of(BIG_ONE, bigIntOf(2_000_003)),
             BigFraction.of(BIG_ONE, bigIntOf(2_000_029))), assertNotNull(result.witness).primal)
         assertEquals("WITNESS", phases.single { it.phase == LpSolvePhase.EXACT_BASIS_POINT }.outcome)
+    }
+
+    @Test
+    fun `a free nonbasic coordinate should use its exact zero seat`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(2L))), listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.of(6L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
+                ExactLpColumn(ExactLpBounds(null, null)),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(List(3) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FREE, VarStatus.FIXED))
+        val meter = RefinementMeter(LpRefinementLimits(), LpRefinementCache(), Cancellation.Never)
+
+        val result = recoverSparseBasisPoint(model, basis, meter)
+
+        assertEquals(listOf(BigFraction.ofLong(3), BigFraction.ZERO), assertNotNull(result.witness).primal)
     }
 }
