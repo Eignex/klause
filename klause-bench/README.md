@@ -172,7 +172,9 @@ with float array extrema. Each
 model has finite-only, linear-real and polynomial-real variants with a witness,
 refutation and minimum. Run the whole suite with `exact=true`; a successful
 minimum is one. The CLI regressions cover the retained native global families and
-set predicates separately, including fractional real objectives.
+set predicates separately, including fractional real objectives. Polynomial
+optimization over a continuous coordinate runs in the lab suite; the focused JVM
+matrix optimizes the finite global argument alongside exact polynomial completion.
 
 [Klause-lab](https://github.com/Eignex/klause-lab) owns remote experiment execution,
 regression schedules and reference-result storage. It builds the Klause revisions

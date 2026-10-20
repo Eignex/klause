@@ -14,5 +14,5 @@ constraint if coupling = 0 then r = 0.0 /\ y = 0.0
 constraint if claim = 0 then x = 1 elseif claim = 1 then
   if coupling = 0 then x = 0 else r = 0.0 endif
   else true endif;
-solve minimize x;
+solve minimize if coupling = 2 then y else int2float(x) endif;
 output ["x = ", show(x), ";\n"];
