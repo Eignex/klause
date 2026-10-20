@@ -71,6 +71,8 @@ IDs to choose an elimination order. Derivatives, substitution and exact division
 never convert to floating values.
 
 Bareiss elimination computes Sylvester determinants with exact division.
+Nonconstant exact division keeps a private sparse remainder and subtracts each
+shifted divisor in place; only a completed quotient becomes an immutable polynomial.
 Resultants handle zero, shared-factor and constant cases; principal subresultant
 coefficients use the truncated Sylvester matrices, with a direct formula when both
 inputs are affine in the eliminated coordinate. Prepared cursors let a caller

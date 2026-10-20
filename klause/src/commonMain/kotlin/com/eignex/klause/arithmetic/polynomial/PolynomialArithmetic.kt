@@ -96,25 +96,48 @@ internal class PolynomialArithmetic(
             yield(it)
             return@sequence
         }
+        yieldAll(prepareNonconstantDivision(dividend, terms))
+    }.iterator()
+
+    private fun prepareNonconstantDivision(
+        dividend: Polynomial,
+        terms: List<PolynomialTerm>,
+    ): Iterator<Polynomial?> = sequence {
         val lead = terms.last()
-        var remainder = dividend
-        var quotient = Polynomial.ZERO
-        while (!remainder.isZero) {
+        val inverse = lead.coefficient.reciprocal()
+        val remainder = HashMap<Monomial, BigFraction>()
+        val quotient = ArrayList<PolynomialTerm>()
+        var batch = 0
+        for (term in dividend.terms) {
             step()
-            val term = remainder.terms.last()
-            val monomial = requireNotNull(term.monomial.quotient(lead.monomial)) { "nonexact polynomial division" }
-            val next = Polynomial.of(listOf(PolynomialTerm(monomial, term.coefficient * lead.coefficient.reciprocal())))
-            quotient = add(quotient, next)
-            val pending = prepareMultiply(next, divisor)
-            var product: Polynomial? = null
-            while (product == null) {
-                product = pending.next()
-                if (product == null) yield(null)
+            remainder[term.monomial] = term.coefficient
+            if (++batch == PREPARATION_BATCH) { batch = 0; yield(null) }
+        }
+        while (remainder.isNotEmpty()) {
+            var leading: PolynomialTerm? = null
+            for ((monomial, coefficient) in remainder) {
+                step()
+                if (leading == null || monomial > leading.monomial) leading = PolynomialTerm(monomial, coefficient)
+                if (++batch == PREPARATION_BATCH) { batch = 0; yield(null) }
             }
-            remainder = subtract(remainder, product)
+            val term = checkNotNull(leading)
+            val monomial = requireNotNull(term.monomial.quotient(lead.monomial)) { "nonexact polynomial division" }
+            step()
+            val next = PolynomialTerm(monomial, term.coefficient * inverse)
+            quotient.add(next)
+            for (factor in terms) {
+                val product = product(next, factor)
+                step()
+                val coefficient = (remainder[product.monomial] ?: BigFraction.ZERO) - product.coefficient
+                if (coefficient.isZero) remainder.remove(product.monomial)
+                else remainder[product.monomial] = coefficient
+                if (++batch == PREPARATION_BATCH) { batch = 0; yield(null) }
+            }
             yield(null)
         }
-        yield(quotient)
+        val result = Polynomial.of(quotient)
+        step()
+        yield(result)
     }.iterator()
 
     private fun scalarQuotient(dividend: Polynomial, divisor: PolynomialTerm?): Polynomial? {
@@ -187,18 +210,10 @@ internal class PolynomialArithmetic(
         divisionObserver?.invoke(dividend, divisor)
         val terms = divisor.terms
         scalarQuotient(dividend, terms.singleOrNull())?.let { return it }
-        val lead = terms.last()
-        var remainder = dividend
-        var quotient = Polynomial.ZERO
-        while (!remainder.isZero) {
-            step()
-            val term = remainder.terms.last()
-            val monomial = requireNotNull(term.monomial.quotient(lead.monomial)) { "nonexact polynomial division" }
-            val next = Polynomial.of(listOf(PolynomialTerm(monomial, term.coefficient * lead.coefficient.reciprocal())))
-            quotient = add(quotient, next)
-            remainder = subtract(remainder, multiply(next, divisor))
-        }
-        return quotient
+        val pending = prepareNonconstantDivision(dividend, terms)
+        var result: Polynomial? = null
+        while (result == null) result = pending.next()
+        return result
     }
 
     /** The resultant in [variable], as the determinant of the Sylvester matrix of [left] and [right]. */

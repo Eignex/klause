@@ -261,6 +261,122 @@ class PolynomialArithmeticTest {
     }
 
     @Test
+    fun `sparse exact division retains rational multivariate cancellation`() {
+        val z = Polynomial.variable(2)
+        val quotient = arithmetic.scale(arithmetic.add(arithmetic.power(arithmetic.subtract(x, y), 5), z),
+            fraction(3) * fraction(7).reciprocal())
+        for (divisor in listOf(
+            arithmetic.add(x, y),
+            arithmetic.add(arithmetic.subtract(arithmetic.power(x, 2), y), Polynomial.ONE),
+            arithmetic.scale(arithmetic.add(y, z), fraction(-2) * fraction(5).reciprocal()),
+        )) {
+            val dividend = arithmetic.multiply(quotient, divisor)
+
+            val result = arithmetic.divideExact(dividend, divisor)
+
+            assertEquals(quotient, result)
+        }
+    }
+
+    @Test
+    fun `exact division retains sparse gaps at extreme coordinate ids`() {
+        val high = Polynomial.variable(Int.MAX_VALUE)
+        val quotient = Polynomial.of(listOf(
+            PolynomialTerm(Monomial.of(mapOf(0 to Int.MAX_VALUE - 1)), fraction(-2)),
+            PolynomialTerm(Monomial.of(mapOf(Int.MAX_VALUE to 7)), fraction(3)),
+            PolynomialTerm(Monomial.ONE, fraction(5)),
+        ))
+        val divisor = arithmetic.add(x, high)
+        val dividend = arithmetic.multiply(quotient, divisor)
+
+        val result = arithmetic.divideExact(dividend, divisor)
+
+        assertEquals(quotient, result)
+    }
+
+    @Test
+    fun `nonexact polynomial division rejects a residual without changing operands`() {
+        val divisor = arithmetic.add(x, y)
+        val dividend = arithmetic.add(arithmetic.multiply(divisor, x), Polynomial.ONE)
+        val dividendTerms = dividend.terms
+        val divisorTerms = divisor.terms
+
+        assertFailsWith<IllegalArgumentException> { arithmetic.divideExact(dividend, divisor) }
+
+        assertEquals(dividendTerms, dividend.terms)
+        assertEquals(divisorTerms, divisor.terms)
+    }
+
+    @Test
+    fun `nonconstant exact division retains containing cancellation and fresh results`() {
+        val quotient = arithmetic.power(arithmetic.subtract(x, y), 9)
+        val divisor = arithmetic.add(arithmetic.add(x, y), Polynomial.ONE)
+        val dividend = arithmetic.multiply(quotient, divisor)
+        var completedWork = 0L
+        val counted = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { completedWork += it }
+        })
+        assertEquals(quotient, counted.divideExact(dividend, divisor))
+
+        for (limit in listOf(1L, completedWork / 2, completedWork - 1)) {
+            var spent = 0L
+            val interrupted = PolynomialArithmetic(object : Cancellation {
+                override fun isCancelled(): Boolean = spent >= limit
+                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            })
+
+            assertFailsWith<PolynomialInterrupted> { interrupted.divideExact(dividend, divisor) }
+        }
+
+        assertEquals(quotient, arithmetic.divideExact(dividend, divisor))
+    }
+
+    @Test
+    fun `prepared subresultants retain the factorization resultant over multivariate coefficients`() {
+        val roots = listOf(y, Polynomial.variable(2), Polynomial.variable(3))
+        val left = roots.fold(Polynomial.ONE) { polynomial, root ->
+            arithmetic.multiply(polynomial, arithmetic.subtract(x, root))
+        }
+        val right = arithmetic.add(arithmetic.power(x, 3), arithmetic.add(x, Polynomial.ONE))
+        val expected = roots.fold(Polynomial.ONE) { polynomial, root ->
+            arithmetic.multiply(polynomial,
+                arithmetic.add(arithmetic.power(root, 3), arithmetic.add(root, Polynomial.ONE)))
+        }
+        for (scale in listOf(1L, -2L)) {
+            val scaled = arithmetic.scale(right, fraction(scale))
+            val result = arithmetic.principalSubresultants(left, scaled, 0)
+            val pending = arithmetic.preparePrincipalSubresultants(left, scaled, 0)
+            var resumed: List<Polynomial>? = null
+            while (resumed == null) resumed = pending.next()
+
+            assertEquals(arithmetic.scale(expected, fraction(scale * scale * scale)), result.first())
+            assertEquals(result, resumed)
+        }
+    }
+
+    @Test
+    fun `prepared determinant cancellation withholds a partial quotient`() {
+        val left = listOf(y, Polynomial.variable(2), Polynomial.variable(3))
+            .fold(Polynomial.ONE) { polynomial, root ->
+                arithmetic.multiply(polynomial, arithmetic.subtract(x, root))
+            }
+        val right = arithmetic.add(arithmetic.power(x, 3), arithmetic.add(x, Polynomial.ONE))
+        for (prepared in listOf(false, true)) {
+            var stop = false
+            val interrupted = PolynomialArithmetic(Cancellation { stop })
+            interrupted.divisionObserver = { _, divisor -> if (divisor.variables.isNotEmpty()) stop = true }
+
+            assertFailsWith<PolynomialInterrupted> {
+                if (prepared) {
+                    val pending = interrupted.preparePrincipalSubresultants(left, right, 0)
+                    while (pending.next() == null) Unit
+                } else interrupted.principalSubresultants(left, right, 0)
+            }
+        }
+    }
+
+    @Test
     fun `scalar exact division reconstructs multivariate coefficients`() {
         val polynomial = arithmetic.add(
             arithmetic.scale(arithmetic.multiply(arithmetic.power(x, 2), y), fraction(5) * fraction(7).reciprocal()),
