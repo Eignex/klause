@@ -27,6 +27,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.search
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
