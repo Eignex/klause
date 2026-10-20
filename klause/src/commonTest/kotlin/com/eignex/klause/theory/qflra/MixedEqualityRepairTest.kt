@@ -1,6 +1,8 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.exactColumnLower
+import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -17,6 +19,128 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
+    @Test
+    fun `zero coefficients should not cite an unrelated equation pivot`() {
+        val rows = listOf(
+            exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ZERO),
+            exactColumnUpper(1, BigFraction.ONE), exactColumnLower(1, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ZERO, BigFraction.ONE),
+                BigFraction.ONE, strict = true),
+        )
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(2, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertTrue(refuted)
+        val indices = assertNotNull(support)
+        assertEquals(setOf(2, 3, 4), indices.toSet())
+        assertTrue(equalityRowsRefute(2, indices.map(rows::get), Cancellation.Never))
+    }
+
+    @Test
+    fun `contradictory equations should exclude unrelated equation pivots from their support`() {
+        val rows = listOf(
+            exactColumnUpper(2, BigFraction.ofLong(7)), exactColumnLower(2, BigFraction.ofLong(7)),
+            exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ZERO),
+            exactColumnUpper(0, BigFraction.ONE), exactColumnLower(0, BigFraction.ONE),
+        )
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(3, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertTrue(refuted)
+        val indices = assertNotNull(support)
+        assertEquals(setOf(2, 3, 4, 5), indices.toSet())
+        assertTrue(equalityRowsRefute(3, indices.map(rows::get), Cancellation.Never))
+    }
+
+    @Test
+    fun `a substituted false row should cite only the pivots it uses`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            exactColumnUpper(2, BigFraction.ZERO), exactColumnLower(2, BigFraction.ZERO),
+            exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ONE, strict = true),
+        )
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(3, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertTrue(refuted)
+        val indices = assertNotNull(support)
+        assertEquals(setOf(0, 1, 4, 5, 6), indices.toSet())
+        assertTrue(equalityRowsRefute(3, indices.map(rows::get), Cancellation.Never))
+    }
+
+    @Test
+    fun `a residual cycle should exclude discarded rows and unused equation pivots`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 2),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ONE),
+            exactColumnUpper(3, BigFraction.ONE), exactColumnLower(3, BigFraction.ONE),
+        )
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertTrue(refuted)
+        val indices = assertNotNull(support)
+        assertEquals(setOf(0, 1, 2, 3), indices.toSet())
+        assertTrue(equalityRowsRefute(4, indices.map(rows::get), Cancellation.Never))
+    }
+
+    @Test
+    fun `a reduced general conflict should exclude discarded row conditions`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ONE),
+            exactColumnUpper(3, BigFraction.ZERO), exactColumnLower(3, BigFraction.ZERO),
+        )
+        val budget = SourceLpBudget()
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { support = it },
+            refutesGeneral = { columns, residual, token ->
+                refuteRealResidualComponents(columns, residual, budget, token)
+            })
+
+        assertTrue(refuted)
+        assertEquals(setOf(0, 1, 2, 3), assertNotNull(support).toSet())
+    }
+
+    @Test
+    fun `cancellation after support expansion should withhold the completed refutation`() {
+        val rows = listOf(
+            exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ZERO),
+            exactColumnUpper(0, BigFraction.ONE), exactColumnLower(0, BigFraction.ONE),
+        )
+        var cancelled = false
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(1, rows, Cancellation { cancelled },
+            onStage = { if (it == "PURE_REAL_EQUALITY_SUPPORT_TRACKED") cancelled = true },
+            onSupport = { support = it })
+
+        assertFalse(refuted)
+        assertNull(support)
+        assertTrue(equalityRowsRefute(1, rows, Cancellation.Never))
+    }
+
     @Test
     fun `a reduced general conflict should retain every original source row`() {
         for (strict in listOf(false, true)) {

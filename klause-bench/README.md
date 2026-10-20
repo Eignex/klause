@@ -660,6 +660,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_<phase>_<route>_Calls`, `_Nanos`, outcomes | Completed attempts, including declines; acceptance includes dual recovery/cleanup and overlaps other phases |
 | `lpPhase_PRIMAL_ROUNDING_ROOT`, `lpPhase_PRIMAL_PUMP_ROUND_ROOT`, `lpPhase_PRIMAL_PROPOSAL_ROOT` | Discrete proposals and completion/admission outcomes; inclusive timing overlaps solve and verification phases |
 | `lpPhase_PRIMAL_LP_PRIMAL_ROOT`, `lpPhase_PRIMAL_LP_DUAL_ROOT` | Root LP point availability and termination before rounding; stopped iterates supply no primal target |
+| `smtCompleteSearchStage_PURE_REAL_EQUALITY_SUPPORT_*` | Tracked or conservative source-row support and retained/input row counts for completed equality refutations; counters supply no independent source proof |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Exact values take precedence over numeric fallbacks; malformed exact values earn

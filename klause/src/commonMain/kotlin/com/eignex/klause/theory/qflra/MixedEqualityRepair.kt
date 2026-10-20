@@ -36,6 +36,9 @@ internal fun equalityRowsRefute(
     refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation) -> Boolean)? = null,
 ): Boolean {
     val support = if (onSupport != null) IntArrayList() else null
+    val proofs = if (onSupport != null) EqualityRowSupport(rows.size, stop) else null
+    val residualOrigins = if (onSupport != null) IntArrayList() else null
+    val residualProofs = if (onSupport != null) IntArrayList() else null
     val paired: ((Int, Int) -> Unit)? = support?.let { indices ->
         { first, second ->
             stop.charge(4L)
@@ -47,8 +50,15 @@ internal fun equalityRowsRefute(
     }
     var falseRow = -1
     var residualRefuted = false
-    val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage, paired)) {
-        is EqualityRows.Prepared -> when (val residual = prepared.repair.reduceRows(rows) { falseRow = it }) {
+    var proof = -1
+    val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage, paired,
+        proofs, onRefutationProof = { proof = it })) {
+        is EqualityRows.Prepared -> when (val residual = prepared.repair.reduceRows(rows,
+            onReducedRow = if (support == null) null else { original, origin ->
+                residualOrigins?.add(original)
+                residualProofs?.add(origin)
+            }, onFalseProof = if (proofs == null) null else { value -> proof = value },
+            onFalseRow = { falseRow = it })) {
             EqualityResidual.Refuted -> true
             EqualityResidual.Declined -> false
             is EqualityResidual.Reduced -> refutesDifferenceResidual(columns, residual.rows, stop, onStage,
@@ -58,14 +68,19 @@ internal fun equalityRowsRefute(
         EqualityRows.Declined -> false
     }
     if (refuted && support != null && !stop()) {
-        if (residualRefuted) {
-            stop.charge(rows.size.toLong() + 1L)
-            if (!stop()) onSupport?.invoke(IntArray(rows.size) { it })
-        } else {
-            stop.charge(support.size.toLong() + 2L)
-            if (falseRow >= 0) support.add(falseRow)
-            if (!stop()) onSupport?.invoke(support.toIntArray())
+        if (residualRefuted) proof = proofs?.combineAll(checkNotNull(residualProofs)) ?: -1
+        val tracked = proofs?.expand(proof)
+        if (stop()) return false
+        val selected = tracked ?: run {
+            stop.charge(support.size.toLong() + (residualOrigins?.size ?: 0) + 2L)
+            if (residualRefuted) support.addAll(checkNotNull(residualOrigins).toIntArray())
+            else if (falseRow >= 0) support.add(falseRow)
+            support.toIntArray()
         }
+        onStage?.invoke(if (tracked == null) "PURE_REAL_EQUALITY_SUPPORT_CONSERVATIVE"
+            else "PURE_REAL_EQUALITY_SUPPORT_TRACKED")
+        onStage?.invoke("PURE_REAL_EQUALITY_SUPPORT_R_${selected.size}_FROM_${rows.size}")
+        if (!stop()) onSupport?.invoke(selected)
     }
     return refuted && !stop()
 }
@@ -96,6 +111,8 @@ internal fun prepareEqualityRows(
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
     onPairedRows: ((Int, Int) -> Unit)? = null,
+    proofs: EqualityRowSupport? = null,
+    onRefutationProof: ((Int) -> Unit)? = null,
 ): EqualityRows {
     if (!admitsEqualityRepairColumns(columns)) {
         onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
@@ -104,8 +121,9 @@ internal fun prepareEqualityRows(
     if (stop()) return EqualityRows.Declined
     val work = MixedPointArithmetic(stop)
     val directions = HashMap<MixedEqualityKey, Int>()
-    val firstRows = if (onPairedRows != null) HashMap<MixedEqualityKey, Int>() else null
+    val firstRows = if (onPairedRows != null || proofs != null) HashMap<MixedEqualityKey, Int>() else null
     val equalities = ArrayList<MixedEqualityKey>()
+    val equalityProofs = if (proofs != null) IntArrayList() else null
     var entries = 0L
     for ((rowIndex, row) in rows.withIndex()) {
         stop.charge(4L * row.columns.size + 3L)
@@ -133,6 +151,9 @@ internal fun prepareEqualityRows(
         if (next == 3 && previous != 3) {
             equalities += key
             if (firstRows != null) onPairedRows?.invoke(firstRows.getValue(key), rowIndex)
+            if (proofs != null) equalityProofs?.add(
+                proofs.combine(proofs.row(checkNotNull(firstRows).getValue(key)), proofs.row(rowIndex)),
+            )
         }
     }
     if (equalities.isEmpty()) {
@@ -143,11 +164,13 @@ internal fun prepareEqualityRows(
     stop.charge(3L * columns)
     if (stop()) return EqualityRows.Declined
     val pivots = arrayOfNulls<ExactRationalInequality>(columns)
-    for (equality in equalities) {
+    val pivotProofs = if (proofs != null) IntArray(columns) { -1 } else null
+    for ((equalityIndex, equality) in equalities.withIndex()) {
         stop.charge(3L * equality.terms.size + 1L)
         if (stop()) return EqualityRows.Declined
         val coefficients = equality.terms.toMap().toMutableMap()
         var bound = equality.bound
+        var proof = equalityProofs?.get(equalityIndex) ?: -1
         while (coefficients.isNotEmpty()) {
             stop.charge(coefficients.size.toLong() + 1L)
             if (stop()) return EqualityRows.Declined
@@ -160,11 +183,13 @@ internal fun prepareEqualityRows(
                 val ordered = coefficients.keys.sorted()
                 pivots[pivot] = ExactRationalInequality(ordered.toIntArray(),
                     ordered.map(coefficients::getValue), bound)
+                pivotProofs?.set(pivot, proof)
                 onStage?.invoke("RECOVERY_EQUALITY_PIVOT")
                 break
             }
             val scale = work.quotient(coefficients.getValue(pivot), previous.coefficients.first())
                 ?: return EqualityRows.Declined
+            if (proofs != null) proof = proofs.combine(proof, checkNotNull(pivotProofs)[pivot])
             coefficients.remove(pivot)
             bound = work.subtractProduct(bound, scale, previous.rhs) ?: return EqualityRows.Declined
             for (index in 1 until previous.columns.size) {
@@ -176,16 +201,20 @@ internal fun prepareEqualityRows(
             }
         }
         if (coefficients.isEmpty() && !bound.isZero) {
+            if (!stop() && proof >= 0) onRefutationProof?.invoke(proof)
             return if (stop()) EqualityRows.Declined else EqualityRows.Refuted
         }
     }
-    return if (stop()) EqualityRows.Declined else EqualityRows.Prepared(MixedEqualityRepair(pivots, stop, onStage))
+    return if (stop()) EqualityRows.Declined else
+        EqualityRows.Prepared(MixedEqualityRepair(pivots, stop, onStage, proofs, pivotProofs))
 }
 
 internal class MixedEqualityRepair(
     private val pivots: Array<ExactRationalInequality?>,
     private val stop: Cancellation,
     private val onStage: ((String) -> Unit)?,
+    private val proofs: EqualityRowSupport? = null,
+    private val pivotProofs: IntArray? = null,
 ) {
     private val work = MixedPointArithmetic(stop)
 
@@ -229,6 +258,8 @@ internal class MixedEqualityRepair(
 
     fun reduceRows(
         rows: List<ExactRationalInequality>,
+        onReducedRow: ((Int, Int) -> Unit)? = null,
+        onFalseProof: ((Int) -> Unit)? = null,
         onFalseRow: ((Int) -> Unit)? = null,
     ): EqualityResidual {
         val residual = ArrayList<ExactRationalInequality>()
@@ -238,11 +269,15 @@ internal class MixedEqualityRepair(
             if (stop() || !admittedEqualityRow(row, pivots.size, work)) return EqualityResidual.Declined
             val coefficients = row.columns.indices.associate { row.columns[it] to row.coefficients[it] }.toMutableMap()
             var bound = row.rhs
+            var proof = if (onReducedRow != null || onFalseProof != null) proofs?.row(rowIndex) ?: -1 else -1
             for (pivot in pivots.indices) {
                 val coefficient = coefficients[pivot] ?: continue
                 val equation = pivots[pivot] ?: continue
                 val scale = work.quotient(coefficient, equation.coefficients.first())
                     ?: return EqualityResidual.Declined
+                if (proofs != null && !scale.isZero) {
+                    proof = proofs.combine(proof, checkNotNull(pivotProofs)[pivot])
+                }
                 coefficients.remove(pivot)
                 bound = work.subtractProduct(bound, scale, equation.rhs) ?: return EqualityResidual.Declined
                 for (index in 1 until equation.columns.size) {
@@ -258,6 +293,7 @@ internal class MixedEqualityRepair(
                     onStage?.invoke("RECOVERY_EQUALITY_RESIDUAL_FALSE")
                     if (stop()) return EqualityResidual.Declined
                     onFalseRow?.invoke(rowIndex)
+                    if (proof >= 0 && !stop()) onFalseProof?.invoke(proof)
                     return if (stop()) EqualityResidual.Declined else EqualityResidual.Refuted
                 }
                 continue
@@ -272,8 +308,76 @@ internal class MixedEqualityRepair(
             val ordered = coefficients.keys.sorted()
             residual += ExactRationalInequality(ordered.toIntArray(), ordered.map(coefficients::getValue), bound,
                 row.strict)
+            if (onReducedRow != null) {
+                stop.charge(2L)
+                if (stop()) return EqualityResidual.Declined
+                onReducedRow(rowIndex, proof)
+            }
         }
         return if (stop()) EqualityResidual.Declined else EqualityResidual.Reduced(residual)
+    }
+}
+
+internal class EqualityRowSupport(private val rows: Int, private val stop: Cancellation) {
+    private val first = IntArrayList()
+    private val second = IntArrayList()
+
+    fun row(index: Int): Int = if (index !in 0 until rows) -1 else append(-1, index)
+
+    fun combine(left: Int, right: Int): Int = when {
+        left < 0 || right < 0 -> -1
+        left == right -> left
+        else -> append(left, right)
+    }
+
+    fun combineAll(roots: IntArrayList): Int {
+        if (roots.isEmpty()) return -1
+        var result = roots[0]
+        for (index in 1 until roots.size) {
+            stop.charge(1L)
+            if (stop()) return -1
+            result = combine(result, roots[index])
+        }
+        return result
+    }
+
+    fun expand(root: Int): IntArray? {
+        if (root !in 0 until first.size || stop()) return null
+        stop.charge(first.size.toLong() + 9L)
+        if (stop()) return null
+        val seen = BooleanArray(first.size)
+        val pending = IntArrayList().also { it.add(root) }
+        val selected = HashSet<Int>()
+        while (!pending.isEmpty()) {
+            stop.charge(4L)
+            if (stop()) return null
+            val node = pending.last()
+            pending.truncateTo(pending.size - 1)
+            if (node !in seen.indices) return null
+            if (seen[node]) continue
+            seen[node] = true
+            val left = first[node]
+            val right = second[node]
+            if (left < 0) {
+                if (right !in 0 until rows) return null
+                selected += right
+                if (selected.size > 4096) return null
+            } else {
+                if (left >= node || right !in 0 until node) return null
+                pending.add(left)
+                pending.add(right)
+            }
+        }
+        stop.charge(selected.size.toLong() * (Int.SIZE_BITS - selected.size.countLeadingZeroBits() + 2L))
+        return if (stop()) null else selected.sorted().toIntArray()
+    }
+
+    private fun append(left: Int, right: Int): Int {
+        stop.charge(4L)
+        if (first.size >= 8192 || stop()) return -1
+        first.add(left)
+        second.add(right)
+        return first.size - 1
     }
 }
 

@@ -56,6 +56,43 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `an equality refutation should exclude unrelated guarded equations`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)), List(2) { BigFraction.ONE },
+                LinearOp.EQ, BigFraction.ONE, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ONE, strict = true, activator = 2),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 3),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        for (variable in listOf(3, 0, 1)) {
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+        }
+        solves = 0
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false)),
+            assertNotNull(conflict.explanation).literals.toSet())
+        assertEquals(0, solves)
+        session.popTo(3)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+        assertIs<SearchResult.Satisfied>(session.solve(0))
+    }
+
+    @Test
     fun `a reduced general conflict should retain its Boolean premises before the primary solve`() {
         val source = Problem(2, 0, emptyArray(), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
