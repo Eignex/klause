@@ -3,15 +3,19 @@ package com.eignex.klause.cli
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
-class MpsModeNumericalStatusTest(private val exact: Boolean, private val maximize: Boolean, private val mixed: Boolean) {
+class MpsModeNumericalStatusTest(
+    private val exact: Boolean,
+    private val maximize: Boolean,
+    private val mixed: Boolean,
+) {
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "exact={0}, maximize={1}, mixed={2}")

@@ -94,7 +94,7 @@ They do not require a separate proof over the feasible set enlarged by tolerance
 The final optimizing point must pass original-source checks, its objective must
 agree with the native value within captured source slack, and the native terminal
 must cover the unrestricted model. Interrupted search, rejected terminal witnesses
-and restricted acceptance filters withhold these statuses.
+and restricted acceptance filters cannot supply these native completion claims.
 
 `optimizationStatus=tolerance-optimum` identifies numerical optimality. An exact
 point alone does not establish an exact optimum. `attained-optimum` requires an

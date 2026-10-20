@@ -16,12 +16,12 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class LinearSourceOutcomeTest(private val exact: Boolean) {
@@ -76,7 +76,10 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
         val native = OpenTheoryExecution.Optimize(OpenTheoryOptimum.Optimal(
             OpenTheoryAssignment.Sampled(rejected), BigFraction.ZERO, SolveStats.EMPTY))
 
-        val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, hooks, _ ->
+        val result = executeLinearSource(
+            SourceExecutionRequest(invocation),
+            SourceExecutionCallbacks(),
+        ) { _, hooks, _ ->
             hooks.finite.onSample(Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0, 2.0),
                 exactReals = listOf(BigFraction.ofLong(2), BigFraction.ofLong(2))))
             SourceExecutionResult.Linear(invocation, native)
@@ -123,7 +126,10 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
         val native = OpenTheoryExecution.Optimize(OpenTheoryOptimum.Optimal(
             OpenTheoryAssignment.Sampled(point), BigFraction.ONE, SolveStats.EMPTY))
 
-        val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, hooks, _ ->
+        val result = executeLinearSource(
+            SourceExecutionRequest(invocation),
+            SourceExecutionCallbacks(),
+        ) { _, hooks, _ ->
             hooks.finite.onSample(Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0, 1.0),
                 exactReals = listOf(BigFraction.ONE, BigFraction.ONE)))
             SourceExecutionResult.Linear(invocation, native)
