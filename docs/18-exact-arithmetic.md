@@ -72,8 +72,11 @@ never convert to floating values.
 
 Bareiss elimination computes Sylvester determinants with exact division.
 Resultants handle zero, shared-factor and constant cases; principal subresultant
-coefficients use the truncated Sylvester matrices, with a direct formula when both
-inputs are affine in the eliminated coordinate. Prepared cursors let a caller
+coefficients use the truncated Sylvester matrices, with direct formulas when both
+inputs are affine or both are quadratic in the eliminated coordinate. The quadratic
+formula combines coefficient minors without division and preserves specialization
+when leading coefficients vanish. These formulas allocate no dense matrix.
+Prepared cursors let a caller
 suspend a long elimination at its own checkpoints and charge the same work as the
 eager path.
 

@@ -152,6 +152,145 @@ class PolynomialArithmeticTest {
     }
 
     @Test
+    fun `quadratic subresultants agree with Sylvester determinants without matrix allocation`() {
+        val z = Polynomial.variable(2)
+        val squared = arithmetic.power(x, 2)
+        val quadratic = arithmetic.add(squared, arithmetic.add(arithmetic.multiply(y, x), Polynomial.ONE))
+        for ((left, right, linearMinor) in listOf(
+            Triple(quadratic, arithmetic.add(squared,
+                arithmetic.add(arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), x), constant(2))), Polynomial.ONE),
+            Triple(arithmetic.add(arithmetic.multiply(y, squared),
+                arithmetic.add(arithmetic.multiply(z, x), Polynomial.ONE)),
+                arithmetic.add(arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), squared),
+                    arithmetic.subtract(arithmetic.multiply(arithmetic.add(z, constant(2)), x), Polynomial.ONE)),
+                arithmetic.subtract(arithmetic.scale(y, fraction(2)), z)),
+            Triple(arithmetic.multiply(arithmetic.subtract(x, y), arithmetic.subtract(x, z)),
+                arithmetic.multiply(arithmetic.subtract(x, y), arithmetic.add(x, Polynomial.ONE)),
+                arithmetic.add(z, Polynomial.ONE)),
+            Triple(arithmetic.add(arithmetic.scale(squared, fraction(2).reciprocal()),
+                arithmetic.add(arithmetic.scale(x, fraction(3) * fraction(5).reciprocal()),
+                    Polynomial.constant(fraction(7) * fraction(11).reciprocal()))),
+                arithmetic.add(arithmetic.scale(squared, fraction(-2) * fraction(3).reciprocal()),
+                    arithmetic.add(arithmetic.scale(x, fraction(5) * fraction(7).reciprocal()),
+                        Polynomial.constant(fraction(-13) * fraction(17).reciprocal()))),
+                Polynomial.constant(fraction(53) * fraction(70).reciprocal())),
+            Triple(quadratic, quadratic, Polynomial.ZERO),
+            Triple(arithmetic.add(squared, Polynomial.ONE), arithmetic.add(squared, constant(2)), Polynomial.ZERO),
+        )) {
+            for ((a, b, sign) in listOf(Triple(left, right, 1L), Triple(right, left, -1L))) {
+                val expected = arithmetic.resultant(a, b, 0)
+                val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
+
+                val immediate = limited.principalSubresultants(a, b, 0)
+                val pending = limited.preparePrincipalSubresultants(a, b, 0)
+                var resumed: List<Polynomial>? = null
+                while (resumed == null) resumed = pending.next()
+
+                assertEquals(listOf(expected, arithmetic.scale(linearMinor, fraction(sign))), immediate)
+                assertEquals(immediate, resumed)
+            }
+        }
+    }
+
+    @Test
+    fun `quadratic principal coefficients preserve vanishing leading specializations`() {
+        val z = Polynomial.variable(2)
+        val squared = arithmetic.power(x, 2)
+        val left = arithmetic.add(arithmetic.multiply(y, squared), arithmetic.add(x, Polynomial.ONE))
+        val right = arithmetic.add(arithmetic.multiply(arithmetic.subtract(y, Polynomial.ONE), squared),
+            arithmetic.add(arithmetic.multiply(z, x), constant(2)))
+        val expectedAtOne = arithmetic.add(arithmetic.subtract(arithmetic.power(z, 2),
+            arithmetic.scale(z, fraction(2))), constant(4))
+
+        val coefficients = arithmetic.principalSubresultants(left, right, 0)
+
+        assertEquals(listOf(arithmetic.subtract(z, Polynomial.ONE), Polynomial.ONE),
+            coefficients.map { arithmetic.substitute(it, 1, Polynomial.ZERO) })
+        assertEquals(listOf(expectedAtOne, z), coefficients.map { arithmetic.substitute(it, 1, Polynomial.ONE) })
+    }
+
+    @Test
+    fun `quadratic subresultant products retain containing cancellation across checkpoints`() {
+        val a = Polynomial.of((0..16).map { PolynomialTerm(Monomial.of(mapOf(1 to it)), BigFraction.ONE) })
+        val b = Polynomial.of((0..16).map { PolynomialTerm(Monomial.of(mapOf(2 to it)), BigFraction.ONE) })
+        val squared = arithmetic.power(x, 2)
+        val left = arithmetic.add(arithmetic.multiply(a, squared), arithmetic.add(arithmetic.multiply(b, x), a))
+        val right = arithmetic.add(arithmetic.multiply(b, squared), arithmetic.add(arithmetic.multiply(a, x), b))
+        var stopped = false
+        val limited = PolynomialArithmetic(Cancellation { stopped }, PolynomialLimits(maxMatrixCells = 0))
+        val pending = limited.preparePrincipalSubresultants(left, right, 0)
+
+        assertNull(pending.next())
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { pending.next() }
+    }
+
+    @Test
+    fun `prepared quadratic subresultants charge the same native work as eager execution`() {
+        val left = arithmetic.add(arithmetic.power(x, 2), arithmetic.add(arithmetic.multiply(y, x), Polynomial.ONE))
+        val right = arithmetic.add(arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), arithmetic.power(x, 2)),
+            arithmetic.add(x, arithmetic.power(y, 2)))
+        val charges = ArrayList<Long>()
+        val results = ArrayList<List<Polynomial>>()
+        for (prepared in listOf(false, true)) {
+            var spent = 0L
+            val counted = PolynomialArithmetic(object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            })
+
+            val result = if (prepared) {
+                val pending = counted.preparePrincipalSubresultants(left, right, 0)
+                var completed: List<Polynomial>? = null
+                while (completed == null) completed = pending.next()
+                completed
+            } else counted.principalSubresultants(left, right, 0)
+
+            charges.add(spent)
+            results.add(result)
+        }
+
+        assertEquals(results[0], results[1])
+        assertTrue(charges[0] > 0)
+        assertEquals(charges[0], charges[1])
+    }
+
+    @Test
+    fun `quadratic subresultant observations visit both principal coefficients`() {
+        val left = arithmetic.add(arithmetic.power(x, 2), y)
+        val right = arithmetic.add(arithmetic.power(x, 2), arithmetic.add(x, Polynomial.ONE))
+        for (prepared in listOf(false, true)) {
+            val observed = PolynomialArithmetic()
+            val indices = ArrayList<Int?>()
+            observed.subresultantObserver = { _, _, _, index -> indices.add(index) }
+
+            if (prepared) {
+                val pending = observed.preparePrincipalSubresultants(left, right, 0)
+                while (pending.next() == null) Unit
+            } else observed.principalSubresultants(left, right, 0)
+
+            assertEquals(listOf(null, 0, 1), indices)
+        }
+    }
+
+    @Test
+    fun `quadratic subresultants retain the containing dense coefficient limit`() {
+        val left = arithmetic.add(arithmetic.power(x, 2), y)
+        val right = arithmetic.add(arithmetic.power(x, 2), Polynomial.ONE)
+        for (prepared in listOf(false, true)) {
+            val limited = PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 2, maxMatrixCells = 0))
+
+            val failure = assertFailsWith<PolynomialResourceLimit> {
+                if (prepared) limited.preparePrincipalSubresultants(left, right, 0).next()
+                else limited.principalSubresultants(left, right, 0)
+            }
+
+            assertEquals(PolynomialResource.DENSE_COEFFICIENTS, failure.resource)
+        }
+    }
+
+    @Test
     fun `solve cancellation should terminate prepared subresultants`() {
         var stopped = false
         val counted = PolynomialArithmetic(Cancellation { stopped })

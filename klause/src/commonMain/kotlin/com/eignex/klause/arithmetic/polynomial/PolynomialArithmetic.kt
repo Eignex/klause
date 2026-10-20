@@ -234,6 +234,12 @@ internal class PolynomialArithmetic(
             subresultantObserver?.invoke(left, right, variable, 0)
             return listOf(subtract(multiply(a[1], b[0]), multiply(a[0], b[1])))
         }
+        if (m == 2 && n == 2) {
+            val pending = prepareQuadraticSubresultants(a, b) { index ->
+                subresultantObserver?.invoke(left, right, variable, index)
+            }
+            while (true) pending.next()?.let { return it }
+        }
         return (0 until minOf(m, n)).map { index ->
             subresultantObserver?.invoke(left, right, variable, index)
             val matrix = matrix(m.toLong() + n - 2L * index)
@@ -282,6 +288,16 @@ internal class PolynomialArithmetic(
             yield(listOf(subtract(ad, bc)))
             return@sequence
         }
+        if (m == 2 && n == 2) {
+            val pending = prepareQuadraticSubresultants(a, b) { index ->
+                subresultantObserver?.invoke(left, right, variable, index)
+            }
+            while (true) {
+                val result = pending.next()
+                yield(result)
+                if (result != null) return@sequence
+            }
+        }
         val result = ArrayList<Polynomial>()
         for (index in 0 until minOf(m, n)) {
             subresultantObserver?.invoke(left, right, variable, index)
@@ -310,6 +326,48 @@ internal class PolynomialArithmetic(
             result += determinant
         }
         yield(result.toList())
+    }.iterator()
+
+    private fun prepareQuadraticSubresultants(
+        a: List<Polynomial>,
+        b: List<Polynomial>,
+        onCoefficient: (Int) -> Unit,
+    ): Iterator<List<Polynomial>?> = sequence {
+        onCoefficient(0)
+        val products = ArrayList<Polynomial>()
+        for ((left, right) in listOf(
+            a[2] to b[0], a[0] to b[2],
+            a[2] to b[1], a[1] to b[2],
+            a[1] to b[0], a[0] to b[1],
+        )) {
+            val pending = prepareMultiply(left, right)
+            var product: Polynomial? = null
+            while (product == null) {
+                product = pending.next()
+                if (product == null) yield(null)
+            }
+            products.add(product)
+            yield(null)
+        }
+        val constantMinor = subtract(products[0], products[1])
+        val linearMinor = subtract(products[2], products[3])
+        val lowerMinor = subtract(products[4], products[5])
+        val finalProducts = ArrayList<Polynomial>()
+        for ((left, right) in listOf(constantMinor to constantMinor, linearMinor to lowerMinor)) {
+            val pending = prepareMultiply(left, right)
+            var product: Polynomial? = null
+            while (product == null) {
+                product = pending.next()
+                if (product == null) yield(null)
+            }
+            finalProducts.add(product)
+            yield(null)
+        }
+        // Sylvester minors give the resultant without division, including singular leading coefficients.
+        val resultant = subtract(finalProducts[0], finalProducts[1])
+        onCoefficient(1)
+        step()
+        yield(listOf(resultant, linearMinor))
     }.iterator()
 
     private fun prepareDeterminant(matrix: Array<Array<Polynomial>>): Iterator<Polynomial?> = sequence {
