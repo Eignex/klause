@@ -32,6 +32,20 @@ import kotlin.test.assertTrue
 
 class RealDifferenceSystemTest {
     @Test
+    fun `oversized residual guard storage should withhold optional deductions`() {
+        val row = ExactRationalInequality(intArrayOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO)
+        val queries = List(256) {
+            Lit.make(0, true) to ExactRationalInequality(IntArray(256) { it },
+                List(256) { BigFraction.ONE }, BigFraction.ZERO)
+        }
+
+        val graph = RealDifferenceSystem.prepareResidualGuards(256, listOf(row), queries, 1, Cancellation.Never)
+
+        assertNull(graph)
+    }
+
+    @Test
     fun `an invalid residual tail should withhold otherwise available guard consequences`() {
         val third = BigFraction.ofLong(3).reciprocal()
         val row = ExactRationalInequality(intArrayOf(0, 1),

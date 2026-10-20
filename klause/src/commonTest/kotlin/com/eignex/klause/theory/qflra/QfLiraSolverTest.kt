@@ -110,7 +110,7 @@ class QfLiraSolverTest {
                     LinearOp.NE, BigFraction.ZERO, activator = 2),
             ), numRealVars = 4, realLower = DoubleArray(4) { Double.NEGATIVE_INFINITY },
                 realUpper = DoubleArray(4) { Double.POSITIVE_INFINITY })
-            val session = SearchSession(listOf(ExactLiraSearchComponent(source)))
+            val session = SearchSession(listOf(ExactLiraSearchComponent(source)), atoms = SearchAtomRegistry(4))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 

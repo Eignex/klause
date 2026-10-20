@@ -798,6 +798,9 @@ class ExactLiraSearchComponent private constructor(
         context: SearchContext,
     ): ComponentResult? {
         val groups = prepareEquationGuards() ?: return null
+        lpStop.charge((residual?.size ?: 0).toLong() + 1L)
+        if (operationStop()) return ComponentResult.Indeterminate
+        val residualEntries = residual?.sumOf { it.columns.size.toLong() + 1L } ?: 65536L
         var checked = 0
         var implied = false
         val queries = ArrayList<Pair<Int, ExactRationalInequality>>()
@@ -819,13 +822,23 @@ class ExactLiraSearchComponent private constructor(
             var constant = true
             var agree = true
             val headQueries = ArrayList<Pair<Int, ExactRationalInequality>>()
+            var headEntries = 0L
+            var graphEligible = true
             for (prepared in rows) {
                 lpStop.charge(2L * prepared.row.size + 1L)
                 if (operationStop()) return ComponentResult.Indeterminate
                 val comparison = prepared.form.comparison(true) { false }
                 val query = repair.query(comparison.ordered.row(comparison.bound, comparison.strict))
                     ?: return@repeat
-                headQueries += reducedComparisonGuards(query.row, comparison.op, guard)
+                val maximumEntries = 2L * (query.row.columns.size + 1L)
+                if (graphEligible && residualEntries + queryEntries + headEntries + maximumEntries <= 65536L) {
+                    val arms = reducedComparisonGuards(query.row, comparison.op, guard)
+                    headEntries += arms.sumOf { it.second.columns.size.toLong() + 1L }
+                    headQueries += arms
+                } else {
+                    graphEligible = false
+                    headQueries.clear()
+                }
                 val support = query.support
                 if (support == null) {
                     constant = false
@@ -847,11 +860,10 @@ class ExactLiraSearchComponent private constructor(
                 if (selected.size > 4096) return@repeat
             }
             if (!constant || !agree) {
-                val entries = headQueries.sumOf { it.second.columns.size.toLong() + 1L }
-                lpStop.charge(entries + headQueries.size + 1L)
+                lpStop.charge(headEntries + headQueries.size + 1L)
                 if (operationStop()) return ComponentResult.Indeterminate
-                if (queryEntries + entries <= 65536L) {
-                    queryEntries += entries
+                if (graphEligible) {
+                    queryEntries += headEntries
                     queries += headQueries
                 }
                 return@repeat

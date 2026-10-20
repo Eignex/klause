@@ -182,6 +182,9 @@ its equality arm contributes both closed rows. These path deductions retain all
 source premises of the selected prefix together with any guarded path conditions.
 Omitted general rows supply no positive coverage, and graph potentials supply no
 witness authority. The graph and its queries remain local to the current check.
+Selected residual entries and query arms share the 65,536-entry limit; each arm's
+maximum size is checked before its construction. A declined head leaves constant
+deductions and ordinary completion available.
 Disjunction members and
 comparisons containing Boolean coefficients defer. Only the nonzero equation
 pivots used by each constant reduction contribute source premises; the queried comparison
