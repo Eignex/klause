@@ -611,6 +611,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PINNED_REAL_LEAF_SHAPE_ROOT` | First fresh pinned residual's bounded matrix-shape observation before numerical admission |
 | `lpPhase_PINNED_REAL_LEAF_COMPACTION_ROOT` | Completed private row compaction; `M_<before>_TO_<after>` records stored row counts before unchanged numerical admission |
 | `lpPhase_PINNED_REAL_LEAF_EXPLANATION_ROOT` | Source-mapped compacted leaf conflict: `POOLED`, `DECLINED` or `NOT_POOLED` |
+| `lpPhase_PINNED_REAL_LEAF_EXPLANATION_DECLINE_ROOT` | Refused source explanation: row provenance, source scope, bound premise, finite-prefix storage or literal truth |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Pinned-leaf shape outcomes encode `N` structural columns, `M` stored rows, `A`

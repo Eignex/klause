@@ -688,7 +688,9 @@ internal class LpEngine(
                 solveContext.certificationPolicy !== ProductionLpCertificationPolicy
             ) return declinedLeafAdmission("ROW_LIMIT")
             val previousRows = relaxation.model.m
-            relaxation = relaxation.compactPinnedRows(session, params.cancellation, ::noteNodeOverhead)
+            relaxation = relaxation.compactPinnedRows(session, params.cancellation,
+                onDecline = { sink.lp.observePrimalPhase("PINNED_REAL_LEAF_EXPLANATION_DECLINE", it, 0L) },
+                onWork = ::noteNodeOverhead)
                 ?: return declinedLeafAdmission(if (params.cancellation()) "CANCELLED" else "COMPACTION_DECLINE")
             sink.lp.observePrimalPhase("PINNED_REAL_LEAF_COMPACTION", "M_${previousRows}_TO_${relaxation.model.m}", 0L)
         }

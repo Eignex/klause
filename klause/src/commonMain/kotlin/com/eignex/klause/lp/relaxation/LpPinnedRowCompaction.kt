@@ -20,6 +20,7 @@ import com.eignex.klause.util.magnitudeBitLength
 internal fun LpRelaxation.compactPinnedRows(
     session: PropagationSession,
     cancellation: Cancellation,
+    onDecline: ((String) -> Unit)? = null,
     onWork: (Long) -> Unit,
 ): LpRelaxation? {
     val state = model.exactState ?: return null
@@ -132,7 +133,8 @@ internal fun LpRelaxation.compactPinnedRows(
         work.step(projection.work)
         if (working == null) return null
         LpRelaxation(working, colVarId, colIsBool, objectiveConstant, intColOf, boolColOf,
-            pinnedExplanation = LpPinnedExplanation.capture(this, sourceRows, session, cancellation, onWork),
+            pinnedExplanation = LpPinnedExplanation.capture(this, sourceRows, session, cancellation,
+                onDecline = onDecline, onWork = onWork),
             circuitArcs = circuitArcs, colReq = colReq, colPresentUpper = colPresentUpper,
             colRealId = colRealId, colRealSign = colRealSign, colPresence = colPresence,
             rowFactorIds = IntArray(compact.m) { -1 })

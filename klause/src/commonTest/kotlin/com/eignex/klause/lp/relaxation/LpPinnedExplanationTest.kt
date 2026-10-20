@@ -65,7 +65,7 @@ class LpPinnedExplanationTest {
         val clause = assertNotNull(explanation.clause(intArrayOf(0), session, Cancellation.Never) {})
 
         assertEquals(setOf(Lit.make(0, false), session.boundGeLit(0, 1, positive = false),
-            session.boundLeLit(0, 1, positive = false), session.equalityLit(0, 1, positive = false)), clause.toSet())
+            session.boundLeLit(0, 1, positive = false)), clause.toSet())
         assertTrue(clause.all { session.litTruth(it) == false })
     }
 
@@ -83,12 +83,14 @@ class LpPinnedExplanationTest {
             val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
             val parent = LpRelaxation(model, intArrayOf(if (unbacked == "column") -1 else 0),
                 booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf())
+            val declines = ArrayList<String>()
             val explanation = assertNotNull(LpPinnedExplanation.capture(parent, listOf(intArrayOf(0)),
-                session, Cancellation.Never) {})
+                session, Cancellation.Never, onDecline = declines::add) {})
 
             val clause = explanation.clause(intArrayOf(0), session, Cancellation.Never) {}
 
             assertNull(clause)
+            assertEquals(listOf(if (unbacked == "row") "ROW_ORIGIN" else "STRUCTURAL_BOUND"), declines)
         }
     }
 

@@ -203,8 +203,8 @@ refutation can map its row support back to that parent, cite every original row
 premise and both current bounds of each structural column touching those rows.
 These bounds cover the fixed-coordinate substitutions and the residual numerical
 bounds. Bound-only support conservatively cites every structural column. The
-explanation also captures and cites the whole finite prefix, including folded
-source inputs that have no remaining matrix coefficient. It admits at most 4,096
+explanation captures the whole finite prefix as a freshness guard. Its clause cites
+only the contributing source row premises and touched structural bounds. It admits at most 4,096
 finite coordinates and requires the same source identity and unchanged pins when
 mapping the conflict. Every literal must be false in the current finite session. An unsupported source parent,
 auxiliary bound, storage limit or cancellation withholds the explanation and keeps
@@ -217,7 +217,9 @@ the handoff to traversal. Optional LP bound-pooling settings are unchanged; miss
 stale or cancelled source explanations retain chronological handling. Native
 integer atoms are never interpreted as shared Boolean IDs. The numerical certificate
 and engine dependencies are unchanged. `PINNED_REAL_LEAF_EXPLANATION` distinguishes
-pooled, declined and unpooled outcomes.
+pooled, declined and unpooled outcomes. `PINNED_REAL_LEAF_EXPLANATION_DECLINE`
+identifies unsupported row origins, source scopes, bound premises, prefix storage
+and literal truth without weakening those admission checks.
 Compaction inspects at most 10,000 rows and structural columns and 65,536 sparse
 entries or premise units, with 4,096-bit normalized scalar admission and charged
 intermediate arithmetic. The current construction owner also pays projection work; cancellation or incomplete conversion withholds the compacted model.

@@ -43,7 +43,7 @@ import kotlin.test.assertTrue
 class LpEngineTest {
     @Test
     fun `a compacted conflict clause should preserve the feasible Boolean sibling`() {
-        val problem = Problem(1, 0, emptyArray(), Array(1002) { row ->
+        val problem = Problem(2, 0, emptyArray(), Array(1002) { row ->
             if (row == 0) ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
                 LinearOp.LE, BigFraction.ZERO, activator = 0)
             else ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
@@ -55,6 +55,7 @@ class LpEngineTest {
             SolveStatsSink(backend = "compacted-source-clause"))
         val rejected = PropagationSession(problem)
         assertIs<PropagationResult.Implied>(rejected.pinBool(0, true))
+        assertIs<PropagationResult.Implied>(rejected.pinBool(1, true))
 
         engine.use {
             assertEquals(LpVerdict.INFEASIBLE, it.leafCertify(rejected).verdict)
@@ -63,10 +64,11 @@ class LpEngineTest {
             assertEquals(setOf(Lit.make(0, false)), clause.toSet())
             val sibling = PropagationSession(problem)
             assertIs<PropagationResult.Implied>(sibling.addLearnedClause(Clause(clause), lbd = 1, permanent = true))
+            assertIs<PropagationResult.Implied>(sibling.pinBool(1, true))
             assertEquals(false, sibling.boolValue(0))
             val leaf = it.leafCertify(sibling)
             assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
-            val point = Sample(booleanArrayOf(false), longArrayOf(), leaf.reals,
+            val point = Sample(booleanArrayOf(false, true), longArrayOf(), leaf.reals,
                 exactReals = assertNotNull(leaf.exactReals))
             assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
         }

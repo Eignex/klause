@@ -1,6 +1,5 @@
 package com.eignex.klause.lp.relaxation
 
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.propagation.PropagationSession
@@ -14,6 +13,7 @@ internal class LpPinnedExplanation private constructor(
     private val problem: Problem,
     private val bools: BooleanArray,
     private val ints: LongArray,
+    private val onDecline: ((String) -> Unit)?,
 ) {
     private val rows = rows.map(IntArray::copyOf)
 
@@ -23,12 +23,20 @@ internal class LpPinnedExplanation private constructor(
             rows: List<IntArray>,
             session: PropagationSession,
             cancellation: Cancellation,
+            onDecline: ((String) -> Unit)? = null,
             onWork: (Long) -> Unit,
         ): LpPinnedExplanation? {
             val problem = session.problem
             val count = problem.numBoolVars.toLong() + problem.numIntVars
             val entries = rows.sumOf { it.size.toLong() }
-            if (count > 4096L || entries > 65536L) return null
+            if (count > 4096L) {
+                onDecline?.invoke("PREFIX_LIMIT_B_${problem.numBoolVars}_I_${problem.numIntVars}")
+                return null
+            }
+            if (entries > 65536L) {
+                onDecline?.invoke("MAPPING_STORAGE")
+                return null
+            }
             val units = 4L * (count + entries + rows.size + 1L)
             onWork(units)
             cancellation.charge(units)
@@ -40,7 +48,7 @@ internal class LpPinnedExplanation private constructor(
                 domain.min
             }
             if (cancellation()) return null
-            return LpPinnedExplanation(original, rows, problem, bools, ints)
+            return LpPinnedExplanation(original, rows, problem, bools, ints, onDecline)
         }
     }
     fun clause(
@@ -78,7 +86,11 @@ internal class LpPinnedExplanation private constructor(
         val parents = selected.indices.filter { selected[it] }.toIntArray()
         val literals = IntArrayList()
         val seen = IntHashSet()
-        if (!LpExplanation.addRowPremiseLits(literals, seen, original, parents, session)) return null
+        var rowDecline: String? = null
+        if (!LpExplanation.addRowPremiseLits(literals, seen, original, parents, session, { rowDecline = it })) {
+            onDecline?.invoke(rowDecline ?: "ROW_PREMISES")
+            return null
+        }
         for (column in 0 until source.n) {
             val columnEntries = source.columnEntries(column)
             entries += columnEntries.size
@@ -87,21 +99,19 @@ internal class LpPinnedExplanation private constructor(
             val bounds = model.exactBounds(column)
             for (lower in listOf(true, false)) {
                 if ((if (lower) bounds.lower else bounds.upper) == null) continue
-                val premises = LpExplanation.boundPremiseLits(original, session, column, lower) ?: return null
+                val premises = LpExplanation.boundPremiseLits(original, session, column, lower) ?: run {
+                    onDecline?.invoke(if (original.colRealId[column] >= 0) "REAL_BOUND" else "STRUCTURAL_BOUND")
+                    return null
+                }
                 if (stopped(premises.size.toLong() + 1L)) return null
                 for (literal in premises) if (seen.add(literal)) literals.add(literal)
             }
         }
-        for (variable in bools.indices) {
-            val literal = Lit.make(variable, !bools[variable])
-            if (seen.add(literal)) literals.add(literal)
-        }
-        for (variable in ints.indices) {
-            val literal = session.equalityLit(variable, ints[variable], positive = false)
-            if (seen.add(literal)) literals.add(literal)
-        }
         if (stopped(literals.size.toLong() + 1L)) return null
-        if ((0 until literals.size).any { session.litTruth(literals[it]) != false }) return null
+        if ((0 until literals.size).any { session.litTruth(literals[it]) != false }) {
+            onDecline?.invoke("LITERAL_TRUTH")
+            return null
+        }
         return literals.toIntArray()
     }
 }
