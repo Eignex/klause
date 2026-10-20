@@ -630,6 +630,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PRIMAL_ROUNDING_ROOT`, `lpPhase_PRIMAL_PUMP_ROUND_ROOT`, `lpPhase_PRIMAL_PROPOSAL_ROOT` | Discrete proposals and completion/admission outcomes; inclusive timing overlaps solve and verification phases |
 | `lpPhase_PRIMAL_LP_PRIMAL_ROOT`, `lpPhase_PRIMAL_LP_DUAL_ROOT` | Root LP point availability and termination before rounding; stopped iterates supply no primal target |
 | `lpPhase_PINNED_REAL_LEAF_SHAPE_ROOT` | First fresh pinned residual's bounded matrix-shape observation before numerical admission |
+| `lpPhase_PINNED_REAL_LEAF_COMPACTION_ROOT` | Completed private row compaction; `M_<before>_TO_<after>` records stored row counts before unchanged numerical admission |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Pinned-leaf shape outcomes encode `N` structural columns, `M` stored rows, `A`
