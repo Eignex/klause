@@ -214,6 +214,20 @@ private source-bound branches fall back to the shared LP route. Admission is cap
 at 10,000 real variables and 100,000 edges; larger models, unsafe weights,
 disequalities and mixed integer/real models keep the exact LP route.
 
+General pure-real completion can retain a necessary difference subset before the
+full LP check. Selected edges keep their signed source guards and immutable
+declared bounds; general rows, Boolean coefficient rows, disjunctions and unsupported
+disequality directions contribute no edge. This owner exposes checked conflicts
+only. Feasible potentials remain private and cannot complete an assignment. Current
+guard checks, private-branch restrictions and production certification requirements
+remain the same as for complete graph conflicts.
+
+The subset admits at most 10,000 real columns, 100,000 source factors and 65,536
+selected edge or sparse units, with 4,096-bit rational admission and charged
+normalization. Preparation and sweeps use the current operation and arithmetic
+check allowance. Representation declines retain the LP route; containing interruption
+withholds all output.
+
 Finite preparation can also install a redundant real graph from one-term and
 two-opposite-coefficient `ExactLinear` rows and `RealElement` selections. It can
 publish conflicts and exclusions, never source real coordinates.

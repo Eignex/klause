@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
@@ -9,6 +10,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.model.PbOp
@@ -25,6 +27,114 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RealDifferenceSystemTest {
+    @Test
+    fun `a necessary source cycle should retain its signed guards across siblings`() {
+        for (strict in listOf(false, true)) {
+            val model = Problem(2, 0, emptyArray(), arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.ZERO, activator = 0),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), LinearOp.LE,
+                    if (strict) BigFraction.ZERO else BigFraction.MINUS_ONE, strict = strict, activator = 1),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(424)),
+                    List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ofLong(100)),
+            ), numRealVars = 425, realLower = DoubleArray(425) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(425) { Double.POSITIVE_INFINITY })
+            val forms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(425) } }
+            val subset = assertNotNull(RealDifferenceSystem.prepareNecessary(model, forms, Cancellation.Never))
+
+            val conflict = assertNotNull(subset.conflict(intArrayOf(1, 1), Cancellation.Never))
+
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)), assertNotNull(conflict.clause).toSet())
+            assertNull(subset.conflict(intArrayOf(1, 0), Cancellation.Never))
+            assertNotNull(subset.conflict(intArrayOf(1, 1), Cancellation.Never))
+            assertNull(RealDifferenceSystem.prepare(model, forms))
+        }
+    }
+
+    @Test
+    fun `feasible source differences should supply no verdict for contradictory general rows`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.ZERO),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ZERO),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.GE, BigFraction.ONE),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val forms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(3) } }
+        val subset = assertNotNull(RealDifferenceSystem.prepareNecessary(model, forms, Cancellation.Never))
+
+        val conflict = subset.conflict(intArrayOf(), Cancellation.Never)
+
+        assertNull(conflict)
+    }
+
+    @Test
+    fun `an unselected equality should contribute no necessary disequality direction`() {
+        val model = Problem(1, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), LinearOp.LE, BigFraction.MINUS_ONE),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val forms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(2) } }
+        val subset = assertNotNull(RealDifferenceSystem.prepareNecessary(model, forms, Cancellation.Never))
+
+        val sibling = subset.conflict(intArrayOf(0), Cancellation.Never)
+
+        assertNull(sibling)
+        assertEquals(setOf(Lit.make(0, false)),
+            assertNotNull(assertNotNull(subset.conflict(intArrayOf(1), Cancellation.Never)).clause).toSet())
+    }
+
+    @Test
+    fun `cancelled necessary source preparation should retain work and permit a fresh retry`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val forms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } }
+        var spent = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 2L
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+
+        val stopped = RealDifferenceSystem.prepareNecessary(model, forms, stop)
+
+        assertNull(stopped)
+        assertTrue(spent >= 2L)
+        assertNotNull(RealDifferenceSystem.prepareNecessary(model, forms, Cancellation.Never))
+    }
+
+    @Test
+    fun `a stopped necessary source sweep should withhold its conflict and permit a fresh retry`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.GE, BigFraction.ONE),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val forms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } }
+        val subset = assertNotNull(RealDifferenceSystem.prepareNecessary(model, forms, Cancellation.Never))
+        var spent = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = spent > 0L
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+
+        val stopped = subset.conflict(intArrayOf(), stop)
+
+        assertNull(stopped)
+        assertTrue(spent > 0L)
+        assertTrue(assertNotNull(assertNotNull(subset.conflict(intArrayOf(), Cancellation.Never)).clause).isEmpty())
+    }
+
     @Test
     fun `fractional strict bounds should retain an exact interior witness`() {
         val model = Problem(

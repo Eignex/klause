@@ -54,7 +54,9 @@ A check proceeds in four steps:
    activator is assigned; the row's truth selects the row or its exact complement.
    Each asserted bound carries the literals that justify it. Disjunction rows stay
    out until search selects a disjunct.
-2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
+2. **Check.** An admitted difference fragment runs the graph check first. A necessary
+   difference subset can also reject a partial assignment before the general LP
+   query, but supplies no point or positive coverage for omitted rows. Otherwise
    the LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
 3. **Explain.** An infeasible system produces a conflict from the certified
