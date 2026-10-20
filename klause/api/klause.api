@@ -12661,6 +12661,7 @@ public final class com/eignex/klause/solver/pipeline/SourceFloatGridCoordinate {
 
 public final class com/eignex/klause/solver/pipeline/SourceFloatProjection {
 	public final fun getCoordinates ()Ljava/util/List;
+	public final fun getDeclaredGridSemantics ()Z
 	public final fun getFactorOrigins ()[I
 	public final fun getMaximize ()Z
 	public final fun getObjectiveOffset ()Lcom/eignex/klause/ir/SemanticRational;

@@ -14321,6 +14321,8 @@ final class com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate { // com
 final class com.eignex.klause.solver.pipeline/SourceFloatProjection { // com.eignex.klause.solver.pipeline/SourceFloatProjection|null[0]
     final val coordinates // com.eignex.klause.solver.pipeline/SourceFloatProjection.coordinates|{}coordinates[0]
         final fun <get-coordinates>(): kotlin.collections/List<com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate> // com.eignex.klause.solver.pipeline/SourceFloatProjection.coordinates.<get-coordinates>|<get-coordinates>(){}[0]
+    final val declaredGridSemantics // com.eignex.klause.solver.pipeline/SourceFloatProjection.declaredGridSemantics|{}declaredGridSemantics[0]
+        final fun <get-declaredGridSemantics>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceFloatProjection.declaredGridSemantics.<get-declaredGridSemantics>|<get-declaredGridSemantics>(){}[0]
     final val factorOrigins // com.eignex.klause.solver.pipeline/SourceFloatProjection.factorOrigins|{}factorOrigins[0]
         final fun <get-factorOrigins>(): kotlin/IntArray // com.eignex.klause.solver.pipeline/SourceFloatProjection.factorOrigins.<get-factorOrigins>|<get-factorOrigins>(){}[0]
     final val maximize // com.eignex.klause.solver.pipeline/SourceFloatProjection.maximize|{}maximize[0]
