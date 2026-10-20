@@ -250,7 +250,7 @@ internal object PolynomialWitnessProbeProfile {
                 for (atom in rows) {
                     step.invoke(arithmetic)
                     val polynomial = checkNotNull(atom).javaClass.getMethod("getPolynomial").invoke(atom)
-                    for (variable in polynomial.javaClass.getMethod("getVariables").invoke(polynomial) as Set<*>) {
+                    for (variable in polynomial.javaClass.getMethod("getVariables").invoke(polynomial) as List<*>) {
                         step.invoke(arithmetic)
                         referenced.add(checkNotNull(variable))
                     }
