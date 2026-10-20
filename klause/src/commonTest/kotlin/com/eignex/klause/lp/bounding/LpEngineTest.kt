@@ -4,10 +4,12 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.OpenIntBounds
@@ -39,6 +41,38 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `a compacted conflict clause should preserve the feasible Boolean sibling`() {
+        val problem = Problem(1, 0, emptyArray(), Array(1002) { row ->
+            if (row == 0) ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ZERO, activator = 0)
+            else ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.GE, BigFraction.ONE)
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+            SolveStatsSink(backend = "compacted-source-clause"))
+        engine.lpNogoods = LpNogoodPool()
+        val rejected = PropagationSession(problem)
+        assertIs<PropagationResult.Implied>(rejected.pinBool(0, true))
+
+        engine.use {
+            assertEquals(LpVerdict.INFEASIBLE, it.leafCertify(rejected).verdict)
+            val clause = assertNotNull(it.lpNogoods).drain().single().literals
+
+            assertEquals(setOf(Lit.make(0, false)), clause.toSet())
+            val sibling = PropagationSession(problem)
+            assertIs<PropagationResult.Implied>(sibling.addLearnedClause(Clause(clause), lbd = 1, permanent = true))
+            assertEquals(false, sibling.boolValue(0))
+            val leaf = it.leafCertify(sibling)
+            assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+            val point = Sample(booleanArrayOf(false), longArrayOf(), leaf.reals,
+                exactReals = assertNotNull(leaf.exactReals))
+            assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
+        }
+    }
+
     @Test
     fun `fixed fractional real leaf should retain its exact contradiction`() {
         val problem = Problem(

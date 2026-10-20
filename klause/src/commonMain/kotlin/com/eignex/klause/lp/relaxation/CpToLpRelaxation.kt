@@ -154,6 +154,7 @@ internal class LpRelaxation(
     /** The factor each row of [model] was emitted for, or -1 for a cut or a row spanning several factors. */
     val rowFactorIds: IntArray = EmptyIntArray,
     val realUpperRows: Map<Int, Int> = emptyMap(),
+    internal val pinnedExplanation: LpPinnedExplanation? = null,
 ) {
     fun column(variable: CpIntId): LpColumnId? =
         intColOf[variable.index].takeIf { it >= 0 }?.let(::LpColumnId)

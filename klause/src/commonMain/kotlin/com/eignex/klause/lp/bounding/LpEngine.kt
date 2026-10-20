@@ -686,7 +686,7 @@ internal class LpEngine(
                 solveContext.certificationPolicy !== ProductionLpCertificationPolicy
             ) return declinedLeafAdmission("ROW_LIMIT")
             val previousRows = relaxation.model.m
-            relaxation = relaxation.compactPinnedRows(params.cancellation, ::noteNodeOverhead)
+            relaxation = relaxation.compactPinnedRows(session, params.cancellation, ::noteNodeOverhead)
                 ?: return declinedLeafAdmission(if (params.cancellation()) "CANCELLED" else "COMPACTION_DECLINE")
             sink.lp.observePrimalPhase("PINNED_REAL_LEAF_COMPACTION", "M_${previousRows}_TO_${relaxation.model.m}", 0L)
         }
@@ -760,13 +760,22 @@ internal class LpEngine(
                 // Pool the theory lemma for restart-time registration: the leaf itself just rejects
                 // (the engine backtracks chronologically), and the next restart makes the lemma a
                 // permanent clause pruning the dead region everywhere.
-                val clause = if (residualOversized) null else {
+                val clause = if (residualOversized) {
+                    val support = certified.farkasRay?.let { ray ->
+                        ray.indices.filter { ray[it] != 0L }.toIntArray()
+                    } ?: certified.infeasibleRows ?: IntArray(model.m) { it }
+                    relaxation.pinnedExplanation?.clause(support, session, params.cancellation, ::noteNodeOverhead)
+                } else {
                     certified.farkasRay
                         ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
                         ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
                         ?: activePremiseClause(relaxation, session)
                 }
-                if (clause != null) lpNogoods?.add(clause)
+                val pooled = clause?.let { lpNogoods?.add(it) } == true
+                if (residualOversized) {
+                    sink.lp.observePrimalPhase("PINNED_REAL_LEAF_EXPLANATION",
+                        if (pooled) "POOLED" else if (clause == null) "DECLINED" else "NOT_POOLED", 0L)
+                }
                 LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
             }
 
