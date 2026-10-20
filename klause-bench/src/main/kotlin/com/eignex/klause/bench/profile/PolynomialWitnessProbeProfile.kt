@@ -1,9 +1,19 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRealProblem
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlinx.serialization.Serializable
@@ -19,11 +29,31 @@ import kotlin.time.Duration.Companion.seconds
 internal object PolynomialWitnessProbeProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1 && args[0].startsWith("request64="))
+        require(args.size in 1..3 && args[0].substringBefore('=') in setOf("request64", "catalog64"))
+        val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(options.size == args.size - 1 && options.keys.all { it in setOf("source", "charges") })
+        val mode = options["source"] ?: "direct"
+        val chargeScope = options["charges"] ?: "all"
+        require(mode in setOf("direct", "shared") && chargeScope in setOf("all", "coupled"))
         val request = Base64.getDecoder().decode(args[0].substringAfter('='))
         require(request.size <= 48 * 1024)
-        val cases = Json.decodeFromString<List<ProbeSource>>(request.toString(Charsets.UTF_8))
-        require(cases.size in 1..8 && cases.map { it.id }.distinct().size == cases.size)
+        val catalog = args[0].startsWith("catalog64=")
+        val cases = if (catalog) {
+            val sources = Json.decodeFromString<List<ProbeCatalogSource>>(request.toString(Charsets.UTF_8))
+            require(sources.size in 1..18 && sources.map { it.suite to it.problem }.distinct().size == sources.size)
+            sources.map { source ->
+                require(source.sha256.matches(Regex("[0-9a-f]{64}")))
+                val reference = Catalog.uncapped(source.suite).problems.single { it.name == source.problem }
+                val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
+                    it.readNBytes(1024 * 1024 + 1)
+                }
+                require(bytes.size <= 1024 * 1024 && sha256(bytes) == source.sha256)
+                ProbeSource(source.suite + "/" + source.problem, Base64.getEncoder().encodeToString(bytes),
+                    source.sha256)
+            }
+        } else Json.decodeFromString<List<ProbeSource>>(request.toString(Charsets.UTF_8)).also { sources ->
+            require(sources.size in 1..8 && sources.map { it.id }.distinct().size == sources.size)
+        }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         File(out, "request.json").writeBytes(request)
         Reports.writeJson(File(out, "provenance.json").path, InstalledBuild.reference)
@@ -34,23 +64,30 @@ internal object PolynomialWitnessProbeProfile {
             put("jvmOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
             put("containingTimeoutMs", 60000)
             put("preparationCheckpoints", 2)
+            put("sourceMode", mode)
+            put("chargeScope", chargeScope)
+            put("sourceInput", if (catalog) "catalog" else "embedded")
         }.toString() + "\n"
         )
         val access = ProbeAccess()
         for ((index, source) in cases.withIndex()) {
             val bytes = Base64.getDecoder().decode(source.base64)
-            require(bytes.size <= 32 * 1024 && sha256(bytes) == source.sha256)
+            require(bytes.size <= (if (catalog) 1024 * 1024 else 32 * 1024) && sha256(bytes) == source.sha256)
             val directory = File(out, index.toString()).apply { mkdirs() }
             File(directory, "source.smt2").writeBytes(bytes)
             val records = (0..1).flatMap { round ->
                 (if (round == 0) listOf(false, true) else listOf(true, false)).map { observed ->
-                    access.measure(bytes.toString(Charsets.UTF_8), observed, chargeStacks = observed)
+                    access.measure(bytes.toString(Charsets.UTF_8), observed, chargeStacks = observed,
+                        sourceMode = mode, coupledChargesOnly = chargeScope == "coupled")
                         .copy(round = round)
                 }
             }
             File(directory, "probe.json").writeText(Json.encodeToString(records))
             require(records.map { it.result to it.stats }.distinct().size == 1) {
                 "Observation changed native work or producer outcome for ${source.id}"
+            }
+            require(records.map { it.sourceShape }.distinct().size == 1) {
+                "Observation changed the selected polynomial input for ${source.id}"
             }
         }
     }
@@ -105,9 +142,18 @@ internal object PolynomialWitnessProbeProfile {
             )
         }
 
-        fun measure(text: String, observed: Boolean, chargeStacks: Boolean = false): ProbeRecord {
-            val source = parse.invoke(parser.getField("INSTANCE").get(null), text, Cancellation.Never, false, false)
-            val sourceFormula = formula.invoke(source)
+        fun measure(
+            text: String,
+            observed: Boolean,
+            chargeStacks: Boolean = false,
+            sourceMode: String = "direct",
+            coupledChargesOnly: Boolean = false,
+        ): ProbeRecord {
+            val input = input(text, sourceMode)
+            val sourceFormula = input.formula ?: return ProbeRecord(
+                0, observed, "NotPolynomialSource", "selected route: " + input.shape.route,
+                0, emptyList(), emptyMap(), input.shape,
+            )
             val fixed = fixings.invoke(null, sourceFormula, {})
             val stops = ArrayList<ProbeStop>()
             var owner: Any? = null
@@ -115,7 +161,9 @@ internal object PolynomialWitnessProbeProfile {
             val charges = LinkedHashMap<String, Long>()
             val meter = if (observed && chargeStacks) {
                 WorkMeter { units ->
-                val frames = Thread.currentThread().stackTrace.filter {
+                val current = owner
+                val outside = coupledChargesOnly && (current == null || coupledEnd.get(current) == null)
+                val frames = if (outside) "outside coupled scope" else Thread.currentThread().stackTrace.filter {
                     it.className.startsWith("com.eignex.klause.") &&
                         !it.className.startsWith("com.eignex.klause.bench.") &&
                         !it.className.startsWith("com.eignex.klause.util.") &&
@@ -146,8 +194,8 @@ internal object PolynomialWitnessProbeProfile {
             )
             val preparedQuery = query.newInstance(
                 sourceFormula,
-                boolCount.invoke(source),
-                realCount.invoke(source),
+                checkNotNull(input.shape.boolCount),
+                checkNotNull(input.shape.realCount),
                 settings,
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed),
             )
@@ -164,11 +212,41 @@ internal object PolynomialWitnessProbeProfile {
                 snapshot.toString(),
                 nativeWork,
                 stops.toList(),
-                charges.toMap(),
+                if (coupledChargesOnly) charges.toList().sortedByDescending { it.second }.toMap()
+                else charges.toMap(),
+                input.shape,
             )
+        }
+
+        private fun input(text: String, mode: String): ProbeInput {
+            require(mode in setOf("direct", "shared"))
+            if (mode == "direct") {
+                val source = parse.invoke(parser.getField("INSTANCE").get(null), text,
+                    Cancellation.Never, false, false)
+                return ProbeInput(formula.invoke(source) as PolynomialRealFormula,
+                    ProbeShape(mode, source.javaClass.simpleName, "direct-query",
+                        realCount.invoke(source) as Int, boolCount.invoke(source) as Int))
+            }
+            val source = SmtLib.parse(text)
+            val invocation = SourceSetup.prepare(SourceSetupRequest(source.source,
+                ExecutionOperation.SATISFY, FiniteEngine.MIXED))
+            val polynomial = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
+            val type = PolynomialRealProblem::class.java
+            fun field(name: String): Any? = polynomial?.let {
+                type.getDeclaredField(name).apply { isAccessible = true }.get(it)
+            }
+            return ProbeInput(field("formula") as? PolynomialRealFormula,
+                ProbeShape(mode, source.source.originalSource.javaClass.simpleName,
+                    invocation.route.javaClass.simpleName, field("totalRealCount") as? Int,
+                    field("totalBoolCount") as? Int))
         }
     }
 }
+
+private class ProbeInput(val formula: PolynomialRealFormula?, val shape: ProbeShape)
+
+@Serializable
+private data class ProbeCatalogSource(val suite: String, val problem: String, val sha256: String)
 
 @Serializable
 private data class ProbeSource(val id: String, val base64: String, val sha256: String)
@@ -182,6 +260,16 @@ internal data class ProbeRecord(
     val nativeWork: Long,
     val stops: List<ProbeStop>,
     val charges: Map<String, Long>,
+    val sourceShape: ProbeShape? = null,
+)
+
+@Serializable
+internal data class ProbeShape(
+    val mode: String,
+    val representation: String,
+    val route: String,
+    val realCount: Int?,
+    val boolCount: Int?,
 )
 
 @Serializable

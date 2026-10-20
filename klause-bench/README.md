@@ -1312,10 +1312,13 @@ source refutation, independent witness acceptance or optimization claim.
 ### Polynomial witness work checkpoints
 
 `com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
-root witness producer before CAD. Its single `request64=<base64>` argument encodes
+root witness producer before CAD. Its `request64=<base64>` argument encodes
 up to eight `{id, base64, sha256}` original SMT sources. The decoded request is bounded
-to 48 KiB and each unchanged source to 32 KiB. Run it through an AWS lab profile at
-a pinned revision. The output retains original bytes, request, installed provenance
+to 48 KiB and each unchanged source to 32 KiB. Alternatively, `catalog64=<base64>`
+encodes up to eighteen `{suite, problem, sha256}` catalog identities and verifies
+each complete original source up to 1 MiB before parsing. Submit the pinned revision
+through the lab without host or machine placement overrides.
+The output retains original bytes, request, installed provenance
 and revision, including installed harness hashes and actual JVM options/core count,
 plus alternating plain/observed producer records.
 
@@ -1324,6 +1327,9 @@ the stack and cumulative charge at the existing coupled-work stop checkpoint wit
 returning cancellation or adding native charges. An observing caller meter also groups
 every existing native charge by its engine stack; the attributed sum must match the
 native snapshot. Stack collection adds diagnostic overhead, not native allowance.
+Optional `charges=coupled` collects charge stacks only inside the existing coupled
+scope and records all remaining native work in an outside-scope bucket. The producer
+sorts these charge totals; their sum must still equal the entire native snapshot.
 Both modes use the same source,
 fixings, default representation caps and a 60-second containing deadline. Two query
 checkpoints run normalization and bounded probing; no projection or lifting follows.
@@ -1331,6 +1337,16 @@ All four native snapshots and outcome classes must agree. A pending producer sup
 no verdict; a component witness still needs ordinary pipeline admission and independent
 original-source checking. Instrumented component timings establish no default-route
 performance gain. Field/method incompatibility fails the diagnostic explicitly.
+
+Default `source=direct` admits the neutral polynomial source directly. Optional
+`source=shared` uses ordinary SMT admission and shared setup, then captures the
+selected polynomial formula and its complete real and Boolean counts. The record
+retains its source representation and selected route; a linear control supplies
+`NotPolynomialSource` with no polynomial verdict or native charges. The captured
+query is unconditioned apart from its required real fixings: it does not replay
+finite-worker Boolean pins, CP state, the CLI driver or portfolio scheduling. All
+four runs must retain the same selected input shape as well as native outcome and
+work. These component observations do not replace whole-CLI comparisons.
 
 `com.eignex.klause.bench.profile.PolynomialPhaseProfile` follows a direct polynomial
 query through its containing stop. Its `request64=<base64>` argument encodes up to
