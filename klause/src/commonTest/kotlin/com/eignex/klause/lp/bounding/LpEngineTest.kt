@@ -68,7 +68,7 @@ class LpEngineTest {
         val point = supplied.single()
         assertEquals(5, point.size)
         assertEquals(BigFraction.ZERO, point[0])
-        assertEquals(BigFraction.ONE / BigFraction.ofLong(2), point[3])
+        assertEquals(BigFraction.ofLong(2).reciprocal(), point[3])
         assertEquals(BigFraction.ofLong(8), point[4])
         assertEquals(IntDomain(0, 1), session.intDomain(0))
         assertNull(session.boolValue(0))

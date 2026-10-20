@@ -28,7 +28,7 @@ class RealPointHintsTest {
                 listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.GE, BigFraction.ZERO, activator = 1),
         ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-        val point = listOf(BigFraction.MINUS_ONE, BigFraction.ofLong(1) / BigFraction.ofLong(2))
+        val point = listOf(BigFraction.MINUS_ONE, BigFraction.ofLong(2).reciprocal())
 
         val hints = realPointHints(source, point, { null }, Cancellation.Never)
 
