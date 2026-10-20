@@ -21,6 +21,7 @@ internal class JvmSourceCompilerReport(
     private var records = 0L
     private var expanded = 0L
     private var definitions = 0L
+    private var methodDefinitions = 0L
     private var ended = false
 
     init {
@@ -28,7 +29,7 @@ internal class JvmSourceCompilerReport(
         output.write(
             buildJsonObject {
                 put("record", "schema")
-                put("encoding", "source-compiler-links-v2")
+                put("encoding", "source-compiler-links-v3")
                 put("originalInputCatalogEntryCopiedVerbatim", input)
                 put("originalReportMember", member)
                 put("originalReportProofCopiedVerbatim", originalProof)
@@ -55,7 +56,7 @@ internal class JvmSourceCompilerReport(
                 put("originalRawRecordOrdinal", records++)
                 put("originalRawRecordIdentity", JvmSavedReports.identity(raw))
                 put("originalExpandedRecordOrdinal", if (row.value == null) JsonNull else JsonPrimitive(expanded++))
-                put("sourceAuditLinkReferences", links)
+                put("sourceAuditMethodReferences", links)
             },
         )
     }
@@ -69,6 +70,7 @@ internal class JvmSourceCompilerReport(
                 put("originalRawRecords", records)
                 put("originalExpandedRecords", expanded)
                 put("sourceLinkDefinitions", definitions)
+                put("methodLinkDefinitions", methodDefinitions)
             },
         )
         ended = true
@@ -93,19 +95,26 @@ internal class JvmSourceCompilerReport(
             )
         })
 
-    fun projectCandidates(observed: JsonElement, parsed: JsonElement, candidates: List<JsonObject>): JsonObject =
-        buildJsonObject {
-            put("observedMethodCopiedVerbatim", observed)
-            put("methodIdentityParsed", parsed)
-            put("allOriginalDeclarationCandidateSourceAuditLinkReferences", JsonArray(candidates.map { candidate ->
-                JsonPrimitive(index.linkReference(binding, observed, candidate) { reference, link ->
-                    output.write(buildJsonObject {
-                        put("record", "source-audit-link-definition")
-                        put("reference", reference)
-                        put("wholeSourceAuditLink", link)
-                    })
-                    definitions++
+    fun projectCandidates(observed: JsonElement, parsed: JsonElement, candidates: List<JsonObject>): JsonPrimitive {
+        val references = JsonArray(candidates.map { candidate ->
+            JsonPrimitive(index.linkReference(binding, observed, candidate) { reference, link ->
+                output.write(buildJsonObject {
+                    put("record", "source-audit-link-definition")
+                    put("reference", reference)
+                    put("wholeSourceAuditLink", link)
                 })
-            }))
-        }
+                definitions++
+            })
+        })
+        return JsonPrimitive(index.methodReference(binding, observed, parsed, references) { reference ->
+            output.write(buildJsonObject {
+                put("record", "source-audit-method-definition")
+                put("reference", reference)
+                put("observedMethodCopiedVerbatim", observed)
+                put("methodIdentityParsed", parsed)
+                put("allOriginalDeclarationCandidateSourceAuditLinkReferences", references)
+            })
+            methodDefinitions++
+        })
+    }
 }

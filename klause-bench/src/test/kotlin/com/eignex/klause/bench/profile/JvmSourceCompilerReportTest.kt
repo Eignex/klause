@@ -86,9 +86,10 @@ class JvmSourceCompilerReportTest {
                 put("methodCount", 3)
             })
             add(observation)
+            add(observation)
             if (!legacy) add(buildJsonObject {
                 put("record", "candidate-report-end")
-                put("recordsBeforeEnd", 5)
+                put("recordsBeforeEnd", 6)
                 put("bindingReferences", 1)
                 put("candidateContexts", 1)
             })
@@ -110,11 +111,12 @@ class JvmSourceCompilerReportTest {
                 val file = File(out, "links-$direct.jsonl.gz")
                 val output = JvmSavedReport(file, JvmSavedReportBudget())
                 val writer = JvmSourceCompilerReport(index, "binding", input, "candidates.gz", proof, output)
+                val project: JvmCandidateProjection = writer::projectCandidates
                 JvmCompilerCandidates(File(out, "candidates-$direct.sqlite")).use { codec ->
                     rows.forEachIndexed { ordinal, row ->
                         val raw = (row.toString() + "\n").encodeToByteArray()
                         if (direct) {
-                            writer.accept(ordinal.toLong(), raw, codec.acceptForLinks(row, writer::projectCandidates))
+                            writer.accept(ordinal.toLong(), raw, codec.acceptForLinks(row, project))
                         } else {
                             writer.accept(ordinal.toLong(), raw, codec.accept(row))
                         }
@@ -192,6 +194,7 @@ class JvmSourceCompilerReportTest {
                     reader.readLines().map { JvmSavedJson.parse(it).jsonObject }
                 }
                 assertEquals(input, actual.first()["originalInputCatalogEntryCopiedVerbatim"])
+                assertEquals(JsonPrimitive("source-compiler-links-v3"), actual.first()["encoding"])
                 assertEquals(proof, actual.first()["originalReportProofCopiedVerbatim"])
                 val denied = actual.first().getValue("deniedProofFlags").jsonObject
                 (SOURCE_PROOF_FLAGS + COHORT_PROOF_FLAGS).forEach {
@@ -210,15 +213,80 @@ class JvmSourceCompilerReportTest {
                     it.getValue("wholeSourceAuditLink").jsonObject["originalDeclarationCandidateCopiedVerbatim"]
                 })
                 val references = originals.slice(2..4).map {
-                    it.getValue("sourceAuditLinkReferences").jsonObject.getValue("method").jsonObject
-                        .getValue("allOriginalDeclarationCandidateSourceAuditLinkReferences").jsonArray
+                    it.getValue("sourceAuditMethodReferences").jsonObject.getValue("method")
                 }
-                assertEquals(listOf(0, 0, 1).map { JsonArray(listOf(JsonPrimitive(it))) }, references)
+                assertEquals(listOf(0, 0, 1).map { JsonPrimitive(it) }, references)
+                val methods = actual.filter { it["record"] == JsonPrimitive("source-audit-method-definition") }
+                assertEquals(listOf(JsonPrimitive(0), JsonPrimitive(1)), methods.map { it["reference"] })
+                assertEquals(listOf(0, 1).map { JsonArray(listOf(JsonPrimitive(it))) }, methods.map {
+                    it.getValue("allOriginalDeclarationCandidateSourceAuditLinkReferences")
+                })
                 assertEquals(JsonPrimitive(6), actual.last()["originalRawRecords"])
                 assertEquals(JsonPrimitive(4), actual.last()["originalExpandedRecords"])
                 assertEquals(JsonPrimitive(2), actual.last()["sourceLinkDefinitions"])
+                assertEquals(JsonPrimitive(2), actual.last()["methodLinkDefinitions"])
             }
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["reversed", "duplicate"])
+    fun `shared method definitions retain candidate order and repetitions`(variant: String, @TempDir out: File) {
+        val origin = buildJsonObject { put("entry", "Cold.class") }
+        val audit = JvmSavedJson.parse(
+            """{
+                "record":"class-audit","originalSyntaxClassOrdinal":0,"internalName":"sample/Cold",
+                "originalClassOrigin":{"entry":"Cold.class"},"originalMethodIndexOrder":[0],
+                "noFormalAlternativeMethodIndexes":[0],"allOriginalMethodFormalChecks":[]
+            }""",
+        ).jsonObject
+        val second = if (variant == "reversed") listOf(false, true) else listOf(true, true, false)
+        val sequences = listOf(listOf(true, false), second)
+        val rows = sequences.map { sequence ->
+            buildJsonObject {
+                put("record", "compiler-observation-candidates")
+                put("methodCandidates", buildJsonObject {
+                    put("method", buildJsonObject {
+                        put("observedMethodCopiedVerbatim", "sample.Cold.pick(I)V")
+                        put("methodIdentityParsed", true)
+                        put("declarationCandidates", JsonArray(sequence.map { unknown ->
+                            buildJsonObject {
+                                put("studySourceHead", "head")
+                                put("syntaxClassOrdinal", 0)
+                                put("methodIndex", 0)
+                                put("originalSyntaxOrigin", origin)
+                                put("unknown", unknown)
+                            }
+                        }))
+                    })
+                })
+            }
+        }
+        val file = File(out, "links.jsonl.gz")
+
+        JvmSourceCompilerIndex(File(out, "index.sqlite")).use { index ->
+            index.add("binding", "head", "audit.gz", 2, audit, JsonObject(emptyMap()))
+            index.finish()
+            val output = JvmSavedReport(file, JvmSavedReportBudget())
+            val writer = JvmSourceCompilerReport(
+                index, "binding", JsonObject(emptyMap()), "candidates.gz",
+                buildJsonObject { put("records", rows.size) }, output,
+            )
+            rows.forEachIndexed { ordinal, row ->
+                writer.accept(ordinal.toLong(), (row.toString() + "\n").encodeToByteArray(), row)
+            }
+            writer.finish()
+            output.verify()
+        }
+
+        val actual = GZIPInputStream(file.inputStream()).bufferedReader().use { reader ->
+            reader.readLines().map { JvmSavedJson.parse(it).jsonObject }
+        }
+        val methods = actual.filter { it["record"] == JsonPrimitive("source-audit-method-definition") }
+        val expected = sequences.map { sequence -> JsonArray(sequence.map { JsonPrimitive(if (it) 0 else 1) }) }
+        assertEquals(expected, methods.map { it["allOriginalDeclarationCandidateSourceAuditLinkReferences"] })
+        assertEquals(JsonPrimitive(2), actual.last()["sourceLinkDefinitions"])
+        assertEquals(JsonPrimitive(2), actual.last()["methodLinkDefinitions"])
     }
 
     @ParameterizedTest

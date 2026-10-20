@@ -1505,15 +1505,18 @@ inputs require every context reference, original binding order, proof default an
 final census; version 2 inputs retain their original values. Missing formal
 alternatives and unavailable method order remain distinct uncredited dispositions.
 
-Output encoding `source-compiler-links-v2` binds each report to its complete input
+Output encoding `source-compiler-links-v3` binds each report to its complete input
 catalog entry, original member and authenticated report proof. Every raw input row,
 including context definitions and the original end record, retains its ordered
 ordinal and exact byte identity. Its complete fields and unknown values remain in
-that whole authenticated input. Compiler observations refer to complete source
-audit link definitions, emitted once for each distinct candidate and observed
-method. Definitions and references belong to one output report; each report
-starts its own reference universe. The schema supplies false proof defaults for
-every record, and a required end record covers all original rows and definitions.
+that whole authenticated input. Compiler observations refer to complete method
+definitions. Each method definition retains its observed identity, parse
+disposition and ordered source-audit link references, including repetitions.
+Source-audit links are emitted once for each distinct candidate and observed
+method. Both definition kinds and their references belong to one report; each
+report starts fresh reference universes. The schema supplies false proof defaults
+for every record, and the required end record covers all original rows and both
+definition counts.
 Whole source audit references retain every formal alternative. Repeated
 observations share those references while retaining their original order.
 
@@ -1526,11 +1529,13 @@ staging after child termination and preserves sources, provenance, process statu
 stdout/stderr and output. All output reports share the 4 GiB logical/512 MiB
 compressed allowance and require a complete byte-count/SHA-256 gzip round trip.
 Three lookup caches each admit at most 4,096 entries and 16 MiB of serialized
-payload weights. They retain immutable decoded contexts, method candidates and
-validated source link references. Oversized and evicted values remain available
-from the complete disk indexes; every reference still checks its original order
-and method bounds. Each report owns a fresh candidate cache and source link
-reference universe.
+payload weights. They retain immutable decoded contexts, candidate or direct
+projection values, and validated source link references. Candidates and direct
+projections share one cache allowance. Projection keys retain the observed value,
+original reference set and owning projection identity. Oversized and evicted values
+are rebuilt from complete input references and disk indexes. Every reference still
+checks its original order and method bounds, including on projection cache hits. Each report owns fresh
+lookup state and both definition universes within the same bounded disk index.
 
 Normalized observations pass validated candidates directly to the link writer.
 This path avoids constructing expanded proof-default JSON; the complete raw input

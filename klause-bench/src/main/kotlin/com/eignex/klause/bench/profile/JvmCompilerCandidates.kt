@@ -10,8 +10,9 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.io.File
+import java.sql.Connection
 
-internal typealias JvmCandidateProjection = (JsonElement, JsonElement, List<JsonObject>) -> JsonObject
+internal typealias JvmCandidateProjection = (JsonElement, JsonElement, List<JsonObject>) -> JsonElement
 
 internal data class JvmCandidateRecord(val value: JsonObject?, val sourceLinksProjected: Boolean)
 
@@ -30,12 +31,24 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
     private val insertContext = db.prepareStatement(
         "INSERT INTO contexts(record,reference,method_count) VALUES (?,?,?)",
     )
-    private val findContext = db.prepareStatement("SELECT reference,method_count FROM contexts WHERE record=?")
-    private val markUsed = db.prepareStatement("UPDATE contexts SET used=1 WHERE record=?")
-    private data class Context(val reference: JsonObject, val methodCount: Long)
+    private sealed interface ReferenceKey
+    private data class CandidateKey(val record: Long, val position: Long) : ReferenceKey
 
-    private val contextCache = JvmSavedReferenceCache<Long, Context>()
-    private val candidateCache = JvmSavedReferenceCache<Pair<Long, Long>, JsonObject>()
+    // A projection owns one report's definition universe.
+    private class ProjectionKey(
+        val observed: JsonElement,
+        val references: JsonArray,
+        val project: JvmCandidateProjection,
+    ) : ReferenceKey {
+        override fun equals(other: Any?): Boolean = other is ProjectionKey &&
+            project === other.project && observed == other.observed && references == other.references
+
+        override fun hashCode(): Int =
+            31 * (31 * observed.hashCode() + references.hashCode()) + System.identityHashCode(project)
+    }
+
+    private val contextLookup = CandidateContextLookup(db)
+    private val referenceCache = JvmSavedReferenceCache<ReferenceKey, JsonElement>()
     private var schemaSeen = false
     private var legacy = false
     private var bindingSchema = false
@@ -199,7 +212,7 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
         )
     }
 
-    private fun expand(value: JsonObject, project: JvmCandidateProjection?): JsonObject {
+    private fun expand(value: JsonObject, project: JvmCandidateProjection?): JsonElement {
         require(
             value.keys == setOf(
             "observedMethodCopiedVerbatim",
@@ -212,32 +225,28 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
         require(value["methodIdentityParsed"] == JsonPrimitive(parsed))
         val references = value.getValue("declarationCandidateReferences").jsonArray
         require(references.size <= 1_000_000 && (references.isEmpty() || parsed))
-        var previous: Pair<Long, Long>? = null
-        val candidates = references.map { raw ->
-            val pair = raw.jsonArray
-            require(pair.size == 2)
-            val record = savedInteger(pair[0])
-            val position = savedInteger(pair[1])
-            previous?.let { require(record > it.first || (record == it.first && position > it.second)) }
-            previous = record to position
-            val context = contextCache.getOrLoad(record) {
-                findContext.setLong(1, record)
-                val (text, count) = findContext.executeQuery().use {
-                    require(it.next()) { "Candidate context is unbound" }
-                    it.getString(1) to it.getLong(2)
+        contextLookup.validate(references)
+        if (project != null) {
+            return referenceCache.getOrLoad(ProjectionKey(observed, references, project)) {
+                val candidates = references.map { raw ->
+                    val pair = raw.jsonArray
+                    contextLookup.candidate(savedInteger(pair[0]), savedInteger(pair[1]))
                 }
-                val reference = JvmSavedJson.parse(text).jsonObject
-                markUsed.setLong(1, record)
-                markUsed.executeUpdate()
-                Context(reference, count) to text.encodeToByteArray().size.toLong()
-            }
-            require(position >= 0 && position < context.methodCount)
-            candidateCache.getOrLoad(record to position) {
-                val candidate = JsonObject(context.reference + ("methodIndex" to JsonPrimitive(position)))
-                candidate to candidate.toString().encodeToByteArray().size.toLong()
+                val result = project(observed, JsonPrimitive(parsed), candidates)
+                val weight = observed.toString().encodeToByteArray().size.toLong() +
+                    references.toString().encodeToByteArray().size + result.toString().encodeToByteArray().size
+                result to weight
             }
         }
-        if (project != null) return project(observed, JsonPrimitive(parsed), candidates)
+        val candidates = references.map { raw ->
+            val pair = raw.jsonArray
+            val record = savedInteger(pair[0])
+            val position = savedInteger(pair[1])
+            referenceCache.getOrLoad(CandidateKey(record, position)) {
+                val result = contextLookup.candidate(record, position)
+                result to result.toString().encodeToByteArray().size.toLong()
+            }.jsonObject
+        }
         return buildJsonObject {
             put("observedMethodCopiedVerbatim", observed)
             put("declarationCandidates", JsonArray(candidates))
@@ -253,8 +262,8 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
     private fun checkSize() = check(file.length() <= MAX_SAVED_INDEX_BYTES) { "Candidate index exceeds bounds" }
 
     override fun close() {
-        contextCache.clear()
-        candidateCache.clear()
+        contextLookup.clear()
+        referenceCache.clear()
         db.close()
     }
 
@@ -277,4 +286,42 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
             }
         }
     }
+}
+
+private class CandidateContextLookup(db: Connection) {
+    private data class Context(val reference: JsonObject, val methodCount: Long)
+
+    private val find = db.prepareStatement("SELECT reference,method_count FROM contexts WHERE record=?")
+    private val markUsed = db.prepareStatement("UPDATE contexts SET used=1 WHERE record=?")
+    private val cache = JvmSavedReferenceCache<Long, Context>()
+
+    fun validate(references: JsonArray) {
+        var previous: Pair<Long, Long>? = null
+        for (raw in references) {
+            val pair = raw.jsonArray
+            require(pair.size == 2)
+            val record = savedInteger(pair[0])
+            val position = savedInteger(pair[1])
+            previous?.let { require(record > it.first || (record == it.first && position > it.second)) }
+            previous = record to position
+            require(position >= 0 && position < context(record).methodCount)
+        }
+    }
+
+    fun candidate(record: Long, position: Long): JsonObject =
+        JsonObject(context(record).reference + ("methodIndex" to JsonPrimitive(position)))
+
+    private fun context(record: Long): Context = cache.getOrLoad(record) {
+        find.setLong(1, record)
+        val (text, count) = find.executeQuery().use {
+            require(it.next()) { "Candidate context is unbound" }
+            it.getString(1) to it.getLong(2)
+        }
+        val reference = JvmSavedJson.parse(text).jsonObject
+        markUsed.setLong(1, record)
+        markUsed.executeUpdate()
+        Context(reference, count) to text.encodeToByteArray().size.toLong()
+    }
+
+    fun clear() = cache.clear()
 }

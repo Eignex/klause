@@ -165,6 +165,140 @@ class JvmCompilerCandidatesTest {
     }
 
     @Test
+    fun `candidate and projection lookups preserve each owning projection`(@TempDir out: File) {
+        val reference = JvmSavedJson.parse(
+            """{
+                "bindingRecordOrdinal":1,"bytecodeClassOrdinal":0,"studySourceHead":"head",
+                "syntaxArchiveId":"syntax","syntaxClassOrdinal":0,"syntaxLineReportFile":"lines.gz",
+                "originalClassIdentity":{"unknown":[null,false]},"originalSyntaxOrigin":{"entry":"Cold.class"}
+            }""",
+        ).jsonObject
+        val context = JsonObject(reference + ("status" to JsonPrimitive("joined-candidates")))
+        val candidate = JvmSavedJson.parse(
+            """{"observedMethodCopiedVerbatim":"sample.Cold.pick(I)V",
+                "methodIdentityParsed":true,"declarationCandidateReferences":[[1,0]]}""",
+        ).jsonObject
+        val observation = buildJsonObject {
+            put("record", "compiler-observation-candidates")
+            put("collection", "compilations")
+            put("originalObservationCopiedVerbatim", buildJsonObject { put("method", "sample.Cold.pick(I)V") })
+            put("methodCandidates", buildJsonObject { put("method", candidate) })
+        }
+        var firstLoads = 0
+        var secondLoads = 0
+        val first: JvmCandidateProjection = { _, _, _ -> firstLoads++; JsonPrimitive(7) }
+        val second: JvmCandidateProjection = { _, _, _ -> secondLoads++; JsonPrimitive(11) }
+
+        val actual = JvmCompilerCandidates(File(out, "index.sqlite")).use { codec ->
+            codec.accept(buildJsonObject {
+                put("record", "schema")
+                put("encoding", "compiler-bytecode-candidates-v3")
+                put("bindingInputId", "binding")
+                put("censusInputId", "census")
+                put("deniedProofFlags", buildJsonObject { COHORT_PROOF_FLAGS.forEach { put(it, false) } })
+            })
+            codec.accept(buildJsonObject { put("record", "original-binding-schema") })
+            codec.accept(buildJsonObject {
+                put("record", "original-binding-reference")
+                put("originalRecordOrdinal", 1)
+                put("originalClassContext", context)
+            })
+            codec.accept(buildJsonObject {
+                put("record", "declaration-candidate-context")
+                put("bindingRecordOrdinal", 1)
+                put("reference", reference)
+                put("methodCount", 1)
+            })
+            val projected = codec.acceptForLinks(observation, first)
+            val expanded = requireNotNull(codec.accept(observation))
+            val repeated = codec.acceptForLinks(observation, first)
+            val other = codec.acceptForLinks(observation, second)
+            codec.accept(buildJsonObject {
+                put("record", "candidate-report-end")
+                put("recordsBeforeEnd", 8)
+                put("bindingReferences", 1)
+                put("candidateContexts", 1)
+            })
+            codec.finish()
+            val expected = JsonArray(listOf(JsonObject(reference + ("methodIndex" to JsonPrimitive(0)))))
+            assertEquals(expected, expanded.getValue("methodCandidates").jsonObject
+                .getValue("method").jsonObject["declarationCandidates"])
+            listOf(projected, repeated, other).map {
+                requireNotNull(it.value).getValue("methodCandidates").jsonObject["method"]
+            }
+        }
+
+        assertEquals(listOf(JsonPrimitive(7), JsonPrimitive(7), JsonPrimitive(11)), actual)
+        assertEquals(1, firstLoads)
+        assertEquals(1, secondLoads)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["parsed", "order", "bounds", "observation", "proof"])
+    fun `a cached projection cannot admit altered observation or reference validation`(
+        variant: String,
+        @TempDir out: File,
+    ) {
+        val reference = JvmSavedJson.parse(
+            """{
+                "bindingRecordOrdinal":1,"bytecodeClassOrdinal":0,"studySourceHead":"head",
+                "syntaxArchiveId":"syntax","syntaxClassOrdinal":0,"syntaxLineReportFile":"lines.gz",
+                "originalClassIdentity":{"unknown":[null,false]},"originalSyntaxOrigin":{"entry":"Cold.class"}
+            }""",
+        ).jsonObject
+        val context = JsonObject(reference + ("status" to JsonPrimitive("joined-candidates")))
+        val candidate = JvmSavedJson.parse(
+            """{"observedMethodCopiedVerbatim":"sample.Cold.pick(I)V",
+                "methodIdentityParsed":true,"declarationCandidateReferences":[[1,0]]}""",
+        ).jsonObject
+        val observation = buildJsonObject {
+            put("record", "compiler-observation-candidates")
+            put("collection", "compilations")
+            put("originalObservationCopiedVerbatim", buildJsonObject { put("method", "sample.Cold.pick(I)V") })
+            put("methodCandidates", buildJsonObject { put("method", candidate) })
+        }
+        val changedCandidate = when (variant) {
+            "parsed" -> JsonObject(candidate + ("methodIdentityParsed" to JsonPrimitive(false)))
+            "order", "bounds" -> JsonObject(candidate + ("declarationCandidateReferences" to
+                JvmSavedJson.parse(if (variant == "order") "[[1,0],[1,0]]" else "[[1,1]]")))
+            else -> candidate
+        }
+        val changedMethod = buildJsonObject { put("method", changedCandidate) }
+        val otherObservation = buildJsonObject { put("method", "sample.Cold.other(I)V") }
+        val changed = when (variant) {
+            "observation" -> JsonObject(observation + ("originalObservationCopiedVerbatim" to otherObservation))
+            "proof" -> JsonObject(observation + (COHORT_PROOF_FLAGS.first() to JsonPrimitive(true)))
+            else -> JsonObject(observation + ("methodCandidates" to changedMethod))
+        }
+        val project: JvmCandidateProjection = { _, _, _ -> JsonPrimitive(7) }
+
+        JvmCompilerCandidates(File(out, "index.sqlite")).use { codec ->
+            codec.accept(buildJsonObject {
+                put("record", "schema")
+                put("encoding", "compiler-bytecode-candidates-v3")
+                put("bindingInputId", "binding")
+                put("censusInputId", "census")
+                put("deniedProofFlags", buildJsonObject { COHORT_PROOF_FLAGS.forEach { put(it, false) } })
+            })
+            codec.accept(buildJsonObject { put("record", "original-binding-schema") })
+            codec.accept(buildJsonObject {
+                put("record", "original-binding-reference")
+                put("originalRecordOrdinal", 1)
+                put("originalClassContext", context)
+            })
+            codec.accept(buildJsonObject {
+                put("record", "declaration-candidate-context")
+                put("bindingRecordOrdinal", 1)
+                put("reference", reference)
+                put("methodCount", 1)
+            })
+            codec.acceptForLinks(observation, project)
+
+            assertFailsWith<IllegalArgumentException> { codec.acceptForLinks(changed, project) }
+        }
+    }
+
+    @Test
     fun `legacy candidate records preserve unknown and cold alternatives`(@TempDir out: File) {
         val row = JvmSavedJson.parse("""{"record":"unknown-legacy","cold":[null,false,{},[]]}""").jsonObject
 

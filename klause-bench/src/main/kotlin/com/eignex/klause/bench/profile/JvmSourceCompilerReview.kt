@@ -229,7 +229,7 @@ internal object JvmSourceCompilerReview {
             return buildJsonObject {
                 put("completed", true)
                 put("reports", JsonArray(proofs))
-                put("reportEncoding", "source-compiler-links-v2")
+                put("reportEncoding", "source-compiler-links-v3")
                 put("allOriginalRawRecordReferencesRetainedInOriginalOrder", true)
                 put("allOriginalFieldsRetainedByAuthenticatedWholeInputReferences", true)
                 put("inputArchiveProofs", JsonArray(inputs.proofs))

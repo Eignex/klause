@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -27,6 +28,10 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
                 "CREATE TABLE links(binding TEXT, observed TEXT, candidate TEXT, reference INTEGER, " +
                     "PRIMARY KEY(binding,observed,candidate))",
             )
+            statement.execute(
+                "CREATE TABLE method_links(binding TEXT, observed TEXT, parsed TEXT, candidates TEXT, " +
+                    "reference INTEGER, PRIMARY KEY(binding,observed,parsed,candidates))",
+            )
         }
     }
     private val insertClass = db.prepareStatement("INSERT INTO classes VALUES (?,?,?,?)")
@@ -39,10 +44,15 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
         "SELECT reference FROM links WHERE binding=? AND observed=? AND candidate=?",
     )
     private val insertLink = db.prepareStatement("INSERT INTO links VALUES (?,?,?,?)")
+    private val findMethodLink = db.prepareStatement(
+        "SELECT reference FROM method_links WHERE binding=? AND observed=? AND parsed=? AND candidates=?",
+    )
+    private val insertMethodLink = db.prepareStatement("INSERT INTO method_links VALUES (?,?,?,?,?)")
     private val linkCache = JvmSavedReferenceCache<LinkKey, Long>()
     private var linkReferences = 0L
+    private var methodReferences = 0L
 
-    // Decoder candidates are immutable and shared by their validated context/method pair.
+    // Identity avoids hashing full candidate bodies; misses use the complete serialized tuple.
     private class LinkKey(val binding: String, val observed: JsonElement, val candidate: JsonObject) {
         override fun equals(other: Any?): Boolean {
             if (other !is LinkKey) return false
@@ -55,8 +65,32 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
 
     fun beginLinkReport() {
         linkCache.clear()
-        db.createStatement().use { it.executeUpdate("DELETE FROM links") }
+        db.createStatement().use {
+            it.executeUpdate("DELETE FROM links")
+            it.executeUpdate("DELETE FROM method_links")
+        }
         linkReferences = 0L
+        methodReferences = 0L
+    }
+
+    fun methodReference(
+        binding: String,
+        observed: JsonElement,
+        parsed: JsonElement,
+        candidates: JsonArray,
+        define: (Long) -> Unit,
+    ): Long {
+        val fields = listOf(binding, observed.toString(), parsed.toString(), candidates.toString())
+        fields.forEachIndexed { index, text -> findMethodLink.setString(index + 1, text) }
+        val existing = findMethodLink.executeQuery().use { if (it.next()) it.getLong(1) else null }
+        if (existing != null) return existing
+        val reference = methodReferences++
+        fields.forEachIndexed { index, text -> insertMethodLink.setString(index + 1, text) }
+        insertMethodLink.setLong(5, reference)
+        insertMethodLink.executeUpdate()
+        checkSize()
+        define(reference)
+        return reference
     }
 
     fun linkReference(
