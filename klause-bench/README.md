@@ -1500,13 +1500,22 @@ archive and 512 MiB per member. Logical reports admit 4 GiB each and 128 MiB per
 record. No successful prefix can replace a complete report, gzip identity or census.
 
 Every original compiler/XML declaration candidate links to its whole source class
-audit and, where present, the ordered formal-method check. The compact original
-candidate record, ordinal and byte identity remain in the output. Version 3
-candidate reports require every context reference, original binding order, proof
-default and final census; version 2 records retain their original values. Missing
-formal alternatives and unavailable method order remain distinct uncredited
-dispositions. A whole audit reference retains the complete formal alternatives
-without duplicating those bodies in every observation.
+audit and, where present, the ordered formal-method check. Version 3 candidate
+inputs require every context reference, original binding order, proof default and
+final census; version 2 inputs retain their original values. Missing formal
+alternatives and unavailable method order remain distinct uncredited dispositions.
+
+Output encoding `source-compiler-links-v2` binds each report to its complete input
+catalog entry, original member and authenticated report proof. Every raw input row,
+including context definitions and the original end record, retains its ordered
+ordinal and exact byte identity. Its complete fields and unknown values remain in
+that whole authenticated input. Compiler observations refer to complete source
+audit link definitions, emitted once for each distinct candidate and observed
+method. Definitions and references belong to one output report; each report
+starts its own reference universe. The schema supplies false proof defaults for
+every record, and a required end record covers all original rows and definitions.
+Whole source audit references retain every formal alternative. Repeated
+observations share those references while retaining their original order.
 
 The unpublished benchmark module uses
 [Apache Commons Compress](https://commons.apache.org/proper/commons-compress/)

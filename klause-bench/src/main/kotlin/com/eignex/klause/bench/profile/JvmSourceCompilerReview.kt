@@ -1,8 +1,6 @@
 package com.eignex.klause.bench.profile
 
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -181,37 +179,24 @@ internal object JvmSourceCompilerReview {
                         budget,
                     )
                     reports.add(report)
-                    var expandedOrdinal = 0L
+                    val originalProof = reportProof(producer, reportMember)
+                    val writer = JvmSourceCompilerReport(index, binding, item, reportMember, originalProof, report)
                     val candidateIndex = File(scratch, "candidate-contexts-%03d.sqlite".format(Locale.ROOT, arm))
                     JvmCompilerCandidates(candidateIndex).use { codec ->
-                        JvmSavedReports.read(cohortPaths.getValue(reportMember), reportProof(producer, reportMember)) {
-                                ordinal,
-                                raw,
-                            ->
+                        JvmSavedReports.read(cohortPaths.getValue(reportMember), originalProof) { ordinal, raw ->
                             val originalRow = JvmSavedJson.parse(raw.decodeToString(throwOnInvalidSequence = true))
                                 .jsonObject
                             val row = codec.accept(originalRow)
-                            if (row != null) {
-                                if (expandedOrdinal == 0L) {
-                                    require(
-                                        row["bindingInputId"] == JsonPrimitive(binding) &&
-                                            row["censusInputId"] == JsonPrimitive(census),
-                                    )
-                                }
-                                report.write(
-                                    buildJsonObject {
-                                    put("record", "original-compiler-source-link")
-                                    put("originalExpandedRecordOrdinal", expandedOrdinal++)
-                                    put("originalRawRecordOrdinal", ordinal)
-                                    put("originalRawRecordIdentity", JvmSavedReports.identity(raw))
-                                    put("originalCandidateRecordCopiedVerbatim", originalRow)
-                                    put("sourceAuditLinks", linkedMethods(index, binding, row))
-                                    PROOF_FLAGS.forEach { put(it, false) }
-                                }
+                            if (ordinal == 0L) {
+                                require(
+                                    row != null && row["bindingInputId"] == JsonPrimitive(binding) &&
+                                        row["censusInputId"] == JsonPrimitive(census),
                                 )
                             }
+                            writer.accept(ordinal, raw, row)
                         }
                         codec.finish()
+                        writer.finish()
                     }
                     check(candidateIndex.delete()) { "Cannot remove closed candidate index" }
                 }
@@ -221,6 +206,9 @@ internal object JvmSourceCompilerReview {
             return buildJsonObject {
                 put("completed", true)
                 put("reports", JsonArray(proofs))
+                put("reportEncoding", "source-compiler-links-v2")
+                put("allOriginalRawRecordReferencesRetainedInOriginalOrder", true)
+                put("allOriginalFieldsRetainedByAuthenticatedWholeInputReferences", true)
                 put("inputArchiveProofs", JsonArray(inputs.proofs))
                 put("wholeOriginalTargetNames", catalog.getValue("targetNames"))
                 put("sourceContextAudits", completion.getValue("sourceContextAudits"))
@@ -230,7 +218,9 @@ internal object JvmSourceCompilerReview {
                 put(
                     "scope",
                     "Complete saved compiler declaration candidates linked to whole source/debug/formal " +
-                        "audit records. Every alternative, unmatched declaration and opaque input is retained. " +
+                        "audit records by shared references. Every original record, alternative, " +
+                        "unmatched declaration " +
+                        "and opaque field is retained by authenticated whole input references. " +
                         "No observation selects source scope or proves semantic phases, loaded/generated selection, " +
                         "physical roots, compiler cost, runtime controls or savings.",
                 )
@@ -308,35 +298,6 @@ internal object JvmSourceCompilerReview {
             }
         }
         index.finish()
-    }
-
-    private fun linkedMethods(index: JvmSourceCompilerIndex, binding: String, row: JsonObject): JsonElement {
-        val methods = when (row["record"]) {
-            JsonPrimitive("compiler-observation-candidates") -> row.getValue("methodCandidates").jsonObject
-
-            JsonPrimitive("xml-observation-candidates") -> buildJsonObject {
-                put("method", row.getValue("methodCandidates"))
-            }
-
-            else -> return JsonNull
-        }
-        return JsonObject(
-            methods.mapValues { (_, raw) ->
-            val value = raw.jsonObject
-            buildJsonObject {
-                put("observedMethodCopiedVerbatim", value.getValue("observedMethodCopiedVerbatim"))
-                put("methodIdentityParsed", value.getValue("methodIdentityParsed"))
-                put(
-                    "allOriginalDeclarationCandidateSourceAuditLinks",
-                    JsonArray(
-                    value.getValue("declarationCandidates").jsonArray.map {
-                        index.link(binding, value.getValue("observedMethodCopiedVerbatim"), it.jsonObject)
-                    },
-                )
-                )
-            }
-        }
-        )
     }
 
     private fun memberNamed(item: JsonObject, name: String): String =

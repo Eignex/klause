@@ -21,7 +21,8 @@ internal object JvmSourceCompilerLinks {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
             for (name in listOf(
                 "JvmSourceCompilerLinks", "JvmSourceCompilerReview", "JvmSourceCompilerIndex",
-                "JvmCompilerCandidates", "JvmSavedJson", "JvmSavedInputs", "JvmSavedReports", "ProfileRunBudget",
+                "JvmSourceCompilerReport", "JvmCompilerCandidates", "JvmSavedJson", "JvmSavedInputs", "JvmSavedReports",
+                "ProfileRunBudget",
                 "ProfileCaptureArchive",
             )) {
                 File(root, "klause-bench/src/main/kotlin/com/eignex/klause/bench/profile/$name.kt")

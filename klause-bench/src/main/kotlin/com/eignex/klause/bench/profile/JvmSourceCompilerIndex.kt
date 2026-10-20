@@ -23,6 +23,10 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
                 "CREATE TABLE methods(binding TEXT, head TEXT, ordinal INTEGER, method INTEGER, " +
                     "position INTEGER, name TEXT, descriptor TEXT, PRIMARY KEY(binding,head,ordinal,method))",
             )
+            statement.execute(
+                "CREATE TABLE links(binding TEXT, observed TEXT, candidate TEXT, reference INTEGER, " +
+                    "PRIMARY KEY(binding,observed,candidate))",
+            )
         }
     }
     private val insertClass = db.prepareStatement("INSERT INTO classes VALUES (?,?,?,?)")
@@ -31,6 +35,41 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
     private val findMethod = db.prepareStatement(
         "SELECT position,name,descriptor FROM methods WHERE binding=? AND head=? AND ordinal=? AND method=?",
     )
+    private val findLink = db.prepareStatement(
+        "SELECT reference FROM links WHERE binding=? AND observed=? AND candidate=?",
+    )
+    private val insertLink = db.prepareStatement("INSERT INTO links VALUES (?,?,?,?)")
+    private var linkReferences = 0L
+
+    fun beginLinkReport() {
+        db.createStatement().use { it.executeUpdate("DELETE FROM links") }
+        linkReferences = 0L
+    }
+
+    fun linkReference(
+        binding: String,
+        observed: JsonElement,
+        candidate: JsonObject,
+        define: (Long, JsonObject) -> Unit,
+    ): Long {
+        val observedText = observed.toString()
+        val candidateText = candidate.toString()
+        findLink.setString(1, binding)
+        findLink.setString(2, observedText)
+        findLink.setString(3, candidateText)
+        val existing = findLink.executeQuery().use { if (it.next()) it.getLong(1) else null }
+        if (existing != null) return existing
+        val value = link(binding, observed, candidate)
+        val reference = linkReferences++
+        insertLink.setString(1, binding)
+        insertLink.setString(2, observedText)
+        insertLink.setString(3, candidateText)
+        insertLink.setLong(4, reference)
+        insertLink.executeUpdate()
+        checkSize()
+        define(reference, value)
+        return reference
+    }
 
     fun add(binding: String, head: String, member: String, ordinal: Long, row: JsonObject, identity: JsonObject) {
         require(row["record"] == JsonPrimitive("class-audit") && row.savedLong("originalSyntaxClassOrdinal") >= 0)
