@@ -78,6 +78,7 @@ internal object Profiler {
         val allocationModelCallers = HashMap<String, Long>()
         val cpuContexts = HashMap<String, Long>()
         val allocationContexts = HashMap<String, Long>()
+        val cpuPolynomialCheckpoints = HashMap<String, Long>()
         RecordingFile(file.toPath()).use { recording ->
             while (recording.hasMoreEvents()) {
                 val event = recording.readEvent()
@@ -88,6 +89,9 @@ internal object Profiler {
                         cpuCallers.merge(cliOperationCallers(event), 1L, Long::plus)
                         cpuModelCallers.merge(cliModelCallers(event), 1L, Long::plus)
                         cpuContexts.merge(cliContextCallers(event), 1L, Long::plus)
+                        val stack = event.stackTrace?.frames.orEmpty()
+                            .map { "${it.method.type.name}.${it.method.name}" }
+                        cpuPolynomialCheckpoints.merge(cliPolynomialCheckpointCallers(stack), 1L, Long::plus)
                     }
                     "jdk.ObjectAllocationSample" -> {
                         val weight = event.getLong("weight")
@@ -102,6 +106,8 @@ internal object Profiler {
         printTable("whole CLI: CPU samples by phase (stack attribution)", phases, 40, output)
         printTable("whole CLI: CPU self-samples", cpu, 60, output)
         printTable("whole CLI: CPU samples by captured callers", cpuCallers, 60, output)
+        printTable("whole CLI: CPU samples by captured polynomial checkpoint callers",
+            cpuPolynomialCheckpoints, Int.MAX_VALUE, output)
         printTable("whole CLI: sampled allocation weight by phase (estimated bytes)", allocation, 40, output)
         printTable("whole CLI: sampled allocation weight by captured callers (estimated bytes)",
             allocationCallers, 60, output)
@@ -145,6 +151,19 @@ internal object Profiler {
         .take(CLI_CALLER_DEPTH)
         .joinToString(" <- ")
         .ifEmpty { "no captured Klause operation" }
+
+    internal fun cliPolynomialCheckpointCallers(stack: List<String>): String {
+        val checkpoint = stack.indexOf("com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.step")
+        if (checkpoint < 0) return "unknown: no captured polynomial checkpoint"
+        return stack.asSequence().drop(checkpoint + 1)
+            .filter {
+                it.startsWith("com.eignex.klause.") &&
+                    !it.startsWith("com.eignex.klause.util.") && !it.startsWith("com.eignex.klause.bench.")
+            }
+            .take(MODEL_CALLER_DEPTH)
+            .joinToString(" <- ")
+            .ifEmpty { "unknown: no captured caller below polynomial checkpoint" }
+    }
 
     private fun cliModelCallers(event: RecordedEvent): String =
         cliModelCallers(event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" })
