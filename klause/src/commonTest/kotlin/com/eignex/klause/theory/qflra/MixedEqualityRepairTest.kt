@@ -20,6 +20,29 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `a reduced query should retain its free coordinates rational bound and strictness`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO))
+        val third = BigFraction.ofLong(3).reciprocal()
+        var query: EqualityQuery? = null
+
+        equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { }, onUnrefutedRepair = {
+            query = it.query(ExactRationalInequality(intArrayOf(0, 1, 3),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), third, strict = true))
+        })
+
+        val reduced = assertNotNull(query).row
+        assertEquals(listOf(2, 3), reduced.columns.toList())
+        assertEquals(listOf(BigFraction.ONE, BigFraction.MINUS_ONE), reduced.coefficients)
+        assertEquals(third, reduced.rhs)
+        assertTrue(reduced.strict)
+        assertNull(assertNotNull(query).support)
+    }
+
+    @Test
     fun `unresolved queries should preserve proof capacity for a later equation consequence`() {
         val rows = (0 until 128).flatMap { column ->
             listOf(exactColumnUpper(column, BigFraction.ZERO), exactColumnLower(column, BigFraction.ZERO))

@@ -169,15 +169,22 @@ no proof condition.
 This negative check can reject a selected prefix while unrelated Boolean choices
 remain open; rows with unknown conditions stay outside the subset.
 The same prepared equations can also determine open guards of general affine
-comparisons. A bounded sweep visits at most 64 open heads; every comparison sharing
-a head must reduce to a constant and agree on its truth. Consequences in one sweep
+comparisons. A bounded sweep visits at most 64 open heads. The constant shortcut
+requires every comparison sharing a head to agree on its truth. Consequences in one sweep
 reuse the same prepared equations, and each retains its own source explanation.
 The cursor resumes at the first head beyond the sweep limit. A nonconstant query
 uses local pivot references and consumes no shared proof nodes; constant queries
 combine their equation premises only after completing exact reduction.
+Other reduced comparisons contribute necessary guarded rows to a difference subset
+of the selected residual. The existing guard propagator can exclude an arm that
+closes a negative cycle. A disequality contributes no unselected strict direction;
+its equality arm contributes both closed rows. These path deductions retain all
+source premises of the selected prefix together with any guarded path conditions.
+Omitted general rows supply no positive coverage, and graph potentials supply no
+witness authority. The graph and its queries remain local to the current check.
 Disjunction members and
 comparisons containing Boolean coefficients defer. Only the nonzero equation
-pivots used by each reduction contribute source premises; the queried comparison
+pivots used by each constant reduction contribute source premises; the queried comparison
 contributes none. The shared Boolean fixpoint receives the resulting signed clause,
 and the originating arithmetic owner retains its new selection before checking
 again. Retraction resets sweep progress. The elimination remains local to the

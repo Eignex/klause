@@ -32,6 +32,46 @@ import kotlin.test.assertTrue
 
 class RealDifferenceSystemTest {
     @Test
+    fun `an invalid residual tail should withhold otherwise available guard consequences`() {
+        val third = BigFraction.ofLong(3).reciprocal()
+        val row = ExactRationalInequality(intArrayOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.MINUS_ONE), third)
+        val query = Lit.make(0, true) to ExactRationalInequality(intArrayOf(0, 1),
+            listOf(BigFraction.MINUS_ONE, BigFraction.ONE), third.negated(), strict = true)
+        val invalid = ExactRationalInequality(intArrayOf(3), listOf(BigFraction.ONE), BigFraction.ZERO)
+
+        val rejected = RealDifferenceSystem.prepareResidualGuards(3, listOf(row, invalid), listOf(query),
+            1, Cancellation.Never)
+
+        assertNull(rejected)
+        val graph = assertNotNull(RealDifferenceSystem.prepareResidualGuards(3, listOf(row), listOf(query),
+            1, Cancellation.Never))
+        val context = SearchSession(emptyList())
+        assertIs<RealDifferenceSystem.Result.Feasible>(graph.check(intArrayOf(-1), Cancellation.Never))
+        assertIs<ComponentResult.Consistent>(graph.implyGuards(context, Cancellation.Never) {})
+        assertEquals(false, context.boolValue(0))
+    }
+
+    @Test
+    fun `a stopped residual guard sweep should withhold its fact and permit a fresh source check`() {
+        val row = ExactRationalInequality(intArrayOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO)
+        val query = Lit.make(0, true) to ExactRationalInequality(intArrayOf(0, 1),
+            listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO, strict = true)
+        val graph = assertNotNull(RealDifferenceSystem.prepareResidualGuards(2, listOf(row), listOf(query),
+            1, Cancellation.Never))
+        val context = SearchSession(emptyList())
+        assertIs<RealDifferenceSystem.Result.Feasible>(graph.check(intArrayOf(-1), Cancellation.Never))
+
+        assertIs<ComponentResult.Indeterminate>(graph.implyGuards(context, Cancellation { true }) {})
+
+        assertNull(context.boolValue(0))
+        assertIs<RealDifferenceSystem.Result.Feasible>(graph.check(intArrayOf(-1), Cancellation.Never))
+        assertIs<ComponentResult.Consistent>(graph.implyGuards(context, Cancellation.Never) {})
+        assertEquals(false, context.boolValue(0))
+    }
+
+    @Test
     fun `a rational strict cycle should imply either signed guard without assigning unused real columns`() {
         val third = BigFraction.ofLong(3).reciprocal()
         for (truth in listOf(false, true)) {

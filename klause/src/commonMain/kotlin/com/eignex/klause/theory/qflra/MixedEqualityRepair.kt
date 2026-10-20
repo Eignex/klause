@@ -35,6 +35,7 @@ internal fun equalityRowsRefute(
     onSupport: ((IntArray) -> Unit)? = null,
     refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation, (IntArray) -> Unit) -> Boolean)? = null,
     onUnrefutedRepair: ((MixedEqualityRepair) -> Unit)? = null,
+    onUnrefutedPrefix: ((MixedEqualityRepair, List<ExactRationalInequality>?) -> Unit)? = null,
 ): Boolean {
     val support = if (onSupport != null) IntArrayList() else null
     val proofs = if (onSupport != null) EqualityRowSupport(rows.size, stop) else null
@@ -54,6 +55,7 @@ internal fun equalityRowsRefute(
     var residualSupport: IntArray? = null
     var proof = -1
     var repair: MixedEqualityRepair? = null
+    var reducedRows: List<ExactRationalInequality>? = null
     val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage, paired,
         proofs, onRefutationProof = { proof = it })) {
         is EqualityRows.Prepared -> {
@@ -66,8 +68,11 @@ internal fun equalityRowsRefute(
                 onFalseRow = { falseRow = it })) {
                 EqualityResidual.Refuted -> true
                 EqualityResidual.Declined -> false
-                is EqualityResidual.Reduced -> refutesDifferenceResidual(columns, residual.rows, stop, onStage,
-                    refutesGeneral, onSupport = { residualSupport = it }).also { residualRefuted = it }
+                is EqualityResidual.Reduced -> {
+                    reducedRows = residual.rows
+                    refutesDifferenceResidual(columns, residual.rows, stop, onStage,
+                        refutesGeneral, onSupport = { residualSupport = it }).also { residualRefuted = it }
+                }
             }
         }
         EqualityRows.Refuted -> true
@@ -100,7 +105,10 @@ internal fun equalityRowsRefute(
         onStage?.invoke("PURE_REAL_EQUALITY_SUPPORT_R_${selected.size}_FROM_${rows.size}")
         if (!stop()) onSupport?.invoke(selected)
     }
-    if (!refuted && !stop()) repair?.let { onUnrefutedRepair?.invoke(it) }
+    if (!refuted && !stop()) repair?.let {
+        onUnrefutedRepair?.invoke(it)
+        if (!stop()) onUnrefutedPrefix?.invoke(it, reducedRows)
+    }
     return refuted && !stop()
 }
 
@@ -246,6 +254,12 @@ internal class MixedEqualityRepair(
     private val work = MixedPointArithmetic(stop)
 
     fun constant(row: ExactRationalInequality): EqualityConstant? {
+        val query = query(row) ?: return null
+        val rows = query.support ?: return null
+        return EqualityConstant(query.row.rhs, rows)
+    }
+
+    fun query(row: ExactRationalInequality): EqualityQuery? {
         val support = proofs ?: return null
         stop.charge(3L * row.columns.size + pivots.size + 1L)
         if (stop() || !admittedEqualityRow(row, pivots.size, work)) return null
@@ -269,7 +283,14 @@ internal class MixedEqualityRepair(
                 if (value.isZero) coefficients.remove(column) else coefficients[column] = value
             }
         }
-        if (coefficients.isNotEmpty() || stop()) return null
+        if (stop()) return null
+        if (coefficients.isNotEmpty()) {
+            stop.charge(coefficients.size.toLong() * coefficients.size + 1L)
+            if (stop()) return null
+            val ordered = coefficients.keys.sorted()
+            return EqualityQuery(ExactRationalInequality(ordered.toIntArray(),
+                ordered.map(coefficients::getValue), bound, row.strict), null)
+        }
         // Nonconstant queries must not consume shared proof capacity; the query contributes no axiom.
         var proof = support.empty()
         for (index in 0 until used.size) {
@@ -277,7 +298,8 @@ internal class MixedEqualityRepair(
             if (stop()) return null
         }
         val rows = support.expand(proof) ?: return null
-        return if (stop()) null else EqualityConstant(bound, rows)
+        return if (stop()) null else EqualityQuery(ExactRationalInequality(intArrayOf(), emptyList(), bound,
+            row.strict), rows)
     }
 
     fun point(guess: List<BigFraction>): List<BigFraction>? {
@@ -381,6 +403,8 @@ internal class MixedEqualityRepair(
 }
 
 internal class EqualityConstant(val bound: BigFraction, val rows: IntArray)
+
+internal class EqualityQuery(val row: ExactRationalInequality, val support: IntArray?)
 
 internal class EqualityRowSupport(private val rows: Int, private val stop: Cancellation) {
     private val first = IntArrayList()

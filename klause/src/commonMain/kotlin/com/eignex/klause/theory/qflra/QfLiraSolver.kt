@@ -744,9 +744,9 @@ class ExactLiraSearchComponent private constructor(
             }
         val refuted = snapshot != null && equalityRowsRefute(model.numRealVars, snapshot.rows,
             lpStop, ::observeCompleteStage,
-            onSupport = { support = it }, refutesGeneral = general, onUnrefutedRepair = { repair ->
+            onSupport = { support = it }, refutesGeneral = general, onUnrefutedPrefix = { repair, residual ->
                 if (bools.any { it == UNASSIGNED }) {
-                    propagation = implyEquationGuard(repair, snapshot.origins, context)
+                    propagation = implyEquationGuard(repair, residual, snapshot.origins, context)
                 }
             })
         if (operationStop()) return ComponentResult.Indeterminate
@@ -793,14 +793,19 @@ class ExactLiraSearchComponent private constructor(
 
     private fun implyEquationGuard(
         repair: MixedEqualityRepair,
+        residual: List<ExactRationalInequality>?,
         origins: List<EqualityRowOrigin>,
         context: SearchContext,
     ): ComponentResult? {
         val groups = prepareEquationGuards() ?: return null
         var checked = 0
         var implied = false
+        val queries = ArrayList<Pair<Int, ExactRationalInequality>>()
+        var queryEntries = 0L
+        fun finish(): ComponentResult? = residual?.let { implyReducedGuards(it, queries, origins, context) }
+            ?: if (implied) ComponentResult.Consistent else null
         repeat(groups.size) {
-            if (checked >= 64) return if (implied) ComponentResult.Consistent else null
+            if (checked >= 64) return finish()
             lpStop.charge(1L)
             if (operationStop()) return ComponentResult.Indeterminate
             val rows = groups[equationGuardCursor]
@@ -811,26 +816,45 @@ class ExactLiraSearchComponent private constructor(
             observeCompleteStage("PURE_REAL_EQUALITY_GUARD_ATTEMPT")
             val selected = HashSet<Int>()
             var truth: Boolean? = null
+            var constant = true
+            var agree = true
+            val headQueries = ArrayList<Pair<Int, ExactRationalInequality>>()
             for (prepared in rows) {
                 lpStop.charge(2L * prepared.row.size + 1L)
                 if (operationStop()) return ComponentResult.Indeterminate
                 val comparison = prepared.form.comparison(true) { false }
-                val constant = repair.constant(comparison.ordered.row(comparison.bound, comparison.strict))
+                val query = repair.query(comparison.ordered.row(comparison.bound, comparison.strict))
                     ?: return@repeat
-                val holds = when (comparison.op) {
-                    LinearOp.LE -> if (comparison.strict) BigFraction.ZERO < constant.bound
-                        else BigFraction.ZERO <= constant.bound
-                    LinearOp.GE -> if (comparison.strict) BigFraction.ZERO > constant.bound
-                        else BigFraction.ZERO >= constant.bound
-                    LinearOp.EQ -> constant.bound.isZero
-                    LinearOp.NE -> !constant.bound.isZero
+                headQueries += reducedComparisonGuards(query.row, comparison.op, guard)
+                val support = query.support
+                if (support == null) {
+                    constant = false
+                    continue
                 }
-                if (truth != null && truth != holds) return@repeat
+                val holds = when (comparison.op) {
+                    LinearOp.LE -> if (comparison.strict) BigFraction.ZERO < query.row.rhs
+                        else BigFraction.ZERO <= query.row.rhs
+                    LinearOp.GE -> if (comparison.strict) BigFraction.ZERO > query.row.rhs
+                        else BigFraction.ZERO >= query.row.rhs
+                    LinearOp.EQ -> query.row.rhs.isZero
+                    LinearOp.NE -> !query.row.rhs.isZero
+                }
+                if (truth != null && truth != holds) agree = false
                 truth = holds
-                lpStop.charge(constant.rows.size.toLong() + 1L)
+                lpStop.charge(support.size.toLong() + 1L)
                 if (operationStop()) return ComponentResult.Indeterminate
-                for (index in constant.rows) selected.add(index)
+                for (index in support) selected.add(index)
                 if (selected.size > 4096) return@repeat
+            }
+            if (!constant || !agree) {
+                val entries = headQueries.sumOf { it.second.columns.size.toLong() + 1L }
+                lpStop.charge(entries + headQueries.size + 1L)
+                if (operationStop()) return ComponentResult.Indeterminate
+                if (queryEntries + entries <= 65536L) {
+                    queryEntries += entries
+                    queries += headQueries
+                }
+                return@repeat
             }
             val explanation = equalityExplanation(selected.toIntArray(), origins, context) ?: return@repeat
             val literal = Lit.make(guard, checkNotNull(truth))
@@ -844,6 +868,65 @@ class ExactLiraSearchComponent private constructor(
             if (accepted !is ComponentResult.Consistent) return accepted
             implied = true
         }
+        return finish()
+    }
+
+    private fun reducedComparisonGuards(
+        row: ExactRationalInequality,
+        op: LinearOp,
+        guard: Int,
+    ): List<Pair<Int, ExactRationalInequality>> {
+        lpStop.charge(4L * row.columns.size + 8L)
+        if (operationStop()) return emptyList()
+        val terms = row.columns.indices.associate { row.columns[it] to row.coefficients[it] }
+        val result = ArrayList<Pair<Int, ExactRationalInequality>>()
+        for (truth in listOf(true, false)) {
+            val comparison = ExactComparison(terms, row.rhs, if (truth) op else op.complemented(),
+                strict = if (truth) row.strict else !row.strict, hasReals = true)
+            // A disequality is a union; neither strict direction is necessary until it is selected.
+            if (comparison.op == LinearOp.NE) continue
+            val rows = ArrayList<ExactRationalInequality>(2)
+            comparison.rowsInto(rows)
+            for (inequality in rows) result += Lit.make(guard, truth) to inequality
+        }
+        return result
+    }
+
+    private fun implyReducedGuards(
+        residual: List<ExactRationalInequality>,
+        queries: List<Pair<Int, ExactRationalInequality>>,
+        origins: List<EqualityRowOrigin>,
+        context: SearchContext,
+    ): ComponentResult? {
+        if (queries.isEmpty() || origins.size > 4096) return null
+        lpStop.charge(origins.size.toLong() + 1L)
+        if (operationStop()) return ComponentResult.Indeterminate
+        val base = equalityExplanation(IntArray(origins.size) { it }, origins, context) ?: return null
+        val graph = RealDifferenceSystem.prepareResidualGuards(model.numRealVars, residual, queries,
+            model.numBoolVars, lpStop) ?: return null
+        observeCompleteStage("PURE_REAL_EQUALITY_REDUCED_GUARD_GRAPH")
+        val checked = graph.check(bools, lpStop) { lpStop.charge(it) }
+        if (operationStop()) return ComponentResult.Indeterminate
+        if (checked !is RealDifferenceSystem.Result.Feasible) return null
+        var implied = false
+        val explained = object : SearchContext by context {
+            override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                val size = base.literals.size.toLong() + explanation.literals.size
+                lpStop.charge(3L * size + 1L)
+                if (size > 4096L || operationStop()) return ComponentResult.Indeterminate
+                val clause = (base.literals.asSequence() + explanation.literals.asSequence()).distinct().toList()
+                    .toIntArray()
+                if (operationStop()) return ComponentResult.Indeterminate
+                return context.imply(literal, SearchExplanation(clause))
+            }
+        }
+        val result = graph.implyGuards(explained, lpStop) { literal ->
+            accept(SearchDecision.Bool(literal), context)
+            implied = true
+            observeCompleteStage("PURE_REAL_EQUALITY_REDUCED_GUARD_IMPLIED")
+        }
+        if (operationStop()) return ComponentResult.Indeterminate
+        if (result is ComponentResult.Conflict) return result
         return if (implied) ComponentResult.Consistent else null
     }
 

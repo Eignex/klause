@@ -296,6 +296,46 @@ internal class RealDifferenceSystem private constructor(
             return !stop()
         }
 
+        fun prepareResidualGuards(
+            realColumns: Int,
+            rows: List<ExactRationalInequality>,
+            queries: List<Pair<Int, ExactRationalInequality>>,
+            booleanVariables: Int,
+            stop: Cancellation,
+        ): RealDifferenceSystem? {
+            if (realColumns !in 1..10000 || rows.size + queries.size > 65536 ||
+                booleanVariables !in 1..100000 || stop()
+            ) return null
+            val work = MixedPointArithmetic(stop)
+            val edges = ArrayList<Edge>()
+            var entries = 0L
+            fun add(row: ExactRationalInequality, guard: Int): Boolean {
+                entries += row.columns.size + 1L
+                stop.charge(8L * (row.columns.size + 1L))
+                if (entries > 65536 || stop() || row.columns.size != row.coefficients.size ||
+                    row.columns.any { it !in 0 until realColumns } ||
+                    row.columns.indices.any { it > 0 && row.columns[it - 1] >= row.columns[it] } ||
+                    !work.admitted(row.rhs) || !row.coefficients.all(work::admitted)
+                ) return false
+                if (row.columns.isEmpty()) return append(row, guard, realColumns, edges, stop)
+                if (row.columns.size > 2) return true
+                val first = row.coefficients[0]
+                if (first.isZero || (row.columns.size == 2 && first != row.coefficients[1].negated())) return true
+                val magnitude = if (first.signum() > 0) first else first.negated()
+                val bound = work.quotient(row.rhs, magnitude) ?: return !stop()
+                val sign = if (first.signum() > 0) BigFraction.ONE else BigFraction.MINUS_ONE
+                val normalized = ExactRationalInequality(row.columns,
+                    if (row.columns.size == 1) listOf(sign) else listOf(sign, sign.negated()), bound, row.strict)
+                return append(normalized, guard, realColumns, edges, stop) || !stop()
+            }
+            for (row in rows) if (!add(row, ALWAYS)) return null
+            for ((guard, row) in queries) {
+                if (guard < 0 || Lit.variable(guard) !in 0 until booleanVariables || !add(row, guard)) return null
+            }
+            if (stop()) return null
+            return build(realColumns, edges, stop)
+        }
+
         private fun build(zero: Int, edges: List<Edge>, stop: Cancellation): RealDifferenceSystem? {
             if (edges.isEmpty() || edges.size > 100000) return null
             var denominator = 1L

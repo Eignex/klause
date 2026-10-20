@@ -59,6 +59,76 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `equation reduced paths should imply signed source guards through peers and retract their premises`() {
+        val third = BigFraction.ofLong(3).reciprocal()
+        val source = Problem(5, 0, emptyArray(), arrayOf(
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) },
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2), Term.ofRealVar(3)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE, third, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE),
+                LinearOp.LE, third, activator = 2),
+            Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+        ), numRealVars = 4, realLower = DoubleArray(4) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(4) { Double.POSITIVE_INFINITY })
+        val request = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute()).request
+        request.componentPlan.search(request.model, emptyMap()).use { planned ->
+            val session = planned.session
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (truth in listOf(true, false)) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, truth))))
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                assertEquals(truth, session.boolValue(2))
+                assertEquals(setOf(Lit.make(0, false), Lit.make(1, !truth), Lit.make(2, truth)),
+                    assertNotNull(session.reasonFor(2)).literals.toSet())
+                assertEquals(if (truth) true else null, session.boolValue(3))
+                assertNull(session.boolValue(4))
+                session.popTo(0)
+                assertNull(session.boolValue(2))
+                assertNull(session.boolValue(3))
+            }
+            assertIs<SearchResult.Satisfied>(session.solve(5))
+        }
+    }
+
+    @Test
+    fun `equation reduced disequality queries should retain both feasible strict alternatives`() {
+        for (strict in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                ExactLinear.of(IntArray(3) { Term.ofRealVar(it) },
+                    listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE),
+                    LinearOp.EQ, BigFraction.ZERO, activator = 0),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(2), Term.ofRealVar(3)),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE,
+                    BigFraction.ZERO, strict = strict, activator = 1),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
+                    listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE),
+                    LinearOp.NE, BigFraction.ZERO, activator = 2),
+            ), numRealVars = 4, realLower = DoubleArray(4) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(4) { Double.POSITIVE_INFINITY })
+            val session = SearchSession(listOf(ExactLiraSearchComponent(source)))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(if (strict) true else null, session.boolValue(2))
+            assertNull(session.boolValue(3))
+            if (!strict) {
+                for (truth in listOf(false, true)) {
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, truth))))
+                    assertIs<SearchResult.Satisfied>(session.solve(4))
+                    session.popTo(2)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `a bounded equation guard sweep should revisit the first head beyond its limit`() {
         val rows = listOf(ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
             LinearOp.EQ, BigFraction.ZERO, activator = 0)) + List(64) { index ->
@@ -172,7 +242,7 @@ class QfLiraSolverTest {
     }
 
     @Test
-    fun `shared equation query guards should require every comparison to have the same known truth`() {
+    fun `shared equation query guards should retain compatible members and refute contradictory members`() {
         for (kind in listOf("agree", "disagree", "open")) {
             val secondColumns = if (kind == "open") intArrayOf(0, 1, 3) else intArrayOf(0, 1, 2)
             val source = Problem(3, 0, emptyArray(), arrayOf(
@@ -187,10 +257,21 @@ class QfLiraSolverTest {
             val session = SearchSession(listOf(ExactLiraSearchComponent(source)))
             assertIs<ComponentResult.Consistent>(session.initialize())
 
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            val result = session.push(SearchDecision.Bool(Lit.make(0, true)))
 
-            assertEquals(if (kind == "agree") true else null, session.boolValue(1))
-            assertNull(session.boolValue(2))
+            if (kind == "disagree") {
+                val reason = assertNotNull(assertIs<ComponentResult.Conflict>(result).explanation)
+                assertTrue(Lit.make(0, false) in reason.literals)
+                assertTrue(reason.literals.all { Lit.variable(it) in 0..1 })
+                session.popTo(0)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+                assertIs<SearchResult.Satisfied>(session.solve(3))
+            } else {
+                assertIs<ComponentResult.Consistent>(result)
+                assertEquals(true, session.boolValue(1))
+                assertNull(session.boolValue(2))
+            }
         }
     }
 
