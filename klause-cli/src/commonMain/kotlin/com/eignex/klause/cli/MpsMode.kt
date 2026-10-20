@@ -322,6 +322,15 @@ internal class MpsOutput(
             else -> "working-model"
         }
         val qualification = when {
+            !source.nativeClaimsUnrestricted && source.nativeConclusion in setOf(
+                LinearSourceConclusion.OPTIMAL, LinearSourceConclusion.UNSATISFIABLE,
+            ) -> "$scope terminal does not cover the unrestricted source"
+            source.numericalClaims && source.nativeConclusion == LinearSourceConclusion.OPTIMAL &&
+                source.conclusion != LinearSourceConclusion.OPTIMAL ->
+                "$scope optimum lacks a checked consistent terminal source point"
+            source.numericalClaims && source.nativeConclusion == LinearSourceConclusion.UNSATISFIABLE &&
+                source.conclusion != LinearSourceConclusion.UNSATISFIABLE ->
+                "$scope refutation conflicts with an accepted source witness"
             source.nativeConclusion == LinearSourceConclusion.UNSATISFIABLE &&
                 source.conclusion != LinearSourceConclusion.UNSATISFIABLE ->
                 "$scope refutation; tolerance-accepted feasibility unproved"
