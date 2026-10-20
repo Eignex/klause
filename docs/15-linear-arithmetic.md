@@ -119,11 +119,14 @@ only that prefix. Once all source Booleans are assigned, general reduced compone
 can compact surviving coordinates and proportional rows before using the reduction
 owner's existing source-LP budget and dimension limit. A necessary difference subset
 can refute a component but supplies no feasible point. Every input is admitted before
-negative authority, and residual conflicts retain all original row and equation
-premises; an internal unguarded cycle is not a source clause. Unknown source choices,
+negative authority. A bounded dependency graph reconstructs the original rows used
+by equation pivots and retained residual rows; discarded tautologies add no premises.
+An internal unguarded cycle is not a source clause. Unknown source choices,
 unsupported premises or cancellation withhold the proof. Capture retains the
 65,536-entry, 4,096-bit arithmetic and 4,096-node explanation bounds under the current
-operation, without renewing a numerical allowance.
+operation, without renewing a numerical allowance. Dependency metadata admits
+8,192 nodes and falls back to conservative equation and retained-row support when
+full; published support still requires every original condition.
 
 Open real objectives with complete affine source capture use
 `RationalTheoryDescent`. Attained witnesses, strict approach paths and feasible
