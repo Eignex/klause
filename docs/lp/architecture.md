@@ -209,8 +209,15 @@ finite coordinates and requires the same source identity and unchanged pins when
 mapping the conflict. Every literal must be false in the current finite session. An unsupported source parent,
 auxiliary bound, storage limit or cancellation withholds the explanation and keeps
 the conflict local. Only a complete source explanation enters the existing pooled
-nogood path; the numerical certificate and engine dependencies are unchanged.
-`PINNED_REAL_LEAF_EXPLANATION` distinguishes pooled, declined and unpooled outcomes.
+nogood path. Required backtracking completion also retains its current checked
+clause for the native CP conflict resolver. That owner analyzes the integer-bound
+atoms, maps native and shared decision levels, registers the learned constraint
+and imports its implications after a backjump. The private completion pool is not
+the handoff to traversal. Optional LP bound-pooling settings are unchanged; missing,
+stale or cancelled source explanations retain chronological handling. Native
+integer atoms are never interpreted as shared Boolean IDs. The numerical certificate
+and engine dependencies are unchanged. `PINNED_REAL_LEAF_EXPLANATION` distinguishes
+pooled, declined and unpooled outcomes.
 Compaction inspects at most 10,000 rows and structural columns and 65,536 sparse
 entries or premise units, with 4,096-bit normalized scalar admission and charged
 intermediate arithmetic. The current construction owner also pays projection work; cancellation or incomplete conversion withholds the compacted model.

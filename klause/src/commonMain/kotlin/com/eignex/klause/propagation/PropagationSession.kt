@@ -705,6 +705,19 @@ class PropagationSession private constructor(
     internal fun analyzeConflictClause(conflictClause: IntArray): ConflictAnalyzer.AnalysisResult =
         state.conflictAnalyzer.analyzeConflictClause(conflictClause)
 
+    internal fun externalConflict(conflictClause: IntArray): PropagationResult.Unsat {
+        val learned = analyzeConflictClause(conflictClause)
+        val constraint = learned as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
+        return PropagationResult.Unsat(
+            conflictBools = if (constraint == null) EmptyIntArray else
+                state.conflictAnalyzer.lastBumpBoolVars().toIntArray(),
+            conflictInts = if (constraint == null) EmptyIntArray else
+                state.conflictAnalyzer.lastBumpIntVars().toIntArray(),
+            conflictLevels = constraint?.decisionLevels ?: EmptyIntArray,
+            learnedClause = learned,
+        )
+    }
+
     /** True when this session runs the native-SAT lane; its learned clauses live in the arena store,
      *  not the general database, so clause-database introspection routes differently. */
     val usesNativeSat: Boolean get() = state.nativeEngine != null
