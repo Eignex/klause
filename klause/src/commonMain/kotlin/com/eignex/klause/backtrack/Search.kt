@@ -800,10 +800,29 @@ private class ResidualRealComponent(
     )
     private var completed: Sample? = null
     private var conflictClause: IntArray? = null
+    private var prefixConflict = false
+    private var prefixVisits = 0L
+    private var prefixQueries = 0
+
+    override fun propagate(context: SearchContext): ComponentResult {
+        if (absCompletion != null || toleranceCheck != null || !engine.residualOversized ||
+            context.decisionLevel == 0 || context.cancelled() || prefixQueries >= MAX_PREFIX_QUERIES
+        ) return ComponentResult.Consistent
+        prefixVisits++
+        if (prefixVisits > PREFIX_WARMUP && prefixVisits % PREFIX_EVERY != 0L) return ComponentResult.Consistent
+        if (!context.consumeCheck()) return ComponentResult.Consistent
+        prefixQueries++
+        if (!engine.prefixRealInfeasible(cp.session) || context.cancelled()) return ComponentResult.Consistent
+        conflictClause = engine.pinnedLeafClause
+        prefixConflict = true
+        completed = null
+        return ComponentResult.Conflict()
+    }
 
     override fun check(context: SearchContext): ComponentCheck {
         completed = null
         conflictClause = null
+        prefixConflict = false
         if (context.cancelled()) return ComponentCheck.Indeterminate
         absCompletion?.let { completion ->
             val discrete = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
@@ -855,13 +874,16 @@ private class ResidualRealComponent(
     override fun retract(decisionLevel: Int) {
         completed = null
         conflictClause = null
+        prefixConflict = false
     }
 
     override fun resolveConflict(context: SearchContext): SearchConflictResolution {
         val clause = conflictClause
         conflictClause = null
+        val phase = if (prefixConflict) "PREFIX_REAL_HANDOFF" else "PINNED_REAL_LEAF_HANDOFF"
+        prefixConflict = false
         if (clause == null) {
-            sink?.lp?.observePrimalPhase("PINNED_REAL_LEAF_HANDOFF", "NO_CLAUSE", 0L)
+            sink?.lp?.observePrimalPhase(phase, "NO_CLAUSE", 0L)
             return SearchConflictResolution.Chronological
         }
         val result = cp.resolveClause(clause, context)
@@ -870,13 +892,14 @@ private class ResidualRealComponent(
             SearchConflictResolution.Exhausted -> "EXHAUSTED"
             SearchConflictResolution.Chronological -> "CHRONOLOGICAL"
         }
-        sink?.lp?.observePrimalPhase("PINNED_REAL_LEAF_HANDOFF", outcome, 0L)
+        sink?.lp?.observePrimalPhase(phase, outcome, 0L)
         return result
     }
 
     override fun onRestart(context: SearchContext) {
         completed = null
         conflictClause = null
+        prefixConflict = false
     }
 
     fun sample(): Sample = requireNotNull(completed)
@@ -886,6 +909,12 @@ private class ResidualRealComponent(
     override fun totalSolveWork(): Long = engine.totalSolveWork() + absWork
 
     override fun close() = engine.close()
+
+    private companion object {
+        const val MAX_PREFIX_QUERIES = 64
+        const val PREFIX_WARMUP = 4L
+        const val PREFIX_EVERY = 32L
+    }
 }
 
 /** The shared learned-clause bound mirrors the CP database's own cap and glue threshold. */

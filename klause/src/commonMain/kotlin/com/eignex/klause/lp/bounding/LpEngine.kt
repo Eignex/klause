@@ -662,40 +662,50 @@ internal class LpEngine(
     internal var pinnedLeafClause: IntArray? = null
         private set
 
-    private fun leafRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
+    private fun leafRelaxation(
+        relaxer: CpToLpRelaxation,
+        session: PropagationSession,
+        requirePins: Boolean = true,
+    ): LpRelaxation? {
         if (!residualOversized) return nodeRelaxation(relaxer, session)
-        if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
+        if (params.cancellation()) return declinedLeafAdmission("CANCELLED", requirePins)
         val visits = problem.numFactors.toLong() + problem.numBoolVars + problem.numIntVars + problem.numRealVars
         noteNodeOverhead(visits * LpNodeOverhead.BUILD)
-        leafPinDecline(session)?.let { return declinedLeafAdmission(it) }
+        if (requirePins) leafPinDecline(session)?.let { return declinedLeafAdmission(it) }
         val assembly = LpLeafRelaxation(problem, relaxer,
             onBuild = { noteNodeOverhead(it * LpNodeOverhead.BUILD) },
             onEdit = { noteNodeOverhead(it * LpNodeOverhead.EDIT) })
         var relaxation = try {
             assembly.build(SessionDomains(session), params.cancellation)
         } catch (_: LpAssemblyCancelled) {
-            return declinedLeafAdmission("CANCELLED")
-        } ?: return declinedLeafAdmission(if (params.cancellation()) "CANCELLED" else "SOURCE_DECLINE")
-        if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
-        if (!leafShapeObserved) {
+            return declinedLeafAdmission("CANCELLED", requirePins)
+        } ?: return declinedLeafAdmission(if (params.cancellation()) "CANCELLED" else "SOURCE_DECLINE", requirePins)
+        if (params.cancellation()) return declinedLeafAdmission("CANCELLED", requirePins)
+        if (requirePins && !leafShapeObserved) {
             leafShapeObserved = true
             val shape = relaxation.model.leafShape(params.cancellation, ::noteNodeOverhead)
             sink.lp.observePrimalPhase("PINNED_REAL_LEAF_SHAPE", shape, 0L)
         }
-        if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
-        if (relaxation.model.m > RESIDUAL_MAX_ROWS) {
+        if (params.cancellation()) return declinedLeafAdmission("CANCELLED", requirePins)
+        if (!requirePins || relaxation.model.m > RESIDUAL_MAX_ROWS) {
             if (problem.semantics.isApproximate ||
                 solveContext.certificationPolicy !== ProductionLpCertificationPolicy
-            ) return declinedLeafAdmission("ROW_LIMIT")
+            ) return declinedLeafAdmission("ROW_LIMIT", requirePins)
             val previousRows = relaxation.model.m
             relaxation = relaxation.compactPinnedRows(session, params.cancellation,
-                onDecline = { sink.lp.observePrimalPhase("PINNED_REAL_LEAF_EXPLANATION_DECLINE", it, 0L) },
+                onDecline = { sink.lp.observePrimalPhase(
+                    if (requirePins) "PINNED_REAL_LEAF_EXPLANATION_DECLINE" else "PREFIX_REAL_EXPLANATION_DECLINE",
+                    it, 0L) },
+                requirePinnedExplanation = requirePins,
                 onWork = ::noteNodeOverhead)
-                ?: return declinedLeafAdmission(if (params.cancellation()) "CANCELLED" else "COMPACTION_DECLINE")
-            sink.lp.observePrimalPhase("PINNED_REAL_LEAF_COMPACTION", "M_${previousRows}_TO_${relaxation.model.m}", 0L)
+                ?: return declinedLeafAdmission(if (params.cancellation()) "CANCELLED" else "COMPACTION_DECLINE",
+                    requirePins)
+            sink.lp.observePrimalPhase(if (requirePins) "PINNED_REAL_LEAF_COMPACTION" else "PREFIX_REAL_COMPACTION",
+                "M_${previousRows}_TO_${relaxation.model.m}", 0L)
         }
-        if (relaxation.model.m > RESIDUAL_MAX_ROWS) return declinedLeafAdmission("ROW_LIMIT")
-        sink.lp.observeRealLeafAdmission("READY")
+        if (relaxation.model.m > RESIDUAL_MAX_ROWS) return declinedLeafAdmission("ROW_LIMIT", requirePins)
+        if (requirePins) sink.lp.observeRealLeafAdmission("READY")
+        else sink.lp.observePrimalPhase("PREFIX_REAL_ADMISSION", "READY", 0L)
         return relaxation
     }
 
@@ -711,9 +721,43 @@ internal class LpEngine(
         return if (params.cancellation()) "CANCELLED" else null
     }
 
-    private fun declinedLeafAdmission(outcome: String): LpRelaxation? {
-        sink.lp.observeRealLeafAdmission(outcome)
+    private fun declinedLeafAdmission(outcome: String, pinned: Boolean = true): LpRelaxation? {
+        if (pinned) sink.lp.observeRealLeafAdmission(outcome)
+        else sink.lp.observePrimalPhase("PREFIX_REAL_ADMISSION", outcome, 0L)
         return null
+    }
+
+    internal fun prefixRealInfeasible(session: PropagationSession): Boolean {
+        requireOpen()
+        pinnedLeafClause = null
+        if (!residualOversized || !params.lpPlan.realResidual || problem.semantics.isApproximate ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
+            params.cancellation() || lpWorkAllowanceSpent()
+        ) return false
+        val relaxer = selectedSourceRelaxation ?: lpRelaxer ?: return false
+        val relaxation = leafRelaxation(relaxer, session, requirePins = false) ?: return false
+        if (params.cancellation() || lpWorkAllowanceSpent()) return false
+        val model = relaxation.model
+        val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
+            .also { leafSolver = it }
+        val budget = nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { it > 0L }
+            ?: sizeBudget(model.n, model.m)
+        val certified = solver.solve(model, cancellation = params.cancellation, workLimit = budget,
+            observer = sink.lp.certificationObserver(LpRoute.STANDALONE), counterResults = lpCounterResults)
+        sink.lp.observePrimalPhase("PREFIX_REAL_CHECK", certified.verdict.name, 0L)
+        if (params.cancellation() || certified.verdict != LpVerdict.INFEASIBLE) return false
+        val support = certified.farkasRay?.let { ray ->
+            ray.indices.filter { ray[it] != 0L }.toIntArray()
+        } ?: certified.infeasibleRows ?: IntArray(model.m) { it }
+        val clause = relaxation.pinnedExplanation?.clause(support, session, params.cancellation, ::noteNodeOverhead)
+        if (clause == null || params.cancellation()) {
+            sink.lp.observePrimalPhase("PREFIX_REAL_EXPLANATION", "DECLINED", 0L)
+            return false
+        }
+        pinnedLeafClause = clause
+        lpNogoods?.add(clause)
+        sink.lp.observePrimalPhase("PREFIX_REAL_EXPLANATION", "L_${clause.size}", 0L)
+        return true
     }
 
     /** The asserting LP backjump clause derived during the last [pruneNode], or null. */

@@ -37,6 +37,31 @@ import kotlin.test.assertTrue
 
 class BacktrackSolverRealTest {
     @Test
+    fun `selected real conflicts should backjump before unrelated Boolean decisions`() {
+        val source = Problem(3, 0, emptyArray(), Array(1002) { row ->
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                if (row == 1) LinearOp.GE else LinearOp.LE,
+                when (row) {
+                    0 -> BigFraction.ZERO
+                    1 -> BigFraction.ONE
+                    else -> BigFraction.ofLong(10)
+                },
+                activator = if (row < 2) row else -1)
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+
+        val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 1,
+            variableSelector = InputOrder, valueSelector = IndomainMax, nodeBudget = NodeBudget(3)))
+
+        val sat = assertIs<SolveResult.Sat>(result)
+        assertEquals(true, sat.assignment.bools[0])
+        assertEquals(false, sat.assignment.bools[1])
+        assertTrue(sat.stats.search.learnedClauses.sum > 0.0)
+        assertTrue((sat.stats.lp.phases["PREFIX_REAL_HANDOFF_ROOT"]?.outcomes?.get("BACKJUMP") ?: 0L) > 0L)
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
+    }
+
+    @Test
     fun `required real conflicts should notify the native variable selector`() {
         val source = Problem(2, 0, emptyArray(), Array(1002) { row ->
             if (row == 0) ExactLinear.of(IntArray(3) { Term.ofRealVar(it) },

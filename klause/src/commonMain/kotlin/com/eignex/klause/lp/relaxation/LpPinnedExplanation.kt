@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.exactBounds
@@ -13,9 +14,11 @@ internal class LpPinnedExplanation private constructor(
     rows: List<IntArray>,
     private val problem: Problem,
     private val booleanVariables: IntArray,
-    private val bools: BooleanArray,
+    private val bools: IntArray,
     private val integerVariables: IntArray,
-    private val ints: LongArray,
+    private val lowerBounds: LongArray,
+    private val upperBounds: LongArray,
+    private val domains: Array<IntDomain>?,
     private val onDecline: ((String) -> Unit)?,
 ) {
     private val rows = rows.map(IntArray::copyOf)
@@ -27,6 +30,7 @@ internal class LpPinnedExplanation private constructor(
             session: PropagationSession,
             cancellation: Cancellation,
             onDecline: ((String) -> Unit)? = null,
+            requirePinned: Boolean = true,
             onWork: (Long) -> Unit,
         ): LpPinnedExplanation? {
             val problem = session.problem
@@ -89,22 +93,38 @@ internal class LpPinnedExplanation private constructor(
                     }
                     if (stopped(4L * premises.size + 1L)) return null
                     for (bound in premises.boundEntries()) if (!remember(bound.variable, false)) return null
-                    for (literal in premises.literalEntries()) if (!remember(Lit.variable(literal), true)) return null
+                    for (literal in premises.literalEntries()) {
+                        val variable = Lit.variable(literal)
+                        if (!remember(variable, true)) return null
+                        if (session.boolValue(variable) == null) {
+                            onDecline?.invoke("UNASSIGNED_ROW_PREMISE")
+                            return null
+                        }
+                    }
                 }
             }
             val count = booleanIds.size.toLong() + integerIds.size
-            if (stopped(8L * (count + 1L))) return null
+            if (stopped((if (requirePinned) 16L else 24L) * (count + 1L))) return null
             val booleanVariables = booleanIds.toIntArray()
             val integerVariables = integerIds.toIntArray()
-            val bools = BooleanArray(booleanVariables.size) { session.boolValue(booleanVariables[it]) ?: return null }
-            val ints = LongArray(integerVariables.size) {
-                val domain = session.intDomain(integerVariables[it])
-                if (!domain.isFixed) return null
-                domain.min
+            val bools = IntArray(booleanVariables.size) {
+                session.boolValue(booleanVariables[it])?.let { value -> if (value) 1 else 0 }
+                    ?: if (requirePinned) return null else -1
+            }
+            val lowerBounds = LongArray(integerVariables.size)
+            val upperBounds = LongArray(integerVariables.size)
+            for (index in integerVariables.indices) {
+                val domain = session.intDomain(integerVariables[index])
+                if (requirePinned && !domain.isFixed) return null
+                lowerBounds[index] = domain.min
+                upperBounds[index] = domain.max
+            }
+            val domains = if (requirePinned) null else Array(integerVariables.size) {
+                session.intDomain(integerVariables[it])
             }
             if (cancellation()) return null
             return LpPinnedExplanation(original, rows, problem, booleanVariables, bools,
-                integerVariables, ints, onDecline)
+                integerVariables, lowerBounds, upperBounds, domains, onDecline)
         }
     }
     fun clause(
@@ -123,11 +143,15 @@ internal class LpPinnedExplanation private constructor(
             cancellation.charge(units)
             return cancellation()
         }
-        if (stopped(4L * (source.n + source.m + support.size + bools.size + ints.size) + 1L)) return null
-        for (index in bools.indices) if (session.boolValue(booleanVariables[index]) != bools[index]) return null
-        for (index in ints.indices) {
+        if (stopped(4L * (source.n + source.m + support.size + bools.size + lowerBounds.size) + 1L)) return null
+        for (index in bools.indices) {
+            val value = session.boolValue(booleanVariables[index])?.let { if (it) 1 else 0 } ?: -1
+            if (value != bools[index]) return null
+        }
+        for (index in lowerBounds.indices) {
             val domain = session.intDomain(integerVariables[index])
-            if (!domain.isFixed || domain.min != ints[index]) return null
+            if (domains != null && domain !== domains[index]) return null
+            if (domain.min != lowerBounds[index] || domain.max != upperBounds[index]) return null
         }
         val selected = BooleanArray(source.m)
         var entries = 0L

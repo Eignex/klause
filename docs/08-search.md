@@ -221,6 +221,11 @@ implication-graph variables of learned conflicts: VSIDS bumps each implicated
 variable once, and CHB rewards each attributed variable.
 Native analysis of required real completion conflicts supplies the same variable
 feedback before its learned consequence is applied, counting the failed leaf once.
+Oversized exact real sources also receive bounded selected-prefix checks beside
+finite CP branching. Only a certified refutation with a complete source clause can
+prune early; a feasible partial relaxation contributes no accepted assignment.
+These checks share the traversal's work and stop controls, attempt at most 64
+queries per search, and follow four initial visits with a cadence of 32 visits.
 Successful fixpoints deliver new deductions to propagation-aware selectors. Phase
 saving captures values before
 retraction, so propagated as well as decided polarities survive backjumps and

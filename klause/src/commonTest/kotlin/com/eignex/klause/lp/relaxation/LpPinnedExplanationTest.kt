@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -18,6 +19,72 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPinnedExplanationTest {
+    @Test
+    fun `partial source snapshots should reject interior domain changes`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val session = PropagationSession(problem)
+        session.pinIntAtMost(0, 2)
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 2L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val parent = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf())
+        val explanation = assertNotNull(LpPinnedExplanation.capture(parent, listOf(intArrayOf(0)), session,
+            Cancellation.Never, requirePinned = false) {})
+        assertNotNull(explanation.clause(intArrayOf(0), session, Cancellation.Never) {})
+
+        session.addLearnedClause(Clause(intArrayOf(session.equalityLit(0, 1, positive = false))),
+            lbd = 1, permanent = true)
+
+        assertEquals(0L, session.intDomain(0).min)
+        assertEquals(2L, session.intDomain(0).max)
+        assertNull(explanation.clause(intArrayOf(0), session, Cancellation.Never) {})
+    }
+
+    @Test
+    fun `partial source snapshots should reject changed finite domain bounds`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
+        val session = PropagationSession(problem)
+        session.pinIntAtMost(0, 1)
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val parent = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf())
+        assertNull(LpPinnedExplanation.capture(parent, listOf(intArrayOf(0)), session, Cancellation.Never) {})
+
+        val explanation = assertNotNull(LpPinnedExplanation.capture(parent, listOf(intArrayOf(0)), session,
+            Cancellation.Never, requirePinned = false) {})
+
+        val clause = assertNotNull(explanation.clause(intArrayOf(0), session, Cancellation.Never) {})
+        assertTrue(clause.all { session.litTruth(it) == false })
+        val sibling = PropagationSession(problem)
+        assertNull(explanation.clause(intArrayOf(0), sibling, Cancellation.Never) {})
+    }
+
+    @Test
+    fun `partial source snapshots should withhold a row with an unassigned Boolean premise`() {
+        val problem = Problem(1, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val source = LpBuilder().apply {
+            val r = addRealVar(null, null)
+            addRealRow(intArrayOf(r), doubleArrayOf(1.0), Relation.LE, 0.0,
+                premiseLits = intArrayOf(Lit.make(0, true)))
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val parent = LpRelaxation(model, intArrayOf(-1), booleanArrayOf(false), 0L, intArrayOf(),
+            intArrayOf(-1), colRealId = intArrayOf(0))
+        val declines = ArrayList<String>()
+
+        val explanation = LpPinnedExplanation.capture(parent, listOf(intArrayOf(0)), PropagationSession(problem),
+            Cancellation.Never, onDecline = declines::add, requirePinned = false) {}
+
+        assertNull(explanation)
+        assertEquals(listOf("UNASSIGNED_ROW_PREMISE"), declines)
+    }
+
     @Test
     fun `weaker coincident row guards should be absent from a compacted refutation`() {
         for (reversed in listOf(false, true)) {

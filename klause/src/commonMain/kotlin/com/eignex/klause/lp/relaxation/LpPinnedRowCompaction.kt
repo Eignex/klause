@@ -21,6 +21,7 @@ internal fun LpRelaxation.compactPinnedRows(
     session: PropagationSession,
     cancellation: Cancellation,
     onDecline: ((String) -> Unit)? = null,
+    requirePinnedExplanation: Boolean = true,
     onWork: (Long) -> Unit,
 ): LpRelaxation? {
     val state = model.exactState ?: return null
@@ -135,7 +136,7 @@ internal fun LpRelaxation.compactPinnedRows(
         if (working == null) return null
         LpRelaxation(working, colVarId, colIsBool, objectiveConstant, intColOf, boolColOf,
             pinnedExplanation = LpPinnedExplanation.capture(this, sourceRows, session, cancellation,
-                onDecline = onDecline, onWork = onWork),
+                onDecline = onDecline, requirePinned = requirePinnedExplanation, onWork = onWork),
             circuitArcs = circuitArcs, colReq = colReq, colPresentUpper = colPresentUpper,
             colRealId = colRealId, colRealSign = colRealSign, colPresence = colPresence,
             rowFactorIds = IntArray(compact.m) { -1 })

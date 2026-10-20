@@ -128,15 +128,23 @@ origins and original row IDs remain mapped. Construction and projection share th
 containing work ledger, with 10,000 rows and columns, 65,536 sparse or premise units
 and 4,096-bit scalar admission.
 
+For exact satisfaction, selected-prefix checks use the same fresh assembly and
+compaction while unrelated finite coordinates remain open. They retain live
+immutable finite domains, their bound intervals and tri-state Boolean snapshots;
+every conditional row premise must already be assigned. The unchanged 1,000-row numerical cap and node
+work allowance bound each query. Only an infeasible result with a checked source
+clause can prune the prefix; positive points remain relaxation values. Required
+leaf completion still waits for all finite pins and checks the original source.
+
 A compacted refutation maps each supported interval to the original rows that
 establish its strongest lower and upper endpoints, retaining a strict parent at
 equal endpoints. It cites those rows' validity premises and both bounds of touched
 structural columns. Weaker coincident rows contribute no proof condition. A freshness
 snapshot retains at most 4,096 finite coordinates referenced by structural columns
 or original row premises; its size is independent of unrelated source coordinates.
-Source identity and captured pins must still match, and every emitted literal must
-be false in the live session. Unsupported source scopes, bounds, storage or
-cancellation withhold the explanation. Required completion forwards a complete
+Source identity, captured Boolean values and finite domain state must still match,
+and every emitted literal must be false in the live session. Unsupported source
+scopes, bounds, storage or cancellation withhold the explanation. Required completion forwards a complete
 source clause to native CP conflict analysis; the private nogood pool is a separate
 consumer. Original-source checks still gate every published witness.
 

@@ -38,9 +38,108 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `a selected real prefix should refute before unrelated finite coordinates are pinned`() {
+        val problem = Problem(3, 1, arrayOf(IntDomain(0, 1)), Array(1002) { row ->
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                if (row == 1) LinearOp.GE else LinearOp.LE,
+                when (row) {
+                    0 -> BigFraction.ZERO
+                    1 -> BigFraction.ONE
+                    else -> BigFraction.ofLong(10)
+                },
+                activator = if (row < 2) row else -1)
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val session = PropagationSession(problem)
+        session.pinBool(0, true)
+        session.pinBool(1, true)
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, learn = true)),
+            SolveStatsSink(backend = "partial-real-source"))
+
+        engine.use {
+            assertEquals(LpVerdict.INDETERMINATE, it.leafCertify(session).verdict)
+            assertTrue(it.prefixRealInfeasible(session))
+
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+                assertNotNull(it.pinnedLeafClause).toSet())
+            assertNull(session.boolValue(2))
+            assertFalse(session.intDomain(0).isFixed)
+            val sibling = PropagationSession(problem)
+            sibling.pinBool(0, true)
+            sibling.pinBool(1, false)
+            assertFalse(it.prefixRealInfeasible(sibling))
+            sibling.pinBool(2, true)
+            sibling.pinInt(0, 0)
+            val leaf = it.leafCertify(sibling)
+            assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+            val point = Sample(booleanArrayOf(true, false, true), longArrayOf(0), leaf.reals,
+                exactReals = assertNotNull(leaf.exactReals))
+            assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
+        }
+    }
+
+    @Test
+    fun `a selected real prefix above the actual row cap should not open a native solver`() {
+        val problem = Problem(1, 0, emptyArray(), Array(1001) { row ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ofLong(row + 1L)), LinearOp.LE, BigFraction.ofLong(row + 1L))
+        }, numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink(backend = "partial-real-row-cap")
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)), sink,
+            LpSolveContext(engineFactory = factory))
+
+        val refuted = engine.use { it.prefixRealInfeasible(PropagationSession(problem)) }
+
+        assertFalse(refuted)
+        assertTrue(factory.calls.isEmpty())
+        assertEquals(1L, sink.snapshot().lp.phases["PREFIX_REAL_ADMISSION_ROOT"]?.outcomes?.get("ROW_LIMIT"))
+    }
+
+    @Test
+    fun `an interrupted real prefix should retain construction work without opening a native solver`() {
+        val problem = Problem(2, 0, emptyArray(), Array(1002) { row ->
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                if (row == 0) LinearOp.LE else LinearOp.GE,
+                if (row == 0) BigFraction.ZERO else BigFraction.ONE, activator = if (row == 0) 0 else -1)
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val session = PropagationSession(problem)
+        session.pinBool(0, true)
+        var stopped = false
+        var armed = false
+        var work = 0L
+        val factory = RecordingLpEngineFactory()
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true),
+                cancellation = Cancellation { stopped }), SolveStatsSink(backend = "partial-real-stop"),
+            LpSolveContext(engineFactory = factory), containingWork = { units ->
+                work += units
+                if (armed) stopped = true
+            })
+        val before = work
+        armed = true
+
+        engine.use {
+            assertFalse(it.prefixRealInfeasible(session))
+
+            assertTrue(work > before)
+            assertNull(it.pinnedLeafClause)
+            assertTrue(factory.calls.isEmpty())
+            armed = false
+            stopped = false
+            assertTrue(it.prefixRealInfeasible(session))
+        }
+    }
+
     @Test
     fun `a compacted source conflict should exclude weaker guards and preserve a satisfying sibling`() {
         val problem = Problem(3, 0, emptyArray(), Array(1002) { row ->
