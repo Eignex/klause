@@ -42,7 +42,8 @@ class LpPinnedExplanationTest {
 
     @Test
     fun `compacted source reasons should retain fixed values and original row guards`() {
-        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1)
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val session = PropagationSession(problem)
         session.pinBool(0, true)
         session.pinInt(0, 1)
