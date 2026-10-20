@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -37,13 +38,7 @@ internal object JvmSourceCompilerReview {
         val completion = result.getOrElse { failure ->
             buildJsonObject {
                 put("completed", false)
-                put(
-                    "error",
-                    buildJsonObject {
-                    put("type", failure.javaClass.name)
-                    put("message", failure.message)
-                }
-                )
+                put("error", failureMetadata(failure))
                 PROOF_FLAGS.forEach { put(it, false) }
             }
         }
@@ -52,6 +47,24 @@ internal object JvmSourceCompilerReview {
         Files.write(File(out, "completion.json").toPath(), bytes, StandardOpenOption.CREATE_NEW)
         if (result.isSuccess) recordStage(out, "complete")
         result.getOrThrow()
+    }
+
+    internal fun failureMetadata(failure: Throwable): JsonObject {
+        val owned = failure.stackTrace.firstOrNull {
+            it.className.startsWith("com.eignex.klause.bench.profile.")
+        }
+        return buildJsonObject {
+            put("type", failure.javaClass.name)
+            put("message", failure.message)
+            put("ownedReaderLocation", owned?.let { frame ->
+                buildJsonObject {
+                    put("class", frame.className)
+                    put("method", frame.methodName)
+                    put("file", frame.fileName)
+                    put("line", frame.lineNumber)
+                }
+            } ?: JsonNull)
+        }
     }
 
     internal fun recordStage(out: File, phase: String, arm: Int? = null) {

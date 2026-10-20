@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -15,6 +16,35 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class JvmSourceCompilerReviewTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["owned", "external", "empty"])
+    fun `failure metadata identifies only an owned reader source location`(variant: String) {
+        val failure = IllegalArgumentException("retained failure")
+        val owned = StackTraceElement(
+            "com.eignex.klause.bench.profile.JvmSavedTables", "project", "JvmSavedTables.kt", 42,
+        )
+        val external = StackTraceElement("external.Library", "parse", "Other.kt", 7)
+        failure.stackTrace = when (variant) {
+            "owned" -> arrayOf(external, owned)
+            "external" -> arrayOf(external)
+            else -> emptyArray()
+        }
+
+        val actual = JvmSourceCompilerReview.failureMetadata(failure)
+
+        assertEquals(JsonPrimitive("java.lang.IllegalArgumentException"), actual["type"])
+        assertEquals(JsonPrimitive("retained failure"), actual["message"])
+        assertEquals(
+            if (variant == "owned") buildJsonObject {
+                put("class", owned.className)
+                put("method", owned.methodName)
+                put("file", owned.fileName)
+                put("line", owned.lineNumber)
+            } else JsonNull,
+            actual["ownedReaderLocation"],
+        )
+    }
+
     @Test
     fun `the reader stage retains the latest owned phase`(@TempDir out: File) {
         JvmSourceCompilerReview.recordStage(out, "catalog")

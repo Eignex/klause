@@ -1574,6 +1574,10 @@ optional input-arm ordinal. It contains no original measurements or elapsed cost
 A stage tag, including `complete`, supplies lifecycle diagnostics; completion
 admission still requires the whole producer header, successful child exit and all
 input/output byte checks.
+Failed completions retain the error type, message and first owned reader stack
+location, or a null location when no reader frame is available. This identifies
+the validation source without interpreting original report fields or admitting
+an incomplete audit.
 
 One monotonic 180-second wrapper budget covers review and capture. Review leaves
 30 seconds for archiving; a child exceeding its remaining review allowance is
