@@ -213,7 +213,31 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `default integer point guidance should attain a source optimum within two decisions`() {
+    fun `integer point guidance attains a source optimum with explicit boolean priority`() {
+        val parsed = stepped()
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+        val minimizer = OpenTheoryMinimizer(
+            parsed.model,
+            objective,
+            PresolveConfig.NONE,
+            solutionSetSensitive = false,
+            presolveCancellation = Cancellation.Never,
+            presolveBudget = null,
+        )
+
+        val result = assertIs<OpenTheoryOptimum.Optimal>(minimizer.minimize(
+            TheoryParams(maxDecisions = 2, openBranching = OpenBranching.SourceOrder)))
+
+        assertEquals("0", result.value.toString())
+        for (variable in listOf("x", "y", "z")) {
+            assertEquals("0", result.assignment.intValue(parsed.intVarNames.getValue(variable)))
+        }
+        assertTrue(result.stats.openHints.usage.componentSelections > 0L)
+    }
+
+    @Test
+    fun `automatic finite priority attains a source optimum within two decisions`() {
         val parsed = stepped()
         val x = parsed.intVarNames.getValue("x")
         val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
@@ -232,7 +256,6 @@ class OpenTheoryMinimizeTest {
         for (variable in listOf("x", "y", "z")) {
             assertEquals("0", result.assignment.intValue(parsed.intVarNames.getValue(variable)))
         }
-        assertTrue(result.stats.openHints.usage.componentSelections > 0L)
     }
 
     @Test

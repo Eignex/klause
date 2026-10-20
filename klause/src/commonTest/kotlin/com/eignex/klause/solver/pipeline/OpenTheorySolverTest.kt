@@ -145,12 +145,17 @@ class OpenTheorySolverTest {
     @Test
     fun `a rejected finite side retains its complementary source witness`() {
         val open = Bits(3).also { it.set(0); it.set(1) }
-        val model = Problem(2,
+        val gate = Lit.make(0, true)
+        val left = Lit.make(1, true)
+        val right = Lit.make(2, true)
+        val model = Problem(3,
             IntBounds.fromModelBounds(LongArray(3), longArrayOf(0, 0, 1), open, open),
-            arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            arrayOf(Clause(intArrayOf(gate, left, right)),
+                Clause(intArrayOf(gate, Lit.negate(left), right)),
+                Clause(intArrayOf(gate, left, Lit.negate(right))),
+                Clause(intArrayOf(gate, Lit.negate(left), Lit.negate(right))),
                 Linear(intArrayOf(2, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
-                ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 1),
-                ReifiedLinear(1, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 1)))
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 1)))
         val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
 
         val result = assertIs<OpenTheoryResult.Sat>(engine.solve())
