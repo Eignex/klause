@@ -1,4 +1,4 @@
-# 14.3 Explanations and conflict learning
+# 9. Learning and theory completion
 
 A deduction is only useful to learning if its reason can be read back later. This
 subchapter starts with the reasons propagators record and how long they stay valid,
@@ -40,7 +40,7 @@ scope withholds the consequence. With LP learning enabled, a bounded deduplicati
 pool admits each row tightening as an implication in the persistent CP session, so it
 survives undo and propagates in sibling branches. These clauses assume no incumbent
 cutoff. See
-[LP consumer contracts](26-lp-architecture.md#consumers-explanations-and-cuts).
+[LP consumer contracts](17-linear-programming.md#consumers-explanations-and-cuts).
 
 ## Conflict analysis
 
@@ -154,9 +154,155 @@ learned database. Vivification strengthens a clause by asserting the negations o
 literals under propagation; subsumption drops subsumed learned clauses and applies
 self-subsuming resolution. Every pass must preserve the variable set, because portfolio workers share learned
 clauses under stable variable ids and share the native arena read-only; variable
-elimination runs once in [presolve](12-presolve.md) instead. Seeded searches skip
+elimination runs once in [presolve](07-presolve.md) instead. Seeded searches skip
 inprocessing, since derivations under assumption pins would not hold globally.
+
+## Theory completion
+
+Finite search assigns Boolean and integer variables; arithmetic theories complete or
+refute the remaining coordinates. This subchapter describes how those theory owners
+take part in the shared traversal: the encoders they install, how several owners agree
+on shared coordinates, and how completed values reach the published model. The
+theories themselves are the subject of [Part IV](14-theories.md).
+
+### Theory completion
+
+A component's partial consistency check or relaxation witness does not accept a
+complete source assignment: every participating owner must finish its required check
+before publication. [Theory contracts](14-theories.md) define the fragment-specific
+checks and evidence. Difference graphs, exact linear systems and polynomial completion
+keep their own state while sharing the traversal's source facts and decision lifetime.
+Integer integrality and finite factors cannot be dropped to obtain an arithmetic
+witness.
+
+Exact linear components wait for finite-owned coordinates before proposing splits
+or accepting completion. Finite publications supply scoped bounds and fixed values
+while the finite owner keeps hole membership, so an arithmetic point outside a source
+value set is withheld rather than accepted on its bound hull. Retraction invalidates
+both peers' scoped outcomes.
+
+Difference components can imply comparison guards from checked active source paths;
+these carry clause-form reasons and enter the shared Boolean fixpoint. See
+[difference proofs](14-theories.md#difference-logic). Open quadratic integer optimization branches
+on exact wide predicates and prunes against certified bounds and checked incumbents,
+without turning objective cutoffs into infeasibility conflicts. See
+[nonlinear integer quadratic objectives](16-nonlinear-arithmetic.md#quadratic-objectives).
+
+### Selected theory encoders
+
+Prepared factor encoders supply the full relations used by shared arithmetic
+components; admission and component construction consume the same selected capture.
+Variable ownership is independent of factor participation: finite declarations retain
+finite state and choices, while a propagator and encoder can consume one factor
+together. Component descriptors distinguish primary `factorIndices` from overlapping
+`participatingFactorIndices`, retaining one authoritative coordinate owner.
+
+Linear relations keep their conjunction and disjunction structure, row activators,
+strictness and original factor attribution. Private real coordinates stay in the
+combined exact model and are stripped before publication. Polynomial installation
+conjoins factor relations with all private auxiliary definitions, and finite integers
+embedded there are private reals fixed from finite state. Relaxation selection cannot
+omit an encoder's enforcing relation, and the original source checker stays required.
+A finite registration skips duplicate original point checks only for factors whose
+mandatory arithmetic peer installs a complete enforcing encoding.
+
+### Arithmetic coordinate agreement
+
+Prepared registration collections with several arithmetic completion groups install
+`SourceCoordinateAgreementComponent` after their ordinary participants. Each group
+must implement `SourceCoordinateAgreement`; unsupported groups leave the combined
+result indeterminate. Standard preparation retains one combined arithmetic owner and
+installs no agreement participant.
+
+The exact-linear adapter exchanges normalized source bounds through the neutral atom
+registry, and peers enforce the same predicates at the shared decision level. Each
+source coordinate has one declared owner. After fragment checks, agreement validates
+the immutable typed snapshot against each peer's current rows and conditions; it
+never combines private fragment points, and a rejected point does not refute other
+completions. Exact integers and rational reals are admitted; unsupported
+contributions stay indeterminate rather than rounded. Agreement supplies no general
+theory combination or bound authority and opens no fresh allowance.
+
+### Contributed model ownership
+
+Components contribute immutable values through typed keys, one owner per key, and
+the assembled model reads them without copying. Exact source integer and real keys
+preserve arbitrary-precision and rational coordinates; extensions can add open keys
+whose payloads must be immutable. See
+[API migration and mappings](19-api.md#typed-contributions-and-migration).
+
+## Primal heuristics and statistics
+
+Complete search proves results, but it can also find good incumbents early. This
+subchapter describes the two primal heuristics that run inside complete search, the
+root LP proposals on mixed models and the monotone clausal probe on pure-Boolean
+optimization, and closes with the counters search reports. Neither heuristic carries
+proof authority: every proposal passes full source verification before it becomes an
+incumbent.
+
+### Root primal proposals
+
+On mixed models, the root LP relaxation also proposes incumbents. Nearest rounding,
+directed upward and downward rounding of the retained LP point, a peer worker's
+discrete assignment and a feasibility pump each produce discrete targets. Every
+distinct proposal passes the discrete fixpoint under the caller's assumptions, then
+real completion through the real-leaf owner or the caller's source tolerance check,
+then full source verification. Only a complete checked witness that strictly
+improves the current cutoff becomes an incumbent.
+
+The opt-in `lbTreeSearch` probe extends this to a private finite trail with exhaustive
+fractional and value alternatives, trying the nearer side of the LP value first. It
+returns accepted witnesses only and exports no optimum, refutation, bound or recession
+claim. The `lp-lbtree` portfolio recipe can enable it.
+
+Root primal work charges the containing root ledger and solve-wide `NodeBudget`, and
+a fallback solve receives only the remaining allowance.
+
+### Monotone clausal primal probe
+
+Pure Boolean clausal optimization with at most 64 positive-cost variables can seed
+incumbents through greedy feasibility repairs when those variables occur only
+positively in hard clauses. The probe runs once before ordinary optimization and is
+skipped behind an existing shared incumbent or within repair fragments.
+
+A private satisfaction repair first finds a feasible assignment, then turns off any
+cost variable whose removal alone keeps every hard clause satisfied. Trials then try
+to turn off the remaining cost variables in descending weight order through a clause
+walk with penalty escalation, restoring the previous feasible assignment on failure.
+Trials run on a projected model reduced by unit propagation and bounded Boolean
+elimination, and lift their result back. Private infeasible verdicts contribute no
+outer proof, and the full original proposal is verified before publication.
+
+The probe's work is charged to its arm and the solve-wide move allowance, within at
+most half the remaining time and 5 seconds.
+
+### Statistics
+
+Search reports what its traversal observed; counters are observations, not proofs.
+
+| Field | Meaning |
+|---|---|
+| `propagations` | Finite Boolean, singleton, bound, hole and survivor-set deductions reported by completed search fixpoints; excludes decision and root pins |
+| `learned` | Learned consequences observed by the traversal, including native CP learning |
+| `caNotApplicable`, `caNonAsserting` | Native CP analyses declining a usable or asserting consequence; exported by every CLI format |
+| `propagationWork` | Monotonic dispatch, literal, watcher, level and linear-term/reason visits, including work across undo |
+| `rootPropagationWork`, `rootPropagationMs` | Initialization root-fixpoint work and time, including private preparation |
+| `propagationMs` | Fixpoint elapsed time; some counted reason scans are outside it |
+| `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |
+| `openNonAssertingConflicts` | Sound shared conflicts retaining chronological fallback |
+| `openReductionNs` | Total shared reduction selection and watch-rebuild time; zero when the cap is off |
+
+A nonzero non-asserting count points at a component reason that did not support
+first-UIP learning. Zero does not establish complete factor reason coverage. Missing
+metrics remain missing, including root theory refutations that never enter shared
+search.
+
+The CLI also exports native CP work and time (`nativeCpPropagationWork` and related
+fields), where root figures are subsets of the totals. Complete open-theory search
+adds `smtCompleteSearch*` observations of Boolean assignment depth, LP checks and
+stage counters; they stay absent until observed and overlap, so they are not a work
+total. See the [CLI](20-cli.md).
 
 ---
 
-Previous: [14.2 Finite propagation](14.2-propagation.md) · [Contents](README.md) · Next: [14.4 Theory completion](14.4-theory-completion.md)
+Previous: [8. Search and propagation](08-search.md) · [Contents](README.md) · Next: [10. Local search](10-local-search.md)

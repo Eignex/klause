@@ -1,4 +1,4 @@
-# 12. Presolve and reconstruction
+# 7. Presolve and validation
 
 With a scope and an allowance in place, the first thing a solve does is prepare
 the model. Presolve reduces it before search while retaining the information
@@ -9,10 +9,10 @@ optimization and counting need different contracts.
 
 Preparation applies only reductions justified for that query, records
 reconstruction and objective mappings, and charges its work to the preparation
-phase of the allowance from [chapter 11](11-resources.md). This chapter gives the
+phase of the allowance from [chapter 11](06-sessions.md#resource-allowances). This chapter gives the
 shape of the pipeline, then the guarantees each reduction must declare, and finally
 how rebuilt models and phase accounting are owned. The search that runs on the
-prepared model is the subject of [chapter 14](14-search.md).
+prepared model is the subject of [chapter 14](08-search.md).
 
 ## Pipeline
 
@@ -65,7 +65,7 @@ Independent source evaluation checks the composed adjustment against reconstruct
 witnesses. A mapping never issues a proof certificate. Optional
 `SourceMapping.captureSolve`, `captureMinimize` and `justification` retain reduced
 evidence and typed obligations for
-[original-source derivations](17-evidence.md); a transformed terminal cannot gain
+[original-source derivations](13-evidence.md); a transformed terminal cannot gain
 original admission from a reduced label, and original-source witness checking
 remains required.
 
@@ -86,7 +86,7 @@ For a selected private float grid, finite presolve reconstructs into the private
 model first, then the invocation's explicit grid map lifts to original real
 coordinates before source checking. Source and engine plans keep separate
 namespaces, and a foreign source, target or consumer cannot reuse the map; see
-[private float projections](03.1-source-relations.md#private-float-projections).
+[private float projections](02-model.md#private-float-projections).
 
 [PresolveShared.rebuildProblem](../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveShared.kt)
 and [RootBaker.reseed](../klause/src/commonMain/kotlin/com/eignex/klause/presolve/RootBaker.kt)
@@ -219,6 +219,95 @@ source into a supported fragment. Source rewrites reselect encoders against the 
 canonical factors; original value sets, reconstruction and assertion premises stay
 authoritative after selection.
 
+## Source witness validation
+
+Presolve hands search a transformed model, and the following chapters describe
+the engines that look for assignments of it. Before any of those engines can
+publish an assignment, it must be checked against the original source. This
+chapter describes that check, because every engine in the rest of this part relies
+on it: a solver's own view of the model is never the authority on whether a point
+is a solution.
+
+`solver.validation` owns reusable checks of proposed source coordinates. Search,
+local search, LP adapters, evidence and pipeline or portfolio orchestration call
+these services; checking does not require an orchestration owner. A check has three
+outcomes. Acceptance means the point satisfies every checked source obligation.
+Rejection refutes the proposed point, never the source. Indeterminate means a
+required checker was unavailable or the check was interrupted. Publication
+identity, restrictions, objective scope and certificate admission remain with the
+[portfolio](12-portfolio.md#witnesses-and-proof-scope) and [evidence](13-evidence.md) callers
+described later in this part.
+
+### Finite points
+
+`composedFixpoint` creates a private propagation session for the full Boolean and
+finite integer point and checks the selected original-source relations. The point is
+the session's private root, so incompatible caller pins still refute it. Prepared
+custom providers keep their selected factories and required original checks.
+Cancellation or unavailable required checking returns indeterminate. Every exit
+reports the propagation work through the caller's accounting hook, and no scratch
+state survives a check.
+
+Exact point checking also validates integer absolute-value and distinctness
+relations on authoritative arbitrary-width values. `AllDifferent` compares every
+present position, preserving presence-literal polarity and exempt values, and
+missing coordinates reject the point.
+
+### Open and real coordinates
+
+`verifyOpenWitness` checks discrete coverage, declared integer bounds and value sets,
+then every original relation touching a real coordinate, then projects the remaining
+discrete relations into a singleton-domain finite check. An unavailable real checker
+stays indeterminate. It invents no bounds for open declarations, and
+arbitrary-width integers go to their exact theory checker instead.
+
+`verifyRealCoordinates` checks authoritative rational coordinates against source
+bounds and supported exact relations, including strict and reified rows. Missing
+coordinates or a factor without a complete checker stay indeterminate; algebraic,
+symbolic and wide-integer checks belong to their specialized owners. Visits are
+charged to the caller, and rational powers compare normalized numerators and
+denominators, using bit-length bounds to refute impossible equalities before
+allocating.
+
+Finite real domains compare their captured binary64 literals as exact rationals. An
+isolated algebraic root matches a rational member when the literal lies inside its
+isolating interval and zeroes its defining polynomial, without opening a polynomial
+solver.
+
+### Projected and tolerance-qualified witnesses
+
+`verifyProjectedSourceWitness` combines original relation checking with integer
+declarations and a private composed fixpoint over captured descriptors. A caller
+callback can add a restriction but cannot replace relation coverage. Exact policy
+uses the full original real graph. Nonzero tolerance has a complete adapter for
+unconditional non-strict linear comparisons and active indicator rows; strict or
+reified tolerance semantics stay indeterminate. A private-grid relation cannot
+certify its own original real relation; see
+[private float projections](02-model.md#private-float-projections).
+
+`finiteWitnessVerifier` combines the finite point check with exact real checking or
+the caller's explicit tolerance policy, checking pins and deduced bounds directly on
+the completed point. A tolerance callback requires complete finite real coordinates
+and does not change exact evidence semantics. See
+[model ownership](02-model.md#published-assignments-and-objectives) for coordinate
+lifetimes.
+
+Original linear-source checking evaluates original rational rows and declaration
+bounds before normalization. Integrality stays exact; row slack is the larger of the
+absolute tolerance and the relative tolerance times the larger of bound magnitude and
+the sum of absolute term activities, with cancelling terms kept separate. Accepted
+points record whether nominal relations also hold, and tolerance acceptance never
+transfers nominal proofs. Unmetered checks poll cancellation at most every 64 visits.
+A captured acceptance check carries a separate permission for floating optimum
+completion, which zero tolerance withholds.
+
+### Dependencies
+
+The shared services depend on source and factor descriptions, propagation, neutral
+sample and verification contracts, exact rational arithmetic and model-facing exact
+row views. They do not depend on pipeline, portfolio, backtracking, local-search,
+evidence orchestration or concrete theories.
+
 ---
 
-Previous: [11. Resource allowances](11-resources.md) · [Contents](README.md) · Next: [13. Source witness validation](13-validation.md)
+Previous: [6. Sessions and resources](06-sessions.md) · [Contents](README.md) · Next: [8. Search and propagation](08-search.md)

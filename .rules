@@ -89,9 +89,9 @@ Read `klause-bench/README.md` before benchmarking. In short:
   Chapters are ordered so every concept is introduced before later chapters rely on it; read the
   relevant chapters before changing a subsystem. User-facing documentation is hosted at
   `https://eignex.com/docs/klause/` and is maintained separately.
-- Solver contracts are split by ownership: `docs/14-search.md` for traversal, propagation and
-  explanations; `docs/10-sessions.md` for invocation scopes; `docs/15-local-search.md` for heuristic
-  state and moves; `docs/16-portfolio.md` for scheduling and publication; `docs/12-presolve.md` for
+- Solver contracts are split by ownership: `docs/08-search.md` for traversal, propagation and
+  explanations; `docs/06-sessions.md` for invocation scopes; `docs/10-local-search.md` for heuristic
+  state and moves; `docs/12-portfolio.md` for scheduling and publication; `docs/07-presolve.md` for
   reductions and source mappings. Extend the chapter that owns a contract and link across
   boundaries. A new chapter goes where its prerequisites have been introduced; renumber the files
   after it and update the table of contents.

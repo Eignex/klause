@@ -604,7 +604,7 @@ Index observations require actual construction through the explicit allowance. E
 but no component steering; positive values allow indexed preferences after caller
 or deferred hints decline. The optional Boolean draw requires this explicit
 allowance. None of these paths renews numerical or indexing allowances; full
-admission and lifetime contracts live in [search](../docs/14-search.md).
+admission and lifetime contracts live in [search](../docs/08-search.md).
 
 `openHintClauseIndexAdmitted` and `openHintClauseIndexDeclined` describe the optional
 semantic index separately from the forward index. `openHintClauseConsulted`,
@@ -672,8 +672,8 @@ root subsets. Native timing aggregates can include several workers and private
 preparation, so subtracting them from invocation duration does not recover theory
 time. Missing startup, open-theory root and open-theory propagation clocks remain
 unavailable. A declared or reported theory label alone does not establish execution;
-preparation can stop before its first check. See the [CLI statistics scopes](../docs/31-cli.md)
-and [search contract](../docs/14.5-primal-and-statistics.md#statistics).
+preparation can stop before its first check. See the [CLI statistics scopes](../docs/20-cli.md)
+and [search contract](../docs/09-learning.md#statistics).
 
 Outputs are staging locations. Store active notes, scripts, manifests, records
 and reports in the shared external `klause-evidence/campaigns/<name>/` directory
@@ -789,7 +789,7 @@ independent flattened-text checker across every component. The witness policy is
 from `flatzinc-binary64`. The independent flattened-text checker interprets float
 literals as exact binary64 rationals and checks supported predicates/bounds; it
 does not establish decimal-rational MiniZinc semantics. `floatApproximation`
-records the lowering policy. See [input semantics](../docs/04-input-semantics.md).
+records the lowering policy. See [input semantics](../docs/03-input-semantics.md).
 
 Unsupported syntax, missing coordinates, residual constraints, compiler failure
 or the ten-second external timeout leave validation unknown. Checking is outside
@@ -1076,7 +1076,7 @@ and residuals; replay or paired comparisons measure that recorded work. A kernel
 trace does not establish correctness or performance of an entire source solve.
 
 Use the basis corpus for numerical regressions and dense comparisons for basis selection.
-[LP architecture](../docs/26-lp-architecture.md) owns implementation contracts; the
+[LP architecture](../docs/17-linear-programming.md) owns implementation contracts; the
 sections above cover full solve measurements.
 
 ### Basis corpus replay
@@ -1552,8 +1552,8 @@ stays outside the repository.
 
 Retain the finite schedule's base 5000, maximum 150000 and growth 1.5. The comparison
 found workload-specific benefits from alternatives without a general replacement.
-[Portfolio scheduling](../docs/16.2-portfolio-scheduling.md#slice-accounting-and-coverage) and
-[resources](../docs/11-resources.md) own the policy and work currencies.
+[Portfolio scheduling](../docs/12-portfolio.md#slice-accounting-and-coverage) and
+[resources](../docs/06-sessions.md#resource-allowances) own the policy and work currencies.
 
 #### Scope and controls
 
@@ -1593,8 +1593,8 @@ to the recorded selection and runtime.
 ### Numerical kernel decisions
 
 These summaries support current implementation choices on bounded workloads.
-[LP architecture](../docs/26-lp-architecture.md), [certification](../docs/27-lp-certification.md) and
-[dependencies](../docs/29-numerical-dependencies.md) own the contracts; measurement procedures live
+[LP architecture](../docs/17-linear-programming.md), [certification](../docs/17-linear-programming.md#lp-certification) and
+[dependencies](../docs/18-exact-arithmetic.md#numerical-dependencies) own the contracts; measurement procedures live
 in [LP capture and replay](#lp-capture-and-replay). Raw evidence stays outside the repository.
 
 #### Dense basis selection
@@ -1633,7 +1633,7 @@ identical-work timing nor completed-solve gains.
 
 #### Cancellation polling
 
-Retain the [polling contract](../docs/27-lp-certification.md#resources-and-cancellation)
+Retain the [polling contract](../docs/17-linear-programming.md#resources-and-cancellation)
 and dispatch frequency. A [fixed-work comparison](https://github.com/Eignex/klause/actions/runs/38043602143)
 used three `nec-smt` inputs and five alternating pairs at seed 1/work 3000.
 Counters and unknown outcomes matched; median duration reductions were 0.45%,
@@ -1646,8 +1646,8 @@ frame removal alone does not justify weaker polling.
 ### State ownership evidence
 
 The bounded comparisons support retaining concrete buffer owners, separate indexed
-vector roles and one cursor/cleanup owner per run. [LP architecture](../docs/26-lp-architecture.md),
-[search](../docs/14-search.md) and [local search](../docs/15-local-search.md) own the contracts.
+vector roles and one cursor/cleanup owner per run. [LP architecture](../docs/17-linear-programming.md),
+[search](../docs/08-search.md) and [local search](../docs/10-local-search.md) own the contracts.
 
 The LP consumer probe checked 2,688 states
 across matched workspace, basis, pricing and traversal comparisons. An independent
@@ -1672,8 +1672,8 @@ own pinned builds, paired measurements and whole-CLI controls.
 
 Retain typed original-source derivations separately from native engine completion.
 Evidence capture stays optional; unsupported capture withholds mathematical coverage.
-[Source evidence](../docs/17-evidence.md) owns this contract, while
-[portfolio admission](../docs/16-portfolio.md) owns native result transport.
+[Source evidence](../docs/13-evidence.md) owns this contract, while
+[portfolio admission](../docs/12-portfolio.md) owns native result transport.
 
 #### Derivation decision evidence
 

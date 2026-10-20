@@ -37,5 +37,5 @@ wrapper prepends `-e ls`; a later explicit `-e` takes precedence.
 ## Native predicates
 
 `redefinitions.mzn` is the advertised native surface; predicates not declared there fall back
-to MiniZinc's standard decomposition. See [native predicate coverage](../docs/07-flatzinc.md#native-predicate-coverage)
-for what a declaration requires, and [FlatZinc](../docs/07-flatzinc.md) for the frontend semantics.
+to MiniZinc's standard decomposition. See [native predicate coverage](../docs/04-finite-formats.md#native-predicate-coverage)
+for what a declaration requires, and [FlatZinc](../docs/04-finite-formats.md#flatzinc) for the frontend semantics.
