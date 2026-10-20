@@ -1286,8 +1286,8 @@ These are separate representations; input declarations cannot stand in for the
 arithmetic query's dimensions. Polynomial totals are read from the existing captured
 source without modifying it; incompatible field layouts fail the diagnostic.
 Linear controls retain their selected linear execution, result and search statistics,
-with no polynomial work attribution. Preparation refutations retain declaration
-dimensions without inventing a theory query. Its single
+with no polynomial work attribution. Refutations retain declaration dimensions;
+absent polynomial query dimensions remain absent. Its single
 deadline, set by `timeoutMs` or the 60-second default, covers admission, preparation
 and execution. It records a
 pipeline trace instead of direct-query checkpoints or a separate gate inspection.
