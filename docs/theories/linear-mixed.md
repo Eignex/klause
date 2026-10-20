@@ -98,7 +98,9 @@ for a source-premised conflict; guessed integer recovery requests no such author
 It can also check an entirely admitted reduced difference residual for a negative
 cycle, retaining every original input-row premise. A graph failure for guessed
 integers remains a failed point attempt, with no source refutation authority.
-A general residual is partitioned by connected real coordinates. Each component
+A general residual compacts its surviving real coordinates before partitioning
+by connectivity. Returned points restore every original coordinate position.
+Each component
 uses the difference checker when supported; other components can request exact points
 through the existing [source LP owner](../lp/architecture.md), sharing the reduction
 owner's operation allowance and unchanged small-model admission. Without equation

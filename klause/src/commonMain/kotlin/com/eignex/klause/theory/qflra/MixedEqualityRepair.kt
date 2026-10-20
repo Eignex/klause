@@ -33,6 +33,7 @@ internal fun equalityRowsRefute(
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
     onSupport: ((IntArray) -> Unit)? = null,
+    refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation) -> Boolean)? = null,
 ): Boolean {
     val support = if (onSupport != null) IntArrayList() else null
     val paired: ((Int, Int) -> Unit)? = support?.let { indices ->
@@ -45,19 +46,19 @@ internal fun equalityRowsRefute(
         }
     }
     var falseRow = -1
-    var graphRefuted = false
+    var residualRefuted = false
     val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage, paired)) {
         is EqualityRows.Prepared -> when (val residual = prepared.repair.reduceRows(rows) { falseRow = it }) {
             EqualityResidual.Refuted -> true
             EqualityResidual.Declined -> false
-            is EqualityResidual.Reduced -> refutesDifferenceResidual(columns, residual.rows, stop, onStage)
-                .also { graphRefuted = it }
+            is EqualityResidual.Reduced -> refutesDifferenceResidual(columns, residual.rows, stop, onStage,
+                refutesGeneral).also { residualRefuted = it }
         }
         EqualityRows.Refuted -> true
         EqualityRows.Declined -> false
     }
     if (refuted && support != null && !stop()) {
-        if (graphRefuted) {
+        if (residualRefuted) {
             stop.charge(rows.size.toLong() + 1L)
             if (!stop()) onSupport?.invoke(IntArray(rows.size) { it })
         } else {
@@ -74,12 +75,13 @@ private fun refutesDifferenceResidual(
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
     onStage: ((String) -> Unit)?,
+    refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation) -> Boolean)?,
 ): Boolean {
     val graph = RealDifferenceSystem.prepareRows(columns, rows, stop)
     if (stop()) return false
     if (graph == null) {
         onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_UNAVAILABLE")
-        return false
+        return refutesGeneral?.invoke(columns, rows, stop) == true && !stop()
     }
     onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_ATTEMPT")
     val result = graph.check(intArrayOf(), stop) { stop.charge(it) }

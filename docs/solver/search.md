@@ -840,8 +840,8 @@ finite and Boolean choices complete, source disjunction or disequality branches,
 and source branchers offering no further choice. `RECOVERY_*` records an actual mixed point attempt
 and its existing return path. Equality repair distinguishes paired equations,
 pivots, reconstructed guesses and failed full-row checks. Its residual observations
-separate unsupported rows, false constants, graph admission and graph points. A false
-residual belongs to guessed integers and establishes no source refutation.
+separate unsupported rows, false constants, graph admission and graph points. In mixed point recovery, a false residual belongs to guessed integers and establishes
+no source refutation.
 The pure-real negative caller separately counts exact equality refutations and
 those with a complete current source-premise explanation. Before an admitted LP
 request it can check a separate necessary-row snapshot at a partial Boolean prefix,
@@ -853,8 +853,12 @@ can prove a negative cycle under the same operation. Its source conflict retains
 all original input-row origins, including the equations used in reduction; the
 graph's unguarded internal clause cannot stand in for those premises. Separate
 observations identify unavailable residual graphs, attempts and completed cycle
-refutations. Feasible or incomplete graph checks retain the LP fallback. These observations do not
-export numerical certificates or establish whole-source exhaustion. Real
+refutations. With source Booleans complete, general residual components can reuse
+the reduction owner's source-LP budget after compacting surviving coordinates.
+Their completed exact refutations retain all original input-row premises;
+`PURE_REAL_EQUALITY_GENERAL_*` distinguishes attempts and accepted negative results.
+Feasible or incomplete component checks retain the primary LP fallback. These
+observations do not export numerical certificates or establish whole-source exhaustion. Real
 component observations identify graph checks, source-LP dimension declines and requests,
 and points returned across every component. `RECOVERY_REAL_COMPONENT_SHAPE_<columns>_<rows>`
 records the compact dimensions of a general component before LP admission.

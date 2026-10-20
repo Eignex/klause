@@ -97,9 +97,15 @@ reduced to a false constant, or a completed negative cycle in an entirely admitt
 reduced difference residual refutes only the current Boolean and private-branch
 prefix. A completed proof retains both original directions of every paired equation
 and the source inequality reduced to a false constant, when present. A residual
-graph refutation conservatively retains every original input row; its internal
-unguarded cycle cannot become a root source clause. Feasible graphs, unsupported
-rows and incomplete checks retain the ordinary LP route. The same row
+residual refutation conservatively retains every original input row; an internal
+unguarded cycle cannot become a root source clause. Once source Booleans are all
+assigned, a residual outside the difference fragment can compact its surviving
+coordinates and partition them into independent components. General components
+reuse the reduction owner's source-LP allowance with unchanged small-model
+admission. Only completed exact infeasibility refutes the current prefix; points
+from this negative-only check are discarded. Every input row is admitted before
+any component can supply a refutation. Feasible or incomplete component checks
+retain the ordinary LP route. The same row
 capture retains immutable declared bounds and each selected row or branch origin.
 Learning resolves all cited folded Boolean values, selected disjuncts, disequality
 directions and registered source branches against the current search context. A
@@ -108,8 +114,10 @@ missing or oversized explanation retains chronological conflict handling. The
 cancellation withholds the result. No numerical certificate is exported. Unpaired
 rows, unsupported input and interrupted arithmetic retain an indeterminate result.
 The sparse repair kernel keeps its 65,536-entry and 4,096-bit limits and charges
-the current check operation; it creates no LP query or renewed allowance. Column
-admission precedes capture, and each arithmetic check attempts elimination once.
+the current check operation. Equality and difference checks create no LP query;
+general residual components can consume the existing reduction owner's numerical
+operations without renewing any allowance. Column admission precedes capture,
+and each arithmetic check attempts elimination once.
 An admitted residual graph uses that same operation's charged arithmetic work;
 its negative result supplies no numerical certificate or positive source witness.
 Complete-caller observations distinguish these pre-LP attempts from actual LP calls.

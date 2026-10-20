@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -16,6 +17,31 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
+    @Test
+    fun `a reduced general conflict should retain every original source row`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE },
+                    if (strict) BigFraction.ZERO else BigFraction.MINUS_ONE, strict = strict),
+            )
+            val budget = SourceLpBudget()
+            var support: IntArray? = null
+
+            val refuted = equalityRowsRefute(3, rows, Cancellation.Never, onSupport = { support = it },
+                refutesGeneral = { columns, residual, token ->
+                    refuteRealResidualComponents(columns, residual, budget, token)
+                })
+
+            assertTrue(refuted)
+            assertEquals(rows.indices.toSet(), assertNotNull(support).toSet())
+        }
+    }
+
     @Test
     fun `a reduced difference cycle should retain all original source rows`() {
         for (strict in listOf(false, true)) {

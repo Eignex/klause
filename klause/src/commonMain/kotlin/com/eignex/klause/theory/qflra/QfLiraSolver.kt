@@ -651,13 +651,17 @@ class ExactLiraSearchComponent private constructor(
         if (!equalityRefutationEligible()) return null
         if (operationStop()) return ComponentCheck.Indeterminate
         observeCompleteStage("PURE_REAL_EQUALITY_ATTEMPT")
-        lpStop.charge(model.numRealVars.toLong() + model.factors.size + preparedRows.size + 1L)
+        lpStop.charge(model.numRealVars.toLong() + model.factors.size + preparedRows.size + bools.size + 1L)
         if (operationStop()) return ComponentCheck.Indeterminate
         val snapshot = reduction.refutationRows(bools, node, lpStop)
         var support: IntArray? = null
+        val general: ((Int, List<ExactRationalInequality>, Cancellation) -> Boolean)? =
+            if (bools.any { it == UNASSIGNED }) null else { columns, rows, token ->
+                reduction.refuteReals(columns, rows, token, ::observeCompleteStage)
+            }
         val refuted = snapshot != null && equalityRowsRefute(model.numRealVars, snapshot.rows,
             lpStop, ::observeCompleteStage,
-            onSupport = { support = it })
+            onSupport = { support = it }, refutesGeneral = general)
         if (operationStop()) return ComponentCheck.Indeterminate
         if (!refuted) return null
         val explanation = support?.let { equalityExplanation(it, checkNotNull(snapshot).origins, context) }
@@ -1813,6 +1817,13 @@ private class ExactLiraReductionCache(
         stop: Cancellation,
         onStage: (String) -> Unit,
     ): List<BigFraction>? = completeMixedRealComponents(columns, rows, budget, stop, onStage)
+
+    fun refuteReals(
+        columns: Int,
+        rows: List<ExactRationalInequality>,
+        stop: Cancellation,
+        onStage: (String) -> Unit,
+    ): Boolean = refuteRealResidualComponents(columns, rows, budget, stop, onStage)
 
     fun reduce(
         bools: IntArray,
