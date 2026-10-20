@@ -215,6 +215,26 @@ Cancelled checks withhold the proof, and missing cycle capture retains the share
 route. Private source-bound branches and overridden LP certification policies also
 retain that route.
 
+The general pure-real linear component can retain a separate necessary difference
+subset when complete graph coverage is unavailable. It includes supported selected
+source rows, their signed Boolean guards and immutable declared bounds. General
+rows, Boolean coefficient rows, source disjunctions and unsupported disequality
+directions contribute no edges. An equality contributes both directions only under
+its positive guard. The subset owner exposes conflicts only; feasible potentials
+remain private numerical state and supply no point or full-source consistency.
+Every conflict passes the same current-guard and source-scope checks as a complete
+graph conflict before shared learning. The ordinary LP still checks the full source.
+
+Subset preparation admits at most 10,000 real columns, 100,000 source factors and
+65,536 selected edge or sparse units. Rational admission and normalization use the
+4,096-bit scalar policy and charged intermediate arithmetic. The graph retains the
+existing common-denominator and overflow envelope. Preparation and each sweep
+charge the current containing operation; a sweep consumes the arithmetic check
+already required by that call and creates no numerical allowance. Stopped or
+unsupported preparation retains the full LP route. Private source-bound branches,
+integer coordinates, private real auxiliaries and overridden certification policies
+retain their existing path.
+
 Admitted pure-real difference components under the production certification policy
 defer LP construction and check the active graph at partial and complete Boolean states,
 including the root. A feasible partial graph supplies consistency and can guide

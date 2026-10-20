@@ -146,6 +146,11 @@ live default consultation and supply no preference. Registration and all complet
 capture work retain their spent debit; later checks do not recapture released hints in that
 opening. An unavailable point or a caller preference that bypasses the component does
 not trigger this release. Source checks and graph or LP fallback retain their owners.
+General pure-real linear completion may also check a necessary difference subset
+under its existing arithmetic check and operation allowance. Only a checked cycle
+with current false source-guard literals can become a conflict; a feasible subset
+does not complete an assignment or change branch preferences. Private numeric branches
+retain the full linear owner. See [real graph admission](../theories/difference.md#real-graph-admission-and-checks).
 Other built-in exact-linear point guidance and compound source-clause preferences
 use the existing `openHintFlips` opt-in, retaining their real-coordinate producer
 admission. Explicit zero permits bounded construction observations but supplies no

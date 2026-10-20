@@ -19,6 +19,11 @@ products belong to [polynomial real arithmetic](polynomial-real.md).
 [Difference logic](difference.md) supplies a graph mechanism for an admitted
 pure-real subfragment. General linear rows retain the LP-backed route; a graph
 admission decline does not itself reject a supported linear source.
+When full graph coverage is unavailable, a retained necessary difference subset can
+still reject a guarded partial assignment before the general LP query. That owner
+exports source conflicts only. It supplies no feasible point or positive coverage
+for the omitted rows; [difference proof authority](difference.md#real-graph-admission-and-checks)
+defines its guard checks and resources.
 
 ## Solving and composition
 
