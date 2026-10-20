@@ -644,48 +644,16 @@ under that workflow; do not retain a historical archive.
 
 ### Original corpus source capture
 
-`com.eignex.klause.bench.profile.CorpusSourceCapture` exports original SMT archive
-members without invoking a source parser, solver, checker or solve-record cache.
-It supports the catalog's flat QF_LIA, QF_LRA, QF_NRA, QF_IDL, QF_RDL and QF_LIRA
-archive suites. Submit a committed, pinned profile main on Linux AWS with one
-`request64=<base64 UTF-8 JSON>` argument. The request is canonical compact JSON
-with `schema: "corpus-original-source-request-v1"` and a nonempty `cases` array;
-each case supplies exactly `suite`, `problem` and a nonnull lowercase 64-digit
-`expectedSha256` of the original plain bytes. Keep requests and captured payloads
-outside the repository. There is no default selection or reference-result filter.
-
-The profile retains raw and resolved requests before transfer. Archive layout and
-URL come from the same catalog declaration used by ordinary selection. The in-process
-source worker uses HTTPS without proxy inheritance, never follows a redirect off HTTPS,
-streams tar metadata through the system `zstd` decoder and copies only requested regular
-plain `.smt2` members. It does not extract an archive into the corpus cache or change the
-cached collection. Missing, compressed-inner, duplicate, unsupported and mismatched members
-remain failed; no identity or source hash is invented. Leading `./` archive prefixes are
-normalized; absolute and traversal names cannot become retained source paths.
-
-Limits are 128 cases, 48 KiB of original request, 256 MiB per downloaded archive,
-512 MiB total observed download, 8 GiB decoded archive bytes per collection,
-200,000 members, 32 MiB per source and 128 MiB total source payload. Worker
-receipts are bounded to 4 MiB each and 32 MiB in total. A 1,200-second deadline is
-checked per block and per member, with a 30-second network connect and read timeout.
-Linux and `zstd` are required.
-
-Under `$OUT/corpus-source-capture`, each completed payload receives an indexed
-`.smt2` path only after source size/hash and complete decoder exit are checked.
-Partial source and failed archive bytes are retained with transfer/failure metadata.
-Bytes read past a cap are debited and reported as omitted; transfer errors never
-trigger retries. Copy and receipt IO preserve the primary failure and separately
-report durability/close failures. A successful archive download is removed after its
-digest receipt is saved; full original source bytes remain. `capture.json` keeps every
-planned case as captured, failed or not reached, and reports no solver/parser/checker
-calls. Installed-build provenance binds the producing code. Retrieve outputs with
-maintained lab `files`/`cat` over authenticated HTTPS. Hash equality establishes
-original-byte custody, never source satisfiability or a runtime gain. The retained
-archive/source/receipt limits bound only the profile's owned files. Harness JFR and
-other harness output are outside that ownership. The lab's 1 GiB output retrieval limit
-can omit files; completion credit requires the actual terminal inventory, `omitted.tsv`
-and collected payload hashes, not only the worker's completion flag.
-
+`output/capture-sources.sh <out-dir> < requests.tsv` exports original archive members byte for
+byte without invoking a source parser, solver or checker. Each request line is
+`<archive url><TAB><member path><TAB><expected sha256>`; the archive URL and member layout of a
+catalog suite are its `sourceLayout` collection in [Suites.kt](src/main/kotlin/com/eignex/klause/bench/catalog/Suites.kt).
+Every HTTPS archive is downloaded once (256 MiB cap, no redirect off HTTPS) and only the requested
+members are extracted with GNU tar and `zstd`; tar refuses absolute and `..` member names.
+`capture.tsv` records each member as captured, mismatch or missing with both digests, and
+`archives.tsv` the downloaded archive digests. The exit status is nonzero unless every member was
+captured. Keep requests and captured sources outside the repository. Hash equality establishes
+original-byte custody, never source satisfiability.
 
 ### Prepared MPS primal probes
 
@@ -1022,37 +990,6 @@ The lab's executed revision and setup identity belong with these results;
 Acceptance certifies source feasibility and objective values, not optimality or
 infeasibility proofs.
 
-### Boolean source verifier
-
-`verify-boolean` checks `DIMACS`, `WCNF` and polynomial `OPB`/WBO records against original
-source bytes in `<sourceHashes.model>.txt` files under `source-root`. It accepts complete
-signed-literal assignments, OPB variable names and WCNF bitstrings. Clauses, hard weights,
-Boolean integrality and integer objectives use exact arithmetic. WBO checks evaluate weighted
-soft-relation violations and enforce the strict soft-top ceiling on that violation cost. UTF-8
-comments preserve original byte hashes. OPB products use Boolean conjunction, including
-complemented and repeated literals, in constraints, objectives and weighted soft relations.
-OPB bodies can omit the variable-count comment; their range is inferred from every product
-literal. Malformed terms and unsupported syntax are declined. The checker does not use
-Klause's format readers.
-
-```sh
-./gradlew :klause-bench:bench --args="verify-boolean cases=/path/to/cases.json \
-  source-root=/path/to/original-sources records-root=/path/to/raw-job \
-  output=/path/to/boolean-source-checks.json"
-```
-
-Better source objectives and source refutations are excluded by one SMT-LIB query to the pinned
-Z3 release (or `KLAUSE_Z3` with `KLAUSE_Z3_SHA256`) under a ten-second solver limit and the
-source-checker resource controls; each settled check records the Z3 binary hash. A recognized
-pigeonhole subformula establishes a refutation directly. Timeout leaves proof checking unknown;
-a feasible point receives no optimum credit without that check. The exact
-`coreGuidedLowerBound` statistic is checked by excluding source objectives below that floor,
-including records without an incumbent. `checkedLowerBound` records only a completed
-independent check; an undecided floor uses `boundCheck=unknown`. Floor telemetry and floor
-checking do not establish an optimum without a matching witness. Errors are recorded per case
-and make the command exit unsuccessfully. The checker reads JSON and gzip case files, declines
-xz, and preserves cases with no claimed verdict.
-
 ## Comparing configurations
 
 Run separate configurations over frozen membership, hashes, settings, proof
@@ -1063,7 +1000,7 @@ strength, budgets, seeds and resolved binaries:
 ./gradlew :klause-bench:solveCampaign --args="solve suite=core kind=cop engine=cp param=var-selector=smallest-domain timeout=30000 label=domain"
 ```
 
-`output/compare.sh [--incomplete] <dirA> <dirB>`, a wrapper for `bench compare`, compares shared cases by
+`output/compare.sh [--incomplete] <dirA> <dirB>` (needs `jq` and `bc`) compares shared cases by
 feasibility, proof and direction-aware objective quality, using time to break ties.
 Complete mode prefers proved optima; incomplete mode ignores proof and splits
 ties equally. Reports include contradictory outcomes. Time prefers witness time,
