@@ -431,6 +431,8 @@ class OpenTheoryEngine internal constructor(
                     }, onBooleanClause = { clause ->
                         planned.session.learn(SearchExplanation(clause))
                         state.smt.observeCompleteSearchStage("WHOLE_SOURCE_BOOLEAN_CLAUSE_L_${clause.size}")
+                    }, onGuidedBranch = {
+                        state.smt.observeCompleteSearchStage("WHOLE_SOURCE_BOOLEAN_CLAUSE_GUIDED_BRANCH")
                     })
                 if (proposals.applicable) {
                     if (it.useWholeSourcePoints(model, proposals::completeBooleans, proposals::offer,
@@ -471,10 +473,13 @@ class OpenTheoryEngine internal constructor(
                 ) OpenBranching.Activity else OpenBranching.SourceOrder
                 else -> params.openBranching
             }
-            val branching = when (selectedBranching) {
+            val baseBranching = when (selectedBranching) {
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
                 OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
             }
+            val branching = wholePoints?.guide(baseBranching, params.openBranching) ?: baseBranching
+            val guidance = if (branching !== baseBranching) wholePoints?.branchHints ?: SearchCandidateHints.None
+                else SearchCandidateHints.None
             val run = planned.session.openRun(
                 model.numBoolVars,
                 solveParams,
@@ -482,7 +487,7 @@ class OpenTheoryEngine internal constructor(
                 booleanBranching = branching,
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = wholePoints?.policy(nodePolicy) ?: nodePolicy,
-                candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
+                candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage, guidance),
                 branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
                     SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
                         SearchBranchKind.Finite))

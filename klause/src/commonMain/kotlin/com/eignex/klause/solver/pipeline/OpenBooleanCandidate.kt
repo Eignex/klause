@@ -571,8 +571,11 @@ internal fun observedCandidateHints(
     caller: SearchCandidateHints,
     component: SearchCandidateHints,
     usage: OpenHintUsageSink,
+    priority: SearchCandidateHints = SearchCandidateHints.None,
 ): SearchCandidateHints {
-    if (caller === SearchCandidateHints.None && component === SearchCandidateHints.None) {
+    if (caller === SearchCandidateHints.None && component === SearchCandidateHints.None &&
+        priority === SearchCandidateHints.None
+    ) {
         return SearchCandidateHints.None
     }
     return SearchCandidateHints { variable ->
@@ -584,9 +587,11 @@ internal fun observedCandidateHints(
                 return@SearchCandidateHints preferred
             }
         }
-        if (component === SearchCandidateHints.None) return@SearchCandidateHints null
+        if (component === SearchCandidateHints.None && priority === SearchCandidateHints.None) {
+            return@SearchCandidateHints null
+        }
         usage.componentConsulted()
-        component.preferredBool(variable)?.also {
+        (priority.preferredBool(variable) ?: component.preferredBool(variable))?.also {
             val indexed = component as? SourceConjunctionHints
             usage.componentSelected(indexed?.isPrimitive(variable), indexed?.isGate(variable) == true)
         }

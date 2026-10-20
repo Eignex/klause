@@ -46,6 +46,29 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheorySolverTest {
+    @Test
+    fun `automatic whole point clause guidance should preserve explicit branching choices`() {
+        val model = Problem(3, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ZERO, strict = true, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.GE,
+                BigFraction.ZERO, strict = true, activator = 2),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) },
+                listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ofLong(100)),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+
+        for (mode in OpenBranching.entries) {
+            val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+            val result = assertIs<OpenTheoryResult.Sat>(engine.solve(TheoryParams(openBranching = mode)))
+
+            val guided = result.stats.smt.completeSearchStages?.get("WHOLE_SOURCE_BOOLEAN_CLAUSE_GUIDED_BRANCH") ?: 0L
+            assertEquals(mode == OpenBranching.Automatic, guided > 0L)
+            assertTrue(result.assignment.boolValue(1) != result.assignment.boolValue(2))
+        }
+    }
 
     @Test
     fun `a whole source graph point should complete open Booleans without a decision`() {

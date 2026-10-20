@@ -15,10 +15,15 @@ import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
+import com.eignex.klause.solver.search.SearchRunObserver
+import com.eignex.klause.solver.search.SearchUnassignListener
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.wholeRealPointTruths
@@ -33,6 +38,7 @@ internal class WholeSourcePointOffer(
     private val publicationCancellation: Cancellation,
     private val onDecline: ((String) -> Unit)? = null,
     private val onBooleanClause: ((IntArray) -> Unit)? = null,
+    private val onGuidedBranch: (() -> Unit)? = null,
 ) {
     private val witnesses = SourceWitnessAssembler(source, original)
     private var booleanPreparationAttempted = false
@@ -40,6 +46,11 @@ internal class WholeSourcePointOffer(
     private var used: BooleanArray? = null
     private var verification: PropagationProblem? = null
     private var pending: OpenTheoryAssignment? = null
+    private val guidanceClauses = ArrayList<IntArray>()
+    private var guidedLiteral = -1
+    val branchHints = SearchCandidateHints { variable ->
+        guidedLiteral.takeIf { it >= 0 && Lit.variable(it) == variable }?.let(Lit::isPositive)
+    }
     var internalPause: Boolean = false
         private set
 
@@ -128,7 +139,14 @@ internal class WholeSourcePointOffer(
         if (stop() || publicationCancellation()) return null
         onDecline?.invoke("BOOLEAN_CUBE_SUPPORT_${support.size}_FROM_${prefix.size}")
         val clause = IntArray(support.size) { Lit.negate(support[it]) }
-        if (!stop() && !publicationCancellation()) onBooleanClause?.invoke(clause)
+        if (!stop() && !publicationCancellation()) {
+            if (guidanceClauses.size < 8) {
+                stop.charge(clause.size.toLong() + 1L)
+                if (stop() || publicationCancellation()) return null
+                guidanceClauses += clause.copyOf()
+            }
+            onBooleanClause?.invoke(clause)
+        }
         return null
     }
 
@@ -213,6 +231,14 @@ internal class WholeSourcePointOffer(
 
     fun invalidate() {
         pending = null
+        guidedLiteral = -1
+    }
+
+    fun guide(delegate: BooleanBranching, mode: OpenBranching): BooleanBranching {
+        guidedLiteral = -1
+        if (mode != OpenBranching.Automatic || !applicable) return delegate
+        return WholePointClauseBranching(delegate, guidanceClauses, publicationCancellation,
+            prefer = { guidedLiteral = it }, onGuided = onGuidedBranch)
     }
 
     fun take(): OpenTheoryAssignment? {
@@ -279,5 +305,47 @@ internal class WholeSourcePointOffer(
         override fun isCancelled(): Boolean = stop()
         override fun deadline() = stop.deadline()
         override fun workMeter(): RootWorkMeter = meter
+    }
+}
+
+private class WholePointClauseBranching(
+    private val delegate: BooleanBranching,
+    private val clauses: List<IntArray>,
+    private val publicationCancellation: Cancellation,
+    private val prefer: (Int) -> Unit,
+    private val onGuided: (() -> Unit)?,
+) : BooleanBranching,
+    SearchRunObserver by (delegate as? SearchRunObserver ?: SearchRunObserver.None),
+    SearchUnassignListener by (delegate as? SearchUnassignListener ?: SearchUnassignListener { }) {
+    override fun alternatives(context: SearchContext): List<SearchDecision>? {
+        prefer(-1)
+        val stop = context.executionControls.cancellation
+        var chosen = -1
+        var fewest = Int.MAX_VALUE
+        for (clause in clauses.asReversed()) {
+            stop.charge(4L * clause.size + 1L)
+            if (stop() || context.cancelled() || publicationCancellation()) return delegate.alternatives(context)
+            var first = -1
+            var unassigned = 0
+            var satisfied = false
+            for (literal in clause) {
+                val value = context.boolValue(Lit.variable(literal))
+                if (value == null) {
+                    unassigned++
+                    if (first < 0) first = literal
+                } else if (value == Lit.isPositive(literal)) {
+                    satisfied = true
+                    break
+                }
+            }
+            if (!satisfied && first >= 0 && unassigned < fewest) {
+                chosen = first
+                fewest = unassigned
+            }
+        }
+        if (chosen < 0 || stop() || publicationCancellation()) return delegate.alternatives(context)
+        prefer(chosen)
+        onGuided?.invoke()
+        return listOf(SearchDecision.Bool(chosen), SearchDecision.Bool(Lit.negate(chosen)))
     }
 }

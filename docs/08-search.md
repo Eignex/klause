@@ -94,6 +94,11 @@ preference only reorders the two sides of an already selected split, preserving 
 complementary alternative. Propagation and complete component checks keep their
 authority, and a hypothetical value supplies no arithmetic fact or feasibility claim.
 
+Automatic pure-real source search can prioritize an open literal of a learned source
+clause. Both alternatives remain, caller hints retain polarity precedence, and
+explicit branch modes keep their order. See
+[whole-source proposals](15-linear-arithmetic.md#whole-source-point-proposals).
+
 Built-in providers derive preferences from a completed arithmetic point: a single
 linear completion owner reuses the point of its last numerical check, and the opt-in
 `openHintFlips` provider indexes source clauses and prefers the polarity that breaks

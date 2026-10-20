@@ -136,6 +136,13 @@ truths captured before the trials add no condition. Missing reasons or a
 unused by clauses and admits at most 4,096 literals under the current operation;
 root snapshots, reason copies and traversal share that allowance, and a stopped
 check supplies no clause.
+Automatic openings retain at most eight trial clauses for branch guidance. A
+charged scan of the live shared state chooses an open literal from an unsatisfied
+clause with the fewest open literals and prefers satisfying it. The complementary
+alternative remains; caller hints precede this preference, and explicit branching
+modes retain their order. Clauses remain source-valid across retraction, while the
+chosen preference is recomputed. This guidance supplies no assignment or arithmetic
+fact, and retains the containing traversal's work and cancellation.
 Checked assignments
 remain private until the traversal reaches its caller-approved publication point;
 assertion, retraction, restart and close discard them. This handoff contributes no

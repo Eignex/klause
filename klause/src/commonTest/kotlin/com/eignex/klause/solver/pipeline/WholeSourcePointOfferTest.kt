@@ -11,9 +11,18 @@ import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.OpenHintUsageSink
+import com.eignex.klause.solver.search.BooleanBranching
+import com.eignex.klause.solver.search.ClauseSearchComponent
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.HintedBooleanBranching
+import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.util.Cancellation
@@ -22,11 +31,144 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WholeSourcePointOfferTest {
+    @Test
+    fun `rejected Boolean clauses should guide exhaustive source splits`() {
+        val source = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { })
+        assertNull(offer.completeBooleans(intArrayOf(0, 1, 0, -1, -1), Cancellation.Never))
+        val branching = offer.guide(BooleanBranching.SourceOrder(5), OpenBranching.Automatic)
+
+        val alternatives = branching.alternatives(SearchSession(emptyList()))
+
+        assertEquals(listOf(SearchDecision.Bool(Lit.make(1, false)), SearchDecision.Bool(Lit.make(1, true))),
+            alternatives)
+    }
+
+    @Test
+    fun `satisfied Boolean guidance should defer and return after retraction`() {
+        val source = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { })
+        assertNull(offer.completeBooleans(intArrayOf(0, 1, 0, -1, -1), Cancellation.Never))
+        val session = SearchSession(emptyList())
+        val branching = offer.guide(BooleanBranching.SourceOrder(5), OpenBranching.Automatic)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+        val satisfied = branching.alternatives(session)
+        session.popTo(0)
+        offer.invalidate()
+        val retracted = branching.alternatives(session)
+
+        assertEquals(SearchDecision.Bool(Lit.make(0, false)), satisfied?.first())
+        assertEquals(SearchDecision.Bool(Lit.make(1, false)), retracted?.first())
+    }
+
+    @Test
+    fun `a rejected guided branch should retain its complementary source alternative`() {
+        val clause = Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
+        val source = Problem(2, 0, emptyArray(), arrayOf(clause), numRealVars = 1,
+            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { })
+        assertNull(offer.completeBooleans(intArrayOf(1, 0), Cancellation.Never))
+        val rejectsFalse = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                if (decision == SearchDecision.Bool(Lit.make(0, false))) ComponentResult.Conflict()
+                else ComponentResult.Consistent
+        }
+        val session = SearchSession(listOf(ClauseSearchComponent(listOf(clause)), rejectsFalse))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        val result = session.solve(2,
+            booleanBranching = offer.guide(BooleanBranching.SourceOrder(2), OpenBranching.Automatic),
+            candidateHints = offer.branchHints)
+
+        assertIs<SearchResult.Satisfied>(result)
+        assertEquals(true, session.boolValue(0))
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `explicit Boolean branching choices should retain their delegate`() {
+        val source = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { })
+        assertNull(offer.completeBooleans(intArrayOf(0, 1, 0, -1, -1), Cancellation.Never))
+
+        for (mode in listOf(OpenBranching.SourceOrder, OpenBranching.Activity)) {
+            val branching = offer.guide(BooleanBranching.SourceOrder(5), mode)
+
+            assertEquals(SearchDecision.Bool(Lit.make(0, false)),
+                branching.alternatives(SearchSession(emptyList()))?.first())
+            assertNull(offer.branchHints.preferredBool(1))
+        }
+    }
+
+    @Test
+    fun `caller hints should precede clause guidance and numerical hints`() {
+        val source = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { })
+        assertNull(offer.completeBooleans(intArrayOf(0, 1, 0, -1, -1), Cancellation.Never))
+        val branching = offer.guide(BooleanBranching.SourceOrder(5), OpenBranching.Automatic)
+
+        for ((caller, expected) in listOf(null to false, true to true, false to false)) {
+            val hints = observedCandidateHints(SearchCandidateHints { caller }, SearchCandidateHints { true },
+                OpenHintUsageSink(), offer.branchHints)
+
+            val alternatives = HintedBooleanBranching(branching, hints).alternatives(SearchSession(emptyList()))
+
+            assertEquals(SearchDecision.Bool(Lit.make(1, expected)), alternatives?.first())
+        }
+    }
+
+    @Test
+    fun `cancelled Boolean guidance should defer without publishing a branch hint`() {
+        val source = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        var guided = 0
+        var cancelled = false
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { }, onGuidedBranch = { guided++ })
+        assertNull(offer.completeBooleans(intArrayOf(0, 1, 0, -1, -1), Cancellation.Never))
+        val branching = offer.guide(BooleanBranching.SourceOrder(5), OpenBranching.Automatic)
+        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        cancelled = true
+
+        val alternatives = branching.alternatives(session)
+
+        assertEquals(SearchDecision.Bool(Lit.make(0, false)), alternatives?.first())
+        assertNull(offer.branchHints.preferredBool(1))
+        assertEquals(0, guided)
+    }
+
     @Test
     fun `an implied Boolean conflict should omit unrelated trial pins from its cube`() {
         val source = Problem(5, 0, emptyArray(), arrayOf(
