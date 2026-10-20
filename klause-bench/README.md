@@ -870,7 +870,11 @@ resident bytes and stops checking after an observed 4 GiB excess. The system
 `time -l` utility retains the waited child's kernel RSS high-water value separately
 from checker output. Receipts bind its log hash, sampled peak, sample count, kernel
 peak, limit, completeness and exceedance. Sampling is an observed process-tree guard;
-the kernel high-water value covers the waited child rather than a continuous
+well-formed zero-RSS rows are terminal observations only after every captured process
+has exited, with one bounded process-reaper wait. They add no positive sample and
+cannot replace the waited-child kernel high-water evidence. Missing live processes,
+malformed rows and earlier failed observations continue to withhold acceptance.
+The kernel high-water value covers the waited child rather than a continuous
 aggregate tree measurement. An excessive peak, missing or malformed observation,
 or incomplete cleanup withholds acceptance. Linux receipts identify address-space
 control without claiming a measured RSS peak. Both hosts bound CPU and output file

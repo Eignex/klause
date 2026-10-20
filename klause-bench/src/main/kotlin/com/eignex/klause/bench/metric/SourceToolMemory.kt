@@ -58,35 +58,54 @@ internal class DarwinToolMemory(directory: File, private val limitBytes: Long) {
             val text = bounded(output) ?: return false.also { complete = false }
             if (bounded(errors)?.isEmpty() != true) return false.also { complete = false }
             if (probe.exitValue() != 0 || text.isBlank()) {
-                if (process.isAlive) complete = false
-                return !process.isAlive
+                val alive = handles.any { it.isAlive }
+                if (alive) complete = false
+                return !alive
             }
-            var bytes = 0L
-            val seen = HashSet<Long>()
-            for (line in text.lineSequence().filter { it.isNotBlank() }) {
-                val columns = line.trim().split(Regex("\\s+"))
-                val pid = columns.getOrNull(0)?.toLongOrNull()
-                val kib = columns.getOrNull(1)?.toLongOrNull()
-                if (columns.size != 2 || pid == null || pid !in pids || !seen.add(pid) ||
-                    kib == null || kib < 0 || kib > (Long.MAX_VALUE - bytes) / 1024
-                ) {
-                    complete = false
-                    return false
-                }
-                bytes += kib * 1024
+            return recordSample(text, pids, { handles.filter { it.isAlive }.map { it.pid() }.toSet() }) {
+                // A zero-RSS timing parent can be waiting for the JVM's process reaper.
+                process.waitFor(25, TimeUnit.MILLISECONDS)
+                handles.filter { it.isAlive }.map { it.pid() }.toSet()
             }
-            if (bytes <= 0 || handles.any { it.isAlive && it.pid() !in seen }) {
-                complete = false
-                return false
-            }
-            samples++
-            peak = maxOf(peak ?: 0, bytes)
-            exceeded = bytes > limitBytes
-            return !exceeded
         } finally {
             if (probe.isAlive) probe.destroyForcibly()
             if (!probe.waitFor(1, TimeUnit.SECONDS)) complete = false
         }
+    }
+
+    fun recordSample(
+        text: String,
+        pids: Set<Long>,
+        livePids: () -> Set<Long>,
+        awaitExit: () -> Set<Long> = livePids,
+    ): Boolean {
+        var bytes = 0L
+        val seen = HashSet<Long>()
+        for (line in text.lineSequence().filter { it.isNotBlank() }) {
+            val columns = line.trim().split(Regex("\\s+"))
+            val pid = columns.getOrNull(0)?.toLongOrNull()
+            val kib = columns.getOrNull(1)?.toLongOrNull()
+            if (columns.size != 2 || pid == null || pid !in pids || !seen.add(pid) ||
+                kib == null || kib < 0 || kib > (Long.MAX_VALUE - bytes) / 1024
+            ) {
+                complete = false
+                return false
+            }
+            bytes += kib * 1024
+        }
+        if (seen.isEmpty() || livePids().any { it !in seen }) {
+            complete = false
+            return false
+        }
+        if (bytes == 0L) {
+            if (awaitExit().isEmpty()) return !exceeded
+            complete = false
+            return false
+        }
+        samples++
+        peak = maxOf(peak ?: 0, bytes)
+        exceeded = bytes > limitBytes
+        return !exceeded
     }
 
     fun finish(): SourceToolMemory {
