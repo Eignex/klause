@@ -33,25 +33,16 @@ admits. Its subchapters follow the life of a worker's output:
 Finite, linear open, polynomial, nonlinear-integer, quadratic and transcendental
 source execution supply retained recipe factories to `PortfolioInvocation` with the
 routing plan and current executable projection. The invocation owns worker slots,
-seed offsets, parallel node quotas, scheduler controls, result verification and
-cleanup. Composed arm attribution remains distinct from materialized replica slots.
-Recipes retain their source-specific pools and reservations; mutable source services
-registered with a slot close when the invocation releases that slot. Open factories
-allocate private completion and walk state per slot, including replicas.
+seed offsets, parallel quotas, scheduler controls, result verification and cleanup;
+mutable services registered with a slot close when the slot is released, and each
+replica gets private state. Native reservations divide the complete family's
+allowance across its slots. Heuristic-only factories carry witness authority, and
+`FIXED` rejects multiple cores.
 
-Native reservations divide the complete family's allowance across its materialized
-slots; complete-only invocations divide the whole native allowance among their
-admitted slots. Heuristic-only factories carry witness authority. Shared source
-execution rejects multiple cores for `FIXED` before constructing a native worker,
-and the finite request boundary enforces the same rule for its deferred consumer.
-
-`SourceExecutionPolicy` owns finite application arm defaults and LP ceilings before
-worker construction. Explicit `arms`, `ls` or `bt` settings take precedence over the
-application recipe count. A supplied finite factory retains its callbacks and
-containing allowance; common source binding applies the selected ceiling without
-raising the factory's lower emphasis. Fixed execution uses one arm and LP off.
-Native arithmetic routes reject finite-only explicit policy instead of silently
-ignoring it. Recipe defaults and ceilings carry no witness or proof authority.
+`SourceExecutionPolicy` sets finite arm defaults and LP ceilings before worker
+construction; explicit `arms`, `ls` or `bt` settings take precedence. Native
+arithmetic routes reject finite-only explicit policy instead of ignoring it. Recipe
+defaults carry no witness or proof authority.
 
 ## Prepared strategy admission
 
@@ -61,32 +52,22 @@ projection and required completion actually selected by preparation. Semantic
 identifiers and worker labels do not establish support. The direct factor inventory
 cannot replace whole-source completion, including continuous products.
 
-Admission is separate from procedure completeness and claim verification. Integer
-traversal can run without a termination guarantee. Heuristic workers have witness
-only authority even when a neighborhood is decided exactly. Independent source
-bounds and proofs require their own checked evidence. Unsupported components and
-operations have explicit decline causes; exhausted caller or representation
-allowances remain invocation stops.
+Admission is separate from procedure completeness and claim verification: integer
+traversal can run without a termination guarantee, heuristic workers have witness
+authority only, and unsupported components decline with explicit causes.
 
-Finite, open, polynomial and nonlinear-integer ordinary portfolios bind
-`EngineInvocation` to the retained plan, actual execution model/objective and
-captured source/execution pins. Their terminal admission consumes
-`CompletedEngineResult` with the actual result; exhausted optimization also retains
-the last finite cutoff read by that worker. A conditioned or foreign completion
-cannot finish a weaker runtime invocation. Finite materializers retain the post-edit
-parameter assumptions before binding; a failed binding closes the allocated worker
-before the invocation unwinds slot resources. Independent original-source
-derivation capture is the subject of [chapter 17](17-evidence.md).
+Portfolios bind `EngineInvocation` to the retained plan, actual execution model and
+objective, and captured pins. Terminal admission consumes `CompletedEngineResult`
+with the actual result, so a conditioned or foreign completion cannot finish a weaker
+invocation. Original-source derivation capture is the subject of
+[chapter 17](17-evidence.md).
 
 ## Statistics
 
 The portfolio owns `SolveStats.run.wallMs` for each satisfaction or optimization
-invocation. Its monotonic clock spans schedule initialization, all segments,
-witness verification, lane completion and retained-handle disposal. Worker counters
-merge independently; backend tags and timeout flags retain their existing merges.
-The portfolio duration replaces worker run windows rather than summing them or
-taking their maximum. Per-arm scheduled times remain inclusive segment totals and
-can overlap across parallel lanes.
+invocation, spanning initialization, all segments, verification and disposal; it
+replaces worker run windows rather than summing them. Worker counters merge
+independently, and per-arm scheduled times can overlap across parallel lanes.
 
 | Field | Meaning |
 |---|---|

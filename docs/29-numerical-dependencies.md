@@ -40,18 +40,13 @@ substitution with an isolated checkout at the revision under test:
 ./gradlew --include-build /path/to/isolated/koblas :klause:jvmTest --max-workers=2
 ```
 
-Record the checkout revision and the resulting artifact hashes separately from published-artifact
-checks. Do not publish over a shared `SNAPSHOT`, or commit machine-specific paths. Dependency updates
-must update every platform pin together and repeat provenance and published-metadata verification.
+Dependency updates must update every platform pin together.
 
 ### Kumulant
 
-Kumulant supplies online statistics and adaptive bandits. The library, CLI and bench
-builds use its timestamped `0.3.4-SNAPSHOT` publication. Contextual-bandit features use
-`com.eignex.koblas.DenseVector`; Kumulant exposes Koblas vector types and declares
-the immutable Koblas root and platform pins listed above transitively. Klause also
-strictly pins those coordinates so direct and transitive consumers select the same
-numerical binaries.
+Kumulant supplies online statistics and adaptive bandits. Its contextual-bandit
+features use Koblas vector types, so Klause strictly pins the Koblas coordinates
+above for both direct and transitive consumers.
 
 The pins consume Kumulant revision `9df19df5c48e2cce2caf0a612e51e39430903352`,
 published by its [snapshot workflow](https://github.com/Eignex/kumulant/actions/runs/38456722493).
@@ -65,33 +60,19 @@ Kumulant coordinates use group `com.eignex` and version prefix `0.3.4-20261013.1
 | kumulant-linuxarm64 | 67 | `a705527909d08e53a8b1a05f1051da970980a6183ed2aea315ba9cb8fa6f5416` |
 | kumulant-macosarm64 | 66 | `f0ce4c7f2f76c8aae200f8b443d4c4d2ad211733ebc540e7854916425ba1678c` |
 
-Kumulant's root metadata also redirects to mutable platform snapshots, so its platform
-constraints follow the same publication policy. Verify numerical ownership and transitive
-dependencies when updating either library.
-
 ## Consumer contracts
 
 | Consumer | Integration contract |
 |---|---|
-| `simplex.basis` | Zero-based sorted unique CSC, owned source/factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Each builder owns fixed-size LU scratch; solve-quality checks reuse one dense product buffer. Factor materialization and updates allocate their owned output arrays directly. The bounded dense LU path uses windowed GER on trailing squares in owner-local matrix/vector buffers and publishes owned CSC factors; arithmetic guards and failed-attempt work remain in Klause. |
-| Sparse slice workflows | Validate windows, indices, capacity and overlap before mutation. Unique scatter/touched support, first-touch order, structural zeros until explicit compaction, positive-zero clearing. Checked scatter delegates to generic primitives; checked dot preserves scalar input order and underflow/nonfinite diagnostics. |
-| `lp.engine` | Pricing and column updates use indexed kernels; checked workflows retain solver semantics. Scaling/refinement keep guarded powers of two, exact accumulation and source maps. No dense vendor Level 2/3 call is required. |
-| `util.SparseSlices` | Shared validated slice workflows serve the LP engine and basis without adding a solver-layer dependency. Other array/permutation/domain helpers have no koblas consumers. |
-| CLI and CI | JDK 25, native-access permission and optional Vector API module. Linux Native tests are separate in CI; release opts into arm64 targets. BLAS libraries are installed by the host, never extracted from klause artifacts. |
-| Tests and capture tools | Common basis/LP tests cover ownership and certification. Real traces verify factorization and update observations plus FTRAN/BTRAN residuals. Kernel composition and vendor identity are diagnostic fields, not promises about reduction order. |
+| `simplex.basis` | Zero-based sorted unique CSC, owned factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Dense LU uses windowed GER in owner-local buffers; arithmetic guards and failed-attempt work stay in Klause. |
+| `util.SparseSlices` | Validated slice workflows shared by the LP engine and basis: windows, indices and overlap are checked before mutation, and checked dot keeps input order and nonfinite diagnostics. |
+| `lp.engine` | Pricing and column updates use indexed kernels. Scaling and refinement keep guarded powers of two and exact accumulation. No dense vendor Level 2/3 call is required. |
 
-Unchecked reductions may reassociate or fuse arithmetic according to the selected implementation.
-Klause does not use vendor `iamax` to choose pivots; masked maximum and candidate positions retain
-their own finite-value and ordering contract. Exact proof checks, work/cancellation budgets, repair
-receipts and scoped replacement ownership remain solver responsibilities.
-
-Windowed GER retains the parent matrix leading dimension and validates matrix and vector
-ranges before mutation. Its built-in panel kernels update the rectangle directly; the
-nonaliasing basis buffers need no vector views or scratch allocation. Each elimination
-step uses matching matrix, multiplier and pivot-row offsets. At order six, five calls
-cover 55 entries in total. Klause retains product overflow/nonzero-underflow checks and
-post-update finite checks around these calls. The `GerWindow` route uses portable panel
-kernels, including on host engines with an installed vendor library.
+Unchecked reductions may reassociate or fuse arithmetic according to the selected
+implementation, so Klause does not use vendor `iamax` to choose pivots. Exact proof
+checks, work and cancellation budgets remain solver responsibilities. The `GerWindow`
+route always uses portable panel kernels, with Klause's overflow, underflow and
+finite checks around each call.
 
 ## Runtime support
 
@@ -99,13 +80,10 @@ JVM launchers and Gradle execution tasks enable `jdk.incubator.vector` and
 `--enable-native-access=ALL-UNNAMED`. `-Pkoblas.noSimd=true` omits the module for portable-kernel
 verification. Embedded JVM callers supply these runtime options themselves.
 
-Koblas selects one immutable platform composition. Its default engines supply portable dense
-Level 2/3 arithmetic as well as Level 1 and sparse primitives. Eligible dense calls can use an
-installed host library; explicit vendor bindings require that library to be available.
-Linux x64 prefers oneMKL or AOCL by CPU vendor; Linux arm64 prefers ArmPL, with installed
-OpenBLAS as a fallback. macOS uses system Accelerate. Bindings use LP64 integers and one compute
-thread per call. Usual sonames and fixed installer prefixes are checked; `koblas.vendor` exposes
-the resolved path/version. Klause has no backend registry or bundled vendor payload.
+Koblas selects one platform composition with portable kernels; eligible dense calls
+can use an installed host library (oneMKL or AOCL on Linux x64, ArmPL or OpenBLAS on
+Linux arm64, Accelerate on macOS), with LP64 integers and one thread per call.
+`koblas.vendor` exposes the resolved library. Klause bundles no vendor payload.
 
 ---
 
