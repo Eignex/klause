@@ -53,7 +53,7 @@ class WholeRealPointTest {
         val compatible = completeWholeRealPoint(source, listOf(BigFraction.ZERO), intArrayOf(1, 1),
             Cancellation.Never) { _, _ -> calls++; booleanArrayOf(true, true) }
         val changed = completeWholeRealPoint(source, listOf(BigFraction.ZERO), intArrayOf(1, 1),
-            Cancellation.Never) { guesses, _ -> guesses.fill(-1); booleanArrayOf(true, false) }
+            Cancellation.Never) { guesses, _ -> calls++; guesses.fill(-1); booleanArrayOf(true, false) }
 
         assertNull(conflicting)
         assertContentEquals(booleanArrayOf(true, true), assertNotNull(compatible).bools)
