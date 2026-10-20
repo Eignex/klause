@@ -224,7 +224,7 @@ class QfLiraSolverTest {
     @Test
     fun `unassigned Boolean coefficients should remain open during equality refutation`() {
         val declaration = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0) {
+            intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
             override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
                 TaggedLinearRow(intArrayOf(Term.ofRealVar(0), Term.ofLit(Lit.make(0, true))),
                     IntegerConstants(UnitConsts(2), 0L), LinearOp.EQ),
