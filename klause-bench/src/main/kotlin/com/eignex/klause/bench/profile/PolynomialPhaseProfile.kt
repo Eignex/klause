@@ -9,6 +9,7 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -17,8 +18,10 @@ import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -95,21 +98,43 @@ internal object PolynomialPhaseProfile {
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = observation,
         ))
+        val plan = invocation.preparedPlan
+        val model = plan?.model
+        val polynomial = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
+            ?: source.source.originalSource as? PolynomialRealProblem
+        val shape = PipelineSourceShape(
+            plan?.kind?.name, source.source.originalSource.javaClass.simpleName,
+            source.boolVarNames.size, source.intVarNames.size, source.realVarNames.size,
+            model?.numBoolVars, model?.numIntVars, model?.numRealVars, model?.numFactors,
+            polynomial?.let { polynomialCount(it, "totalBoolCount") },
+            polynomial?.let { polynomialCount(it, "totalRealCount") },
+        )
         val preparedCharges = observation.charges
-        val completed = SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = PolynomialTheoryParams(
-            timeout = observation,
-            strategy = PolynomialStrategyParams(
-                backtrack = BacktrackParams(randomSeed = 3),
-                localSearch = LocalSearchParams(randomSeed = 3),
+        val completed = SourceSetup.execute(SourceExecutionRequest(
+            invocation, theory = TheoryParams(timeout = observation, randomSeed = 3),
+            polynomial = PolynomialTheoryParams(
+                timeout = observation,
+                strategy = PolynomialStrategyParams(
+                    backtrack = BacktrackParams(randomSeed = 3),
+                    localSearch = LocalSearchParams(randomSeed = 3),
+                ),
             ),
-        ), cores = 1))
+            cores = 1,
+        ))
         if (completed is SourceExecutionResult.Declined || completed is SourceExecutionResult.Refuted) {
             return PipelinePhaseTrace(
                 if (completed is SourceExecutionResult.Refuted) "SourceRefuted" else "Unknown",
                 (completed as? SourceExecutionResult.Declined)?.reason?.toString(),
                 "source-preparation", null, "not started", "not started",
-                preparedCharges, observation.charges - preparedCharges, observation.stack,
+                preparedCharges, observation.charges - preparedCharges, observation.stack, shape,
             )
+        }
+        if (completed is SourceExecutionResult.Linear) {
+            val execution = completed.result
+            return PipelinePhaseTrace(execution.result.javaClass.simpleName,
+                (execution.result as? OpenTheoryResult.Unknown)?.reason?.toString(), null, null,
+                "not a polynomial execution", execution.result.stats.toString(),
+                preparedCharges, observation.charges - preparedCharges, observation.stack, shape)
         }
         val execution = (completed as? SourceExecutionResult.Polynomial)?.result
             ?: error("source setup did not install polynomial satisfaction")
@@ -117,8 +142,11 @@ internal object PolynomialPhaseProfile {
             (execution.result as? OpenTheoryResult.Unknown)?.reason?.toString(),
             execution.resource?.toString(), execution.nativeResource,
             execution.stats.toString(), execution.result.stats.toString(),
-            preparedCharges, observation.charges - preparedCharges, observation.stack)
+            preparedCharges, observation.charges - preparedCharges, observation.stack, shape)
     }
+
+    private fun polynomialCount(source: PolynomialRealProblem, field: String): Int =
+        source.javaClass.getDeclaredField(field).apply { isAccessible = true }.getInt(source)
 
     private class DeadlineObservation(timeoutMs: Long) : Cancellation, WorkMeter {
         private val clock = Cancellation.after(timeoutMs.milliseconds)
@@ -302,4 +330,20 @@ internal data class PipelinePhaseTrace(
     val preparationCharges: Long,
     val executionCharges: Long,
     val containingDeadlineStack: List<String>?,
+    val sourceShape: PipelineSourceShape? = null,
+)
+
+@Serializable
+internal data class PipelineSourceShape(
+    val preparedKind: String?,
+    val sourceRepresentation: String,
+    val declaredBooleans: Int,
+    val declaredIntegers: Int,
+    val declaredReals: Int,
+    val modelBooleans: Int?,
+    val modelIntegers: Int?,
+    val modelReals: Int?,
+    val modelFactors: Int?,
+    val theoryBooleans: Int?,
+    val theoryReals: Int?,
 )

@@ -1249,7 +1249,8 @@ performance gain. Field/method incompatibility fails the diagnostic explicitly.
 query through its containing stop. Its `request64=<base64>` argument encodes up to
 18 `{suite, problem, sha256}` catalog identities, with at most 48 KiB of encoded
 request and 1 MiB per original source. It requires the frozen original hash before
-parsing and retains those bytes. Run the committed profile through the lab on AWS.
+parsing and retains those bytes. Submit the committed diagnostic through the lab
+without host or machine placement overrides.
 The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
 
@@ -1278,11 +1279,19 @@ pair phase attribution with source-matched ordinary CLI records.
 Add `pipeline=true` after the request argument to observe source admission and the same
 MIXED/P1/seed3 satisfaction execution used by default CLI polynomial requests.
 That mode records the common termination reason, native/resource and search
-statistics, caller charges and the first containing deadline stack. Its single
+statistics, caller charges and the first containing deadline stack. It also records
+declared Boolean/integer/real counts, the retained factor model's coordinate and
+factor counts, and the polynomial request's total Boolean/real counts when present.
+These are separate representations; input declarations cannot stand in for the
+arithmetic query's dimensions. Polynomial totals are read from the existing captured
+source without modifying it; incompatible field layouts fail the diagnostic.
+Linear controls retain their selected linear execution, result and search statistics,
+with no polynomial work attribution. Preparation refutations retain declaration
+dimensions without inventing a theory query. Its single
 deadline, set by `timeoutMs` or the 60-second default, covers admission, preparation
 and execution. It records a
 pipeline trace instead of direct-query checkpoints or a separate gate inspection.
-The source must select polynomial admission; a linear route fails explicitly.
+Other execution families fail explicitly.
 Pipeline caller charges include source/search preparation and are separate from
 the native arithmetic snapshot. This mode does not render a CLI model or independently
 validate a source witness. Keep ordinary CLI records for publication/control evidence.
