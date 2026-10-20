@@ -28,9 +28,11 @@ class MpsCompilerRoutingTest {
                     "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0\n UP B X 1\n" + indicator + "ENDATA",
             ).toExactSourceProblem()
 
-            val route = compiled.model.pipelineRoute()
+            val route = assertIs<SourceProblemRoute.OpenTheory>(compiled.model.pipelineRoute())
 
-            assertIs<SourceProblemRoute.Finite>(route)
+            assertEquals(ProblemPipeline.EXACT_LIRA, route.request.route)
+            assertEquals(IntVariableOwner.CP, route.request.componentPlan.intOwner(0))
+            assertSame(compiled.model, route.preparedPlan.originalSource)
         }
     }
 

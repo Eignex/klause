@@ -630,10 +630,9 @@ class SourceStrategyTest {
         )
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve(params)).assignment
-            val real = assertNotNull(assertIs<OpenTheoryAssignment.Sampled>(witness).sample.exactReals)[0]
+            val real = assertNotNull(BigFraction.ofDouble(0.3)) - assertNotNull(BigFraction.ofDouble(0.1))
 
             assertEquals("1", witness.intValue(0))
-            assertEquals(assertNotNull(BigFraction.ofDouble(0.3)), real + assertNotNull(BigFraction.ofDouble(0.1)))
             assertEquals(real.toString(), witness.realValue(0))
         }
     }
