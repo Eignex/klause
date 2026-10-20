@@ -251,30 +251,23 @@ internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
     emitAllDifferentCore(vars, exceptSet = EmptyLongArray, boundsConsistent = bc)
 }
 
-/** Emit `circuit` / `subcircuit`, channeling to 0-based values when needed. */
+/** Emit one-based FlatZinc successors through the native zero-based relation. */
 internal fun FlatZincCompiler.emitCircuit(c: FznConstraint, sub: Boolean) {
     expectArity(c, 1)
     val srcIds = evalIntVarArray(c.args[0])
     val n = srcIds.size
-    var offset = Long.MAX_VALUE
-    for (v in srcIds) offset = minOf(offset, intDomains[v].min)
-    if (offset == Long.MAX_VALUE) offset = 0L
-    val ids = if (offset == 0L) {
-        srcIds
-    } else {
-        IntArray(n) { i ->
-            val auxName = "__circuit_aux_${i}_${factors.size}"
-            val auxId = allocInt(auxName, 0L, (n - 1).toLong())
-            factors.add(
-                Linear(
-                    coeffs = intArrayOf(1, -1),
-                    vars = intArrayOf(srcIds[i], auxId),
-                    op = LinearOp.EQ,
-                    bound = offset.toInt(),
-                ),
-            )
-            auxId
-        }
+    val ids = IntArray(n) { i ->
+        val auxName = "__circuit_aux_${i}_${factors.size}"
+        val auxId = allocInt(auxName, 0L, (n - 1).toLong())
+        factors.add(
+            Linear(
+                coeffs = intArrayOf(1, -1),
+                vars = intArrayOf(srcIds[i], auxId),
+                op = LinearOp.EQ,
+                bound = 1,
+            ),
+        )
+        auxId
     }
     factors.add(Circuit(succ = ids, subcircuit = sub))
 }
@@ -311,11 +304,19 @@ internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
     }
 }
 
-internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint) {
+internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint, strict: Boolean) {
     expectArity(c, 2)
     val starts = evalIntVarArray(c.args[0])
     val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
     factors.add(Cumulative.unary(starts = starts, durations = durations, durationVars = durationVars))
+    val canBeEmpty = if (durationVars.isEmpty()) durations.any { it == 0L } else
+        durationVars.any { 0L in intDomains[it] }
+    if (strict && canBeEmpty) {
+        // A zero-duration task must still be ordered outside every other task's interior.
+        val zero = resolveIntVar(FznExpr.IntLit(0))
+        factors.add(Diffn(starts, IntArray(starts.size) { zero }, durations,
+            LongArray(starts.size) { 1L }, widthVars = durationVars.takeIf { it.isNotEmpty() }))
+    }
 }
 
 private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<LongArray, IntArray> {
@@ -324,13 +325,6 @@ private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<LongAr
     val vars = evalIntVarArray(e)
     val ubs = LongArray(vars.size) { intDomains[vars[it]].max }
     return ubs to vars
-}
-
-private fun FlatZincCompiler.resolveIntConstOrVar(e: FznExpr): Pair<Int, Int> {
-    val asConst = evalIntConstOrNull(e)
-    if (asConst != null) return asConst.toInt() to -1
-    val varId = resolveIntVar(e)
-    return intDomains[varId].max.toInt() to varId
 }
 
 // Returns `(constOrUb, varId)` for int scalar arguments whose value may exceed 32-bit range.
@@ -345,19 +339,25 @@ private fun FlatZincCompiler.resolveLongConstOrVar(e: FznExpr): Pair<Long, Int> 
 private fun FlatZincCompiler.emitCountComparison(
     c: FznConstraint,
     tag: String,
-    bounds: (n: Int, count: Int) -> Pair<Int, Int>,
+    bounds: (n: Long, count: Long) -> Pair<Long, Long>,
 ) {
     expectArity(c, 3)
-    val n = evalIntConst(c.args[0]).toInt()
+    val n = evalIntConst(c.args[0])
     val xs = evalIntVarArray(c.args[1])
-    val v = evalIntConst(c.args[2]).toInt()
+    val v = evalIntConst(c.args[2])
+    val (low, high) = bounds(n, xs.size.toLong())
+    val min = maxOf(0L, low)
+    val max = minOf(xs.size.toLong(), high)
+    if (min > max) {
+        postFalseFactor()
+        return
+    }
     val lits = IntArray(xs.size) { i ->
         val aux = allocBool("__${tag}_${xs[i]}_eq_$v")
-        factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, v))
+        factors.add(ReifiedLinear(aux, longArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, v))
         Lit.make(aux, true)
     }
-    val (min, max) = bounds(n, lits.size)
-    factors.add(Cardinality(lits, min = min, max = max))
+    factors.add(Cardinality(lits, min = min.toInt(), max = max.toInt()))
 }
 
 internal fun FlatZincCompiler.emitExactly(c: FznConstraint) = emitCountComparison(c, "exactly") { n, _ -> n to n }
@@ -365,7 +365,7 @@ internal fun FlatZincCompiler.emitExactly(c: FznConstraint) = emitCountCompariso
 internal fun FlatZincCompiler.emitAtLeast(c: FznConstraint) =
     emitCountComparison(c, "atleast") { n, count -> n to count }
 
-internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) = emitCountComparison(c, "atmost") { n, _ -> 0 to n }
+internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) = emitCountComparison(c, "atmost") { n, _ -> 0L to n }
 
 internal fun FlatZincCompiler.emitGcc(c: FznConstraint, variant: GccVariant) {
     expectArity(c, if (variant.lowUp) 4 else 3)
@@ -422,20 +422,23 @@ internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
     expectArity(c, 3)
     val xs = evalIntVarArray(c.args[0])
     val value = evalIntConst(c.args[1])
-    val (countConst, countVar) = resolveIntConstOrVar(c.args[2])
+    val (countConst, countVar) = resolveLongConstOrVar(c.args[2])
     if (xs.isEmpty()) {
         if (countVar >= 0) factors.add(Linear(intArrayOf(1), intArrayOf(countVar), LinearOp.EQ, 0))
+        else if (countConst != 0L) postFalseFactor()
         return
     }
-    if (countVar >= 0) {
+    if (countVar < 0 && countConst !in 0L..xs.size.toLong()) {
+        postFalseFactor()
+    } else if (countVar >= 0) {
         factors.add(GlobalCardinality(xs = xs, cover = longArrayOf(value), countVars = intArrayOf(countVar)))
     } else {
         factors.add(
             GlobalCardinality(
                 xs = xs,
                 cover = longArrayOf(value),
-                countLow = intArrayOf(countConst),
-                countHigh = intArrayOf(countConst),
+                countLow = intArrayOf(countConst.toInt()),
+                countHigh = intArrayOf(countConst.toInt()),
             ),
         )
     }

@@ -166,6 +166,13 @@ source-checked default/exact experiments separately.
 
 ## Klause-lab
 
+`exact-globals` exercises MiniZinc's bin-packing and variable-count decompositions
+and offset circuit, subcircuit, symmetric-permutation and inverse wrappers. Each
+model has finite-only, linear-real and polynomial-real variants with a witness,
+refutation and minimum. Run the whole suite with `exact=true`; a successful
+minimum is one. The CLI regressions cover the retained native global families and
+set predicates separately, including fractional real objectives.
+
 [Klause-lab](https://github.com/Eignex/klause-lab) owns remote experiment execution,
 regression schedules and reference-result storage. It builds the Klause revisions
 named by an experiment, selects problems through `klause-bench select`, and runs
