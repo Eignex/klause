@@ -82,12 +82,14 @@ eager path.
 `RationalPolynomial` captures ascending rational coefficients. Euclidean gcd,
 square-free decomposition and Sturm sequences isolate all distinct real roots;
 nonpoint isolating intervals contain exactly one root, and point intervals certify
-a rational root. Refinement intersects an isolating interval with the exact
+a rational root. General refinement uses Sturm-counted bisection. Order comparisons
+can intersect a temporary isolating interval with the exact
 [interval Newton](https://epubs.siam.org/doi/10.1137/1.9780898717716.ch8) enclosure
 when its derivative enclosure excludes zero. Outward dyadic rounding bounds endpoint
 precision by the contracted interval width. The intersection must contract by at
 least half. Endpoint roots become point intervals; otherwise Sturm-counted bisection
-supplies the refinement.
+supplies the refinement. These contracted comparison intervals stay local to the
+comparison; retained algebraic values and rational sector sampling use bisection.
 
 `AlgebraicReal` is an owned read-only scalar: an ascending rational coefficient
 list, a one-based index among the distinct real roots, and exact isolating bounds.

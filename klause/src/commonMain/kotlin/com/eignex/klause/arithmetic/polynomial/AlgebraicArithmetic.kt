@@ -67,6 +67,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         value.definingPolynomial, value.rootIndex, univariate.refine(value.definingPolynomial, value.interval),
     )
 
+    private fun contractForComparison(value: AlgebraicReal): AlgebraicReal = AlgebraicReal(
+        value.definingPolynomial, value.rootIndex, univariate.contractRoot(value.definingPolynomial, value.interval),
+    )
+
     fun compare(left: AlgebraicReal, right: AlgebraicReal): Int {
         arithmetic.step()
         if (left === right) return 0
@@ -86,8 +90,8 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
                 if (a.interval.upper <= b.interval.upper) a.interval.upper else b.interval.upper,
             )
             if (sequence.isNotEmpty() && univariate.countOpen(sequence, overlap) > 0) return 0
-            a = refine(a)
-            b = refine(b)
+            a = contractForComparison(a)
+            b = contractForComparison(b)
             a.rational?.let { return -compareRational(b, it) }
             b.rational?.let { return compareRational(a, it) }
         }
@@ -101,7 +105,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             if (current.interval.upper <= other) return -1
             if (current.interval.lower >= other) return 1
             if (univariate.evaluate(current.definingPolynomial, other).isZero) return 0
-            current = refine(current)
+            current = contractForComparison(current)
         }
     }
 

@@ -227,13 +227,23 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         return roots.sortedWith { left, right -> left.lower.compareTo(right.lower) }
     }
 
-    fun refine(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval {
+    fun refine(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval =
+        refine(polynomial, interval, useNewton = false)
+
+    fun contractRoot(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval =
+        refine(polynomial, interval, useNewton = true)
+
+    private fun refine(
+        polynomial: RationalPolynomial,
+        interval: RationalInterval,
+        useNewton: Boolean,
+    ): RationalInterval {
         arithmetic.step()
         if (interval.isPoint) return interval
         val midpoint = (interval.lower + interval.upper) * BigFraction.ofLong(2).reciprocal()
         val value = evaluate(polynomial, midpoint)
         if (value.isZero) return RationalInterval(midpoint, midpoint)
-        contract(polynomial, interval, midpoint, value)?.let { return it }
+        if (useNewton) contract(polynomial, interval, midpoint, value)?.let { return it }
         val left = RationalInterval(interval.lower, midpoint)
         return if (countOpen(sturm(polynomial), left) == 1) left else RationalInterval(midpoint, interval.upper)
     }

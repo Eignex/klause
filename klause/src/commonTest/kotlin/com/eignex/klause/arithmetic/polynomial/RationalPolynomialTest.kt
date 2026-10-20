@@ -65,12 +65,29 @@ class RationalPolynomialTest {
     }
 
     @Test
+    fun `general root refinement retains bisection bounds for subsequent sampling`() {
+        val polynomial = RationalPolynomial.of(-2, 0, 1)
+        for (sign in listOf(1L, -1L)) {
+            val lower = if (sign > 0) BigFraction.ONE else BigFraction.ofLong(-2)
+            val upper = if (sign > 0) BigFraction.ofLong(2) else BigFraction.MINUS_ONE
+            val interval = RationalInterval(lower, upper)
+
+            val refined = arithmetic.refine(polynomial, interval)
+
+            val midpoint = BigFraction.ofLong(3 * sign) * BigFraction.ofLong(2).reciprocal()
+            val expected = if (sign > 0) RationalInterval(lower, midpoint) else RationalInterval(midpoint, upper)
+            assertEquals(expected, refined)
+            assertEquals(1, arithmetic.countOpen(arithmetic.sturm(polynomial), refined))
+        }
+    }
+
+    @Test
     fun `interval Newton refinement contracts isolated roots of either sign`() {
         val polynomial = RationalPolynomial.of(-2, 0, 1)
         for ((lower, upper) in listOf(1L to 2L, -2L to -1L)) {
             val interval = RationalInterval(BigFraction.ofLong(lower), BigFraction.ofLong(upper))
 
-            val refined = arithmetic.refine(polynomial, interval)
+            val refined = arithmetic.contractRoot(polynomial, interval)
 
             assertTrue(refined.lower >= interval.lower && refined.upper <= interval.upper)
             assertTrue(refined.upper - refined.lower < BigFraction.ofLong(4).reciprocal())
@@ -83,7 +100,7 @@ class RationalPolynomialTest {
         val polynomial = RationalPolynomial.of(-1, 1)
         val interval = RationalInterval(BigFraction.ZERO, BigFraction.ofLong(3))
 
-        val refined = arithmetic.refine(polynomial, interval)
+        val refined = arithmetic.contractRoot(polynomial, interval)
 
         assertEquals(RationalInterval(BigFraction.ONE, BigFraction.ONE), refined)
     }
@@ -96,7 +113,7 @@ class RationalPolynomialTest {
             RationalPolynomial.of(1, -2, 1) to
                 RationalInterval(BigFraction.MINUS_ONE, BigFraction.ofLong(2)),
         )) {
-            val refined = arithmetic.refine(polynomial, interval)
+            val refined = arithmetic.contractRoot(polynomial, interval)
 
             assertTrue(refined.lower >= interval.lower && refined.upper <= interval.upper)
             assertTrue(refined.upper - refined.lower < interval.upper - interval.lower)
@@ -111,7 +128,7 @@ class RationalPolynomialTest {
         val polynomial = RationalPolynomial.of(-2, 0, 1)
         val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
 
-        assertFailsWith<PolynomialInterrupted> { cancelled.refine(polynomial, interval) }
+        assertFailsWith<PolynomialInterrupted> { cancelled.contractRoot(polynomial, interval) }
     }
 
     @Test
@@ -120,7 +137,7 @@ class RationalPolynomialTest {
         for ((lower, upper) in listOf(1L to 2L, -2L to -1L)) {
             var interval = RationalInterval(BigFraction.ofLong(lower), BigFraction.ofLong(upper))
             repeat(4) {
-                val refined = arithmetic.refine(polynomial, interval)
+                val refined = arithmetic.contractRoot(polynomial, interval)
 
                 val width = refined.upper - refined.lower
                 val precision = maxOf(1, width.den.magnitudeBitLength() - width.num.magnitudeBitLength() + 4)
