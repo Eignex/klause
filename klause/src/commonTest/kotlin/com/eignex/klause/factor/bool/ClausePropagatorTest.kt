@@ -42,4 +42,27 @@ class ClausePropagatorTest {
         val r = problem.propagate(Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false)))
         assertIs<PropagationResult.Unsat>(r)
     }
+
+    @Test
+    fun `clause watches moved before backtracking should propagate a sibling branch`() {
+        val problem = Problem(
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true))),
+            ),
+        )
+        val session = PropagationSession(problem)
+        session.pinBool(0, false)
+        session.pinBool(1, false)
+        session.pinBool(2, false)
+        session.popToLevel(0)
+
+        session.pinBool(3, false)
+        session.pinBool(2, false)
+        session.pinBool(0, false)
+
+        assertEquals(true, session.boolValue(1))
+    }
 }

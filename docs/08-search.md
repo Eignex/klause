@@ -165,6 +165,11 @@ replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see
 them.
 
+Clauses return immediately when either watched literal satisfies them. An unsettled
+clause repairs the first watch before the second, then checks for satisfaction,
+conflict or a unit implication. Watch positions survive undo; later propagation
+revalidates them against the restored assignment.
+
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,
 suspension or retraction.

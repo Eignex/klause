@@ -75,7 +75,10 @@ internal class ClausePropagator(
         ) {
             return true
         }
+        return propagateUnsettled(state, factorId, watches)
+    }
 
+    private fun propagateUnsettled(state: PropagationState, factorId: Int, watches: IntArray): Boolean {
         if (litFalseInPropState(state, literals, watches[0])) {
             val rep = findNonFalseLitExcept(state, literals, watches[0], watches[1])
             if (rep >= 0) {
