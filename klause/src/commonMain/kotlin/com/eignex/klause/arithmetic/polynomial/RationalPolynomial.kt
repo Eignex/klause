@@ -227,8 +227,44 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         arithmetic.step()
         if (interval.isPoint) return interval
         val midpoint = (interval.lower + interval.upper) * BigFraction.ofLong(2).reciprocal()
-        if (evaluate(polynomial, midpoint).isZero) return RationalInterval(midpoint, midpoint)
+        val value = evaluate(polynomial, midpoint)
+        if (value.isZero) return RationalInterval(midpoint, midpoint)
+        contract(polynomial, interval, midpoint, value)?.let { return it }
         val left = RationalInterval(interval.lower, midpoint)
         return if (countOpen(sturm(polynomial), left) == 1) left else RationalInterval(midpoint, interval.upper)
+    }
+
+    private fun contract(
+        polynomial: RationalPolynomial,
+        interval: RationalInterval,
+        midpoint: BigFraction,
+        value: BigFraction,
+    ): RationalInterval? {
+        val slope = encloseDerivative(polynomial, interval)
+        if (slope.lower.signum() <= 0 && slope.upper.signum() >= 0) return null
+        val first = value * slope.lower.reciprocal()
+        val second = value * slope.upper.reciprocal()
+        // The mean value theorem keeps the isolated root inside midpoint - value / slope.
+        val lower = maxOf(interval.lower, midpoint - maxOf(first, second))
+        val upper = minOf(interval.upper, midpoint - minOf(first, second))
+        if (lower > upper || (upper - lower) + (upper - lower) > interval.upper - interval.lower) return null
+        if (evaluate(polynomial, lower).isZero) return RationalInterval(lower, lower)
+        if (evaluate(polynomial, upper).isZero) return RationalInterval(upper, upper)
+        arithmetic.step()
+        return RationalInterval(lower, upper)
+    }
+
+    private fun encloseDerivative(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval {
+        var lower = BigFraction.ZERO
+        var upper = BigFraction.ZERO
+        for (degree in polynomial.degree downTo 1) {
+            arithmetic.step()
+            val products = listOf(lower * interval.lower, lower * interval.upper,
+                upper * interval.lower, upper * interval.upper)
+            val coefficient = polynomial[degree] * BigFraction.ofLong(degree.toLong())
+            lower = checkNotNull(products.minOrNull()) + coefficient
+            upper = checkNotNull(products.maxOrNull()) + coefficient
+        }
+        return RationalInterval(lower, upper)
     }
 }

@@ -1,6 +1,7 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -60,6 +61,56 @@ class RationalPolynomialTest {
 
         assertTrue(refined.upper - refined.lower < initial.upper - initial.lower)
         assertEquals(1, arithmetic.countOpen(arithmetic.sturm(polynomial), refined))
+    }
+
+    @Test
+    fun `interval Newton refinement contracts isolated roots of either sign`() {
+        val polynomial = RationalPolynomial.of(-2, 0, 1)
+        for ((lower, upper) in listOf(1L to 2L, -2L to -1L)) {
+            val interval = RationalInterval(BigFraction.ofLong(lower), BigFraction.ofLong(upper))
+
+            val refined = arithmetic.refine(polynomial, interval)
+
+            assertTrue(refined.lower >= interval.lower && refined.upper <= interval.upper)
+            assertTrue(refined.upper - refined.lower < BigFraction.ofLong(4).reciprocal())
+            assertEquals(1, arithmetic.countOpen(arithmetic.sturm(polynomial), refined))
+        }
+    }
+
+    @Test
+    fun `interval Newton refinement captures a rational root away from the midpoint`() {
+        val polynomial = RationalPolynomial.of(-1, 1)
+        val interval = RationalInterval(BigFraction.ZERO, BigFraction.ofLong(3))
+
+        val refined = arithmetic.refine(polynomial, interval)
+
+        assertEquals(RationalInterval(BigFraction.ONE, BigFraction.ONE), refined)
+    }
+
+    @Test
+    fun `refinement preserves isolated roots when the derivative enclosure includes zero`() {
+        for ((polynomial, interval) in listOf(
+            RationalPolynomial.of(-2, 0, 0, 1) to
+                RationalInterval(BigFraction.ZERO, BigFraction.ofLong(2)),
+            RationalPolynomial.of(1, -2, 1) to
+                RationalInterval(BigFraction.MINUS_ONE, BigFraction.ofLong(2)),
+        )) {
+            val refined = arithmetic.refine(polynomial, interval)
+
+            assertTrue(refined.lower >= interval.lower && refined.upper <= interval.upper)
+            assertTrue(refined.upper - refined.lower < interval.upper - interval.lower)
+            assertEquals(1, arithmetic.countOpen(arithmetic.sturm(polynomial), refined))
+        }
+    }
+
+    @Test
+    fun `cancelled interval Newton refinement exposes no partial interval`() {
+        var polls = 0
+        val cancelled = RationalPolynomialArithmetic(PolynomialArithmetic(Cancellation { ++polls >= 6 }))
+        val polynomial = RationalPolynomial.of(-2, 0, 1)
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+
+        assertFailsWith<PolynomialInterrupted> { cancelled.refine(polynomial, interval) }
     }
 
     @Test
