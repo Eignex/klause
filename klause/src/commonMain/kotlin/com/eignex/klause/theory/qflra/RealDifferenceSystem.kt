@@ -127,6 +127,85 @@ internal class RealDifferenceSystem private constructor(
             return build(realColumns, edges, stop)
         }
 
+        fun prepareNecessary(
+            model: Problem,
+            forms: List<List<ExactRowForm>>,
+            stop: Cancellation,
+            onStage: ((String) -> Unit)? = null,
+        ): RealDifferenceRefuter? {
+            if (model.numIntVars != 0 || model.numRealVars !in 1..10000 ||
+                model.factors.size > 100000 || stop()
+            ) return null
+            onStage?.invoke("INPUT_N_${model.numRealVars}_F_${model.factors.size}")
+            val zero = model.numRealVars
+            val work = MixedPointArithmetic(stop)
+            val edges = ArrayList<Edge>()
+            var entries = 0L
+            fun appendSelected(row: ExactRationalInequality, guard: Int): Boolean {
+                entries += row.columns.size + 1L
+                stop.charge(8L * (row.columns.size + 1L))
+                if (entries > 65536L || edges.size >= 65536) {
+                    onStage?.invoke("STORAGE_ENTRIES_${entries}_EDGES_${edges.size}")
+                    return false
+                }
+                if (stop() ||
+                    row.columns.size != row.coefficients.size || row.columns.any { it !in 0 until zero } ||
+                    !work.admitted(row.rhs) || !row.coefficients.all(work::admitted)
+                ) return false
+                if (row.columns.size > 2) return true
+                if (row.columns.isEmpty()) return append(row, guard, zero, edges, stop)
+                val first = row.coefficients[0]
+                if (first.isZero || (row.columns.size == 2 && first != row.coefficients[1].negated())) return true
+                val magnitude = if (first.signum() > 0) first else first.negated()
+                val bound = work.quotient(row.rhs, magnitude) ?: return !stop()
+                val sign = if (first.signum() > 0) BigFraction.ONE else BigFraction.MINUS_ONE
+                val normalized = ExactRationalInequality(row.columns,
+                    if (row.columns.size == 1) listOf(sign) else listOf(sign, sign.negated()), bound, row.strict)
+                append(normalized, guard, zero, edges, stop)
+                return !stop()
+            }
+            for (real in 0 until zero) {
+                stop.charge(2L)
+                if (stop()) return null
+                if (model.realLower[real].isFinite() &&
+                    !appendSelected(exactBound(real, model.realLower[real], false), ALWAYS)
+                ) return null
+                if (model.realUpper[real].isFinite() &&
+                    !appendSelected(exactBound(real, model.realUpper[real], true), ALWAYS)
+                ) return null
+            }
+            val boundEdges = edges.size
+            for ((factorIndex, factor) in model.factors.withIndex()) {
+                stop.charge(1L)
+                if (stop()) return null
+                val source = (factor as? EncodedTheoryFactor)?.takeIf {
+                    it.linearForm === it.source.linearForm
+                }?.source ?: factor
+                if (source is Clause || source is Cardinality || factor.linearForm is LinearForm.Disjunction) continue
+                for ((rowIndex, row) in factor.linearRows.withIndex()) {
+                    stop.charge(4L * row.size + 1L)
+                    if (stop() || (row.activator != LinearRow.ALWAYS && row.activator !in 0 until model.numBoolVars)) {
+                        return null
+                    }
+                    if ((0 until row.size).any { Term.isBool(row.ref(it)) }) continue
+                    val truths = if (row.activator == LinearRow.ALWAYS) listOf(true) else listOf(true, false)
+                    for (truth in truths) {
+                        val comparison = forms[factorIndex][rowIndex].comparison(truth) { false }
+                        if (comparison.terms.keys.any { it !in 0 until zero }) return null
+                        if (comparison.terms.size > 2) continue
+                        if (comparison.op == LinearOp.NE && comparison.terms.isNotEmpty()) continue
+                        val rows = ArrayList<ExactRationalInequality>(2)
+                        comparison.rowsInto(rows)
+                        val guard = if (row.activator == LinearRow.ALWAYS) ALWAYS else Lit.make(row.activator, truth)
+                        for (inequality in rows) if (!appendSelected(inequality, guard)) return null
+                    }
+                }
+            }
+            if (edges.size == boundEdges || stop()) return null
+            onStage?.invoke("PREPARED_N_${zero}_E_${edges.size}_S_$entries")
+            return build(zero, edges, stop)?.let(::RealDifferenceRefuter)
+        }
+
         private fun build(zero: Int, edges: List<Edge>, stop: Cancellation): RealDifferenceSystem? {
             if (edges.isEmpty() || edges.size > 100000) return null
             var denominator = 1L
@@ -203,6 +282,16 @@ internal class RealDifferenceSystem private constructor(
                 bound.num.toLong(), row.strict, guard, bound.den.toLong())
             return true
         }
+    }
+}
+
+internal class RealDifferenceRefuter(private val system: RealDifferenceSystem) {
+    fun conflict(
+        bools: IntArray,
+        stop: Cancellation,
+    ): RealDifferenceSystem.Result.Infeasible? {
+        val result = system.check(bools, stop) { stop.charge(it) }
+        return (result as? RealDifferenceSystem.Result.Infeasible)?.takeUnless { stop() }
     }
 }
 
