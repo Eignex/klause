@@ -25,7 +25,9 @@ class MiniZincModeExactGlobalsTest(
         @Parameterized.Parameters(name = "{0} {1} {2}")
         fun cases(): List<Array<Any>> = (flatZincGlobalCases + flatZincSetGlobalCases).flatMap { global ->
             listOf("finite", "linear", "polynomial", "algebraic").flatMap { coupling ->
-                listOf("witness", "refutation", "optimum").map { verdict -> arrayOf<Any>(global, coupling, verdict) }
+                val verdicts = if (coupling == "finite") listOf("witness", "refutation", "optimum") else
+                    listOf("witness", "refutation", "real-refutation", "optimum")
+                verdicts.map { verdict -> arrayOf<Any>(global, coupling, verdict) }
             }
         } + listOf("finite", "linear", "polynomial", "algebraic").map { coupling ->
             arrayOf<Any>(Triple("count_eq-empty-invalid", "klause_count_eq([],1,1)", null), coupling, "refutation")
@@ -40,8 +42,9 @@ class MiniZincModeExactGlobalsTest(
             "polynomial", "algebraic" -> "constraint float_times(y,y,r);"
             else -> ""
         }
+        val realUpper = if (verdict == "real-refutation") "0.25" else "2.0"
         val realDeclarations = if (coupling == "finite") "" else
-            "var 0.0..3.0: r :: output_var; var 0.0..2.0: y :: output_var; "
+            "var 0.0..3.0: r :: output_var; var 0.0..$realUpper: y :: output_var; "
         val pin = if (verdict == "optimum") "" else {
             val value = (if (verdict == "refutation") 0 else 1) + if (coupling == "algebraic") 1 else 0
             if (coupling == "finite") "constraint int_eq(x,$value);" else "constraint float_eq(r,$value.0);"
@@ -50,7 +53,7 @@ class MiniZincModeExactGlobalsTest(
         val solve = if (verdict == "optimum") "minimize $objective" else "satisfy"
         val source = File.createTempFile("exact-global", ".fzn").apply {
             val roles = listOf("v", "d", "two", "z", "s", "t", "b", "c")
-                .filter { Regex("\\b$it\\b").containsMatchIn(global.second) || it == bridge && coupling == "algebraic" }
+                .filter { Regex("\\b$it\\b").containsMatchIn(global.second) || (it == bridge && coupling == "algebraic") }
             val declarations = roles.joinToString(" ") {
                 when (it) {
                     "v" -> "var 1..3: v;"
@@ -92,7 +95,7 @@ class MiniZincModeExactGlobalsTest(
         val output = bytes.toString(Charsets.UTF_8.name())
         assertFalse("klause-grid" in output, output)
         assertFalse("=====UNKNOWN=====" in output, output)
-        if (verdict == "refutation") {
+        if (verdict.endsWith("refutation")) {
             assertTrue("=====UNSATISFIABLE=====" in output.lines(), output)
             assertFalse("----------" in output.lines(), output)
         } else {
@@ -100,7 +103,7 @@ class MiniZincModeExactGlobalsTest(
             assertEquals("x = 1;", output.lineSequence().lastOrNull { it.startsWith("x = ") }, output)
             if (coupling != "finite") {
                 val exact = output.lineSequence().lastOrNull { it.startsWith("% klause-exact: y = ") }
-                if (coupling == "algebraic" || coupling == "polynomial" && exact != "% klause-exact: y = 1;") {
+                if (coupling == "algebraic" || (coupling == "polynomial" && exact != "% klause-exact: y = 1;")) {
                     assertTrue(assertNotNull(exact, output).startsWith("% klause-exact: y = root("), output)
                     val image = if (coupling == "algebraic") 2 else 1
                     assertEquals("% klause-exact: r = $image;",
