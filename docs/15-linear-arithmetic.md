@@ -119,7 +119,12 @@ variables absent from all clauses may receive a default value.
 
 The pipeline binds the proposal to the exact receiving source and fragment, lifts
 it through the existing reconstruction, and runs the full original-source witness
-checker. A rejected proposal contributes no conflict or bound. Checked assignments
+checker. A rejected numerical point supplies no arithmetic deduction. If the private
+clause-only fixpoint refutes a prefix of trial Boolean pins, negating every trial in
+that prefix yields a source Boolean clause for shared propagation. The prefix keeps
+every applied trial condition, omits values unused by clauses and admits at most
+4,096 literals under the current operation; a stopped check supplies no clause.
+Checked assignments
 remain private until the traversal reaches its caller-approved publication point;
 assertion, retraction, restart and close discard them. This handoff contributes no
 guessed shared facts or peer model values. Sources with integers, private real

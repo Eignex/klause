@@ -28,6 +28,74 @@ import kotlin.test.assertTrue
 
 class WholeSourcePointOfferTest {
     @Test
+    fun `a rejected Boolean cube should retain every conditioning pin in its source clause`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true), Lit.make(2, false))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val clauses = ArrayList<IntArray>()
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { clauses += it })
+
+        val result = offer.completeBooleans(intArrayOf(1, 0, -1, 0), Cancellation.Never)
+
+        assertNull(result)
+        val clause = clauses.single()
+        assertContentEquals(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(3, true)), clause)
+        for (mask in 0 until 16) {
+            if (source.factors.all { factor ->
+                    (factor as Clause).literals.any { literal ->
+                        (mask and (1 shl Lit.variable(literal)) != 0) == Lit.isPositive(literal)
+                    }
+                }
+            ) assertTrue(clause.any { literal ->
+                (mask and (1 shl Lit.variable(literal)) != 0) == Lit.isPositive(literal)
+            })
+        }
+        assertContentEquals(BooleanArray(4),
+            offer.completeBooleans(intArrayOf(0, 0, 0, 0), Cancellation.Never))
+    }
+
+    @Test
+    fun `cancellation after a Boolean cube conflict should withhold its source clause`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        var cancelled = false
+        var clauses = 0
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onDecline = { if (it == "BOOLEAN_ROOT_CONFLICT") cancelled = true },
+            onBooleanClause = { clauses++ })
+
+        val result = offer.completeBooleans(intArrayOf(1, 0), Cancellation { cancelled })
+
+        assertNull(result)
+        assertTrue(cancelled)
+        assertEquals(0, clauses)
+    }
+
+    @Test
+    fun `only referenced trial pins should count toward Boolean cube support limits`() {
+        for (size in listOf(4096, 4097)) {
+            val source = Problem(size + 7, 0, emptyArray(), arrayOf(
+                Clause(IntArray(size) { Lit.make(it + 7, true) }),
+            ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+            var clause: IntArray? = null
+            val offer = WholeSourcePointOffer(source, source,
+                SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+                onBooleanClause = { clause = it })
+
+            val result = offer.completeBooleans(IntArray(size + 7), Cancellation.Never)
+
+            assertNull(result)
+            if (size <= 4096) assertContentEquals(IntArray(size) { Lit.make(it + 7, true) }, clause)
+            else assertNull(clause)
+        }
+    }
+
+    @Test
     fun `the original source should be checked after Boolean reconstruction`() {
         val source = Problem(2, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))

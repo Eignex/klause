@@ -9,6 +9,7 @@ import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.propagation.bake
@@ -22,6 +23,7 @@ import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.wholeRealPointTruths
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import kotlin.coroutines.cancellation.CancellationException
 
 internal class WholeSourcePointOffer(
@@ -30,6 +32,7 @@ internal class WholeSourcePointOffer(
     private val mapping: SourceMapping,
     private val publicationCancellation: Cancellation,
     private val onDecline: ((String) -> Unit)? = null,
+    private val onBooleanClause: ((IntArray) -> Unit)? = null,
 ) {
     private val witnesses = SourceWitnessAssembler(source, original)
     private var booleanPreparationAttempted = false
@@ -63,22 +66,54 @@ internal class WholeSourcePointOffer(
             if (guesses[variable] !in -1..1) return null
             if (guesses[variable] == -1 && !referenced[variable]) guesses[variable] = 0
         }
-        val keys = guesses.indices.filter { guesses[it] != -1 }.toIntArray()
+        val staged = onBooleanClause != null
+        val assigned = guesses.indices.filter { guesses[it] != -1 }
+        val keys = if (staged) (assigned.filter { referenced[it] } + assigned.filter { !referenced[it] }).toIntArray()
+            else assigned.toIntArray()
         val values = BooleanArray(keys.size) { guesses[keys[it]] == 1 }
+        if (staged) stop.charge(64L * keys.size + 1L)
         if (stop()) return null
         val session = PropagationSession.forPointCheck(model,
-            Assumptions(keys, values, intArrayOf(), longArrayOf()), stop)
+            if (staged) Assumptions.None else Assumptions(keys, values, intArrayOf(), longArrayOf()), stop)
+        var accountedWork = 0L
         return try {
             if (session.isUnsatAtRoot) return declined("BOOLEAN_ROOT_CONFLICT")
             if (session.fixpointCancelled || stop()) return null
+            if (staged) {
+                val prefix = IntArrayList()
+                for (index in keys.indices) {
+                    stop.charge(session.work - accountedWork + 1L)
+                    accountedWork = session.work
+                    if (stop() || session.fixpointCancelled) return null
+                    val previous = session.boolValue(keys[index])
+                    if (previous == values[index]) continue
+                    prefix.add(Lit.make(keys[index], values[index]))
+                    if (previous != null) return rejectBooleanCube(prefix, stop)
+                    val result = session.pinBool(keys[index], values[index])
+                    stop.charge(session.work - accountedWork)
+                    accountedWork = session.work
+                    if (stop() || session.fixpointCancelled) return null
+                    if (result is PropagationResult.Unsat) return rejectBooleanCube(prefix, stop)
+                }
+            }
             val result = BooleanArray(source.numBoolVars) {
                 session.boolValue(it) ?: return declined("BOOLEAN_UNRESOLVED")
             }
             if (stop() || session.checkSelectedProjection() != ComponentCheck.Feasible) return declined("BOOLEAN_CHECK")
             result.takeUnless { stop() }
         } finally {
-            stop.charge(session.work)
+            stop.charge(session.work - accountedWork)
         }
+    }
+
+    private fun rejectBooleanCube(prefix: IntArrayList, stop: Cancellation): Nothing? {
+        onDecline?.invoke("BOOLEAN_ROOT_CONFLICT")
+        stop.charge(4L * prefix.size + 1L)
+        if (stop() || publicationCancellation()) return null
+        if (prefix.size > 4096) return declined("BOOLEAN_CUBE_PREFIX_LIMIT")
+        val clause = IntArray(prefix.size) { Lit.negate(prefix[it]) }
+        if (!stop() && !publicationCancellation()) onBooleanClause?.invoke(clause)
+        return null
     }
 
     fun offer(value: ExactLiraAssignment, stop: Cancellation): Boolean {

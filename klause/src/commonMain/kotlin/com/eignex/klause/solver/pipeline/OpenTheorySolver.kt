@@ -29,6 +29,7 @@ import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchSelection
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchDecisionBudget
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRestart
@@ -427,6 +428,9 @@ class OpenTheoryEngine internal constructor(
                 val proposals = WholeSourcePointOffer(model, prepared.source, prepared.mapping, cancellation,
                     onDecline = { reason ->
                         state.smt.observeCompleteSearchStage("WHOLE_SOURCE_POINT_DECLINE_$reason")
+                    }, onBooleanClause = { clause ->
+                        planned.session.learn(SearchExplanation(clause))
+                        state.smt.observeCompleteSearchStage("WHOLE_SOURCE_BOOLEAN_CLAUSE_L_${clause.size}")
                     })
                 if (proposals.applicable) {
                     if (it.useWholeSourcePoints(model, proposals::completeBooleans, proposals::offer,
