@@ -100,6 +100,7 @@ internal object PolynomialWitnessProbeProfile {
         val command = listOf(
             File(System.getProperty("java.home"), "bin/java").absolutePath,
             "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
+            "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
             "-Dklause.workspace.root=${CorpusFetcher.workspaceRoot()}",
             "-Dklause.bench.corpusCache=${CorpusFetcher.cacheRoot}",
             "-cp", System.getProperty("java.class.path"), PolynomialWitnessProbeProfile::class.java.name,

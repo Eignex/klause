@@ -21,11 +21,13 @@ class PolynomialWitnessProbeProfileTest {
         val observed = access.measure(source, true, chargeStacks = true,
             sourceMode = "shared", coupledChargesOnly = true)
 
-        assertEquals("Satisfiable", observed.result)
+        assertEquals(plain.result, observed.result)
         assertEquals(plain.stats, observed.stats)
         assertEquals(plain.sourceShape, observed.sourceShape)
         assertEquals("shared", observed.sourceShape?.mode)
         assertEquals("Problem", observed.sourceShape?.representation)
+        assertTrue(checkNotNull(observed.sourceShape?.realCount) > 2)
+        assertTrue(observed.nativeWork > 0)
         assertEquals(observed.nativeWork, observed.charges.values.sum())
     }
 
