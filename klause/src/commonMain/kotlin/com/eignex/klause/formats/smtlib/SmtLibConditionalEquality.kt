@@ -210,7 +210,12 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         }.literal
     }
 
-    fun expandPending(builder: Compiler.Builder) {
+    class BooleanAlias(val variable: Int, val target: Int, val factors: List<Factor>)
+
+    fun expandPending(builder: Compiler.Builder): List<BooleanAlias> {
+        builder.booleanWork(0L)
+        builder.booleanWork(1L)
+        val aliases = ArrayList<BooleanAlias>()
         definitionsClosed = true
         val replaced = HashSet<Factor>()
         for ((key, equality) in pendingEqualities.entries.toList().asReversed()) {
@@ -223,9 +228,15 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
             builder.factors.addAll(clauses)
             definePredicate(Lit.variable(equality.literal), clauses)
             replaced.add(equality.factor)
+            if (Lit.isPositive(equality.literal) && Lit.isPositive(expanded)) {
+                builder.booleanWork(3L)
+                aliases += BooleanAlias(Lit.variable(equality.literal), Lit.variable(expanded), clauses)
+            }
         }
         builder.factors.removeAll { it in replaced }
         pendingEqualities.clear()
+        builder.booleanWork(aliases.size.toLong() + 1L)
+        return aliases.toList()
     }
 
     private fun expand(variable: Int, value: Long, builder: Compiler.Builder): Int? {

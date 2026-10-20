@@ -327,11 +327,11 @@ internal object Compiler {
                 if (isRealExpr(t)) realObjective(t, false) else linearObjective(t, false)
             } else null
             lowerOpenIteChains() // an objective term can open chains of its own
-            conditionalEqualities.expandPending(this)
+            val aliases = conditionalEqualities.expandPending(this)
             val removed = conditionalEqualities.retainNeededDefinitions(
                 factors, intNames.values, boolNames.values, compiledObjective,
             )
-            val objective = compactConditionalColumns(removed, compiledObjective)
+            val objective = compactConditionalColumns(removed, compiledObjective, aliases)
             factors.addAll(affineRealTables.infer())
             val sourceBounds = modelIntBounds()
 
@@ -355,11 +355,16 @@ internal object Compiler {
             )
         }
 
-        private fun compactConditionalColumns(
+        internal fun compactConditionalColumns(
             removed: SmtLibConditionalEquality.UnusedColumns,
             objective: LinearObjectiveSpec?,
+            aliases: List<SmtLibConditionalEquality.BooleanAlias>,
         ): LinearObjectiveSpec? {
-            if (removed.ints.isEmpty() && removed.bools.isEmpty()) return objective
+            booleanWork(0L)
+            val booleanAliases = retainedBooleanAliases(aliases, removed.bools, objective)
+            if (removed.ints.isEmpty() && removed.bools.isEmpty() && booleanAliases.isEmpty()) return objective
+            booleanWork(nextInt.toLong() + nextBool + intNames.size + boolNames.size +
+                (objective?.intCoefficientValues?.size ?: 0) + (objective?.boolWeightValues?.size ?: 0) + 1L)
             val mapping = IntArray(nextInt) { -1 }
             val retained = ArrayList<PresolveDomain>()
             for (variable in mapping.indices) {
@@ -370,16 +375,19 @@ internal object Compiler {
             }
             var retainedBooleans = 0
             val boolMapping = IntArray(nextBool) { variable ->
-                if (variable in removed.bools) -1 else retainedBooleans++
+                if (variable in removed.bools || variable in booleanAliases) -1 else retainedBooleans++
             }
+            for ((variable, target) in booleanAliases) boolMapping[variable] = boolMapping[target]
             val remap = VarRemap(boolMapping, mapping)
             for (index in factors.indices) {
                 val factor = factors[index]
+                booleanWork(factor.variables.ints.size.toLong() + factor.variables.boolVars.size + 1L)
                 if (factor.variables.ints.isNotEmpty() || factor.variables.boolVars.isNotEmpty()) {
                     check(factor.variables.ints.all { mapping[it] >= 0 })
                     check(factor.variables.boolVars.all { boolMapping[it] >= 0 })
                     factors[index] = factor.remap(remap)
                 }
+                booleanWork(0L)
             }
             for (entry in intNames.entries) entry.setValue(mapping[entry.value])
             for (entry in boolNames.entries) entry.setValue(boolMapping[entry.value])
@@ -393,12 +401,53 @@ internal object Compiler {
             )
         }
 
+        private fun retainedBooleanAliases(
+            aliases: List<SmtLibConditionalEquality.BooleanAlias>,
+            removed: Set<Int>,
+            objective: LinearObjectiveSpec?,
+        ): Map<Int, Int> {
+            if (aliases.isEmpty()) return emptyMap()
+            booleanWork(boolNames.size.toLong() + 1L)
+            val declared = boolNames.values.toHashSet()
+            val parents = HashMap<Int, Int>()
+            val redundant = HashSet<Factor>()
+            for (alias in aliases) {
+                booleanWork(6L)
+                if (alias.variable in removed || alias.target in removed || alias.variable in declared ||
+                    objective?.boolWeightValues?.getOrNull(alias.variable)?.let { it != 0L } == true
+                ) continue
+                val target = aliasRepresentative(alias.target, parents)
+                if (target != alias.variable) parents[alias.variable] = target
+                redundant.addAll(alias.factors)
+            }
+            for (variable in parents.keys) parents[variable] = aliasRepresentative(variable, parents)
+            booleanWork(factors.size.toLong() + 1L)
+            factors.removeAll { it in redundant }
+            return parents
+        }
+
+        private fun aliasRepresentative(variable: Int, parents: MutableMap<Int, Int>): Int {
+            var root = variable
+            while (true) {
+                booleanWork(1L)
+                root = parents[root] ?: break
+            }
+            var current = variable
+            while (current != root) {
+                booleanWork(1L)
+                val next = parents.getValue(current)
+                parents[current] = root
+                current = next
+            }
+            return root
+        }
+
         private fun compactCoefficients(coefficients: LongArray, mapping: IntArray, size: Int): LongArray {
             if (coefficients.isEmpty()) return coefficients
             val compacted = LongArray(size)
             for (variable in coefficients.indices) {
                 val target = mapping[variable]
-                if (target >= 0) compacted[target] = coefficients[variable]
+                if (target >= 0 && coefficients[variable] != 0L) compacted[target] = coefficients[variable]
             }
             return compacted
         }

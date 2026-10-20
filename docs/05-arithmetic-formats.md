@@ -207,6 +207,10 @@ A result with an open bound instead keeps guarded exact equalities to its branch
 Affine real conditionals retain `RealElement`. Comparisons against a conditional
 can lower to Boolean tests of its branches when the branch images are small, and
 definitions no surviving constraint needs are dropped after a dependency fixpoint.
+Proven positive Boolean aliases of expanded conditional queries are compacted after
+that fixpoint, using the existing literals and preserving source declarations and
+nonzero objective columns. Negative expansions retain their equivalence clauses.
+Alias resolution and factor remapping charge the containing source work token.
 For up to eight Boolean inputs, a scalar defined by consistent, complete cases also
 supplies a verified affine row beside the source factors.
 

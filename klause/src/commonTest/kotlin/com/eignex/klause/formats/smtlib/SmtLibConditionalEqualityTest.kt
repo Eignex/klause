@@ -32,6 +32,80 @@ import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `an expanded conditional query should retain the same Boolean frontier as its direct formula`() {
+        val prefix = """
+            (declare-const b Bool) (declare-const x Int) (declare-const r Bool)
+            (assert true)
+        """.trimIndent()
+        val conditional = SmtLib.parse("$prefix (assert (= r (= (ite b x 0) 1)))")
+        val direct = SmtLib.parse("$prefix (assert (= r (and b (= x 1))))")
+
+        assertEquals(direct.model.numBoolVars, conditional.model.numBoolVars)
+        assertEquals(direct.boolVarNames.keys, conditional.boolVarNames.keys)
+    }
+
+    @Test
+    fun `dependent expanded queries should preserve declared Boolean values`() {
+        for (selected in listOf(true, false)) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool) (declare-const c Bool)
+                (declare-const r Bool) (declare-const x Int)
+                (assert ${if (selected) "b" else "(not b)"}) (assert c)
+                (assert (= x 1))
+                (assert (let ((u (ite b x 0))) (let ((v (ite c u 2))) (= r (= v 1)))))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            assertEquals(selected, sample.boolValue(parsed.boolVarNames.getValue("b")))
+            assertEquals(true, sample.boolValue(parsed.boolVarNames.getValue("c")))
+            assertEquals(selected, sample.boolValue(parsed.boolVarNames.getValue("r")))
+            assertEquals("1", sample.intValue(parsed.intVarNames.getValue("x")))
+        }
+    }
+
+    @Test
+    fun `a negative expanded query should preserve its declared result`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const r Bool)
+            (assert (= r (= (ite b 1 2) 2))) (assert r)
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+        assertEquals(false, sample.boolValue(parsed.boolVarNames.getValue("b")))
+        assertEquals(true, sample.boolValue(parsed.boolVarNames.getValue("r")))
+    }
+
+    @Test
+    fun `an aliased query should retain an independent numeric objective consumer`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const x Int) (declare-const y Int)
+            (declare-const r Bool)
+            (assert (let ((v (ite b x 0))) (and (= y v) (= r (= v 1)))))
+            (assert r) (assert b) (assert (= x 1))
+            (minimize y)
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(parsed.model).optimize(
+            assertNotNull(parsed.objective).toLinearObjective(),
+        )
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result.result)
+        assertEquals(BigFraction.ofLong(1), optimum.incumbent.value.rational)
+    }
+
+    @Test
     fun `late child images should reject multiple values within one shared allowance`() {
         val builder = Compiler.Builder(
             Long.MIN_VALUE,
