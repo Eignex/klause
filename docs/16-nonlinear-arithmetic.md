@@ -245,8 +245,8 @@ implements the decision procedure. The pipeline uses
 
 `solveQfNra` decides a neutral `PolynomialRealFormula`. Normalization expands exact
 rational polynomial expressions and keeps each atom's sign, relation and Boolean
-structure. The procedure then runs in four stages; only the last two are needed for
-completeness.
+structure. The procedure then runs in five stages; the final three supply complete
+Boolean-region traversal and CAD.
 
 **1. Bounded probe.** An optional prefix tries to settle the query cheaply. It
 checks necessary conditions on conjunctive atoms (sign enclosures from coefficient
@@ -256,13 +256,23 @@ specialized equality, coupled lines, dyadic points). Every proposal must pass th
 complete original-formula check. The probe is limited to small formulas and one
 65,536-unit slice; a decline leaves complete CAD available.
 
-**2. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
+**2. Required graph reduction.** Boolean unit propagation and constant numeric
+truths identify necessary signed predicates without choosing a Boolean branch.
+Sign propagation can refute their conjunction. A required equality with a nonzero
+rational coordinate coefficient defines a total polynomial graph; substitution
+rewrites every atom while retaining the Boolean structure. Opposing proportional
+weak bounds can expose such an equality. The reduced formula's total term count
+and rational coefficient footprint stay within the normalized input's sizes.
+A representation refusal retains only completed substitutions and their reverse
+fibres. The initial probe retains its original admission counts and runs once.
+
+**3. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
 enumerates source implicants: assignments of Boolean leaves and signed numeric
 predicates that make the formula true. Propagation treats numeric predicates as
 opaque leaves, a proof scan keeps only supporting literals, and private exclusion
 clauses prevent revisiting a region without entering shared learning.
 
-**3. Regional reduction and projection.** Each region's signed predicates form a
+**4. Regional reduction and projection.** Each region's signed predicates form a
 conjunction. Linear required equalities are solved and substituted, coordinates
 occurring only linearly in inequalities are eliminated by affine pairing, and sign
 propagation can refute the region outright.
@@ -272,13 +282,14 @@ preserves delineability including repeated roots and vanishing leading
 coefficients. A required equality with a provably nonzero leading coefficient
 restricts its level to that equation's roots.
 
-**4. Lifting and truth.** Traversal walks the levels in order. Each projection
+**5. Lifting and truth.** Traversal walks the levels in order. Each projection
 polynomial is specialized at the earlier coordinates, the
 [kernel](18-exact-arithmetic.md#algebraic-arithmetic-and-lifting) isolates its real
 roots, and roots become section samples with rational samples in the sectors
 between them. A violated region literal prunes the cell. At a complete sample,
-eliminated coordinates are reconstructed and the full assignment passes the
-original formula before capture. Exhausting every cell refutes the region.
+regional coordinates are reconstructed before required graph fibres are applied
+in reverse substitution order. The full assignment passes the original formula
+before capture. Exhausting every cell refutes the region.
 
 #### Objective-image traversal
 

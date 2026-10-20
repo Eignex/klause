@@ -133,7 +133,22 @@ internal class QfNraQuery(
             work.booleanTheoryAtoms = 0
             work.booleanTheoryConstantRefutations = 0
             work.booleanTheoryResourceRefusals = 0
-            val regions = normalized.booleanRegions(arithmetic)
+            val preparingFormula = PolynomialFormulaReduction.prepare(normalized, realCount, arithmetic) {
+                val sections = checkNotNull(work.equationalSections)
+                work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
+            }
+            var formulaReduction: PolynomialFormulaReduction? = null
+            while (formulaReduction == null) {
+                formulaReduction = preparingFormula.next()
+                if (formulaReduction == null) yield(null)
+            }
+            if (formulaReduction.inconsistent) {
+                arithmetic.step()
+                yield(QfNraResult.Unsatisfiable(work.snapshot()))
+                return@sequence
+            }
+            val reducedFormula = formulaReduction.formula
+            val regions = reducedFormula.booleanRegions(arithmetic)
             var incomplete: PolynomialResource? = null
             while (regions.hasNext()) {
                 val region = regions.next()
@@ -146,12 +161,12 @@ internal class QfNraQuery(
                 val atoms = checkNotNull(work.booleanTheoryAtoms)
                 work.booleanTheoryAtoms = atoms + minOf(region.atoms.size.toLong(), Long.MAX_VALUE - atoms)
                 try {
-                    if (!regionFeasible(normalized, region, emptyMap(), arithmetic, algebraic)) {
+                    if (!regionFeasible(reducedFormula, region, emptyMap(), arithmetic, algebraic)) {
                         val constants = checkNotNull(work.booleanTheoryConstantRefutations)
                         work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                         continue
                     }
-                    val reducing = PolynomialAffineReduction.prepare(normalized, region, realCount, arithmetic) {
+                    val reducing = PolynomialAffineReduction.prepare(reducedFormula, region, realCount, arithmetic) {
                         val sections = checkNotNull(work.equationalSections)
                         work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
                     }
@@ -162,7 +177,7 @@ internal class QfNraQuery(
                     }
                     if (reduction.inconsistent) continue
                     reducedRegionObserver?.invoke(reduction.atoms)
-                    val activeFormula = if (reduction.eliminatedCount == 0) normalized
+                    val activeFormula = if (reduction.eliminatedCount == 0) reducedFormula
                     else PolynomialFormula.conjunction(reduction.atoms, arithmetic)
                     val activeRegion = if (reduction.eliminatedCount == 0) region
                     else PolynomialBooleanRegion(activeFormula.atoms.indices.associateWith {
@@ -207,8 +222,12 @@ internal class QfNraQuery(
                     val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
                         arithmetic, algebraic, work, fixed)
                     if (assignment != null) {
-                        val checked = if (reduction.eliminatedCount == 0) assignment else {
+                        val regionChecked = if (reduction.eliminatedCount == 0) assignment else {
                             val point = reduction.reconstruct(assignment, arithmetic, algebraic)
+                            checkRegionSample(reducedFormula, region, point, boolCount, arithmetic, algebraic)
+                        }
+                        val checked = if (formulaReduction.eliminatedCount == 0) regionChecked else {
+                            val point = formulaReduction.reconstruct(regionChecked, arithmetic, algebraic)
                             checkRegionSample(normalized, region, point, boolCount, arithmetic, algebraic)
                         }
                         arithmetic.step()
