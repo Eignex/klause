@@ -26,6 +26,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.10")
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("org.xerial:sqlite-jdbc:3.53.4.0")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.22.3")
     testImplementation("org.junit.jupiter:junit-jupiter")
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
     implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")

@@ -86,7 +86,7 @@ internal object JvmSavedReports {
     }
 
     const val MAX_LOGICAL_BYTES = 4L * 1024 * 1024 * 1024
-    private const val MAX_ROW_BYTES = 128L * 1024 * 1024
+    const val MAX_ROW_BYTES = 128L * 1024 * 1024
 }
 
 internal class JvmSavedReportBudget {

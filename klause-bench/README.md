@@ -1517,6 +1517,14 @@ cannot supply an observed method candidate. These tables share the existing
 source index allowance. Static descriptor agreement does not prove source phase
 semantics or loaded class selection.
 
+Static table projection streams the encoded values, checking every dictionary
+reference, primitive and object arity, including unselected method and instruction
+fields. It constructs JSON values only for the selected class identity and method
+fields. Envelope fields may appear in any order. Strict UTF-8, duplicate-key checks,
+the 128 MiB record bound and 4,096-level nesting bound still apply. Parser field
+name canonicalization, interning and buffer recycling are disabled; this path adds
+no lookup cache or index allowance.
+
 Output encoding `source-compiler-links-v4` binds each report to its complete input
 catalog entry, original member and authenticated report proof. Every raw input row,
 including context definitions and the original end record, retains its ordered
@@ -1534,7 +1542,8 @@ observations share those references while retaining their original order.
 
 The unpublished benchmark module uses
 [Apache Commons Compress](https://commons.apache.org/proper/commons-compress/)
-for tar input and [SQLite JDBC](https://github.com/xerial/sqlite-jdbc) for bounded
+for tar input, [Jackson Core](https://github.com/FasterXML/jackson-core) for streaming
+JSON tokens and [SQLite JDBC](https://github.com/xerial/sqlite-jdbc) for bounded
 disk indexes. Each index admits at most 8 GiB with a 16 MiB page cache. Closed
 candidate indexes are removed after their arm; the wrapper removes owned input
 staging after child termination and preserves sources, provenance, process status,

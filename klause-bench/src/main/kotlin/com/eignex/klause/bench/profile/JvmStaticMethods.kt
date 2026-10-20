@@ -191,14 +191,14 @@ internal class JvmStaticMethods(private val db: Connection, private val checkSiz
             val counts = heads.associateWith { 0L }.toMutableMap()
             var count = 0L
             JvmSavedReports.read(file, proof) { ordinal, raw ->
-                val encoded = JvmSavedJson.parse(raw.decodeToString(throwOnInvalidSequence = true)).jsonObject
                 if (ordinal == 0L) {
+                    val encoded = JvmSavedJson.parse(raw.decodeToString(throwOnInvalidSequence = true)).jsonObject
                     require(
                         encoded["record"] == JsonPrimitive("schema") &&
                             encoded["encoding"] == JsonPrimitive("bytecode-source-bindings-v1"),
                     ) { "Whole original static report schema differs" }
                 } else {
-                    val row = declaration(encoded)
+                    val row = declaration(raw)
                     val classOrdinal = row.savedLong("bytecodeClassOrdinal")
                     val head = row.savedString("studySourceHead")
                     require(classOrdinal in 0 until classes && head in heads && seen.add(classOrdinal to head)) {
@@ -223,16 +223,13 @@ internal class JvmStaticMethods(private val db: Connection, private val checkSiz
             }) { "Original static per-context class census differs" }
         }
 
-        private fun declaration(encoded: JsonObject): JsonObject {
-            val tables = JvmSavedTables(encoded)
-            val row = tables.project(CONTEXT_FIELDS + setOf(
-                "status", "internalName", "classIdentity", "syntaxOrigin",
-                "bytecodeArchiveId", "bytecodeArchiveClassOrdinal",
-            ))
-            if (row["status"] != JsonPrimitive("joined-candidates")) return row
-            return JsonObject(
-                row + ("methods" to tables.objectArray("methods", setOf("methodIndex", "name", "descriptor"))),
+        private fun declaration(raw: ByteArray): JsonObject =
+            JvmSavedTables(raw).project(
+                CONTEXT_FIELDS + setOf(
+                    "status", "internalName", "classIdentity", "syntaxOrigin", "methods",
+                    "bytecodeArchiveId", "bytecodeArchiveClassOrdinal",
+                ),
+                mapOf("methods" to setOf("methodIndex", "name", "descriptor")),
             )
-        }
     }
 }
