@@ -1,5 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.propagation.bake
@@ -7,6 +9,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,6 +17,19 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincSolutionWriterTest {
+    @Test
+    fun `irrational source coordinates should retain their selected exact root`() {
+        val program = parseFlatZinc("var 0.0..2.0: x :: output_var; solve satisfy;", exactFloats = true)
+        val root = AlgebraicArithmetic().roots(RationalPolynomial(
+            listOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE))).last()
+        val assignment = OpenTheoryAssignment.ExactNra(ExactNraAssignment(BooleanArray(0), listOf(root)))
+
+        val output = writeFlatZincSolution(program.sourceProgram, assignment)
+
+        assertTrue("% klause-exact: x = root(2;[-2,0,1]);" in output.lines(), output)
+        assertTrue(output.endsWith("----------\n"), output)
+    }
+
     @Test
     fun `mixed components should preserve exact coordinates and grid provenance`() {
         val program = parseFlatZinc(

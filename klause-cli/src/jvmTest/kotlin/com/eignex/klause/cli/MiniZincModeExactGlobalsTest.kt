@@ -24,25 +24,26 @@ class MiniZincModeExactGlobalsTest(
         @JvmStatic
         @Parameterized.Parameters(name = "{0} {1} {2}")
         fun cases(): List<Array<Any>> = (flatZincGlobalCases + flatZincSetGlobalCases).flatMap { global ->
-            listOf("finite", "linear", "polynomial").flatMap { coupling ->
+            listOf("finite", "linear", "polynomial", "algebraic").flatMap { coupling ->
                 listOf("witness", "refutation", "optimum").map { verdict -> arrayOf<Any>(global, coupling, verdict) }
             }
-        } + listOf("finite", "linear", "polynomial").map { coupling ->
+        } + listOf("finite", "linear", "polynomial", "algebraic").map { coupling ->
             arrayOf<Any>(Triple("count_eq-empty-invalid", "klause_count_eq([],1,1)", null), coupling, "refutation")
         }
     }
 
     @Test
     fun `exact execution should enforce the advertised global through source completion`() {
-        val realConstraints = if (coupling == "finite") "" else "constraint int2float(x,r); " + when (coupling) {
+        val bridge = if (coupling == "algebraic") "v" else "x"
+        val realConstraints = if (coupling == "finite") "" else "constraint int2float($bridge,r); " + when (coupling) {
             "linear" -> "constraint float_lin_eq([3.0,-1.0],[y,r],0.0);"
-            "polynomial" -> "constraint float_times(y,y,r);"
+            "polynomial", "algebraic" -> "constraint float_times(y,y,r);"
             else -> ""
         }
         val realDeclarations = if (coupling == "finite") "" else
-            "var 0.0..2.0: r :: output_var; var 0.0..2.0: y :: output_var; "
+            "var 0.0..3.0: r :: output_var; var 0.0..2.0: y :: output_var; "
         val pin = if (verdict == "optimum") "" else {
-            val value = if (verdict == "refutation") 0 else 1
+            val value = (if (verdict == "refutation") 0 else 1) + if (coupling == "algebraic") 1 else 0
             if (coupling == "finite") "constraint int_eq(x,$value);" else "constraint float_eq(r,$value.0);"
         }
         val objective = if (coupling == "finite") "x" else "y"
@@ -90,9 +91,15 @@ class MiniZincModeExactGlobalsTest(
             assertTrue("----------" in output.lines(), output)
             assertEquals("x = 1;", output.lineSequence().lastOrNull { it.startsWith("x = ") }, output)
             if (coupling != "finite") {
-                val value = if (coupling == "linear") "1/3" else "1"
-                assertEquals("% klause-exact: y = $value;",
-                    output.lineSequence().lastOrNull { it.startsWith("% klause-exact: y = ") }, output)
+                val exact = output.lineSequence().lastOrNull { it.startsWith("% klause-exact: y = ") }
+                if (coupling == "algebraic") {
+                    assertTrue(assertNotNull(exact, output).startsWith("% klause-exact: y = root("), output)
+                    assertEquals("% klause-exact: r = 2;",
+                        output.lineSequence().lastOrNull { it.startsWith("% klause-exact: r = ") }, output)
+                } else {
+                    val value = if (coupling == "linear") "1/3" else "1"
+                    assertEquals("% klause-exact: y = $value;", exact, output)
+                }
             }
             if (verdict == "optimum") assertTrue("==========" in output.lines(), output)
         }
