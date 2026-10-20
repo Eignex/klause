@@ -1153,9 +1153,9 @@ class ExactLiraSearchComponent private constructor(
         operationStop.charge(order.premises.size + order.terms.size * 4L + 4L)
         if (operationStop()) return ComponentResult.Indeterminate
         val terms = order.terms.map { (variable, coefficient) ->
-            SourceBoundTerm(SearchIntValue(variable), coefficient.asFraction())
+            SourceBoundTerm(SearchIntValue(variable), BigFraction.ofLong(coefficient))
         }
-        val threshold = order.bound.asFraction() - (if (order.upper) BigFraction.ZERO else BigFraction.ONE)
+        val threshold = BigFraction.ofLong(order.bound) - (if (order.upper) BigFraction.ZERO else BigFraction.ONE)
         val split = SourceBoundAtom.integerSplit(context, terms, threshold) ?: return if (operationStop()) {
             ComponentResult.Indeterminate
         } else {

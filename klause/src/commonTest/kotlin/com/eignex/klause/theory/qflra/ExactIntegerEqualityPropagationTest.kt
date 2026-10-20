@@ -11,7 +11,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.asFraction
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
@@ -794,8 +794,8 @@ class ExactIntegerEqualityPropagationTest {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(3))
         session.initialize()
         for (literal in listOf(0, 2, 4)) session.push(SearchDecision.Bool(literal))
-        val terms = listOf(SourceBoundTerm(SearchIntValue(0), 1L.asFraction()))
-        val atom = assertNotNull(SourceBoundAtom.integerSplit(session, terms, 6L.asFraction()))
+        val terms = listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ofLong(1L)))
+        val atom = assertNotNull(SourceBoundAtom.integerSplit(session, terms, BigFraction.ofLong(6L)))
         val literal = assertNotNull(session.atomLiteral(SearchDecision.Theory(atom.positive)))
         session.push(SearchDecision.Theory(atom.negative))
         val level = session.decisionLevel
@@ -824,8 +824,8 @@ class ExactIntegerEqualityPropagationTest {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(3))
         session.initialize()
         for (literal in listOf(4, 2, 0)) session.push(SearchDecision.Bool(literal))
-        val terms = listOf(SourceBoundTerm(SearchIntValue(0), 1L.asFraction()))
-        val atom = assertNotNull(SourceBoundAtom.integerSplit(session, terms, 6L.asFraction()))
+        val terms = listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ofLong(1L)))
+        val atom = assertNotNull(SourceBoundAtom.integerSplit(session, terms, BigFraction.ofLong(6L)))
         val literal = assertNotNull(session.atomLiteral(SearchDecision.Theory(atom.positive)))
         val propagation = assertNotNull(ExactIntegerEqualityPropagation.prepare(model, Cancellation.Never))
         propagation.propagate(session, Cancellation.Never,
@@ -843,7 +843,7 @@ class ExactIntegerEqualityPropagationTest {
             orderEligible = { _, _, _ -> true },
             receiveOrder = { order -> session.imply(literal, SearchExplanation(order.premises + literal)) })
 
-        val repeated = assertNotNull(SourceBoundAtom.integerSplit(session, terms, 6L.asFraction()))
+        val repeated = assertNotNull(SourceBoundAtom.integerSplit(session, terms, BigFraction.ofLong(6L)))
         assertEquals(literal, session.atomLiteral(SearchDecision.Theory(repeated.positive)))
         assertEquals(Lit.isPositive(literal), session.boolValue(Lit.variable(literal)))
         assertEquals(setOf(1, 3, 5, literal), session.reasonFor(Lit.variable(literal))?.literals?.toSet())
@@ -877,10 +877,10 @@ class ExactIntegerEqualityPropagationTest {
 
                 component.nextBranch(session)
 
-                val terms = listOf(SourceBoundTerm(SearchIntValue(0), 1L.asFraction()),
-                    SourceBoundTerm(SearchIntValue(1), (-1L).asFraction()))
+                val terms = listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ofLong(1L)),
+                    SourceBoundTerm(SearchIntValue(1), BigFraction.ofLong(-1L)))
                 val atom = assertNotNull(SourceBoundAtom.integerSplit(session, terms,
-                    (if (upper) 6L else 7L).asFraction()))
+                    BigFraction.ofLong(if (upper) 6L else 7L)))
                 val decision = SearchDecision.Theory(if (upper) atom.positive else atom.negative)
                 val literal = assertNotNull(session.atomLiteral(decision))
                 assertEquals(Lit.isPositive(literal), session.boolValue(Lit.variable(literal)))
