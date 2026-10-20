@@ -154,17 +154,23 @@ class QfLiraSolverTest {
             ))
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side.positive)))
             assertIs<ComponentCheck.Feasible>(component.check(session))
-            assertTrue(assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.single() < BigFraction.ZERO)
+            assertTrue(
+                assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.single() < BigFraction.ZERO,
+            )
             session.popTo(0)
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side.negative)))
             assertIs<ComponentCheck.Feasible>(component.check(session))
-            assertTrue(assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.single() > BigFraction.ZERO)
+            assertTrue(
+                assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.single() > BigFraction.ZERO,
+            )
 
             assertIs<ComponentResult.Consistent>(session.restart())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side.positive)))
 
             assertIs<ComponentCheck.Feasible>(component.check(session))
-            assertTrue(assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.single() < BigFraction.ZERO)
+            assertTrue(
+                assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.single() < BigFraction.ZERO,
+            )
         }
     }
 

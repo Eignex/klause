@@ -495,7 +495,9 @@ class ExactLiraSearchComponent private constructor(
         beginOperation()
         return try {
             if (completeTraversalObserved) {
-                observeCompleteStage(if (sourceRowIndex == null) "SOURCE_ROW_FULL_SCAN_ONLY" else "SOURCE_ROW_INDEX_PRESENT")
+                observeCompleteStage(
+                    if (sourceRowIndex == null) "SOURCE_ROW_FULL_SCAN_ONLY" else "SOURCE_ROW_INDEX_PRESENT",
+                )
             }
             graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
