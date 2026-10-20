@@ -147,6 +147,10 @@ semantics. A scope with open integer declarations selects the
 [nonlinear integer adapter](#) instead; open integers are
 never boxed.
 
+Selected clauses retain their source Boolean disjunctions. Their literals enter
+Boolean region search directly, without real selector coordinates or numeric
+comparison predicates.
+
 Each strategy uses the plan in its own way:
 
 - **Backtracking** checks interval relaxations at partial states and exact
