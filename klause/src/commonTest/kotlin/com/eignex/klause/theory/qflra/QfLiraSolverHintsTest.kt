@@ -615,19 +615,21 @@ class QfLiraSolverHintsTest {
         val model = Problem(
             numBoolVars = 2,
             intBounds = openBounds(0),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(0.0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, -1.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
             factors = arrayOf(
                 declaration,
                 Linear(
                     intArrayOf(),
                     doubleArrayOf(),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 1.0),
                     LinearOp.EQ,
                     0.0,
                 ),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -1.0),
+                    LinearOp.EQ, 0.0),
             ),
         )
         ExactLiraSearchComponent(model).use { component ->
