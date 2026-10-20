@@ -55,6 +55,7 @@ internal fun recoverExactPointWitness(
     request: LpRefinementRequest,
     cancellation: Cancellation,
     observer: LpCertificationObserver? = null,
+    basis: Basis? = null,
 ): ExactPointRecovery {
     val meter = RefinementMeter(request.effectiveLimits(), request.pointCache, cancellation, perAttempt = true)
     var witness: ExactLpWitness? = null
@@ -68,49 +69,55 @@ internal fun recoverExactPointWitness(
         if (primal.size != model.n || primal.any { !it.isFinite() } || !model.finiteExactInput()) {
             meter.stop(LpRefinementDecline.CANDIDATE)
         }
-        val candidate = ArrayList<BigFraction>(model.n)
-        meter.charge(model.n.toLong(), model.n.toLong() * 8L)
-        for (value in primal) {
-            meter.charge(64L, 256L)
-            val part = reconstructRational(value, maxDenominator = MAX_POINT_DENOMINATOR)
-                ?: meter.stop(LpRefinementDecline.CANDIDATE)
-            candidate += meter.number(
-                BigFraction.of(
-                    bigIntOf(part.numerator),
-                    bigIntOf(part.denominator),
-                ),
-            )
-        }
-        val scan = scanPoint(model, candidate, meter)
-        while (scan != null && scan.violations.isNotEmpty() && repairs < MAX_POINT_REPAIRS) {
-            val correction = choosePointCorrection(model, scan, candidate, meter) ?: break
-            candidate[correction.column] = meter.pointAdd(
-                candidate[correction.column],
-                correction.delta,
-            )
-            scan.shifted[correction.column] = meter.pointAdd(
-                scan.shifted[correction.column],
-                correction.delta,
-            )
-            model.forEachRationalColumn(correction.column) { row, coefficient ->
-                meter.charge()
-                val change = meter.pointMultiply(coefficient, correction.delta)
-                scan.slacks[row] = meter.pointAdd(scan.slacks[row], meter.number(change.negated()))
+        if (basis != null) {
+            val timer = LpPhaseTimer(observer, LpSolvePhase.EXACT_BASIS_POINT)
+            val before = meter.spentWork
+            var recovered: SparseBasisPoint? = null
+            try {
+                recovered = recoverSparseBasisPoint(model, basis, meter)
+                witness = recovered.witness
+            } finally {
+                timer.finish(recovered?.outcome ?: "INTERRUPTED", meter.spentWork - before,
+                    steps = recovered?.peeled ?: 0)
             }
-            scan.violations.removeAt(0)
-            scan.violations.removeAll { violation ->
-                meter.charge()
-                model.withinExactBounds(
-                    model.slackCol(violation.row),
-                    scan.slacks[violation.row],
-                    meter,
+        }
+        if (witness == null) {
+            val candidate = ArrayList<BigFraction>(model.n)
+            meter.charge(model.n.toLong(), model.n.toLong() * 8L)
+            for (value in primal) {
+                meter.charge(64L, 256L)
+                val part = reconstructRational(value, maxDenominator = MAX_POINT_DENOMINATOR)
+                    ?: meter.stop(LpRefinementDecline.CANDIDATE)
+                candidate += meter.number(
+                    BigFraction.of(
+                        bigIntOf(part.numerator),
+                        bigIntOf(part.denominator),
+                    ),
                 )
             }
-            repairs++
-        }
-        if (scan != null && scan.violations.isEmpty()) {
+            val scan = scanPoint(model, candidate, meter)
+            while (scan != null && scan.violations.isNotEmpty() && repairs < MAX_POINT_REPAIRS) {
+                val correction = choosePointCorrection(model, scan, candidate, meter) ?: break
+                candidate[correction.column] = meter.pointAdd(candidate[correction.column], correction.delta)
+                scan.shifted[correction.column] = meter.pointAdd(scan.shifted[correction.column], correction.delta)
+                model.forEachRationalColumn(correction.column) { row, coefficient ->
+                    meter.charge()
+                    val change = meter.pointMultiply(coefficient, correction.delta)
+                    scan.slacks[row] = meter.pointAdd(scan.slacks[row], meter.number(change.negated()))
+                }
+                scan.violations.removeAt(0)
+                scan.violations.removeAll { violation ->
+                    meter.charge()
+                    model.withinExactBounds(model.slackCol(violation.row), scan.slacks[violation.row], meter)
+                }
+                repairs++
+            }
+            if (scan != null && scan.violations.isEmpty()) {
+                checks++
+                witness = checkedLpWitness(model, candidate, meter)
+            }
+        } else {
             checks++
-            witness = checkedLpWitness(model, candidate, meter)
         }
         meter.poll()
         if (witness != null) decline = null

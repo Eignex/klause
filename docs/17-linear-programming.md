@@ -265,6 +265,14 @@ restarts the operation from authority, and every attempt is charged. Owner-local
 exact factors require the same matrix and ordered basis. An off-status feasible
 point cannot furnish a claimed warm basis.
 
+Large-model point recovery can solve the structural part of the numerical basis
+without factoring its logical identity columns. Nonbasic columns take their exact
+seats, singleton equations determine structural basics, and the remaining coupled
+block uses the ordinary exact factorizer and its dimension limit. The lifted point
+must satisfy every original row and bound. Assembly, substitution, factorization and
+verification share the point-recovery allowance; a failed candidate supplies no
+conflict, dual bound or reusable basis.
+
 ### Farkas and recession checks
 
 For `M = [A | I]`, a Farkas contradiction requires

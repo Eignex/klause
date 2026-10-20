@@ -660,6 +660,7 @@ private fun certifyLpResultWithin(
                 refinement,
                 cancellation,
                 observer,
+                result.basis,
             )
             observer?.observePhase(LpPhaseMetrics(
                 LpSolvePhase.EXACT_POINT_RECOVERY, recovered.decline?.name ?: "WITNESS",
