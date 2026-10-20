@@ -212,6 +212,8 @@ class ExactLiraSearchComponent private constructor(
     private var equationGuardRows: List<List<PreparedSourceRow>>? = null
     private var equationGuardIndexAttempted = false
     private var equationGuardCursor = 0
+    private var partialGeneralVisits = 0L
+    private var partialGeneralAttempts = 0
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifferenceState = lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private val realDifference by realDifferenceState
@@ -738,9 +740,13 @@ class ExactLiraSearchComponent private constructor(
         val snapshot = reduction.refutationRows(bools, node, lpStop)
         var support: IntArray? = null
         var propagation: ComponentResult? = null
-        val general: ((Int, List<ExactRationalInequality>, Cancellation, (IntArray) -> Unit) -> Boolean)? =
-            if (bools.any { it == UNASSIGNED }) null else { columns, rows, token, onSupport ->
-                reduction.refuteReals(columns, rows, token, ::observeCompleteStage, onSupport)
+        val partial = bools.any { it == UNASSIGNED }
+        val general: (Int, List<ExactRationalInequality>, Cancellation, (IntArray) -> Unit) -> Boolean =
+            { columns, rows, token, onSupport ->
+                if (partial && !partialGeneralRefutationDue()) false else {
+                    if (partial) observeCompleteStage("PURE_REAL_PARTIAL_GENERAL_ATTEMPT")
+                    reduction.refuteReals(columns, rows, token, ::observeCompleteStage, onSupport)
+                }
             }
         val refuted = snapshot != null && equalityRowsRefute(model.numRealVars, snapshot.rows,
             lpStop, ::observeCompleteStage,
@@ -761,6 +767,15 @@ class ExactLiraSearchComponent private constructor(
         assignment = null
         outcome = ComponentCheck.Infeasible(explanation)
         return ComponentResult.Conflict(explanation)
+    }
+
+    private fun partialGeneralRefutationDue(): Boolean {
+        partialGeneralVisits++
+        if (partialGeneralAttempts >= 64 || (partialGeneralVisits > 4 && partialGeneralVisits % 32L != 0L)) {
+            return false
+        }
+        partialGeneralAttempts++
+        return true
     }
 
     private fun prepareEquationGuards(): List<List<PreparedSourceRow>>? {

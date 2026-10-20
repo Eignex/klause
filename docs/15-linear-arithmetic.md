@@ -152,9 +152,13 @@ insufficient. Strict infeasibility requires a completed strict-feasibility check
 Pure-real checks can first eliminate paired opposite closed source rows as equations
 over a necessary subset with known Boolean and branch premises. Inconsistent
 equations, a false reduced constant or a negative reduced difference cycle reject
-only that prefix. Once all source Booleans are assigned, general reduced components
-can compact surviving coordinates and proportional rows before using the reduction
-owner's existing source-LP budget and dimension limit. A necessary difference subset
+only that prefix. General reduced components can compact surviving coordinates
+and proportional rows before using the reduction owner's existing source-LP budget
+and dimension limit. Complete Boolean prefixes are eligible; partial selected prefixes
+can also refute on a bounded schedule: the first four general residual visits and
+then every 32nd, with at most 64 partial attempts per opening. Retraction and restart
+do not renew that schedule or the shared source-LP allowance. Feasible partial checks
+publish neither points nor witnesses. A necessary difference subset
 can refute a component but supplies no feasible point. Every input is admitted before
 negative authority. A bounded dependency graph reconstructs the original rows used
 by equation pivots and retained residual rows; discarded tautologies add no premises.

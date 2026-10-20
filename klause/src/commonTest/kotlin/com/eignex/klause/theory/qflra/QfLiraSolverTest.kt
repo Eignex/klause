@@ -27,6 +27,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.search
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -58,6 +59,78 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `a selected general residual should conflict before unrelated Boolean assignments`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2)),
+                listOf(BigFraction.ofLong(-2), BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.MINUS_ONE),
+        ), numRealVars = 4, realLower = DoubleArray(4) { if (it == 3) 0.0 else Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(4) { if (it == 3) 0.0 else Double.POSITIVE_INFINITY })
+        val stats = SmtStatsSink()
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observeWith(stats)
+        component.observeCompleteTraversal()
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        solves = 0
+
+        val result = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+            assertNotNull(result.explanation).literals.toSet())
+        assertNull(session.boolValue(2))
+        assertEquals(0, solves)
+        assertTrue((stats.snapshot().completeSearchStages?.get("PURE_REAL_PARTIAL_GENERAL_ATTEMPT") ?: 0L) > 0L)
+        assertTrue((stats.snapshot().completeSearchStages?.get("PURE_REAL_EQUALITY_GENERAL_REFUTED") ?: 0L) > 0L)
+        val operations = stats.snapshot().sourceLp.operations
+        session.popTo(1)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+        assertIs<SearchResult.Satisfied>(session.solve(3))
+        assertTrue(stats.snapshot().sourceLp.operations >= operations)
+    }
+
+    @Test
+    fun `feasible partial general checks should withhold complete model contributions`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ofLong(3), activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2)),
+                listOf(BigFraction.ofLong(-2), BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.MINUS_ONE),
+        ), numRealVars = 4, realLower = DoubleArray(4) { if (it == 3) 0.0 else Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(4) { if (it == 3) 0.0 else Double.POSITIVE_INFINITY })
+        val stats = SmtStatsSink()
+        val component = ExactLiraSearchComponent(source)
+        component.observeWith(stats)
+        component.observeCompleteTraversal()
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertTrue((stats.snapshot().completeSearchStages?.get("PURE_REAL_PARTIAL_GENERAL_ATTEMPT") ?: 0L) > 0L)
+        assertTrue(stats.snapshot().sourceLp.operations > 0L)
+        assertNull(session.boolValue(2))
+        assertIs<ComponentCheck.Indeterminate>(session.check())
+        assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        assertIs<SearchResult.Satisfied>(session.solve(3))
+    }
+
     @Test
     fun `equation reduced paths should imply signed source guards through peers and retract their premises`() {
         val third = BigFraction.ofLong(3).reciprocal()

@@ -20,6 +20,45 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `a stopped general refutation should withhold support without renewing its source allowance`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2),
+                listOf(BigFraction.ofLong(-2), BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))
+        val budget = SourceLpBudget(maxOperations = 2)
+        var cancelled = false
+        var support: IntArray? = null
+
+        val stopped = equalityRowsRefute(3, rows, Cancellation { cancelled }, onSupport = { support = it },
+            refutesGeneral = { columns, residual, token, cite ->
+                refuteRealResidualComponents(columns, residual, budget, token,
+                    onStage = { if (it == "PURE_REAL_EQUALITY_GENERAL_REFUTED") cancelled = true }, onSupport = cite)
+            })
+
+        assertFalse(stopped)
+        assertNull(support)
+        assertEquals(1, budget.operations)
+        cancelled = false
+        assertTrue(equalityRowsRefute(3, rows, Cancellation.Never, onSupport = { support = it },
+            refutesGeneral = { columns, residual, token, cite ->
+                refuteRealResidualComponents(columns, residual, budget, token, onSupport = cite)
+            }))
+        assertEquals(rows.indices.toSet(), assertNotNull(support).toSet())
+        assertEquals(2, budget.operations)
+        support = null
+        assertFalse(equalityRowsRefute(3, rows, Cancellation.Never, onSupport = { support = it },
+            refutesGeneral = { columns, residual, token, cite ->
+                refuteRealResidualComponents(columns, residual, budget, token, onSupport = cite)
+            }))
+        assertNull(support)
+        assertEquals(2, budget.operations)
+    }
+
+    @Test
     fun `a reduced query should retain its free coordinates rational bound and strictness`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1, 2),
