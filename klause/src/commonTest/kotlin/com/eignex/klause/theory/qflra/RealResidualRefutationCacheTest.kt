@@ -98,9 +98,11 @@ class RealResidualRefutationCacheTest {
         val budget = SourceLpBudget(maxOperations = 1)
         assertTrue(refuteRealResidualComponents(2, rows, budget, Cancellation.Never, cache = cache))
 
-        for (columns in listOf(intArrayOf(2), intArrayOf(0, 0))) {
+        for (lastColumn in listOf(2, 0)) {
             var support: IntArray? = null
-            val tail = ExactRationalInequality(columns, List(columns.size) { BigFraction.ONE }, BigFraction.ZERO)
+            val tail = ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO)
+            tail.columns[1] = lastColumn
 
             val refuted = refuteRealResidualComponents(2, rows + tail, budget, Cancellation.Never,
                 onSupport = { support = it }, cache = cache)
