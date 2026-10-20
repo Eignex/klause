@@ -20,6 +20,19 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `a sector between shared projection roots retains its exact rational sample`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (> x0 0) (< x0 1) (< (- (* x0 x0) 1) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val assignment = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.ofLong(2).reciprocal(), assignment.realValue(0).rational)
+    }
+
+    @Test
     fun `reduced region observation retains predicates without changing native work`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

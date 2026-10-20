@@ -1519,16 +1519,16 @@ private fun searchCells(
     while (frames.isNotEmpty()) {
         arithmetic.step()
         val frame = frames.last()
-        if (frame.nextCell >= frame.cellCount) {
+        if (!frame.hasNext()) {
             coordinates.remove(frame.variable)
             frames.removeLast()
             continue
         }
         val cell = frame.nextCell++
         val root = (cell / 2).toInt()
-        val coordinate = frame.point ?: if (frame.rootsOnly) frame.roots[cell.toInt()]
-        else if (cell and 1L != 0L) frame.roots[root] else {
-            algebraic.rational(algebraic.sampleBetween(frame.roots.getOrNull(root - 1), frame.roots.getOrNull(root)))
+        val coordinate = frame.point ?: if (frame.rootsOnly) checkNotNull(frame.root(cell.toInt()))
+        else if (cell and 1L != 0L) checkNotNull(frame.root(root)) else {
+            algebraic.rational(algebraic.sampleBetween(frame.root(root - 1), frame.root(root)))
         }
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
@@ -1549,12 +1549,30 @@ private fun searchCells(
 private class CadFrame(
     val level: Int,
     val variable: Int,
-    val roots: List<AlgebraicReal>,
+    private val roots: List<AlgebraicReal>,
     val point: AlgebraicReal? = null,
     val rootsOnly: Boolean = false,
+    private val merging: PolynomialRootMerge? = null,
 ) {
-    val cellCount: Long = if (point != null) 1 else if (rootsOnly) roots.size.toLong() else 2L * roots.size + 1
+    private val boundaries = ArrayList<AlgebraicReal>()
+    private var complete = false
     var nextCell: Long = 0
+
+    fun root(index: Int): AlgebraicReal? {
+        if (merging == null) return roots.getOrNull(index)
+        while (index >= boundaries.size && !complete) {
+            val next = merging.next()
+            if (next == null) complete = true else boundaries.add(next)
+        }
+        return boundaries.getOrNull(index)
+    }
+
+    fun hasNext(): Boolean {
+        if (point != null) return nextCell == 0L
+        if (rootsOnly) return nextCell < roots.size
+        val next = root((nextCell / 2).toInt())
+        return if (nextCell and 1L != 0L) next != null else nextCell <= 2L * boundaries.size
+    }
 }
 
 private fun liftFrame(
@@ -1576,19 +1594,13 @@ private fun liftFrame(
         val roots = if (specialized.degree == it.degree) algebraic.roots(specialized) else emptyList()
         return CadFrame(level, variable, roots, rootsOnly = true)
     }
-    val roots = mutableListOf<AlgebraicReal>()
+    val roots = ArrayList<List<AlgebraicReal>>()
     for (polynomial in projection.polynomials(level)) {
         arithmetic.step()
         val specialized = algebraic.specialize(polynomial, variable, coordinates)
-        if (!specialized.isZero) roots.addAll(algebraic.roots(specialized))
+        if (!specialized.isZero) roots.add(algebraic.roots(specialized))
     }
-    roots.sortWith(Comparator { left, right -> algebraic.compare(left, right) })
-    val distinct = mutableListOf<AlgebraicReal>()
-    for (root in roots) {
-        arithmetic.step()
-        if (distinct.isEmpty() || algebraic.compare(distinct.last(), root) != 0) distinct.add(root)
-    }
-    return CadFrame(level, variable, distinct)
+    return CadFrame(level, variable, emptyList(), merging = PolynomialRootMerge(roots, algebraic))
 }
 
 private fun regionFeasible(

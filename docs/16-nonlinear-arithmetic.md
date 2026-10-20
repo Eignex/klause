@@ -275,8 +275,11 @@ restricts its level to that equation's roots.
 **4. Lifting and truth.** Traversal walks the levels in order. Each projection
 polynomial is specialized at the earlier coordinates, the
 [kernel](18-exact-arithmetic.md#algebraic-arithmetic-and-lifting) isolates its real
-roots, and roots become section samples with rational samples in the sectors
-between them. A violated region literal prunes the cell. At a complete sample,
+roots. A merge of the increasing per-polynomial root lists supplies distinct
+boundaries as traversal requests them, retaining the first polynomial's scalar
+when roots coincide. Roots become section samples with rational samples in the
+sectors between them; later boundaries need ordering only when their cells are
+visited. A violated region literal prunes the cell. At a complete sample,
 eliminated coordinates are reconstructed and the full assignment passes the
 original formula before capture. Exhausting every cell refutes the region.
 
