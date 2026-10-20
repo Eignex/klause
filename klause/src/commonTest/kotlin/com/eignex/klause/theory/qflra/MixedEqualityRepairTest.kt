@@ -20,6 +20,60 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `a reduced cycle should exclude retained rows outside the cycle`() {
+        for (general in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(1, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.MINUS_ONE),
+                ExactRationalInequality(intArrayOf(2, 3),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ofLong(10)),
+            ) + if (general) listOf(ExactRationalInequality(intArrayOf(1, 2, 3),
+                List(3) { BigFraction.ONE }, BigFraction.ofLong(10))) else emptyList()
+            val budget = SourceLpBudget()
+            var support: IntArray? = null
+
+            val refuted = equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { support = it },
+                refutesGeneral = { columns, residual, token ->
+                    refuteRealResidualComponents(columns, residual, budget, token)
+                })
+
+            assertTrue(refuted)
+            val selected = assertNotNull(support)
+            assertEquals(setOf(0, 1, 2, 3), selected.toSet())
+            assertTrue(equalityRowsRefute(4, selected.map(rows::get), Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `cancellation after a necessary residual cycle should withhold source support`() {
+        val rows = listOf(
+            exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+        )
+        var cancelled = false
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(4, rows, Cancellation { cancelled },
+            onStage = { if (it == "PURE_REAL_EQUALITY_SUBSET_GRAPH_REFUTED") cancelled = true },
+            onSupport = { support = it }, refutesGeneral = { _, _, _ -> false })
+
+        assertFalse(refuted)
+        assertNull(support)
+        assertTrue(equalityRowsRefute(4, rows, Cancellation.Never,
+            refutesGeneral = { _, _, _ -> false }))
+    }
+
+    @Test
     fun `zero coefficients should not cite an unrelated equation pivot`() {
         val rows = listOf(
             exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ZERO),

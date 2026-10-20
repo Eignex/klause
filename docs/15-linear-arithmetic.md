@@ -121,6 +121,8 @@ owner's existing source-LP budget and dimension limit. A necessary difference su
 can refute a component but supplies no feasible point. Every input is admitted before
 negative authority. A bounded dependency graph reconstructs the original rows used
 by equation pivots and retained residual rows; discarded tautologies add no premises.
+A reduced difference cycle cites only its cycle rows and their pivot dependencies,
+including when general residual rows accompany the necessary difference subset.
 An internal unguarded cycle is not a source clause. Unknown source choices,
 unsupported premises or cancellation withhold the proof. Capture retains the
 65,536-entry, 4,096-bit arithmetic and 4,096-node explanation bounds under the current

@@ -25,6 +25,7 @@ internal class RealDifferenceSystem private constructor(
     private val graph: DifferenceGraph,
     private val guards: IntArray,
     private val scale: Long,
+    private val rowOrigins: IntArray?,
 ) {
     private var potentials: LongArray? = null
 
@@ -44,7 +45,12 @@ internal class RealDifferenceSystem private constructor(
                 val clause = cycle?.takeIf { edges -> edges.all { active[it] } }?.asSequence()
                     ?.map { guards[it] }?.filter { it != ALWAYS }?.map(Lit::negate)
                     ?.distinct()?.sorted()?.toList()?.toIntArray()
-                if (stop()) Result.Interrupted else Result.Infeasible(clause)
+                val rows = rowOrigins?.let { origins ->
+                    val size = cycle?.size ?: 0
+                    onWork?.invoke(size.toLong() * (Int.SIZE_BITS - size.countLeadingZeroBits() + 4L))
+                    cycle?.map { origins[it] }?.distinct()?.sorted()?.toIntArray()
+                }
+                if (stop()) Result.Interrupted else Result.Infeasible(clause, rows)
             }
             is Potentials.Found -> {
                 if (stop()) return Result.Interrupted
@@ -64,7 +70,7 @@ internal class RealDifferenceSystem private constructor(
         class Feasible(point: () -> List<BigFraction>) : Result {
             val point by lazy(point)
         }
-        class Infeasible(val clause: IntArray?) : Result
+        class Infeasible(val clause: IntArray?, val rowSupport: IntArray? = null) : Result
         data object Interrupted : Result
     }
 
@@ -119,9 +125,9 @@ internal class RealDifferenceSystem private constructor(
         ): RealDifferenceSystem? {
             if (realColumns !in 1..10000 || rows.size > 100000 || stop()) return null
             val edges = ArrayList<Edge>()
-            for (row in rows) {
+            for ((index, row) in rows.withIndex()) {
                 if (row.columns.any { it !in 0 until realColumns } ||
-                    !append(row, ALWAYS, realColumns, edges, stop)
+                    !append(row, ALWAYS, realColumns, edges, stop, index)
                 ) return null
             }
             return build(realColumns, edges, stop)
@@ -131,12 +137,13 @@ internal class RealDifferenceSystem private constructor(
             realColumns: Int,
             rows: List<ExactRationalInequality>,
             stop: Cancellation,
+            onSupport: ((IntArray) -> Unit)? = null,
         ): Boolean {
             if (realColumns !in 1..10000 || rows.size > 65536 || stop()) return false
             val work = MixedPointArithmetic(stop)
             val edges = ArrayList<Edge>()
             var entries = 0L
-            for (row in rows) {
+            for ((index, row) in rows.withIndex()) {
                 entries += row.columns.size + 1L
                 stop.charge(8L * (row.columns.size + 1L))
                 if (entries > 65536L || stop() || row.columns.size != row.coefficients.size ||
@@ -145,7 +152,7 @@ internal class RealDifferenceSystem private constructor(
                     !work.admitted(row.rhs) || !row.coefficients.all(work::admitted)
                 ) return false
                 if (row.columns.isEmpty()) {
-                    if (!append(row, ALWAYS, realColumns, edges, stop)) return false
+                    if (!append(row, ALWAYS, realColumns, edges, stop, index)) return false
                     continue
                 }
                 if (row.columns.size > 2) continue
@@ -157,12 +164,14 @@ internal class RealDifferenceSystem private constructor(
                 val sign = if (positive) BigFraction.ONE else BigFraction.MINUS_ONE
                 val normalized = ExactRationalInequality(row.columns,
                     if (row.columns.size == 1) listOf(sign) else listOf(sign, sign.negated()), bound, row.strict)
-                if (!append(normalized, ALWAYS, realColumns, edges, stop) && stop()) return false
+                if (!append(normalized, ALWAYS, realColumns, edges, stop, index) && stop()) return false
             }
             if (stop()) return false
             val graph = build(realColumns, edges, stop) ?: return false
             val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
-            return result is Result.Infeasible && !stop()
+            if (stop() || result !is Result.Infeasible) return false
+            result.rowSupport?.let { onSupport?.invoke(it) }
+            return !stop()
         }
 
         private fun build(zero: Int, edges: List<Edge>, stop: Cancellation): RealDifferenceSystem? {
@@ -200,7 +209,10 @@ internal class RealDifferenceSystem private constructor(
                 graph.addEdge(edge.source, edge.target, edge.bound * multiplier - if (edge.strict) 1L else 0L)
             }
             if (stop()) return null
-            return RealDifferenceSystem(graph, edges.map { it.guard }.toIntArray(), scale)
+            stop.charge(2L * edges.size)
+            if (stop()) return null
+            val origins = if (edges.all { it.origin >= 0 }) edges.map { it.origin }.toIntArray() else null
+            return RealDifferenceSystem(graph, edges.map { it.guard }.toIntArray(), scale, origins)
         }
 
         private fun exactBound(column: Int, value: Double, upper: Boolean): ExactRationalInequality =
@@ -216,13 +228,14 @@ internal class RealDifferenceSystem private constructor(
             zero: Int,
             edges: MutableList<Edge>,
             stop: Cancellation,
+            origin: Int = -1,
         ): Boolean {
             stop.charge(1)
             if (stop()) return false
             if (row.columns.size > 2) return false
             if (row.columns.isEmpty()) {
                 edges += Edge(zero, zero, if (row.rhs.signum() < 0) -1L else 0L,
-                    row.strict && row.rhs.isZero, guard)
+                    row.strict && row.rhs.isZero, guard, origin = origin)
                 return true
             }
             val coefficient = row.coefficients[0]
@@ -238,7 +251,7 @@ internal class RealDifferenceSystem private constructor(
             val first = row.columns[0]
             val second = row.columns.getOrNull(1) ?: zero
             edges += Edge(if (positive) second else first, if (positive) first else second,
-                bound.num.toLong(), row.strict, guard, bound.den.toLong())
+                bound.num.toLong(), row.strict, guard, bound.den.toLong(), origin)
             return true
         }
     }
@@ -251,4 +264,5 @@ private class Edge(
     val strict: Boolean,
     val guard: Int,
     val denominator: Long = 1L,
+    val origin: Int = -1,
 )

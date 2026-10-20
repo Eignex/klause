@@ -56,6 +56,45 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `a residual cycle should exclude unrelated retained guards from its source conflict`() {
+        val source = Problem(5, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(2)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2)),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), LinearOp.LE, BigFraction.MINUS_ONE, activator = 2),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2), Term.ofRealVar(3)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.ofLong(10), activator = 3),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2), Term.ofRealVar(3)),
+                List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ofLong(10), activator = 4),
+        ), numRealVars = 4, realLower = DoubleArray(4) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(4) { Double.POSITIVE_INFINITY })
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        for (variable in listOf(3, 4, 0, 1)) {
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+        }
+        solves = 0
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false)),
+            assertNotNull(conflict.explanation).literals.toSet())
+        assertEquals(0, solves)
+        session.popTo(4)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+        assertIs<SearchResult.Satisfied>(session.solve(0))
+    }
+
+    @Test
     fun `an equality refutation should exclude unrelated guarded equations`() {
         val source = Problem(4, 0, emptyArray(), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)), List(2) { BigFraction.ONE },

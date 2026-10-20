@@ -50,6 +50,7 @@ internal fun equalityRowsRefute(
     }
     var falseRow = -1
     var residualRefuted = false
+    var residualSupport: IntArray? = null
     var proof = -1
     val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage, paired,
         proofs, onRefutationProof = { proof = it })) {
@@ -62,18 +63,30 @@ internal fun equalityRowsRefute(
             EqualityResidual.Refuted -> true
             EqualityResidual.Declined -> false
             is EqualityResidual.Reduced -> refutesDifferenceResidual(columns, residual.rows, stop, onStage,
-                refutesGeneral).also { residualRefuted = it }
+                refutesGeneral, onSupport = { residualSupport = it }).also { residualRefuted = it }
         }
         EqualityRows.Refuted -> true
         EqualityRows.Declined -> false
     }
     if (refuted && support != null && !stop()) {
-        if (residualRefuted) proof = proofs?.combineAll(checkNotNull(residualProofs)) ?: -1
+        if (residualRefuted) {
+            val selected = residualSupport
+            val roots = if (selected == null) checkNotNull(residualProofs) else IntArrayList().also { values ->
+                stop.charge(selected.size.toLong() * 2L)
+                if (stop()) return false
+                for (index in selected) values.add(checkNotNull(residualProofs)[index])
+            }
+            proof = proofs?.combineAll(roots) ?: -1
+        }
         val tracked = proofs?.expand(proof)
         if (stop()) return false
         val selected = tracked ?: run {
             stop.charge(support.size.toLong() + (residualOrigins?.size ?: 0) + 2L)
-            if (residualRefuted) support.addAll(checkNotNull(residualOrigins).toIntArray())
+            if (residualRefuted) {
+                val selected = residualSupport
+                if (selected == null) support.addAll(checkNotNull(residualOrigins).toIntArray())
+                else for (index in selected) support.add(checkNotNull(residualOrigins)[index])
+            }
             else if (falseRow >= 0) support.add(falseRow)
             support.toIntArray()
         }
@@ -91,16 +104,26 @@ private fun refutesDifferenceResidual(
     stop: Cancellation,
     onStage: ((String) -> Unit)?,
     refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation) -> Boolean)?,
+    onSupport: (IntArray) -> Unit,
 ): Boolean {
     val graph = RealDifferenceSystem.prepareRows(columns, rows, stop)
     if (stop()) return false
     if (graph == null) {
         onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_UNAVAILABLE")
+        if (refutesGeneral != null) {
+            onStage?.invoke("PURE_REAL_EQUALITY_SUBSET_GRAPH_ATTEMPT")
+            if (RealDifferenceSystem.refutesSubset(columns, rows, stop, onSupport)) {
+                onStage?.invoke("PURE_REAL_EQUALITY_SUBSET_GRAPH_REFUTED")
+                return !stop()
+            }
+            if (stop()) return false
+        }
         return refutesGeneral?.invoke(columns, rows, stop) == true && !stop()
     }
     onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_ATTEMPT")
     val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
     if (stop() || result !is RealDifferenceSystem.Result.Infeasible) return false
+    result.rowSupport?.let(onSupport)
     onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_REFUTED")
     return !stop()
 }
