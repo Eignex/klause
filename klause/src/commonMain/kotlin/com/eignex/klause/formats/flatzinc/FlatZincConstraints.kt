@@ -110,7 +110,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "inverse", "fzn_inverse", "klause_inverse" -> emitInverse(c, withOffsets = false)
 
-    "inverse_offsets", "fzn_inverse_offsets" -> emitInverse(c, withOffsets = true)
+    "inverse_offsets", "fzn_inverse_offsets", "klause_inverse_offsets" -> emitInverse(c, withOffsets = true)
 
     "nvalue", "fzn_nvalue", "klause_nvalue" -> emitNValue(c, NValue.Mode.Eq)
 
@@ -146,9 +146,9 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "sliding_sum", "fzn_sliding_sum" -> emitSlidingSum(c)
 
-    "disjunctive", "fzn_disjunctive",
-    "disjunctive_strict", "fzn_disjunctive_strict",
-    -> emitDisjunctive(c)
+    "disjunctive", "fzn_disjunctive" -> emitDisjunctive(c, strict = false)
+
+    "disjunctive_strict", "fzn_disjunctive_strict" -> emitDisjunctive(c, strict = true)
 
     "int_times" -> emitIntTimes(c)
 

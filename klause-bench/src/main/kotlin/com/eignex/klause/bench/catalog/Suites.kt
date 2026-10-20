@@ -31,7 +31,7 @@ internal object Suites {
             smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit, productAliases,
         ) + QfNraSuites.all + QfNraCanonicalSuite.suite + NonlinearIntegerSuite.suite +
             DivModSuite.suite + AbsSuite.suite + ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
-            SourceOwnershipSuite.suite
+            SourceOwnershipSuite.suite + ExactGlobalsSuite.suite
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the

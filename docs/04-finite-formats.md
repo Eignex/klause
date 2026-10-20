@@ -243,6 +243,49 @@ matching parser and lowering path. Fixed nonnegative integer `pow` emits
 Extending native coverage means implementing the factor and its lowering,
 declaring the predicate, and adding focused and end-to-end tests.
 
+#### Exact globals and real composition
+
+`--exact` keeps the advertised finite globals in their native finite projection.
+Connecting an integer argument to a real with `int2float` does not replace its
+global with linear relaxation rows. Linear completion respects the finite choices;
+polynomial completion conditions its exact formula on those same choices. Both
+paths enforce every finite factor before publishing a source witness. Complete
+traversal can refute all choices or combine their certified objective results.
+
+| Advertised global family | Enforced finite representation |
+|---|---|
+| `all_different_int`, `alldifferent_except_0`, `symmetric_all_different` | `AllDifferent` with its exceptions, or `SymmetricAllDifferent` |
+| `all_equal_int`, `member_int`, `sort` | Equality rows, reified membership with `Cardinality`, or `Sort` |
+| The four `global_cardinality` variants; `count_eq`, `among` | `GlobalCardinality` with closed-cover, count-variable and bound variants; `among` also sums its cover counts |
+| `exactly_int`, `at_least_int`, `at_most_int` | Reified integer equalities and `Cardinality`; variable counted values use MiniZinc's equality-sum decomposition |
+| `nvalue`, `atleast_nvalues`, `atmost_nvalues` | `NValue` with the requested count relation |
+| `inverse`, `inverse_offsets`; integer array minimum/maximum and their `minimum_int`/`maximum_int` aliases | `Inverse` with index offsets; `ArrayMinMax` |
+| Increasing/decreasing and strict integer ordering; `lex_less_int`, `lex_lesseq_int` | `Increasing`, reversing descending chains; `LexLess` |
+| `value_precede_int`, `value_precede_chain_int` | `ValuePrecede` relations |
+| `diffn`, `diffn_nonstrict`; `circuit`, `subcircuit` | `Diffn` with the declared zero-size semantics; `Circuit` with the declared cycle semantics |
+| `table_int`, `regular`, `mdd` | `Table`, `Regular`, `Mdd` |
+| `cumulative`, `disjunctive`, `disjunctive_strict`, `sliding_sum` | `Cumulative`, including variable durations/resources/capacity; unary cumulative for disjunctive scheduling; window sum rows |
+| `bin_packing`, `bin_packing_capa`, `bin_packing_load` | MiniZinc's exact assignment channels and weighted Boolean capacity/load rows |
+| Set membership, inclusion, equality, disequality and ordering, including reifications; cardinality, union, intersection and difference; set-array selection, `all_disjoint`, `set_partition_into` | Membership indicators, clauses and exact arithmetic channels; native `Element` for selection |
+
+The library normalizes circuit and symmetric-permutation index sets before
+flattening, and preserves both inverse index offsets. FlatZinc circuit successors
+are one-based independently of their declared value bounds. Empty counted arrays
+require zero occurrences. Count comparisons preserve signed-word counted values
+and intersect occurrence bounds with the array length before narrowing them.
+Strict disjunctive scheduling keeps unary cumulative
+propagation and adds `Diffn` enforcement when a duration can be zero: such a task
+may touch an endpoint but cannot lie inside another task. Ordinary disjunctive
+scheduling permits it there.
+
+These compositions require supported finite declarations and admitted real
+relations. They do not establish complete support for open integers in CP-only
+globals, variable or negative powers, or arbitrary real functions. Exact arithmetic
+and objective completion can return UNKNOWN on resource or representation limits;
+unsupported source forms decline explicitly. No such limit permits a grid,
+an omitted global or a relaxation to acquire enforcement authority. A heuristic
+worker's failure supplies no refutation or optimum.
+
 ### FlatZinc floats
 
 Canonical compilation retains original real declarations and exact real relations;

@@ -7,4 +7,4 @@
 predicate klause_circuit(array[int] of var int: x);
 
 predicate fzn_circuit(array[int] of var int: x) =
-    klause_circuit(x);
+    klause_circuit([x[i] - min(index_set(x)) + 1 | i in index_set(x)]);
