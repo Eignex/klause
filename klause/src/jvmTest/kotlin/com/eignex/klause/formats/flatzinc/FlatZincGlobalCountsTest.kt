@@ -23,6 +23,8 @@ class FlatZincGlobalCountsTest(private val constraint: String, private val expec
             arrayOf("count_eq([1],1,4294967297)", 0),
             arrayOf("at_least_int(-1,[],1)", 1),
             arrayOf("at_most_int(-1,[],1)", 0),
+            arrayOf("sliding_sum(4294967296,4294967296,1,[4294967296])", 1),
+            arrayOf("sliding_sum(4294967296,4294967296,1,[0])", 0),
         )
     }
 

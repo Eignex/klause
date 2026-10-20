@@ -266,6 +266,7 @@ traversal can refute all choices or combine their certified objective results.
 | `table_int`, `regular`, `mdd` | `Table`, `Regular`, `Mdd` |
 | `cumulative`, `disjunctive`, `disjunctive_strict`, `sliding_sum` | `Cumulative`, including variable durations/resources/capacity; unary cumulative for disjunctive scheduling; window sum rows |
 | `bin_packing`, `bin_packing_capa`, `bin_packing_load` | MiniZinc's exact assignment channels and weighted Boolean capacity/load rows |
+| Float array minimum/maximum | MiniZinc's chain of exact scalar real extrema |
 | Set membership, inclusion, equality, disequality and ordering, including reifications; cardinality, union, intersection and difference; set-array selection, `all_disjoint`, `set_partition_into` | Membership indicators, clauses and exact arithmetic channels; native `Element` for selection |
 
 The library normalizes circuit and symmetric-permutation index sets before
@@ -280,8 +281,12 @@ scheduling permits it there.
 
 These compositions require supported finite declarations and admitted real
 relations. They do not establish complete support for open integers in CP-only
-globals, variable or negative powers, or arbitrary real functions. Exact arithmetic
-and objective completion can return UNKNOWN on resource or representation limits;
+globals, variable or negative powers, or arbitrary real functions.
+Set universes and constant set members must fit signed 32-bit integers; set
+ordering additionally requires every universe member to exceed `Int.MIN_VALUE`.
+Automaton state indexes, inverse offsets and constant GCC occurrence bounds use
+signed 32-bit parameters and decline wider values; window sums preserve signed-word
+bounds. Exact arithmetic and objective completion can return UNKNOWN on resource or representation limits;
 unsupported source forms decline explicitly. No such limit permits a grid,
 an omitted global or a relaxation to acquire enforcement authority. A heuristic
 worker's failure supplies no refutation or optimum.

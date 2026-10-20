@@ -57,20 +57,7 @@ internal fun FlatZincCompiler.compileParamArray(name: String, elem: FznType, lit
 
         is FznType.SetOfInt -> FlatZincArray.IntSetParam(
             name,
-            lit.elements.map { e ->
-                val arr: IntArray = when (e) {
-                    is FznExpr.IntSetLit -> IntArray(e.values.size) { e.values[it].toInt() }
-
-                    is FznExpr.IntRangeLit -> IntArray((e.hi - e.lo + 1).toInt()) { (e.lo + it).toInt() }
-
-                    is FznExpr.Ident -> (params[e.name] as? ParamValue.IntSet)?.let { p ->
-                        IntArray(p.values.size) { p.values[it].toInt() }
-                    } ?: failHere("`${e.name}` is not an int-set parameter")
-
-                    else -> failHere("set-of-int array `$name`: unexpected element ${e::class.simpleName}")
-                }
-                arr.also { it.sort() }
-            },
+            lit.elements.map { resolveSetLiteral(it) },
         )
 
         is FznType.Array -> unsupportedHere("nested arrays not supported")
@@ -144,11 +131,18 @@ internal fun FlatZincCompiler.evalFloatConst(e: FznExpr): Double = when (e) {
     else -> failHere("expected float constant, got ${e::class.simpleName}")
 }
 
+internal fun FlatZincCompiler.checkedIntConstant(value: Long): Int {
+    if (value !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+        unsupportedHere("integer parameter $value must fit in 32-bit integers")
+    }
+    return value.toInt()
+}
+
 internal fun FlatZincCompiler.evalIntConstArray(e: FznExpr): IntArray = when (e) {
-    is FznExpr.ArrayLit -> IntArray(e.elements.size) { evalIntConst(e.elements[it]).toInt() }
+    is FznExpr.ArrayLit -> IntArray(e.elements.size) { checkedIntConstant(evalIntConst(e.elements[it])) }
 
     is FznExpr.Ident -> when (val arr = arrays[e.name]) {
-        is FlatZincArray.IntParam -> IntArray(arr.values.size) { arr.values[it].toInt() }
+        is FlatZincArray.IntParam -> IntArray(arr.values.size) { checkedIntConstant(arr.values[it]) }
         else -> failHere("`${e.name}` is not an int parameter array")
     }
 
@@ -178,14 +172,14 @@ internal fun FlatZincCompiler.tryEvalIntConstArray(e: FznExpr): IntArray? = when
                 ok = false
                 0L
             }
-            out[i] = v.toInt()
+            out[i] = checkedIntConstant(v)
             if (!ok) break
         }
         if (ok) out else null
     }
 
     is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.IntParam)?.values
-        ?.let { v -> IntArray(v.size) { v[it].toInt() } }
+        ?.let { v -> IntArray(v.size) { checkedIntConstant(v[it]) } }
 
     else -> null
 }

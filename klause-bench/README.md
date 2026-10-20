@@ -167,7 +167,8 @@ source-checked default/exact experiments separately.
 ## Klause-lab
 
 `exact-globals` exercises MiniZinc's bin-packing and variable-count decompositions
-and offset circuit, subcircuit, symmetric-permutation and inverse wrappers. Each
+and offset circuit, subcircuit, symmetric-permutation and inverse wrappers, together
+with float array extrema. Each
 model has finite-only, linear-real and polynomial-real variants with a witness,
 refutation and minimum. Run the whole suite with `exact=true`; a successful
 minimum is one. The CLI regressions cover the retained native global families and

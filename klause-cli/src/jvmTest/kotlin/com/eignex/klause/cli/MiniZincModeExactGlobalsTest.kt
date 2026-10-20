@@ -91,6 +91,7 @@ class MiniZincModeExactGlobalsTest(
             assertTrue("----------" in output.lines(), output)
             assertTrue("x = 1;" in output.lines(), output)
             if (coupling == "linear") assertTrue("% klause-exact: y = 1/3;" in output.lines(), output)
+            if (coupling == "polynomial") assertTrue("% klause-exact: y = 1;" in output.lines(), output)
             if (verdict == "optimum") assertTrue("==========" in output.lines(), output)
         }
     }

@@ -47,14 +47,15 @@ private fun FlatZincCompiler.materialisePinnedSetLayout(name: String, members: I
 }
 
 internal fun FlatZincCompiler.resolveSetLiteral(e: FznExpr): IntArray = when (e) {
-    is FznExpr.IntSetLit -> e.values.map { it.toInt() }.toIntArray().also { it.sort() }
+    is FznExpr.IntSetLit -> universeElements(FznType.IntSet(e.values), "<literal>")
 
-    is FznExpr.IntRangeLit -> IntArray((e.hi - e.lo + 1).toInt()) { (e.lo + it).toInt() }
+    is FznExpr.IntRangeLit -> if (e.lo > e.hi) IntArray(0) else
+        universeElements(FznType.IntRange(e.lo, e.hi), "<literal>")
 
     is FznExpr.Ident -> {
         val pv = params[e.name] ?: failHere("undefined set parameter `${e.name}`")
         when (pv) {
-            is FlatZincCompiler.ParamValue.IntSet -> pv.values.map { it.toInt() }.toIntArray().also { it.sort() }
+            is FlatZincCompiler.ParamValue.IntSet -> universeElements(FznType.IntSet(pv.values), e.name)
             else -> failHere("`${e.name}` is not a set parameter")
         }
     }
@@ -329,6 +330,9 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
             postFalseFactor()
         }
         return
+    }
+    if (universe.first() == Int.MIN_VALUE) {
+        unsupportedHere("set ordering requires universe elements greater than ${Int.MIN_VALUE}")
     }
     val lo = universe.first() - 1
     val hi = universe.last()
