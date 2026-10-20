@@ -77,6 +77,8 @@ internal class FloatGridPublication(
                     accepted == 0L -> FiniteSolveVerdict.UNKNOWN
                     binding.consumer.declaredGridSemantics && native.verdict == FiniteSolveVerdict.OPTIMAL &&
                         native.bestSample != null && lastChecked === native.bestSample -> FiniteSolveVerdict.OPTIMAL
+                    binding.consumer.declaredGridSemantics && native.verdict != FiniteSolveVerdict.OPTIMAL ->
+                        native.verdict
                     binding.objective != null -> FiniteSolveVerdict.BEST_FOUND
                     else -> FiniteSolveVerdict.SAT
                 },
