@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 
-internal const val SMT_SOURCE_POLICY = "smt-external-original-claims-v1"
+internal const val SMT_SOURCE_POLICY = "smt-external-original-claims-v2"
 
 internal object SmtSourceValidation {
     const val GROUND = "ground-original-smt-witness"
@@ -169,7 +169,11 @@ internal object SmtSourceValidation {
                 "Z3 returned UNSAT on the original source"
             }
             "invalid" -> "Dolmen rejected the original-source model"
-            else -> "external SMT checking incomplete or unsupported"
+            else -> when {
+                process.memory?.exceeded == true -> "external SMT checker exceeded its memory limit"
+                process.memory?.qualified() != true -> "external SMT checker memory observation incomplete"
+                else -> "external SMT checking incomplete or unsupported"
+            }
         }, sourceHashes = record.sourceHashes, scope = scope,
             checkedWitness = record.finalWitness.takeIf { status == "valid" && scope == GROUND }, checker = checker),
             mapOf(
@@ -186,6 +190,7 @@ internal object SmtSourceValidation {
     }
 
     internal fun interpret(scope: String, process: SmtToolProcess): String {
+        if (process.memory?.qualified() != true) return "unknown"
         if (process.exit != 0 || process.timedOut || !process.cleanupComplete) {
             return if (scope == GROUND && process.exit == 6 && !process.timedOut && process.cleanupComplete &&
                 process.stderr.trim() == "E:bad-model") "invalid" else "unknown"

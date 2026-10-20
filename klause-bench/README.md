@@ -820,7 +820,7 @@ SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
 Earlier incumbents are unchecked, so attribution is limited to the final objective.
 
 SMT-LIB satisfaction runs opt in with `param=source-validation=true` under policy
-`smt-external-original-claims-v1`. The CLI retains its original budget, seed and
+`smt-external-original-claims-v2`. The CLI retains its original budget, seed and
 engine. The bench invokes established external tools after the native solve;
 there is no internal mathematical checker or custom fallback.
 
@@ -865,8 +865,16 @@ Extracted executables are bounded to 128 MiB. Executables are checked against th
 hash before and after use; receipts retain release URLs and archive digests. Adjacent `smt-source-check-*` directories retain original
 source/model/stdout, the producer record, the exact tool response input and a receipt
 binding those bytes to the executable hash, command, true exit, timing and raw streams.
-Linux bounds address space and output file size; macOS bounds CPU and output file size.
-The tools also enforce their own memory and time limits. The JVM allows 35 seconds
+Linux enforces a 4 GiB address-space limit. macOS samples the live process tree's
+resident bytes and stops checking after an observed 4 GiB excess. The system
+`time -l` utility retains the waited child's kernel RSS high-water value separately
+from checker output. Receipts bind its log hash, sampled peak, sample count, kernel
+peak, limit, completeness and exceedance. Sampling is an observed process-tree guard;
+the kernel high-water value covers the waited child rather than a continuous
+aggregate tree measurement. An excessive peak, missing or malformed observation,
+or incomplete cleanup withholds acceptance. Linux receipts identify address-space
+control without claiming a measured RSS peak. Both hosts bound CPU and output file
+size; the tools also enforce their own memory and time limits. The JVM allows 35 seconds
 for the process and bounded cleanup; output streams are each limited to 1 MiB.
 Checker time is separate from native solve and incumbent time. SAT checks issue no
 solver query; incomplete reference output leaves the completed query count unknown.

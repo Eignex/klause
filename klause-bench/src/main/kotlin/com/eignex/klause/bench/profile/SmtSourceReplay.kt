@@ -90,6 +90,16 @@ internal object SmtSourceReplay {
             check(version.exit == 0 && !version.timedOut && version.cleanupComplete) {
                 "external model checker could not start; model compatibility is unverified"
             }
+            check(version.memory?.qualified() == true) { "external tool memory observation incomplete" }
+            if (System.getProperty("os.name") == "Mac OS X") {
+                val probeDirectory = File(out, "memory-limit-probe").apply { check(mkdir()) }
+                val probe = SmtSourceReceipt.run(listOf("/bin/sleep", "60"), empty, probeDirectory,
+                    2_000, residentLimitBytes = 1_048_576)
+                Reports.writeJson(File(out, "memory-limit-probe.json").path, probe)
+                check(probe.memory?.exceeded == true && probe.cleanupComplete && !probe.timedOut) {
+                    "resident-memory guard did not reject its below-baseline process allowance"
+                }
+            }
             for ((index, element) in models.withIndex()) {
                 check(!Thread.currentThread().isInterrupted && System.nanoTime() - started < 120_000_000_000) {
                     "whole replay interrupted or timed out"
