@@ -149,6 +149,10 @@ Structural reduction offers each factor its `structuralReduce` hook under curren
 domains, so a pinned global becomes a simpler factor; on source models it reaches
 only factors over closed integer columns. Redundancy and subsumption remove
 duplicate and dominated rows using indices maintained across rounds.
+Same-vector domination normalizes each row to a GCD-reduced upper bound and keys
+its tagged term references in ascending order, with input position breaking ties.
+Primitive index sorting preserves coefficient pairing without boxing the indices;
+integer and Boolean references retain separate tag ranges.
 Comparison-clause folding replaces a clause over sole-use reified comparison
 indicators with one comparison disjunction. Duplicate-column merging replaces two
 columns with identical linear occurrences by their sum and splits the value back on

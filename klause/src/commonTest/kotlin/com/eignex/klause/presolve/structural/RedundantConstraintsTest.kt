@@ -123,6 +123,36 @@ class RedundantConstraintsTest {
     }
 
     @Test
+    fun `permuted proportional rows should retain the tighter source constraint`() {
+        val problems = listOf(
+            Problem(
+                0,
+                3,
+                dom(3, 3),
+                listOf(
+                    Linear(intArrayOf(2, -4, 6), intArrayOf(2, 0, 1), LinearOp.LE, 5),
+                    Linear(intArrayOf(-6, -2, 4), intArrayOf(1, 2, 0), LinearOp.GE, -7),
+                ),
+            ),
+            Problem(
+                3,
+                0,
+                emptyArray(),
+                listOf(
+                    PseudoBoolean(longArrayOf(2, 4, 6), intArrayOf(pos(0), Lit.make(1, false), pos(2)), PbOp.LE, 5),
+                    PseudoBoolean(longArrayOf(6, 2, 4), intArrayOf(pos(2), pos(0), Lit.make(1, false)), PbOp.LE, 7),
+                ),
+            ),
+        )
+
+        for (problem in problems) {
+            val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
+
+            assertEquals(listOf(1), delta.droppedIndices.toList())
+        }
+    }
+
+    @Test
     fun `a subset-dominated source row should be dropped`() {
         val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(5, 0, 1, 1, 1, 2, 1)))
 

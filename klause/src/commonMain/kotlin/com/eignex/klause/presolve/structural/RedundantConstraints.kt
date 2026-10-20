@@ -30,6 +30,7 @@ import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.MutableLongObjectMap
 import com.eignex.klause.util.addExact
+import com.eignex.klause.util.argsortByIntKey
 import com.eignex.kumulant.math.splitmix64
 
 /** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
@@ -736,7 +737,7 @@ internal object RedundantConstraints {
 
     private fun refKey(refs: IntArray, coeffs: LongArray): TermKey {
         val terms = ArrayList<Long>(refs.size * 2)
-        for (i in refs.indices.sortedBy { refs[it] }) {
+        for (i in argsortByIntKey(refs.size) { refs[it] }) {
             terms.add(refs[i].toLong())
             terms.add(coeffs[i])
         }
