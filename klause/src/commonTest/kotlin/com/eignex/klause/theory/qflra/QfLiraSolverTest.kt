@@ -244,7 +244,7 @@ class QfLiraSolverTest {
         val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
         assertEquals(BigFraction.ofLong(-1),
-            assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).reals.single())
+            assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single())
     }
 
     @Test
