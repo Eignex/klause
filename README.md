@@ -30,10 +30,10 @@ User documentation is hosted at [eignex.com/docs/klause](https://eignex.com/docs
 Repository `docs/` contains [internal developer documentation](docs/README.md)
 and architecture contracts.
 
-- [System architecture](docs/architecture.md) and [search](docs/solver/search.md).
-- [LP architecture](docs/lp/architecture.md) and [exact certification](docs/lp/certification.md).
-- [Frontend and result contracts](docs/formats.md).
-- [Benchmarking](klause-bench/README.md) and [development](docs/development.md).
+- [System architecture](docs/02-architecture.md) and [search](docs/14-search.md).
+- [LP architecture](docs/26-lp-architecture.md) and [exact certification](docs/27-lp-certification.md).
+- [Frontend and result contracts](docs/04-input-semantics.md).
+- [Benchmarking](klause-bench/README.md) and [development](docs/32-development.md).
 
 ## Build
 
@@ -42,5 +42,5 @@ and architecture contracts.
 klause-cli/build/install/klause-cli-jvm/bin/klause-cli --help
 ```
 
-The JVM launcher requires JDK 25 or newer. See [CLI setup](docs/cli.md#build-and-run)
+The JVM launcher requires JDK 25 or newer. See [CLI setup](docs/31-cli.md#build-and-run)
 for runtime options and native builds.

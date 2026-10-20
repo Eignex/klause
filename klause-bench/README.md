@@ -2,8 +2,9 @@
 
 JVM catalog, corpus management, subprocess runner and offline measurement tools.
 This README owns benchmark usage, records, validation and diagnostics. Solver
-contracts live in [docs](../docs/README.md); committed input identities and
-licenses live in [fixture provenance](../docs/testing/fixtures.md).
+contracts live in [docs](../docs/README.md). Committed fixture identities and
+licenses live in the README beside each fixture directory, or in
+[fixture provenance](#fixture-provenance) for fixtures without one.
 Commands run from the repository root unless shown otherwise.
 
 | Task | Read |
@@ -12,7 +13,8 @@ Commands run from the repository root unless shown otherwise.
 | Run remote experiments or regression schedules | [Klause-lab](#klause-lab) |
 | Identify and compare measurements | [Provenance](#installed-build-provenance), [records](#saved-results), [comparisons](#comparing-configurations) |
 | Check source claims | [Validation](#source-validation) |
-| Investigate cost | [Profiling](#profiling), [focused probes](#focused-probes), [LP replay](../docs/lp/replay.md) |
+| Investigate cost | [Profiling](#profiling), [focused probes](#focused-probes), [LP replay](#lp-capture-and-replay) |
+| Review retained design decisions | [Design evidence](#design-evidence) |
 
 ## Build and run
 
@@ -31,7 +33,10 @@ subprocess. Before a generic `bench solve`, rebuild the CLI explicitly:
 ```
 
 `installDist` leaves a stale CLI binary. The installed launcher requires JDK 25
-or newer; see [CLI runtime setup](../docs/cli.md#build-and-run). The installed bench
+or newer. Gradle provisions its own compilation toolchain, so a shell whose default
+`java` is older fails at run time with `UnsupportedClassVersionError`; point
+`JAVA_HOME` at the provisioned JDK, for example
+`JAVA_HOME=$(ls -d ~/.gradle/jdks/*-25-*/ | head -1)`. The installed bench
 launcher uses `klause-bench` as its working directory. `-Dklause.*` properties are
 forwarded to the bench JVM. Keep the CLI distribution and runtime fixed during a run.
 
@@ -502,6 +507,53 @@ plain input contents, original unsanitized settings, budget, validation/objectiv
 representation versions and installed-build/runtime provenance. Byte-identical
 rebuilds can reuse results. Use `-Dklause.bench.cache=false` for fresh measurements.
 
+## Fixture provenance
+
+Fixtures with a directory README record their identities and licenses there:
+the [smoke corpus](smoke-corpus/README.md) and the
+[basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md). The
+remaining committed fixtures are recorded here.
+
+### XCSP3 source checking
+
+The self-authored Apache-2.0 [region-counts-tiny.xml](src/test/resources/xcsp3/region-counts-tiny.xml)
+combines grouped Boolean membership sums with variable conditions, region-size
+vector lookup and starred extension tuples. Complete-search tests check returned
+named witnesses against the original XML. The contradictory count variant requires
+four region memberships across three cells, while every cell belongs to exactly one
+region. It exercises source lowering and complete search without a wall-clock budget.
+
+The self-authored Apache-2.0
+[reified-hole-tiny.xml](src/test/resources/xcsp3/reified-hole-tiny.xml)
+ties a disequality indicator to a table that can remove its target without moving
+the domain bounds. A branch with that hole conflicts with the opposite indicator.
+After rollback and learning, a source-checked assignment using the restored target
+must remain feasible.
+
+### XCSP3 reference importer
+
+The cp-sat reference image and its self-authored importer regression fixtures live in
+[klause-lab](https://github.com/Eignex/klause-lab/tree/main/images/xcsp3-cpsat), which builds and runs
+the reference images. Full fetched XCSP sources and saved witness records remain external; their source
+hashes and independent checker receipts bind remote regression controls to original bytes.
+Source-preserving reference records retain the installed image/importer identity, complete source
+assignment and exact integer objective. See the [benchmark reference workflow](#klause-lab) for the
+distinction between source witnesses and native proof claims.
+
+### FlatZinc witness
+
+[voltage_divider.fzn](src/test/resources/flatzinc/voltage_divider.fzn)
+is Hakan Kjellerstrand's `minizinc/voltage_divider/voltage_divider.mzn` from the
+Hakank corpus at revision `cfdfb67f9a22836ab6b9de0ee3940c6947742bec`,
+compiled with MiniZinc 2.9.7 and Klause's globals library. The MIT notice remains
+in the fixture. Local-path
+comments were removed. All 15 original flattened predicates and six scalar range
+bounds remain. The test checks exact witness coordinates without solver lowering.
+Source SHA-256 is
+`ab64d949341580bf5ea6c556e6d708b2285f40593f0de49b881f15869aa4d88e`;
+fixture SHA-256 is
+`e8353427783116d2980f3b0c05579d493fb072e92c18d38008fec458c3f840f7`.
+
 ## Installed-build provenance
 
 Cache keys hash every installed launcher/dependency jar, selected Java runtime
@@ -552,7 +604,7 @@ Index observations require actual construction through the explicit allowance. E
 but no component steering; positive values allow indexed preferences after caller
 or deferred hints decline. The optional Boolean draw requires this explicit
 allowance. None of these paths renews numerical or indexing allowances; full
-admission and lifetime contracts live in [search](../docs/solver/search.md).
+admission and lifetime contracts live in [search](../docs/14-search.md).
 
 `openHintClauseIndexAdmitted` and `openHintClauseIndexDeclined` describe the optional
 semantic index separately from the forward index. `openHintClauseConsulted`,
@@ -620,15 +672,14 @@ root subsets. Native timing aggregates can include several workers and private
 preparation, so subtracting them from invocation duration does not recover theory
 time. Missing startup, open-theory root and open-theory propagation clocks remain
 unavailable. A declared or reported theory label alone does not establish execution;
-preparation can stop before its first check. See the [CLI statistics scopes](../docs/cli.md)
-and [search contract](../docs/solver/search.md#statistics).
+preparation can stop before its first check. See the [CLI statistics scopes](../docs/31-cli.md)
+and [search contract](../docs/14.5-primal-and-statistics.md#statistics).
 
 Outputs are staging locations. Store active notes, scripts, manifests, records
 and reports in the shared external `klause-evidence/campaigns/<name>/` directory
 alongside the primary checkout. All worktrees share it. Promote reusable tools,
 fixtures and architectural conclusions, then delete obsolete campaign bundles.
-The [evidence policy](../docs/development.md#campaign-evidence) prohibits committed
-raw/generated archives and campaign GitHub workflows.
+Do not commit raw or generated archives, and do not add campaign GitHub workflows.
 
 Publish evidence needed by active reviews as downloadable snapshot assets on the
 public Klause-lab `active-evidence-<campaign>` prerelease. The lab's
@@ -738,7 +789,7 @@ independent flattened-text checker across every component. The witness policy is
 from `flatzinc-binary64`. The independent flattened-text checker interprets float
 literals as exact binary64 rationals and checks supported predicates/bounds; it
 does not establish decimal-rational MiniZinc semantics. `floatApproximation`
-records the lowering policy. See [input semantics](../docs/formats.md).
+records the lowering policy. See [input semantics](../docs/04-input-semantics.md).
 
 Unsupported syntax, missing coordinates, residual constraints, compiler failure
 or the ten-second external timeout leave validation unknown. Checking is outside
@@ -1017,6 +1068,124 @@ and report spread. Kernel, pivot or allocation improvements alone do not establi
 complete-solve gains. Inspect retained arm failures and quarantine separately;
 independent witness checks do not by themselves verify optimality/refutation.
 
+## LP capture and replay
+
+These opt-in tools isolate numerical basis operations.
+Capture records a bounded operation stream; verification checks its identities
+and residuals; replay or paired comparisons measure that recorded work. A kernel
+trace does not establish correctness or performance of an entire source solve.
+
+Use the basis corpus for numerical regressions and dense comparisons for basis selection.
+[LP architecture](../docs/26-lp-architecture.md) owns implementation contracts; the
+sections above cover full solve measurements.
+
+### Basis corpus replay
+
+The `:klause:basisTrace` task operates on the committed, versioned basis corpus under
+`klause/src/jvmTest/resources/basis-corpus/`. It runs only when invoked explicitly; ordinary tests never perform
+capture or timing.
+
+
+```
+./gradlew :klause:basisTrace --args="list"
+./gradlew :klause:basisTrace --args="verify"
+./gradlew :klause:basisTrace --args="replay"
+./gradlew :klause:basisTrace --args="benchmark"
+./gradlew :klause:basisTrace --args="replay trace=/path/to/one.kbtrace"
+```
+
+`list`, `replay`, `benchmark`, and `verify` use committed fixtures by default and emit one NDJSON record per
+fixture (or one corpus-verification record). Replay rebuilds portable headings on the basis under test,
+recomputes update preparation on its own current factors, and checks `B*x=b` and `B^T*x=b` directly against the
+stored CSC matrix after builds and updates. A replay stops at the failing operation and resumes at the next
+complete checkpoint.
+
+Two oracles are independent of the basis under test. The stored CSC matrix and the tracked headings give the
+residual check. The captured trace supplies the factorization outcome and the update acceptance the real solve
+observed. Both are checked before anything else, so nothing downstream can mask them.
+
+Replay records the koblas jar hash, kernel selection, and resolved vendor library/version. The selection
+identifies the engine composition, not the implementation of every operation: short and strided Level 1
+calls can use portable kernels. The sparse basis does not call vendor Level 2/3. Run with
+`-Pkoblas.noSimd=true` to check the portable JVM reductions against the same captured observations.
+
+Every accepted update is then rebuilt by a from-scratch Markowitz factorization of the same columns and solved
+through the rebuild. This is a measurement, not a third oracle: it runs only on a basis the residual check has
+already accepted and probes the same right-hand side, so it cannot find an unsolvable basis that check missed.
+It reports `freshRelativeResidual`, the accuracy a from-scratch build reaches on that probe and so a drift
+reference for the Forrest-Tomlin chain, and `freshDeclines`, a conditioning signal. A declining rebuild is
+reported rather than failed: it applies threshold partial pivoting under a bounded Markowitz search while an
+update accepts on an absolute pivot test alone, so the two disagree on badly scaled bases by construction.
+
+`benchmark` performs one warmup and three repetitions. Setup, build/rebuild, FTRAN, BTRAN, update-only,
+preparation-plus-update, composed lifecycle and setup-plus-lifecycle totals are reported separately with
+median/min/max nanoseconds; setup, individual operations and preparation-plus-update also report Java thread
+allocations. The oracle checks are outside the timed regions. Preparation-plus-update is labelled
+`synthetic_prepared`: a shadow basis recomputes the referenced solves and applies the update, while shadow setup
+and checkpoint builds stay outside that metric and the composed lifecycle.
+
+`compare` replays one complete `mps-afiro` operation window under its captured rebuilds and a fixed
+deferred schedule: skip the successful same-heading checkpoint at operation 41, rebuild at the next
+captured checkpoint at 86, and continue through operation 93. It runs one warmup and four alternating
+pairs; `trace=... checkpoint=...` selects another complete trace and validated same-heading checkpoint with a later build
+and following solve. A same-heading checkpoint has the identical immutable matrix and ordered basis;
+the trace does not record the production reason for rebuilding, so this is a basis-level cost experiment,
+not authorization to change solver policy. Any changed/failed/initial checkpoint, unexpected backend
+rebuild advice, numerical decline or 16-update harness limit invalidates that pair. The backend's own
+50-update limit remains in force. Both arms receive the same ordered trace operations and RHS vectors,
+but each computes its own spike and pivotal row. Cancellation is checked between operations in both arms.
+
+The comparator checks each update state in a separate validation pass and checks every measured solve output
+after replay against the stored CSC matrix and a fresh factorization of its recorded headings. This keeps
+oracle probes out of measured backend work. Timed phases cover owner
+setup, every captured build, RHS preparation and solves, updates, and close. NDJSON records phase and total
+elapsed time, current-thread CPU, Java allocations, plus independent backend work units. Native allocations
+are unavailable. Validity requires both arms to complete the whole window with independent numerical checks;
+captured update labels do not prove the deferred arm. These operation traces contain no complete LP bounds,
+objective, source proof or exact certificate, so they cannot establish an exact solver outcome. The fixed
+40-boxed-integer full-solver regression remains a separate control for any later policy proposal.
+
+```
+./gradlew :klause:basisTrace --args="compare"
+```
+
+Repair and structural replacement are covered by the dedicated engine tests rather than by replay, which drives
+only factorization, FTRAN, BTRAN and updates.
+
+Capture is opt-in and bounded to the limits in `basis-corpus/manifest.json`. It records raw matrix/RHS IEEE bits,
+source/unit headings, source mappings, strictness, update evidence and checkpoints; it never stores LU state or
+native pointers. Examples for every supported source format:
+
+```
+./gradlew :klause:basisTrace --args="capture id=local-mps format=mps source=/corpus/model.mps source-label=collection/model.mps@REV license=LICENSE output=/path/to/evidence/local-mps.kbtrace"
+./gradlew :klause:basisTrace --args="capture id=local-mzn format=minizinc source=klause-mzn-lib/test-models/graph_coloring.mzn license=repository-internal output=/path/to/evidence/local-mzn.kbtrace"
+./gradlew :klause:basisTrace --args="capture id=local-smt format=smtlib source=klause-bench/smoke-corpus/smtlib/lia-wide-span.smt2 license=repository-internal output=/path/to/evidence/local-smt.kbtrace"
+```
+
+MiniZinc source is compiled through this repository's `klause.msc`; an already flattened `.fzn` is accepted
+directly. MPS and MiniZinc traces use the production LP-relaxation assembly. SMT traces are labelled
+`SMT_SOURCE_DERIVED`: the frontend's authoritative exact asserted state is projected into the float engine for
+this harness. This capture route is distinct from a production theory event stream. Boolean SMT branches and objectives
+decline instead of being silently selected or relaxed. See the [basis corpus README](../klause/src/jvmTest/resources/basis-corpus/README.md)
+for source identities, redistribution terms, hashes and exclusions.
+
+### Dense selection comparison
+
+```
+./gradlew :klause:basisTrace --args="compare-dense trace=/path/to/captured.kbtrace repetitions=5"
+```
+
+`compare-dense` runs one warmup per arm and alternating pairs of the whole recorded
+operation stream. `sparse` sets `denseDimensionLimit = 0`; `selected` uses the
+production dimension/density rule. Each record includes the pair/order, source and
+artifact hashes, runtime and Koblas identity, dense build attempts, phase timing,
+Java allocation counts, update observations and independent source residuals in both
+directions. The fresh numerical reference always disables dense selection. Any
+state/residual error stops the comparison. A truncated trace establishes only its
+recorded prefix. Short trace timings include JIT/noise and do not establish a
+complete-solver gain or a universal crossover. Matched source solves and repeated
+factor batches are separate controls.
+
 ## Profiling
 
 `profile=cpu|wall|alloc` writes `build/bench-prof.jfr` and prints a flat method table.
@@ -1078,7 +1247,7 @@ The Gradle hook accepts `-PasyncProfiler=/path/to/libasyncProfiler.so`,
 `-PprofEvent=cpu|alloc|wall`, `-PprofFormat=traces=30`, `-PprofOut=<path>`.
 Retain raw profiles/resource reports externally; compare uninstrumented paired
 runs separately. Inlining/frame removal does not establish saved CPU time.
-[LP capture/replay](../docs/lp/replay.md) covers numerical and owner lifecycles.
+[LP capture and replay](#lp-capture-and-replay) covers numerical and owner lifecycles.
 
 ### Compressed profile captures
 
@@ -1366,10 +1535,178 @@ and export no proofs.
 `:klause:basisTrace --args="verify"` and `--args="replay"` are opt-in fixture
 checks; numerical declines and missing inputs keep their normal semantics.
 Run source-verifier regressions with its pinned requirements. Benchmarks, captures
-and timing probes do not run as part of ordinary repository checks; follow the
-[development validation policy](../docs/development.md#validation).
+and timing probes do not run as part of ordinary repository checks.
 
 `source-ownership` contains self-authored original MiniZinc mixed integer/real
 product controls, including an unrelated finite distinctness constraint and an
 excluded integer value. Run CP/LS with default and exact modes; the harness records
 the original MiniZinc source check separately from compiled FlatZinc semantics.
+
+## Design evidence
+
+These short summaries support current design decisions. The contracts themselves
+live in the [docs](../docs/README.md) chapters each summary links; raw evidence
+stays outside the repository.
+
+### Portfolio slice policy
+
+Retain the finite schedule's base 5000, maximum 150000 and growth 1.5. The comparison
+found workload-specific benefits from alternatives without a general replacement.
+[Portfolio scheduling](../docs/16.2-portfolio-scheduling.md#slice-accounting-and-coverage) and
+[resources](../docs/11-resources.md) own the policy and work currencies.
+
+#### Scope and controls
+
+The comparison covered 13 inputs across MiniZinc, XCSP3, MPS, DIMACS, WCNF and OPB:
+312 runs with two seeds and two repeats per setting. Settings were implicit/explicit
+defaults, base 1000, maximum 30000, growth 2 and a flat 5000 schedule. Each run used
+one processor, a 200000 decision/move allowance and a 30-second outer deadline.
+Source/build identities and effective settings were checked. Equal nominal caps
+did not imply equal completed work when preparation or deadlines stopped a run.
+
+#### Slice decision evidence
+
+The smaller base reduced work to proofs on `flugpl` and `hole9`, but produced no
+witness on Cargo `challenge05_1s_954`, where defaults produced checked cost-11032
+witnesses at the same ledger charge. Growth 2 found checked cost-6 witnesses on
+`GenHyperTW_grid5`; scheduling/allocation inputs did not show a general advantage.
+The flat and smaller-maximum schedules likewise gave no consistent benefit.
+
+These tradeoffs support the retained defaults on this selection. They establish
+neither a globally best schedule nor deterministic outcomes under elapsed limits.
+
+#### Acceptance and limits
+
+Independent original-source checks under the recorded policies accepted 229 final
+witnesses and checked all
+72 completed proof claims through source refutation or better-objective exclusion.
+Witness acceptance and proof credit remain separate. A further 52 one-/four-processor
+runs stayed within the aggregate 20000-unit cap while retaining unused worker quota;
+that check was not a matched-work speed comparison.
+
+[Review evidence](https://github.com/Eignex/klause-lab/releases/tag/active-evidence-resource-scopes-slice-policy)
+records specifications, build identities and source checks for revision
+`fdf42c72c1e4eda1d9e4d421fb84fd0cd53318c3`. Its snapshot excludes source input bytes,
+installed binaries, profiles and original subprocess stdout. Conclusions are limited
+to the recorded selection and runtime.
+
+### Numerical kernel decisions
+
+These summaries support current implementation choices on bounded workloads.
+[LP architecture](../docs/26-lp-architecture.md), [certification](../docs/27-lp-certification.md) and
+[dependencies](../docs/29-numerical-dependencies.md) own the contracts; measurement procedures live
+in [LP capture and replay](#lp-capture-and-replay). Raw evidence stays outside the repository.
+
+#### Dense basis selection
+
+Retain the bounded dense-LU selection and windowed updates. Captured bases came
+from MIPLIB2017 `markshare1`, `gr4x6`, `22433` and the committed basis corpus. Linux amd64/JDK 25
+measurements used three fresh JVM forks with warm, paired complete factor builds,
+including ownership and numerical guards.
+
+On the populated six-row `markshare1` basis, windowed/full-buffer elapsed ratios
+were 0.983 for retained and fresh owners; windowed/sparse ratios were 0.480 and
+0.498. Independent products and operation replay checked both solve directions.
+Windowed updates charged 125 fewer deterministic work units per build. Source
+controls preserved outcomes, with 54 final witnesses independently checked.
+
+Direct dense-build benefit was measured at order six; orders 2–5 remain inside the
+bounded rule without that direct evidence. Larger captured bases favored sparse
+construction, and the `22433` recording covers only its captured prefix. These
+results justify neither a wider dense rule, a dependency-upgrade speedup nor a
+whole-solver timing claim.
+
+#### Rational normalization
+
+Retain the [fraction factory](../klause/src/commonMain/kotlin/com/eignex/klause/simplex/exact/BigFraction.kt)
+paths that skip redundant normalization when coprimality is established.
+A [fixed-work comparison](https://github.com/Eignex/klause/actions/runs/38043606727)
+covered six `nec-smt` inputs, three seeds and work allowances 3000/6000. All 108
+pairs matched non-timing counters and outcomes; median paired duration reductions
+ranged from 7.41% to 15.53% across inputs.
+
+[Independent source checks](https://github.com/Eignex/klause/actions/runs/38042314816)
+covered 104 matched MPS/SMT records. Claimed verdicts agreed with source constraints;
+four rounded default-MPS points received separate source satisfiability checks.
+Deadline-limited runs traversed different prefixes, so they establish neither
+identical-work timing nor completed-solve gains.
+
+#### Cancellation polling
+
+Retain the [polling contract](../docs/27-lp-certification.md#resources-and-cancellation)
+and dispatch frequency. A [fixed-work comparison](https://github.com/Eignex/klause/actions/runs/38043602143)
+used three `nec-smt` inputs and five alternating pairs at seed 1/work 3000.
+Counters and unknown outcomes matched; median duration reductions were 0.45%,
+-0.57% and -0.20%, providing no useful dispatch-speedup evidence.
+
+Overlapping CPU-profile frames do not measure additive cancellation cost.
+Regression coverage protects live deadline rearming and external cancellation;
+frame removal alone does not justify weaker polling.
+
+### State ownership evidence
+
+The bounded comparisons support retaining concrete buffer owners, separate indexed
+vector roles and one cursor/cleanup owner per run. [LP architecture](../docs/26-lp-architecture.md),
+[search](../docs/14-search.md) and [local search](../docs/15-local-search.md) own the contracts.
+
+The LP consumer probe checked 2,688 states
+across matched workspace, basis, pricing and traversal comparisons. An independent
+vertex oracle checked source bounds, exact values/objectives/bounds and owner closure.
+Results and numerical work matched; warm median JVM thread allocations changed by
+at most +0.54% per measured consumer phase.
+
+The local-search probe checked
+12,800 witnesses across three DIMACS fixtures, satisfaction/minimization and legacy
+versus seven-instruction slices. Results, charged work and retained-state digests
+matched; warm median thread allocations changed by at most +0.4%.
+
+Independent source checks accepted 212 numeric/Boolean CLI records, including 60
+exact MPS records. Thirty-two rounded default-MPS optima were excluded from exact
+proof acceptance. Witness checks alone do not certify optimality or refutation.
+
+These results establish neither whole-CLI speedups nor native allocation totals or
+corpus-wide behavior. The sections above
+own pinned builds, paired measurements and whole-CLI controls.
+
+### Source-scoped derivation admission
+
+Retain typed original-source derivations separately from native engine completion.
+Evidence capture stays optional; unsupported capture withholds mathematical coverage.
+[Source evidence](../docs/17-evidence.md) owns this contract, while
+[portfolio admission](../docs/16-portfolio.md) owns native result transport.
+
+#### Derivation decision evidence
+
+The original-source controls at revision
+`304a1fcbe374f1cd080bc64d626e77f3c931694f` retain original inputs, separate caller
+conditions, actual claims, checker identities and runtime artifact hashes. Independent
+standard-library rational checkers accept fourteen supported claims across quadratic
+MIN/MAX, affine MPS and strict/mixed SMT sources. The maintained
+[probe and checker workflow](#source-validation) owns these controls.
+
+The controls include a decimal objective beyond binary64 precision, adjacent integer
+branch coverage, Boolean branch coverage, a Farkas refutation, improving integer/real
+rays and strict unattained limits. A conditioned witness retains Boolean true,
+integer `18446744073709551616` and real `1/3` with matching original objective and
+bound. A budget-exhausted result retains a checked global bound `1/2` without an
+incumbent or terminal claim. These distinct outcomes require distinct mathematical
+claims; a completion token cannot substitute for them.
+
+The [platform validation](https://github.com/Eignex/klause/actions/runs/38468169304)
+checks scope/claim matching, original-source feasibility, actual native publications,
+optional capture, projection obligations, imports and cancellation. Missing coordinate
+images, nonintegral integer images, nonpositive objective scales, foreign invocations
+and incomplete branch coverage cannot acquire proof credit through metadata.
+
+#### Acceptance limits
+
+The independent checkers cover their declared affine and quadratic subsets. Native
+admission, a checked witness and a checked terminal claim remain separate obligations.
+A partial bound does not establish an optimum; a strict bound does not alone establish
+an approach to a limit; an improving direction needs a feasible source base.
+
+Capture does not export general proof files. Missing source premises, transformation
+justifications, exact coordinates, retained inputs or checker reports withhold the
+corresponding acceptance. New decoders and workers must consume these source scopes
+and publication interfaces while preserving their existing resource and numerical
+ownership boundaries.

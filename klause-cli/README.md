@@ -2,5 +2,5 @@
 
 Kotlin Multiplatform command-line frontend for Klause.
 
-See [CLI setup and flags](../docs/cli.md), [input semantics](../docs/formats.md)
-and [MiniZinc integration](../docs/minizinc.md).
+See [CLI setup and flags](../docs/31-cli.md), [input semantics](../docs/04-input-semantics.md)
+and [MiniZinc integration](../klause-mzn-lib/README.md).
