@@ -12,6 +12,136 @@ import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
     @Test
+    fun `logical targets should complete source bounds without exporting a numerical basis`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val seven = ExactLpNumber.of(7L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one)), emptyList(), emptyList(), emptyList()),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(3L)))),
+                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(2L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(seven), ExactLpSide(seven))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()), ExactLpObjective(List(5) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel): Basis = error("numerical target must remain unused")
+        }
+
+        val target = captureContinuationTarget(model, solver, null,
+            ExactContinuationLimits(), Cancellation.Never, logical = true)
+        val result = continueExactLp(model, assertNotNull(target.basis), targetMetrics = target.metrics)
+
+        val expected = listOf(1L, 3L, 2L, 7L).map { BigFraction.ofLong(it) }
+        assertEquals(expected, assertNotNull(result.witness).primal)
+        assertTrue(result.metrics.success)
+        assertEquals(0, result.metrics.imports)
+        assertNull(result.conflict)
+    }
+
+    @Test
+    fun `logical targets should retain exact conflict support from strict source bounds`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(zero),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
+            listOf(ExactLpRow(global = false, premises = ExactLpPremises(emptyList(), listOf(9)))),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.assertBound(0, false, ExactLpSide(zero, strict = true), 11L))
+        assertTrue(trail.assertBound(1, false, ExactLpSide(zero), 12L))
+        val model = assertNotNull(trail.state.toWorkingModel())
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+        }
+
+        val target = captureContinuationTarget(model, solver, null,
+            ExactContinuationLimits(), Cancellation.Never, logical = true)
+        val result = continueExactLp(model, assertNotNull(target.basis), targetMetrics = target.metrics)
+
+        assertNull(result.witness)
+        assertNotNull(result.conflict)
+        val support = assertNotNull(result.support)
+        assertTrue(support.state === trail.state)
+        assertEquals(setOf(11L, 12L), support.sides.map { it.witness }.toSet())
+        assertEquals(listOf(9), assertNotNull(support.rows.single().second.premises).literalEntries())
+    }
+
+    @Test
+    fun `logical targets should verify a point inside strict source bounds`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(listOf(emptyList()), emptyList(), listOf(
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true),
+                ExactLpSide(ExactLpNumber.of(1L), strict = true))),
+        ), emptyList(), ExactLpObjective(listOf(zero)))
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+        }
+
+        val target = captureContinuationTarget(model, solver, null,
+            ExactContinuationLimits(), Cancellation.Never, logical = true)
+        val result = continueExactLp(model, assertNotNull(target.basis), targetMetrics = target.metrics)
+
+        val value = assertNotNull(result.witness).primal.single()
+        assertTrue(value > BigFraction.ZERO && value < BigFraction.ONE)
+        assertTrue(result.metrics.success)
+        assertNull(result.conflict)
+    }
+
+    @Test
+    fun `logical target admission should withhold interrupted target arrays`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+        }
+        val cases = listOf(
+            Triple(ExactContinuationLimits(maxWork = 0), Cancellation.Never, ContinuationDecline.WORK),
+            Triple(ExactContinuationLimits(), Cancellation { true }, ContinuationDecline.CANCELLED),
+        )
+        for ((limits, stop, reason) in cases) {
+            val target = captureContinuationTarget(model, solver, null, limits, stop, logical = true)
+
+            assertNull(target.basis)
+            assertEquals(reason, target.metrics.decline)
+        }
+    }
+
+    @Test
+    fun `logical targets should decline a nonzero objective`() {
+        val model = LpBuilder().apply { addVar(0L, 1L, cost = 1L) }.build(Sense.MINIMIZE)
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+        }
+
+        val target = captureContinuationTarget(model, solver, null,
+            ExactContinuationLimits(), Cancellation.Never, logical = true)
+
+        assertNull(target.basis)
+        assertEquals(ContinuationDecline.INVALID_INPUT, target.metrics.decline)
+    }
+
+    @Test
     fun `direct continuation dimension declines should retain no state and later admit another model`() {
         val cache = LpExactContinuationCache()
         val models = listOf(2, 1).map { rows ->

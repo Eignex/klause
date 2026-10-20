@@ -755,7 +755,8 @@ internal class LpEngine(
         }
         val certified = solver.solve(model, cancellation = params.cancellation,
             workLimit = remaining?.let { minOf(budget, it) } ?: budget,
-            observer = sink.lp.certificationObserver(LpRoute.STANDALONE), counterResults = lpCounterResults)
+            observer = sink.lp.certificationObserver(LpRoute.STANDALONE), counterResults = lpCounterResults,
+            logicalContinuation = true)
         sink.lp.observePrimalPhase("PREFIX_REAL_CHECK", certified.verdict.name, 0L)
         if (onPoint != null && !params.cancellation() &&
             (certified.verdict == LpVerdict.FEASIBLE || certified.verdict == LpVerdict.ATTAINED_OPTIMUM)

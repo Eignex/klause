@@ -671,6 +671,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PREFIX_REAL_HANDOFF_ROOT` | Native conflict handling for a checked selected-prefix source clause |
 | `lpPhase_PREFIX_REAL_POINT_ROOT` | Positive-primal mapping attempts, their four-attempt lifetime limit, available real and finite integer relaxation coordinates, or a missing exact primal; fractional integers remain guidance, with no additional numerical query |
 | `lpPhase_PREFIX_REAL_HINT_ROOT` | Optional preparation when guidance is absent; ready vectors report open and total Boolean heads. Selections distinguish integers, matching Boolean heads and missing Boolean heads; matching candidates report retained-phase precedence or Boolean/integer fallback use. Retraction, restart, leaf checking and close report vector disposal |
+| `lpContinuationWork_IMPORT`, `lpContinuationWork_FEASIBILITY` | Exact target import and feasibility work. Partial zero-objective prefix queries use admitted source logical targets; full source verification remains required |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Pinned-leaf shape outcomes use `N` for structural columns, `M` for stored rows,

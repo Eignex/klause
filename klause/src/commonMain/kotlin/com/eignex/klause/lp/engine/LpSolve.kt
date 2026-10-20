@@ -314,6 +314,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
         floatAccept: ((FloatLpResult) -> Boolean)? = null,
         floatOffset: Double = 0.0,
+        logicalContinuation: Boolean = false,
     ): CertifiedLpResult {
         // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
         if (floatAccept != null && result != null && result.optimal && !cancellation()) {
@@ -343,6 +344,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
             model, solver, result, cancellation, observer, context.certificationPolicy,
             counterResults, continuationCache = continuation, refinement = refinement,
             sparsePointRecovery = context.sparsePointRecovery,
+            logicalContinuation = logicalContinuation,
         )
         ladderTimer.finish(certified.verdict.name)
         return certified
@@ -372,6 +374,7 @@ internal fun certifyLpResult(
     fullContinuation: Boolean = true,
     refinement: LpRefinementRequest? = null,
     sparsePointRecovery: Boolean = false,
+    logicalContinuation: Boolean = false,
 ): CertifiedLpResult {
     val pairing = observer?.let { LpRejectionPairing() }
     var completed = false
@@ -379,7 +382,7 @@ internal fun certifyLpResult(
     try {
         val certified = certifyLpResultWithin(
             model, solver, result, cancellation, observer, policy, counterResults, continuationCache,
-            continuationLimits, fullContinuation, refinement, sparsePointRecovery, pairing,
+            continuationLimits, fullContinuation, refinement, sparsePointRecovery, pairing, logicalContinuation,
         )
         completed = true
         return certified
@@ -414,6 +417,7 @@ private fun certifyLpResultWithin(
     refinement: LpRefinementRequest? = null,
     sparsePointRecovery: Boolean = false,
     pairing: LpRejectionPairing? = null,
+    logicalContinuation: Boolean = false,
 ): CertifiedLpResult {
     fun stopped(): Boolean = cancellation().also {
         if (it) pairing?.stopObserved = true
@@ -430,6 +434,7 @@ private fun certifyLpResultWithin(
         result,
         continuationLimits,
         cancellation,
+        logicalContinuation,
     ).also { capturedTarget = it }
     if (state != null) {
         if (stopped()) return CertifiedLpResult(null, null, null, null, null, false, { null })

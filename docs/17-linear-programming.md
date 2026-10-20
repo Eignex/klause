@@ -134,7 +134,11 @@ immutable finite domains, their bound intervals and tri-state Boolean snapshots;
 every conditional row premise must already be assigned. The unchanged 1,000-row numerical cap and node
 work allowance, including prior standalone solves, bound each query. Only an
 infeasible result with a checked source clause can prune the prefix; positive
-points remain relaxation values. An already available exact primal can supply
+points remain relaxation values. Partial zero-objective queries start exact
+continuation from source logical columns, with nonbasic structural columns at
+their fixed, lower, upper or free source seats. Admission checks every cost is
+zero before constructing this target. The same exact feasibility and source
+verification checks certify its result. An already available exact primal can supply
 source real and finite integer coordinates for phase guidance without
 another solve or point recovery request. Integer columns retain fractional
 relaxation values; uncarried integers take their current domain minimum. A finite
@@ -298,7 +302,7 @@ stall heuristics only schedule work; they never authorize proofs.
 | Rational reconstruction | Continued fractions and common denominators; check equations, bounds, signs and complementarity exactly. |
 | Residual refinement | Solve scaled rational corrections through the same floating engine and basis; accumulate exactly and reconstruct. |
 | Rational basis verification | Exact FTRAN gives basics; BTRAN gives duals or Farkas candidates. Singularity requests repair. |
-| Exact continuation | Import the numerical basis pivot by pivot, repairing unseatable basics with logicals, then run Bland feasibility. |
+| Exact continuation | Use a source logical basis for admitted partial zero-objective queries, or import a numerical target pivot by pivot; run Bland feasibility and verify the source result. |
 
 Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
 restarts the operation from authority, and every attempt is charged. Owner-local

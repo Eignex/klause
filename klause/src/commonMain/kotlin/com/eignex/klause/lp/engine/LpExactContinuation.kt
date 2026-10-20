@@ -68,6 +68,7 @@ internal fun captureContinuationTarget(
     result: FloatLpResult?,
     limits: ExactContinuationLimits,
     cancellation: Cancellation,
+    logical: Boolean = false,
 ): LpContinuationTarget {
     val budget = ContinuationBudget(admissionLimits(limits), cancellation)
     budget.phase = ContinuationPhase.ADMISSION
@@ -79,14 +80,12 @@ internal fun captureContinuationTarget(
             decline = ContinuationDecline.DIMENSION
         } else {
             admitContinuation(model, budget)
-            // The hook validates current authority and returns owned target arrays.
             budget.step(bytes = (model.m.toLong() + model.numVars) * 64L)
-            basis = solver.continuationBasis(model) ?: if (model.exactState == null) {
+            basis = if (logical) logicalContinuationBasis(model, budget) else solver.continuationBasis(model)
+            if (basis == null && !logical && model.exactState == null) {
                 (result?.basis ?: solver.infeasibleBasis)?.let {
-                    Basis(it.basicVars.copyOf(), it.status.copyOf(), false)
+                    basis = Basis(it.basicVars.copyOf(), it.status.copyOf(), false)
                 }
-            } else {
-                null
             }
             budget.step()
         }
@@ -106,6 +105,23 @@ internal fun captureContinuationTarget(
             allocationByPhase = budget.allocationByPhase.toMap(),
         ),
     )
+}
+
+private fun logicalContinuationBasis(model: LpModel, budget: ContinuationBudget): Basis {
+    val status = Array(model.numVars) { column ->
+        budget.step()
+        if (!model.exactCost(column).isZero) throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
+        val bounds = model.exactBounds(column)
+        if (!bounds.consistent) throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
+        when {
+            column >= model.n -> VarStatus.BASIC
+            bounds.fixed -> VarStatus.FIXED
+            bounds.lower != null -> VarStatus.AT_LOWER
+            bounds.upper != null -> VarStatus.AT_UPPER
+            else -> VarStatus.FREE
+        }
+    }
+    return Basis(IntArray(model.m) { model.n + it }, status, captureEligible = false)
 }
 
 internal class LpContinuationVerification(

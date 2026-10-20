@@ -21,6 +21,7 @@ internal class LpSolveSession(
         floatAccept: ((FloatLpResult) -> Boolean)? = null,
         floatOffset: Double = 0.0,
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+        logicalContinuation: Boolean = false,
     ): CertifiedLpResult {
         check(!closed) { "LP solve session is closed" }
         require(workLimit >= 0L)
@@ -44,7 +45,7 @@ internal class LpSolveSession(
                 observer?.observeSolve(current.lastMetrics, current is ComponentLpSolverCapability)
             }
             return certification.certify(model, current, result, cancellation, observer, counterResults,
-                refinementLimits, floatAccept, floatOffset)
+                refinementLimits, floatAccept, floatOffset, logicalContinuation)
         } catch (primary: Throwable) {
             try {
                 releaseSolvers()
