@@ -1,14 +1,15 @@
 # 4. Finite formats and FlatZinc
 
 The schema of the previous chapter is built in Kotlin. The remaining frontends read
-files, and this chapter covers the four whose problems are entirely Boolean or
-finite-integer: DIMACS CNF, weighted CNF (WCNF), pseudo-Boolean OPB/WBO and XCSP3.
+files. This chapter covers the four whose problems are entirely Boolean or
+finite-integer, DIMACS CNF, weighted CNF (WCNF), pseudo-Boolean OPB/WBO and XCSP3,
+and then FlatZinc, which adds floats, annotations and an output model.
 They share one shape: a streaming parser turns the text into a source document, a
 lowering step turns it into factors, and the result keeps the source objective,
 its direction and the names needed to print a solution. No numeric interpretation
-is configurable, so these formats show the frontend contract from
+is configurable in the finite formats, so they show the frontend contract from
 [input semantics](03-input-semantics.md) in its simplest form. The chapter takes
-them in order of growing expressiveness.
+the formats in order of growing expressiveness.
 
 ## Source models and objectives
 
@@ -145,16 +146,13 @@ without enumerating the domain span (see
 
 FlatZinc is the flat constraint language that the MiniZinc compiler emits for a
 solver, using the predicate declarations the solver advertises. Like the finite
-formats of the previous chapter, it is a file of declarations and constraints, but
+formats above, it is a file of declarations and constraints, but
 it adds float variables, annotations that steer search and output, and an output
 model that reconstructs the original MiniZinc variables. The frontend preserves
 source names, output annotations and constraints, and records whether each float
 component uses exact arithmetic or a finite approximation.
 
-The chapter covers the declared semantics, integer and Boolean lowering, retained
-annotations and native predicates, then floats, which build on all of these, and
-finally output rendering. A grid result never establishes an exact source optimum
-or refutation.
+A grid result never establishes an exact source optimum or refutation.
 
 ### Declared semantics and caller ranges
 

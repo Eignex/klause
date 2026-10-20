@@ -1,13 +1,13 @@
 # 11. Neighborhoods and restarts
 
-The scoring axis of [Strategies and moves](10-local-search.md#strategies-and-moves) values a candidate
-by its effect on the model. With the definitions of
-[Preparation and definitions](10-local-search.md#preparation-and-definitions) in place, that effect reaches
-beyond the coordinates a move writes: every derived output and every factor reading
-one can change. This subchapter describes how a candidate is graded exactly and
-reversibly, how factors select their scoring projection, how continuous arithmetic
-is scored, and the structured neighborhoods that NValue, Cumulative and Diffn
-contribute.
+[Local search](10-local-search.md) values a candidate by its effect on the model,
+and with definitions in place that effect reaches beyond the coordinates a move
+writes. This chapter first describes how a candidate is graded exactly and
+reversibly, how factors select their scoring projection and how continuous
+arithmetic is scored, then the structured neighborhoods that NValue, Cumulative and
+Diffn contribute. It ends with what a walk needs before it publishes and across
+slices: continuous completion, exact coordinate neighborhoods, restart anchors,
+ALNS seeding and the handles that own a run's state.
 
 ## Scoring and probe restoration
 
@@ -112,12 +112,10 @@ only the Diffn's own satisfaction; complete scoring covers the rest.
 
 ## Completion, restarts and ownership
 
-The walk of the previous subchapters moves discrete coordinates and scores them
-heuristically. Before anything is published, a candidate needs authoritative values
-for its continuous coordinates, and a run that lasts across portfolio slices needs
-state that survives suspension without leaking into other operations. This
-subchapter covers continuous completion, exact coordinate neighborhoods, restart
-anchors, ALNS seeding, and the handles that own a run's state.
+The walk moves discrete coordinates and scores them heuristically. Before anything
+is published, a candidate needs authoritative values for its continuous coordinates,
+and a run that lasts across portfolio slices needs state that survives suspension
+without leaking into other operations.
 
 ### Continuous candidate completion
 

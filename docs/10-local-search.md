@@ -11,9 +11,14 @@ A low score guides the walk; it does not prove feasibility, optimality or
 infeasibility. Every candidate still passes the same
 [source validation](07-presolve.md#source-witness-validation) as a complete-search witness, including
 arithmetic completion, before it is published, so local search can share incumbents
-with complete search in the [portfolios](12-portfolio.md) of the next chapter.
-Caller scopes follow [sessions](06-sessions.md), and work is charged against the
+with complete search in [portfolios](12-portfolio.md). Caller scopes follow
+[sessions](06-sessions.md), and work is charged against the
 [resource allowances](06-sessions.md#resource-allowances) of the containing solve.
+
+This chapter describes the walk, the strategies built over it and how a run
+prepares its projection, initial assignment and definitions. The
+[next chapter](11-neighborhoods.md) covers scoring, structured neighborhoods,
+continuous completion, restarts and ownership.
 
 ## The walk
 
@@ -47,23 +52,6 @@ treating an `objective ≤ incumbent` ratchet as one more constraint. Every stra
 therefore optimizes on an optimization model; a satisfaction model ends at its first
 feasible point.
 
-## Subchapters
-
-The subchapters follow a run from its strategy to its lifetime:
-
-1. [Strategies and moves](#strategies-and-moves) describes the four axes every
-   strategy is built from: move sources, scoring, acceptance and schedules, with
-   tabu and the named recipes built over them.
-2. [Preparation and definitions](#preparation-and-definitions) covers how a run prepares
-   its projection and initial assignment, and how one-way definitions, repairs and
-   literal channels keep derived coordinates consistent.
-3. [Scoring and neighborhoods](11-neighborhoods.md) covers reversible scoring probes,
-   selected scoring projections, continuous scores and the structured
-   neighborhoods of NValue, Cumulative and Diffn.
-4. [Completion, restarts and ownership](11-neighborhoods.md#completion-restarts-and-ownership) covers completing
-   continuous coordinates, exact coordinate neighborhoods, restart anchors, ALNS
-   seeding, resumable handles and residual reporting.
-
 ## Strategies and moves
 
 Every local-search arm is a recipe over one shared driver,
@@ -71,10 +59,8 @@ Every local-search arm is a recipe over one shared driver,
 candidates from configured move sources, scores them, filters them and lets an
 acceptance rule choose. A recipe's behaviour is fully described by four axes —
 sources, scoring, acceptance and schedule — plus tabu, configuration checking and
-an optional perturbation hook. This subchapter describes those axes, the move
-sources they draw from and the named recipes built from them. The
-[chapter overview](#) introduces moves, invariants and the two
-optimization phases they act on.
+an optional perturbation hook. This section describes those axes, the move
+sources they draw from and the named recipes built from them.
 
 ### Move sources
 
@@ -213,7 +199,7 @@ also contain coordinates that are functions of others: a product's result, an
 Element's selected value, a channelled indicator. Searching those coordinates
 independently would waste moves and break relations the source states exactly, so
 local search maintains them as one-way definitions and backsolves repairs through
-them. This subchapter follows preparation, initialization, the materialization of
+them. This section follows preparation, initialization, the materialization of
 source definitions, and the repairs and channels built on them.
 
 ### Projections and preparation

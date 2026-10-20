@@ -125,7 +125,7 @@ bound.
 
 Workers in a [portfolio](12-portfolio.md) share bounds and witnesses while they run.
 Those publications carry the runtime binding that lets a consumer check them; the
-admission rules are in [chapter 16.1](12-portfolio.md#witnesses-and-proof-scope).
+admission rules are in [portfolio witnesses and proof scope](12-portfolio.md#witnesses-and-proof-scope).
 
 `EngineInvocation` keeps the prepared plan, its original source and objective
 direction, the execution model and owned assumption snapshots, plus an optional

@@ -1,7 +1,7 @@
 # 3. Input semantics and the schema DSL
 
-Chapter 3 described the source model. This chapter describes how input formats
-produce one and what every format must preserve in doing so. A frontend
+The previous chapter described the source model. This chapter describes how input
+formats produce one and what every format must preserve in doing so. A frontend
 translates source syntax into the shared model and retains what it needs to render
 and check source assignments; the pipeline then chooses solving mechanisms from
 that model. Parsing a constraint, finding a candidate and proving a result are
@@ -9,7 +9,8 @@ separate steps, and source correspondence must survive each one.
 
 The chapter covers the rules all formats share (numeric authority, finite versus
 open models, current coverage) and the relations whose source forms recur across
-formats. The next five chapters take each frontend in turn.
+formats, then the first frontend: the Kotlin schema DSL. The next two chapters
+cover the file formats.
 
 ## Source contracts
 
@@ -123,14 +124,9 @@ backtracking owns selector allocation.
 
 ## Schema lowering
 
-The previous chapter set the rules every frontend follows. This is the first of
-the frontends, and the only one that does not read a file: the Kotlin schema DSL.
-A schema declares named variables and constraints in Kotlin, compiles them into
+The schema DSL is the only frontend that does not read a file. A schema declares named variables and constraints in Kotlin, compiles them into
 the shared source model and retains the metadata needed to decode solutions back
 into the caller's names and types.
-
-The chapter covers how a schema is declared and compiled, the integer constructs
-that need more than a direct factor, and floats and continuous products.
 
 ### Declaring and compiling a schema
 

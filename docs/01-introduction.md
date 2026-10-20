@@ -9,10 +9,11 @@ to every published result stay the same.
 
 This chapter sets out what Klause is meant to be: one model surface for every
 search style, results whose strength matches their evidence, and a clear boundary
-between finite propagation and arithmetic. It then describes the targets the
-system is still growing towards, and ends with where the implementation stands.
-Later chapters describe the implemented system; gaps are named in the last two
-sections and in [current coverage](03-input-semantics.md#solving-coverage).
+between finite propagation and arithmetic. It then records where the
+implementation stands against those targets and closes with the system
+architecture that keeps the guarantees. Later chapters describe the implemented
+system; remaining gaps are listed in
+[current coverage](03-input-semantics.md#solving-coverage).
 
 ## Shared model breadth
 
@@ -162,9 +163,8 @@ owns the contract.
 
 ## System architecture
 
-The introduction stated what every solving route must guarantee. This chapter
-shows how the code base is arranged to keep those guarantees: it follows a problem
-from source to result and maps each step onto modules and packages.
+The code base is arranged to keep those guarantees. This section follows a
+problem from source to result and maps each step onto modules and packages.
 
 The system has three layers. Model construction turns a Kotlin schema or a source
 file into an engine-neutral source model. Solving policy decides when to search,

@@ -1,16 +1,20 @@
 # 15. Linear arithmetic
 
-Linear real constraints combine real coordinates with constant coefficients and
-Boolean structure. They generalize the difference rows of the
-[previous chapter](14-theories.md#difference-logic) to arbitrary rational coefficients. Exact
-rational checks decide the active linear system, and shared search explores the
-Boolean alternatives. Strict inequalities require an interior point, not a point
-on the closure's boundary.
+Linear constraints combine coordinates with constant coefficients and Boolean
+structure. They generalize the difference rows of
+[difference logic](14-theories.md#difference-logic) to arbitrary rational coefficients.
+This chapter describes one linear component and the three theories built on it:
+linear real arithmetic checks the active system exactly, linear integer arithmetic
+adds integrality, and linear mixed arithmetic couples integer and real columns and
+recovers a complete point from what the LP returns.
 
-This chapter introduces the linear component that the integer and mixed theories in
-the next two chapters extend.
+## Linear real arithmetic
 
-## Scope and boundaries
+Exact rational checks decide the active linear system, and shared search explores
+the Boolean alternatives. Strict inequalities require an interior point, not a
+point on the closure's boundary.
+
+### Scope and boundaries
 
 The pure-real route requires real variables, no source integer variables, and
 factors wholly represented by admitted exact linear forms. Source bounds,
@@ -20,7 +24,7 @@ products belong to [polynomial real arithmetic](16-nonlinear-arithmetic.md#polyn
 admitted pure-real subfragment; a graph decline does not reject a supported
 linear source.
 
-## Solving and composition
+### Solving and composition
 
 The linear component sits on two lifecycles at once: the
 [search session](08-search.md) owns Boolean decisions and retraction, and the
@@ -28,7 +32,7 @@ The linear component sits on two lifecycles at once: the
 assertions. The component turns assigned source rows into LP bounds, and LP
 verdicts into conflicts, branches and witnesses.
 
-### Rows as bounds
+#### Rows as bounds
 
 The component follows the slack-variable design of Dutertre and de Moura: every
 normalized multi-column term gets one slack column defined by an equality row, so
@@ -42,7 +46,7 @@ first seen under an activator, branch or disjunct get their definition row appen
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
 
-### A check
+#### A check
 
 A check proceeds in four steps:
 
@@ -63,7 +67,7 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 
-### Disjunctions and disequalities
+#### Disjunctions and disequalities
 
 A source disjunction is registered with search as one atom per disjunct; a disjunct
 that is a single comparison is named by its exact bound, so the same predicate
@@ -76,7 +80,7 @@ A disequality `t != b` is satisfied by either strict side. If the current bounds
 already exclude one side, the component asserts the other; otherwise, at a complete
 Boolean state, it registers the split `t < b` against `t > b`.
 
-### Strict inequalities
+#### Strict inequalities
 
 The floating simplex solves the closure, where strict and non-strict bounds
 coincide. Certification decides strictness with a margin auxiliary: it maximizes a
@@ -85,14 +89,14 @@ slack `t` added to every strict row and accepts only an exact witness with posit
 [LP certification](17-linear-programming.md#refinement-and-strict-inequalities)
 defines that check.
 
-### Coordinate agreement
+#### Coordinate agreement
 
 When the component shares a model with other components, it publishes its selected
 rows as exact source-bound atoms and can check a candidate assembled by others
 against the rows selected by the current Boolean state. A missing coordinate
 declines rather than failing the candidate.
 
-### Polarity guidance
+#### Polarity guidance
 
 While Booleans remain open, a completed partial point from the LP or the graph can
 guide which polarity search tries first for a primitive comparison. Every row
@@ -101,7 +105,7 @@ guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
 
-## Results and proof authority
+### Results and proof authority
 
 `ExactLraAssignment` captures Boolean values and rational real coordinates.
 Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
@@ -114,7 +118,7 @@ improving rays determine its result; `OpenTheoryOptimum.linearResult` separates 
 incumbent value from an unattained limit. Incomplete optimization withholds global
 claims while preserving checked incumbents.
 
-## State and resources
+### State and resources
 
 Immutable row addresses, forms and Boolean dependencies can be shared by fresh
 components over one canonical fragment. `prepareExactLiraSource` returns an opaque
@@ -123,7 +127,7 @@ callbacks, cancellation and mutable arithmetic owners. Scoped assertions, graph
 potentials, LP bases and candidates remain invocation-owned. Optional hint storage
 admits at most 65,536 entries and 4,096-bit normalized rationals.
 
-## Implementation
+### Implementation
 
 [QfLraSystem](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/QfLraSystem.kt)
 builds the asserted source system, slack columns and premise literals.
@@ -138,7 +142,7 @@ this route `EXACT_LRA`.
 ## Linear integer arithmetic
 
 Linear integer constraints combine integer coordinates with constant coefficients
-and Boolean structure. The theory takes the [linear real component](#)
+and Boolean structure. The theory takes the [linear real component](#linear-real-arithmetic)
 and adds integrality: the rational relaxation is checked exactly, a fractional
 point causes integer branching, and an exact lattice reduction keeps unbounded
 problems finite where the source supports it. Open source bounds stay open instead
@@ -265,8 +269,8 @@ implements the integral descent. The pipeline names the integer-containing route
 ## Linear mixed arithmetic
 
 Mixed linear constraints couple integer and real coordinates in one source model.
-This theory combines the two previous chapters: the
-[linear real](#) relaxation checks real feasibility, and the
+This theory combines the two above: the
+[linear real](#linear-real-arithmetic) relaxation checks real feasibility, and the
 [linear integer](#linear-integer-arithmetic) branch order enforces integrality on the
 integer columns. A feasible continuous point is not enough to accept a mixed model,
 and the main addition here is how a complete integral and real point is recovered

@@ -6,10 +6,10 @@ through the frontends of Part II, runs the selected solve route and renders
 assignments or a terminal verdict. All formats share the solve-control flags and
 driver; each frontend owns parsing and output semantics.
 
-The chapter starts with building and running the CLI, then covers format dispatch
-and how arithmetic results are published, and ends with the flags and the
-statistics it reports. [Input semantics](03-input-semantics.md) explains coverage and
-result strength.
+The chapter starts with building and running the CLI, then covers format dispatch,
+how arithmetic results are published, and the flags and statistics it reports. It
+ends with working on the code itself: module layout, building, the Kotlin DSL and
+the conventions for tests and source.
 
 ## Build and run
 
@@ -192,17 +192,15 @@ interpretation is never an environment setting: it belongs to the format's typed
 
 ## Development
 
-Part VII is about working on the Kotlin code itself. This chapter covers the module
-layout, building and checking the code, a first program against the Kotlin DSL, and
-the conventions for tests and source. The [repository modules](01-introduction.md#repository-modules)
-and [package boundaries](01-introduction.md#package-boundaries) from chapter 2 are
-the map; the chapters in between describe the contract of each component you might
-change.
+The [repository modules](01-introduction.md#repository-modules) and
+[package boundaries](01-introduction.md#package-boundaries) of the introduction are
+the map for working on the code; the chapters in between describe the contract of
+each component you might change.
 
 ### Modules and building
 
 The Gradle build includes `:klause` (model, DSL, compilation, formats and solving),
-`:klause-cli` (the command-line driver of [chapter 31](#)) and
+`:klause-cli` (the command-line driver described [above](#build-and-run)) and
 `:klause-bench`, a JVM module that is not published. The default build targets JVM
 and Linux x64; releases opt into Linux arm64 and macOS arm64 with `-Ptargets.full`.
 

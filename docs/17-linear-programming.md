@@ -2,9 +2,9 @@
 
 Part V describes the numerical mechanisms that search and the theories of Part IV
 call on. The linear programming engine comes first because it has the most
-consumers: finite CP/COP relaxations, mixed-integer models and the open linear theories of
-chapters [20](15-linear-arithmetic.md)–[22](15-linear-arithmetic.md#linear-mixed-arithmetic) all run on one
-production floating revised simplex with exact certification. Shared search owns
+consumers: finite CP/COP relaxations, mixed-integer models and the
+[open linear theories](15-linear-arithmetic.md) all run on one production floating
+revised simplex with exact certification. Shared search owns
 integer, comparison and disequality branches; LP feasibility alone does not
 establish integrality.
 
@@ -12,9 +12,10 @@ The flow is to assemble a source-aware linear model, solve its floating working
 representation, certify the requested result, then let the consumer reconstruct
 or apply it. Bound changes and retraction update that same numerical scope. This
 chapter follows that flow: engine boundaries, exact authority and consumer
-integration come before private basis mechanics. The [next chapter](#lp-certification)
-defines the proof packages a certified result carries, and
-[chapter 29](18-exact-arithmetic.md#numerical-dependencies) the external kernel interfaces.
+integration come before private basis mechanics, and
+[certification](#lp-certification) closes the chapter with the proof packages a
+certified result carries. [Numerical dependencies](18-exact-arithmetic.md#numerical-dependencies)
+describes the external kernel interfaces.
 
 ## Boundaries
 
@@ -188,13 +189,11 @@ their built-in descriptors.
 
 ## LP certification
 
-The [previous chapter](#) followed a linear model from assembly
-to a floating solve. This chapter covers the step that gives that solve any
-authority: certification turns a numerical candidate into evidence about the exact
-active linear model. Feasible points, objective bounds, infeasibility and
+Certification is the step that gives a floating solve any authority: it turns a
+numerical candidate into evidence about the exact active linear model. Feasible points, objective bounds, infeasibility and
 unboundedness require different packages; one cannot substitute for another.
 
-The chapter first lists those packages, then the mechanisms that produce them:
+The packages come first, then the mechanisms that produce them:
 safe objective bounds, exact reconstruction and refinement, Farkas and recession
 checks, and strict inequalities. The later sections cover deductions for mixed
 models, the model-facing optimization adapter, tolerance recovery and the

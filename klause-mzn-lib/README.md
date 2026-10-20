@@ -14,11 +14,8 @@ minizinc --solver "$PWD/klause-mzn-lib/share/minizinc/solvers/klause.msc" \
   klause-mzn-lib/test-models/queens.mzn -a -n 10
 ```
 
-The wrapper resolves the CLI through `KLAUSE_HOME`, defaulting to the repository root two
-directories above the script. The JVM launcher needs JDK 25 or newer. Use the explicit
-configuration path for an in-tree checkout. To register the solver globally, keep the
-configuration's relative library and executable layout, or adjust those paths to the
-installed locations before registering it with MiniZinc.
+The wrapper finds the CLI through `KLAUSE_HOME`, defaulting to the repository root. To register
+the solver globally, keep or adjust the configuration's relative library and executable paths.
 
 | File | Purpose |
 |---|---|
@@ -29,13 +26,11 @@ installed locations before registering it with MiniZinc.
 | [redefinitions.mzn](share/minizinc/klause/redefinitions.mzn) | Predicates advertised as native |
 | [test-models](test-models) | Small smoke models |
 
-The CLI defaults to mixed search unless `klause.engine` / `KLAUSE_ENGINE` selects another
-default. The standard wrapper forwards flags without selecting an engine. `-e fixed` follows
-supported FlatZinc annotations; `-f` or `-e cp` selects the free backtrack portfolio. The LS
-wrapper prepends `-e ls`; a later explicit `-e` takes precedence.
+The standard wrapper forwards flags unchanged, so the CLI's default engine applies; `-e fixed`
+follows FlatZinc search annotations and `-f` selects free search. The LS wrapper prepends `-e ls`,
+which a later `-e` overrides.
 
 ## Native predicates
 
-`redefinitions.mzn` is the advertised native surface; predicates not declared there fall back
-to MiniZinc's standard decomposition. See [native predicate coverage](../docs/04-finite-formats.md#native-predicate-coverage)
-for what a declaration requires, and [FlatZinc](../docs/04-finite-formats.md#flatzinc) for the frontend semantics.
+Predicates declared in `redefinitions.mzn` reach Klause natively; the rest use MiniZinc's standard
+decompositions. See [native predicate coverage](../docs/04-finite-formats.md#native-predicate-coverage).

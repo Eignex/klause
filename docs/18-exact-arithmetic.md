@@ -2,8 +2,8 @@
 
 The theories of Part IV decide fragments that linear programming cannot express:
 quadratic objectives, polynomial constraints and real functions. This chapter
-describes the exact kernels they compute with. Like the LP engine of
-[chapter 26](17-linear-programming.md), each kernel is a numerical mechanism: it
+describes the exact kernels they compute with and the external numerical libraries
+underneath them. Like the [LP engine](17-linear-programming.md), each kernel is a numerical mechanism: it
 certifies an arithmetic fact, while a source-aware caller decides what that fact
 establishes about a formula or objective. None of them reads factors, finite
 domains, search state or solver verdicts.
@@ -12,8 +12,8 @@ The four kernels share one pattern: an immutable exact value or certificate, a
 check that is either completed or declined, and work charged to the caller's
 cancellation token. Quadratic certificates come first because they reuse only the
 rational simplex primitives. Polynomial and algebraic arithmetic and transcendental
-enclosures follow as independent kernels, and exact analytic reals close the
-chapter because they combine those two.
+enclosures follow as independent kernels, and exact analytic reals combine those
+two. The chapter closes with the numerical dependencies the LP engine builds on.
 
 ## Exact quadratic certificates
 
@@ -189,13 +189,10 @@ outlive the invocation that checked them.
 
 ## Numerical dependencies
 
-The last chapter of Part V looks below the mechanisms described so far, at the
-external libraries they build on. These libraries supply data containers and
-kernels within Klause's owned LP engine. They do not select source models, solving
-routes or result semantics. This chapter explains what comes from each dependency,
-how it is pinned, and the consumer and runtime obligations at that boundary. The
-engine and its working state are described in [chapter 26](17-linear-programming.md),
-result authority in [chapter 27](17-linear-programming.md#lp-certification).
+External libraries supply data containers and kernels within Klause's owned
+[LP engine](17-linear-programming.md). They do not select source models, solving
+routes or result semantics. This section covers what comes from each dependency,
+how it is pinned, and the consumer and runtime obligations at that boundary.
 
 Klause owns sparse and small dense LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic and scratch
 lifetime. Koblas supplies validated CSC containers, indexed/vector Level 1 kernels and generic sparse

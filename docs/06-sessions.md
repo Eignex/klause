@@ -12,9 +12,9 @@ state. The caller opens a session, establishes assumptions, starts an operation,
 consumes or resumes it, and closes its owner before changing scope. Published
 results remain readable after the live operation ends.
 
-This chapter defines capture, exclusion and cleanup. The work an operation may
-spend is attached to these scopes in [chapter 11](#resource-allowances); the traversal
-and heuristic state an operation retains is described with
+This chapter defines capture, exclusion and cleanup, then the
+[resource allowances](#resource-allowances) attached to those scopes. The
+traversal and heuristic state an operation retains is described with
 [search](08-search.md) and [local search](10-local-search.md).
 
 ## Assumptions and conditioned queries
@@ -123,12 +123,12 @@ follow these rules; see
 
 ## Resource allowances
 
-Every operation from [chapter 10](#) runs under a containing deadline
-and work limits. Preparation phases, workers, resumable slices and arithmetic
-services each consume part of that allowance in their own units. This chapter
-describes how those units are configured, how they compose when one scope runs
-inside another, and what an exhausted allowance may and may not mean. Every later
-chapter in this part spends from the ledgers introduced here.
+Every session operation runs under a containing deadline and work limits.
+Preparation phases, workers, resumable slices and arithmetic services each consume
+part of that allowance in their own units. This section describes how those units
+are configured, how they compose when one scope runs inside another, and what an
+exhausted allowance may and may not mean. Every later chapter in this part spends
+from the ledgers introduced here.
 
 The governing rule is that the ledger stays with its scope. Resuming a handle,
 reseeding a worker or rebuilding a model does not renew the containing allowance,

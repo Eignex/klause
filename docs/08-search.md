@@ -1,7 +1,7 @@
 # 8. Search and propagation
 
 This chapter describes the first of the engines that run on a prepared model:
-complete search. It explores alternatives, restores state when a branch fails and
+complete search. Search explores alternatives, restores state when a branch fails and
 checks complete assignments with the [source validation](07-presolve.md#source-witness-validation) service
 before publication. Finite propagation narrows Boolean and integer domains, and
 arithmetic components enforce the parts of the source model they own. Learning
@@ -10,7 +10,10 @@ reuses conflicts only when their explanations remain valid in that scope.
 The traversal loop is shared by every complete strategy: establish a fixpoint,
 check or choose a decision, apply it, and retract to another alternative after a
 conflict. Exhausting alternatives supports a refutation only if all required checks
-completed; interruption leaves the unexplored space undecided.
+completed; interruption leaves the unexplored space undecided. This chapter
+covers the shared search owners, traversal and branching, and finite propagation;
+the [next chapter](09-learning.md) covers explanations, learning and theory
+completion.
 
 ## Shared component search
 
@@ -48,33 +51,12 @@ retained root preparation implement `PreparingSearchComponent` and return no ver
 until it completes; see
 [portfolio preparation](12-portfolio.md#polynomial-root-preparation).
 
-## Chapter outline
-
-The subchapters follow one pass of the traversal loop, from choosing a decision to
-publishing a model:
-
-1. [Traversal and branching](#traversal-and-branching): how decisions are proposed and
-   ordered, how source bound atoms name arithmetic splits, and how components are
-   registered and assembled into a session.
-2. [Finite propagation](#finite-propagation): the finite-domain fixpoint, selected
-   propagation projections, branching heuristics fed by propagation, and the checks a
-   complete finite point must pass.
-3. [Explanations and conflict learning](09-learning.md): reasons for deductions,
-   first-UIP analysis, the native SAT lane, pseudo-Boolean learning, learned-clause
-   retention, restarts and inprocessing.
-4. [Theory completion](09-learning.md#theory-completion): how arithmetic owners complete or
-   refute the coordinates finite search leaves open, agree on shared coordinates and
-   contribute typed model values.
-5. [Primal heuristics and statistics](09-learning.md#primal-heuristics-and-statistics): root primal
-   proposals, the monotone clausal probe, and the counters search reports.
-
 ## Traversal and branching
 
 Every pass of the traversal loop starts by choosing what to decide next. This
-subchapter describes how branching proposals are collected and ordered, how
-component hints choose which side of a split to try first, how arithmetic splits get
-stable Boolean names, and how the components that take part in a search are
-registered and assembled into one session.
+section describes how branching proposals are collected and ordered, how component
+hints choose which side of a split to try first, how arithmetic splits get stable
+Boolean names, and how components are registered and assembled into one session.
 
 ### Lazy branch selection
 
@@ -163,11 +145,11 @@ how those values are contributed.
 
 After a decision is applied, search runs the finite-domain fixpoint: every
 propagator narrows the Boolean and integer domains it watches until nothing changes
-or a conflict appears. This subchapter describes who owns that state, how the
+or a conflict appears. This section describes who owns that state, how the
 propagation projection for each factor is selected, how propagation feeds the
 branching heuristics, and which checks a complete finite point must pass before it
-can be published. The reasons propagators record for their deductions are the
-subject of the [next subchapter](09-learning.md).
+can be published. The reasons propagators record are the subject of the
+[next chapter](09-learning.md).
 
 ### Finite propagation
 

@@ -1,16 +1,16 @@
 # 5. MPS and SMT-LIB
 
-The formats so far were finite or, for FlatZinc, used binary64 floats. MPS is
-the standard file format for linear and mixed-integer programs: linear rows,
+The formats so far were finite or, for FlatZinc, used binary64 floats. This
+chapter covers the two arithmetic formats: MPS for linear and mixed-integer
+programs, and SMT-LIB for formulas over unbounded integers and reals.
+
+MPS is the standard file format for linear and mixed-integer programs: linear rows,
 column bounds, integrality markers and one linear objective, written as decimal
 numbers. Klause keeps those decimals as the source authority even when a numerical
 working model restates them in binary64, so an MPS result always says whether it
 satisfies the file exactly or only within a published feasibility tolerance.
-
-The chapter covers how a file is read, the declared policy, how the source is kept
-beside its numerical working view, what a tolerance-accepted result may claim, and
-how routing produces results of different strength. The numerical evidence itself
-belongs to [LP certification](17-linear-programming.md#lp-certification).
+The numerical evidence itself belongs to
+[LP certification](17-linear-programming.md#lp-certification).
 
 ## Reading MPS files
 
@@ -141,10 +141,6 @@ are exact rationals, so an SMT-LIB source can need any of the arithmetic theorie
 described in Part IV. The frontend's job is to keep that meaning intact: it
 preserves the formula, the declarations and their names, and leaves the choice of
 mechanism to shared setup.
-
-The chapter covers admission, declarations and lexical scope, then lowering from
-Boolean and linear structure to nonlinear and function sources, and finally how
-results are printed.
 
 ### Supported models
 

@@ -8,23 +8,24 @@ or arithmetic decisions, and the theory checks their consequences and contribute
 authoritative coordinates or conflicts. Frontends select no concrete theory, and
 finite propagation keeps Bool+Int state only.
 
-This chapter defines the contract every theory shares. The chapters after it
-describe the theories in order of increasing expressiveness, each building on the
-ones before it. Every theory chapter uses the same five sections: scope and
+This chapter defines the contract every theory shares and then describes the
+smallest theory, difference logic. [Linear arithmetic](15-linear-arithmetic.md) and
+[nonlinear arithmetic](16-nonlinear-arithmetic.md) follow in order of increasing
+expressiveness. Each theory is described in the same five parts: scope and
 boundaries, solving and composition, results and proof authority, state and
 resources, and implementation.
 
 ## Theory directory
 
-| Chapter | Source fragment | Main mechanism |
+| Theory | Source fragment | Main mechanism |
 |---|---|---|
-| [19. Difference logic](#difference-logic) | Integer or real difference constraints with Boolean guards | Graph potentials and negative cycles |
-| [20. Linear real arithmetic](15-linear-arithmetic.md) | Linear real constraints with Boolean structure | Exact rational LP checks; the difference graph for admitted fragments |
-| [21. Linear integer arithmetic](15-linear-arithmetic.md#linear-integer-arithmetic) | Linear integer constraints with Boolean structure | Linear real checks plus integer reductions and branching |
-| [22. Linear mixed arithmetic](15-linear-arithmetic.md#linear-mixed-arithmetic) | Coupled linear integer/real constraints | The integer route with real completion and point recovery |
-| [23. Nonlinear integer arithmetic](16-nonlinear-arithmetic.md) | Polynomial Int/Real/Bool satisfaction | Incomplete integer search with exact polynomial real completion |
-| [24. Polynomial real arithmetic](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) | Polynomial real constraints, optionally beside finite factors | Exact algebraic completion and cylindrical algebraic decomposition |
-| [25. Transcendental real arithmetic](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) | exp/log/sin/cos constraints with mixed declarations | Certified enclosures, polynomial relaxation and symbolic checks |
+| [Difference logic](#difference-logic) | Integer or real difference constraints with Boolean guards | Graph potentials and negative cycles |
+| [Linear real arithmetic](15-linear-arithmetic.md) | Linear real constraints with Boolean structure | Exact rational LP checks; the difference graph for admitted fragments |
+| [Linear integer arithmetic](15-linear-arithmetic.md#linear-integer-arithmetic) | Linear integer constraints with Boolean structure | Linear real checks plus integer reductions and branching |
+| [Linear mixed arithmetic](15-linear-arithmetic.md#linear-mixed-arithmetic) | Coupled linear integer/real constraints | The integer route with real completion and point recovery |
+| [Nonlinear integer arithmetic](16-nonlinear-arithmetic.md) | Polynomial Int/Real/Bool satisfaction | Incomplete integer search with exact polynomial real completion |
+| [Polynomial real arithmetic](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) | Polynomial real constraints, optionally beside finite factors | Exact algebraic completion and cylindrical algebraic decomposition |
+| [Transcendental real arithmetic](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) | exp/log/sin/cos constraints with mixed declarations | Certified enclosures, polynomial relaxation and symbolic checks |
 
 Difference logic is the smallest fragment, and the linear real theory reuses its
 graph. The linear integer and mixed theories add integrality to the same linear
@@ -138,8 +139,7 @@ factors into theory formulas. Each theory lives in its own subpackage:
 
 ## Difference logic
 
-Difference logic is the smallest arithmetic fragment and the first theory in this
-part. A difference constraint bounds the distance between two coordinates, such as
+Difference logic is the smallest arithmetic fragment. A difference constraint bounds the distance between two coordinates, such as
 `x - y <= c`. A graph represents each admitted row as an edge from `y` to `x` with
 weight `c`. Feasible potentials supply coordinates; a negative cycle supplies a
 contradiction. The [linear real theory](15-linear-arithmetic.md) in the next chapter
