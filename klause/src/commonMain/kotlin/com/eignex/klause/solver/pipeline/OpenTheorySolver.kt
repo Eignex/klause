@@ -418,11 +418,20 @@ class OpenTheoryEngine internal constructor(
         )
         var handedOff = false
         var failure: Throwable? = null
+        var wholePoints: WholeSourcePointOffer? = null
         try {
             (planned.theory as? ExactLiraSearchComponent)?.let {
                 it.observePrimaryLpWith(stats.lp.certificationObserver(LpRoute.STANDALONE))
                 it.observeCompleteTraversal()
                 it.useMixedPointCompletion()
+                val proposals = WholeSourcePointOffer(model, prepared.source, prepared.mapping, cancellation)
+                if (proposals.applicable) {
+                    if (it.useWholeSourcePoints(model, proposals::completeBooleans, proposals::offer,
+                            proposals::invalidate)
+                    ) wholePoints = proposals
+                } else {
+                    state.smt.observeCompleteSearchStage("WHOLE_SOURCE_POINT_MAPPING_DECLINED")
+                }
             }
             planned.session.bindOpenTheoryWork(work)
             when (planned.session.initialize()) {
@@ -465,7 +474,7 @@ class OpenTheoryEngine internal constructor(
                 decisionBudget = state.decisionBudget,
                 booleanBranching = branching,
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
-                nodePolicy = nodePolicy,
+                nodePolicy = wholePoints?.policy(nodePolicy) ?: nodePolicy,
                 candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
                 branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
                     SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
@@ -476,7 +485,7 @@ class OpenTheoryEngine internal constructor(
                     SearchBranchKind.Finite)) else SearchBranchSelection.Default,
             )
             handedOff = true
-            return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
+            return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params, wholePoints))
         } catch (primary: Throwable) {
             failure = primary
             throw primary
@@ -493,6 +502,7 @@ class OpenTheoryEngine internal constructor(
         private val stats: SolveStatsSink,
         private val state: OpenTheorySolveState,
         private val params: TheoryParams,
+        private val wholePoints: WholeSourcePointOffer?,
     ) : AutoCloseable {
         private val witnesses = SourceWitnessAssembler(prepared.mapping.target, prepared.source)
 
@@ -500,30 +510,38 @@ class OpenTheoryEngine internal constructor(
         val session: com.eignex.klause.solver.search.SearchSession get() = planned.session
 
         /** Continue the search: its verdict, or null when the node policy paused it. */
-        fun advance(): OpenTheoryResult? = when (val event = run.next()) {
-            is SearchRunEvent.Satisfied -> {
-                val assignment = witnesses.assemble(event.model, prepared.mapping)
-                if (assignment != null) {
-                    OpenTheoryResult.Sat(assignment, stats.finish(state, planned.session))
-                } else if (params.timeout() || params.cancellation() || state.work.exhausted) {
-                    unknown(params.timeout(), stats = stats, state = state, session = planned.session)
-                } else {
-                    OpenTheoryResult.Unknown(TerminationReason.Unsupported, stats.finish(state, planned.session))
-                }
+        fun advance(): OpenTheoryResult? {
+            val event = run.next()
+            if (event == SearchRunEvent.Paused && wholePoints?.internalPause == true) {
+                val assignment = wholePoints.take()
+                return if (assignment != null) OpenTheoryResult.Sat(assignment, stats.finish(state, planned.session))
+                else unknown(params.timeout(), stats = stats, state = state, session = planned.session)
             }
+            return when (event) {
+                is SearchRunEvent.Satisfied -> {
+                    val assignment = witnesses.assemble(event.model, prepared.mapping)
+                    if (assignment != null) {
+                        OpenTheoryResult.Sat(assignment, stats.finish(state, planned.session))
+                    } else if (params.timeout() || params.cancellation() || state.work.exhausted) {
+                        unknown(params.timeout(), stats = stats, state = state, session = planned.session)
+                    } else {
+                        OpenTheoryResult.Unknown(TerminationReason.Unsupported, stats.finish(state, planned.session))
+                    }
+                }
 
-            SearchRunEvent.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
+                SearchRunEvent.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
 
-            SearchRunEvent.Paused -> null
+                SearchRunEvent.Paused -> null
 
-            is SearchRunEvent.Indeterminate -> unknown(
-                params.timeout(),
-                planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted(),
-                stats,
-                state,
-                planned.session,
-                planned.session.executionControls.stopCause,
-            )
+                is SearchRunEvent.Indeterminate -> unknown(
+                    params.timeout(),
+                    planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted(),
+                    stats,
+                    state,
+                    planned.session,
+                    planned.session.executionControls.stopCause,
+                )
+            }
         }
 
         override fun close() = planned.close()

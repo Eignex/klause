@@ -233,6 +233,13 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintValues: IntArray? = null
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
+    private var wholePointSource: Problem? = null
+    private var completeWholeBooleans: ((IntArray, Cancellation) -> BooleanArray?)? = null
+    private var offerWholePoint: ((ExactLiraAssignment, Cancellation) -> Boolean)? = null
+    private var invalidateWholePoint: (() -> Unit)? = null
+    private val wholePointVisits = IntArray(2)
+    private val wholePointAttempts = IntArray(2)
+    private val nextWholePointVisit = intArrayOf(1, 1)
     private var dirty = true
     private var sourceInstalled = false
     private var graphFirst = false
@@ -325,6 +332,66 @@ class ExactLiraSearchComponent private constructor(
     internal fun useMixedPointCompletion() {
         check(context == null)
         mixedPointCompletion = true
+    }
+
+    internal fun bindWholePointSource(source: Problem, fragment: Problem) {
+        check(context == null)
+        if (model === fragment) wholePointSource = source
+    }
+
+    internal fun useWholeSourcePoints(
+        source: Problem,
+        completeBooleans: (IntArray, Cancellation) -> BooleanArray?,
+        offer: (ExactLiraAssignment, Cancellation) -> Boolean,
+        invalidate: () -> Unit,
+    ): Boolean {
+        check(context == null)
+        if (wholePointSource !== source || hasPrivateReals || model.numIntVars != 0 || source.numIntVars != 0 ||
+            source.numBoolVars == 0 || source.numBoolVars != model.numBoolVars ||
+            source.numRealVars != model.numRealVars || source.semantics.isApproximate
+        ) {
+            observeCompleteStage("WHOLE_SOURCE_POINT_BIND_DECLINED")
+            return false
+        }
+        completeWholeBooleans = completeBooleans
+        offerWholePoint = offer
+        invalidateWholePoint = invalidate
+        observeCompleteStage("WHOLE_SOURCE_POINT_BOUND")
+        return true
+    }
+
+    private fun tryWholePoint(
+        point: () -> List<BigFraction>,
+        context: SearchContext,
+        graph: Boolean,
+    ): Boolean {
+        val source = wholePointSource ?: return false
+        val complete = completeWholeBooleans ?: return false
+        val offer = offerWholePoint ?: return false
+        if (graphFirst || unassignedBooleans == 0 || node.sourceBranches.isNotEmpty() ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy || operationStop()
+        ) return false
+        val origin = if (graph) 0 else 1
+        if (wholePointAttempts[origin] >= 4) return false
+        wholePointVisits[origin]++
+        if (wholePointVisits[origin] != nextWholePointVisit[origin]) return false
+        wholePointAttempts[origin]++
+        nextWholePointVisit[origin] *= 4
+        observeCompleteStage(if (graph) "WHOLE_SOURCE_GRAPH_PROPOSAL" else "WHOLE_SOURCE_LP_PROPOSAL")
+        val stop = operationStop.shorten(0.2)
+        stop.charge(8L * (source.numBoolVars + source.numRealVars + 1L))
+        if (stop()) return false
+        val pins = IntArray(source.numBoolVars) { variable ->
+            context.boolValue(variable)?.let { if (it) 1 else 0 } ?: -1
+        }
+        val candidate = completeWholeRealPoint(source, point(), pins, stop, complete)
+        if (candidate == null || stop()) {
+            observeCompleteStage(if (stop()) "WHOLE_SOURCE_POINT_CANCELLED" else "WHOLE_SOURCE_POINT_DECLINED")
+            return false
+        }
+        val accepted = offer(candidate, stop)
+        observeCompleteStage(if (accepted) "WHOLE_SOURCE_POINT_ACCEPTED" else "WHOLE_SOURCE_POINT_WITHHELD")
+        return accepted
     }
 
     internal fun useDefaultDisjunctionHints() {
@@ -512,6 +579,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+        invalidateWholePoint?.invoke()
         beginOperation()
         return try {
             if (operationStop()) {
@@ -634,13 +702,18 @@ class ExactLiraSearchComponent private constructor(
             endOperation(context)
         }
     }
-    override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
+    override fun retract(decisionLevel: Int) {
+        invalidateWholePoint?.invoke()
+        lp.retract(decisionLevel)
+    }
     override fun onRestart(context: SearchContext) {
+        invalidateWholePoint?.invoke()
         floatCandidate = null
         pointHintValues = null
         lp.onRestart(context)
     }
     override fun close() {
+        invalidateWholePoint?.invoke()
         floatCandidate = null
         releasePartialPointHints()
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
@@ -891,6 +964,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun accept(decision: SearchDecision, context: SearchContext): ComponentResult {
+        invalidateWholePoint?.invoke()
         if (decision is SearchDecision.Bool && decision.literal ushr 1 !in bools.indices) {
             return ComponentResult.Consistent
         }
@@ -1198,8 +1272,15 @@ class ExactLiraSearchComponent private constructor(
                 if (!context.consumeCheck()) return ComponentResult.Indeterminate
                 checked = true
                 observeCompleteStage("PURE_REAL_DIFFERENCE_SUBSET_CHECK")
-                val conflict = subset.conflict(bools, operationStop)
+                var wholePointAccepted = false
+                val conflict = subset.conflict(bools, operationStop) {
+                    wholePointAccepted = tryWholePoint(it, context, graph = true)
+                }
                 if (operationStop()) return ComponentResult.Indeterminate
+                if (wholePointAccepted) {
+                    dirty = false
+                    return ComponentResult.Consistent
+                }
                 if (conflict != null) {
                     differenceConflict(conflict, context)?.let {
                         if (it is ComponentResult.Conflict) observeCompleteStage("PURE_REAL_DIFFERENCE_SUBSET_REFUTED")
@@ -1244,6 +1325,9 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Conflict(explanation)
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
+        if (candidate?.let { values -> tryWholePoint({ values }, context, graph = false) } == true) {
+            return ComponentResult.Consistent
+        }
         if (bools.any { it == UNASSIGNED }) {
             candidate?.let { capturePointHints(it, context) }
         } else if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
@@ -1516,6 +1600,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        invalidateWholePoint?.invoke()
         for (index in sourceAssertionLevels.indices) {
             if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
         }

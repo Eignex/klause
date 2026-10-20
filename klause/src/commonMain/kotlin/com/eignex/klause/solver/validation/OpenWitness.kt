@@ -33,6 +33,7 @@ internal fun verifyOpenWitness(
 
 internal fun verifyOpenWitness(
     model: Problem, sample: Sample, cancellation: Cancellation, projection: PropagationProblem,
+    onWork: (Long) -> Unit = {},
 ): Verification<Sample, Unit> {
     require(projection.problem === model) { "witness projection belongs to a different source" }
     if (cancellation()) return Verification.Indeterminate("open witness check cancelled")
@@ -71,7 +72,7 @@ internal fun verifyOpenWitness(
     val point = discrete.withIntDomains(Array(model.numIntVars) { IntDomain(sample.intValue(it), sample.intValue(it)) })
     return try {
         composedFixpoint(projection.bakeRetainedView(point, retained.toIntArray(), cancellation),
-            Candidate(sample, Unit), cancellation)
+            Candidate(sample, Unit), cancellation, onWork = onWork)
     } catch (_: CancellationException) {
         Verification.Indeterminate("open witness check cancelled")
     }

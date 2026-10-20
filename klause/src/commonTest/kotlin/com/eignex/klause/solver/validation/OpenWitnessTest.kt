@@ -4,8 +4,10 @@ import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
@@ -22,8 +24,26 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class OpenWitnessTest {
+    @Test
+    fun `original discrete point checks should report work even when the point is rejected`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+        ))
+        val projection = PropagationProblem(source)
+        for (value in listOf(false, true)) {
+            var spent = 0L
+
+            val result = verifyOpenWitness(source, Sample(booleanArrayOf(true, value), longArrayOf()),
+                Cancellation.Never, projection, onWork = { spent += it })
+
+            if (value) assertIs<Verification.Accepted<*, *>>(result) else assertIs<Verification.Rejected>(result)
+            assertTrue(spent > 0L)
+        }
+    }
+
     @Test
     fun `real min max points should be checked before discrete propagation`() {
         for (maximum in listOf(false, true)) {

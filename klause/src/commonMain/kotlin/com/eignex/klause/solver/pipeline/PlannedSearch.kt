@@ -15,6 +15,7 @@ import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.Cancellation
@@ -63,6 +64,7 @@ internal class PreparedSearchComponents(
     spec: Problem,
     cpDomains: Map<Int, IntDomain>,
 ) {
+    private val sourceModel = spec
     private val fragment = plan.encodedTheoryFragment(spec) ?: plan.theoryFragment(spec)
     private val projection = if (plan.hasCpComponent) plan.cpProjection(spec, cpDomains) else null
     private val propagation = projection?.takeIf { it.problem.factorProjections?.nativePropagation != false }
@@ -143,5 +145,7 @@ internal class PreparedSearchComponents(
         smtStats: SmtStatsSink? = null,
         theorySolveStop: Cancellation? = null,
         openHintFlips: Long? = null,
-    ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips)
+    ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips).also {
+        (it.theory as? ExactLiraSearchComponent)?.bindWholePointSource(sourceModel, fragment)
+    }
 }

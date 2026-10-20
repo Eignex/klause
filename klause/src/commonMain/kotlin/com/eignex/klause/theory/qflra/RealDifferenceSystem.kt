@@ -289,8 +289,10 @@ internal class RealDifferenceRefuter(private val system: RealDifferenceSystem) {
     fun conflict(
         bools: IntArray,
         stop: Cancellation,
+        onProposal: ((() -> List<BigFraction>) -> Unit)? = null,
     ): RealDifferenceSystem.Result.Infeasible? {
         val result = system.check(bools, stop) { stop.charge(it) }
+        if (result is RealDifferenceSystem.Result.Feasible && !stop()) onProposal?.invoke { result.point }
         return (result as? RealDifferenceSystem.Result.Infeasible)?.takeUnless { stop() }
     }
 }
