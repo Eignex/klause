@@ -56,6 +56,33 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `whole point proposals should be invalidated by source scope changes`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ZERO, activator = 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val component = assertNotNull(prepareExactLiraSource(source, Cancellation.Never)).open()
+        component.bindWholePointSource(source, source)
+        var invalidations = 0
+        assertTrue(component.useWholeSourcePoints(source, { _, _ -> null }, { _, _ -> false }, { invalidations++ }))
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        val initial = invalidations
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        assertTrue(invalidations > initial)
+        val asserted = invalidations
+        session.popTo(0)
+        assertTrue(invalidations > asserted)
+        val retracted = invalidations
+        component.onRestart(session)
+        assertTrue(invalidations > retracted)
+        val restarted = invalidations
+        component.close()
+        assertTrue(invalidations > restarted)
+    }
+
+    @Test
     fun `a necessary difference conflict should avoid the primary solve and preserve its sibling`() {
         val source = Problem(3, 0, emptyArray(), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),

@@ -236,6 +236,13 @@ preserve arbitrary-precision and rational coordinates; extensions can add open k
 whose payloads must be immutable. See
 [API migration and mappings](19-api.md#typed-contributions-and-migration).
 
+An optional [linear primal proposal](15-linear-arithmetic.md#whole-source-point-proposals)
+can bypass remaining Boolean choices only after the pipeline's full original-source
+check accepts its complete assignment. The immutable checked result stays outside
+component contributions and shared facts. The caller's node policy runs first; an
+approved expansion can hand the result back through a private pause. Source changes
+invalidate the pending result, and publication consumes it once under cancellation.
+
 ## Primal heuristics and statistics
 
 Complete search proves results, but it can also find good incumbents early. This

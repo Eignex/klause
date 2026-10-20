@@ -56,7 +56,7 @@ A check proceeds in four steps:
    out until search selects a disjunct.
 2. **Check.** An admitted difference fragment runs the graph check first. A necessary
    difference subset can also reject a partial assignment before the general LP
-   query, but supplies no point or positive coverage for omitted rows. Otherwise
+   query, but supplies no positive coverage for omitted rows. Otherwise
    the LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
 3. **Explain.** An infeasible system produces a conflict from the certified
@@ -107,6 +107,24 @@ guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
 
+#### Whole-source point proposals
+
+For a pure-real source containing only clauses and exact linear comparisons, an
+existing partial LP point or necessary-graph potential can also propose a complete
+witness. Exact evaluation assigns each primitive comparison its truth, including
+strict boundaries and both equality directions. Every shared activator must agree
+and every current source Boolean pin must survive. A private Boolean unit fixpoint
+completes clause gates; unresolved clause variables withhold the proposal. Only
+variables absent from all clauses may receive a default value.
+
+The pipeline binds the proposal to the exact receiving source and fragment, lifts
+it through the existing reconstruction, and runs the full original-source witness
+checker. A rejected proposal contributes no conflict or bound. Checked assignments
+remain private until the traversal reaches its caller-approved publication point;
+assertion, retraction, restart and close discard them. This handoff contributes no
+guessed shared facts or peer model values. Sources with integers, private real
+coordinates or unsupported relations retain ordinary completion.
+
 ### Results and proof authority
 
 `ExactLraAssignment` captures Boolean values and rational real coordinates.
@@ -128,6 +146,13 @@ factory only after complete, uncancelled preparation; each opening binds fresh
 callbacks, cancellation and mutable arithmetic owners. Scoped assertions, graph
 potentials, LP bases and candidates remain invocation-owned. Optional hint storage
 admits at most 65,536 entries and 4,096-bit normalized rationals.
+
+Whole-source proposals admit at most 10,000 reals, 100,000 Booleans or factors,
+1,000,000 numeric or clause entries and 4,096-bit arithmetic. Each opening permits
+four attempts per existing point origin, on visits 1, 4, 16 and 64. With a deadline,
+an attempt uses at most one fifth of the current operation's remaining time. It charges preparation,
+arithmetic and private propagation to that operation; it opens no extra LP query or
+allowance. Declared real bounds remain arithmetic bounds.
 
 ### Implementation
 

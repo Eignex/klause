@@ -218,7 +218,9 @@ General pure-real completion can retain a necessary difference subset before the
 full LP check. Selected edges keep their signed source guards and immutable
 declared bounds; general rows, Boolean coefficient rows, disjunctions and unsupported
 disequality directions contribute no edge. This owner exposes checked conflicts
-only. Feasible potentials remain private and cannot complete an assignment. Current
+and optional numerical proposals. A feasible subset supplies no positive source
+coverage; the [whole-source primal check](15-linear-arithmetic.md#whole-source-point-proposals)
+must validate every omitted relation before a proposal can become a witness. Current
 guard checks, private-branch restrictions and production certification requirements
 remain the same as for complete graph conflicts.
 
