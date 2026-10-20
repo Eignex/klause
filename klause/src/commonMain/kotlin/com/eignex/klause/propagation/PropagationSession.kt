@@ -690,9 +690,14 @@ class PropagationSession private constructor(
      * This is the same antecedent set native first-UIP analysis walks, exposed so a shared analyzer
      * can resolve through a CP-implied literal instead of stopping at it.
      */
-    fun boolReasonClause(v: Int): IntArray? {
+    fun boolReasonClause(v: Int): IntArray? = boolReasonClause(v, Int.MAX_VALUE, null)
+
+    internal fun boolReasonClause(v: Int, maxEntries: Int, onWork: ((Long) -> Unit)?): IntArray? {
         val antecedents = state.reasonOf(state.boolAntecedents[v]) ?: return null
         val assigned = state.boolValues[v] ?: return null
+        if (antecedents.size >= maxEntries) return null
+        onWork?.invoke(antecedents.size.toLong() + 1L)
+        if (onWork != null && cancellation()) return null
         val reason = IntArray(antecedents.size + 1)
         reason[0] = Lit.make(v, assigned)
         antecedents.copyInto(reason, destinationOffset = 1)

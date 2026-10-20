@@ -128,10 +128,14 @@ variables absent from all clauses may receive a default value.
 The pipeline binds the proposal to the exact receiving source and fragment, lifts
 it through the existing reconstruction, and runs the full original-source witness
 checker. A rejected numerical point supplies no arithmetic deduction. If the private
-clause-only fixpoint refutes a prefix of trial Boolean pins, negating every trial in
-that prefix yields a source Boolean clause for shared propagation. The prefix keeps
-every applied trial condition, omits values unused by clauses and admits at most
-4,096 literals under the current operation; a stopped check supplies no clause.
+clause-only fixpoint refutes a prefix of trial Boolean pins, their negations yield
+a source Boolean clause for shared propagation. A trial contradicting an implied
+Boolean follows its reasons back to the causal trial conditions; unconditional
+truths captured before the trials add no condition. Missing reasons or a
+65,536-entry reason limit retain the complete prefix. The prefix omits values
+unused by clauses and admits at most 4,096 literals under the current operation;
+root snapshots, reason copies and traversal share that allowance, and a stopped
+check supplies no clause.
 Checked assignments
 remain private until the traversal reaches its caller-approved publication point;
 assertion, retraction, restart and close discard them. This handoff contributes no

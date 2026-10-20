@@ -28,6 +28,107 @@ import kotlin.test.assertTrue
 
 class WholeSourcePointOfferTest {
     @Test
+    fun `an implied Boolean conflict should omit unrelated trial pins from its cube`() {
+        val source = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val clauses = ArrayList<IntArray>()
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { clauses += it })
+
+        val result = offer.completeBooleans(intArrayOf(0, 1, 0, -1, -1), Cancellation.Never)
+
+        assertNull(result)
+        val clause = clauses.single()
+        assertContentEquals(intArrayOf(Lit.make(1, false), Lit.make(2, true)), clause)
+        for (mask in 0 until 32) {
+            if (source.factors.all { factor ->
+                    (factor as Clause).literals.any { literal ->
+                        (mask and (1 shl Lit.variable(literal)) != 0) == Lit.isPositive(literal)
+                    }
+                }
+            ) assertTrue(clause.any { literal ->
+                (mask and (1 shl Lit.variable(literal)) != 0) == Lit.isPositive(literal)
+            })
+        }
+        assertContentEquals(booleanArrayOf(false, false, false, false, true),
+            offer.completeBooleans(intArrayOf(0, 0, 0, 0, 1), Cancellation.Never))
+    }
+
+    @Test
+    fun `unconditional Boolean root truths should not acquire unrelated cube conditions`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(2, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val clauses = ArrayList<IntArray>()
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { clauses += it })
+
+        val result = offer.completeBooleans(intArrayOf(0, -1, 0), Cancellation.Never)
+
+        assertNull(result)
+        assertContentEquals(intArrayOf(Lit.make(2, true)), clauses.single())
+        assertContentEquals(booleanArrayOf(false, true, true),
+            offer.completeBooleans(intArrayOf(0, 1, 1), Cancellation.Never))
+    }
+
+    @Test
+    fun `multi step Boolean cube reasons should retain signed trial conditions`() {
+        val source = Problem(6, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(5, true))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
+            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            Clause(intArrayOf(Lit.make(3, false), Lit.make(4, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val clauses = ArrayList<IntArray>()
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onBooleanClause = { clauses += it })
+
+        val result = offer.completeBooleans(intArrayOf(0, 0, -1, -1, 0, -1), Cancellation.Never)
+
+        assertNull(result)
+        val clause = clauses.single()
+        assertContentEquals(intArrayOf(Lit.make(1, true), Lit.make(4, true)), clause)
+        for (mask in 0 until 64) {
+            if (source.factors.all { factor ->
+                    (factor as Clause).literals.any { literal ->
+                        (mask and (1 shl Lit.variable(literal)) != 0) == Lit.isPositive(literal)
+                    }
+                }
+            ) assertTrue(clause.any { literal ->
+                (mask and (1 shl Lit.variable(literal)) != 0) == Lit.isPositive(literal)
+            })
+        }
+        assertContentEquals(booleanArrayOf(false, true, true, false, false, true),
+            offer.completeBooleans(intArrayOf(0, 1, 1, 0, 0, 1), Cancellation.Never))
+    }
+
+    @Test
+    fun `cancellation while explaining an implied Boolean should withhold its cube`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        var cancelled = false
+        var clauses = 0
+        val offer = WholeSourcePointOffer(source, source,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onDecline = { if (it == "BOOLEAN_CUBE_CAUSAL_ATTEMPT") cancelled = true },
+            onBooleanClause = { clauses++ })
+
+        val result = offer.completeBooleans(intArrayOf(1, 0), Cancellation { cancelled })
+
+        assertNull(result)
+        assertTrue(cancelled)
+        assertEquals(0, clauses)
+        assertContentEquals(BooleanArray(2), offer.completeBooleans(intArrayOf(0, 0), Cancellation.Never))
+    }
+
+    @Test
     fun `a rejected Boolean cube should retain every conditioning pin in its source clause`() {
         val source = Problem(4, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true))),

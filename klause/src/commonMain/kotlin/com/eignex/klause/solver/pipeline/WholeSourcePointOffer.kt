@@ -80,6 +80,11 @@ internal class WholeSourcePointOffer(
             if (session.isUnsatAtRoot) return declined("BOOLEAN_ROOT_CONFLICT")
             if (session.fixpointCancelled || stop()) return null
             if (staged) {
+                stop.charge(4L * source.numBoolVars + 1L)
+                if (stop()) return null
+                val roots = IntArray(source.numBoolVars) {
+                    session.boolValue(it)?.let { value -> if (value) 1 else 0 } ?: -1
+                }
                 val prefix = IntArrayList()
                 for (index in keys.indices) {
                     stop.charge(session.work - accountedWork + 1L)
@@ -88,7 +93,7 @@ internal class WholeSourcePointOffer(
                     val previous = session.boolValue(keys[index])
                     if (previous == values[index]) continue
                     prefix.add(Lit.make(keys[index], values[index]))
-                    if (previous != null) return rejectBooleanCube(prefix, stop)
+                    if (previous != null) return rejectBooleanCube(prefix, stop, session, roots)
                     val result = session.pinBool(keys[index], values[index])
                     stop.charge(session.work - accountedWork)
                     accountedWork = session.work
@@ -106,14 +111,79 @@ internal class WholeSourcePointOffer(
         }
     }
 
-    private fun rejectBooleanCube(prefix: IntArrayList, stop: Cancellation): Nothing? {
+    private fun rejectBooleanCube(
+        prefix: IntArrayList,
+        stop: Cancellation,
+        session: PropagationSession? = null,
+        roots: IntArray? = null,
+    ): Nothing? {
         onDecline?.invoke("BOOLEAN_ROOT_CONFLICT")
         stop.charge(4L * prefix.size + 1L)
         if (stop() || publicationCancellation()) return null
         if (prefix.size > 4096) return declined("BOOLEAN_CUBE_PREFIX_LIMIT")
-        val clause = IntArray(prefix.size) { Lit.negate(prefix[it]) }
+        val support = if (session != null && roots != null) {
+            onDecline?.invoke("BOOLEAN_CUBE_CAUSAL_ATTEMPT")
+            causalBooleanCube(prefix, session, roots, stop) ?: prefix
+        } else prefix
+        if (stop() || publicationCancellation()) return null
+        onDecline?.invoke("BOOLEAN_CUBE_SUPPORT_${support.size}_FROM_${prefix.size}")
+        val clause = IntArray(support.size) { Lit.negate(support[it]) }
         if (!stop() && !publicationCancellation()) onBooleanClause?.invoke(clause)
         return null
+    }
+
+    private fun causalBooleanCube(
+        prefix: IntArrayList,
+        session: PropagationSession,
+        roots: IntArray,
+        stop: Cancellation,
+    ): IntArrayList? {
+        stop.charge(4L * (roots.size + prefix.size) + 1L)
+        if (prefix.isEmpty() || stop()) return null
+        val trials = IntArray(roots.size) { -1 }
+        for (index in 0 until prefix.size - 1) trials[Lit.variable(prefix[index])] = index
+        val selected = BooleanArray(prefix.size)
+        selected[prefix.size - 1] = true
+        if (session.litTruth(prefix.last()) != false) return null
+        val pending = IntArrayList().also { it.add(Lit.variable(prefix.last())) }
+        val seen = BooleanArray(roots.size)
+        var entries = 0
+        while (!pending.isEmpty()) {
+            stop.charge(4L)
+            if (stop()) return null
+            val variable = pending.last()
+            pending.truncateTo(pending.size - 1)
+            if (variable !in roots.indices) return null
+            if (seen[variable]) continue
+            seen[variable] = true
+            val value = session.boolValue(variable) ?: return null
+            val trial = trials[variable]
+            if (trial >= 0) {
+                if (Lit.isPositive(prefix[trial]) != value) return null
+                selected[trial] = true
+                continue
+            }
+            // The disposable clause-only root has no trial assumptions.
+            if (roots[variable] >= 0) {
+                if (roots[variable] != if (value) 1 else 0) return null
+                continue
+            }
+            val reason = session.boolReasonClause(variable, 65536 - entries) { stop.charge(it) } ?: return null
+            entries += reason.size
+            stop.charge(4L * reason.size + 1L)
+            if (stop() || reason.isEmpty() || reason[0] != Lit.make(variable, value)) return null
+            for (index in 1 until reason.size) {
+                val literal = reason[index]
+                if (literal < 0 || Lit.variable(literal) !in roots.indices || session.litTruth(literal) != false) {
+                    return null
+                }
+                pending.add(Lit.variable(literal))
+            }
+        }
+        stop.charge(prefix.size.toLong() + 1L)
+        return if (stop()) null else IntArrayList().also { support ->
+            for (index in selected.indices) if (selected[index]) support.add(prefix[index])
+        }
     }
 
     fun offer(value: ExactLiraAssignment, stop: Cancellation): Boolean {

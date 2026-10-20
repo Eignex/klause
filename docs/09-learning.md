@@ -25,6 +25,9 @@ deductions stay eager. Reasons are built only when a bound actually tightens the
 domain. A reified equality whose target value is a hole keeps that removal as a
 premise, because bounds alone cannot justify the conflict.
 
+Consumers can read a Boolean reason with a copy limit and charged cancellation
+boundary. An oversized or stopped copy supplies no explanation.
+
 Assumption cores keep the applied seed prefix when propagation refutes it, or the full
 assumption set when the tree is exhausted. Cores are jointly refuted with the hard
 model and need not be minimal; an interrupted seeding cannot certify the full seed.
