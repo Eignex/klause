@@ -1,6 +1,10 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.unaryMinus
 
 internal class RationalPolynomial(coefficients: List<BigFraction>) {
     private val captured = coefficients.dropLastWhile { it.isZero }
@@ -247,13 +251,33 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         // The mean value theorem keeps the isolated root inside midpoint - value / slope.
         val candidateLower = if (first <= second) first else second
         val candidateUpper = if (first >= second) first else second
-        val lower = if (interval.lower >= candidateLower) interval.lower else candidateLower
-        val upper = if (interval.upper <= candidateUpper) interval.upper else candidateUpper
-        if (lower > upper || (upper - lower) + (upper - lower) > interval.upper - interval.lower) return null
+        val clippedLower = if (interval.lower >= candidateLower) interval.lower else candidateLower
+        val clippedUpper = if (interval.upper <= candidateUpper) interval.upper else candidateUpper
+        if (clippedLower > clippedUpper) return null
+        if (clippedLower == clippedUpper) {
+            return if (evaluate(polynomial, clippedLower).isZero) RationalInterval(clippedLower, clippedLower) else null
+        }
+        val rounded = dyadicEnclosure(RationalInterval(clippedLower, clippedUpper)) ?: return null
+        val lower = if (interval.lower >= rounded.lower) interval.lower else rounded.lower
+        val upper = if (interval.upper <= rounded.upper) interval.upper else rounded.upper
+        if ((upper - lower) + (upper - lower) > interval.upper - interval.lower) return null
         if (evaluate(polynomial, lower).isZero) return RationalInterval(lower, lower)
         if (evaluate(polynomial, upper).isZero) return RationalInterval(upper, upper)
         arithmetic.step()
         return RationalInterval(lower, upper)
+    }
+
+    private fun dyadicEnclosure(interval: RationalInterval): RationalInterval? {
+        arithmetic.step()
+        val width = interval.upper - interval.lower
+        val bits = maxOf(0L, width.den.magnitudeBitLength().toLong() - width.num.magnitudeBitLength() + 3)
+        if (bits > Int.MAX_VALUE) return null
+        val denominator = BIG_ONE shl bits.toInt()
+        val scale = BigFraction.of(denominator, BIG_ONE)
+        // Outward rounding bounds endpoint precision by the contracted interval width.
+        val lower = -(interval.lower * scale).negated().ceilInteger()
+        val upper = (interval.upper * scale).ceilInteger()
+        return RationalInterval(BigFraction.of(lower, denominator), BigFraction.of(upper, denominator))
     }
 
     private fun encloseDerivative(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval {

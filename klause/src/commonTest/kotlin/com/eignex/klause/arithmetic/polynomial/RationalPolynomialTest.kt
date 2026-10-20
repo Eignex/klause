@@ -2,6 +2,7 @@ package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -111,6 +112,26 @@ class RationalPolynomialTest {
         val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
 
         assertFailsWith<PolynomialInterrupted> { cancelled.refine(polynomial, interval) }
+    }
+
+    @Test
+    fun `successive root refinements bound endpoint precision by interval width`() {
+        val polynomial = RationalPolynomial.of(-2, 0, 1)
+        for ((lower, upper) in listOf(1L to 2L, -2L to -1L)) {
+            var interval = RationalInterval(BigFraction.ofLong(lower), BigFraction.ofLong(upper))
+            repeat(4) {
+                val refined = arithmetic.refine(polynomial, interval)
+
+                val width = refined.upper - refined.lower
+                val precision = maxOf(1, width.den.magnitudeBitLength() - width.num.magnitudeBitLength() + 4)
+                for (endpoint in listOf(refined.lower, refined.upper)) {
+                    assertTrue(endpoint.den.magnitudeBitLength() <= precision)
+                }
+                assertTrue(refined.upper - refined.lower < interval.upper - interval.lower)
+                assertEquals(1, arithmetic.countOpen(arithmetic.sturm(polynomial), refined))
+                interval = refined
+            }
+        }
     }
 
     @Test
