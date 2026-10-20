@@ -696,6 +696,10 @@ peer can complete source checking for an opaque finite filter; using that finite
 projection alone retains its original checking obligation. Integer embeddings and private Boolean-choice
 auxiliaries retain typed source correspondence and factor attribution. Their defining
 guards are conjoined with the relation; source publication excludes private auxiliaries.
+Within a combined polynomial capture, repeated 0/1 selections of the same Boolean
+literal share one defining coordinate and guard. Every using factor retains that
+coordinate in its attribution. Positive and negative literals have separate
+definitions; independent captures share no allocation or lookup state.
 Generic linear-to-polynomial equivalence belongs to `lowering`. Exact source checks
 remain separate from a numerical execution view and from relaxation-provider emission.
 

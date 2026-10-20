@@ -56,7 +56,7 @@ class EncodingAttribution internal constructor(
     val integerEmbeddings: Map<SourceIntId, TheoryRealId> get() = intMap.toMap()
     /** Original real coordinates represented in the private theory namespace. */
     val realEmbeddings: Map<SourceRealId, TheoryRealId> get() = realMap.toMap()
-    /** Private defining coordinates omitted from source witness publication. */
+    /** Private defining coordinates used by this factor, including shared literal indicators, omitted from publication. */
     val auxiliaries: List<TheoryRealId> get() = auxiliaryIds.toList()
     /** Exact source integer pins supporting a conditioned relation. */
     val integerConditions: Map<SourceIntId, BigInt> get() = intPins.toMap()

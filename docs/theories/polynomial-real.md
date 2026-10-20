@@ -37,6 +37,11 @@ constraints remain in CP. Exact linear rows, Boolean reification, real bounds an
 integer/real products and `ContinuousProduct` become neutral polynomial formulas through
 the captured encoder provider. Generic equivalent row encoding belongs in `lowering`.
 Typed factor attribution records integer embeddings and private defining auxiliaries.
+Repeated 0/1 selections of the same Boolean literal share a private coordinate in
+the combined capture, with its defining selection retained in the complete formula
+and its coordinate attributed to every using factor. Lookup debits the containing
+installation allowance. Other selections retain independent definitions; source
+coordinate counts and the native admission predicates remain unchanged.
 Only participating integers allocate numeric slots; unrelated finite variables retain
 finite ownership and receive no reserved numeric coordinate. AllDifferent, scheduling
 and other finite factors remain intact in the finite projection. Linear relaxation

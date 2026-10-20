@@ -11,6 +11,7 @@ import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
@@ -116,6 +117,22 @@ internal class SharedPolynomialModel private constructor(
                 participating.indices.filter { participating[it] }, cancellation = stop, onDecline = onDecline)
                 ?: return null
             val lowering = PolynomialRealLowering(source.numRealVars)
+            val indicators = HashMap<Pair<Int, Boolean>, PolynomialExpression.Variable>()
+            val one = constant(BigFraction.ONE)
+            val zero = constant(BigFraction.ZERO)
+            fun indicatorLiteral(
+                condition: PolynomialRealFormula,
+                whenTrue: PolynomialExpression,
+                whenFalse: PolynomialExpression,
+            ): Pair<Int, Boolean>? {
+                if (whenTrue != one || whenFalse != zero) return null
+                return when (condition) {
+                    is PolynomialRealFormula.BooleanVariable -> condition.id.index to true
+                    is PolynomialRealFormula.Not ->
+                        (condition.operand as? PolynomialRealFormula.BooleanVariable)?.id?.index?.let { it to false }
+                    else -> null
+                }
+            }
             val integerIds = LinkedHashMap<Int, Int>()
             fun integer(id: Int): PolynomialExpression = PolynomialExpression.Variable(
                 SourceRealId(integerIds.getOrPut(id) { lowering.opaqueReal().id.index }),
@@ -138,7 +155,7 @@ internal class SharedPolynomialModel private constructor(
                 val emitted = ArrayList<PolynomialRealFormula>()
                 val integerMapping = LinkedHashMap<SourceIntId, TheoryRealId>()
                 val realMapping = LinkedHashMap<SourceRealId, TheoryRealId>()
-                val auxiliaries = ArrayList<TheoryRealId>()
+                val auxiliaries = LinkedHashSet<TheoryRealId>()
                 val encoding = object : TheoryEncoding {
                     override val target = EncodingTarget.POLYNOMIAL
                     override val sourceFactorIndex = index
@@ -175,8 +192,15 @@ internal class SharedPolynomialModel private constructor(
                         validatePolynomialEncodingCoordinates(null, whenTrue, coordinates, booleans, cancellation)
                         validatePolynomialEncodingCoordinates(null, whenFalse, coordinates, booleans, cancellation)
                         val before = lowering.realCount
-                        return lowering.conditional(condition, whenTrue, whenFalse).also {
+                        val shared = indicatorLiteral(condition, whenTrue, whenFalse)?.let { literal ->
+                            cancellation.polynomialSourceCheckpoint(1)
+                            indicators.getOrPut(literal) {
+                                lowering.conditional(condition, whenTrue, whenFalse) as PolynomialExpression.Variable
+                            }
+                        }
+                        return (shared ?: lowering.conditional(condition, whenTrue, whenFalse)).also {
                             for (id in before until lowering.realCount) auxiliaries += TheoryRealId(id)
+                            if (shared != null) auxiliaries += TheoryRealId(shared.id.index)
                         }
                     }
                 }
@@ -192,7 +216,7 @@ internal class SharedPolynomialModel private constructor(
                 formulas += emitted
                 attributions += EncodingAttribution(index, factor.boolVars.map(::SourceBoolId),
                     factor.intVars.map(::SourceIntId), factor.variables.reals.map(::SourceRealId),
-                    integerMapping, realMapping, auxiliaries)
+                    integerMapping, realMapping, auxiliaries.toList())
             }
             for (id in 0 until source.numRealVars) {
                 val lower = source.realLower[id]
