@@ -158,7 +158,8 @@ class PolynomialArithmeticTest {
         val quadratic = arithmetic.add(squared, arithmetic.add(arithmetic.multiply(y, x), Polynomial.ONE))
         for ((left, right, linearMinor) in listOf(
             Triple(quadratic, arithmetic.add(squared,
-                arithmetic.add(arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), x), constant(2))), Polynomial.ONE),
+                arithmetic.add(arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), x), constant(2))),
+                Polynomial.ONE),
             Triple(arithmetic.add(arithmetic.multiply(y, squared),
                 arithmetic.add(arithmetic.multiply(z, x), Polynomial.ONE)),
                 arithmetic.add(arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), squared),
