@@ -608,7 +608,16 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_<phase>_<route>_Calls`, `_Nanos`, outcomes | Completed attempts, including declines; acceptance includes dual recovery/cleanup and overlaps other phases |
 | `lpPhase_PRIMAL_ROUNDING_ROOT`, `lpPhase_PRIMAL_PUMP_ROUND_ROOT`, `lpPhase_PRIMAL_PROPOSAL_ROOT` | Discrete proposals and completion/admission outcomes; inclusive timing overlaps solve and verification phases |
 | `lpPhase_PRIMAL_LP_PRIMAL_ROOT`, `lpPhase_PRIMAL_LP_DUAL_ROOT` | Root LP point availability and termination before rounding; stopped iterates supply no primal target |
+| `lpPhase_PINNED_REAL_LEAF_SHAPE_ROOT` | First fresh pinned residual's bounded matrix-shape observation before numerical admission |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
+
+Pinned-leaf shape outcomes encode `N` structural columns, `M` stored rows, `A`
+active rows and `F` fixed structural columns. After omitting fixed columns, `Z`,
+`S` and `P` count active rows with zero, one and two terms. `U` counts distinct
+nonempty coefficient vectors up to sign; `D` counts repeats. This grouping ignores
+row bounds and right-hand sides and does not prove redundant constraints or a
+smaller admissible solve. `DIMENSION`, `ENTRIES`, `SCALAR` and `CANCELLED` withhold
+the complete shape. Its work belongs to construction, with no numerical query.
 
 Exact values take precedence over numeric fallbacks; malformed exact values earn
 no objective credit. `best-found`, plain `sat` and unbounded witnesses earn no
