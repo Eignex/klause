@@ -28,10 +28,15 @@ internal class PolynomialBooleanPropagation(
 
     fun decide(): Boolean {
         val leaf = unassignedLeaf() ?: return false
+        decide(leaf)
+        return true
+    }
+
+    fun decide(leaf: Int) {
         arithmetic.step()
+        check(values[leaf] == UNASSIGNED)
         choices.add(Choice(leaf, trail.size))
         check(assign(leaf, FALSE))
-        return true
     }
 
     fun initialize(): Boolean {

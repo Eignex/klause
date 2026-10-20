@@ -208,6 +208,55 @@ internal class PolynomialFormula private constructor(
         return values[root]
     }
 
+    fun completeBooleans(
+        boolCount: Int,
+        atomValues: IntArray,
+        arithmetic: PolynomialArithmetic,
+    ): BooleanArray? {
+        if (booleanVariables.isEmpty()) {
+            val values = IntArray(boolCount) { arithmetic.step(); UNASSIGNED }
+            arithmetic.step()
+            if (truth(values, atomValues, arithmetic) != TRUE) return null
+            return BooleanArray(boolCount) { arithmetic.step(); false }
+        }
+        val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
+        if (!state.initialize()) return null
+        val leaves = IntArray(boolCount) { arithmetic.step(); -1 }
+        for ((index, node) in nodes.withIndex()) {
+            arithmetic.step()
+            when (node) {
+                is FormulaNode.BooleanVariable -> leaves[node.variable] = index
+                is FormulaNode.Atom -> {
+                    val value = atomValues[node.atom]
+                    require(value == FALSE || value == TRUE)
+                    if (!state.assign(index, value)) return null
+                }
+                else -> Unit
+            }
+        }
+        while (true) {
+            arithmetic.step()
+            if (!state.propagate()) {
+                if (!state.backtrack()) return null
+                continue
+            }
+            val variable = booleanVariables.firstOrNull {
+                arithmetic.step()
+                state.value(leaves[it]) == UNASSIGNED
+            }
+            if (variable == null) {
+                val result = BooleanArray(boolCount) { arithmetic.step(); false }
+                for (id in booleanVariables) {
+                    arithmetic.step()
+                    result[id] = state.value(leaves[id]) == TRUE
+                }
+                arithmetic.step()
+                return result
+            }
+            state.decide(leaves[variable])
+        }
+    }
+
     companion object {
         const val UNASSIGNED: Int = -1
         const val FALSE: Int = 0

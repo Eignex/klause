@@ -22,6 +22,110 @@ import kotlin.test.assertNull
 
 class PolynomialFormulaTest {
     @Test
+    fun `fixed numeric truths complete reified Booleans with their required polarity`() {
+        for (negated in listOf(false, true)) for (value in listOf(false, true)) {
+            val predicate = if (negated) "(not (> x 0))" else "(> x 0)"
+            val source = SmtLibPolynomial.parse(
+                "(declare-const x Real) (declare-const b Bool) (assert (= b $predicate))",
+            )
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+            val facts = IntArray(formula.atoms.size) { if (value) PolynomialFormula.TRUE else PolynomialFormula.FALSE }
+
+            val completed = assertNotNull(formula.completeBooleans(source.boolCount, facts, arithmetic))
+
+            assertEquals(listOf(value != negated), completed.toList())
+        }
+    }
+
+    @Test
+    fun `numeric conflicts reject a candidate before unrelated Boolean choices exhaust its allowance`() {
+        val choices = (0 until 32).map { "c$it" }
+        val declarations = choices.joinToString(" ") { "(declare-const $it Bool)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) $declarations (declare-const b Bool)
+            (assert (or ${choices.joinToString(" ")}))
+            (assert (= b (> x 0))) (assert b)
+            """.trimIndent(),
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        var spent = 0L
+        val arithmetic = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 32_768
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        })
+
+        val completed = formula.completeBooleans(source.boolCount,
+            IntArray(formula.atoms.size) { PolynomialFormula.FALSE }, arithmetic)
+
+        assertNull(completed)
+    }
+
+    @Test
+    fun `Boolean completion unwinds correlated choices and defaults unused declarations to false`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const a Bool) (declare-const b Bool) (declare-const c Bool) (declare-const unused Bool)
+            (assert (and (or a b c) (or a b (not c))
+              (or a (not b) c) (or a (not b) (not c))))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val completed = assertNotNull(formula.completeBooleans(source.boolCount, IntArray(0), arithmetic))
+
+        assertEquals(listOf(true, false, false, false), completed.toList())
+    }
+
+    @Test
+    fun `Boolean completion retains false first source order when formula leaves appear in reverse order`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) (declare-const unused Bool) (assert (or b a))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val completed = assertNotNull(formula.completeBooleans(source.boolCount, IntArray(0), arithmetic))
+
+        assertEquals(listOf(false, true, false), completed.toList())
+    }
+
+    @Test
+    fun `interrupted Boolean completion leaves later numeric facts independent`() {
+        val names = (0 until 24).map { "b$it" }
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) " + names.joinToString(" ") {
+                "(declare-const $it Bool) (assert (= $it (> x 0)))"
+            },
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        val facts = IntArray(formula.atoms.size) { PolynomialFormula.TRUE }
+        var completedWork = 0L
+        val counter = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { completedWork += it }
+        })
+        val completed = assertNotNull(formula.completeBooleans(source.boolCount, facts, counter))
+        assertEquals(List(24) { true }, completed.toList())
+
+        for (limit in listOf(completedWork / 2, completedWork - 1)) {
+            var spent = 0L
+            val interrupted = PolynomialArithmetic(object : Cancellation {
+                override fun isCancelled(): Boolean = spent >= limit
+                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            })
+
+            assertFailsWith<PolynomialInterrupted> { formula.completeBooleans(source.boolCount, facts, interrupted) }
+        }
+
+        val fresh = assertNotNull(formula.completeBooleans(source.boolCount,
+            IntArray(formula.atoms.size) { PolynomialFormula.FALSE }, PolynomialArithmetic()))
+        assertEquals(List(24) { false }, fresh.toList())
+    }
+
+    @Test
     fun `forced reified predicates retain their required polarity`() {
         val relations = listOf(
             "=" to PolynomialRelation.EQ, "distinct" to PolynomialRelation.NE,

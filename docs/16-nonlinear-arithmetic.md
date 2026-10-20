@@ -252,8 +252,10 @@ completeness.
 checks necessary conditions on conjunctive atoms (sign enclosures from coefficient
 signs and monomial parity, magnitude bounds, cancelled common monomials) and
 proposes exact points (rational centers, single-coordinate repairs from roots of a
-specialized equality, coupled lines, dyadic points). Every proposal must pass the
-complete original-formula check. Witness guidance also retains numeric predicates
+specialized equality, coupled lines, dyadic points). Evaluated numeric predicates
+supply fixed facts to Boolean propagation; remaining Boolean coordinates use
+false-first decisions in source-ID order. Every completed assignment must pass the
+full original-formula check. Witness guidance retains numeric predicates
 forced by unit propagation through the full Boolean formula, including reified
 requirements. It makes no Boolean decisions, and optional alternatives supply no
 unconditional guides. Admission uses the original coordinate and atom counts

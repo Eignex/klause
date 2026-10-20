@@ -1728,56 +1728,11 @@ private fun checkedBooleans(
     atomValues: IntArray,
     arithmetic: PolynomialArithmetic,
 ): BooleanArray? {
-    val bools = solveBooleans(formula, boolCount, atomValues, arithmetic) ?: return null
+    val bools = formula.completeBooleans(boolCount, atomValues, arithmetic) ?: return null
     val complete = IntArray(bools.size) {
         arithmetic.step()
         if (bools[it]) PolynomialFormula.TRUE else PolynomialFormula.FALSE
     }
     check(formula.truth(complete, atomValues, arithmetic) == PolynomialFormula.TRUE)
     return bools
-}
-
-private fun solveBooleans(
-    formula: PolynomialFormula,
-    boolCount: Int,
-    atomValues: IntArray,
-    arithmetic: PolynomialArithmetic,
-): BooleanArray? {
-    val values = IntArray(boolCount) {
-        arithmetic.step()
-        PolynomialFormula.UNASSIGNED
-    }
-    val decisions = ArrayDeque<Int>()
-    while (true) {
-        arithmetic.step()
-        when (formula.truth(values, atomValues, arithmetic)) {
-            PolynomialFormula.TRUE -> return BooleanArray(boolCount) {
-                arithmetic.step()
-                values[it] == PolynomialFormula.TRUE
-            }
-            PolynomialFormula.UNASSIGNED -> {
-                val variable = formula.booleanVariables.first {
-                    arithmetic.step()
-                    values[it] == PolynomialFormula.UNASSIGNED
-                }
-                values[variable] = PolynomialFormula.FALSE
-                decisions.addLast(variable)
-            }
-            else -> {
-                var changed = false
-                while (decisions.isNotEmpty()) {
-                    arithmetic.step()
-                    val variable = decisions.last()
-                    if (values[variable] == PolynomialFormula.FALSE) {
-                        values[variable] = PolynomialFormula.TRUE
-                        changed = true
-                        break
-                    }
-                    values[variable] = PolynomialFormula.UNASSIGNED
-                    decisions.removeLast()
-                }
-                if (!changed) return null
-            }
-        }
-    }
 }

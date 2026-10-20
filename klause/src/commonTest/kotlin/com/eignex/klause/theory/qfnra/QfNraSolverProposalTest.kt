@@ -22,6 +22,28 @@ class QfNraSolverProposalTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `candidate checking reaches an existing rational center after a numeric Boolean conflict`() {
+        val choices = (0 until 32).map { "c$it" }
+        val declarations = choices.joinToString(" ") { "(declare-const $it Bool)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) $declarations (declare-const b Bool)
+            (assert (or ${choices.joinToString(" ")}))
+            (assert (= b (> (* x x) 0))) (assert b)
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 65_536))
+
+        val completed = assertIs<QfNraResult.Satisfiable>(result)
+        assertEquals(BigFraction.ONE, completed.assignment.realValue(0).rational)
+        assertEquals(true, completed.assignment.boolValue(source.boolVarNames.getValue("b")))
+        assertTrue(choices.any { completed.assignment.boolValue(source.boolVarNames.getValue(it)) })
+        assertEquals(0L, completed.stats.projectedPolynomials)
+    }
+
+    @Test
     fun `reified definitions guide a witness checked against the complete formula`() {
         val source = SmtLibPolynomial.parse(
             """
