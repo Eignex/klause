@@ -67,10 +67,10 @@ class QfLiraSolverTest {
             ExactLinear.of(intArrayOf(Term.ofRealVar(399), Term.ofRealVar(400), Term.ofRealVar(424)),
                 listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE),
                 LinearOp.EQ, BigFraction.ZERO, activator = 0),
-            ExactLinear.of(intArrayOf(Term.ofRealVar(400), Term.ofRealVar(423), Term.ofRealVar(424)),
-                List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ZERO, activator = 1),
-            ExactLinear.of(intArrayOf(Term.ofRealVar(400), Term.ofRealVar(423), Term.ofRealVar(424)),
-                List(3) { BigFraction.MINUS_ONE }, LinearOp.LE, BigFraction.MINUS_ONE),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(400), Term.ofRealVar(423)),
+                List(2) { BigFraction.ONE }, LinearOp.LE, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(423), Term.ofRealVar(424)),
+                List(2) { BigFraction.MINUS_ONE }, LinearOp.LE, BigFraction.MINUS_ONE),
             ExactLinear.of(intArrayOf(Term.ofRealVar(10)), listOf(BigFraction.ONE),
                 LinearOp.EQ, BigFraction.ofLong(7), activator = 2),
         ), numRealVars = 425,
@@ -100,7 +100,7 @@ class QfLiraSolverTest {
         val reals = List(425) {
             when (it) {
                 10 -> BigFraction.ofLong(7)
-                400, 424 -> BigFraction.of(BIG_ONE, bigIntOf(2))
+                400, 424 -> BigFraction.ONE
                 else -> BigFraction.ZERO
             }
         }
