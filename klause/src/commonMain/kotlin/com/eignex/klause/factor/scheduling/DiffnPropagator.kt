@@ -31,6 +31,8 @@ internal class DiffnPropagator(
     private val varSize: Boolean,
 ) : Propagator {
 
+    private val hasStrictZeroSize = !nonStrict && !varSize && (widths.any { it == 0L } || heights.any { it == 0L })
+
     override val expensiveBake: Boolean get() = true
 
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
@@ -155,7 +157,9 @@ internal class DiffnPropagator(
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         state.propagatorFailures.remove(this)
-        if (varSize) return propagateVarSizeSoundOnly(state)
+        if (varSize) return checkPairOverlaps(state)
+        // Area sweeps skip empty boxes; strict separation still applies to their positions.
+        if (hasStrictZeroSize && !checkPairOverlaps(state)) return false
         // Sweep each axis: advance every rectangle's origin to the first column where some orthogonal
         // position escapes all other rectangles' compulsory parts. This subsumes pairwise reasoning
         // (a forced overlap gives both rectangles a compulsory part the sweep already sees) and also
@@ -305,9 +309,7 @@ internal class DiffnPropagator(
         return cursor <= oMax
     }
 
-    /** Sound-only infeasibility check for the variable-size case: a pair is unconditionally
-     *  infeasible iff it must overlap on both axes even at the *smallest* sizes each var allows. */
-    private fun propagateVarSizeSoundOnly(state: PropagationState): Boolean {
+    private fun checkPairOverlaps(state: PropagationState): Boolean {
         val wvars = widthVars
         val hvars = heightVars
         fun wMin(i: Int): Long = if (wvars == null) widths[i] else state.intDomains[wvars[i]].min

@@ -22,6 +22,29 @@ import kotlin.test.assertTrue
 class DiffnPropagatorTest {
 
     @Test
+    fun `strict constant zero width boxes should reject an interior position`() {
+        val problem = Problem(0, 4,
+            arrayOf(IntDomain(0, 0), IntDomain(1, 1), IntDomain(0, 0), IntDomain(0, 0)),
+            arrayOf(Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 0), longArrayOf(1, 1))))
+
+        val result = problem.propagate()
+
+        assertIs<PropagationResult.Unsat>(result)
+    }
+
+    @Test
+    fun `non strict constant zero width boxes should allow an interior position`() {
+        val problem = Problem(0, 4,
+            arrayOf(IntDomain(0, 0), IntDomain(1, 1), IntDomain(0, 0), IntDomain(0, 0)),
+            arrayOf(Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 0), longArrayOf(1, 1),
+                nonStrict = true)))
+
+        val result = problem.propagate()
+
+        assertIs<PropagationResult.Implied>(result)
+    }
+
+    @Test
     fun `sweep should clear a width-two box past a two-rectangle wall`() {
         // The box dodges each wall square alone by switching rows, so no single pair forces x >= 2.
         val problem = Problem(
