@@ -11,6 +11,7 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +21,105 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class PolynomialFormulaTest {
+    @Test
+    fun `forced reified predicates retain their required polarity`() {
+        val relations = listOf(
+            "=" to PolynomialRelation.EQ, "distinct" to PolynomialRelation.NE,
+            "<" to PolynomialRelation.LT, "<=" to PolynomialRelation.LE,
+            ">" to PolynomialRelation.GT, ">=" to PolynomialRelation.GE,
+        )
+        val complements = mapOf(
+            PolynomialRelation.EQ to PolynomialRelation.NE, PolynomialRelation.NE to PolynomialRelation.EQ,
+            PolynomialRelation.LT to PolynomialRelation.GE, PolynomialRelation.LE to PolynomialRelation.GT,
+            PolynomialRelation.GT to PolynomialRelation.LE, PolynomialRelation.GE to PolynomialRelation.LT,
+        )
+        for ((operator, relation) in relations) for (positive in listOf(false, true)) {
+            val source = SmtLibPolynomial.parse(
+                """
+                (declare-const x Real) (declare-const b Bool)
+                (assert (= b ($operator x 0)))
+                (assert ${if (positive) "b" else "(not b)"})
+                """.trimIndent(),
+            )
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+            val atoms = assertNotNull(formula.witnessAtoms(arithmetic, 128))
+
+            assertEquals(if (positive) relation else complements.getValue(relation), atoms.single().relation)
+            assertNull(formula.conjunctiveAtoms(arithmetic, 128))
+        }
+    }
+
+    @Test
+    fun `unresolved reification supplies no unconditional witness predicates`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const b Bool)
+            (assert (= b (> (* x x) 5)))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val atoms = assertNotNull(formula.witnessAtoms(arithmetic, 128))
+
+        assertEquals(emptyList(), atoms)
+    }
+
+    @Test
+    fun `constant predicates can force a numeric alternative`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (assert (or (> 0 1) (> x 2)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val atoms = assertNotNull(formula.witnessAtoms(arithmetic, 128))
+
+        assertEquals(PolynomialRelation.GT, atoms.single { it.polynomial.mainVariable != null }.relation)
+        assertNull(formula.conjunctiveAtoms(arithmetic, 128))
+    }
+
+    @Test
+    fun `propagated witness guidance withholds an oversized predicate set`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real) (declare-const b Bool)
+            (assert (= b (and (> x 0) (> y 0))))
+            (assert b)
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val atoms = formula.witnessAtoms(arithmetic, 1)
+
+        assertNull(atoms)
+    }
+
+    @Test
+    fun `interrupted Boolean guidance exposes no partial predicate set`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const b Bool)
+            (assert (or (and b (> x 0)) (and (not b) (< x 0))))
+            """.trimIndent(),
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        var spent = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 16L
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+        val arithmetic = PolynomialArithmetic(cancellation)
+
+        assertFailsWith<PolynomialInterrupted> { formula.witnessAtoms(arithmetic, 128) }
+
+        assertEquals(16L, spent)
+        assertEquals(emptyList(), formula.witnessAtoms(PolynomialArithmetic(), 128))
+    }
+
     @Test
     fun `witness guidance retains only unconditional signed atoms`() {
         val source = SmtLibPolynomial.parse(

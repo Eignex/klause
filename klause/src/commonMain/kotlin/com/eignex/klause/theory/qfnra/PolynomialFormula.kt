@@ -132,6 +132,47 @@ internal class PolynomialFormula private constructor(
             }
             if (result.size > maximumAtoms) return null
         }
+        return propagatedWitnessAtoms(result, arithmetic, maximumAtoms)
+    }
+
+    private fun propagatedWitnessAtoms(
+        result: ArrayList<PolynomialAtom>,
+        arithmetic: PolynomialArithmetic,
+        maximumAtoms: Int,
+    ): List<PolynomialAtom>? {
+        val state = PolynomialBooleanPropagation(nodes, root, arithmetic)
+        if (!state.initialize()) return null
+        for ((index, node) in nodes.withIndex()) {
+            arithmetic.step()
+            if (node !is FormulaNode.Atom) continue
+            val atom = atoms[node.atom]
+            if (atom.polynomial.mainVariable != null) continue
+            val sign = atom.polynomial.terms.firstOrNull()?.coefficient?.signum() ?: 0
+            if (!state.assign(index, if (atom.holds(sign)) TRUE else FALSE)) return null
+        }
+        if (!state.propagate()) return null
+        val retained = HashSet<PolynomialAtom>()
+        for (atom in result) {
+            arithmetic.step()
+            retained.add(atom)
+        }
+        for ((index, node) in nodes.withIndex()) {
+            arithmetic.step()
+            if (node !is FormulaNode.Atom) continue
+            val value = state.value(index)
+            if (value == UNASSIGNED) continue
+            val atom = atoms[node.atom]
+            val signed = if (value == TRUE) atom else PolynomialAtom(atom.polynomial, when (atom.relation) {
+                PolynomialRelation.EQ -> PolynomialRelation.NE
+                PolynomialRelation.NE -> PolynomialRelation.EQ
+                PolynomialRelation.LT -> PolynomialRelation.GE
+                PolynomialRelation.LE -> PolynomialRelation.GT
+                PolynomialRelation.GT -> PolynomialRelation.LE
+                PolynomialRelation.GE -> PolynomialRelation.LT
+            })
+            if (retained.add(signed)) result.add(signed)
+            if (result.size > maximumAtoms) return null
+        }
         return result
     }
 

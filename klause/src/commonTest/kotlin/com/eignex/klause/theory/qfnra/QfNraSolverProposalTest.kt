@@ -22,6 +22,38 @@ class QfNraSolverProposalTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `reified definitions guide a witness checked against the complete formula`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (declare-const b Bool) (declare-const c Bool)
+            (declare-const d Bool) (declare-const e Bool)
+            (assert (= b (= y (* x x)))) (assert b)
+            (assert (= c (> x 2))) (assert c)
+            (assert (= d (< x 3))) (assert d)
+            (assert (= e (> (* x x) 5))) (assert e)
+            """.trimIndent(),
+        )
+        val work = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(work)
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+        val assignment = assertIs<QfNraAssignment>(
+            work.probe { probe.probeWitness(source.realCount, emptyMap(), work::coupled) },
+        )
+
+        val x = assignment.realValue(0)
+        val squared = algebraic.multiply(x, x)
+        assertTrue(algebraic.compare(x, algebraic.rational(BigFraction.ofLong(2))) > 0)
+        assertTrue(algebraic.compare(x, algebraic.rational(BigFraction.ofLong(3))) < 0)
+        assertTrue(algebraic.compare(squared, algebraic.rational(BigFraction.ofLong(5))) > 0)
+        assertEquals(0, algebraic.compare(squared, assignment.realValue(1)))
+        for (id in 0 until source.boolCount) assertEquals(true, assignment.boolValue(id))
+        assertEquals(0L, work.snapshot().projectedPolynomials)
+    }
+
+    @Test
     fun `nonzero coupled sectors should preserve positive coordinates while breaking symmetry`() {
         val source = SmtLibPolynomial.parse(
             """

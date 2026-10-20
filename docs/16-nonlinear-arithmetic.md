@@ -253,7 +253,11 @@ checks necessary conditions on conjunctive atoms (sign enclosures from coefficie
 signs and monomial parity, magnitude bounds, cancelled common monomials) and
 proposes exact points (rational centers, single-coordinate repairs from roots of a
 specialized equality, coupled lines, dyadic points). Every proposal must pass the
-complete original-formula check. The probe is limited to small formulas and one
+complete original-formula check. Witness guidance also retains numeric predicates
+forced by unit propagation through the full Boolean formula, including reified
+requirements. It makes no Boolean decisions, and optional alternatives supply no
+unconditional guides. Admission uses the original coordinate and atom counts
+before guidance extraction. The probe is limited to small formulas and one
 65,536-unit slice; a decline leaves complete CAD available.
 
 **2. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
