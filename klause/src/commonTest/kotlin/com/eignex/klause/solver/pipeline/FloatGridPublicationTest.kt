@@ -30,6 +30,53 @@ import kotlin.time.Duration
 
 class FloatGridPublicationTest {
     @Test
+    fun `interrupted declared grid enumeration should retain points without claiming completion`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.ENUMERATE, FiniteEngine.FIXED))
+        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
+            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
+            declaredGridSemantics = true))
+        val binding = assertNotNull(invocation.floatGrid)
+        val publication = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks({}, {}))
+        publication.onSample(Sample(booleanArrayOf(), longArrayOf(1)))
+
+        val result = publication.result(FinitePipelinePreparation(binding.projection.problem, null, { it }, null),
+            Duration.ZERO, FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 1, null, 0))
+
+        val outcome = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        assertEquals(FiniteSolveVerdict.UNKNOWN, outcome.verdict)
+        assertEquals(BigFraction.ofDouble(0.5), assertNotNull(outcome.bestSample).exactReals?.single())
+    }
+
+    @Test
+    fun `a rejected terminal grid optimum should retain only an accepted incumbent`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)), maximize = true))
+        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
+            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
+            declaredGridSemantics = true))
+        val binding = assertNotNull(invocation.floatGrid)
+        val publication = FloatGridPublication(binding, Cancellation.Never, { it.approximateRealValue(0) <= 0.5 },
+            FiniteSolveCallbacks({}, {}))
+        publication.onSample(Sample(booleanArrayOf(), longArrayOf(0)))
+
+        val result = publication.result(FinitePipelinePreparation(binding.projection.problem, null, { it }, null),
+            Duration.ZERO, FiniteSolveOutcome.Completed(FiniteSolveVerdict.OPTIMAL, SolveStats.EMPTY, 2,
+                Sample(booleanArrayOf(), longArrayOf(2)), 0))
+
+        val outcome = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        assertEquals(FiniteSolveVerdict.BEST_FOUND, outcome.verdict)
+        assertEquals(BigFraction.ZERO, assertNotNull(outcome.bestSample).exactReals?.single())
+    }
+
+    @Test
     fun `private extrema publications should check the original relation without a finite real propagator`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), false)),
             numRealVars = 3, realLower = doubleArrayOf(-1.0, 0.0, -1.0),
