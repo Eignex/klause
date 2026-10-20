@@ -53,7 +53,10 @@ class MiniZincModeExactGlobalsTest(
         val solve = if (verdict == "optimum") "minimize $objective" else "satisfy"
         val source = File.createTempFile("exact-global", ".fzn").apply {
             val roles = listOf("v", "d", "two", "z", "s", "t", "b", "c")
-                .filter { Regex("\\b$it\\b").containsMatchIn(global.second) || (it == bridge && coupling == "algebraic") }
+                .filter {
+                    val usedByGlobal = Regex("\\b$it\\b").containsMatchIn(global.second)
+                    usedByGlobal || (it == bridge && coupling == "algebraic")
+                }
             val declarations = roles.joinToString(" ") {
                 when (it) {
                     "v" -> "var 1..3: v;"
