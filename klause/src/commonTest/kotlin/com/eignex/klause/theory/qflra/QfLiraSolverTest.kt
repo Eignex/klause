@@ -29,6 +29,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.search
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -77,7 +78,10 @@ class QfLiraSolverTest {
             realLower = DoubleArray(425) { if (it == 399) 0.0 else Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(425) { if (it == 399) 0.0 else Double.POSITIVE_INFINITY })
         var solves = 0
+        val telemetry = SmtStatsSink()
         val component = ExactLiraSearchComponent(source)
+        component.observeWith(telemetry)
+        component.observeCompleteTraversal()
         component.observePrimaryLpWith(object : LpCertificationObserver {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
             override fun observeExactInput(accepted: Boolean) = Unit
@@ -95,6 +99,9 @@ class QfLiraSolverTest {
         assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
             assertNotNull(conflict.explanation).literals.toSet())
         assertEquals(0, solves)
+        assertTrue((telemetry.snapshot().completeSearchStages?.get("PURE_REAL_EQUALITY_ACTIVE_C_5_FROM_425")
+            ?: 0L) > 0L)
+        assertTrue((telemetry.snapshot().completeSearchStages?.get("PURE_REAL_EQUALITY_EXPLAINED") ?: 0L) > 0L)
         session.popTo(2)
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
         val reals = List(425) {

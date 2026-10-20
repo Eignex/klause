@@ -2119,7 +2119,7 @@ private class ExactLiraReductionCache(
     ): List<ExactRationalInequality>? = captureRows(bools, node, cancellation)
 
     fun refutationRows(bools: IntArray, node: SearchNode, cancellation: Cancellation): SourceRefutationRows? {
-        if (model.numIntVars != 0 || !admitsEqualityRepairColumns(model.numRealVars)) return null
+        if (model.numIntVars != 0 || model.numRealVars !in 1..10000) return null
         val origins = ArrayList<EqualityRowOrigin>()
         val rows = captureRows(bools, node, cancellation, origins, partial = true) ?: return null
         return SourceRefutationRows(rows, origins)
@@ -2134,11 +2134,13 @@ private class ExactLiraReductionCache(
     ): List<ExactRationalInequality>? {
         if (origins != null && (model.numIntVars != 0 || origins.isNotEmpty())) return null
         val rows = ArrayList<ExactRationalInequality>()
+        var capturedEntries = 0L
         fun recordOrigin(start: Int, origin: EqualityRowOrigin): Boolean {
             if (origins == null) return true
             val count = rows.size - start
             cancellation.charge(count.toLong() + 2L)
-            if (rows.size > 65536 || cancellation()) return false
+            for (index in start until rows.size) capturedEntries += rows[index].columns.size + 1L
+            if (rows.size > 65536 || capturedEntries > 65536L || cancellation()) return false
             repeat(count) { origins.add(origin) }
             return true
         }
