@@ -107,7 +107,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a tolerance accepted constant row must not inherit a nominal refutation`() {
+    fun `completed native refutations should report under the selected certification policy`() {
         val source = File.createTempFile("mps-tolerated-empty-row", ".mps").apply {
             writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R 0.00000005\nENDATA\n")
             deleteOnExit()
@@ -118,13 +118,13 @@ class MpsModeTest {
                 assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
             }
 
-            assertTrue((if (exact) "s UNSATISFIABLE" else "s UNKNOWN") in text.lines(), text)
-            if (!exact) assertTrue("nominal refutation; tolerance-accepted feasibility unproved" in text, text)
+            assertTrue("s UNSATISFIABLE" in text.lines(), text)
+            if (!exact) assertTrue("MPS numerical status under configured tolerances" in text, text)
         }
     }
 
     @Test
-    fun `nominal continuous optimization should retain its point without claiming the tolerant optimum`() {
+    fun `configured tolerance should retain a completed numerical optimum`() {
         val source = File.createTempFile("mps-tolerant-objective", ".mps").apply {
             writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n LO B X 1\nENDATA\n")
             deleteOnExit()
@@ -134,11 +134,11 @@ class MpsModeTest {
                 "--source-relative-tolerance", "0", source.absolutePath)))
         }
 
-        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("o 1" in text.lines(), text)
         assertEquals(1.0, text.lines().single { it.startsWith("v ") }.substringAfter("X=").toDouble())
-        assertTrue("nominalSourceOptimizationStatus=" in text, text)
-        assertTrue("tolerance-accepted optimality unproved" in text, text)
+        assertTrue("c optimizationStatus=tolerance-optimum" in text.lines(), text)
+        assertFalse("tolerance-accepted optimality unproved" in text, text)
     }
 
     @Test
@@ -505,8 +505,8 @@ class MpsModeTest {
                 assertEquals(0, runCli(arrayOf("-s", "-p", "1", *flags, source.absolutePath)))
             }
 
-            assertTrue((if (flags.isNotEmpty()) "s OPTIMUM FOUND" else "s SATISFIABLE") in text.lines(), text)
-            if (flags.isEmpty()) assertTrue("nominalSourceOptimizationStatus=" in text, text)
+            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+            if (flags.isEmpty()) assertTrue("optimizationStatus=tolerance-optimum" in text, text)
             assertTrue("o 0" in text.lines(), text)
             assertTrue("c frontendRoutingOutcome=native-formula" in text.lines(), text)
             assertTrue("c reportedBackend=numerical-mip" in text.lines(), text)
@@ -692,8 +692,8 @@ class MpsModeTest {
 
         val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", source.absolutePath))) }
 
-        assertTrue("s SATISFIABLE" in text.lines(), text)
-        assertTrue("nominalSourceOptimizationStatus=tolerance-optimum" in text, text)
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("optimizationStatus=tolerance-optimum" in text, text)
         assertTrue("exact original MPS source witness" in text, text)
     }
 
@@ -722,7 +722,7 @@ class MpsModeTest {
                 }
 
                 assertTrue(
-                    if (engine == "cp" && exact) {
+                    if (engine == "cp") {
                         "s OPTIMUM FOUND" in text.lines()
                     } else {
                         "s SATISFIABLE" in text.lines()
@@ -739,7 +739,7 @@ class MpsModeTest {
                 )
                 if (exact) assertTrue("v X=1/3" in text.lines(), text)
                 if (engine == "cp" && !exact) {
-                    assertTrue("nominalSourceOptimizationStatus=" in text, text)
+                    assertTrue("optimizationStatus=tolerance-optimum" in text, text)
                 }
                 if (engine == "ls") assertFalse("optimizationStatus=" in text, text)
                 assertFalse("exact-neighborhood" in text, text)
@@ -1168,7 +1168,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `complete search should retain nominal decimal objective cutoff evidence`() {
+    fun `complete search should report numerical decimal objective optimality`() {
         val mps = File.createTempFile("mpssourceobjective", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R -1\n" +
@@ -1181,8 +1181,8 @@ class MpsModeTest {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=10000", mps.absolutePath)))
         }
 
-        assertTrue("s SATISFIABLE" in text.lines(), text)
-        assertTrue("nominalSourceOptimizationStatus=" in text, text)
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("optimizationStatus=tolerance-optimum" in text, text)
         assertTrue("o 0.10000000000000000001" in text.lines(), text)
         assertTrue("v I=0 X=0.1" in text.lines(), text)
     }
@@ -1207,7 +1207,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `exact source refutations should not follow rounded decimal feasibility`() {
+    fun `native decimal refutations should retain their selected certification scope`() {
         val mps = File.createTempFile("mpssourceconflict", ".mps").apply {
             writeText(
                 "ROWS\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0\n" +
@@ -1223,8 +1223,8 @@ class MpsModeTest {
                 assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, mps.absolutePath)))
             }
 
-            assertTrue((if (exact) "s UNSATISFIABLE" else "s UNKNOWN") in text.lines(), text)
-            if (!exact) assertTrue("nominal refutation; tolerance-accepted feasibility unproved" in text, text)
+            assertTrue("s UNSATISFIABLE" in text.lines(), text)
+            if (!exact) assertTrue("MPS numerical status under configured tolerances" in text, text)
             assertFalse(text.lines().any { it.startsWith("v ") }, text)
         }
     }

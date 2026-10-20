@@ -88,21 +88,25 @@ within `1e-12` of zero to zero when the result is integral, fits `Long`, passes
 every original check and keeps the same source objective; otherwise the original
 float witness is kept. This changes no search or optimization authority.
 
-`TOLERANCE_OPTIMUM` differs from `ATTAINED_OPTIMUM`. A tolerance-accepted point need
-not be exact, and positive slack can enlarge the feasible set even when every row
-is represented exactly. A nominal refutation or optimum therefore needs a checked
-transfer to the accepted set. `MpsCompiled.exactClaimsCoverTolerance` checks that
-the two sets coincide, using integer rounding, row activity lattices and empty
-accepted intervals. `MpsCompiled.toleranceObjectiveBound` supplies an independent
-exact bound from accepted declarations; an accepted point attaining it establishes
-an attained optimum.
+With positive feasibility tolerance, completed native optimization and refutation
+report `OPTIMUM FOUND` and `UNSATISFIABLE` under numerical certification policy.
+They do not require a separate proof over the feasible set enlarged by tolerance.
+The final optimizing point must pass original-source checks, its objective must
+agree with the native value within captured source slack, and the native terminal
+must cover the unrestricted model. Interrupted search, rejected terminal witnesses
+and restricted acceptance filters withhold these statuses.
 
-Without a transfer, CLI output keeps accepted points and source objectives, and
-scopes native proof metadata as `nominalSource…` or `workingModel…` keys. An
-untransferred nominal refutation prints `UNKNOWN` with its proof scope. Optimum
-output reports `optimizationStatus=attained-optimum` or `tolerance-optimum` only for
-its covered set; attainment requires a certified rational point and a matching
-bound.
+`optimizationStatus=tolerance-optimum` identifies numerical optimality. An exact
+point alone does not establish an exact optimum. `attained-optimum` requires an
+exact source bound attained by the point, including an independently checked bound
+over the accepted set. `LinearSourceOutcome.numericalClaims` records whether terminal
+statuses use numerical tolerance policy, and output identifies that scope.
+
+Zero tolerance, including `--exact`, requires exact original-source certification.
+Native proof metadata retains its nominal-source or working-model scope when no
+qualified claim is available. Unboundedness requires a checked source recession
+proof under either policy. Original decimal objectives and caller declaration
+scope remain visible in both modes.
 
 ## Routing and result strength
 

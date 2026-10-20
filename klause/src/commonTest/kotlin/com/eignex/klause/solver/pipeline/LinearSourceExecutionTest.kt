@@ -333,7 +333,7 @@ class LinearSourceExecutionTest {
     }
 
     @Test
-    fun `a nominal rational optimum should retain its certificate without claiming tolerance optimality`() {
+    fun `a nominal rational optimum should report under numerical tolerance policy`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("n", true), LinearSourceVariable("x", false)),
             listOf(
@@ -364,8 +364,9 @@ class LinearSourceExecutionTest {
         val outcome = assertNotNull(result.linearSource)
         assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
         assertEquals(LinearSourceConclusion.OPTIMAL, outcome.nativeConclusion)
-        assertEquals(LinearSourceConclusion.SATISFIABLE, outcome.conclusion)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
         assertFalse(outcome.claimsCoverTolerance)
+        assertTrue(outcome.numericalClaims)
         assertEquals(BigFraction.ofLong(3).reciprocal(), outcome.incumbent?.objective)
         assertTrue(assertNotNull(outcome.acceptedObjectiveBound) < assertNotNull(outcome.incumbent?.objective))
         assertEquals(1, assertNotNull(invocation.preparedPlan).sourceRealCount)
