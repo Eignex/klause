@@ -659,6 +659,8 @@ internal class LpEngine(
         private set
 
     private var leafShapeObserved = false
+    internal var pinnedLeafClause: IntArray? = null
+        private set
 
     private fun leafRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
         if (!residualOversized) return nodeRelaxation(relaxer, session)
@@ -727,6 +729,7 @@ internal class LpEngine(
      */
     fun leafCertify(session: PropagationSession, toleranceCheck: ((Sample) -> Boolean)? = null): LeafRealResult {
         requireOpen()
+        pinnedLeafClause = null
         lpBackjump = null
         val relaxer = selectedSourceRelaxation ?: lpRelaxer
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
@@ -773,6 +776,7 @@ internal class LpEngine(
                 }
                 val pooled = clause?.let { lpNogoods?.add(it) } == true
                 if (residualOversized) {
+                    pinnedLeafClause = clause
                     sink.lp.observePrimalPhase("PINNED_REAL_LEAF_EXPLANATION",
                         if (pooled) "POOLED" else if (clause == null) "DECLINED" else "NOT_POOLED", 0L)
                 }

@@ -40,6 +40,8 @@ import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchConflictResolution
+import com.eignex.klause.solver.search.SearchConflictResolver
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchDecisionBudget
@@ -768,7 +770,7 @@ private class ResidualRealComponent(
     params: BacktrackParams,
     sink: SolveStatsSink?,
     solveContext: LpSolveContext,
-) : SearchComponent,
+) : SearchConflictResolver,
     LpSearchResource {
     private val toleranceCheck = params.toleranceCheck
     private val absCompletion = if (problem.factors.any {
@@ -792,9 +794,11 @@ private class ResidualRealComponent(
         solveContext,
     )
     private var completed: Sample? = null
+    private var conflictClause: IntArray? = null
 
     override fun check(context: SearchContext): ComponentCheck {
         completed = null
+        conflictClause = null
         if (context.cancelled()) return ComponentCheck.Indeterminate
         absCompletion?.let { completion ->
             val discrete = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
@@ -834,7 +838,10 @@ private class ResidualRealComponent(
                 else ComponentCheck.Feasible.also { completed = sample }
             }
 
-            LpVerdict.INFEASIBLE -> ComponentCheck.Infeasible()
+            LpVerdict.INFEASIBLE -> {
+                conflictClause = engine.pinnedLeafClause
+                ComponentCheck.Infeasible()
+            }
 
             LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> ComponentCheck.Indeterminate
         }
@@ -842,6 +849,18 @@ private class ResidualRealComponent(
 
     override fun retract(decisionLevel: Int) {
         completed = null
+        conflictClause = null
+    }
+
+    override fun resolveConflict(context: SearchContext): SearchConflictResolution {
+        val clause = conflictClause ?: return SearchConflictResolution.Chronological
+        conflictClause = null
+        return cp.resolveClause(clause, context)
+    }
+
+    override fun onRestart(context: SearchContext) {
+        completed = null
+        conflictClause = null
     }
 
     fun sample(): Sample = requireNotNull(completed)

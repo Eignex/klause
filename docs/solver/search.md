@@ -15,6 +15,15 @@ caller assumptions; [presolve](presolve.md) owns reconstruction;
 [local search](local-search.md) and [portfolios](portfolio.md) own their strategy
 state and scheduling. [Model ownership](../model.md) defines the engine views.
 
+Required finite real completion can supply a completed source-mapped conflict
+clause to the CP component's native resolver. CP retains ownership of integer-bound
+atoms, first-UIP analysis, learned constraints and native/shared level translation.
+The completing component keeps only its current leaf clause, consumes it once and
+clears it on retraction or restart. A private numerical nogood pool does not deliver
+that conflict to traversal. Unexplained or stopped completion remains chronological;
+optional LP bound-learning settings retain their own policy. See
+[LP source explanations](../lp/architecture.md#consumers-explanations-and-cuts).
+
 Reusable candidate fixpoint checks belong to [source validation](validation.md).
 Traversal calls that service with its existing assumptions, cancellation and work
 accounting; validation retains no backtracking state.

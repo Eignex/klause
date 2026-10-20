@@ -51,9 +51,8 @@ class LpEngineTest {
         }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
         val engine = LpEngine(problem, LinearObjective(),
-            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, learn = true)),
             SolveStatsSink(backend = "compacted-source-clause"))
-        engine.lpNogoods = LpNogoodPool()
         val rejected = PropagationSession(problem)
         assertIs<PropagationResult.Implied>(rejected.pinBool(0, true))
 
