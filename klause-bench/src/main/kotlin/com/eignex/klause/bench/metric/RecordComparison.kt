@@ -59,7 +59,9 @@ internal object RecordComparison {
         }
         val mode = if (complete) "complete" else "incomplete"
         return buildString {
-            appendLine("=== MiniZinc Challenge $mode scoring:  ${dirA.name}  vs  ${dirB.name}   (${rows.size} shared) ===")
+            appendLine(
+                "=== MiniZinc Challenge $mode scoring:  ${dirA.name}  vs  ${dirB.name}   (${rows.size} shared) ===",
+            )
             val unsound = rows.filter { it.third.unsound }.map { it.first.text("problem") }
             if (unsound.isNotEmpty()) {
                 appendLine("  !! UNSOUND (A beats a proven optimum / SAT-vs-UNSAT): " + unsound.joinToString(", "))
@@ -67,7 +69,8 @@ internal object RecordComparison {
             for ((a, b, o) in rows) {
                 val direction = if (a.flag("maximize") == true) " (max)" else ""
                 appendLine(
-                    "  A${if (o.scoreA >= o.scoreB) '+' else ' '}${format(o.scoreA)} [${a.text("problem")}]$direction " +
+                    "  A${if (o.scoreA >= o.scoreB) '+' else ' '}${format(o.scoreA)} " +
+                        "[${a.text("problem")}]$direction " +
                         "A=${display(a)}${if (optimal(a)) "!" else ""}@${o.timeA}ms  " +
                         "B=${display(b)}${if (optimal(b)) "!" else ""}@${o.timeB}ms",
                 )

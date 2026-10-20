@@ -84,14 +84,14 @@ internal class TarStream(private val input: InputStream) {
         var position = 0
         while (position < bytes.size) {
             val space = (position until bytes.size).firstOrNull { bytes[it] == SPACE }
-                ?: throw IOException("malformed pax record")
+                ?: malformed("malformed pax record")
             val length = bytes.copyOfRange(position, space).decodeToString().toIntOrNull()
             if (length == null || length <= space - position || position + length > bytes.size) {
-                throw IOException("malformed pax record")
+                malformed("malformed pax record")
             }
             val record = bytes.copyOfRange(space + 1, position + length - 1).decodeToString()
             val separator = record.indexOf('=')
-            if (separator < 0) throw IOException("malformed pax record")
+            if (separator < 0) malformed("malformed pax record")
             records[record.substring(0, separator)] = record.substring(separator + 1)
             position += length
         }
@@ -115,16 +115,18 @@ internal class TarStream(private val input: InputStream) {
         if (first == BASE256_POSITIVE) {
             var value = 0L
             for (index in offset + 1 until offset + length) {
-                if (value ushr (Long.SIZE_BITS - Byte.SIZE_BITS - 1) != 0L) throw IOException("tar number overflows")
+                if (value ushr (Long.SIZE_BITS - Byte.SIZE_BITS - 1) != 0L) malformed("tar number overflows")
                 value = (value shl Byte.SIZE_BITS) or (header[index].toLong() and BYTE_MASK.toLong())
             }
             return value
         }
-        if (first and BASE256_POSITIVE != 0) throw IOException("negative tar number")
+        if (first and BASE256_POSITIVE != 0) malformed("negative tar number")
         val digits = text(header, offset, length).trim()
         if (digits.isEmpty()) return 0
-        return digits.toLongOrNull(OCTAL) ?: throw IOException("invalid tar number")
+        return digits.toLongOrNull(OCTAL) ?: malformed("invalid tar number")
     }
+
+    private fun malformed(message: String): Nothing = throw IOException(message)
 
     private fun text(header: ByteArray, offset: Int, length: Int): String {
         var end = offset

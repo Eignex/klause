@@ -51,7 +51,7 @@ internal object BooleanSourceQuery {
                     when {
                         !soft -> out.terms(source.objective.orEmpty())
                         source.objective.isNullOrEmpty() -> out.append("soft")
-                        else -> out.append("(+ ").terms(source.objective.orEmpty()).append(" soft)")
+                        else -> out.append("(+ ").terms(source.objective).append(" soft)")
                     }
                     out.append(' ').integer(bound).append("))\n")
                 }
