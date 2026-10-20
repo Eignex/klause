@@ -925,4 +925,3 @@ class ExactIntegerEqualityPropagationTest {
         }
     }
 }
-}
