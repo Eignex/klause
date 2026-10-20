@@ -19,6 +19,21 @@ internal class SourceWitnessAssembler(
     private val source: Problem,
     private val originalSource: Problem = source,
 ) {
+    fun assembleRationalProposal(
+        receivingSource: Problem,
+        bools: BooleanArray,
+        reals: List<BigFraction>,
+        mapping: SourceMapping,
+    ): OpenTheoryAssignment? {
+        if (receivingSource !== source || mapping.target !== source || mapping.source !== originalSource ||
+            source.numIntVars != 0 || originalSource.numIntVars != 0 || bools.size != source.numBoolVars ||
+            mapping.source.numBoolVars != source.numBoolVars || reals.size != source.numRealVars ||
+            mapping.source.numRealVars != source.numRealVars
+        ) return null
+        return mapping.lift(SourceCoordinateWitness(bools, emptyArray(),
+            reals.map { SourceRealCoordinate.Rational(it) }))
+    }
+
     fun assemble(model: AssembledSearchModel, mapping: SourceMapping): OpenTheoryAssignment? {
         if (mapping.target !== source || mapping.source !== originalSource ||
             mapping.source.numBoolVars != source.numBoolVars ||

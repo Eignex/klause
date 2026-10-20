@@ -4,9 +4,11 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntBounds
@@ -14,6 +16,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.RebuildStep
@@ -43,6 +46,56 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheorySolverTest {
+
+    @Test
+    fun `a whole source graph point should complete open Booleans without a decision`() {
+        val model = Problem(3, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ZERO, activator = 2),
+            Clause(IntArray(3) { Lit.make(it, true) }),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) },
+                listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+        val result = assertIs<OpenTheoryResult.Sat>(engine.solve(TheoryParams(maxDecisions = 0, maxLeaves = 1)))
+
+        assertEquals(0L, result.stats.openTheory.openBoolDecisions)
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("WHOLE_SOURCE_POINT_ACCEPTED"))
+        for (variable in 0..2) {
+            assertTrue(result.assignment.boolValue(variable))
+            assertEquals("0", result.assignment.realValue(variable))
+        }
+    }
+
+    @Test
+    fun `an existing LP point should complete the source when its graph proposal fails`() {
+        val model = Problem(3, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ZERO, activator = 2),
+            Clause(IntArray(3) { Lit.make(it, true) }),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.GE, BigFraction.ONE),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+        val result = assertIs<OpenTheoryResult.Sat>(engine.solve(TheoryParams(maxDecisions = 0, maxLeaves = 1)))
+
+        assertEquals(0L, result.stats.openTheory.openBoolDecisions)
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("WHOLE_SOURCE_LP_PROPOSAL"))
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("WHOLE_SOURCE_POINT_DECLINED"))
+        assertTrue((0..2).any { result.assignment.boolValue(it) })
+    }
 
     @Test
     fun `separate integer linear openings should report their own primary LP work`() {

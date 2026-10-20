@@ -36,6 +36,41 @@ import kotlin.test.assertNull
 
 class SourceWitnessAssemblerTest {
     @Test
+    fun `rational proposals should retain source identity and complete dimensions`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val foreign = Problem(1, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY)
+        val assembler = SourceWitnessAssembler(source)
+
+        assertNull(assembler.assembleRationalProposal(foreign, booleanArrayOf(true), listOf(BigFraction.ZERO), mapping))
+        assertNull(assembler.assembleRationalProposal(source, booleanArrayOf(), listOf(BigFraction.ZERO), mapping))
+        assertNull(assembler.assembleRationalProposal(source, booleanArrayOf(true), emptyList(), mapping))
+        assertNull(assembler.assembleRationalProposal(source, booleanArrayOf(true), listOf(BigFraction.ZERO),
+            SourceMapping(foreign, source, TransformationGuarantees.IDENTITY)))
+    }
+
+    @Test
+    fun `rational proposals should own coordinates and apply source Boolean reconstruction`() {
+        val source = Problem(2, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val bools = booleanArrayOf(true, true)
+        val reals = mutableListOf(BigFraction.ofLong(3).reciprocal())
+        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,
+            rebuild = SourceRebuilds(listOf(RebuildStep.CopyLiteral(1, Lit.make(0, false)))))
+
+        val result = assertNotNull(SourceWitnessAssembler(source)
+            .assembleRationalProposal(source, bools, reals, mapping))
+        bools.fill(false)
+        reals[0] = BigFraction.ZERO
+
+        assertEquals(true, result.boolValue(0))
+        assertEquals(false, result.boolValue(1))
+        assertEquals("1/3", result.realValue(0))
+    }
+
+    @Test
     fun `missing source coordinates should withhold a witness`() {
         val source = Problem(
             numBoolVars = 1,
