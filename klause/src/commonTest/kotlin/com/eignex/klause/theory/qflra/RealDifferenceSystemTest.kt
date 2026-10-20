@@ -15,18 +15,114 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RealDifferenceSystemTest {
+    @Test
+    fun `a necessary difference cycle should cite only its original rows`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(1, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ofLong(10)),
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE),
+                    if (strict) BigFraction.ZERO else BigFraction.MINUS_ONE, strict = strict),
+            )
+            var support: IntArray? = null
+
+            val refuted = RealDifferenceSystem.refutesSubset(3, rows, Cancellation.Never) { support = it }
+
+            assertTrue(refuted)
+            val selected = assertNotNull(support)
+            assertEquals(setOf(1, 3), selected.toSet())
+            assertTrue(RealDifferenceSystem.refutesSubset(3, selected.map(rows::get), Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `a valid general row should not hide a necessary difference refutation`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE),
+                    if (strict) BigFraction.ZERO else BigFraction.MINUS_ONE, strict = strict),
+                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            )
+
+            val refuted = RealDifferenceSystem.refutesSubset(3, rows, Cancellation.Never)
+
+            assertTrue(refuted)
+            assertNull(RealDifferenceSystem.prepareRows(3, rows, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `a feasible necessary difference subset should supply no refutation`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+        )
+
+        val refuted = RealDifferenceSystem.refutesSubset(3, rows, Cancellation.Never)
+
+        assertFalse(refuted)
+    }
+
+    @Test
+    fun `an invalid tail should withhold a necessary difference refutation`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(3), listOf(BigFraction.ONE), BigFraction.ZERO),
+        )
+
+        val refuted = RealDifferenceSystem.refutesSubset(3, rows, Cancellation.Never)
+
+        assertFalse(refuted)
+    }
+
+    @Test
+    fun `an interrupted necessary difference check should retain work without a refutation`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.MINUS_ONE),
+        )
+        var spent = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 8L
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+
+        val refuted = RealDifferenceSystem.refutesSubset(3, rows, stop)
+
+        assertFalse(refuted)
+        assertTrue(spent >= 8L)
+        assertTrue(RealDifferenceSystem.refutesSubset(3, rows, Cancellation.Never))
+    }
+
     @Test
     fun `a necessary source cycle should retain its signed guards across siblings`() {
         for (strict in listOf(false, true)) {
