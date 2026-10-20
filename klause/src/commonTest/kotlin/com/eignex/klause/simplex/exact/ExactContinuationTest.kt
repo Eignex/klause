@@ -260,6 +260,205 @@ class ExactContinuationTest {
     }
 
     @Test
+    fun `nonzero nonbasic endpoints should contribute to every basic row`() {
+        for (status in listOf(ContinuationStatus.LOWER, ContinuationStatus.UPPER, ContinuationStatus.FIXED)) {
+            val endpoint = if (status == ContinuationStatus.UPPER) BigFraction.ofLong(-2) else BigFraction.ofLong(2)
+            val rhs = BigFraction.ofLong(5)
+            val input = ExactContinuationInput(
+                listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE)),
+                listOf(rhs),
+                listOf(if (status == ContinuationStatus.UPPER) null else endpoint, null, BigFraction.ZERO),
+                listOf(if (status == ContinuationStatus.LOWER) null else endpoint, null, BigFraction.ZERO),
+                listOf(1),
+                listOf(status, ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+            )
+
+            val result = ExactContinuation(input).resume()
+
+            assertEquals(listOf(endpoint, rhs - endpoint, BigFraction.ZERO), result.values)
+            assertNull(result.ray)
+        }
+    }
+
+    @Test
+    fun `zero nonbasic seats should retain a nonzero basic right hand side`() {
+        val three = BigFraction.ofLong(3)
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE)),
+            listOf(three),
+            listOf(BigFraction.ZERO, null, BigFraction.ZERO),
+            listOf(null, null, BigFraction.ZERO),
+            listOf(1),
+            listOf(ContinuationStatus.LOWER, ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        assertEquals(listOf(BigFraction.ZERO, three, BigFraction.ZERO), result.values)
+        assertNull(result.ray)
+    }
+
+    @Test
+    fun `strict epsilon seats should preserve coupled interior points in either direction`() {
+        for (upper in listOf(false, true)) {
+            val input = ExactContinuationInput(
+                listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE)),
+                listOf(BigFraction.ONE),
+                List(3) { BigFraction.ZERO },
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ZERO),
+                listOf(1),
+                listOf(if (upper) ContinuationStatus.UPPER else ContinuationStatus.LOWER,
+                    ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+                lowerStrict = listOf(!upper, false, false),
+                upperStrict = listOf(upper, false, false),
+            )
+
+            val result = ExactContinuation(input).resume()
+
+            val point = assertNotNull(result.values)
+            assertTrue(point[0] > BigFraction.ZERO && point[0] < BigFraction.ONE)
+            assertTrue(point[1] > BigFraction.ZERO && point[1] < BigFraction.ONE)
+            assertEquals(BigFraction.ONE, point[0] + point[1])
+            assertNull(result.ray)
+        }
+    }
+
+    @Test
+    fun `resuming after import should read the endpoints of the changed basis`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE)),
+            listOf(BigFraction.ofLong(5)),
+            listOf(BigFraction.ofLong(3), BigFraction.ofLong(2)),
+            listOf(BigFraction.ofLong(4), BigFraction.ofLong(3)),
+            listOf(0),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.UPPER),
+        )
+        val session = ExactContinuation(input)
+        val paused = session.resume(ExactContinuationLimits(maxPivots = 0))
+        assertEquals(ContinuationDecline.PIVOTS, paused.metrics.decline)
+        assertNull(paused.values)
+
+        val resumed = session.resume(ExactContinuationLimits(maxPivots = 1))
+
+        assertEquals(listOf(BigFraction.ofLong(3), BigFraction.ofLong(2)), resumed.values)
+        assertEquals(paused.metrics.work + resumed.metrics.work, session.usedWork)
+        assertNull(resumed.ray)
+    }
+
+    @Test
+    fun `wide nonbasic endpoints should retain exact cancellation in basic values`() {
+        val huge = BigFraction.of(BIG_ONE shl 180, BIG_ONE)
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE)),
+            listOf(huge + BigFraction.ONE),
+            listOf(huge, null, BigFraction.ZERO),
+            listOf(huge, null, BigFraction.ZERO),
+            listOf(1),
+            listOf(ContinuationStatus.FIXED, ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        assertEquals(listOf(huge, BigFraction.ONE, BigFraction.ZERO), result.values)
+        assertNull(result.ray)
+    }
+
+    @Test
+    fun `an exhausted allocation allowance should not be renewed by resuming evaluation`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE)),
+            listOf(BigFraction.ONE),
+            List(3) { BigFraction.ZERO },
+            listOf(null, null, BigFraction.ZERO),
+            listOf(1),
+            listOf(ContinuationStatus.LOWER, ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+        )
+        val completed = ExactContinuation(input).resume()
+        assertNotNull(completed.values)
+        val limits = ExactContinuationLimits(maxAllocation = completed.metrics.allocation - 1L)
+        val session = ExactContinuation(input)
+
+        val first = session.resume(limits)
+        val repeated = session.resume(limits)
+
+        assertEquals(ContinuationDecline.ALLOCATION, first.metrics.decline)
+        assertEquals(ContinuationDecline.ALLOCATION, repeated.metrics.decline)
+        assertNull(first.values)
+        assertNull(repeated.values)
+    }
+
+    @Test
+    fun `sparse imported equations should preserve unused fixed coordinates in either precision`() {
+        for (wide in listOf(false, true)) {
+            val scale = if (wide) BigFraction.of(BIG_ONE shl 180, BIG_ONE) else BigFraction.ONE
+            val two = BigFraction.ofLong(2)
+            val input = ExactContinuationInput(
+                listOf(listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
+                    listOf(1 to BigFraction.ONE, 2 to BigFraction.ONE), listOf(2 to BigFraction.ONE), emptyList()),
+                listOf(BigFraction.ofLong(3) * scale, BigFraction.ofLong(5) * scale, BigFraction.ofLong(7) * scale),
+                listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, two,
+                    BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO),
+                listOf(null, null, null, two, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO),
+                listOf(0, 1, 2),
+                List(7) { if (it < 3) ContinuationStatus.BASIC else ContinuationStatus.FIXED },
+            )
+
+            val result = ExactContinuation(input).resume()
+
+            assertEquals(listOf(BigFraction.ofLong(3) * scale, two * scale, BigFraction.ofLong(5) * scale,
+                two, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO), result.values)
+            assertNull(result.ray)
+        }
+    }
+
+    @Test
+    fun `independent strict rows should retain their interior equations`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE),
+                listOf(1 to BigFraction.ONE), listOf(1 to BigFraction.ONE)),
+            List(2) { BigFraction.ONE },
+            List(6) { BigFraction.ZERO },
+            List(6) { if (it < 4) BigFraction.ONE else BigFraction.ZERO },
+            listOf(1, 3),
+            listOf(ContinuationStatus.LOWER, ContinuationStatus.BASIC, ContinuationStatus.UPPER,
+                ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED),
+            lowerStrict = listOf(true, false, false, false, false, false),
+            upperStrict = listOf(false, false, true, false, false, false),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        val point = assertNotNull(result.values)
+        assertTrue(point[0] > BigFraction.ZERO && point[0] <= BigFraction.ONE)
+        assertTrue(point[2] >= BigFraction.ZERO && point[2] < BigFraction.ONE)
+        assertEquals(BigFraction.ONE, point[0] + point[1])
+        assertEquals(BigFraction.ONE, point[2] + point[3])
+        assertNull(result.ray)
+    }
+
+    @Test
+    fun `inconsistent sparse equations should retain an exact cancelling ray`() {
+        val two = BigFraction.ofLong(2)
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ZERO, BigFraction.ONE),
+            listOf(null, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(null, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(0, 3),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.FIXED,
+                ContinuationStatus.FIXED, ContinuationStatus.BASIC),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        val ray = assertNotNull(result.ray)
+        assertEquals(2, ray.size)
+        assertEquals(BigFraction.ZERO, ray[0] + ray[1])
+        assertTrue(!ray[1].isZero)
+        assertNull(result.values)
+    }
+
+    @Test
     fun `resource ceilings should decline without certifying a candidate`() {
         val input = ExactContinuationInput(
             listOf(listOf(0 to BigFraction.ONE)),

@@ -265,6 +265,12 @@ restarts the operation from authority, and every attempt is charged. Owner-local
 exact factors require the same matrix and ordered basis. An off-status feasible
 point cannot furnish a claimed warm basis.
 
+Each exact-continuation row evaluation captures the current nonzero nonbasic seats
+and strict epsilon seats separately. Pivots and imports invalidate those captures.
+Scratch allocation, capture and retained term visits charge the same continuation
+allowance. Zero tableau coefficients and products are omitted while visited-cell
+work, scalar admission history and cancellation remain charged.
+
 ### Farkas and recession checks
 
 For `M = [A | I]`, a Farkas contradiction requires
