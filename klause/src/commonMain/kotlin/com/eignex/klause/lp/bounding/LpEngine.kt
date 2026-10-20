@@ -14,6 +14,7 @@ import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.cut.AggregationMirSeparator
 import com.eignex.klause.lp.cut.AllDifferentSeparator
 import com.eignex.klause.lp.cut.AssignmentObjectiveCut
@@ -51,6 +52,7 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.SessionDomains
 import com.eignex.klause.lp.relaxation.compactPinnedRows
 import com.eignex.klause.lp.relaxation.exactLeafResult
+import com.eignex.klause.lp.relaxation.exactReals
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
 import com.eignex.klause.lp.relaxation.leafShape
@@ -73,7 +75,9 @@ import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.constructionLongArray
+import com.eignex.klause.util.magnitudeBitLength
 import kotlin.math.abs
 
 /** The persistent gated-residual float filter: the node-invariant [relaxation], the ONE [simplex]
@@ -727,7 +731,10 @@ internal class LpEngine(
         return null
     }
 
-    internal fun prefixRealInfeasible(session: PropagationSession): Boolean {
+    internal fun prefixRealInfeasible(
+        session: PropagationSession,
+        onPoint: ((List<BigFraction>, Cancellation) -> Unit)? = null,
+    ): Boolean {
         requireOpen()
         pinnedLeafClause = null
         if (!residualOversized || !params.lpPlan.realResidual || problem.semantics.isApproximate ||
@@ -749,6 +756,13 @@ internal class LpEngine(
             workLimit = remaining?.let { minOf(budget, it) } ?: budget,
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE), counterResults = lpCounterResults)
         sink.lp.observePrimalPhase("PREFIX_REAL_CHECK", certified.verdict.name, 0L)
+        if (onPoint != null && !params.cancellation() &&
+            (certified.verdict == LpVerdict.FEASIBLE || certified.verdict == LpVerdict.ATTAINED_OPTIMUM)
+        ) {
+            val primal = certified.exactPrimal
+            if (primal == null) sink.lp.observePrimalPhase("PREFIX_REAL_POINT", "NO_EXACT_PRIMAL", 0L)
+            else offerPrefixRealPoint(relaxation, primal, onPoint)
+        }
         if (params.cancellation() || certified.verdict != LpVerdict.INFEASIBLE) return false
         val support = certified.farkasRay?.let { ray ->
             ray.indices.filter { ray[it] != 0L }.toIntArray()
@@ -762,6 +776,45 @@ internal class LpEngine(
         lpNogoods?.add(clause)
         sink.lp.observePrimalPhase("PREFIX_REAL_EXPLANATION", "L_${clause.size}", 0L)
         return true
+    }
+
+    private fun offerPrefixRealPoint(
+        relaxation: LpRelaxation,
+        primal: List<BigFraction>,
+        offer: (List<BigFraction>, Cancellation) -> Unit,
+    ) {
+        if (problem.numIntVars != 0 || problem.numRealVars !in 1..10000 || primal.size < relaxation.model.n) return
+        val parent = params.cancellation.shorten(0.2)
+        val meter = object : WorkMeter {
+            override fun charge(units: Long) = noteNodeOverhead(units)
+        }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = parent() || lpWorkAllowanceSpent(sink.lp.standaloneWork)
+            override fun deadline() = parent.deadline()
+            override fun workMeter(): WorkMeter = meter
+        }
+        stop.charge(8L * (problem.numRealVars + relaxation.colRealId.size + 1L))
+        if (stop()) return
+        val carried = IntArray(problem.numRealVars)
+        for (column in relaxation.colRealId.indices) {
+            if (stop()) return
+            val real = relaxation.colRealId[column]
+            if (real < 0 || column >= primal.size) continue
+            val sign = relaxation.colRealSign[column]
+            if (real !in carried.indices || ++carried[real] > 2 || (sign != -1 && sign != 1)) return
+            val value = primal[column]
+            val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
+            if (bits > 4096) return
+            // Two split columns can contribute to a source coordinate; the charge covers their exact sum.
+            val width = 2L * bits + 2L
+            val words = width / Long.SIZE_BITS + 1L
+            stop.charge(width + 4L * words * words)
+        }
+        if (stop()) return
+        val point = relaxation.exactReals(primal, problem)
+        if (stop() || !point.admittedSourcePoint()) return
+        sink.lp.observePrimalPhase("PREFIX_REAL_POINT", "AVAILABLE", 0L)
+        offer(point, stop)
     }
 
     /** The asserting LP backjump clause derived during the last [pruneNode], or null. */

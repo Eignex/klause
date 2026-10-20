@@ -44,6 +44,33 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `an existing positive prefix query should expose source coordinates without pinning Booleans`() {
+        val source = Problem(3, 0, emptyArray(), Array(1002) { row ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(3), Term.ofRealVar(4)),
+                List(3) { BigFraction.ONE }, LinearOp.GE, BigFraction.ONE,
+                activator = if (row == 0) 1 else -1)
+        }, numRealVars = 5, realLower = DoubleArray(5) { if (it == 0) 7.0 else Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(5) { if (it == 0) 7.0 else Double.POSITIVE_INFINITY })
+        val session = PropagationSession(source)
+        val supplied = ArrayList<List<BigFraction>>()
+        val engine = LpEngine(source, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, learn = true)),
+            SolveStatsSink(backend = "partial-real-point"))
+
+        val refuted = engine.use { it.prefixRealInfeasible(session) { point, stop ->
+            assertFalse(stop())
+            supplied += point
+        } }
+
+        assertFalse(refuted)
+        val point = supplied.single()
+        assertEquals(5, point.size)
+        assertEquals(BigFraction.ofLong(7), point[0])
+        assertTrue(point[1] + point[3] + point[4] >= BigFraction.ONE)
+        assertNull(session.boolValue(1))
+    }
+
+    @Test
     fun `standalone solves spending the allowance should leave real prefixes to finite search`() {
         val problem = Problem(1, 0, emptyArray(), Array(1001) {
             ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },

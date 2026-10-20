@@ -102,6 +102,16 @@ fewer of them. Index construction is bounded and charged to the opening token; s
 Solution-guided LP bounding may also order values by verified peer incumbents until
 its first local witness. Hints supply no incumbent, pruning or publication authority.
 
+Finite real completion can use an available exact partial-LP point to guide Boolean
+comparison heads. Each opening may prepare hints at existing prefix queries 1, 4,
+16 and 64. Exact guard evaluation shares the numerical owner's current work ledger
+and uses at most one fifth of its parent deadline's remaining time. Source integer
+models, unsafe scalars and oversized indexes decline this optional guidance.
+Disagreeing comparisons sharing a head omit that head. Saved phases, target phases,
+solution phases and forced rephasing retain precedence; disabled phase tracking
+keeps the value selector's order. Retraction and restart discard active point hints.
+Both Boolean alternatives and the complete source checks remain required.
+
 ### Source bound atoms
 
 Fractional source integers split at exact floor/ceiling thresholds: Long values in

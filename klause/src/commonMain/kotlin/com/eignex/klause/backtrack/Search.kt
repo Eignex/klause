@@ -23,6 +23,7 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Verification
@@ -207,6 +208,7 @@ internal class CpSatisfactionTraversal(
     init {
         try {
             completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
+            traversal.brancher.realPointPreference = completion::preferredBoolean
             completion.lpResource?.let {
                 resources.own(it)
                 lpResources.add(it)
@@ -484,6 +486,7 @@ internal class BacktrackBrancher(
     private val onEvent = params.onEvent
     private var restartCount = 0L
     private var preferImportedSolution = false
+    var realPointPreference: ((Int) -> Boolean?)? = null
 
     init {
         if (params.phaseSaving || params.targetPhasing) {
@@ -503,10 +506,13 @@ internal class BacktrackBrancher(
             ?: variables.pick(session, rng)
             ?: return null
         if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
+        val candidate = (variable as? VarRef.Bool)?.let { realPointPreference?.invoke(it.varId) }
+        val previousUses = phase.candidateUses
         val preferred = branching.orderValues(
             variable,
-            phase.applyPhase(variable, values.values(session, variable, rng), rng),
+            phase.applyPhase(variable, values.values(session, variable, rng), rng, candidate),
         )
+        if (phase.candidateUses > previousUses) sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "PHASE_FALLBACK", 0L)
         val ordered = if (preferImportedSolution && values is SolutionGuided) {
             values.guide(session, variable, preferred)
         } else preferred
@@ -639,6 +645,7 @@ private fun SearchDecision.asSelectorDecision(): Pair<VarRef, Long>? = when (thi
 
 private sealed interface BacktrackCompletion {
     val lpResource: LpSearchResource? get() = null
+    fun preferredBoolean(variable: Int): Boolean? = null
 
     fun addTo(components: MutableList<SearchComponent>)
 
@@ -655,6 +662,7 @@ private sealed interface BacktrackCompletion {
 
     class ResidualReal(private val component: ResidualRealComponent) : BacktrackCompletion {
         override val lpResource: LpSearchResource get() = component
+        override fun preferredBoolean(variable: Int): Boolean? = component.preferredBoolean(variable)
 
         override fun addTo(components: MutableList<SearchComponent>) {
             components += component
@@ -803,6 +811,15 @@ private class ResidualRealComponent(
     private var prefixResolution: SearchConflictResolution? = null
     private var prefixVisits = 0L
     private var prefixQueries = 0
+    private val phaseTracking = params.phaseSaving || params.targetPhasing
+    private val pointHintsEnabled = phaseTracking && supportsRealPointHints(problem)
+    private var pointHints: IntArray? = null
+
+    fun preferredBoolean(variable: Int): Boolean? = when (pointHints?.getOrNull(variable)) {
+        0 -> false
+        1 -> true
+        else -> null
+    }
 
     override fun propagate(context: SearchContext): ComponentResult {
         prefixResolution = null
@@ -813,7 +830,29 @@ private class ResidualRealComponent(
         if (prefixVisits > PREFIX_WARMUP && prefixVisits % PREFIX_EVERY != 0L) return ComponentResult.Consistent
         if (!context.consumeCheck()) return ComponentResult.Consistent
         prefixQueries++
-        if (!engine.prefixRealInfeasible(cp.session) || context.cancelled()) return ComponentResult.Consistent
+        if (prefixQueries == 1) {
+            val admission = when {
+                !phaseTracking -> "PHASE_DISABLED"
+                !pointHintsEnabled -> "SOURCE_LIMIT"
+                else -> "ENABLED"
+            }
+            sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", admission, 0L)
+            sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT",
+                "SOURCE_I_${problem.numIntVars}_R_${problem.numRealVars}_B_${problem.numBoolVars}_F_${problem.numFactors}",
+                0L)
+        }
+        val requestPoint = pointHintsEnabled && prefixQueries in listOf(1, 4, 16, 64)
+        if (requestPoint) pointHints = null
+        val onPoint: ((List<BigFraction>, Cancellation) -> Unit)? = if (!requestPoint) null else { point, stop ->
+            sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "ATTEMPT", 0L)
+            val hints = realPointHints(problem, point, cp.session::boolValue, stop)
+            val usable = hints?.any { it == 0 || it == 1 } == true && !stop()
+            if (usable) pointHints = hints
+            sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", if (usable) "READY" else "DECLINED", 0L)
+        }
+        if (!engine.prefixRealInfeasible(cp.session, onPoint) || context.cancelled()) {
+            return ComponentResult.Consistent
+        }
         val clause = engine.pinnedLeafClause ?: return ComponentResult.Consistent
         prefixResolution = cp.resolveClause(clause, context)
         completed = null
@@ -824,6 +863,7 @@ private class ResidualRealComponent(
         completed = null
         conflictClause = null
         prefixResolution = null
+        pointHints = null
         if (context.cancelled()) return ComponentCheck.Indeterminate
         absCompletion?.let { completion ->
             val discrete = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
@@ -875,6 +915,7 @@ private class ResidualRealComponent(
     override fun retract(decisionLevel: Int) {
         completed = null
         conflictClause = null
+        pointHints = null
         // Propagation conflicts retain their native analysis across the traversal's initial retraction.
     }
 
@@ -902,6 +943,7 @@ private class ResidualRealComponent(
         completed = null
         conflictClause = null
         prefixResolution = null
+        pointHints = null
     }
 
     fun sample(): Sample = requireNotNull(completed)
@@ -910,7 +952,10 @@ private class ResidualRealComponent(
 
     override fun totalSolveWork(): Long = engine.totalSolveWork() + absWork
 
-    override fun close() = engine.close()
+    override fun close() {
+        pointHints = null
+        engine.close()
+    }
 
     private companion object {
         const val MAX_PREFIX_QUERIES = 64

@@ -42,6 +42,8 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
     // polarity source is pinned to it and the autonomous rephase rotation is suspended; [UNMANAGED]
     // (the default) leaves the rotation in charge.
     private var managedMode = PhaseMode.UNMANAGED
+    var candidateUses: Long = 0L
+        private set
 
     /** Set the externally-managed phase regime (see [RestartSchedule.phaseMode]). */
     fun setManagedMode(mode: PhaseMode) {
@@ -54,7 +56,12 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
      * the cached value is the target phase, the saved phase, or a rephase-mode fixed/random polarity;
      * for an integer it is the saved value. [rng] supplies the `RANDOM` rephase mode's coin flip.
      */
-    fun applyPhase(varRef: VarRef, values: Sequence<Long>, rng: Random? = null): Sequence<Long> = when (varRef) {
+    fun applyPhase(
+        varRef: VarRef,
+        values: Sequence<Long>,
+        rng: Random? = null,
+        candidate: Boolean? = null,
+    ): Sequence<Long> = when (varRef) {
         is VarRef.Bool -> {
             val v = varRef.varId
             val savedFirst: Long? = if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[v]) {
@@ -67,6 +74,10 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
             } else {
                 null
             }
+            fun savedOrCandidate(): Long? = savedFirst ?: if (boolPhaseTracking && candidate != null) {
+                candidateUses++
+                if (candidate) 1L else 0L
+            } else null
             // A managing schedule pins the source (stable → dive on the best solution/target, focused →
             // plain saved); otherwise the autonomous rephase rotation chooses. Each source falls back to
             // the saved phase when its array isn't populated, so a disabled feature is a no-op.
@@ -76,15 +87,15 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
                 PhaseMode.UNMANAGED -> rephaseMode
             }
             val preferred: Long? = when (source) {
-                RephaseMode.SOLUTION -> solutionFirst ?: savedFirst
+                RephaseMode.SOLUTION -> solutionFirst ?: savedOrCandidate()
 
                 RephaseMode.TARGET -> if (boolTarget != null && boolTargetSet != null && boolTargetSet[v]) {
                     if (boolTarget[v]) 1L else 0L
                 } else {
-                    savedFirst
+                    savedOrCandidate()
                 }
 
-                RephaseMode.SAVED -> savedFirst
+                RephaseMode.SAVED -> savedOrCandidate()
 
                 RephaseMode.TRUE -> 1L
 

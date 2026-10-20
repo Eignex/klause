@@ -7,9 +7,11 @@ import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.LocalSearchSolver
@@ -36,6 +38,25 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class BacktrackSolverRealTest {
+    @Test
+    fun `a partial real point should guide an unobserved Boolean phase without a conflict`() {
+        val source = Problem(3, 0, emptyArray(), Array<Factor>(1002) { row ->
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.GE, BigFraction.ONE, activator = if (row == 0) 1 else -1)
+        } + Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+
+        val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 1,
+            variableSelector = InputOrder, valueSelector = IndomainMin, phaseSaving = true, nodeBudget = NodeBudget(8)))
+
+        val sat = assertIs<SolveResult.Sat>(result)
+        assertEquals(true, sat.assignment.bools[1])
+        assertEquals(0L, sat.stats.search.fails.sum.toLong())
+        assertTrue((sat.stats.lp.phases["PREFIX_REAL_HINT_ROOT"]?.outcomes?.get("PHASE_FALLBACK") ?: 0L) > 0L)
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
+    }
+
     @Test
     fun `selected real conflicts should backjump before unrelated Boolean decisions`() {
         val source = Problem(3, 0, emptyArray(), Array(1002) { row ->

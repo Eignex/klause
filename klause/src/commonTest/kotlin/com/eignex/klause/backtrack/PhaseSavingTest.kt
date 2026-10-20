@@ -23,6 +23,40 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class PhaseSavingTest {
+    @Test
+    fun `candidate phases should only fill enabled unobserved Boolean phases`() {
+        for (enabled in listOf(false, true)) {
+            val phase = PhaseSaving(1, 0, BacktrackParams(phaseSaving = enabled))
+
+            val values = phase.applyPhase(VarRef.Bool(0), sequenceOf(0L, 1L), candidate = true).toList()
+
+            assertEquals(if (enabled) listOf(1L, 0L) else listOf(0L, 1L), values)
+            assertEquals(if (enabled) 1L else 0L, phase.candidateUses)
+        }
+    }
+
+    @Test
+    fun `retained phase sources should precede a numerical candidate`() {
+        for (kind in listOf("saved", "target", "solution")) {
+            val session = boolSession(1)
+            session.pinBool(0, false)
+            val phase = PhaseSaving(1, 0,
+                BacktrackParams(phaseSaving = true, targetPhasing = true, solutionPhasing = true))
+            when (kind) {
+                "saved" -> phase.capture(VarRef.Bool(0), session)
+                "target" -> phase.captureTargetIfDeeper(session, 1)
+                "solution" -> {
+                    phase.onSolution(Sample(booleanArrayOf(false), longArrayOf()))
+                    phase.setManagedMode(PhaseMode.STABLE)
+                }
+            }
+
+            val values = phase.applyPhase(VarRef.Bool(0), sequenceOf(1L, 0L), candidate = true).toList()
+
+            assertEquals(listOf(0L, 1L), values)
+            assertEquals(0L, phase.candidateUses)
+        }
+    }
 
     @Test
     fun `a propagated phase should survive backtracking`() {
