@@ -61,7 +61,6 @@ Compared with the others:
 - Klause is young. On problems squarely in another solver's domain, such as large MIPs, hard SAT instances or SMT benchmarks, the established solvers are usually much faster.
 - Nonlinear integer and transcendental arithmetic are incomplete: Klause can find and check solutions, but may stop with an unknown result instead of a proof. Nonconvex quadratic objectives get no global optimality claim when a branch stays unresolved.
 - SMT-LIB support covers quantifier-free arithmetic only. Bit-vectors, arrays, strings, quantifiers, uninterpreted functions and incremental solving are rejected.
-- Nonlinear float constraints in FlatZinc can run on a finite grid. Klause then reports the best solution found without an optimality or infeasibility marker, where other FlatZinc solvers report the grid optimum as optimal.
 - Proofs are checked in memory, but Klause cannot yet export proof files for an independent checker.
 - Not every kind of model has every search style yet; local search and portfolio coverage still have gaps.
 
