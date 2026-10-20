@@ -10,6 +10,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.File
 import java.util.zip.GZIPInputStream
@@ -17,6 +18,118 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class JvmSourceCompilerReportTest {
+    @ParameterizedTest
+    @CsvSource(
+        "compilations,false", "inlining,false", "xml,false",
+        "compilations,true", "inlining,true", "xml,true",
+    )
+    fun `direct and expanded decoding produce identical complete link reports`(
+        variant: String,
+        legacy: Boolean,
+        @TempDir out: File,
+    ) {
+        val reference = JvmSavedJson.parse(
+            """{
+                "bindingRecordOrdinal":1,"bytecodeClassOrdinal":7,"studySourceHead":"head",
+                "syntaxArchiveId":"syntax","syntaxClassOrdinal":3,"syntaxLineReportFile":"lines.gz",
+                "originalClassIdentity":{"unknown":[null,false]},"originalSyntaxOrigin":{"entry":"Cold.class"}
+            }""",
+        ).jsonObject
+        val context = JsonObject(reference + ("status" to JsonPrimitive("joined-candidates")))
+        val observed = JsonPrimitive("sample.Cold.pick(I)V")
+        val candidate = buildJsonObject {
+            put("observedMethodCopiedVerbatim", observed)
+            put("methodIdentityParsed", true)
+            if (legacy) {
+                put("declarationCandidates", JsonArray(listOf(0, 2).map {
+                    JsonObject(reference + ("methodIndex" to JsonPrimitive(it)))
+                }))
+            } else {
+                put("declarationCandidateReferences", JvmSavedJson.parse("[[1,0],[1,2]]"))
+            }
+        }
+        val observation = buildJsonObject {
+            put("record", if (variant == "xml") "xml-observation-candidates" else "compiler-observation-candidates")
+            put("collection", if (variant == "xml") "tasks" else variant)
+            put("unknown", JsonArray(listOf(JsonNull, JsonPrimitive(false))))
+            put("originalObservationCopiedVerbatim", buildJsonObject {
+                when (variant) {
+                    "xml" -> put("rawAttributes", buildJsonObject { put("method", "sample/Cold\u00a0pick (I)V") })
+                    "inlining" -> { put("caller", observed); put("callee", observed) }
+                    else -> put("method", observed)
+                }
+            })
+            put("methodCandidates", when (variant) {
+                "xml" -> candidate
+                "inlining" -> buildJsonObject { put("caller", candidate); put("callee", candidate) }
+                else -> buildJsonObject { put("method", candidate) }
+            })
+        }
+        val rows = buildList {
+            add(buildJsonObject {
+                put("record", "schema")
+                put("encoding", if (legacy) "compiler-bytecode-candidates-v2" else "compiler-bytecode-candidates-v3")
+                put("bindingInputId", "binding")
+                put("censusInputId", "census")
+                if (!legacy) put("deniedProofFlags", buildJsonObject { COHORT_PROOF_FLAGS.forEach { put(it, false) } })
+            })
+            add(buildJsonObject { put("record", "original-binding-schema") })
+            add(buildJsonObject {
+                put("record", "original-binding-reference")
+                put("originalRecordOrdinal", 1)
+                put("originalClassContext", context)
+            })
+            if (!legacy) add(buildJsonObject {
+                put("record", "declaration-candidate-context")
+                put("bindingRecordOrdinal", 1)
+                put("reference", reference)
+                put("methodCount", 3)
+            })
+            add(observation)
+            if (!legacy) add(buildJsonObject {
+                put("record", "candidate-report-end")
+                put("recordsBeforeEnd", 5)
+                put("bindingReferences", 1)
+                put("candidateContexts", 1)
+            })
+        }
+        val audit = JvmSavedJson.parse(
+            """{
+                "record":"class-audit","originalSyntaxClassOrdinal":3,"internalName":"sample/Cold",
+                "originalClassOrigin":{"entry":"Cold.class"},"originalMethodIndexOrder":[0,1,2],
+                "noFormalAlternativeMethodIndexes":[0,1,2],"allOriginalMethodFormalChecks":[]
+            }""",
+        ).jsonObject
+        val input = buildJsonObject { put("id", "whole-input"); put("unknown", "retained") }
+        val proof = buildJsonObject { put("records", rows.size) }
+
+        val actual = JvmSourceCompilerIndex(File(out, "source-index.sqlite")).use { index ->
+            index.add("binding", "head", "audit.gz", 2, audit, JsonObject(emptyMap()))
+            index.finish()
+            listOf(false, true).map { direct ->
+                val file = File(out, "links-$direct.jsonl.gz")
+                val output = JvmSavedReport(file, JvmSavedReportBudget())
+                val writer = JvmSourceCompilerReport(index, "binding", input, "candidates.gz", proof, output)
+                JvmCompilerCandidates(File(out, "candidates-$direct.sqlite")).use { codec ->
+                    rows.forEachIndexed { ordinal, row ->
+                        val raw = (row.toString() + "\n").encodeToByteArray()
+                        if (direct) {
+                            writer.accept(ordinal.toLong(), raw, codec.acceptForLinks(row, writer::projectCandidates))
+                        } else {
+                            writer.accept(ordinal.toLong(), raw, codec.accept(row))
+                        }
+                    }
+                    codec.finish()
+                    writer.finish()
+                }
+                output.verify()
+                GZIPInputStream(file.inputStream()).bufferedReader().use { it.readText() }
+            }
+        }
+
+        assertEquals(actual[0], actual[1])
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [1, 2])
     fun `each report shares complete links while retaining every original record reference`(

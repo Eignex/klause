@@ -199,19 +199,21 @@ internal object JvmSourceCompilerReview {
                     reports.add(report)
                     val originalProof = reportProof(producer, reportMember)
                     val writer = JvmSourceCompilerReport(index, binding, item, reportMember, originalProof, report)
+                    val project: JvmCandidateProjection = writer::projectCandidates
                     val candidateIndex = File(scratch, "candidate-contexts-%03d.sqlite".format(Locale.ROOT, arm))
                     JvmCompilerCandidates(candidateIndex).use { codec ->
                         JvmSavedReports.read(cohortPaths.getValue(reportMember), originalProof) { ordinal, raw ->
                             val originalRow = JvmSavedJson.parse(raw.decodeToString(throwOnInvalidSequence = true))
                                 .jsonObject
-                            val row = codec.accept(originalRow)
+                            val accepted = codec.acceptForLinks(originalRow, project)
+                            val row = accepted.value
                             if (ordinal == 0L) {
                                 require(
                                     row != null && row["bindingInputId"] == JsonPrimitive(binding) &&
                                         row["censusInputId"] == JsonPrimitive(census),
                                 )
                             }
-                            writer.accept(ordinal, raw, row)
+                            writer.accept(ordinal, raw, accepted)
                         }
                         codec.finish()
                         writer.finish()

@@ -41,15 +41,20 @@ internal class JvmSourceCompilerReport(
     }
 
     fun accept(ordinal: Long, raw: ByteArray, row: JsonObject?) {
+        accept(ordinal, raw, JvmCandidateRecord(row, false))
+    }
+
+    fun accept(ordinal: Long, raw: ByteArray, row: JvmCandidateRecord) {
         check(!ended)
         require(ordinal == records) { "Original report record order differs" }
-        val links = row?.let(::linkedMethods) ?: JsonNull
+        val methods = row.value?.let(::methodCandidates)
+        val links = if (row.sourceLinksProjected) methods ?: JsonNull else methods?.let(::linkedMethods) ?: JsonNull
         output.write(
             buildJsonObject {
                 put("record", "original-compiler-source-link")
                 put("originalRawRecordOrdinal", records++)
                 put("originalRawRecordIdentity", JvmSavedReports.identity(raw))
-                put("originalExpandedRecordOrdinal", if (row == null) JsonNull else JsonPrimitive(expanded++))
+                put("originalExpandedRecordOrdinal", if (row.value == null) JsonNull else JsonPrimitive(expanded++))
                 put("sourceAuditLinkReferences", links)
             },
         )
@@ -69,32 +74,38 @@ internal class JvmSourceCompilerReport(
         ended = true
     }
 
-    private fun linkedMethods(row: JsonObject): JsonElement {
-        val methods = when (row["record"]) {
+    private fun methodCandidates(row: JsonObject): JsonObject? =
+        when (row["record"]) {
             JsonPrimitive("compiler-observation-candidates") -> row.getValue("methodCandidates").jsonObject
             JsonPrimitive("xml-observation-candidates") -> buildJsonObject {
                 put("method", row.getValue("methodCandidates"))
             }
-            else -> return JsonNull
+            else -> null
         }
-        return JsonObject(methods.mapValues { (_, raw) ->
+
+    private fun linkedMethods(methods: JsonObject): JsonObject =
+        JsonObject(methods.mapValues { (_, raw) ->
             val value = raw.jsonObject
-            val observed = value.getValue("observedMethodCopiedVerbatim")
-            val references = value.getValue("declarationCandidates").jsonArray
-            buildJsonObject {
-                put("observedMethodCopiedVerbatim", observed)
-                put("methodIdentityParsed", value.getValue("methodIdentityParsed"))
-                put("allOriginalDeclarationCandidateSourceAuditLinkReferences", JsonArray(references.map {
-                    JsonPrimitive(index.linkReference(binding, observed, it.jsonObject) { reference, link ->
-                        output.write(buildJsonObject {
-                            put("record", "source-audit-link-definition")
-                            put("reference", reference)
-                            put("wholeSourceAuditLink", link)
-                        })
-                        definitions++
-                    })
-                }))
-            }
+            projectCandidates(
+                value.getValue("observedMethodCopiedVerbatim"),
+                value.getValue("methodIdentityParsed"),
+                value.getValue("declarationCandidates").jsonArray.map { it.jsonObject },
+            )
         })
-    }
+
+    fun projectCandidates(observed: JsonElement, parsed: JsonElement, candidates: List<JsonObject>): JsonObject =
+        buildJsonObject {
+            put("observedMethodCopiedVerbatim", observed)
+            put("methodIdentityParsed", parsed)
+            put("allOriginalDeclarationCandidateSourceAuditLinkReferences", JsonArray(candidates.map { candidate ->
+                JsonPrimitive(index.linkReference(binding, observed, candidate) { reference, link ->
+                    output.write(buildJsonObject {
+                        put("record", "source-audit-link-definition")
+                        put("reference", reference)
+                        put("wholeSourceAuditLink", link)
+                    })
+                    definitions++
+                })
+            }))
+        }
 }

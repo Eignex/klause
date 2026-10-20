@@ -1532,6 +1532,11 @@ from the complete disk indexes; every reference still checks its original order
 and method bounds. Each report owns a fresh candidate cache and source link
 reference universe.
 
+Normalized observations pass validated candidates directly to the link writer.
+This path avoids constructing expanded proof-default JSON; the complete raw input
+record and unknown fields remain bound by their authenticated whole-input reference.
+The expanded candidate API and legacy input path retain their original values.
+
 `source-compiler-links-stage.json` records the latest owned reader phase and an
 optional input-arm ordinal. It contains no original measurements or elapsed costs.
 A stage tag, including `complete`, supplies lifecycle diagnostics; completion

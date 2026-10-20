@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.File
 import kotlin.test.Test
@@ -128,8 +129,15 @@ class JvmCompilerCandidatesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["missing-end", "false-proof-default", "unknown-record"])
-    fun `an incomplete or altered normalized report cannot complete`(variant: String, @TempDir out: File) {
+    @CsvSource(
+        "missing-end,false", "false-proof-default,false", "unknown-record,false",
+        "missing-end,true", "false-proof-default,true", "unknown-record,true",
+    )
+    fun `an incomplete or altered normalized report cannot complete`(
+        variant: String,
+        direct: Boolean,
+        @TempDir out: File,
+    ) {
         JvmCompilerCandidates(File(out, "index.sqlite")).use { codec ->
             val schema = buildJsonObject {
                 put("record", "schema")
@@ -143,10 +151,14 @@ class JvmCompilerCandidatesTest {
                 }
                 )
             }
+            val project: JvmCandidateProjection = { _, _, _ -> error("A refused report cannot project candidates") }
 
             assertFailsWith<IllegalArgumentException> {
-                codec.accept(schema)
-                if (variant == "unknown-record") codec.accept(buildJsonObject { put("record", "unknown") })
+                if (direct) codec.acceptForLinks(schema, project) else codec.accept(schema)
+                if (variant == "unknown-record") {
+                    val row = buildJsonObject { put("record", "unknown") }
+                    if (direct) codec.acceptForLinks(row, project) else codec.accept(row)
+                }
                 codec.finish()
             }
         }

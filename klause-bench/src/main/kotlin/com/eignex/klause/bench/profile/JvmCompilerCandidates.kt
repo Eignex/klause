@@ -11,6 +11,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.io.File
 
+internal typealias JvmCandidateProjection = (JsonElement, JsonElement, List<JsonObject>) -> JsonObject
+
+internal data class JvmCandidateRecord(val value: JsonObject?, val sourceLinksProjected: Boolean)
+
 internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
     private val db = savedIndex(file).apply {
         createStatement().use {
@@ -41,8 +45,15 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
     private var bindings = 0L
     private var contexts = 0L
 
+    fun accept(row: JsonObject): JsonObject? = accept(row, null)
+
+    fun acceptForLinks(row: JsonObject, project: JvmCandidateProjection): JvmCandidateRecord {
+        val value = accept(row, project)
+        return JvmCandidateRecord(value, !legacy)
+    }
+
     @Suppress("LongMethod")
-    fun accept(row: JsonObject): JsonObject? {
+    private fun accept(row: JsonObject, project: JvmCandidateProjection?): JsonObject? {
         if (!schemaSeen) {
             schemaSeen = true
             return schema(row)
@@ -96,7 +107,7 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
                         null
                     }
 
-                    "compiler-observation-candidates", "xml-observation-candidates" -> observation(row, kind)
+                    "compiler-observation-candidates", "xml-observation-candidates" -> observation(row, kind, project)
 
                     "original-case", "original-recording-sections", "original-xml-sections" -> row
 
@@ -152,7 +163,7 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
         checkSize()
     }
 
-    private fun observation(row: JsonObject, kind: String): JsonObject {
+    private fun observation(row: JsonObject, kind: String, project: JvmCandidateProjection?): JsonObject {
         require(COHORT_PROOF_FLAGS.none { it in row })
         val original = row.getValue("originalObservationCopiedVerbatim").jsonObject
         val collection = row.savedString("collection")
@@ -163,17 +174,23 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
             require(methods.keys == fields.toSet())
             JsonObject(
                 fields.associateWith { field ->
-                expand(methods.getValue(field).jsonObject).also {
-                    require(it["observedMethodCopiedVerbatim"] == (original[field] ?: JsonNull))
+                    val value = methods.getValue(field).jsonObject
+                    require(value["observedMethodCopiedVerbatim"] == (original[field] ?: JsonNull))
+                    expand(value, project)
                 }
-            }
             )
         } else {
             require(collection in setOf("queued", "tasks", "nmethods"))
-            val methods = expand(row.getValue("methodCandidates").jsonObject)
+            val value = row.getValue("methodCandidates").jsonObject
             val attributes = (original["rawAttributes"] ?: JsonObject(emptyMap())).jsonObject
-            require(methods["observedMethodCopiedVerbatim"] == xmlMethod(attributes["method"]))
-            methods
+            require(value["observedMethodCopiedVerbatim"] == xmlMethod(attributes["method"]))
+            expand(value, project)
+        }
+        if (project != null) {
+            return buildJsonObject {
+                put("record", kind)
+                put("methodCandidates", candidates)
+            }
         }
         return JsonObject(
             row + ("methodCandidates" to candidates) + COHORT_PROOF_FLAGS.associateWith {
@@ -182,7 +199,7 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
         )
     }
 
-    private fun expand(value: JsonObject): JsonObject {
+    private fun expand(value: JsonObject, project: JvmCandidateProjection?): JsonObject {
         require(
             value.keys == setOf(
             "observedMethodCopiedVerbatim",
@@ -220,6 +237,7 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
                 candidate to candidate.toString().encodeToByteArray().size.toLong()
             }
         }
+        if (project != null) return project(observed, JsonPrimitive(parsed), candidates)
         return buildJsonObject {
             put("observedMethodCopiedVerbatim", observed)
             put("declarationCandidates", JsonArray(candidates))
