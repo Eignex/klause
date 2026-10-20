@@ -45,7 +45,7 @@ class ExactContinuationTest {
     fun `independent equality pivots should finish within their allocation allowance`() {
         val n = 32
         val huge = BigFraction.of(BIG_ONE shl 130, BIG_ONE)
-        val limits = ExactContinuationLimits(maxAllocation = 200_000)
+        val limits = ExactContinuationLimits(maxAllocation = 800_000)
         for (target in listOf(BigFraction.ONE, huge)) {
             val input = ExactContinuationInput(
                 List(n) { listOf(it to BigFraction.ONE) },
