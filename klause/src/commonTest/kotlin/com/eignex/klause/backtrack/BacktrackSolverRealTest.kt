@@ -138,18 +138,17 @@ class BacktrackSolverRealTest {
 
     @Test
     fun `a leaf no theory could decide should report unknown rather than unsat`() {
-        // Past RESIDUAL_MAX_ROWS the leaf certify declines deterministically rather than by cancellation.
-        val rows = Array<Factor>(1001) {
-            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.LE, 5L)
+        val rows = Array<Factor>(1001) { row ->
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, (row + 1).toDouble()), intArrayOf(0, 1), LinearOp.LE, 5L)
         }
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 1)),
             factors = rows,
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(10.0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(10.0, 10.0),
         )
         val result = BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 1L))
         val unknown = assertIs<SolveResult.Unknown>(result)
