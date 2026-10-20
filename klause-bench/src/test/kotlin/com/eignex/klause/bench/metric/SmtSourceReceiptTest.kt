@@ -77,7 +77,8 @@ class SmtSourceReceiptTest {
     fun `incomplete or unsupported tool responses should withhold acceptance`(failure: String) {
         val process = SmtToolProcess(listOf("dolmen"), if (failure == "parser") 3 else 0, 1,
             failure == "timeout", failure != "cleanup", if (failure == "extra-output") "unknown" else "",
-            if (failure in setOf("parser", "foreign-error")) "E:parsing-error\n" else "")
+            if (failure in setOf("parser", "foreign-error")) "E:parsing-error\n" else "",
+            SourceToolMemory(SourceToolMemory.LINUX, SourceToolMemory.LIMIT, true, false))
 
         assertEquals("unknown", SmtSourceValidation.interpret(SmtSourceValidation.GROUND, process))
     }
@@ -85,7 +86,8 @@ class SmtSourceReceiptTest {
     @ParameterizedTest
     @ValueSource(strings = ["sat", "unknown", "unsat\nunsat", "unsat\n(error bad)"])
     fun `reference answers other than one complete unsat should withhold refutation`(answer: String) {
-        val process = SmtToolProcess(listOf("z3"), 0, 1, false, true, answer, "")
+        val process = SmtToolProcess(listOf("z3"), 0, 1, false, true, answer, "",
+            SourceToolMemory(SourceToolMemory.LINUX, SourceToolMemory.LIMIT, true, false))
 
         assertEquals("unknown", SmtSourceValidation.interpret(SmtSourceValidation.REFUTATION, process))
     }
@@ -146,5 +148,62 @@ class SmtSourceReceiptTest {
 
         assertEquals(true, process.timedOut)
         assertEquals("unknown", SmtSourceValidation.interpret(SmtSourceValidation.GROUND, process))
+    }
+
+    @ParameterizedTest
+    @CsvSource("linux,valid", "darwin,valid", "missing,unknown", "incomplete,unknown", "exceeded,unknown",
+        "kernel-missing,unknown", "kernel-over-limit,unknown", "sample-over-limit,unknown",
+        "sample-missing,unknown", "timing-missing,unknown", "foreign-policy,unknown")
+    fun `memory qualification is required before accepting a completed tool response`(case: String, status: String) {
+        val measured = SourceToolMemory(SourceToolMemory.DARWIN, SourceToolMemory.LIMIT, true, false,
+            samplePeakBytes = 1024, kernelPeakBytes = 2048, samples = 1, timingSha256 = "0".repeat(64))
+        val memory = when (case) {
+            "linux" -> SourceToolMemory(SourceToolMemory.LINUX, SourceToolMemory.LIMIT, true, false)
+            "darwin" -> measured
+            "missing" -> null
+            "incomplete" -> measured.copy(complete = false)
+            "exceeded" -> measured.copy(exceeded = true)
+            "kernel-missing" -> measured.copy(kernelPeakBytes = null)
+            "kernel-over-limit" -> measured.copy(kernelPeakBytes = SourceToolMemory.LIMIT + 1)
+            "sample-over-limit" -> measured.copy(samplePeakBytes = SourceToolMemory.LIMIT + 1)
+            "sample-missing" -> measured.copy(samplePeakBytes = null)
+            "timing-missing" -> measured.copy(timingSha256 = null)
+            else -> measured.copy(policy = "tool-managed")
+        }
+        val process = SmtToolProcess(listOf("dolmen"), 0, 1, false, true, "", "", memory)
+
+        assertEquals(status, SmtSourceValidation.interpret(SmtSourceValidation.GROUND, process))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["missing", "duplicate", "malformed", "over-limit"])
+    fun `incomplete or excessive kernel high water withholds memory qualification`(case: String) {
+        val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
+        val line = "2048  maximum resident set size\n"
+        when (case) {
+            "duplicate" -> memory.timingFile.writeText(line + line)
+            "malformed" -> memory.timingFile.writeText("unknown maximum resident set size\n")
+            "over-limit" -> memory.timingFile.writeText("${SourceToolMemory.LIMIT + 1} maximum resident set size\n")
+        }
+
+        val result = memory.finish()
+
+        assertFalse(result.qualified())
+        assertEquals(case == "over-limit", result.exceeded)
+    }
+
+    @Test
+    fun `a fast child retains its kernel high water without inventing a sample`() {
+        val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
+        val bytes = "  0.01 real  0.00 user  0.00 sys\n    2048  maximum resident set size\n".toByteArray()
+        memory.timingFile.writeBytes(bytes)
+
+        val result = memory.finish()
+
+        assertEquals(true, result.qualified())
+        assertEquals(2048L, result.kernelPeakBytes)
+        assertEquals(0, result.samples)
+        assertEquals(null, result.samplePeakBytes)
+        assertEquals(sha256(bytes), result.timingSha256)
     }
 }
