@@ -12,6 +12,9 @@ internal fun prepareMixedEqualityRepair(
     onStage: ((String) -> Unit)? = null,
 ): MixedEqualityRepair? = (prepareEqualityRows(columns, rows, stop, onStage) as? EqualityRows.Prepared)?.repair
 
+internal fun admitsEqualityRepairColumns(columns: Int): Boolean =
+    columns > 0 && columns.toLong() * columns <= MAX_REPAIR_ENTRIES
+
 internal sealed interface EqualityRows {
     class Prepared(val repair: MixedEqualityRepair) : EqualityRows
     data object Refuted : EqualityRows
@@ -62,7 +65,7 @@ internal fun prepareEqualityRows(
     onStage: ((String) -> Unit)? = null,
     onPairedRows: ((Int, Int) -> Unit)? = null,
 ): EqualityRows {
-    if (columns <= 0 || columns.toLong() * columns > MAX_REPAIR_ENTRIES) {
+    if (!admitsEqualityRepairColumns(columns)) {
         onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
         return EqualityRows.Declined
     }

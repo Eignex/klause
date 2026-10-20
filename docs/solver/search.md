@@ -843,7 +843,12 @@ pivots, reconstructed guesses and failed full-row checks. Its residual observati
 separate unsupported rows, false constants, graph admission and graph points. A false
 residual belongs to guessed integers and establishes no source refutation.
 The pure-real negative caller separately counts exact equality refutations and
-those with a complete current source-premise explanation. These observations do not
+those with a complete current source-premise explanation. Before an admitted LP
+request it can check a separate necessary-row snapshot at a partial Boolean prefix,
+including only rows with known Boolean inputs and current source premises. Omitted
+source choices cannot contribute equations or explanations. Contradiction rejects
+that prefix; positive agreement and witness checks still require complete source
+coverage. These observations do not
 export numerical certificates or establish whole-source exhaustion. Real
 component observations identify graph checks, source-LP dimension declines and requests,
 and points returned across every component. `RECOVERY_REAL_COMPONENT_SHAPE_<columns>_<rows>`

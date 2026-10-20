@@ -89,8 +89,10 @@ validation, the same retained pivots reduce the remaining inequalities. A suppor
 difference residual can complete the free real coordinates before pivot reconstruction.
 The kernel distinguishes exact row contradiction from representation or resource
 decline. This guessed-integer caller treats both as failed point attempts; neither
-can refute the source model. Only a complete exact [pure-real](linear-real.md)
-source conjunction can consume the kernel's negative result as a local refutation.
+can refute the source model. The exact [pure-real](linear-real.md) caller can
+consume a negative result over a necessary source-row subset as a local refutation.
+Every included row retains its known Boolean inputs and current source premises;
+unknown guards, unresolved source choices and unknown Boolean terms are omitted.
 That caller may retain the original paired-equation and false-residual row identities
 for a source-premised conflict; guessed integer recovery requests no such authority.
 A general residual is partitioned by connected real coordinates. Each component

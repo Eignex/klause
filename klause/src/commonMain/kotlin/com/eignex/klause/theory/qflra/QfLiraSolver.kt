@@ -590,14 +590,11 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun agreementSourceRows(
-        context: SearchContext,
-        origins: MutableList<EqualityRowOrigin>? = null,
-    ): List<ExactRationalInequality>? {
+    private fun agreementSourceRows(context: SearchContext): List<ExactRationalInequality>? {
         lpStop.charge(model.numIntVars.toLong() + model.numRealVars + preparedRows.size + 1L)
         if (operationStop()) return null
         val bounded = node.withPublishedBounds(model.numIntVars, context::intLowerBound, context::intUpperBound)
-        return reduction.sourceRows(bools, bounded, lpStop, origins)
+        return reduction.sourceRows(bools, bounded, lpStop)
     }
 
     private fun equalityExplanation(
@@ -646,21 +643,24 @@ class ExactLiraSearchComponent private constructor(
         return context.explainAtoms(SearchAtomPremise.All(leaves)).takeUnless { operationStop() }
     }
 
-    private fun equalityRefutationEligible(): Boolean = unassignedBooleans == 0 && model.numIntVars == 0 &&
+    private fun equalityRefutationEligible(): Boolean = model.numIntVars == 0 &&
+        admitsEqualityRepairColumns(model.numRealVars) && preparedRows.size <= 65536 &&
         !model.semantics.isApproximate && solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
     private fun equalityRefutation(context: SearchContext): ComponentCheck? {
         if (!equalityRefutationEligible()) return null
         if (operationStop()) return ComponentCheck.Indeterminate
         observeCompleteStage("PURE_REAL_EQUALITY_ATTEMPT")
-        val origins = ArrayList<EqualityRowOrigin>()
-        val rows = agreementSourceRows(context, origins)
+        lpStop.charge(model.numRealVars.toLong() + model.factors.size + preparedRows.size + 1L)
+        if (operationStop()) return ComponentCheck.Indeterminate
+        val snapshot = reduction.refutationRows(bools, node, lpStop)
         var support: IntArray? = null
-        val refuted = rows != null && equalityRowsRefute(model.numRealVars, rows, lpStop, ::observeCompleteStage,
+        val refuted = snapshot != null && equalityRowsRefute(model.numRealVars, snapshot.rows,
+            lpStop, ::observeCompleteStage,
             onSupport = { support = it })
         if (operationStop()) return ComponentCheck.Indeterminate
         if (!refuted) return null
-        val explanation = support?.let { equalityExplanation(it, origins, context) }
+        val explanation = support?.let { equalityExplanation(it, checkNotNull(snapshot).origins, context) }
         if (operationStop()) return ComponentCheck.Indeterminate
         smtStats?.observeConflict(explanation)
         observeCompleteStage("PURE_REAL_EQUALITY_REFUTED")
@@ -1405,12 +1405,6 @@ class ExactLiraSearchComponent private constructor(
                 observeCompleteStage("RECOVERY_NO_FLOAT")
             }
         }
-        if (candidate == null) {
-            equalityRefutation(context)?.let { result ->
-                outcome = result
-                return null
-            }
-        }
         if (candidate == null || operationStop()) {
             outcome = ComponentCheck.Indeterminate
             return null
@@ -1983,7 +1977,21 @@ private class ExactLiraReductionCache(
         bools: IntArray,
         node: SearchNode,
         cancellation: Cancellation,
+    ): List<ExactRationalInequality>? = captureRows(bools, node, cancellation)
+
+    fun refutationRows(bools: IntArray, node: SearchNode, cancellation: Cancellation): SourceRefutationRows? {
+        if (model.numIntVars != 0 || !admitsEqualityRepairColumns(model.numRealVars)) return null
+        val origins = ArrayList<EqualityRowOrigin>()
+        val rows = captureRows(bools, node, cancellation, origins, partial = true) ?: return null
+        return SourceRefutationRows(rows, origins)
+    }
+
+    private fun captureRows(
+        bools: IntArray,
+        node: SearchNode,
+        cancellation: Cancellation,
         origins: MutableList<EqualityRowOrigin>? = null,
+        partial: Boolean = false,
     ): List<ExactRationalInequality>? {
         if (origins != null && (model.numIntVars != 0 || origins.isNotEmpty())) return null
         val rows = ArrayList<ExactRationalInequality>()
@@ -2014,7 +2022,9 @@ private class ExactLiraReductionCache(
             model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
             if (!recordOrigin(start, EqualityRowOrigin.Declared)) return null
         }
-        val complete = node.forEachSelectedRow(model, disjunctionAtoms) { factor, index, row ->
+        val complete = node.forEachSelectedRow(model, disjunctionAtoms, allowUnselectedDisjunctions = partial) {
+                factor, index, row ->
+            if (origins != null) cancellation.charge(2L * row.size + 2L)
             if (cancellation()) return null
             val truth = node.rowTruth(RowAddress(factor, index), row, bools) ?: return@forEachSelectedRow
             val comparison = exactForms[factor][index].comparison(truth) { bools[it] == TRUE }
@@ -2023,7 +2033,9 @@ private class ExactLiraReductionCache(
             } else {
                 null
             }
-            if (origins != null && comparison.op == LinearOp.NE && direction == null) return null
+            if (origins != null && comparison.op == LinearOp.NE && direction == null) {
+                if (partial) return@forEachSelectedRow else return null
+            }
             val start = rows.size
             comparison.rowsInto(rows, direction)
             if (origins != null && !recordOrigin(start,
@@ -2291,6 +2303,11 @@ private sealed interface EqualityRowOrigin {
     class Branch(val atom: SourceBoundAtom) : EqualityRowOrigin
 }
 
+private class SourceRefutationRows(
+    val rows: List<ExactRationalInequality>,
+    val origins: List<EqualityRowOrigin>,
+)
+
 private data class SearchNode(
     val branches: List<IntegerBranch> = emptyList(),
     val sourceBranches: List<SourceBoundAtom> = emptyList(),
@@ -2354,6 +2371,7 @@ private data class SearchNode(
     inline fun forEachSelectedRow(
         model: Problem,
         disjunctionAtoms: Map<Int, List<DisjunctAtom>>,
+        allowUnselectedDisjunctions: Boolean = false,
         action: (Int, Int, LinearRow) -> Unit,
     ): Boolean {
         for ((index, factor) in model.factors.withIndex()) {
@@ -2365,7 +2383,7 @@ private data class SearchNode(
                             (rowAssertions[it.address]?.payload as? NamedDisjunctDecision)?.holds == true
                     }
                 ) {
-                    return false
+                    if (!allowUnselectedDisjunctions) return false
                 }
                 for (disjunct in disjuncts) {
                     if (disjunct.address in rowAssertions) {
@@ -2373,7 +2391,7 @@ private data class SearchNode(
                     }
                 }
             } else if (factor.linearForm is LinearForm.Disjunction) {
-                return false
+                if (!allowUnselectedDisjunctions) return false
             } else {
                 for (rowIndex in rows.indices) action(index, rowIndex, rows[rowIndex])
             }

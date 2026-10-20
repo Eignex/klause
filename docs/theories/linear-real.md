@@ -85,11 +85,13 @@ Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
 Strict infeasibility requires a completed strict-feasibility check, not failure to
 find a positive margin within a budget.
 
-At a complete exact pure-real conjunction under production certification, source
-equality elimination precedes the LP request after its ordinary check admission.
-Every source disjunction and disequality direction must already be selected; a
-missing selection retains ordinary LP and branching. A missing LP point can also
-trigger the same elimination after those choices complete. Paired opposite closed rows
+For exact pure-real sources under production certification, source equality
+elimination precedes the LP request after its ordinary check admission. A separate
+negative-only snapshot retains necessary rows whose Boolean inputs and current
+source premises are known. It omits unknown guards or Boolean coefficients,
+unselected disjunctions and undirected disequalities. Contradiction in this subset
+can reject a partial Boolean prefix; complete agreement capture for witnesses and
+peer coordinates retains its full source-choice requirements. Paired opposite closed rows
 provide equations. An inconsistent equation combination, or a source inequality
 reduced to a false constant, refutes only the current Boolean and private-branch
 prefix. A completed proof retains both original directions of every paired equation
@@ -102,7 +104,8 @@ missing or oversized explanation retains chronological conflict handling. The
 cancellation withholds the result. No numerical certificate is exported. Unpaired
 rows, unsupported input and interrupted arithmetic retain an indeterminate result.
 The sparse repair kernel keeps its 65,536-entry and 4,096-bit limits and charges
-the current complete-check operation; it creates no LP query or renewed allowance.
+the current check operation; it creates no LP query or renewed allowance. Column
+admission precedes capture, and each arithmetic check attempts elimination once.
 Complete-caller observations distinguish these pre-LP attempts from actual LP calls.
 The [mixed point recovery](linear-mixed.md) caller retains witness-only authority
 for its private integer guesses.
