@@ -92,10 +92,14 @@ source premises are known. It omits unknown guards or Boolean coefficients,
 unselected disjunctions and undirected disequalities. Contradiction in this subset
 can reject a partial Boolean prefix; complete agreement capture for witnesses and
 peer coordinates retains its full source-choice requirements. Paired opposite closed rows
-provide equations. An inconsistent equation combination, or a source inequality
-reduced to a false constant, refutes only the current Boolean and private-branch
+provide equations. An inconsistent equation combination, a source inequality
+reduced to a false constant, or a completed negative cycle in an entirely admitted
+reduced difference residual refutes only the current Boolean and private-branch
 prefix. A completed proof retains both original directions of every paired equation
-and the source inequality reduced to a false constant, when present. The same row
+and the source inequality reduced to a false constant, when present. A residual
+graph refutation conservatively retains every original input row; its internal
+unguarded cycle cannot become a root source clause. Feasible graphs, unsupported
+rows and incomplete checks retain the ordinary LP route. The same row
 capture retains immutable declared bounds and each selected row or branch origin.
 Learning resolves all cited folded Boolean values, selected disjuncts, disequality
 directions and registered source branches against the current search context. A
@@ -106,6 +110,8 @@ rows, unsupported input and interrupted arithmetic retain an indeterminate resul
 The sparse repair kernel keeps its 65,536-entry and 4,096-bit limits and charges
 the current check operation; it creates no LP query or renewed allowance. Column
 admission precedes capture, and each arithmetic check attempts elimination once.
+An admitted residual graph uses that same operation's charged arithmetic work;
+its negative result supplies no numerical certificate or positive source witness.
 Complete-caller observations distinguish these pre-LP attempts from actual LP calls.
 The [mixed point recovery](linear-mixed.md) caller retains witness-only authority
 for its private integer guesses.

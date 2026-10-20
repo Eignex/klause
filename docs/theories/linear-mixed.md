@@ -95,6 +95,9 @@ Every included row retains its known Boolean inputs and current source premises;
 unknown guards, unresolved source choices and unknown Boolean terms are omitted.
 That caller may retain the original paired-equation and false-residual row identities
 for a source-premised conflict; guessed integer recovery requests no such authority.
+It can also check an entirely admitted reduced difference residual for a negative
+cycle, retaining every original input-row premise. A graph failure for guessed
+integers remains a failed point attempt, with no source refutation authority.
 A general residual is partitioned by connected real coordinates. Each component
 uses the difference checker when supported; other components can request exact points
 through the existing [source LP owner](../lp/architecture.md), sharing the reduction

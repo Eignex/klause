@@ -45,17 +45,47 @@ internal fun equalityRowsRefute(
         }
     }
     var falseRow = -1
+    var graphRefuted = false
     val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage, paired)) {
-        is EqualityRows.Prepared -> prepared.repair.reduceRows(rows) { falseRow = it } == EqualityResidual.Refuted
+        is EqualityRows.Prepared -> when (val residual = prepared.repair.reduceRows(rows) { falseRow = it }) {
+            EqualityResidual.Refuted -> true
+            EqualityResidual.Declined -> false
+            is EqualityResidual.Reduced -> refutesDifferenceResidual(columns, residual.rows, stop, onStage)
+                .also { graphRefuted = it }
+        }
         EqualityRows.Refuted -> true
         EqualityRows.Declined -> false
     }
     if (refuted && support != null && !stop()) {
-        stop.charge(support.size.toLong() + 2L)
-        if (falseRow >= 0) support.add(falseRow)
-        if (!stop()) onSupport?.invoke(support.toIntArray())
+        if (graphRefuted) {
+            stop.charge(rows.size.toLong() + 1L)
+            if (!stop()) onSupport?.invoke(IntArray(rows.size) { it })
+        } else {
+            stop.charge(support.size.toLong() + 2L)
+            if (falseRow >= 0) support.add(falseRow)
+            if (!stop()) onSupport?.invoke(support.toIntArray())
+        }
     }
     return refuted && !stop()
+}
+
+private fun refutesDifferenceResidual(
+    columns: Int,
+    rows: List<ExactRationalInequality>,
+    stop: Cancellation,
+    onStage: ((String) -> Unit)?,
+): Boolean {
+    val graph = RealDifferenceSystem.prepareRows(columns, rows, stop)
+    if (stop()) return false
+    if (graph == null) {
+        onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_UNAVAILABLE")
+        return false
+    }
+    onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_ATTEMPT")
+    val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
+    if (stop() || result !is RealDifferenceSystem.Result.Infeasible) return false
+    onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_REFUTED")
+    return !stop()
 }
 
 internal fun prepareEqualityRows(

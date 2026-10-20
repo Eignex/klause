@@ -17,6 +17,101 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `a reduced difference cycle should retain all original source rows`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO, strict = strict),
+                ExactRationalInequality(intArrayOf(1, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE),
+                    if (strict) BigFraction.ZERO else BigFraction.MINUS_ONE),
+            )
+            var support: IntArray? = null
+
+            val refuted = equalityRowsRefute(3, rows, Cancellation.Never, onSupport = { support = it })
+
+            assertTrue(refuted)
+            assertEquals(rows.indices.toSet(), assertNotNull(support).toSet())
+        }
+    }
+
+    @Test
+    fun `a feasible reduced graph should retain point repair without a refutation`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 2),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ONE),
+        )
+
+        val refuted = equalityRowsRefute(3, rows, Cancellation.Never)
+        val repair = assertNotNull(prepareMixedEqualityRepair(3, rows, Cancellation.Never))
+        val point = repair.completePoint(rows, null)
+
+        assertFalse(refuted)
+        assertTrue(assertNotNull(point).satisfiesSourceRows(rows))
+    }
+
+    @Test
+    fun `an unsupported residual row should withhold graph refutation support`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 2),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+        )
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertFalse(refuted)
+        assertNull(support)
+    }
+
+    @Test
+    fun `a cancelled residual cycle should withhold all source support`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 2),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.MINUS_ONE),
+        )
+        var cancelled = false
+        var work = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = cancelled
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(3, rows, stop,
+            onStage = { if (it == "PURE_REAL_EQUALITY_GRAPH_REFUTED") cancelled = true },
+            onSupport = { support = it })
+
+        assertFalse(refuted)
+        assertNull(support)
+        assertTrue(work > 0L)
+        assertTrue(equalityRowsRefute(3, rows, Cancellation.Never))
+    }
+
+    @Test
     fun `inconsistent rational equalities should return an exact refutation`() {
         for (wide in listOf(false, true)) {
             val scale = if (wide) BigFraction.of(BIG_ONE shl 180, BIG_ONE) else BigFraction.ONE

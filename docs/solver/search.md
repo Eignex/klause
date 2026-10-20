@@ -848,7 +848,12 @@ request it can check a separate necessary-row snapshot at a partial Boolean pref
 including only rows with known Boolean inputs and current source premises. Omitted
 source choices cannot contribute equations or explanations. Contradiction rejects
 that prefix; positive agreement and witness checks still require complete source
-coverage. These observations do not
+coverage. After equation elimination, a fully admitted reduced difference graph
+can prove a negative cycle under the same operation. Its source conflict retains
+all original input-row origins, including the equations used in reduction; the
+graph's unguarded internal clause cannot stand in for those premises. Separate
+observations identify unavailable residual graphs, attempts and completed cycle
+refutations. Feasible or incomplete graph checks retain the LP fallback. These observations do not
 export numerical certificates or establish whole-source exhaustion. Real
 component observations identify graph checks, source-LP dimension declines and requests,
 and points returned across every component. `RECOVERY_REAL_COMPONENT_SHAPE_<columns>_<rows>`
