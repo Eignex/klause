@@ -65,7 +65,7 @@ class LpPinnedExplanationTest {
         val clause = assertNotNull(explanation.clause(intArrayOf(0), session, Cancellation.Never) {})
 
         assertEquals(setOf(Lit.make(0, false), session.boundGeLit(0, 1, positive = false),
-            session.equalityLit(0, 1, positive = false)), clause.toSet())
+            session.boundLeLit(0, 1, positive = false), session.equalityLit(0, 1, positive = false)), clause.toSet())
         assertTrue(clause.all { session.litTruth(it) == false })
     }
 
