@@ -837,9 +837,9 @@ private class ResidualRealComponent(
                 else -> "ENABLED"
             }
             sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", admission, 0L)
-            sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT",
-                "SOURCE_I_${problem.numIntVars}_R_${problem.numRealVars}_B_${problem.numBoolVars}_F_${problem.numFactors}",
-                0L)
+            val shape = "SOURCE_I_${problem.numIntVars}_R_${problem.numRealVars}" +
+                "_B_${problem.numBoolVars}_F_${problem.numFactors}"
+            sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", shape, 0L)
         }
         val requestPoint = pointHintsEnabled && prefixQueries in listOf(1, 4, 16, 64)
         if (requestPoint) pointHints = null
