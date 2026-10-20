@@ -221,9 +221,11 @@ internal fun Problem.pipelineRoute(
     preparationCancellation: Cancellation,
     polynomialCancellation: Cancellation = preparationCancellation,
     onLpStats: ((LpStats) -> Unit)? = null,
+    preferIncrementalRealSatisfaction: Boolean = false,
 ): SourceProblemRoute = pipelineRouteObserved(
     objective, maximize, true, boundCancellation, onLpStats,
-    requiresExactObjectiveRoute(objective, preparationCancellation),
+    requiresExactObjectiveRoute(objective, preparationCancellation) ||
+        (preferIncrementalRealSatisfaction && numRealVars > 0 && !semantics.isApproximate),
     projections.providers, projections, polynomialCancellation = polynomialCancellation,
     preparationCancellation = preparationCancellation,
 )
@@ -394,8 +396,8 @@ private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, s
  * A source that states no upper bound is not thereby a model for a complete theory: the relaxation
  * routinely proves one, and a model every side of which is proved finite is a finite model that the
  * finite lane owns. Deciding that here rather than after the lane is chosen is what stops a proved-finite
- * model being handed to the exact theory, which cannot use the proof and can spend the whole budget inside
- * one exact reduction.
+ * model retaining an unnecessary open integer scope. Exact linear satisfaction with real columns keeps
+ * incremental arithmetic beside its finite peers so selected prefixes can be checked during traversal.
  *
  * A closure that reaches only some of the open sides is kept too. Which lane runs is not all that reads
  * these bounds: [componentPlan] owns a column CP or THEORY by whether its sides are stated, and an open

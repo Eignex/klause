@@ -151,6 +151,7 @@ object SourceSetup {
             preparationCancellation = stop,
             polynomialCancellation = polynomialCancellation or stop,
             onLpStats = onLpStats,
+            preferIncrementalRealSatisfaction = request.operation == ExecutionOperation.SATISFY,
         )
         return PreparedSourceInvocation(request, route, stop)
     }

@@ -214,6 +214,11 @@ arithmetic-owned. Invocation-local fixings are never permanent source bounds. A
 declined composition keeps its finite owners, and the missing completion withholds
 whole-query admission.
 
+Exact linear satisfaction with real columns retains incremental arithmetic beside
+finite propagation. Declared finite integers keep their domains and ownership,
+while arithmetic can check selected prefixes before those choices are complete.
+Counting and sampling retain their finite projection machinery.
+
 Optional passes and bound closing run under the presolve phase token, while required
 component installation runs under the containing invocation token. Exhausting the
 phase can forgo reductions, but never skips a required encoder or turns an uncovered

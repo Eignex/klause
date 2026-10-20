@@ -1,11 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
@@ -20,6 +24,66 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceRoutingPolicyTest {
+    @Test
+    fun `bounded mixed real satisfaction should retain incremental arithmetic for every engine`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 1L),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+
+        for (engine in FiniteEngine.entries) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SourceAttachment(source), ExecutionOperation.SATISFY, engine,
+            ))
+
+            val route = assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
+            assertEquals(ProblemPipeline.EXACT_LIRA, route.request.route)
+            assertSame(source, route.preparedPlan.originalSource)
+            assertEquals(setOf(0), route.request.componentPlan.cpSourceDomains(route.request.model).keys)
+        }
+    }
+
+    @Test
+    fun `bounded mixed real counting and sampling should retain finite projection ownership`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 1L),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+
+        for (operation in listOf(ExecutionOperation.ENUMERATE, ExecutionOperation.EXACT_COUNT,
+            ExecutionOperation.APPROXIMATE_COUNT, ExecutionOperation.UNIFORM_SAMPLE, ExecutionOperation.SAMPLE)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SourceAttachment(source), operation, FiniteEngine.BACKTRACK,
+            ))
+
+            assertIs<SourceProblemRoute.Finite>(invocation.route)
+            assertSame(source, invocation.preparedPlan.originalSource)
+        }
+    }
+
+    @Test
+    fun `mixed real contradictions should reject a prefix before unrelated finite choices`() {
+        val source = Problem(2, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, 0.0),
+            Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 1L),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val request = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute()).request
+
+        val domains = request.componentPlan.cpSourceDomains(request.model)
+        request.componentPlan.search(request.model, domains).use { planned ->
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            val conflict = assertIs<ComponentResult.Conflict>(
+                planned.session.push(SearchDecision.Bool(Lit.make(0, true))),
+            )
+
+            assertTrue(Lit.make(0, false) in assertNotNull(conflict.explanation).literals)
+            assertNull(planned.session.boolValue(1))
+            assertEquals(2L, assertNotNull(planned.cp).session.intDomain(0).valueCount)
+        }
+    }
+
     @Test
     fun `native finite setup should avoid unselected arithmetic installation`() {
         val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
