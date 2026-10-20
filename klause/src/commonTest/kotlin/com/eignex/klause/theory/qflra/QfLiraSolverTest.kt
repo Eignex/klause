@@ -59,6 +59,32 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `several equation guard consequences should retain their own signed source reasons`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ofLong(2) },
+                LinearOp.LE, BigFraction.ONE, activator = 1),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ofLong(3) },
+                LinearOp.GE, BigFraction.MINUS_ONE, activator = 2),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.NE, BigFraction.ZERO, activator = 3),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val session = SearchSession(listOf(ExactLiraSearchComponent(source)))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+        for ((guard, truth) in listOf(1 to true, 2 to true, 3 to false)) {
+            assertEquals(truth, session.boolValue(guard))
+            assertEquals(setOf(Lit.make(0, false), Lit.make(guard, truth)),
+                assertNotNull(session.reasonFor(guard)).literals.toSet())
+        }
+        assertIs<SearchResult.Satisfied>(session.solve(4))
+    }
+
+    @Test
     fun `selected general equations should imply exact comparison guards at either side of a boundary`() {
         for (op in LinearOp.entries) for (strict in if (op == LinearOp.LE || op == LinearOp.GE) {
             listOf(false, true)

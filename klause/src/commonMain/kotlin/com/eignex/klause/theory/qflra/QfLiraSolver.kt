@@ -798,6 +798,7 @@ class ExactLiraSearchComponent private constructor(
     ): ComponentResult? {
         val groups = prepareEquationGuards() ?: return null
         var checked = 0
+        var implied = false
         repeat(groups.size) {
             lpStop.charge(1L)
             if (operationStop()) return ComponentResult.Indeterminate
@@ -805,7 +806,7 @@ class ExactLiraSearchComponent private constructor(
             equationGuardCursor = (equationGuardCursor + 1) % groups.size
             val guard = rows.first().row.activator
             if (bools[guard] != UNASSIGNED || context.boolValue(guard) != null) return@repeat
-            if (checked++ >= 64) return null
+            if (checked++ >= 64) return if (implied) ComponentResult.Consistent else null
             observeCompleteStage("PURE_REAL_EQUALITY_GUARD_ATTEMPT")
             val selected = HashSet<Int>()
             var truth: Boolean? = null
@@ -838,9 +839,11 @@ class ExactLiraSearchComponent private constructor(
             if (result !is ComponentResult.Consistent) return result
             observeCompleteStage("PURE_REAL_EQUALITY_GUARD_IMPLIED")
             // Search publishes to peers; retain this owner's new source selection before its next check.
-            return accept(SearchDecision.Bool(literal), context)
+            val accepted = accept(SearchDecision.Bool(literal), context)
+            if (accepted !is ComponentResult.Consistent) return accepted
+            implied = true
         }
-        return null
+        return if (implied) ComponentResult.Consistent else null
     }
 
     private fun coordinateDeclined(context: SearchContext): ComponentCheck {

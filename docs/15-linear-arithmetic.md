@@ -170,7 +170,9 @@ This negative check can reject a selected prefix while unrelated Boolean choices
 remain open; rows with unknown conditions stay outside the subset.
 The same prepared equations can also determine open guards of general affine
 comparisons. A bounded sweep visits at most 64 open heads; every comparison sharing
-a head must reduce to a constant and agree on its truth. Disjunction members and
+a head must reduce to a constant and agree on its truth. Consequences in one sweep
+reuse the same prepared equations, and each retains its own source explanation.
+Disjunction members and
 comparisons containing Boolean coefficients defer. Only the nonzero equation
 pivots used by each reduction contribute source premises; the queried comparison
 contributes none. The shared Boolean fixpoint receives the resulting signed clause,
