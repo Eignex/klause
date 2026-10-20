@@ -11,6 +11,62 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `cancelled coupled pivots should resume a complete exact assignment`() {
+        val n = 8
+        val input = ExactContinuationInput(
+            List(n) { column ->
+                List(n) { row -> row to BigFraction.ofLong(if (row == column) 2L else 1L) }
+            },
+            List(n) { BigFraction.ofLong(n + 1L) },
+            List(2 * n) { BigFraction.ZERO },
+            List(2 * n) { if (it < n) null else BigFraction.ZERO },
+            List(n) { n + it },
+            List(2 * n) { if (it < n) ContinuationStatus.LOWER else ContinuationStatus.BASIC },
+        )
+        for (stopAt in listOf(256, 512, 1024, 2048)) {
+            val session = ExactContinuation(input)
+            var polls = 0
+
+            val interrupted = session.resume(cancellation = Cancellation { ++polls >= stopAt })
+            val resumed = session.resume()
+
+            assertEquals(ContinuationDecline.CANCELLED, interrupted.metrics.decline)
+            assertNull(interrupted.values)
+            assertNull(interrupted.ray)
+            assertEquals(List(2 * n) { if (it < n) BigFraction.ONE else BigFraction.ZERO },
+                assertNotNull(resumed.values))
+            assertNull(resumed.ray)
+            assertNull(resumed.metrics.decline)
+            assertEquals(interrupted.metrics.work + resumed.metrics.work, session.usedWork)
+        }
+    }
+
+    @Test
+    fun `independent equality pivots should finish within their allocation allowance`() {
+        val n = 32
+        val huge = BigFraction.of(BIG_ONE shl 130, BIG_ONE)
+        val limits = ExactContinuationLimits(maxAllocation = 200_000)
+        for (target in listOf(BigFraction.ONE, huge)) {
+            val input = ExactContinuationInput(
+                List(n) { listOf(it to BigFraction.ONE) },
+                List(n) { target },
+                List(2 * n) { BigFraction.ZERO },
+                List(2 * n) { if (it < n) null else BigFraction.ZERO },
+                List(n) { n + it },
+                List(2 * n) { if (it < n) ContinuationStatus.LOWER else ContinuationStatus.BASIC },
+            )
+
+            val result = ExactContinuation(input).resume(limits)
+
+            assertEquals(List(2 * n) { if (it < n) target else BigFraction.ZERO },
+                assertNotNull(result.values, result.metrics.toString()))
+            assertNull(result.ray)
+            assertNull(result.metrics.decline)
+            assertTrue(result.metrics.allocation <= limits.maxAllocation)
+        }
+    }
+
+    @Test
     fun `sparse wide equality systems should finish within their containing work allowance`() {
         val rows = 16
         val columns = 64

@@ -641,15 +641,20 @@ private class RationalContinuationLane<F>(
 
     // Publish only a complete pivot. Resource failure leaves the previous basis and tableau usable.
     private fun pivot(row: Int, enter: Int, seat: ContinuationStatus, budget: ContinuationBudget) {
-        budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L)
-        val next = table.map { it.toMutableList() }
+        budget.step(input.m.toLong(), input.m * 8L)
+        val next = table.toMutableList()
+        budget.step(width.toLong(), width * 8L)
+        next[row] = table[row].toMutableList()
         val inverse = reciprocal(table[row][enter], budget)
         for (j in 0 until width) {
             budget.step()
             if (!ops.isZero(table[row][j])) next[row][j] = multiply(table[row][j], inverse, budget)
         }
         for (i in headings.indices) {
+            budget.step()
             if (i == row || ops.isZero(table[i][enter])) continue
+            budget.step(width.toLong(), width * 8L)
+            next[i] = table[i].toMutableList()
             for (j in 0 until width) {
                 budget.step()
                 if (!ops.isZero(next[row][j])) {

@@ -305,8 +305,10 @@ completed target pass. An already seated target leaves the tableau, bounds and
 nonbasic seats unchanged, so advancing past it only charges progress and polls
 cancellation. Interrupted passes retain their completed target position.
 Exact zero tableau coefficients contribute no arithmetic to value, epsilon or
-pivot updates. Dense tableau copies and coefficient traversal remain charged;
-nonzero arithmetic retains scalar admission and pivots publish atomically.
+pivot updates. Pivots copy the normalized row and each row with a nonzero entering
+coefficient, sharing unchanged rows until a later pivot edits them. Row selection,
+copies and coefficient traversal remain charged; nonzero arithmetic retains scalar
+admission and pivots publish atomically.
 
 Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
 restarts the operation from authority, and every attempt is charged. Owner-local
