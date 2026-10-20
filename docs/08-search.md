@@ -178,6 +178,11 @@ uses exact comparisons and filters at most 256 values per fire, falling back to 
 on wider domains. Mixed-sign inputs keep their interior values, and complete
 assignment checks still enforce the full relation.
 
+`DivMod` collects supports from at most 4,096 operand pairs before narrowing any
+role. Repeated roles must agree within each tuple. Support application follows the
+distinct coordinate order, tightens the lower bound before the upper bound and
+then removes unsupported interior values.
+
 #### Difference systems
 
 The finite difference system is posted after presolve only when its fragment has a
