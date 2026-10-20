@@ -41,6 +41,19 @@ through the ordinary arithmetic assertion path before peer propagation. This
 optional deduction owns no source assignment; all remaining source, LP and integer
 checks retain their authority.
 
+Relative unit aliases can also combine an asserted integer exclusion with an
+active weak order to prove a strict source bound. The component admits this
+deduction only for a pending disequality whose raw source expression differs from
+the weak order's expression; matching direct expressions remain with ordinary
+arithmetic side selection. `E != b` with `E <= b` proves `E <= b - 1`, and with
+`E >= b` proves `E >= b + 1`. Each consequence names an existing source-bound atom
+over the original disequality coordinates. Its clause retains both source facts
+and their alias paths, without exporting private root ids or selecting a point.
+The arithmetic owner receives the implied theory literal normally and can consume
+the bound during disequality side selection. No adjacent original Boolean order
+guard is required. Stops, overflow, stale premises or unsupported registration
+withhold publication; retraction removes its scoped assertion.
+
 With null `openHintFlips`, one exact-linear completion owner can reuse a completed
 partial LP point for direct primitive Boolean preferences, including integer-only
 sources. Registration charges the opening token; capture and bounded comparison

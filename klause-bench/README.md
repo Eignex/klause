@@ -570,6 +570,16 @@ Use the same record's route, index outcome and usage to establish feature covera
 `smtCompleteSearchStage_INTEGER_EQUALITY_IMPLICATION` counts admitted affine-equality
 consequences received by the complete integer arithmetic owner. It supplies no
 source verdict, CPU attribution or count of distinct guards.
+`smtCompleteSearchStage_ALIASED_ORDER_ATOM_WEAK_BOUND` counts retained normalized
+weak endpoint keys. `ALIASED_ORDER_ATOM_TIGHTENED` requires a pending source
+disequality, a different raw weak-order expression and an alias-justified strict
+side. `ALIASED_ORDER_ATOM_MATCH` marks its constructed false-premise proof before
+the receiver checks the named literal. `ALIASED_ORDER_ATOM_PUBLISHED` requires
+session acceptance of a new implication; `ALIASED_ORDER_ATOM_RECEIVED` also requires
+ordinary arithmetic acceptance. `ALIASED_ORDER_ATOM_REGISTER_DECLINED` marks
+unsupported source-atom registration. Counts are cumulative callback events, not
+distinct predicates, source witnesses, LP queries, proofs or CPU costs. Reported
+native claims still require original-source validation.
 With absent `open-hint-flips`, one exact-linear completion owner can supply direct
 primitive preferences from an existing partial point without source-clause indexing.
 Index observations require actual construction through the explicit allowance. Explicit zero permits bounded construction observations

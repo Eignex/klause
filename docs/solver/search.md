@@ -32,6 +32,17 @@ exhaustion from becoming a source refutation. See [theory roles](../theories.md#
 The session exchanges Boolean literals, semantic integer bounds and
 opaque theory decisions rather than native CP domains.
 
+An integer alias-order proof can imply a registered source-bound literal with an
+ordinary false-premise clause. Registration uses the original source integer
+coordinates and the exact complementary predicates from `SourceBoundAtom`;
+callback-local alias ids never enter its retained meaning. The implication creates
+no search decision. Source LP installation and level binding precede immediate
+arithmetic reception, and shared propagation receives the same named literal.
+An already true name is skipped, while an opposite name produces an ordinary
+clause conflict. Name reuse survives retraction; the implied trail fact and its
+arithmetic assertion follow their source premises' scope. See
+[integer composition](../theories/linear-integer.md#solving-and-composition).
+
 [SearchSession](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)
 coordinates component callbacks, conflicts and complete checks.
 [SearchTrail](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchTrail.kt)

@@ -214,7 +214,7 @@ class ExactLiraSearchComponent private constructor(
     private val integerEqualities by lazy {
         if (completeTraversalObserved && model.numRealVars == 0 &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy
-        ) ExactIntegerEqualityPropagation.prepare(model, operationStop) else null
+        ) ExactIntegerEqualityPropagation.prepare(model, operationStop, ::observeCompleteStage) else null
     }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
@@ -1132,12 +1132,64 @@ class ExactLiraSearchComponent private constructor(
         return ComponentResult.Conflict(explanation)
     }
 
+    private fun pendingAliasOrder(factor: Int, row: Int, truth: Boolean): Boolean {
+        if (operationStop()) return false
+        val address = RowAddress(factor, row)
+        return address !in node.disequalityDirections &&
+            node.rowTruth(address, model.factors[factor].linearRows[row], bools) == truth
+    }
+
+    private fun implyAliasOrder(
+        order: ExactIntegerEqualityPropagation.Order,
+        context: SearchContext,
+    ): ComponentResult? {
+        if (!pendingAliasOrder(order.factor, order.row, order.sourceTruth)) return null
+        if (order.premises.any { literal ->
+                val variable = Lit.variable(literal)
+                val truth = !Lit.isPositive(literal)
+                context.boolValue(variable) != truth || bools.getOrNull(variable) != if (truth) TRUE else FALSE
+            }
+        ) return null
+        operationStop.charge(order.premises.size + order.terms.size * 4L + 4L)
+        if (operationStop()) return ComponentResult.Indeterminate
+        val terms = order.terms.map { (variable, coefficient) ->
+            SourceBoundTerm(SearchIntValue(variable), coefficient.asFraction())
+        }
+        val threshold = order.bound.asFraction() - (if (order.upper) BigFraction.ZERO else BigFraction.ONE)
+        val split = SourceBoundAtom.integerSplit(context, terms, threshold) ?: return if (operationStop()) {
+            ComponentResult.Indeterminate
+        } else {
+            observeCompleteStage("ALIASED_ORDER_ATOM_REGISTER_DECLINED")
+            null
+        }
+        val decision = SearchDecision.Theory(if (order.upper) split.positive else split.negative)
+        val literal = context.atomLiteral(decision) ?: return null
+        if (context.boolValue(Lit.variable(literal)) == Lit.isPositive(literal)) return null
+        if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop) || operationStop()) {
+            return ComponentResult.Indeterminate
+        }
+        operationStop.charge(order.premises.size + 1L)
+        if (operationStop()) return ComponentResult.Indeterminate
+        if (order.premises.any { context.boolValue(Lit.variable(it)) != !Lit.isPositive(it) }) return null
+        val implied = context.imply(literal, SearchExplanation(order.premises + literal))
+        if (implied !is ComponentResult.Consistent) return implied
+        observeCompleteStage("ALIASED_ORDER_ATOM_PUBLISHED")
+        return accept(decision, context).also { result ->
+            if (result is ComponentResult.Consistent) observeCompleteStage("ALIASED_ORDER_ATOM_RECEIVED")
+        }
+    }
+
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
         floatCandidate = null
         pointHintValues = null
-        val equalityResult = integerEqualities?.propagate(context, operationStop) { literal ->
+        val equalityResult = integerEqualities?.propagate(
+            context,
+            operationStop,
+            orderEligible = ::pendingAliasOrder,
+            receiveOrder = { order -> implyAliasOrder(order, context) },
+        ) { literal ->
             accept(SearchDecision.Bool(literal), context).also { result ->
                 if (result is ComponentResult.Consistent) observeCompleteStage("INTEGER_EQUALITY_IMPLICATION")
             }

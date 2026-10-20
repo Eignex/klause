@@ -566,3 +566,17 @@ A transient cancellation discards the private projection. Installation failure a
 missing conditions cannot publish a prefix or restart with a renewed allowance.
 Choosing the smaller finite member or hole traversal avoids scanning a declared
 interval merely to preserve its membership constraints.
+
+Integer equality and aliased order-atom propagation share the private snapshot's
+ceiling of 1,048,576 visits, at most 65,536 native unit conjunction rows and 65,536
+retained equality-premise occurrences. Weak endpoint keys retain source-row
+references and guard premises, at most one per admitted source order. A pending
+exclusion can contribute at most two strict-side candidates. Proof paths are
+combined on demand within the same visit and premise limits. Source scans,
+normalization, indexing, proof construction and atom reception debit the existing
+operation token. Checked overflow declines the optional consequence. Source LP
+installation and level binding use that token and do not solve an additional LP.
+Registered names denote only the two strict sides and their complements for each
+original source disequality expression, so callbacks and retraction reuse a bounded
+set of names. All alias/index state is discarded after the callback; no query,
+decision allowance, deadline, finite domain or feasibility verdict is created.
