@@ -357,7 +357,9 @@ internal fun executeLinearSource(
     val equivalent = prepared.view.exact && prepared.claimsCoverTolerance && nativeClaimsUnrestricted
     val acceptedOptimal = incumbent?.objective?.let { value -> value == prepared.acceptedObjectiveBound } == true
     val nativeOptimalAttained = nativeOptimum?.let { point ->
-        point.objective == incumbent?.objective && prepared.matchesNativeObjective(point, nativeOptimalValue, stop)
+        prepared.matchesNativeObjective(point, nativeOptimalValue, stop) && incumbent?.let {
+            prepared.matchesNativeObjective(it, nativeOptimalValue, stop)
+        } == true
     } == true
     val conclusion = when {
         acceptedOptimal -> LinearSourceConclusion.OPTIMAL

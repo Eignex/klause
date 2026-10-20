@@ -109,6 +109,33 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
     }
 
     @Test
+    fun `a source better incumbent should retain numerical optimality at a tied native cost`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ofLong(2))),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
+        val value = BigFraction.ONE + BigFraction.ofLong(100_000_000).reciprocal()
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble(), 1.0),
+            exactReals = listOf(value, BigFraction.ONE))
+        val native = OpenTheoryExecution.Optimize(OpenTheoryOptimum.Optimal(
+            OpenTheoryAssignment.Sampled(point), BigFraction.ONE, SolveStats.EMPTY))
+
+        val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, hooks, _ ->
+            hooks.finite.onSample(Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0, 1.0),
+                exactReals = listOf(BigFraction.ONE, BigFraction.ONE)))
+            SourceExecutionResult.Linear(invocation, native)
+        }
+
+        val outcome = assertNotNull(result.linearSource)
+        val expected = if (exact) LinearSourceConclusion.SATISFIABLE else LinearSourceConclusion.OPTIMAL
+        assertEquals(expected, outcome.conclusion)
+        assertEquals(BigFraction.ONE, outcome.incumbent?.objective)
+    }
+
+    @Test
     fun `a restricted native refutation should withhold an original source refutation`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ZERO, SemanticRational.ONE)), emptyList(),
