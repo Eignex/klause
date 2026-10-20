@@ -4,6 +4,7 @@ import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.parseBigInt
 
@@ -28,18 +29,26 @@ internal class FlatZincValues(
         { sample.boolValue(it) },
         { sample.exactIntValue(it).toString() },
         { sample.approximateRealValue(it) },
-        { sample.exactReals?.get(it)?.toString() },
+        { id -> sample.exactReals?.get(id)?.toString() ?: sample.algebraicReals?.get(id)?.let { value ->
+            value.rational?.toString()
+                ?: "root(${value.rootIndex};[${value.definingCoefficients.joinToString(",")}])"
+        } },
     )
 
     constructor(assignment: OpenTheoryAssignment) : this(
         assignment::boolValue,
         assignment::intValue,
         { id ->
-            val parts = assignment.realValue(id).split('/')
-            BigFraction.of(
-                parseBigInt(parts[0]),
-                if (parts.size == 1) BIG_ONE else parseBigInt(parts[1]),
-            ).toDouble()
+            val algebraic = assignment.algebraicRealValue(id)
+            if (algebraic != null) algebraic.rational?.toDouble()
+                ?: (algebraic.lowerBound.toDouble() / 2 + algebraic.upperBound.toDouble() / 2)
+            else {
+                val parts = assignment.realValue(id).split('/')
+                BigFraction.of(
+                    parseBigInt(parts[0]),
+                    if (parts.size == 1) BIG_ONE else parseBigInt(parts[1]),
+                ).toDouble()
+            }
         },
         assignment::realValue,
     )

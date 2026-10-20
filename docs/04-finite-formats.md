@@ -339,8 +339,12 @@ by `3/72057594037927936`. The rational product violates the bound and substituti
 
 ### MiniZinc output rendering
 
-Exact rational coordinates are emitted as `% klause-exact:` comments beside
-MiniZinc-compatible decimal assignments. Mixed exact/grid witnesses add
+Exact coordinates are emitted as `% klause-exact:` comments beside
+MiniZinc-compatible decimal assignments. Rational coordinates retain their fraction;
+irrational coordinates use `root(index;[c0,c1,...])`, naming the selected real root
+of the rational polynomial in ascending coefficient order. Decimal assignments are
+display approximations; the fraction or root description retains source authority.
+Mixed exact/grid witnesses add
 `% klause-coordinate:` and `% klause-float-component:` comments with each grid
 point's binary64 value and approximation reason. With a selected finite grid,
 `==========` reports a grid optimum or completed satisfaction search, and
