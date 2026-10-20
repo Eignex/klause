@@ -242,11 +242,13 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
     ): RationalInterval? {
         val slope = encloseDerivative(polynomial, interval)
         if (slope.lower.signum() <= 0 && slope.upper.signum() >= 0) return null
-        val first = value * slope.lower.reciprocal()
-        val second = value * slope.upper.reciprocal()
+        val first = midpoint - value * slope.lower.reciprocal()
+        val second = midpoint - value * slope.upper.reciprocal()
         // The mean value theorem keeps the isolated root inside midpoint - value / slope.
-        val lower = maxOf(interval.lower, midpoint - maxOf(first, second))
-        val upper = minOf(interval.upper, midpoint - minOf(first, second))
+        val candidateLower = if (first <= second) first else second
+        val candidateUpper = if (first >= second) first else second
+        val lower = if (interval.lower >= candidateLower) interval.lower else candidateLower
+        val upper = if (interval.upper <= candidateUpper) interval.upper else candidateUpper
         if (lower > upper || (upper - lower) + (upper - lower) > interval.upper - interval.lower) return null
         if (evaluate(polynomial, lower).isZero) return RationalInterval(lower, lower)
         if (evaluate(polynomial, upper).isZero) return RationalInterval(upper, upper)
@@ -262,8 +264,8 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             val products = listOf(lower * interval.lower, lower * interval.upper,
                 upper * interval.lower, upper * interval.upper)
             val coefficient = polynomial[degree] * BigFraction.ofLong(degree.toLong())
-            lower = checkNotNull(products.minOrNull()) + coefficient
-            upper = checkNotNull(products.maxOrNull()) + coefficient
+            lower = products.reduce { a, b -> if (a <= b) a else b } + coefficient
+            upper = products.reduce { a, b -> if (a >= b) a else b } + coefficient
         }
         return RationalInterval(lower, upper)
     }
