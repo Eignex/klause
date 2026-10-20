@@ -85,7 +85,7 @@ class LinearSourcePublicationTest {
     }
 
     @Test
-    fun `a nominal optimum should not become an optimum of tolerance acceptance`() {
+    fun `a nominal optimum should report under captured numerical tolerance policy`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("n", true), LinearSourceVariable("x", false)),
             listOf(LinearSourceRow(listOf(LinearSourceTerm(1, SemanticRational.ofLong(3))),
@@ -116,8 +116,9 @@ class LinearSourcePublicationTest {
         assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), values)
         val result = assertIs<SourceExecutionResult.Numerical>(retained)
         assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
-        assertEquals(LinearSourceConclusion.SATISFIABLE, result.linearSource?.conclusion)
-        assertEquals(Verdict.BEST_FOUND, completed)
+        assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+        assertTrue(assertNotNull(result.linearSource).numericalClaims)
+        assertEquals(Verdict.OPTIMAL, completed)
     }
 
     @Test
