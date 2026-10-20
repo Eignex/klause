@@ -1,16 +1,28 @@
 package com.eignex.klause.bench.profile
 
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.io.SequenceInputStream
 import java.nio.file.Files
 import java.util.Base64
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 
 class CorpusSourceCaptureTest {
@@ -54,118 +66,195 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
-    fun `owned source worker exit status and raw output should remain distinct`() {
-        for (exit in listOf(0, 7)) {
-            val out = Files.createTempDirectory("source-worker-test-").toFile()
-            try {
-                val command = listOf("/usr/bin/setsid", "/bin/sh", "-c", "printf 'raw\\r\\n'; exit $exit")
-                if (exit == 0) CorpusSourceCapture.execute(command, out)
-                else assertFailsWith<IllegalStateException> { CorpusSourceCapture.execute(command, out) }
+    fun `original bytes should keep line endings and hash`() = inTemp { dir ->
+        val raw = "opaque\r\nsource\n".toByteArray()
+        val worker = CorpusSourceWorker(dir, checkpoint = {})
 
-                assertEquals("raw\r\n", out.resolve("worker.stdout").readText())
-                val receipt = Json.parseToJsonElement(out.resolve("worker-process.json").readText()).jsonObject
-                assertEquals(exit.toString(), receipt.getValue("exit").jsonPrimitive.content)
-                assertEquals("true", receipt.getValue("streamsComplete").jsonPrimitive.content)
-            } finally {
-                out.deleteRecursively()
-            }
+        val copy = worker.copySource(raw.inputStream(), dir.resolve("source.part"), CorpusSourceCapture.hash(raw))
+
+        assertContentEquals(raw, dir.resolve("source.part").readBytes())
+        assertEquals(raw.size.toLong(), copy.bytes)
+        assertEquals(raw.size.toLong(), worker.sources.used)
+    }
+
+    @Test
+    fun `a mismatched hash should retain the complete unaccepted bytes`() = inTemp { dir ->
+        val raw = "opaque source".toByteArray()
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            CorpusSourceWorker(dir, checkpoint = {}).copySource(raw.inputStream(), dir.resolve("source.part"), ZEROS)
+        }
+
+        assertTrue("hash differs" in error.message.orEmpty())
+        assertContentEquals(raw, dir.resolve("source.part").readBytes())
+    }
+
+    @Test
+    fun `a byte decline should retain only the bounded partial prefix`() = inTemp { dir ->
+        val worker = CorpusSourceWorker(dir, checkpoint = {})
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            worker.copySource("abcd".byteInputStream(), dir.resolve("source.part"), ZEROS, maximum = 3)
+        }
+
+        assertTrue("byte cap" in error.message.orEmpty())
+        assertEquals("abc", dir.resolve("source.part").readText())
+        assertEquals(3L, worker.sources.used)
+    }
+
+    @Test
+    fun `a containing stop should never turn a partial copy into success`() = inTemp { dir ->
+        val worker = CorpusSourceWorker(dir, checkpoint = { throw CaptureStopped("containing stop") })
+
+        assertFailsWith<CaptureStopped> {
+            worker.copySource("opaque".byteInputStream(), dir.resolve("source.part"), ZEROS)
+        }
+
+        assertEquals(0L, dir.resolve("source.part").length())
+        assertFalse(receipt(dir, "source").getValue("hashMatched").jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun `a source read failure should be rethrown and recorded in its receipt`() = inTemp { dir ->
+        val failure = IOException("source read failure")
+
+        val caught = assertFailsWith<IOException> {
+            CorpusSourceWorker(dir, checkpoint = {})
+                .copySource(failingAfter("opaque", failure), dir.resolve("source.part"), ZEROS)
+        }
+
+        assertSame(failure, caught)
+        assertEquals("opaque", dir.resolve("source.part").readText())
+        val receipt = receipt(dir, "source")
+        assertTrue("source read failure" in receipt.getValue("copyError").jsonPrimitive.content)
+        assertFalse(receipt.getValue("streamComplete").jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun `an archive over its cap should debit every observed byte and retain a bounded prefix`() = inTemp { dir ->
+        val worker = CorpusSourceWorker(dir, checkpoint = {})
+        val input = SequenceInputStream("ab".byteInputStream(), "cdefgh".byteInputStream())
+
+        assertFailsWith<IllegalArgumentException> {
+            worker.transferArchive(input, null, dir.resolve("archive.part"), maximum = 5)
+        }
+
+        assertEquals("abcde", dir.resolve("archive.part").readText())
+        assertEquals(6L, worker.downloads.used)
+        val receipt = receipt(dir, "archive")
+        assertEquals(6L, receipt.getValue("observedBytes").jsonPrimitive.long)
+        assertEquals(5L, receipt.getValue("retainedBytes").jsonPrimitive.long)
+        assertEquals(1L, receipt.getValue("omittedBytes").jsonPrimitive.long)
+        assertEquals(CorpusSourceCapture.hash("abcde".toByteArray()), receipt.getValue("sha256").jsonPrimitive.content)
+        assertFalse(receipt.getValue("transportComplete").jsonPrimitive.boolean)
+        assertFalse(receipt.getValue("streamEof").jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun `a failed transfer receipt should not replace the original read failure`() = inTemp { dir ->
+        val failure = IOException("connection reset")
+        dir.resolve("archive.transfer.json").mkdir()
+
+        val caught = assertFailsWith<IOException> {
+            CorpusSourceWorker(dir, checkpoint = {})
+                .transferArchive(failingAfter("ab", failure), null, dir.resolve("archive.part"))
+        }
+
+        assertSame(failure, caught)
+        assertEquals("ab", dir.resolve("archive.part").readText())
+        assertTrue(caught.suppressed.any { "transfer receipt" in it.message.orEmpty() })
+    }
+
+    @Test
+    fun `archive paths should not escape the declared member identity`() {
+        assertEquals("non-incremental/QF_NRA/family/input.smt2",
+            CorpusSourceWorker.canonicalMember("./non-incremental/QF_NRA/family/input.smt2"))
+        for (name in listOf("../input", "/input", "family/../input", "family\\input", "family//input")) {
+            assertFailsWith<IllegalArgumentException> { CorpusSourceWorker.canonicalMember(name) }
         }
     }
 
     @Test
-    fun `short lived source workers should drain both streams before cleanup returns`() {
-        repeat(20) {
-            val out = Files.createTempDirectory("source-short-worker-test-").toFile()
-            try {
-                val command = listOf("/usr/bin/setsid", "/bin/sh", "-c",
-                    "printf 'raw\\r\\n'; printf 'diagnostic\\r\\n' >&2")
+    fun `a requested member should be captured byte for byte from a tar zst archive`() = inTemp { dir ->
+        val raw = "(check-sat)\r\n".toByteArray()
+        val archive = archive(dir, "gnu", mapOf(MEMBER to raw, "non-incremental/other.smt2" to "x".toByteArray()))
+        val out = dir.resolve("out").apply { mkdir() }
 
-                CorpusSourceCapture.execute(command, out)
+        val captured = worker(out, archive).capture(listOf(case(MEMBER, CorpusSourceCapture.hash(raw))))
 
-                assertEquals("raw\r\n", out.resolve("worker.stdout").readText())
-                assertEquals("diagnostic\r\n", out.resolve("worker.stderr").readText())
-                val receipt = Json.parseToJsonElement(out.resolve("worker-process.json").readText()).jsonObject
-                assertEquals("true", receipt.getValue("streamsComplete").jsonPrimitive.content)
-            } finally {
-                out.deleteRecursively()
-            }
-        }
+        assertTrue(captured)
+        assertContentEquals(raw, out.resolve("source-0.smt2").readBytes())
+        assertFalse(out.resolve("archive-0.tar.zst").exists())
     }
 
     @Test
-    fun `worker overflow should retain a bounded prefix and stop the owned group`() {
-        val out = Files.createTempDirectory("source-overflow-test-").toFile()
+    fun `a member absent from the archive should fail without a captured source`() = inTemp { dir ->
+        val archive = archive(dir, "gnu", mapOf("non-incremental/other.smt2" to "x".toByteArray()))
+        val out = dir.resolve("out").apply { mkdir() }
+
+        val captured = worker(out, archive).capture(listOf(case(MEMBER, ZEROS)))
+
+        assertFalse(captured)
+        assertFalse(out.resolve("source-0.smt2").exists())
+        val result = Json.parseToJsonElement(out.resolve("capture.json").readText()).jsonObject
+            .getValue("results").jsonArray.single().jsonObject
+        assertEquals("failed", result.getValue("state").jsonPrimitive.content)
+        assertEquals("requested member absent from archive",
+            result.getValue("issues").jsonArray.single().jsonPrimitive.content)
+    }
+
+    @Test
+    fun `long member names should resolve in gnu pax and ustar archives`() {
+        val member = "non-incremental/QF_NRA/${"f".repeat(60)}/${"g".repeat(60)}/input.smt2"
+        val raw = "(assert true)\n".toByteArray()
+        for (format in listOf("gnu", "posix", "ustar")) inTemp { dir ->
+            val archive = archive(dir, format, mapOf(member to raw))
+            val out = dir.resolve("out").apply { mkdir() }
+
+            val captured = worker(out, archive).capture(listOf(case(member, CorpusSourceCapture.hash(raw))))
+
+            assertTrue(captured, format)
+            assertContentEquals(raw, out.resolve("source-0.smt2").readBytes())
+        }
+    }
+
+    private fun inTemp(block: (File) -> Unit) {
+        val dir = Files.createTempDirectory("corpus-source-capture-test-").toFile()
         try {
-            val command = listOf("/usr/bin/setsid", "/bin/sh", "-c", "yes x")
-
-            assertFailsWith<IllegalStateException> { CorpusSourceCapture.execute(command, out) }
-
-            assertTrue(out.resolve("worker.stdout").length() <= 1024 * 1024)
-            val receipt = Json.parseToJsonElement(out.resolve("worker-process.json").readText()).jsonObject
-            assertEquals("true", receipt.getValue("overflow").jsonPrimitive.content)
+            block(dir)
         } finally {
-            out.deleteRecursively()
+            dir.deleteRecursively()
         }
     }
 
-    @Test
-    fun `a containing interruption should close the worker before returning`() {
-        val out = Files.createTempDirectory("source-stop-test-").toFile()
-        try {
-            Thread.currentThread().interrupt()
+    private fun failingAfter(prefix: String, failure: IOException): InputStream =
+        SequenceInputStream(ByteArrayInputStream(prefix.toByteArray()), object : InputStream() {
+            override fun read(): Int = throw failure
+        })
 
-            assertFailsWith<InterruptedException> {
-                CorpusSourceCapture.execute(listOf("/usr/bin/setsid", "/bin/sh", "-c", "sleep 30"), out)
-            }
+    private fun receipt(dir: File, stem: String): JsonObject =
+        Json.parseToJsonElement(dir.resolve("$stem.transfer.json").readText()).jsonObject
 
-            val receipt = Json.parseToJsonElement(out.resolve("worker-process.json").readText()).jsonObject
-            assertEquals("true", receipt.getValue("containingStop").jsonPrimitive.content)
-        } finally {
-            Thread.interrupted()
-            out.deleteRecursively()
-        }
+    private fun archive(dir: File, format: String, members: Map<String, ByteArray>): File {
+        val tree = dir.resolve("tree")
+        for ((name, bytes) in members) tree.resolve(name).apply { parentFile.mkdirs() }.writeBytes(bytes)
+        val archive = dir.resolve("collection.tar.zst")
+        val process = ProcessBuilder("tar", "--zstd", "--format=$format", "-cf", archive.path, "-C", tree.path, ".")
+            .redirectErrorStream(true).start()
+        val output = process.inputStream.readAllBytes().decodeToString()
+        assertEquals(0, process.waitFor(), output)
+        return archive
     }
 
-    @Test
-    fun `failed group cleanup should retain the process receipt and release its registration`() {
-        val out = Files.createTempDirectory("source-cleanup-failure-test-").toFile()
-        try {
-            assertFailsWith<IllegalStateException> {
-                CorpusSourceCapture.execute(listOf("/usr/bin/setsid", "/bin/sh", "-c", "exit 0"), out,
-                    cleanupHelper = out.resolve("missing-runtime").path)
-            }
+    private fun worker(out: File, archive: File) = CorpusSourceWorker(out, checkpoint = {}, open = {
+        ArchiveResponse(it, archive.length(), archive.inputStream())
+    })
 
-            val process = Json.parseToJsonElement(out.resolve("worker-process.json").readText()).jsonObject
-            val cleanup = Json.parseToJsonElement(out.resolve("worker-cleanup.json").readText()).jsonObject
-            assertEquals("0", process.getValue("exit").jsonPrimitive.content)
-            assertEquals("false", cleanup.getValue("cleanupComplete").jsonPrimitive.content)
-            assertEquals("true", cleanup.getValue("registrationReleased").jsonPrimitive.content)
-            assertEquals("true", cleanup.getValue("shutdownHookRemoved").jsonPrimitive.content)
-        } finally {
-            out.deleteRecursively()
-        }
-    }
-
-    @Test
-    fun `interruption during cleanup should be restored after durable retirement receipts`() {
-        val out = Files.createTempDirectory("source-cleanup-stop-test-").toFile()
-        try {
-            assertFailsWith<IllegalStateException> {
-                CorpusSourceCapture.execute(listOf("/usr/bin/setsid", "/bin/sh", "-c", "exit 0"), out,
-                    afterWorker = { Thread.currentThread().interrupt() })
-            }
-
-            assertTrue(Thread.currentThread().isInterrupted)
-            val process = Json.parseToJsonElement(out.resolve("worker-process.json").readText()).jsonObject
-            val cleanup = Json.parseToJsonElement(out.resolve("worker-cleanup.json").readText()).jsonObject
-            assertEquals("true", process.getValue("containingStop").jsonPrimitive.content)
-            assertEquals("false", cleanup.getValue("cleanupComplete").jsonPrimitive.content)
-            assertEquals("true", cleanup.getValue("registrationReleased").jsonPrimitive.content)
-            assertEquals("true", cleanup.getValue("shutdownHookRemoved").jsonPrimitive.content)
-        } finally {
-            Thread.interrupted()
-            out.deleteRecursively()
-        }
+    private fun case(member: String, sha256: String) = buildJsonObject {
+        put("index", 0)
+        put("expectedSha256", sha256)
+        put("archiveUrl", "https://example.invalid/collection.tar.zst")
+        put("member", member)
     }
 
     private fun request(
@@ -183,5 +272,10 @@ class CorpusSourceCaptureTest {
             })
         }
         return Base64.getEncoder().encodeToString(root.toString().toByteArray())
+    }
+
+    private companion object {
+        const val MEMBER = "non-incremental/QF_NRA/family/input.smt2"
+        val ZEROS = "0".repeat(64)
     }
 }

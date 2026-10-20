@@ -31,7 +31,7 @@ internal object Xcsp3CpSatReference {
     /** Unique suffix per container `--name`, so the watchdog can `docker kill` the exact container. */
     private val seq = AtomicLong()
 
-    /** The container's one-line JSON verdict (see `klause-bench/xcsp3-cpsat/solve.py`). */
+    /** The container's one-line JSON verdict (`images/xcsp3-cpsat/solve.py` in klause-lab). */
     @Serializable
     private data class Verdict(
         val exit: String,
@@ -178,7 +178,7 @@ internal object Xcsp3CpSatReference {
         val v = stdout.lineSequence().lastOrNull { exit == 0 && !timedOut && it.trimStart().startsWith("{") }
             ?.let { Reports.json.decodeFromString<Verdict>(it) }
         check(v == null || v.version == VERSION) {
-            "xcsp3 cp-sat: incompatible importer '${v?.version}'; rebuild $IMAGE from klause-bench/xcsp3-cpsat"
+            "xcsp3 cp-sat: incompatible importer '${v?.version}'; rebuild $IMAGE from klause-lab images/xcsp3-cpsat"
         }
         val result = when {
             exit != 0 || timedOut -> undecided(cmd, stdout, "container exit=$exit, watchdog=$timedOut ($error)")

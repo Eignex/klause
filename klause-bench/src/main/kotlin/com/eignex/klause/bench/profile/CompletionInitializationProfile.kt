@@ -1,5 +1,7 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.bench.metric.SmtSourceTools
+import com.eignex.klause.bench.metric.SmtSourceValidation
 import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
@@ -18,11 +20,9 @@ import com.eignex.klause.util.WorkMeter
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
-import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import java.util.zip.ZipFile
 
 /** Measures actual completion initialization retries and checks their exact source witnesses. */
 object CompletionInitializationProfile {
@@ -235,34 +235,11 @@ object CompletionInitializationProfile {
 
     private fun prepareReference(out: File) {
         if (System.getProperty("klause.bench.z3") != null) return
-        require(System.getProperty("os.name").startsWith("Linux") &&
-            System.getProperty("os.arch") in setOf("amd64", "x86_64")) {
-            "set klause.bench.z3 for another platform"
-        }
-        val url = "https://files.pythonhosted.org/packages/" +
-            "b9/0b/f15168475e5493ea44fa3c5e642903f05d2b870db71ad05662ed87a06976/" +
-            "z3_solver-4.15.3.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-        val expected = "a9afd9ceb290482097474d43f08415bcc1874f433189d1449f6c1508e9c68384"
-        val wheel = File.createTempFile("completion-reference-", ".whl")
-        try {
-            val connection = URI(url).toURL().openConnection().apply {
-                connectTimeout = 30_000
-                readTimeout = 30_000
-            }
-            connection.getInputStream().use { input -> wheel.outputStream().use { input.copyTo(it) } }
-            check(hash(wheel) == expected) { "reference archive hash mismatch" }
-            val binary = out.resolve("reference-z3")
-            ZipFile(wheel).use { archive ->
-                val entry = checkNotNull(archive.getEntry("z3_solver-4.15.3.0.data/data/bin/z3"))
-                archive.getInputStream(entry).use { input -> binary.outputStream().use { input.copyTo(it) } }
-            }
-            check(binary.setExecutable(true)) { "could not make reference executable" }
-            System.setProperty("klause.bench.z3", binary.absolutePath)
-            out.resolve("reference-provenance.txt").writeText("url=$url\narchiveSha256=$expected\n" +
-                "binarySha256=${hash(binary)}\n")
-        } finally {
-            wheel.delete()
-        }
+        val tool = SmtSourceTools.provision(SmtSourceValidation.REFUTATION, out.resolve("reference"))
+        System.setProperty("klause.bench.z3", tool.executable.absolutePath)
+        out.resolve("reference-provenance.txt").writeText(
+            "url=${tool.artifactUrl}\narchiveSha256=${tool.artifactSha256}\nbinarySha256=${tool.binarySha256}\n",
+        )
     }
 
     private fun validate(out: File, source: String, witnesses: List<Sample>) {

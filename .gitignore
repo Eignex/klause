@@ -36,6 +36,3 @@ klause-bench/reference/
 .specstory/
 .aider*
 *.local.md
-
-# Python verification tools
-__pycache__/

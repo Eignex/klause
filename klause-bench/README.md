@@ -368,9 +368,10 @@ and retain installed-build provenance when supported by the selected revision.
 XCSP3 references accept only `cp-sat`; `solve-one backend=reference solver=cp-sat`
 uses the CPMpy importer and OR-Tools engine. Unsupported solver names are rejected
 before invocation and cannot supply a reference verdict under another engine's label.
-The `xcsp3-source-preserving-v2` policy uses the pinned packages in
-[`xcsp3-cpsat/requirements.txt`](xcsp3-cpsat/requirements.txt) and the
-`klause-xcsp3-cpsat:source-preserving-v2` image. Negative extension tables encode each forbidden tuple as a disjunction of
+The `xcsp3-source-preserving-v2` policy uses the pinned packages of the
+`klause-xcsp3-cpsat:source-preserving-v2` image, built from
+[klause-lab](https://github.com/Eignex/klause-lab/tree/main/images/xcsp3-cpsat).
+Negative extension tables encode each forbidden tuple as a disjunction of
 coordinate disequalities; wildcard coordinates contribute no comparison. This
 preserves every permitted source pair after unary exclusions and avoids the
 native negated-table conversion. Positive extension tables keep their native
@@ -386,32 +387,10 @@ verdict. Feasible claims without a complete witness and proofs with incompatible
 native settings are undecided. Native optimum/refutation statuses remain reference
 claims; a source-checked witness certifies feasibility and its objective only.
 
-Build and inspect an owned reference image through the lab client on a pinned
-revision, on the host providing Docker:
+klause-lab builds the image on the host providing Docker and runs its importer regressions,
+which cover matrix axes, weighted expression sums, contradictions, unconstrained source
+variables and objectives beyond binary64 precision.
 
-```sh
-./deploy/lab profile com.eignex.klause.bench.profile.Xcsp3ReferenceImage <ref> "build XCSP3 reference image" lab 1200 build
-```
-
-Without `build`, that profile inspects the legacy `latest` image. It retains the
-image identity, installed importer/parser bytes, dependency versions and installed
-bench provenance. Importer behavior regressions run in the ordinary build gate;
-they cover matrix axes, weighted expression sums, contradictions, unconstrained
-source variables and objectives beyond binary64 precision.
-
-`bench.profile.Xcsp3ReferenceReplay` accepts `request64=<base64 JSON array>` with
-one `{suite,problem,sourceSha256,witness,objective}` entry per bounded job. It resolves
-original XCSP sources through the catalog and requires their hashes to match.
-The default diagnoses the legacy image; `image=current` diagnoses the maintained
-image. It retains original bytes, parsed-witness violations, exact objective,
-native model text, runtime identities and solver outcomes under ordinary, pinned
-and isolated presolve settings. Each supplied witness also uses the maintained
-independent source checker, retaining its accepted, invalid or declined result.
-`mode=reduce` weakens the legacy native diagnostic
-model while retaining a supplied witness, with at most 120 bounded solver calls;
-its reduced models are diagnostic derivatives, never original-source reference
-rows or independently checked proofs. Independently validate supplied and newly
-returned witnesses against the original XML with the source checker.
 Check failed, unsupported and missing cases before interpreting comparisons.
 Lab agreement and regression confirmation remain recorded-result evidence;
 [independent source validation](#source-validation) defines stronger checks.
@@ -676,54 +655,37 @@ each case supplies exactly `suite`, `problem` and a nonnull lowercase 64-digit
 outside the repository. There is no default selection or reference-result filter.
 
 The profile retains raw and resolved requests before transfer. Archive layout and
-URL come from the same catalog declaration used by ordinary selection. The source
-worker uses HTTPS without proxy inheritance, streams tar metadata through an owned
-`zstd` decoder and copies only requested regular plain `.smt2` members. It does not
-extract an archive into the corpus cache or change the cached collection. Missing,
-compressed-inner, duplicate, unsupported and mismatched members remain failed;
-no identity or source hash is invented. Leading `./` archive prefixes are normalized;
-absolute and traversal names cannot become retained source paths.
+URL come from the same catalog declaration used by ordinary selection. The in-process
+source worker uses HTTPS without proxy inheritance, never follows a redirect off HTTPS,
+streams tar metadata through the system `zstd` decoder and copies only requested regular
+plain `.smt2` members. It does not extract an archive into the corpus cache or change the
+cached collection. Missing, compressed-inner, duplicate, unsupported and mismatched members
+remain failed; no identity or source hash is invented. Leading `./` archive prefixes are
+normalized; absolute and traversal names cannot become retained source paths.
 
 Limits are 128 cases, 48 KiB of original request, 256 MiB per downloaded archive,
 512 MiB total observed download, 8 GiB decoded archive bytes per collection,
 200,000 members, 32 MiB per source and 128 MiB total source payload. Worker
-receipts are bounded to 4 MiB each and 32 MiB in total. The Python worker retains a
-1,200-second containing watchdog, 30-second network read timeout and 2 GiB address
-space limit. The owning JVM bounds the worker to 1,230 seconds and each output
-stream to 1 MiB. Child-group cleanup includes the decoder, including when its
-Python parent has exited. Linux `setsid`, Python 3 and `zstd` are required; Python
-runs isolated without provisioning mathematical packages. Cooperative IO and OS
-cleanup can overrun a polling boundary; the containing owner kills the group and
-withholds process completeness on timeout, overflow or interrupted draining.
-Exited workers retain their pipes until the stream readers finish; group cleanup
-still terminates owned descendants. An incomplete capture reports its exit,
-stream completion and cleanup state in the failure message.
+receipts are bounded to 4 MiB each and 32 MiB in total. A 1,200-second deadline is
+checked per block and per member, with a 30-second network connect and read timeout.
+Linux and `zstd` are required.
 
 Under `$OUT/corpus-source-capture`, each completed payload receives an indexed
 `.smt2` path only after source size/hash and complete decoder exit are checked.
 Partial source and failed archive bytes are retained with transfer/failure metadata.
-Failed HTTP reads retain bounded exception-partial bytes, account for all observed
-bytes including omitted excess, and durably record the retained prefix hash and
-primary transfer failure. Socket-buffer bytes not exposed by the read API remain
-explicitly unavailable; transfer errors never trigger retries. Copy and receipt
-IO preserve the primary failure and separately report durability/close failures.
-Decoder kill, reap, stream retirement and signal restoration are independently
-attempted; any unavailable cleanup or receipt prevents completion credit.
-A successful archive download is removed after its digest and decoder receipts are
-saved; full original source bytes remain. `capture.json` keeps every planned case
-as captured, failed or not reached, and reports no solver/parser/checker calls.
-`worker-process.json` retains true child exit, stream completion, primary failure,
-checked group/helper/reap outcomes and stop flags. `worker-cleanup.json` joins final
-registration release, hook removal and cleanup failures. Interrupted or failed
-cleanup still attempts those durable receipts and withholds completeness;
-installed-build provenance and worker hashes bind the producing code. Retrieve
-outputs with maintained lab `files`/`cat` over authenticated HTTPS. Hash equality
-establishes original-byte custody, never source satisfiability or a runtime gain.
-The retained archive/source/decoder-stream/worker-receipt limits bound only the
-profile's owned files. Harness JFR and other harness output are outside that
-ownership. The lab's 1 GiB output retrieval limit can omit files; completion credit
-requires the actual terminal inventory, `omitted.tsv` and collected payload hashes,
-not only the worker's completion flag.
+Bytes read past a cap are debited and reported as omitted; transfer errors never
+trigger retries. Copy and receipt IO preserve the primary failure and separately
+report durability/close failures. A successful archive download is removed after its
+digest receipt is saved; full original source bytes remain. `capture.json` keeps every
+planned case as captured, failed or not reached, and reports no solver/parser/checker
+calls. Installed-build provenance binds the producing code. Retrieve outputs with
+maintained lab `files`/`cat` over authenticated HTTPS. Hash equality establishes
+original-byte custody, never source satisfiability or a runtime gain. The retained
+archive/source/receipt limits bound only the profile's owned files. Harness JFR and
+other harness output are outside that ownership. The lab's 1 GiB output retrieval limit
+can omit files; completion credit requires the actual terminal inventory, `omitted.tsv`
+and collected payload hashes, not only the worker's completion flag.
+
 
 ### Prepared MPS primal probes
 
@@ -1060,40 +1022,36 @@ The lab's executed revision and setup identity belong with these results;
 Acceptance certifies source feasibility and objective values, not optimality or
 infeasibility proofs.
 
-
 ### Boolean source verifier
 
-[verify_boolean_source_results.py](tools/verify_boolean_source_results.py) checks
-`DIMACS`, `WCNF` and polynomial `OPB`/WBO records against original source bytes in
-`<sourceHashes.model>.txt` files in the supplied directory. It accepts complete
-signed-literal assignments, OPB variable
-names and WCNF bitstrings. Clauses, hard weights, Boolean integrality and integer
-objectives use exact arithmetic. WBO checks evaluate weighted soft-relation
-violations and enforce the strict soft-top ceiling on that violation cost. UTF-8
-comments preserve original byte hashes.
-OPB products use Boolean conjunction, including complemented and repeated literals,
-in constraints, objectives and weighted soft relations. OPB bodies can omit the
-variable-count comment; their range is inferred from every product literal.
-Malformed terms and unsupported syntax are declined.
+`verify-boolean` checks `DIMACS`, `WCNF` and polynomial `OPB`/WBO records against original
+source bytes in `<sourceHashes.model>.txt` files under `source-root`. It accepts complete
+signed-literal assignments, OPB variable names and WCNF bitstrings. Clauses, hard weights,
+Boolean integrality and integer objectives use exact arithmetic. WBO checks evaluate weighted
+soft-relation violations and enforce the strict soft-top ceiling on that violation cost. UTF-8
+comments preserve original byte hashes. OPB products use Boolean conjunction, including
+complemented and repeated literals, in constraints, objectives and weighted soft relations.
+OPB bodies can omit the variable-count comment; their range is inferred from every product
+literal. Malformed terms and unsupported syntax are declined. The checker does not use
+Klause's format readers.
 
 ```sh
-python3 -m pip install -r klause-bench/tools/requirements-source-checks.txt
-python3 klause-bench/tools/verify_boolean_source_results.py /path/to/cases.json \
-  --source-root /path/to/original-sources --records-root /path/to/raw-job \
-  --output /path/to/boolean-source-checks.json
+./gradlew :klause-bench:bench --args="verify-boolean cases=/path/to/cases.json \
+  source-root=/path/to/original-sources records-root=/path/to/raw-job \
+  output=/path/to/boolean-source-checks.json"
 ```
 
-The checker independently excludes better source objectives or refutes source
-constraints using the pinned Z3 dependency with a ten-second limit. A recognized
-pigeonhole subformula can establish a refutation directly. Timeout leaves proof
-checking unknown; a feasible point receives no optimum credit without that check.
-The exact `coreGuidedLowerBound` statistic is checked by excluding source objectives
-below that floor, including records without an incumbent. `checkedLowerBound` records
-only a completed independent check; an undecided floor uses `boundCheck=unknown`.
-Floor telemetry and floor checking do not establish an optimum without a matching witness.
-Errors are recorded per case and make the command exit unsuccessfully. The checker
-supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
-
+Better source objectives and source refutations are excluded by one SMT-LIB query to the pinned
+Z3 release (or `KLAUSE_Z3` with `KLAUSE_Z3_SHA256`) under a ten-second solver limit and the
+source-checker resource controls; each settled check records the Z3 binary hash. A recognized
+pigeonhole subformula establishes a refutation directly. Timeout leaves proof checking unknown;
+a feasible point receives no optimum credit without that check. The exact
+`coreGuidedLowerBound` statistic is checked by excluding source objectives below that floor,
+including records without an incumbent. `checkedLowerBound` records only a completed
+independent check; an undecided floor uses `boundCheck=unknown`. Floor telemetry and floor
+checking do not establish an optimum without a matching witness. Errors are recorded per case
+and make the command exit unsuccessfully. The checker reads JSON and gzip case files, declines
+xz, and preserves cases with no claimed verdict.
 
 ## Comparing configurations
 
@@ -1105,7 +1063,7 @@ strength, budgets, seeds and resolved binaries:
 ./gradlew :klause-bench:solveCampaign --args="solve suite=core kind=cop engine=cp param=var-selector=smallest-domain timeout=30000 label=domain"
 ```
 
-`output/compare.sh [--incomplete] <dirA> <dirB>` compares shared cases by
+`output/compare.sh [--incomplete] <dirA> <dirB>`, a wrapper for `bench compare`, compares shared cases by
 feasibility, proof and direction-aware objective quality, using time to break ties.
 Complete mode prefers proved optima; incomplete mode ignores proof and splits
 ties equally. Reports include contradictory outcomes. Time prefers witness time,

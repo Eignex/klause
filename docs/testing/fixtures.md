@@ -119,20 +119,14 @@ must remain feasible.
 
 ## XCSP3 reference importer
 
-[`test_solve.py`](../../klause-bench/xcsp3-cpsat/test_solve.py) contains self-authored
-constant and variable matrix fixtures, grouped conditions and axis-bound failures.
-Its weighted expression-sum, contradiction, unconstrained-variable and wide
-objective controls are self-authored Apache-2.0 sources. Full fetched XCSP sources
-and saved witness records remain external; their source hashes and independent
-checker receipts bind remote regression controls to original bytes.
-The reference importer uses column-count strides for row-major matrix selection
-and enforces both source index bounds. Source-preserving reference records retain
-the installed image/importer identity, complete source assignment and exact integer
-objective. Negative extension tuples retain their complement semantics under
-source-domain exclusions through explicit conflict clauses.
-See the [benchmark reference workflow](../../klause-bench/README.md#klause-lab)
-for image preparation, replay and the distinction between source witnesses and
-native proof claims.
+The cp-sat reference image and its self-authored importer regression fixtures live in
+[klause-lab](https://github.com/Eignex/klause-lab/tree/main/images/xcsp3-cpsat), which builds and runs
+the reference images. Full fetched XCSP sources and saved witness records remain external; their source
+hashes and independent checker receipts bind remote regression controls to original bytes.
+Source-preserving reference records retain the installed image/importer identity, complete source
+assignment and exact integer objective. See the
+[benchmark reference workflow](../../klause-bench/README.md#klause-lab) for the distinction between
+source witnesses and native proof claims.
 
 ## Measurement storage
 
