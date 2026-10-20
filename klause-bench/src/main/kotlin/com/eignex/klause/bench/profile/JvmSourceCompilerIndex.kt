@@ -39,9 +39,22 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
         "SELECT reference FROM links WHERE binding=? AND observed=? AND candidate=?",
     )
     private val insertLink = db.prepareStatement("INSERT INTO links VALUES (?,?,?,?)")
+    private val linkCache = JvmSavedReferenceCache<LinkKey, Long>()
     private var linkReferences = 0L
 
+    // Decoder candidates are immutable and shared by their validated context/method pair.
+    private class LinkKey(val binding: String, val observed: JsonElement, val candidate: JsonObject) {
+        override fun equals(other: Any?): Boolean {
+            if (other !is LinkKey) return false
+            return binding == other.binding && observed == other.observed && candidate === other.candidate
+        }
+
+        override fun hashCode(): Int =
+            31 * (31 * binding.hashCode() + observed.hashCode()) + System.identityHashCode(candidate)
+    }
+
     fun beginLinkReport() {
+        linkCache.clear()
         db.createStatement().use { it.executeUpdate("DELETE FROM links") }
         linkReferences = 0L
     }
@@ -52,23 +65,27 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
         candidate: JsonObject,
         define: (Long, JsonObject) -> Unit,
     ): Long {
-        val observedText = observed.toString()
-        val candidateText = candidate.toString()
-        findLink.setString(1, binding)
-        findLink.setString(2, observedText)
-        findLink.setString(3, candidateText)
-        val existing = findLink.executeQuery().use { if (it.next()) it.getLong(1) else null }
-        if (existing != null) return existing
-        val value = link(binding, observed, candidate)
-        val reference = linkReferences++
-        insertLink.setString(1, binding)
-        insertLink.setString(2, observedText)
-        insertLink.setString(3, candidateText)
-        insertLink.setLong(4, reference)
-        insertLink.executeUpdate()
-        checkSize()
-        define(reference, value)
-        return reference
+        return linkCache.getOrLoad(LinkKey(binding, observed, candidate)) {
+            val observedText = observed.toString()
+            val candidateText = candidate.toString()
+            val weight = binding.encodeToByteArray().size.toLong() + observedText.encodeToByteArray().size +
+                candidateText.encodeToByteArray().size
+            findLink.setString(1, binding)
+            findLink.setString(2, observedText)
+            findLink.setString(3, candidateText)
+            val existing = findLink.executeQuery().use { if (it.next()) it.getLong(1) else null }
+            if (existing != null) return@getOrLoad existing to weight
+            val value = link(binding, observed, candidate)
+            val reference = linkReferences++
+            insertLink.setString(1, binding)
+            insertLink.setString(2, observedText)
+            insertLink.setString(3, candidateText)
+            insertLink.setLong(4, reference)
+            insertLink.executeUpdate()
+            checkSize()
+            define(reference, value)
+            reference to weight
+        }
     }
 
     fun add(binding: String, head: String, member: String, ordinal: Long, row: JsonObject, identity: JsonObject) {
@@ -176,7 +193,10 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
 
     private fun checkSize() = check(file.length() <= MAX_SAVED_INDEX_BYTES) { "Source index exceeds bounds" }
 
-    override fun close() = db.close()
+    override fun close() {
+        linkCache.clear()
+        db.close()
+    }
 }
 
 internal const val MAX_SAVED_INDEX_BYTES = 8L * 1024 * 1024 * 1024

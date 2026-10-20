@@ -28,6 +28,10 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
     )
     private val findContext = db.prepareStatement("SELECT reference,method_count FROM contexts WHERE record=?")
     private val markUsed = db.prepareStatement("UPDATE contexts SET used=1 WHERE record=?")
+    private data class Context(val reference: JsonObject, val methodCount: Long)
+
+    private val contextCache = JvmSavedReferenceCache<Long, Context>()
+    private val candidateCache = JvmSavedReferenceCache<Pair<Long, Long>, JsonObject>()
     private var schemaSeen = false
     private var legacy = false
     private var bindingSchema = false
@@ -199,15 +203,22 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
             val position = savedInteger(pair[1])
             previous?.let { require(record > it.first || (record == it.first && position > it.second)) }
             previous = record to position
-            findContext.setLong(1, record)
-            val reference = findContext.executeQuery().use {
-                require(it.next()) { "Candidate context is unbound" }
-                require(position >= 0 && position < it.getLong(2))
-                JvmSavedJson.parse(it.getString(1)).jsonObject
+            val context = contextCache.getOrLoad(record) {
+                findContext.setLong(1, record)
+                val (text, count) = findContext.executeQuery().use {
+                    require(it.next()) { "Candidate context is unbound" }
+                    it.getString(1) to it.getLong(2)
+                }
+                val reference = JvmSavedJson.parse(text).jsonObject
+                markUsed.setLong(1, record)
+                markUsed.executeUpdate()
+                Context(reference, count) to text.encodeToByteArray().size.toLong()
             }
-            markUsed.setLong(1, record)
-            markUsed.executeUpdate()
-            JsonObject(reference + ("methodIndex" to JsonPrimitive(position)))
+            require(position >= 0 && position < context.methodCount)
+            candidateCache.getOrLoad(record to position) {
+                val candidate = JsonObject(context.reference + ("methodIndex" to JsonPrimitive(position)))
+                candidate to candidate.toString().encodeToByteArray().size.toLong()
+            }
         }
         return buildJsonObject {
             put("observedMethodCopiedVerbatim", observed)
@@ -223,7 +234,11 @@ internal class JvmCompilerCandidates(private val file: File) : AutoCloseable {
 
     private fun checkSize() = check(file.length() <= MAX_SAVED_INDEX_BYTES) { "Candidate index exceeds bounds" }
 
-    override fun close() = db.close()
+    override fun close() {
+        contextCache.clear()
+        candidateCache.clear()
+        db.close()
+    }
 
     private companion object {
         val CONTEXT_FIELDS = listOf(

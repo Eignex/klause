@@ -19,6 +19,7 @@ internal object JvmSourceCompilerReview {
         val out = File(args[2])
         val scratch = File(args[3])
         val result = runCatching {
+            recordStage(out, "catalog")
             val catalogFile = File(out, "input-catalog.json")
             savedDownload(args[0], catalogFile, JvmSavedJson.Kind.CATALOG_METADATA.maximumBytes, args[1])
             val catalog = JvmSavedJson.read(catalogFile, JvmSavedJson.Kind.CATALOG_METADATA).jsonObject
@@ -49,7 +50,20 @@ internal object JvmSourceCompilerReview {
         val bytes = (completion.toString() + "\n").encodeToByteArray()
         require(bytes.size <= JvmSavedJson.Kind.PRODUCER_COMPLETION.maximumBytes)
         Files.write(File(out, "completion.json").toPath(), bytes, StandardOpenOption.CREATE_NEW)
+        if (result.isSuccess) recordStage(out, "complete")
         result.getOrThrow()
+    }
+
+    internal fun recordStage(out: File, phase: String, arm: Int? = null) {
+        require(phase in STAGES && (arm == null || arm in 0..1))
+        File(out, "source-compiler-links-stage.json").writeText(
+            buildJsonObject {
+                put("schema", "source-compiler-links-stage-v1")
+                put("phase", phase)
+                put("arm", arm)
+                put("scope", "Owned reader lifecycle stage; no original data or savings proof")
+            }.toString() + "\n",
+        )
     }
 
     private fun originalInputs(catalog: JsonObject): List<JsonObject> =
@@ -133,6 +147,7 @@ internal object JvmSourceCompilerReview {
         require(items.isNotEmpty() && items.size + 1 <= 8)
         val inputs = JvmSavedInputs(out, scratch)
         val descriptor = catalog.getValue("descriptorInput").jsonObject
+        recordStage(out, "authenticate-inputs")
         val saved = (items + descriptor).associate { it.savedString("id") to inputs.authenticate(it) }
         val paths = saved.getValue(descriptor.savedString("id"))
         val completion = JvmSavedJson.read(
@@ -143,10 +158,12 @@ internal object JvmSourceCompilerReview {
             paths.getValue(descriptor.savedString("catalogMember")),
             JvmSavedJson.Kind.CATALOG_METADATA,
         ).jsonObject
+        recordStage(out, "validate-source-universe")
         val contexts = validateCatalog(catalog, requirements, original, completion)
         val reports = ArrayList<JvmSavedReport>()
         try {
             JvmSourceCompilerIndex(File(scratch, "source-compiler-links.sqlite")).use { index ->
+                recordStage(out, "source-audits")
                 indexAudits(index, descriptor, paths, completion, contexts)
                 val observations = catalog.getValue("observationInputs").jsonArray.map { it.jsonObject }
                 val cohorts = observations.filter { it["role"] == JsonPrimitive("compiler-cohort") }
@@ -159,6 +176,7 @@ internal object JvmSourceCompilerReview {
                 val census = observations.single { it["role"] == JsonPrimitive("compiler-census") }.savedString("id")
                 val budget = JvmSavedReportBudget()
                 cohorts.forEachIndexed { arm, item ->
+                    recordStage(out, "candidate-links", arm)
                     val cohortPaths = saved.getValue(item.savedString("id"))
                     val reportMember = memberNamed(item, "compiler-bytecode-candidates.jsonl.gz")
                     val producer = JvmSavedJson.read(
@@ -201,8 +219,11 @@ internal object JvmSourceCompilerReview {
                     check(candidateIndex.delete()) { "Cannot remove closed candidate index" }
                 }
             }
+            recordStage(out, "output-round-trip")
             val proofs = reports.map { it.verify() }
+            recordStage(out, "input-reverification")
             inputs.verifyUnchanged()
+            recordStage(out, "completion-metadata")
             return buildJsonObject {
                 put("completed", true)
                 put("reports", JsonArray(proofs))
@@ -310,4 +331,8 @@ internal object JvmSourceCompilerReview {
             }
 
     private val PROOF_FLAGS = (SOURCE_PROOF_FLAGS + COHORT_PROOF_FLAGS).distinct()
+    private val STAGES = setOf(
+        "catalog", "authenticate-inputs", "validate-source-universe", "source-audits", "candidate-links",
+        "output-round-trip", "input-reverification", "completion-metadata", "complete",
+    )
 }

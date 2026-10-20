@@ -1525,6 +1525,18 @@ candidate indexes are removed after their arm; the wrapper removes owned input
 staging after child termination and preserves sources, provenance, process status,
 stdout/stderr and output. All output reports share the 4 GiB logical/512 MiB
 compressed allowance and require a complete byte-count/SHA-256 gzip round trip.
+Three lookup caches each admit at most 4,096 entries and 16 MiB of serialized
+payload weights. They retain immutable decoded contexts, method candidates and
+validated source link references. Oversized and evicted values remain available
+from the complete disk indexes; every reference still checks its original order
+and method bounds. Each report owns a fresh candidate cache and source link
+reference universe.
+
+`source-compiler-links-stage.json` records the latest owned reader phase and an
+optional input-arm ordinal. It contains no original measurements or elapsed costs.
+A stage tag, including `complete`, supplies lifecycle diagnostics; completion
+admission still requires the whole producer header, successful child exit and all
+input/output byte checks.
 
 One monotonic 180-second wrapper budget covers review and capture. Review leaves
 30 seconds for archiving; a child exceeding its remaining review allowance is

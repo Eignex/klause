@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -14,6 +15,40 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class JvmSourceCompilerReviewTest {
+    @Test
+    fun `the reader stage retains the latest owned phase`(@TempDir out: File) {
+        JvmSourceCompilerReview.recordStage(out, "catalog")
+
+        JvmSourceCompilerReview.recordStage(out, "candidate-links", 1)
+
+        val actual = JvmSavedJson.read(
+            File(out, "source-compiler-links-stage.json"), JvmSavedJson.Kind.CATALOG_METADATA,
+        ).jsonObject
+        assertEquals(JsonPrimitive("source-compiler-links-stage-v1"), actual["schema"])
+        assertEquals(JsonPrimitive("candidate-links"), actual["phase"])
+        assertEquals(JsonPrimitive(1), actual["arm"])
+        assertEquals(
+            JsonPrimitive("Owned reader lifecycle stage; no original data or savings proof"), actual["scope"],
+        )
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["phase", "arm"])
+    fun `unknown diagnostic fields cannot replace a valid owned stage`(variant: String, @TempDir out: File) {
+        JvmSourceCompilerReview.recordStage(out, "catalog")
+        val file = File(out, "source-compiler-links-stage.json")
+        val original = file.readText()
+
+        assertFailsWith<IllegalArgumentException> {
+            JvmSourceCompilerReview.recordStage(
+                out, if (variant == "phase") "original-input-content" else "candidate-links",
+                if (variant == "arm") 2 else null,
+            )
+        }
+
+        assertEquals(original, file.readText())
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["complete", "missing-end", "late-class", "wrong-target"])
     fun `a whole source audit requires its final obligations after every original class`(
