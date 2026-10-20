@@ -100,7 +100,7 @@ internal class JvmSavedTables(raw: ByteArray) {
     }
 
     private companion object {
-        val FACTORY = JsonFactoryBuilder()
+        val FACTORY: JsonFactory = JsonFactoryBuilder()
             .streamReadConstraints(
                 StreamReadConstraints.builder()
                     .maxNestingDepth(4096)
