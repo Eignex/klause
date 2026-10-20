@@ -326,8 +326,8 @@ class ExactLiraSearchComponent private constructor(
     }
 
     internal fun deferIntegerPrefixChecks() {
-        check(context == null && model.numIntVars > 0 && model.numRealVars == 0)
-        deferIntegerPrefixes = true
+        check(context == null)
+        deferIntegerPrefixes = model.numIntVars > 0 && model.numRealVars == 0
     }
 
     internal fun observeCompleteTraversal() {

@@ -20,7 +20,7 @@ import kotlin.test.assertIs
 
 class TheoryComponentFactoryTest {
     @Test
-    fun `the shared integer route should postpone optional prefix checks`() {
+    fun `the generic integer component factory should retain eager prefix checks`() {
         val open = Bits(2).also { it.set(0); it.set(1) }
         val model = Problem(
             numBoolVars = 2,
@@ -38,7 +38,7 @@ class TheoryComponentFactoryTest {
 
             val result = session.push(SearchDecision.Bool(Lit.make(0, true)))
 
-            assertIs<ComponentResult.Consistent>(result)
+            assertIs<ComponentResult.Conflict>(result)
             assertIs<ComponentCheck.Infeasible>(session.check())
         }
     }

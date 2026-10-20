@@ -200,7 +200,8 @@ internal class RationalTheoryDescent(
                 if (route == ProblemPipeline.UNSUPPORTED_OPEN || route == ProblemPipeline.FINITE_CP) {
                     return finish(TerminationReason.Unsupported)
                 }
-                val engine = OpenTheoryEngine(model, route, PresolveConfig.NONE, true, Cancellation.Never, null)
+                val engine = OpenTheoryEngine(model, route, PresolveConfig.NONE, true, Cancellation.Never, null,
+                    integerModelChecks = false)
                 ResumableOpenTheory(
                     engine,
                     params.copy(

@@ -403,6 +403,7 @@ class OpenTheoryMinimizer internal constructor(
                 presolveCancellation,
                 reuseOpeningBoundAttempt,
                 declaredRoute = opened.boundedPlan.theoryPipeline,
+                integerModelChecks = false,
             )
             reuseOpeningBoundAttempt = false
             return ResumableOpenTheory(engine, params, state)

@@ -61,9 +61,6 @@ internal fun ComponentPlan.theoryComponentFactory(
             override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
         })
         return listOf(factory.open(cpIntVars, contribution).also { component ->
-            if (theoryPipeline == ProblemPipeline.EXACT_LIRA && fragment.numIntVars > 0 && fragment.numRealVars == 0) {
-                component.deferIntegerPrefixChecks()
-            }
             opening.ownComponent(component)
             component.useSolveStop(opening.theorySolveStop)
             opening.smtStats?.let(component::observeWith)

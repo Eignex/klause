@@ -261,6 +261,7 @@ class OpenTheoryEngine internal constructor(
     private val preparationCancellation: Cancellation,
     private val reuseOpeningBoundAttempt: Boolean,
     private val sourceSemantics: EffectiveSourceSemantics,
+    private val integerModelChecks: Boolean = true,
 ) {
     private var preparation: OpenSourcePreparation? = null
 
@@ -287,6 +288,7 @@ class OpenTheoryEngine internal constructor(
         presolveCancellation: Cancellation,
         presolveBudget: PresolveBudget?,
         projections: PreparedFactorProjections? = null,
+        integerModelChecks: Boolean = true,
     ) : this(
         route,
         { cancellation ->
@@ -302,6 +304,7 @@ class OpenTheoryEngine internal constructor(
         presolveCancellation,
         false,
         model.semantics,
+        integerModelChecks,
     )
 
     /** Decide an already-prepared model under the plan selected from it. */
@@ -310,8 +313,9 @@ class OpenTheoryEngine internal constructor(
         preparationCancellation: Cancellation,
         reuseOpeningBoundAttempt: Boolean,
         declaredRoute: ProblemPipeline = planned.route,
+        integerModelChecks: Boolean = true,
     ) : this(declaredRoute, { planned }, preparationCancellation, reuseOpeningBoundAttempt,
-        planned.prepared.source.semantics)
+        planned.prepared.source.semantics, integerModelChecks)
 
     init {
         require(declaredRoute != ProblemPipeline.FINITE_CP && declaredRoute != ProblemPipeline.UNSUPPORTED_OPEN) {
@@ -420,6 +424,7 @@ class OpenTheoryEngine internal constructor(
         var failure: Throwable? = null
         try {
             (planned.theory as? ExactLiraSearchComponent)?.let {
+                if (integerModelChecks) it.deferIntegerPrefixChecks()
                 it.observePrimaryLpWith(stats.lp.certificationObserver(LpRoute.STANDALONE))
                 it.observeCompleteTraversal()
                 it.useMixedPointCompletion()

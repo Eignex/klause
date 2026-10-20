@@ -43,6 +43,27 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheorySolverTest {
+    @Test
+    fun `integer satisfaction should check a complete Boolean model after postponing its prefix`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(
+                Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.GE, 2),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+            ),
+        )
+        val engine = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA, PresolveConfig.NONE, false,
+            Cancellation.Never, null)
+
+        val result = assertIs<OpenTheoryResult.Sat>(engine.solve())
+
+        assertTrue((result.stats.smt.completeSearchStages?.get("INTEGER_PREFIX_DEFERRED") ?: 0L) > 0L)
+        assertTrue((result.stats.smt.completeSearchLinearChecks ?: 0L) > 0L)
+    }
 
     @Test
     fun `separate integer linear openings should report their own primary LP work`() {

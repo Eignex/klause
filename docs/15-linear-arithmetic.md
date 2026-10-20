@@ -57,11 +57,12 @@ A check proceeds in four steps:
 2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
    the LP solves the asserted system with exact certification. Real and mixed
    components check partial Boolean states once an arithmetic row is determined.
-   The shared pure-integer route checks root propagation normally, then postpones
+   Pure-integer satisfaction checks root propagation normally, then postpones
    optional numerical checks below the root until every original Boolean is
    assigned. Postponed prefixes stay dirty and provide no feasibility verdict or
    point. Explicit check and branch requests drain their pending arithmetic under
-   the caller's operation allowance.
+   the caller's operation allowance. Optimization rounds keep eager prefix checks
+   and their partial-point guidance.
 3. **Explain.** An infeasible system produces a conflict from the certified
    infeasibility support: each cited row or bound contributes its premise literals.
    If a cited row or bound has changed in the live LP state, no conflict is
