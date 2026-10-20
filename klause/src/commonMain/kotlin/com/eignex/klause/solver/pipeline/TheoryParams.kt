@@ -14,7 +14,7 @@ enum class OpenBranching(
     /** Conflict-activity order over the shared session. */
     Activity("activity"),
 
-    /** Activity for a complete mixed default point owner; source order for other openings. */
+    /** Component and Boolean order selected for the complete default opening. */
     Automatic("auto"),
     ;
 
@@ -68,7 +68,9 @@ data class TheoryParams(
      * Boolean branching for each feasibility traversal.
      *
      * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner,
-     * and source order for other openings, including private queries and explicit hint allowances.
+     * and source order for other openings, including private queries and explicit hint allowances. A pure-integer
+     * exact linear composition with a finite participant and no explicit hint allowance consults finite splits
+     * before Boolean choices. Explicit strategies retain Boolean priority in that composition.
      * The theory decides the arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,

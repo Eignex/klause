@@ -7,6 +7,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntBounds
@@ -43,6 +44,120 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheorySolverTest {
+
+    @Test
+    fun `automatic integer compositions branch on finite columns before booleans`() {
+        val open = Bits(3).also { it.set(0); it.set(1) }
+        val model = Problem(2,
+            IntBounds.fromModelBounds(LongArray(3), longArrayOf(0, 0, 1), open, open),
+            arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Linear(intArrayOf(2, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)))
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+        val result = engine.solve(TheoryParams(maxDecisions = 1))
+
+        assertEquals(1L, result.stats.openTheory.openIntDecisions)
+        assertEquals(0L, result.stats.openTheory.openBoolDecisions)
+    }
+
+    @Test
+    fun `explicit boolean strategies retain priority over finite columns`() {
+        for (strategy in listOf(OpenBranching.SourceOrder, OpenBranching.Activity)) {
+            val open = Bits(3).also { it.set(0); it.set(1) }
+            val model = Problem(2,
+                IntBounds.fromModelBounds(LongArray(3), longArrayOf(0, 0, 1), open, open),
+                arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                    Linear(intArrayOf(2, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)))
+            val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+            val result = engine.solve(TheoryParams(maxDecisions = 1, openBranching = strategy))
+
+            assertEquals(1L, result.stats.openTheory.openBoolDecisions)
+            assertEquals(0L, result.stats.openTheory.openIntDecisions)
+        }
+    }
+
+    @Test
+    fun `explicit hint allowances retain boolean priority over finite columns`() {
+        for (flips in listOf(0L, 16L)) {
+            val open = Bits(3).also { it.set(0); it.set(1) }
+            val model = Problem(2,
+                IntBounds.fromModelBounds(LongArray(3), longArrayOf(0, 0, 1), open, open),
+                arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                    Linear(intArrayOf(2, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)))
+            val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+            val result = engine.solve(TheoryParams(maxDecisions = 1, openHintFlips = flips))
+
+            assertEquals(1L, result.stats.openTheory.openBoolDecisions)
+            assertEquals(0L, result.stats.openTheory.openIntDecisions)
+        }
+    }
+
+    @Test
+    fun `automatic mixed compositions retain boolean priority over finite columns`() {
+        val open = Bits(3).also { it.set(0); it.set(1) }
+        val model = Problem(2,
+            IntBounds.fromModelBounds(LongArray(3), longArrayOf(0, 0, 1), open, open),
+            arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Linear(intArrayOf(2, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)),
+            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+        val result = engine.solve(TheoryParams(maxDecisions = 1))
+
+        assertEquals(1L, result.stats.openTheory.openBoolDecisions)
+        assertEquals(0L, result.stats.openTheory.openIntDecisions)
+    }
+
+    @Test
+    fun `a fixed finite residual falls through to boolean choices`() {
+        val open = Bits(3).also { it.set(0); it.set(1) }
+        val model = Problem(2,
+            IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+            arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Linear(intArrayOf(2, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)))
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+        val result = engine.solve(TheoryParams(maxDecisions = 1))
+
+        assertEquals(1L, result.stats.openTheory.openBoolDecisions)
+        assertEquals(0L, result.stats.openTheory.openIntDecisions)
+    }
+
+    @Test
+    fun `finite priority respects an exhausted shared decision allowance`() {
+        val open = Bits(3).also { it.set(0); it.set(1) }
+        val model = Problem(2,
+            IntBounds.fromModelBounds(LongArray(3), longArrayOf(0, 0, 1), open, open),
+            arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Linear(intArrayOf(2, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)))
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+        val result = engine.solve(TheoryParams(maxDecisions = 0))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(0L, result.stats.openTheory.openIntDecisions)
+        assertEquals(0L, result.stats.openTheory.openBoolDecisions)
+    }
+
+    @Test
+    fun `a rejected finite side retains its complementary source witness`() {
+        val open = Bits(3).also { it.set(0); it.set(1) }
+        val model = Problem(2,
+            IntBounds.fromModelBounds(LongArray(3), longArrayOf(0, 0, 1), open, open),
+            arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Linear(intArrayOf(2, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 1)))
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+        val result = assertIs<OpenTheoryResult.Sat>(engine.solve())
+
+        assertEquals("1", result.assignment.intValue(2))
+        assertTrue(result.stats.openTheory.openIntDecisions > 0L)
+    }
 
     @Test
     fun `separate integer linear openings should report their own primary LP work`() {

@@ -459,6 +459,8 @@ class OpenTheoryEngine internal constructor(
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
                 OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
             }
+            val pureIntegerDefault = params.openBranching == OpenBranching.Automatic &&
+                params.openHintFlips == null && model.numRealVars == 0
             val run = planned.session.openRun(
                 model.numBoolVars,
                 solveParams,
@@ -472,8 +474,13 @@ class OpenTheoryEngine internal constructor(
                         SearchBranchKind.Finite))
                 } else if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
                     plan.cpIntVars.isNotEmpty()
-                ) SearchBranchSelection.Priority(listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
-                    SearchBranchKind.Finite)) else SearchBranchSelection.Default,
+                ) {
+                    val order = if (pureIntegerDefault && planned.cp != null &&
+                        planned.theory is ExactLiraSearchComponent
+                    ) listOf(SearchBranchKind.Finite, SearchBranchKind.Boolean, SearchBranchKind.Arithmetic)
+                    else listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic, SearchBranchKind.Finite)
+                    SearchBranchSelection.Priority(order)
+                } else SearchBranchSelection.Default,
             )
             handedOff = true
             return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))

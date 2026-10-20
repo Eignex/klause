@@ -80,6 +80,13 @@ refutation. A conditioned run keeps the decision level at which it opens; restar
 return there, backjumps below it fall back to chronological traversal, and
 exhaustion is conditional (see [sessions](06-sessions.md)).
 
+An automatic pure-integer exact linear composition with a finite participant
+consults finite proposals before Boolean choices, then arithmetic proposals. These
+splits use only the finite columns already assigned to CP; open integers remain
+symbolic. A missing finite proposal falls through to Boolean traversal. Explicit
+Boolean strategies and hint allowances retain Boolean, arithmetic, finite priority;
+mixed-real compositions keep that order as well.
+
 For an entirely theory-owned integer difference graph, source-proved relative
 interval proposals precede Boolean choices through arithmetic category priority,
 registering exact complementary difference predicates; see
