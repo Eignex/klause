@@ -24,6 +24,8 @@ import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.search
@@ -40,6 +42,7 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.contribute
+import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
@@ -58,6 +61,54 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `a sparse real namespace should retain guarded equality refutations and a source sibling`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(399), Term.ofRealVar(400), Term.ofRealVar(424)),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(400), Term.ofRealVar(423), Term.ofRealVar(424)),
+                List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(400), Term.ofRealVar(423), Term.ofRealVar(424)),
+                List(3) { BigFraction.MINUS_ONE }, LinearOp.LE, BigFraction.MINUS_ONE),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(10)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ofLong(7), activator = 2),
+        ), numRealVars = 425,
+            realLower = DoubleArray(425) { if (it == 399) 0.0 else Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(425) { if (it == 399) 0.0 else Double.POSITIVE_INFINITY })
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        for (variable in listOf(2, 0)) {
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+        }
+        solves = 0
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+            assertNotNull(conflict.explanation).literals.toSet())
+        assertEquals(0, solves)
+        session.popTo(2)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+        val reals = List(425) {
+            when (it) {
+                10 -> BigFraction.ofLong(7)
+                400, 424 -> BigFraction.of(BIG_ONE, bigIntOf(2))
+                else -> BigFraction.ZERO
+            }
+        }
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source,
+            Sample(booleanArrayOf(true, false, true), longArrayOf(), DoubleArray(425) { reals[it].toDouble() },
+                exactReals = reals)))
+    }
+
     @Test
     fun `a compacted general conflict should exclude weaker guards and preserve a source sibling`() {
         val rows = listOf(

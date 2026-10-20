@@ -152,7 +152,11 @@ insufficient. Strict infeasibility requires a completed strict-feasibility check
 Pure-real checks can first eliminate paired opposite closed source rows as equations
 over a necessary subset with known Boolean and branch premises. Inconsistent
 equations, a false reduced constant or a negative reduced difference cycle reject
-only that prefix. Once all source Booleans are assigned, general reduced components
+only that prefix. Negative checks can remap the selected rows' used real columns
+from a source namespace of at most 10,000 coordinates into the unchanged
+256-column elimination limit. Validation includes every original row and scalar;
+source row IDs survive remapping, and omitted coordinates supply no positive
+assignment. Once all source Booleans are assigned, general reduced components
 can compact surviving coordinates and proportional rows before using the reduction
 owner's existing source-LP budget and dimension limit. A necessary difference subset
 can refute a component but supplies no feasible point. Every input is admitted before

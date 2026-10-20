@@ -723,7 +723,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun equalityRefutationEligible(): Boolean = model.numIntVars == 0 &&
-        admitsEqualityRepairColumns(model.numRealVars) && preparedRows.size <= 65536 &&
+        model.numRealVars in 1..10000 && preparedRows.size <= 65536 &&
         !model.semantics.isApproximate && solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
     private fun equalityRefutation(context: SearchContext): ComponentCheck? {

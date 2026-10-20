@@ -667,6 +667,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PRIMAL_LP_PRIMAL_ROOT`, `lpPhase_PRIMAL_LP_DUAL_ROOT` | Root LP point availability and termination before rounding; stopped iterates supply no primal target |
 | `smtCompleteSearchStage_PURE_REAL_EQUALITY_SUPPORT_*` | Tracked or conservative source-row support and retained/input row counts for completed equality refutations; counters supply no independent source proof |
 | `smtCompleteSearchStage_PURE_REAL_EQUALITY_GENERAL_SUPPORT_R_*_FROM_*` | Residual input rows retained by a refuting general component after coordinate and proportional-row mapping, before equation dependency expansion |
+| `smtCompleteSearchStage_PURE_REAL_EQUALITY_ACTIVE_C_*_FROM_*` | Used columns in a validated negative source snapshot before the unchanged 256-column elimination admission; namespace compaction supplies no primal coordinates |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Exact values take precedence over numeric fallbacks; malformed exact values earn

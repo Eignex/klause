@@ -20,6 +20,76 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `selected equality rows should refute within the active column limit of a sparse namespace`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(400, 424),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(400, 424),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnUpper(400, BigFraction.ZERO), exactColumnLower(424, BigFraction.ONE),
+        )
+        val stages = ArrayList<String>()
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(425, rows, Cancellation.Never,
+            onStage = { stages += it }, onSupport = { support = it })
+
+        assertTrue(refuted)
+        assertEquals(rows.indices.toSet(), assertNotNull(support).toSet())
+        assertTrue("PURE_REAL_EQUALITY_ACTIVE_C_2_FROM_425" in stages)
+        assertEquals(EqualityRows.Declined, prepareEqualityRows(425, rows, Cancellation.Never))
+        assertTrue(List(425) { BigFraction.ZERO }.satisfiesSourceRows(rows.dropLast(1)))
+    }
+
+    @Test
+    fun `selected equality columns above the dense admission should withhold a refutation`() {
+        val rows = List(257) { exactColumnUpper(if (it == 256) 424 else it, BigFraction.ZERO) } +
+            listOf(exactColumnLower(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ONE))
+        val stages = ArrayList<String>()
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(425, rows, Cancellation.Never,
+            onStage = { stages += it }, onSupport = { support = it })
+
+        assertFalse(refuted)
+        assertNull(support)
+        assertTrue("PURE_REAL_EQUALITY_ACTIVE_C_257_FROM_425" in stages)
+    }
+
+    @Test
+    fun `an invalid unused coordinate should withhold a compacted equality refutation`() {
+        val rows = listOf(
+            exactColumnUpper(400, BigFraction.ZERO), exactColumnLower(400, BigFraction.ZERO),
+            exactColumnUpper(424, BigFraction.ZERO), exactColumnLower(424, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(425), listOf(BigFraction.ZERO), BigFraction.ZERO),
+        )
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(425, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertFalse(refuted)
+        assertNull(support)
+    }
+
+    @Test
+    fun `cancellation after active column capture should withhold source support`() {
+        val rows = listOf(
+            exactColumnUpper(400, BigFraction.ZERO), exactColumnLower(400, BigFraction.ZERO),
+            exactColumnUpper(424, BigFraction.ZERO), exactColumnLower(424, BigFraction.ONE),
+        )
+        var cancelled = false
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(425, rows, Cancellation { cancelled },
+            onStage = { if (it.startsWith("PURE_REAL_EQUALITY_ACTIVE_C_")) cancelled = true },
+            onSupport = { support = it })
+
+        assertFalse(refuted)
+        assertNull(support)
+        assertTrue(equalityRowsRefute(425, rows, Cancellation.Never))
+    }
+
+    @Test
     fun `a compacted general refutation should retain only the used equation dependencies`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1),

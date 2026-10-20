@@ -35,6 +35,11 @@ internal fun equalityRowsRefute(
     onSupport: ((IntArray) -> Unit)? = null,
     refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation, (IntArray) -> Unit) -> Boolean)? = null,
 ): Boolean {
+    if (!admitsEqualityRepairColumns(columns)) {
+        val compact = compactRefutationColumns(columns, rows, stop, onStage) ?: return false
+        if (stop()) return false
+        return equalityRowsRefute(compact.columns, compact.rows, stop, onStage, onSupport, refutesGeneral)
+    }
     val support = if (onSupport != null) IntArrayList() else null
     val proofs = if (onSupport != null) EqualityRowSupport(rows.size, stop) else null
     val residualOrigins = if (onSupport != null) IntArrayList() else null
@@ -96,6 +101,45 @@ internal fun equalityRowsRefute(
         if (!stop()) onSupport?.invoke(selected)
     }
     return refuted && !stop()
+}
+
+private class EqualityRefutationRows(val columns: Int, val rows: List<ExactRationalInequality>)
+
+private fun compactRefutationColumns(
+    columns: Int,
+    rows: List<ExactRationalInequality>,
+    stop: Cancellation,
+    onStage: ((String) -> Unit)?,
+): EqualityRefutationRows? {
+    if (columns !in 1..10000 || rows.size > 65536) return null
+    stop.charge(4L * columns + rows.size + 1L)
+    if (stop()) return null
+    val used = BooleanArray(columns)
+    val work = MixedPointArithmetic(stop)
+    var entries = 0L
+    for (row in rows) {
+        entries += row.columns.size + 1L
+        stop.charge(8L * (row.columns.size + 1L))
+        if (entries > MAX_REPAIR_ENTRIES || stop() || !admittedEqualityRow(row, columns, work)) return null
+        for (index in row.columns.indices) if (!row.coefficients[index].isZero) used[row.columns[index]] = true
+    }
+    val active = used.count { it }
+    if (stop()) return null
+    onStage?.invoke("PURE_REAL_EQUALITY_ACTIVE_C_${active}_FROM_$columns")
+    if (!admitsEqualityRepairColumns(active) || stop()) return null
+    stop.charge(4L * columns + 8L * entries + 1L)
+    if (stop()) return null
+    val local = IntArray(columns) { -1 }
+    var next = 0
+    for (column in used.indices) if (used[column]) local[column] = next++
+    val compact = ArrayList<ExactRationalInequality>(rows.size)
+    for (row in rows) {
+        if (stop()) return null
+        val nonzero = row.columns.indices.filter { !row.coefficients[it].isZero }
+        compact += ExactRationalInequality(nonzero.map { local[row.columns[it]] }.toIntArray(),
+            nonzero.map { row.coefficients[it] }, row.rhs, row.strict)
+    }
+    return if (stop()) null else EqualityRefutationRows(active, compact)
 }
 
 private fun refutesDifferenceResidual(
