@@ -62,7 +62,7 @@ internal class DifferenceGuardPropagation private constructor(
         values: LongArray,
         context: SearchContext,
         cancellation: Cancellation? = null,
-        onImplied: (() -> Unit)? = null,
+        onImplied: ((Int) -> Unit)? = null,
     ): ComponentResult {
         var interrupted = false
         var remaining = POLL_INTERVAL
@@ -149,7 +149,7 @@ internal class DifferenceGuardPropagation private constructor(
         context: SearchContext,
         stop: Cancellation,
         forcePoll: () -> Boolean,
-        onImplied: (() -> Unit)?,
+        onImplied: ((Int) -> Unit)?,
     ): ComponentResult {
         var heads = 0
         while (cursor < base.numNodes && heads < HEAD_SWEEP_BUDGET) {
@@ -198,8 +198,9 @@ internal class DifferenceGuardPropagation private constructor(
                 reset = true
                 scratch.completion = DifferencePathCompletion.Declined
                 if (forcePoll()) return ComponentResult.Indeterminate
-                val result = context.imply(Lit.negate(guard), reason)
-                onImplied?.invoke()
+                val literal = Lit.negate(guard)
+                val result = context.imply(literal, reason)
+                if (result is ComponentResult.Consistent) onImplied?.invoke(literal)
                 return result
             }
         }

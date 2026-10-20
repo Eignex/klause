@@ -1320,12 +1320,6 @@ class ExactLiraSearchComponent private constructor(
                 }
                 is RealDifferenceSystem.Result.Feasible -> {
                     if (bools.any { it == UNASSIGNED }) {
-                        var implied = false
-                        val propagation = realDifference?.implyGuards(context, operationStop) {
-                            implied = true
-                            observeCompleteStage("PURE_REAL_DIFFERENCE_GUARD_IMPLIED")
-                        } ?: ComponentResult.Consistent
-                        if (propagation != ComponentResult.Consistent || implied) return propagation
                         if (pointHintRows != null) {
                             operationStop.charge(model.numRealVars.toLong() + 1L)
                             if (!operationStop()) capturePointHints(result.point, context, graph = true)
@@ -1375,7 +1369,9 @@ class ExactLiraSearchComponent private constructor(
                 }
                 if (bools.any { it == UNASSIGNED }) {
                     var implied = false
-                    val propagation = subset.implyGuards(context, operationStop) {
+                    val propagation = subset.implyGuards(context, operationStop) { literal ->
+                        // Search delivers a publication only to peers; retain this owner's row selection here.
+                        accept(SearchDecision.Bool(literal), context)
                         implied = true
                         observeCompleteStage("PURE_REAL_DIFFERENCE_GUARD_IMPLIED")
                     }

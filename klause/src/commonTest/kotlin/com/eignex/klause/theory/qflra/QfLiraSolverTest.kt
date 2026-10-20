@@ -121,10 +121,12 @@ class QfLiraSolverTest {
         }
         solves = 0
 
-        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+        val reason = assertNotNull(session.reasonFor(2))
+
+        assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(2, true))))
 
         assertEquals(setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false)),
-            assertNotNull(conflict.explanation).literals.toSet())
+            reason.literals.toSet())
         assertEquals(0, solves)
         session.popTo(4)
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
@@ -443,10 +445,12 @@ class QfLiraSolverTest {
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
         solves = 0
 
-        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+        val reason = assertNotNull(session.reasonFor(1))
+
+        assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
         assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
-            assertNotNull(conflict.explanation).literals.toSet())
+            reason.literals.toSet())
         assertEquals(0, solves)
         session.popTo(2)
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))

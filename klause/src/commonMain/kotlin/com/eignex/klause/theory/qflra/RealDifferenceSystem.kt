@@ -80,7 +80,7 @@ internal class RealDifferenceSystem private constructor(
         }
     }
 
-    fun implyGuards(context: SearchContext, stop: Cancellation, onImplied: () -> Unit): ComponentResult {
+    fun implyGuards(context: SearchContext, stop: Cancellation, onImplied: (Int) -> Unit): ComponentResult {
         val edges = guardEdges ?: return ComponentResult.Consistent
         val point = latestPoint ?: return ComponentResult.Consistent
         if (stop()) return ComponentResult.Indeterminate
@@ -391,7 +391,7 @@ internal class RealDifferenceSystem private constructor(
 }
 
 internal class RealDifferenceRefuter(private val system: RealDifferenceSystem) {
-    fun implyGuards(context: SearchContext, stop: Cancellation, onImplied: () -> Unit): ComponentResult =
+    fun implyGuards(context: SearchContext, stop: Cancellation, onImplied: (Int) -> Unit): ComponentResult =
         system.implyGuards(context, stop, onImplied)
 
     fun retractGuards() = system.retractGuards()
