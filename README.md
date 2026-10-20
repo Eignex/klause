@@ -26,12 +26,12 @@ It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc m
 
 ## How it differs
 
-Specialised solvers such as CP-SAT, Z3 and HiGHS are mature and usually faster on problems squarely in their own domain. Klause trades some of that speed for breadth and checked results.
+Specialised solvers such as CP-SAT, Z3 and Gurobi are mature and usually faster on problems squarely in their own domain. Klause trades some of that speed for breadth and checked results.
 
 - **Compared with CP-SAT**, which works over Booleans and integers, Klause also handles real variables, unbounded integers and nonlinear arithmetic in the same model, and can run local search on the same models.
 - **Compared with Z3**, which decides logical theories, Klause adds optimization, finite-domain global constraints, local search and MIP-style LP relaxations, while still deciding linear integer and real arithmetic exactly.
-- **Compared with HiGHS**, which solves LP and MIP in floating point, Klause certifies LP results in exact rational arithmetic before using them as proofs, and combines MIP with propagation and local search.
-- **Compared with all three**, Klause is written in Kotlin and bundles no native solver library, so it runs wherever Kotlin Multiplatform does.
+- **Compared with MIP solvers such as Gurobi or HiGHS**, which solve LP and MIP in floating point, Klause certifies LP results in exact rational arithmetic before using them as proofs, and combines MIP with propagation and local search.
+- **Compared with all of these**, Klause is written in Kotlin and bundles no native solver library, so it runs wherever Kotlin Multiplatform does.
 
 ## The LP engine
 
@@ -43,7 +43,7 @@ Specialised solvers such as CP-SAT, Z3 and HiGHS are mature and usually faster o
 
 Compared with the others:
 
-- **HiGHS** solves in floating point and accepts results within tolerances. Klause also solves in floating point for speed, but publishes only results it has certified exactly.
+- **Gurobi and HiGHS** solve in floating point and accept results within tolerances. Klause also solves in floating point for speed, but publishes only results it has certified exactly.
 - **Z3** runs its simplex in exact rational arithmetic throughout. Klause does the heavy work in floating point and spends exact arithmetic only on certification.
 - **CP-SAT** also runs an LP inside its search, but over integer variables only. Klause's LP carries continuous columns too, so the same engine serves MIP, CP relaxations and real arithmetic.
 
