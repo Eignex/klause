@@ -224,6 +224,15 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
+    fun `polynomial images of a real cubic root should retain their cubic identity`() {
+        val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+
+        val square = arithmetic.evaluate(RationalPolynomial.of(0, 0, 1), root)
+
+        assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-4, 0, 0, 1), square))
+    }
+
+    @Test
     fun `different irrational conjugates should sum to exact zero`() {
         val roots = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
 

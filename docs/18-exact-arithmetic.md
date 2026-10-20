@@ -95,9 +95,10 @@ polynomials compare equal; object identity is not numerical equality.
 
 Addition and multiplication eliminate the operands' defining polynomials by
 resultants, and reciprocal reverses coefficients after an exact nonzero check;
-certified enclosures then select the unique result root. No fixed precision decides
-equality or order. Rational sector samples lie strictly between ordered algebraic
-boundaries. Evaluation owners cache root counts, coordinate powers and line images
+certified enclosures then select the unique result root. Once an enclosure singles
+out one result root, selection returns without further operand refinement. No fixed
+precision decides equality or order. Rational sector samples lie strictly between
+ordered algebraic boundaries. Evaluation owners cache root counts, coordinate powers and line images
 for one caller, charging lookups to the same token; published values keep no cache.
 
 Specialization evaluates coefficients at earlier exact coordinates and trims

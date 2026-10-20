@@ -151,10 +151,8 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val relation = arithmetic.subtract(Polynomial.variable(1), lift(remainder, 0))
         val annihilator = extract(arithmetic.resultant(y, relation, 0), 1)
         var current = value
-        return select(annihilator) {
-            val enclosure = enclose(remainder, current.interval)
-            current = refine(current)
-            enclosure
+        return select(annihilator, refineOperands = { current = refine(current) }) {
+            enclose(remainder, current.interval)
         }
     }
 
@@ -193,12 +191,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val annihilator = extract(arithmetic.resultant(first, second, 0), 1)
         var a = left
         var b = right
-        return select(annihilator) {
-            val enclosure = intervalAdd(a.interval, b.interval)
+        return select(annihilator, refineOperands = {
             a = refine(a)
             b = refine(b)
-            enclosure
-        }
+        }) { intervalAdd(a.interval, b.interval) }
     }
 
     fun subtract(left: AlgebraicReal, right: AlgebraicReal): AlgebraicReal {
@@ -220,12 +216,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val annihilator = extract(arithmetic.resultant(first, second, 0), 1)
         var a = left
         var b = right
-        return select(annihilator) {
-            val enclosure = intervalMultiply(a.interval, b.interval)
+        return select(annihilator, refineOperands = {
             a = refine(a)
             b = refine(b)
-            enclosure
-        }
+        }) { intervalMultiply(a.interval, b.interval) }
     }
 
     fun reciprocal(value: AlgebraicReal): AlgebraicReal {
@@ -233,13 +227,11 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         value.rational?.let { return rational(it.reciprocal()) }
         val annihilator = RationalPolynomial(value.definingPolynomial.coefficients.asReversed())
         var current = value
-        return select(annihilator) {
+        return select(annihilator, refineOperands = { current = refine(current) }) {
             while (current.interval.lower.signum() <= 0 && current.interval.upper.signum() >= 0) {
                 current = refine(current)
             }
-            val enclosure = RationalInterval(current.interval.upper.reciprocal(), current.interval.lower.reciprocal())
-            current = refine(current)
-            enclosure
+            RationalInterval(current.interval.upper.reciprocal(), current.interval.lower.reciprocal())
         }
     }
 
@@ -386,7 +378,11 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         return roots(annihilator).filter { sign(evaluate(polynomial, it)) == 0 }
     }
 
-    private fun select(polynomial: RationalPolynomial, enclosure: () -> RationalInterval): AlgebraicReal {
+    private fun select(
+        polynomial: RationalPolynomial,
+        refineOperands: () -> Unit,
+        enclosure: () -> RationalInterval,
+    ): AlgebraicReal {
         var candidates = roots(polynomial)
         check(candidates.isNotEmpty()) { "annihilator has no real root" }
         while (true) {
@@ -396,7 +392,11 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
                 it.interval.lower <= interval.upper && interval.lower <= it.interval.upper
             }
             check(candidates.isNotEmpty()) { "root enclosure lost its annihilator" }
-            if (candidates.size == 1) return candidates.single()
+            if (candidates.size == 1) {
+                arithmetic.step()
+                return candidates.single()
+            }
+            refineOperands()
             candidates = candidates.map(::refine)
         }
     }
