@@ -208,7 +208,7 @@ internal class CpSatisfactionTraversal(
     init {
         try {
             completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
-            traversal.brancher.realPointPreference = completion::preferredBoolean
+            traversal.brancher.realPointPreference = completion::preferredValue
             completion.lpResource?.let {
                 resources.own(it)
                 lpResources.add(it)
@@ -486,7 +486,7 @@ internal class BacktrackBrancher(
     private val onEvent = params.onEvent
     private var restartCount = 0L
     private var preferImportedSolution = false
-    var realPointPreference: ((VarRef) -> Boolean?)? = null
+    var realPointPreference: ((VarRef) -> Long?)? = null
 
     init {
         if (params.phaseSaving || params.targetPhasing) {
@@ -510,10 +510,16 @@ internal class BacktrackBrancher(
         val previousUses = phase.candidateUses
         val preferred = branching.orderValues(
             variable,
-            phase.applyPhase(variable, values.values(session, variable, rng), rng, candidate),
+            phase.applyPhase(variable, values.values(session, variable, rng), rng,
+                candidate = if (variable is VarRef.Bool) candidate?.let { it != 0L } else null,
+                integerCandidate = if (variable is VarRef.IntVar) candidate else null),
         )
         if (candidate != null) {
-            val outcome = if (phase.candidateUses > previousUses) "PHASE_FALLBACK" else "RETAINED_PHASE"
+            val outcome = when {
+                phase.candidateUses == previousUses -> "RETAINED_PHASE"
+                variable is VarRef.IntVar -> "PHASE_INTEGER_FALLBACK"
+                else -> "PHASE_FALLBACK"
+            }
             sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", outcome, 0L)
         }
         val ordered = if (preferImportedSolution && values is SolutionGuided) {
@@ -648,7 +654,7 @@ private fun SearchDecision.asSelectorDecision(): Pair<VarRef, Long>? = when (thi
 
 private sealed interface BacktrackCompletion {
     val lpResource: LpSearchResource? get() = null
-    fun preferredBoolean(variable: VarRef): Boolean? = null
+    fun preferredValue(variable: VarRef): Long? = null
 
     fun addTo(components: MutableList<SearchComponent>)
 
@@ -665,7 +671,7 @@ private sealed interface BacktrackCompletion {
 
     class ResidualReal(private val component: ResidualRealComponent) : BacktrackCompletion {
         override val lpResource: LpSearchResource get() = component
-        override fun preferredBoolean(variable: VarRef): Boolean? = component.preferredBoolean(variable)
+        override fun preferredValue(variable: VarRef): Long? = component.preferredValue(variable)
 
         override fun addTo(components: MutableList<SearchComponent>) {
             components += component
@@ -815,18 +821,21 @@ private class ResidualRealComponent(
     private var prefixVisits = 0L
     private var prefixQueries = 0
     private val phaseTracking = params.phaseSaving || params.targetPhasing
+    private val integerPhaseTracking = params.phaseSaving
     private val pointHintsEnabled = phaseTracking && supportsRealPointHints(problem)
     private var pointHints: IntArray? = null
+    private var integerHints: LongArray? = null
 
-    fun preferredBoolean(variable: VarRef): Boolean? {
+    fun preferredValue(variable: VarRef): Long? {
         val hints = pointHints ?: return null
-        if (variable !is VarRef.Bool) {
+        if (variable is VarRef.IntVar) {
             sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "SELECTED_INTEGER", 0L)
-            return null
+            return integerHints?.getOrNull(variable.varId)
         }
+        variable as VarRef.Bool
         val preferred = when (hints.getOrNull(variable.varId)) {
-            0 -> false
-            1 -> true
+            0 -> 0L
+            1 -> 1L
             else -> null
         }
         val outcome = if (preferred == null) "SELECTED_BOOLEAN_MISSING" else "SELECTED_BOOLEAN_MATCH"
@@ -837,6 +846,7 @@ private class ResidualRealComponent(
     private fun discardPointHints(reason: String) {
         if (pointHints != null) sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", reason, 0L)
         pointHints = null
+        integerHints = null
     }
 
     override fun propagate(context: SearchContext): ComponentResult {
@@ -863,10 +873,15 @@ private class ResidualRealComponent(
         if (requestPoint) discardPointHints("REPLACED")
         val onPoint: ((List<BigFraction>, Cancellation) -> Unit)? = if (!requestPoint) null else { point, stop ->
             sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "ATTEMPT", 0L)
+            val integers = if (integerPhaseTracking) {
+                integerPointHints(problem, point, cp.session::intDomain, stop)
+            } else LongArray(0)
             val hints = realPointHints(problem, point, cp.session::boolValue, stop)
-            val usable = hints?.any { it == 0 || it == 1 } == true && !stop()
+            val usable = hints != null && integers != null &&
+                (integers.isNotEmpty() || hints.any { it == 0 || it == 1 }) && !stop()
             if (usable && hints != null) {
                 pointHints = hints
+                integerHints = integers
                 var total = 0
                 var open = 0
                 for (head in hints.indices) if (hints[head] == 0 || hints[head] == 1) {

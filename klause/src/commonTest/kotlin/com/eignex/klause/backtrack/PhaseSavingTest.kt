@@ -24,6 +24,36 @@ import kotlin.test.assertIs
 
 class PhaseSavingTest {
     @Test
+    fun `integer candidates should only fill enabled unobserved phases`() {
+        for (enabled in listOf(false, true)) {
+            val phase = PhaseSaving(0, 1, BacktrackParams(phaseSaving = enabled))
+
+            val values = phase.applyPhase(VarRef.IntVar(0), sequenceOf(0L, 1L), integerCandidate = 1L).toList()
+
+            assertEquals(if (enabled) listOf(1L, 0L) else listOf(0L, 1L), values)
+            assertEquals(if (enabled) 1L else 0L, phase.candidateUses)
+        }
+    }
+
+    @Test
+    fun `saved and solution integer phases should precede a numerical candidate`() {
+        for (solution in listOf(false, true)) {
+            val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()))
+            session.pinInt(0, 0)
+            val phase = PhaseSaving(0, 1, BacktrackParams(phaseSaving = true, solutionPhasing = true))
+            if (solution) {
+                phase.onSolution(Sample(booleanArrayOf(), longArrayOf(0)))
+                phase.setManagedMode(PhaseMode.STABLE)
+            } else phase.capture(VarRef.IntVar(0), session)
+
+            val values = phase.applyPhase(VarRef.IntVar(0), sequenceOf(1L, 0L), integerCandidate = 1L).toList()
+
+            assertEquals(listOf(0L, 1L), values)
+            assertEquals(0L, phase.candidateUses)
+        }
+    }
+
+    @Test
     fun `candidate phases should only fill enabled unobserved Boolean phases`() {
         for (enabled in listOf(false, true)) {
             val phase = PhaseSaving(1, 0, BacktrackParams(phaseSaving = enabled))

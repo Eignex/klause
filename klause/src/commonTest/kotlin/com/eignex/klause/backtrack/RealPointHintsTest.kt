@@ -20,6 +20,35 @@ import kotlin.test.assertNull
 
 class RealPointHintsTest {
     @Test
+    fun `integer proposals should ceil fractional coordinates within live domain bounds`() {
+        val source = Problem(1, 1, arrayOf(IntDomain(-5, 5)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val half = BigFraction.ofLong(2).reciprocal()
+        val huge = BigFraction.of(BIG_ONE shl 4095, BIG_ONE)
+        for ((value, expected) in listOf(half.negated() to 0L, half to 1L, huge to 2L, huge.negated() to -2L)) {
+            val hints = integerPointHints(source, listOf(BigFraction.ZERO, value),
+                { IntDomain(-2, 2) }, Cancellation.Never)
+
+            assertEquals(listOf(expected), assertNotNull(hints).toList())
+        }
+    }
+
+    @Test
+    fun `integer proposals should withhold stopped or invalid coordinate vectors`() {
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val huge = BigFraction.of(BIG_ONE shl 4096, BIG_ONE)
+
+        assertNull(integerPointHints(source, List(2) { BigFraction.ZERO },
+            { IntDomain(0, 1) }, Cancellation { true }))
+        for (point in listOf(listOf(BigFraction.ZERO), listOf(BigFraction.ZERO, huge))) {
+            assertNull(integerPointHints(source, point, { IntDomain(0, 1) }, Cancellation.Never))
+        }
+    }
+
+    @Test
     fun `mixed guard preferences should use real then integer coordinates without rounding`() {
         val source = Problem(2, 1, arrayOf(IntDomain(0, 1)), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),

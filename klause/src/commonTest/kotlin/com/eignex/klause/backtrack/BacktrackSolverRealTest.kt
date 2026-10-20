@@ -39,6 +39,27 @@ import kotlin.test.assertTrue
 
 class BacktrackSolverRealTest {
     @Test
+    fun `a partial real point should guide an unobserved integer without a conflict`() {
+        val source = Problem(2, 1, arrayOf(IntDomain(0, 1)), Array<Factor>(1002) {
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1),
+                Term.ofRealVar(2), Term.ofIntVar(0)), List(4) { BigFraction.ONE },
+                LinearOp.GE, BigFraction.ONE)
+        } + Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            numRealVars = 3, realLower = DoubleArray(3), realUpper = DoubleArray(3))
+
+        val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 1,
+            variableSelector = InputOrder, valueSelector = IndomainMin,
+            phaseSaving = true, nodeBudget = NodeBudget(8)))
+
+        val sat = assertIs<SolveResult.Sat>(result)
+        assertEquals(1L, sat.assignment.intValue(0))
+        assertEquals(0L, sat.stats.search.fails.sum.toLong())
+        val outcomes = sat.stats.lp.phases["PREFIX_REAL_HINT_ROOT"]?.outcomes
+        assertTrue((outcomes?.get("PHASE_INTEGER_FALLBACK") ?: 0L) > 0L)
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
+    }
+
+    @Test
     fun `a partial real point should guide an unobserved Boolean phase without a conflict`() {
         for (integers in 0..1) {
             val source = Problem(3, integers, Array(integers) { IntDomain(0, 1) }, Array<Factor>(1002) { row ->

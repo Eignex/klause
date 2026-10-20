@@ -61,6 +61,7 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
         values: Sequence<Long>,
         rng: Random? = null,
         candidate: Boolean? = null,
+        integerCandidate: Long? = null,
     ): Sequence<Long> = when (varRef) {
         is VarRef.Bool -> {
             val v = varRef.varId
@@ -116,6 +117,10 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
             val preferred: Long? = when {
                 useSolution && sols != null && hasSolution && vi < sols.size -> sols[vi]
                 intPhase != null && intPhaseSet != null && intPhaseSet[vi] -> intPhase[vi]
+                intPhase != null && integerCandidate != null -> {
+                    candidateUses++
+                    integerCandidate
+                }
                 else -> null
             }
             if (preferred != null) sequenceOf(preferred) + values.filter { it != preferred } else values
