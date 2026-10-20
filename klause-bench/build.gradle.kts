@@ -37,10 +37,6 @@ application {
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
 }
 
-tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
-    from("tools/capture_corpus_sources.py") { into("corpus-source-capture") }
-}
-
 // Choco installation includes its FlatZinc jar, globals library, wrapper and MiniZinc registration.
 val chocoVersion = "6.0.1"
 val chocoCacheDir = File(System.getProperty("user.home"), ".cache/klause-choco")
