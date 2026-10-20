@@ -178,6 +178,34 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
+    fun `comparison should separate overlapping root bounds without changing their values`() {
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+        val lower = AlgebraicReal(RationalPolynomial.of(-2, 0, 1), 2, interval)
+        val upper = AlgebraicReal(RationalPolynomial.of(-3, 0, 1), 2, interval)
+
+        val forward = arithmetic.compare(lower, upper)
+        val reverse = arithmetic.compare(upper, lower)
+
+        assertEquals(-1, forward)
+        assertEquals(1, reverse)
+        for (root in listOf(lower, upper)) {
+            assertEquals(BigFraction.ONE, root.lowerBound)
+            assertEquals(BigFraction.ofLong(2), root.upperBound)
+        }
+    }
+
+    @Test
+    fun `contracted common roots should compare equal across defining polynomials`() {
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+        val first = AlgebraicReal(RationalPolynomial.of(-2, 0, 1), 2, interval)
+        val second = AlgebraicReal(RationalPolynomial.of(-4, 0, 0, 0, 1), 2, interval)
+
+        val result = arithmetic.compare(first, second)
+
+        assertEquals(0, result)
+    }
+
+    @Test
     fun `distinct irrational roots should have exact order and polynomial signs`() {
         val roots = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
 

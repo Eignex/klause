@@ -86,10 +86,13 @@ a rational root.
 
 `AlgebraicReal` is an owned read-only scalar: an ascending rational coefficient
 list, a one-based index among the distinct real roots, and exact isolating bounds.
-Defining polynomials need not be minimal. Comparison uses exact gcd and
-common-root tests and interval separation, and sign evaluation refines intervals
-until a nonzero sign is certified. Equal values with different defining
-polynomials compare equal; object identity is not numerical equality.
+Defining polynomials need not be minimal. Comparison first tries exact interval
+separation, with one certified interval Newton contraction when the derivative
+enclosure excludes zero. These contracted bounds remain local to the comparison.
+Overlapping bounds fall back to exact gcd, common-root tests and Sturm refinement;
+ordinary refinement and rational sector sampling use bisection. Sign evaluation
+refines intervals until a nonzero sign is certified. Equal values with different
+defining polynomials compare equal; object identity is not numerical equality.
 
 ### Algebraic arithmetic and lifting
 

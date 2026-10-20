@@ -1,9 +1,12 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RationalPolynomialTest {
@@ -72,5 +75,59 @@ class RationalPolynomialTest {
         )
 
         assertEquals(1, count)
+    }
+
+    @Test
+    fun `optional contraction should preserve isolated roots in narrower intervals`() {
+        for ((polynomial, lower, upper) in listOf(
+            Triple(RationalPolynomial.of(-2, 0, 1), 1L, 2L),
+            Triple(RationalPolynomial.of(-2, 0, 1), -2L, -1L),
+            Triple(RationalPolynomial.of(4, 0, -2), 1L, 2L),
+            Triple(RationalPolynomial.of(-2, 0, 0, 1), 1L, 2L),
+        )) {
+            val initial = RationalInterval(BigFraction.ofLong(lower), BigFraction.ofLong(upper))
+
+            val contracted = assertNotNull(arithmetic.tryContractRoot(polynomial, initial))
+
+            assertTrue(contracted.lower >= initial.lower)
+            assertTrue(contracted.upper <= initial.upper)
+            val width = contracted.upper - contracted.lower
+            assertTrue(width + width <= initial.upper - initial.lower)
+            assertEquals(1, arithmetic.countOpen(arithmetic.sturm(polynomial), contracted))
+        }
+    }
+
+    @Test
+    fun `optional contraction should decline derivative enclosures containing zero`() {
+        for ((polynomial, lower, upper) in listOf(
+            Triple(RationalPolynomial.of(-2, 0, 1), 0L, 2L),
+            Triple(RationalPolynomial.of(4, 0, -4, 0, 1), 1L, 2L),
+        )) {
+            val interval = RationalInterval(BigFraction.ofLong(lower), BigFraction.ofLong(upper))
+
+            val contracted = arithmetic.tryContractRoot(polynomial, interval)
+
+            assertNull(contracted)
+        }
+    }
+
+    @Test
+    fun `optional contraction should retain exact midpoint roots`() {
+        val polynomial = RationalPolynomial.of(-1, 0, 1)
+        val interval = RationalInterval(BigFraction.ZERO, BigFraction.ofLong(2))
+
+        val contracted = arithmetic.tryContractRoot(polynomial, interval)
+
+        assertEquals(RationalInterval(BigFraction.ONE, BigFraction.ONE), contracted)
+    }
+
+    @Test
+    fun `optional contraction should obey caller cancellation`() {
+        val cancelled = RationalPolynomialArithmetic(PolynomialArithmetic(Cancellation { true }))
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+
+        assertFailsWith<PolynomialInterrupted> {
+            cancelled.tryContractRoot(RationalPolynomial.of(-2, 0, 1), interval)
+        }
     }
 }

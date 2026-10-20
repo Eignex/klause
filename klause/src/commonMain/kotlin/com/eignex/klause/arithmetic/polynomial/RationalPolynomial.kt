@@ -1,6 +1,10 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.unaryMinus
 
 internal class RationalPolynomial(coefficients: List<BigFraction>) {
     private val captured = coefficients.dropLastWhile { it.isZero }
@@ -223,6 +227,15 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         return roots.sortedWith { left, right -> left.lower.compareTo(right.lower) }
     }
 
+    fun tryContractRoot(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval? {
+        arithmetic.step()
+        if (interval.isPoint) return interval
+        val midpoint = (interval.lower + interval.upper) * BigFraction.ofLong(2).reciprocal()
+        val value = evaluate(polynomial, midpoint)
+        if (value.isZero) return RationalInterval(midpoint, midpoint)
+        return contract(polynomial, interval, midpoint, value)
+    }
+
     fun refine(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval {
         arithmetic.step()
         if (interval.isPoint) return interval
@@ -230,5 +243,61 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         if (evaluate(polynomial, midpoint).isZero) return RationalInterval(midpoint, midpoint)
         val left = RationalInterval(interval.lower, midpoint)
         return if (countOpen(sturm(polynomial), left) == 1) left else RationalInterval(midpoint, interval.upper)
+    }
+
+    private fun contract(
+        polynomial: RationalPolynomial,
+        interval: RationalInterval,
+        midpoint: BigFraction,
+        value: BigFraction,
+    ): RationalInterval? {
+        val slope = encloseDerivative(polynomial, interval)
+        if (slope.lower.signum() <= 0 && slope.upper.signum() >= 0) return null
+        val first = midpoint - value * slope.lower.reciprocal()
+        val second = midpoint - value * slope.upper.reciprocal()
+        // The mean value theorem keeps the isolated root inside midpoint - value / slope.
+        val candidateLower = if (first <= second) first else second
+        val candidateUpper = if (first >= second) first else second
+        val clippedLower = if (interval.lower >= candidateLower) interval.lower else candidateLower
+        val clippedUpper = if (interval.upper <= candidateUpper) interval.upper else candidateUpper
+        if (clippedLower > clippedUpper) return null
+        if (clippedLower == clippedUpper) {
+            return if (evaluate(polynomial, clippedLower).isZero) RationalInterval(clippedLower, clippedLower) else null
+        }
+        val rounded = dyadicEnclosure(RationalInterval(clippedLower, clippedUpper)) ?: return null
+        val lower = if (interval.lower >= rounded.lower) interval.lower else rounded.lower
+        val upper = if (interval.upper <= rounded.upper) interval.upper else rounded.upper
+        if ((upper - lower) + (upper - lower) > interval.upper - interval.lower) return null
+        if (evaluate(polynomial, lower).isZero) return RationalInterval(lower, lower)
+        if (evaluate(polynomial, upper).isZero) return RationalInterval(upper, upper)
+        arithmetic.step()
+        return RationalInterval(lower, upper)
+    }
+
+    private fun dyadicEnclosure(interval: RationalInterval): RationalInterval? {
+        arithmetic.step()
+        val width = interval.upper - interval.lower
+        val bits = maxOf(0L, width.den.magnitudeBitLength().toLong() - width.num.magnitudeBitLength() + 3)
+        if (bits > Int.MAX_VALUE) return null
+        val denominator = BIG_ONE shl bits.toInt()
+        val scale = BigFraction.of(denominator, BIG_ONE)
+        // Outward rounding bounds endpoint precision by the contracted interval width.
+        val lower = -(interval.lower * scale).negated().ceilInteger()
+        val upper = (interval.upper * scale).ceilInteger()
+        return RationalInterval(BigFraction.of(lower, denominator), BigFraction.of(upper, denominator))
+    }
+
+    private fun encloseDerivative(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval {
+        var lower = BigFraction.ZERO
+        var upper = BigFraction.ZERO
+        for (degree in polynomial.degree downTo 1) {
+            arithmetic.step()
+            val products = listOf(lower * interval.lower, lower * interval.upper,
+                upper * interval.lower, upper * interval.upper)
+            val coefficient = polynomial[degree] * BigFraction.ofLong(degree.toLong())
+            lower = products.reduce { a, b -> if (a <= b) a else b } + coefficient
+            upper = products.reduce { a, b -> if (a >= b) a else b } + coefficient
+        }
+        return RationalInterval(lower, upper)
     }
 }
