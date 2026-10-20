@@ -670,7 +670,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PREFIX_REAL_CHECK_ROOT`, `lpPhase_PREFIX_REAL_EXPLANATION_ROOT` | Exact prefix query verdict and emitted source clause length; positive points carry no source witness authority |
 | `lpPhase_PREFIX_REAL_HANDOFF_ROOT` | Native conflict handling for a checked selected-prefix source clause |
 | `lpPhase_PREFIX_REAL_POINT_ROOT` | Available real and finite integer relaxation coordinates reused from an existing positive prefix query, or a missing exact primal; fractional integers remain guidance, with no additional numerical query |
-| `lpPhase_PREFIX_REAL_HINT_ROOT` | Optional guard-hint preparation, ready or declined vectors, and numerical phase fallbacks below retained phase sources |
+| `lpPhase_PREFIX_REAL_HINT_ROOT` | Optional guard-hint preparation; ready vectors report open and total heads. Selections distinguish integers, matching Boolean heads and missing Boolean heads; matching candidates report retained-phase precedence or fallback use. Replacement, retraction, restart, leaf checking and close report vector disposal |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Pinned-leaf shape outcomes use `N` for structural columns, `M` for stored rows,

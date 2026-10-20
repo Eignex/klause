@@ -486,7 +486,7 @@ internal class BacktrackBrancher(
     private val onEvent = params.onEvent
     private var restartCount = 0L
     private var preferImportedSolution = false
-    var realPointPreference: ((Int) -> Boolean?)? = null
+    var realPointPreference: ((VarRef) -> Boolean?)? = null
 
     init {
         if (params.phaseSaving || params.targetPhasing) {
@@ -506,13 +506,16 @@ internal class BacktrackBrancher(
             ?: variables.pick(session, rng)
             ?: return null
         if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
-        val candidate = (variable as? VarRef.Bool)?.let { realPointPreference?.invoke(it.varId) }
+        val candidate = realPointPreference?.invoke(variable)
         val previousUses = phase.candidateUses
         val preferred = branching.orderValues(
             variable,
             phase.applyPhase(variable, values.values(session, variable, rng), rng, candidate),
         )
-        if (phase.candidateUses > previousUses) sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "PHASE_FALLBACK", 0L)
+        if (candidate != null) {
+            val outcome = if (phase.candidateUses > previousUses) "PHASE_FALLBACK" else "RETAINED_PHASE"
+            sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", outcome, 0L)
+        }
         val ordered = if (preferImportedSolution && values is SolutionGuided) {
             values.guide(session, variable, preferred)
         } else preferred
@@ -645,7 +648,7 @@ private fun SearchDecision.asSelectorDecision(): Pair<VarRef, Long>? = when (thi
 
 private sealed interface BacktrackCompletion {
     val lpResource: LpSearchResource? get() = null
-    fun preferredBoolean(variable: Int): Boolean? = null
+    fun preferredBoolean(variable: VarRef): Boolean? = null
 
     fun addTo(components: MutableList<SearchComponent>)
 
@@ -662,7 +665,7 @@ private sealed interface BacktrackCompletion {
 
     class ResidualReal(private val component: ResidualRealComponent) : BacktrackCompletion {
         override val lpResource: LpSearchResource get() = component
-        override fun preferredBoolean(variable: Int): Boolean? = component.preferredBoolean(variable)
+        override fun preferredBoolean(variable: VarRef): Boolean? = component.preferredBoolean(variable)
 
         override fun addTo(components: MutableList<SearchComponent>) {
             components += component
@@ -815,10 +818,25 @@ private class ResidualRealComponent(
     private val pointHintsEnabled = phaseTracking && supportsRealPointHints(problem)
     private var pointHints: IntArray? = null
 
-    fun preferredBoolean(variable: Int): Boolean? = when (pointHints?.getOrNull(variable)) {
-        0 -> false
-        1 -> true
-        else -> null
+    fun preferredBoolean(variable: VarRef): Boolean? {
+        val hints = pointHints ?: return null
+        if (variable !is VarRef.Bool) {
+            sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "SELECTED_INTEGER", 0L)
+            return null
+        }
+        val preferred = when (hints.getOrNull(variable.varId)) {
+            0 -> false
+            1 -> true
+            else -> null
+        }
+        val outcome = if (preferred == null) "SELECTED_BOOLEAN_MISSING" else "SELECTED_BOOLEAN_MATCH"
+        sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", outcome, 0L)
+        return preferred
+    }
+
+    private fun discardPointHints(reason: String) {
+        if (pointHints != null) sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", reason, 0L)
+        pointHints = null
     }
 
     override fun propagate(context: SearchContext): ComponentResult {
@@ -842,12 +860,21 @@ private class ResidualRealComponent(
             sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", shape, 0L)
         }
         val requestPoint = pointHintsEnabled && prefixQueries in listOf(1, 4, 16, 64)
-        if (requestPoint) pointHints = null
+        if (requestPoint) discardPointHints("REPLACED")
         val onPoint: ((List<BigFraction>, Cancellation) -> Unit)? = if (!requestPoint) null else { point, stop ->
             sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "ATTEMPT", 0L)
             val hints = realPointHints(problem, point, cp.session::boolValue, stop)
             val usable = hints?.any { it == 0 || it == 1 } == true && !stop()
-            if (usable) pointHints = hints
+            if (usable && hints != null) {
+                pointHints = hints
+                var total = 0
+                var open = 0
+                for (head in hints.indices) if (hints[head] == 0 || hints[head] == 1) {
+                    total++
+                    if (cp.session.boolValue(head) == null) open++
+                }
+                sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "READY_OPEN_${open}_TOTAL_$total", 0L)
+            }
             sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", if (usable) "READY" else "DECLINED", 0L)
         }
         if (!engine.prefixRealInfeasible(cp.session, onPoint) || context.cancelled()) {
@@ -863,7 +890,7 @@ private class ResidualRealComponent(
         completed = null
         conflictClause = null
         prefixResolution = null
-        pointHints = null
+        discardPointHints("LEAF_CHECK")
         if (context.cancelled()) return ComponentCheck.Indeterminate
         absCompletion?.let { completion ->
             val discrete = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
@@ -915,7 +942,7 @@ private class ResidualRealComponent(
     override fun retract(decisionLevel: Int) {
         completed = null
         conflictClause = null
-        pointHints = null
+        discardPointHints("RETRACTED")
         // Propagation conflicts retain their native analysis across the traversal's initial retraction.
     }
 
@@ -943,7 +970,7 @@ private class ResidualRealComponent(
         completed = null
         conflictClause = null
         prefixResolution = null
-        pointHints = null
+        discardPointHints("RESTARTED")
     }
 
     fun sample(): Sample = requireNotNull(completed)
@@ -953,7 +980,7 @@ private class ResidualRealComponent(
     override fun totalSolveWork(): Long = engine.totalSolveWork() + absWork
 
     override fun close() {
-        pointHints = null
+        discardPointHints("CLOSED")
         engine.close()
     }
 
