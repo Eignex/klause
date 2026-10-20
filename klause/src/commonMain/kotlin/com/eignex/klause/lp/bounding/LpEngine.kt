@@ -42,6 +42,7 @@ import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
+import com.eignex.klause.lp.relaxation.leafShape
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
@@ -655,6 +656,8 @@ internal class LpEngine(
     var residualOversized: Boolean = false
         private set
 
+    private var leafShapeObserved = false
+
     private fun leafRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
         if (!residualOversized) return nodeRelaxation(relaxer, session)
         if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
@@ -669,6 +672,12 @@ internal class LpEngine(
         } catch (_: LpAssemblyCancelled) {
             return declinedLeafAdmission("CANCELLED")
         } ?: return declinedLeafAdmission(if (params.cancellation()) "CANCELLED" else "SOURCE_DECLINE")
+        if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
+        if (!leafShapeObserved) {
+            leafShapeObserved = true
+            val shape = relaxation.model.leafShape(params.cancellation, ::noteNodeOverhead)
+            sink.lp.observePrimalPhase("PINNED_REAL_LEAF_SHAPE", shape, 0L)
+        }
         if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
         if (relaxation.model.m > RESIDUAL_MAX_ROWS) return declinedLeafAdmission("ROW_LIMIT")
         sink.lp.observeRealLeafAdmission("READY")

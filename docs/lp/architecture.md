@@ -189,6 +189,16 @@ distinguishes ready residuals, row-limit declines, unpinned coordinates, source
 projection declines and cancellation. Other native work, precision and
 witness/proof checks retain their existing limits and owners.
 
+The first fresh pinned residual also records bounded `PINNED_REAL_LEAF_SHAPE`
+metadata before row admission: structural columns, stored and active rows, fixed
+structural columns, row widths after omitting fixed columns, and distinct or
+repeated coefficient vectors up to sign. Bounds and right-hand sides are not part
+of that grouping; it supplies no redundancy, feasibility or admission proof.
+At most 10,000 columns and rows, 65,536 sparse entries and 4,096-bit coefficients
+are inspected. Construction, scalar and storage work charge the same containing
+ledger; interruption and metadata limits retain their own outcomes. No numerical
+query is created and the row cap remains unchanged.
+
 Complete mixed witness recovery can submit a connected real residual to `SourceLp`
 after fixing private integer guesses and reducing source equations. These requests
 share the exact-linear reduction owner's existing `SourceLpBudget` and small-model
