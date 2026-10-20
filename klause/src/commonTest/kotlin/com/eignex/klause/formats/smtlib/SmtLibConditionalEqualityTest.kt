@@ -39,7 +39,7 @@ import kotlin.test.assertTrue
 class SmtLibConditionalEqualityTest {
     @Test
     fun `distinct queries of an open conditional should conflict without arithmetic checks`() {
-        for ((first, second) in listOf("1" to "2", "(- 9223372036854775808)" to "9223372036854775807")) {
+        for ((first, second) in listOf("1" to "2", "(- (- 9223372036854775807) 1)" to "9223372036854775807")) {
             val builder = Compiler.Builder(
                 Long.MIN_VALUE,
                 Long.MAX_VALUE,
@@ -66,7 +66,7 @@ class SmtLibConditionalEqualityTest {
 
             val result = session.initialize()
 
-            assertIs<ComponentResult.Conflict>(result)
+            assertIs<ComponentResult.Conflict>(result, "$first and $second")
         }
     }
 
