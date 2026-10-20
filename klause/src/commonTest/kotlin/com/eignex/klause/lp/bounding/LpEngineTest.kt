@@ -101,10 +101,11 @@ class LpEngineTest {
     @Test
     fun `an active real residual above the row cap should not open a native solver`() {
         val problem = Problem(0, 0, emptyArray(), Array(1001) { row ->
-            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ofLong(row + 1L)),
                 LinearOp.LE, BigFraction.ofLong(row + 1L))
-        }, numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        }, numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
         val factory = RecordingLpEngineFactory()
         val sink = SolveStatsSink(backend = "pinned-real-row-cap")
         val engine = LpEngine(problem, LinearObjective(),
@@ -116,6 +117,99 @@ class LpEngineTest {
         assertEquals(LpVerdict.INDETERMINATE, leaf.verdict)
         assertTrue(factory.calls.isEmpty())
         assertEquals(1L, sink.snapshot().lp.phases["PINNED_REAL_LEAF_ADMISSION"]?.outcomes?.get("ROW_LIMIT"))
+    }
+
+    @Test
+    fun `parallel real rows should compact before the native row cap`() {
+        val problem = Problem(0, 0, emptyArray(), Array(1001) { row ->
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ofLong(row + 1L))
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val factory = RecordingLpEngineFactory()
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+            SolveStatsSink(backend = "compacted-real-leaf"), LpSolveContext(engineFactory = factory))
+
+        val leaf = engine.use { it.leafCertify(PropagationSession(problem)) }
+
+        assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+        assertTrue(factory.calls.isNotEmpty())
+        val point = Sample(booleanArrayOf(), longArrayOf(), leaf.reals,
+            exactReals = assertNotNull(leaf.exactReals))
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
+    }
+
+    @Test
+    fun `compacted strict intervals should retain original source feasibility`() {
+        val third = BigFraction.ofLong(3).reciprocal()
+        val problem = Problem(0, 0, emptyArray(), Array(1002) { row ->
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                if (row % 2 == 0) LinearOp.GE else LinearOp.LE,
+                if (row % 2 == 0) third else third + third, strict = true)
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+            SolveStatsSink(backend = "compacted-strict-real-leaf"))
+
+        val leaf = engine.use { it.leafCertify(PropagationSession(problem)) }
+
+        assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+        val point = Sample(booleanArrayOf(), longArrayOf(), leaf.reals,
+            exactReals = assertNotNull(leaf.exactReals))
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
+    }
+
+    @Test
+    fun `compacted fixed coordinate rows should preserve translated source values`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(2, 2)), Array(1002) { row ->
+            ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
+                List(4) { BigFraction.ONE }, if (row % 2 == 0) LinearOp.GE else LinearOp.LE,
+                BigFraction.ofLong(if (row % 2 == 0) 3L else 4L))
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+            SolveStatsSink(backend = "compacted-fixed-real-leaf"))
+
+        val leaf = engine.use { it.leafCertify(PropagationSession(problem)) }
+
+        assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+        val point = Sample(booleanArrayOf(), longArrayOf(2), leaf.reals,
+            exactReals = assertNotNull(leaf.exactReals))
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
+    }
+
+    @Test
+    fun `compacted conditional conflicts should leave feasible siblings available`() {
+        val problem = Problem(1, 0, emptyArray(), Array(1002) { row ->
+            if (row == 0) ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ZERO, activator = 0)
+            else ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.GE, BigFraction.ONE)
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+            SolveStatsSink(backend = "compacted-conditional-real-leaf"))
+
+        engine.use {
+            for (truth in listOf(true, false, true)) {
+                val session = PropagationSession(problem)
+                assertIs<PropagationResult.Implied>(session.pinBool(0, truth))
+
+                val leaf = it.leafCertify(session)
+
+                if (truth) assertEquals(LpVerdict.INFEASIBLE, leaf.verdict)
+                else {
+                    assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+                    val point = Sample(booleanArrayOf(false), longArrayOf(), leaf.reals,
+                        exactReals = assertNotNull(leaf.exactReals))
+                    assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
+                }
+            }
+        }
     }
 
     @Test

@@ -38,20 +38,22 @@ import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpCertificationPolicy
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
-import com.eignex.klause.lp.relaxation.leafShape
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpLeafRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.SessionDomains
+import com.eignex.klause.lp.relaxation.compactPinnedRows
 import com.eignex.klause.lp.relaxation.exactLeafResult
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
+import com.eignex.klause.lp.relaxation.leafShape
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
@@ -667,7 +669,7 @@ internal class LpEngine(
         val assembly = LpLeafRelaxation(problem, relaxer,
             onBuild = { noteNodeOverhead(it * LpNodeOverhead.BUILD) },
             onEdit = { noteNodeOverhead(it * LpNodeOverhead.EDIT) })
-        val relaxation = try {
+        var relaxation = try {
             assembly.build(SessionDomains(session), params.cancellation)
         } catch (_: LpAssemblyCancelled) {
             return declinedLeafAdmission("CANCELLED")
@@ -679,6 +681,15 @@ internal class LpEngine(
             sink.lp.observePrimalPhase("PINNED_REAL_LEAF_SHAPE", shape, 0L)
         }
         if (params.cancellation()) return declinedLeafAdmission("CANCELLED")
+        if (relaxation.model.m > RESIDUAL_MAX_ROWS) {
+            if (problem.semantics.isApproximate ||
+                solveContext.certificationPolicy !== ProductionLpCertificationPolicy
+            ) return declinedLeafAdmission("ROW_LIMIT")
+            val previousRows = relaxation.model.m
+            relaxation = relaxation.compactPinnedRows(params.cancellation, ::noteNodeOverhead)
+                ?: return declinedLeafAdmission(if (params.cancellation()) "CANCELLED" else "COMPACTION_DECLINE")
+            sink.lp.observePrimalPhase("PINNED_REAL_LEAF_COMPACTION", "M_${previousRows}_TO_${relaxation.model.m}", 0L)
+        }
         if (relaxation.model.m > RESIDUAL_MAX_ROWS) return declinedLeafAdmission("ROW_LIMIT")
         sink.lp.observeRealLeafAdmission("READY")
         return relaxation

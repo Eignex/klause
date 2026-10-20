@@ -174,7 +174,7 @@ guarded formula. The original real coordinates remain the witness authority.
 
 The optional per-node real filter uses a root estimate of real-bearing factors.
 When that estimate exceeds 1,000, required leaf completion builds the current
-pinned source residual and admits a numerical query only if its actual row count
+pinned source residual and admits a numerical query only if its derived row count
 is at most 1,000. Every source Boolean and integer coordinate must be pinned.
 It does not reuse a root layout or optional cuts on this path.
 `LpLeafRelaxation` stages the selected rows and bounds through immutable exact
@@ -188,6 +188,23 @@ retains those charges and withholds the model. `PINNED_REAL_LEAF_ADMISSION`
 distinguishes ready residuals, row-limit declines, unpinned coordinates, source
 projection declines and cancellation. Other native work, precision and
 witness/proof checks retain their existing limits and owners.
+
+For exact source semantics under production certification, a zero-objective
+pinned residual above that cap can first compact equivalent row expressions.
+Fixed structural coordinates are substituted at their current exact values;
+equal or opposite remaining coefficient vectors share one intersected interval.
+Strictness follows each endpoint into the new slack bounds. Constant tautologies
+are omitted; conflicting intervals retain an explicit contradictory numerical row.
+Every merged row retains the union of its source row premises and global flags.
+Structural columns, origins and source-coordinate maps stay intact. The private
+model absorbs the current column bounds, so its refutation remains local to the
+complete finite prefix and supplies no pooled nogood.
+Compaction inspects at most 10,000 rows and structural columns and 65,536 sparse
+entries or premise units, with 4,096-bit normalized scalar admission and charged
+intermediate arithmetic. The current construction owner also pays projection work; cancellation or incomplete conversion withholds the compacted model.
+The unchanged 1,000-row admission runs after compaction and before any numerical
+query. Other objectives, approximate semantics and certification policies retain
+their existing decline. Full original-source checking still gates each witness.
 
 The first fresh pinned residual also records bounded `PINNED_REAL_LEAF_SHAPE`
 metadata before row admission: structural columns, stored and active rows, fixed
