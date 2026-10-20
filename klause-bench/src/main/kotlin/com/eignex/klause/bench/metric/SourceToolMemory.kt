@@ -31,7 +31,7 @@ internal data class SourceToolMemory(
     }
 }
 
-internal class DarwinToolMemory(private val directory: File, private val limitBytes: Long) {
+internal class DarwinToolMemory(directory: File, private val limitBytes: Long) {
     val timingFile = File(directory, "memory.time")
     private val output = File(directory, "memory.sample")
     private val errors = File(directory, "memory.stderr")

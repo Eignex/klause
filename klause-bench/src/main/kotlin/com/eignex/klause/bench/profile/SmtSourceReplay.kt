@@ -16,6 +16,7 @@ import java.nio.file.StandardCopyOption
 import java.util.Base64
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -40,30 +41,49 @@ internal object SmtSourceReplay {
         val bytes = CorpusFiles.open(input).use { it.readNBytes(16 * 1024 * 1024 + 1) }
         require(bytes.size <= 16 * 1024 * 1024) { "expanded replay request exceeds limit" }
         val request = Reports.json.parseToJsonElement(bytes.decodeToString(throwOnInvalidSequence = true)).jsonObject
-        require(request.getValue("schema").jsonPrimitive.int == 1)
-        val models = request.getValue("models").jsonArray
+        val schema = request.getValue("schema").jsonPrimitive.int
+        require(schema in 1..2)
+        val claims = request.getValue(if (schema == 1) "models" else "claims").jsonArray
+        fun scope(claim: JsonObject): String = if (schema == 1) SmtSourceValidation.GROUND
+            else claim.getValue("scope").jsonPrimitive.content
+        val scopes = claims.map { scope(it.jsonObject) }.toSet()
+        require(scopes.all { it in setOf(SmtSourceValidation.GROUND, SmtSourceValidation.REFUTATION) })
+        val modelCount = claims.count { scope(it.jsonObject) == SmtSourceValidation.GROUND }
         val sources = request.getValue("sources").jsonArray
-        require(models.size in 1..4096 && sources.size in 1..4096)
+        require(claims.size in 1..4096 && sources.size in 1..4096)
         Reports.writeJson(File(out, "build-provenance.json").path, InstalledBuild.reference)
         Reports.writeJson(File(out, "environment.json").path, EnvInfo.capture())
         val results = ArrayList<JsonObject>()
-        var tool: SmtSourceValidation.Tool? = null
+        val tools = LinkedHashMap<String, SmtSourceValidation.Tool>()
         var failure: String? = "replay did not complete; inspect retained process logs"
         fun summary(cleanup: Boolean) {
             val value = buildJsonObject {
                 put("requestSha256", sha256(compressed))
                 put("sourceCount", sources.size)
-                put("modelCount", models.size)
+                put("modelCount", modelCount)
+                put("refutationCount", claims.size - modelCount)
+                put("claimCount", claims.size)
                 put("elapsedMs", (System.nanoTime() - started) / 1_000_000)
-                put("completedModels", results.size)
-                put("allModelsAttempted", results.size == models.size)
-                put("allAccepted", cleanup && failure == null && results.size == models.size && results.all {
+                val completedModels = results.count {
+                    it.getValue("scope").jsonPrimitive.content == SmtSourceValidation.GROUND
+                }
+                put("completedModels", completedModels)
+                put("allModelsAttempted", completedModels == modelCount)
+                put("allClaimsAttempted", results.size == claims.size)
+                put("allAccepted", cleanup && failure == null && results.size == claims.size && results.all {
                     it.getValue("validation").jsonObject.getValue("status").jsonPrimitive.content == "valid"
                 })
                 put("cleanupComplete", cleanup)
                 put("failure", failure)
-                put("solverInvocations", 0)
-                put("solverSearchQueries", 0)
+                put("nativeSolverInvocations", 0)
+                put("referenceCheckAttempts", results.size - completedModels)
+                put("solverInvocations", results.size - completedModels)
+                val queries = results.map {
+                    it.getValue("stats").jsonObject["sourceValidationSolverQueries"]?.jsonPrimitive?.content
+                }
+                if (queries.all { it == "0" || it == "1" }) {
+                    put("solverSearchQueries", queries.count { it == "1" })
+                } else put("solverSearchQueries", JsonNull)
                 put("proofCertificateChecked", false)
                 put("sources", sources)
                 put("results", JsonArray(results))
@@ -74,52 +94,59 @@ internal object SmtSourceReplay {
         }
         summary(false)
         try {
-            val resolved = SmtSourceTools.resolve(SmtSourceValidation.GROUND, File(out, "tool"))
-            tool = resolved
-            Reports.writeJson(File(out, "tool-identity.json").path, mapOf(
-                "executablePath" to resolved.executable.absolutePath,
-                "executableSha256" to resolved.binarySha256,
-                "artifactUrl" to resolved.artifactUrl,
-                "artifactSha256" to resolved.artifactSha256,
-            ))
-            val versionDirectory = File(out, "version").apply { check(mkdir()) }
-            val empty = File(versionDirectory, "stdin").apply { writeBytes(byteArrayOf()) }
-            val version = SmtSourceReceipt.run(listOf(resolved.executable.absolutePath, "--version"),
-                empty, versionDirectory, 10_000)
-            Reports.writeJson(File(out, "tool-version.json").path, version)
-            check(version.exit == 0 && !version.timedOut && version.cleanupComplete) {
-                "external model checker could not start; model compatibility is unverified"
-            }
-            check(version.memory?.qualified() == true) { "external tool memory observation incomplete" }
-            if (System.getProperty("os.name") == "Mac OS X") {
-                val probeDirectory = File(out, "memory-limit-probe").apply { check(mkdir()) }
-                val probe = SmtSourceReceipt.run(listOf("/bin/sleep", "60"), empty, probeDirectory,
-                    2_000, residentLimitBytes = 1_048_576)
-                Reports.writeJson(File(out, "memory-limit-probe.json").path, probe)
-                check(probe.memory?.exceeded == true && probe.cleanupComplete && !probe.timedOut) {
-                    "resident-memory guard did not reject its below-baseline process allowance"
+            for (scope in scopes) {
+                val name = if (scope == SmtSourceValidation.GROUND) "tool" else "reference-tool"
+                val resolved = SmtSourceTools.resolve(scope, File(out, name))
+                tools[scope] = resolved
+                Reports.writeJson(File(out, "$name-identity.json").path, mapOf(
+                    "executablePath" to resolved.executable.absolutePath,
+                    "executableSha256" to resolved.binarySha256,
+                    "artifactUrl" to resolved.artifactUrl,
+                    "artifactSha256" to resolved.artifactSha256,
+                ))
+                val versionDirectory = File(out, "$name-version").apply { check(mkdir()) }
+                val empty = File(versionDirectory, "stdin").apply { writeBytes(byteArrayOf()) }
+                val version = SmtSourceReceipt.run(listOf(resolved.executable.absolutePath, "--version"),
+                    empty, versionDirectory, 10_000)
+                Reports.writeJson(File(out, "$name-version.json").path, version)
+                check(version.exit == 0 && !version.timedOut && version.cleanupComplete) {
+                    "external model checker could not start; model compatibility is unverified"
+                }
+                check(version.memory?.qualified() == true) { "external tool memory observation incomplete" }
+                if (scope == scopes.first() && System.getProperty("os.name") == "Mac OS X") {
+                    val probeDirectory = File(out, "memory-limit-probe").apply { check(mkdir()) }
+                    val probe = SmtSourceReceipt.run(listOf("/bin/sleep", "60"), empty, probeDirectory,
+                        2_000, residentLimitBytes = 1_048_576)
+                    Reports.writeJson(File(out, "memory-limit-probe.json").path, probe)
+                    check(probe.memory?.exceeded == true && probe.cleanupComplete && !probe.timedOut) {
+                        "resident-memory guard did not reject its below-baseline process allowance"
+                    }
                 }
             }
-            for ((index, element) in models.withIndex()) {
+            for ((index, element) in claims.withIndex()) {
                 check(!Thread.currentThread().isInterrupted && System.nanoTime() - started < 120_000_000_000) {
                     "whole replay interrupted or timed out"
                 }
                 val model = element.jsonObject
                 val producerJson = model.getValue("producerJson").jsonPrimitive.content
                 val record = Reports.json.decodeFromString<SolveRecord>(producerJson)
-                require(record.feasible == true && SmtSourceValidation.eligible(record) == SmtSourceValidation.GROUND)
+                val scope = scope(model)
+                require(SmtSourceValidation.eligible(record) == scope)
                 require(record.sourceHashes["model"] == model.getValue("sourceSha256").jsonPrimitive.content)
-                require(sha256(requireNotNull(record.finalWitness).toByteArray()) ==
-                    model.getValue("modelSha256").jsonPrimitive.content)
+                if (scope == SmtSourceValidation.GROUND) {
+                    require(sha256(requireNotNull(record.finalWitness).toByteArray()) ==
+                        model.getValue("modelSha256").jsonPrimitive.content)
+                } else require(model.getValue("modelSha256") == JsonNull)
                 val ref = Catalog.uncapped(model.getValue("suite").jsonPrimitive.content).problems.single {
                     it.name == model.getValue("problem").jsonPrimitive.content
                 }
                 require(record.problem == ref.name) { "producer problem identity differs" }
                 val result = SmtSourceValidation.validateSaved(ref, record,
                     model.getValue("stdout").jsonPrimitive.content, File(out, "case-$index"),
-                    resolved.copy(owned = false), producerJson.toByteArray())
+                    tools.getValue(scope).copy(owned = false), producerJson.toByteArray())
                 results += buildJsonObject {
                     put("index", index)
+                    put("scope", scope)
                     put("id", model.getValue("id"))
                     put("sourceSha256", model.getValue("sourceSha256"))
                     put("modelSha256", model.getValue("modelSha256"))
@@ -129,11 +156,11 @@ internal object SmtSourceReplay {
                 }
                 summary(false)
             }
-            resolved.verify()
+            tools.values.forEach { it.verify() }
             failure = null
         } finally {
             val complete = failure == null
-            val cleanup = runCatching { tool?.close() }.isSuccess
+            val cleanup = tools.values.map { runCatching { it.close() } }.all { it.isSuccess }
             if (!cleanup) failure = "external replay tool cleanup incomplete"
             summary(cleanup)
             check(cleanup || !complete) { "external replay tool cleanup incomplete" }
