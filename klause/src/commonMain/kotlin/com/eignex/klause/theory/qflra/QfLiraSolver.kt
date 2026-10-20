@@ -228,6 +228,7 @@ class ExactLiraSearchComponent private constructor(
     private var dirty = true
     private var sourceInstalled = false
     private var graphFirst = false
+    private var integerPrefixGraph = false
     private var solveContext = LpSolveContext.Production
     private var solveStop: Cancellation? = null
     private var operationAllowance: ((Cancellation) -> Cancellation)? = null
@@ -492,8 +493,12 @@ class ExactLiraSearchComponent private constructor(
         return try {
             graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
+            integerPrefixGraph = completeTraversalObserved && model.numRealVars == 0 &&
+                model.numIntVars in 1..10000 && model.numBoolVars > 0 &&
+                solveContext.certificationPolicy === ProductionLpCertificationPolicy
             if (graphFirst) smtStats?.observeRealGraphOpening()
-            if ((!graphFirst && !installSource()) || operationStop()) {
+            if (integerPrefixGraph) observeCompleteStage("INTEGER_PREFIX_LP_INSTALL_DEFERRED")
+            if ((!graphFirst && !integerPrefixGraph && !installSource()) || operationStop()) {
                 ComponentResult.Indeterminate
             } else {
                 lp.initialize(context).takeUnless { operationStop() } ?: ComponentResult.Indeterminate
@@ -987,6 +992,37 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
+    private fun integerPrefixRelaxation(context: SearchContext): PartialDifferenceRelaxation? {
+        if (node.sourceBranches.isNotEmpty() || node.disequalityDirections.isNotEmpty()) return null
+        val comparisons = ArrayList<ExactComparison>()
+        for (prepared in preparedRows) {
+            operationStop.charge(prepared.row.size.toLong() + 1L)
+            if (operationStop()) return null
+            if (prepared.disjunction && node.rowAssertions[prepared.address] == null) continue
+            val truth = node.rowTruth(prepared.address, prepared.row, bools) ?: continue
+            if (comparisons.size == 100000) return null
+            comparisons += prepared.form.comparison(truth) { bools[it] == TRUE }
+        }
+        for (integer in 0 until model.numIntVars) {
+            operationStop.charge(5)
+            if (operationStop() || comparisons.size > 100000 - 4) return null
+            val terms = mapOf(integer to BigFraction.ONE)
+            model.intBounds.lowerAsBigInteger(integer)?.let {
+                comparisons += ExactComparison(terms, it.asFraction(), LinearOp.GE, false, false)
+            }
+            model.intBounds.upperAsBigInteger(integer)?.let {
+                comparisons += ExactComparison(terms, it.asFraction(), LinearOp.LE, false, false)
+            }
+            context.intLowerBound(integer)?.let {
+                comparisons += ExactComparison(terms, it.asFraction(), LinearOp.GE, false, false)
+            }
+            context.intUpperBound(integer)?.let {
+                comparisons += ExactComparison(terms, it.asFraction(), LinearOp.LE, false, false)
+            }
+        }
+        return PartialDifferenceRelaxation.prepare(model.numIntVars, comparisons, operationStop)
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
@@ -1147,6 +1183,33 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Consistent
         }
         var checked = false
+        if (integerPrefixGraph && unassignedBooleans > 0) {
+            observeCompleteStage("INTEGER_PREFIX_GRAPH_ATTEMPT")
+            val relaxation = integerPrefixRelaxation(context)
+            if (operationStop()) return ComponentResult.Indeterminate
+            if (relaxation == null) {
+                observeCompleteStage("INTEGER_PREFIX_GRAPH_COVERAGE_FALLBACK")
+            } else {
+                observeCompleteStage("INTEGER_PREFIX_GRAPH_ADMITTED")
+                if (!context.consumeCheck()) return ComponentResult.Indeterminate
+                checked = true
+                when (val result = relaxation.check(operationStop)) {
+                    PartialDifferenceRelaxation.Result.Interrupted -> return ComponentResult.Indeterminate
+                    PartialDifferenceRelaxation.Result.Declined ->
+                        observeCompleteStage("INTEGER_PREFIX_GRAPH_POINT_FALLBACK")
+                    is PartialDifferenceRelaxation.Result.Feasible -> {
+                        capturePointHints(result.point, context, graph = true)
+                        if (operationStop()) return ComponentResult.Indeterminate
+                        observeCompleteStage("INTEGER_PREFIX_GRAPH_BYPASS")
+                        candidate = null
+                        assignment = null
+                        outcome = null
+                        dirty = false
+                        return ComponentResult.Consistent
+                    }
+                }
+            }
+        }
         // Partial graph consistency needs no numerical guide; complete points still check source rows.
         if (graphFirst && node.sourceBranches.isEmpty()) {
             if (!context.consumeCheck()) return ComponentResult.Indeterminate

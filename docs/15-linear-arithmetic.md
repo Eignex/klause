@@ -183,6 +183,27 @@ The theory adds no cutting planes: integrality is enforced only by these
 exhaustive splits and the reduction. Every split is a named source-bound atom, so
 conflict learning can cite it like any Boolean.
 
+#### Partial difference relaxations
+
+A complete worker with only integer columns can defer installing the source LP
+while source Booleans remain open. It collects every currently ready conjunction
+and selected disjunct, together with declared and published integer bounds. When
+all these expressions are unary bounds or opposite-coefficient differences, the
+real difference graph checks their rational relaxation. Strict comparisons keep
+their rational meaning. The returned point must satisfy every collected comparison
+exactly, including disequalities, before the component reports partial consistency.
+The point can guide the existing Boolean polarity provider but supplies no integer
+witness or source-bound publication.
+
+An unsupported expression, a source-bound branch, a selected disequality side,
+an unrepresentable graph, a negative cycle or a failed point check uses the source
+LP. Boolean-complete states also use the LP and integer completion. An inconclusive
+graph query and its LP fallback share one search check; cancellation retains the
+containing operation's spent work. Prefix rows, graph state and exact verification
+charge that operation, within the graph's 10,000-column and 100,000-row/edge limits.
+Complete-search stage counters record admission, verified bypass, coverage and
+point fallback, and deferred source installation.
+
 #### The double-bounded reduction
 
 Branch and bound alone need not terminate on an unbounded integer problem: the
@@ -262,6 +283,8 @@ defines linear factor admission.
 implements integer and mixed checks, the branch order and the reduction cache,
 building on the echelon/Hermite and double-bounded split helpers in `lp` and
 `simplex.exact`.
+[PartialDifferenceRelaxation](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/PartialDifferenceRelaxation.kt)
+checks the complete asserted rational prefix before an integer worker bypasses LP work.
 [OpenTheoryMinimizer](../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/OpenTheoryMinimize.kt)
 implements the integral descent. The pipeline names the integer-containing route
 `EXACT_LIRA`.

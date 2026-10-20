@@ -19,6 +19,7 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -50,6 +51,242 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `declared integer bounds should constrain the entire partial relaxation`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component))
+
+            assertIs<ComponentResult.Conflict>(session.initialize())
+
+            assertNotNull(component.lpMetrics)
+        }
+    }
+
+    @Test
+    fun `a selected source bound should retain its LP branch constraint`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val split = assertNotNull(
+                SourceBoundAtom.integerSplit(
+                    session,
+                    listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                    BigFraction.ZERO,
+                ),
+            )
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
+
+            assertNotNull(component.lpMetrics)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("INTEGER_PREFIX_GRAPH_COVERAGE_FALLBACK"))
+        }
+    }
+
+    @Test
+    fun `a stopped prefix operation should resume with its spent work retained`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
+        )
+        var charged = 0L
+        var limited = true
+        val meter = WorkMeter { charged += it }
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            component.useOperationAllowance { parent ->
+                parent or object : Cancellation {
+                    override fun isCancelled(): Boolean = limited && charged > 0L
+                    override fun workMeter(): WorkMeter = meter
+                }
+            }
+            val context = SearchSession(emptyList())
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+
+            assertIs<ComponentResult.Indeterminate>(component.propagate(context))
+            assertTrue(component.operationBudgetExhausted)
+            assertTrue(charged > 0L)
+            assertNull(component.lpMetrics)
+            assertIs<ComponentCheck.Indeterminate>(component.check(context))
+            val spent = charged
+            limited = false
+
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            assertTrue(charged > spent)
+            assertNull(component.lpMetrics)
+        }
+    }
+
+    @Test
+    fun `containing cancellation should withhold a consistent integer prefix`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
+        )
+        var cancelled = false
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), cancellation = Cancellation { cancelled })
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            cancelled = true
+
+            assertIs<ComponentResult.Indeterminate>(component.propagate(session))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+            assertNull(component.lpMetrics)
+        }
+    }
+
+    @Test
+    fun `a rational integer prefix should withhold a source witness until integer completion`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+            assertNull(component.lpMetrics)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("INTEGER_PREFIX_GRAPH_BYPASS"))
+
+            assertIs<SearchResult.Exhausted>(session.solve(1))
+            assertNotNull(component.lpMetrics)
+            assertTrue((stats.snapshot().completeSearchLinearChecks ?: 0L) > 0L)
+        }
+    }
+
+    @Test
+    fun `an unsupported ready row should use the source LP`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(3),
+            factors = arrayOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1)),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNotNull(component.lpMetrics)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("INTEGER_PREFIX_GRAPH_COVERAGE_FALLBACK"))
+            assertNull(stats.snapshot().completeSearchStages?.get("INTEGER_PREFIX_GRAPH_BYPASS"))
+        }
+    }
+
+    @Test
+    fun `a declined prefix point and its LP fallback should spend one check`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ),
+        )
+        var checks = 0
+        val context = object : SearchContext by SearchSession(emptyList()) {
+            override fun consumeCheck(): Boolean {
+                checks++
+                return checks == 1
+            }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+
+            assertIs<ComponentResult.Conflict>(component.propagate(context))
+
+            assertEquals(1, checks)
+        }
+    }
+
+    @Test
+    fun `a declined check allowance should withhold an integer prefix bypass`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), maxChecks = 0)
+
+            assertIs<ComponentResult.Indeterminate>(session.initialize())
+
+            assertNull(component.lpMetrics)
+            assertNull(stats.snapshot().completeSearchStages?.get("INTEGER_PREFIX_GRAPH_BYPASS"))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `a published integer bound should invalidate a consistent prefix`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertNull(component.lpMetrics)
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.IntAtLeast(0, 1)))
+        }
+    }
+
+    @Test
+    fun `retracted integer prefixes should check siblings and restarted root facts`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.restart())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+        }
+    }
+
     @Test
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")
