@@ -208,9 +208,15 @@ Exact integer rows select compact signed-word propagation when their constants f
 and the sum of coefficient magnitudes is at most `Long.MAX_VALUE`, keeping residual
 checks within 128 bits; wider rows keep arbitrary-precision propagation. Packed SAT
 propagation requires built-in clause descriptors, so a clause assigned to a custom
-projection uses the general CP lane. AllDifferent tries its cached incremental path
-before full matching. Assignment-dependent payloads such as live tuples and diagram
-reachability stay state-owned.
+projection uses the general CP lane. Assignment-dependent payloads such as live
+tuples and diagram reachability stay state-owned.
+
+AllDifferent tries its cached incremental path before full matching. Rebuilding
+separates value counting, warm seeding, Hall recovery and reversible matching
+publication. Matching publication precedes SCC pruning; validity and domain-reference
+publication follow successful pruning. The full fallback keeps excepted-value copies
+shareable during pruning and publishes its matching and fixpoint after successful
+pruning.
 
 An inert descriptor requires an explicit reason and cannot claim an exact check, so
 its absent mechanism needs an enforcing peer or separate source certification.

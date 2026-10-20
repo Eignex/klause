@@ -145,6 +145,18 @@ class AllDifferentPropagatorTest {
         assertEquals(2, d2.max)
     }
 
+    @Test
+    fun `a non-contiguous Hall conflict should be detected despite enough total values`() {
+        val d13 = IntDomain(1, 3).excludeValue(2)
+        val d24 = IntDomain(2, 4).excludeValue(3)
+        val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 1, domainSize = 4)
+        val state = stateWithAD(factor, arrayOf(d13, d13, d13, d24))
+
+        val feasible = state.problem.propagators[0].propagate(state, factorId = 0)
+
+        assertFalse(feasible)
+    }
+
     private fun problemOf(factor: Factor, vararg domains: IntDomain) = Problem(
         numBoolVars = 0,
         numIntVars = domains.size,
