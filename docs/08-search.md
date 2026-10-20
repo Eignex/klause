@@ -160,6 +160,12 @@ scratch, watchers and failure contexts belong to each state. Undo discards pendi
 failure context, and fresh presolve rebuilds keep the originating cancellation token;
 see [presolve](07-presolve.md).
 
+Plain global cardinality propagation maintains reversible definite and possible
+cover counts. Unseeded, widened or span-wide domains select a full recount;
+otherwise removed values and new singletons update the counts incrementally.
+Domain references advance only after the selected count pass finishes, so undo
+restores the count state and its delta base together.
+
 Boolean-only models journal each pin without integer-state padding. Integer undo
 replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see

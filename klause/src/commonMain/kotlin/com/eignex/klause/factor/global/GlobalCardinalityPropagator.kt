@@ -174,6 +174,15 @@ internal class GlobalCardinalityPropagator(
      */
     private fun maintainCounts(state: PropagationState, inc: GccIncrementalState) {
         val n = inc.n
+        if (countsNeedRebuild(state, inc, n)) {
+            rebuildCounts(state, inc, n)
+        } else {
+            patchCounts(state, inc, n)
+        }
+        for (i in 0 until n) inc.domRef[i].set(state.intDomains[inc.xs[i]])
+    }
+
+    private fun countsNeedRebuild(state: PropagationState, inc: GccIncrementalState, n: Int): Boolean {
         // A domain larger than the walk cap cannot be walked to detect widening or to count cover
         // membership. Force a full rebuild (below, counted span-safely per variable) rather than the
         // incremental delta, whose widen/leave scans enumerate the domain value-by-value.
@@ -196,50 +205,53 @@ internal class GlobalCardinalityPropagator(
                 }
             }
         }
-        if (rebuild) {
-            for (k in 0 until inc.m) {
-                inc.definite[k] = 0
-                inc.possible[k] = 0
+        return rebuild
+    }
+
+    private fun rebuildCounts(state: PropagationState, inc: GccIncrementalState, n: Int) {
+        for (k in 0 until inc.m) {
+            inc.definite[k] = 0
+            inc.possible[k] = 0
+        }
+        for (i in 0 until n) {
+            inc.pinnedCover[i] = -1
+            val d = state.intDomains[inc.xs[i]]
+            if (d.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
+                d.values.forEach { v ->
+                    val k = coverIndexByValue.getOrDefault(v, -1)
+                    if (k >= 0) inc.possible[k] = inc.possible[k] + 1
+                }
+            } else {
+                // Iterate the (small) cover set and test membership — span-independent, and only
+                // cover values contribute to the counts anyway.
+                for (k in cover.indices) if (cover[k] in d) inc.possible[k] = inc.possible[k] + 1
             }
-            for (i in 0 until n) {
-                inc.pinnedCover[i] = -1
-                val d = state.intDomains[inc.xs[i]]
-                if (d.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
-                    d.values.forEach { v ->
-                        val k = coverIndexByValue.getOrDefault(v, -1)
-                        if (k >= 0) inc.possible[k] = inc.possible[k] + 1
-                    }
-                } else {
-                    // Iterate the (small) cover set and test membership — span-independent, and only
-                    // cover values contribute to the counts anyway.
-                    for (k in cover.indices) if (cover[k] in d) inc.possible[k] = inc.possible[k] + 1
-                }
-                if (d.min == d.max) {
-                    val k = coverIndexByValue.getOrDefault(d.min, -1)
-                    inc.pinnedCover[i] = if (k >= 0) k else -2
-                    if (k >= 0) inc.definite[k] = inc.definite[k] + 1
-                }
-            }
-            inc.valid.set(1)
-        } else {
-            for (i in 0 until n) {
-                val prev = requireNotNull(inc.domRef[i].value)
-                val cur = state.intDomains[inc.xs[i]]
-                if (cur === prev) continue
-                prev.values.forEach { v ->
-                    if (v !in cur) {
-                        val k = coverIndexByValue.getOrDefault(v, -1)
-                        if (k >= 0) inc.possible[k] = inc.possible[k] - 1
-                    }
-                }
-                if (inc.pinnedCover[i] == -1 && cur.min == cur.max) {
-                    val k = coverIndexByValue.getOrDefault(cur.min, -1)
-                    inc.pinnedCover[i] = if (k >= 0) k else -2
-                    if (k >= 0) inc.definite[k] = inc.definite[k] + 1
-                }
+            if (d.min == d.max) {
+                val k = coverIndexByValue.getOrDefault(d.min, -1)
+                inc.pinnedCover[i] = if (k >= 0) k else -2
+                if (k >= 0) inc.definite[k] = inc.definite[k] + 1
             }
         }
-        for (i in 0 until n) inc.domRef[i].set(state.intDomains[inc.xs[i]])
+        inc.valid.set(1)
+    }
+
+    private fun patchCounts(state: PropagationState, inc: GccIncrementalState, n: Int) {
+        for (i in 0 until n) {
+            val prev = requireNotNull(inc.domRef[i].value)
+            val cur = state.intDomains[inc.xs[i]]
+            if (cur === prev) continue
+            prev.values.forEach { v ->
+                if (v !in cur) {
+                    val k = coverIndexByValue.getOrDefault(v, -1)
+                    if (k >= 0) inc.possible[k] = inc.possible[k] - 1
+                }
+            }
+            if (inc.pinnedCover[i] == -1 && cur.min == cur.max) {
+                val k = coverIndexByValue.getOrDefault(cur.min, -1)
+                inc.pinnedCover[i] = if (k >= 0) k else -2
+                if (k >= 0) inc.definite[k] = inc.definite[k] + 1
+            }
+        }
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {

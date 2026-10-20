@@ -9,16 +9,46 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.propagation.undoTo
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class GlobalCardinalityPropagatorTest {
+
+    @Test
+    fun `count bounds should reflect sibling domains after undo`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { if (it < 3) IntDomain(0, 2) else IntDomain(0, 3) },
+            factors = arrayOf<Factor>(
+                GlobalCardinality(xs = intArrayOf(0, 1, 2), cover = longArrayOf(0), countVars = intArrayOf(3)),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        assertNull(state.runToFixpoint(allFactors = true))
+        val root = state.mark()
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 0) && state.excludeIntValue(1, 0))
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.undoTo(root)
+
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 1) && state.tightenIntMin(2, 1))
+        assertNull(state.runToFixpoint(allFactors = true))
+
+        assertEquals(0L, state.intDomains[3].min)
+        assertEquals(1L, state.intDomains[3].max)
+    }
 
     @Test
     fun `global cardinality deductions should be implied by their reasons under carved holes`() {
