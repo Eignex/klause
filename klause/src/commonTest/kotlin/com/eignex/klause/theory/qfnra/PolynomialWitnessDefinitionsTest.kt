@@ -17,6 +17,107 @@ import kotlin.test.assertTrue
 
 class PolynomialWitnessDefinitionsTest {
     @Test
+    fun `free coordinate proposals retain independent transitive definitions`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const z Real) (declare-const y Real)
+            (declare-const t Real) (declare-const w Real) (declare-const fixed Real)
+            (assert (and (= y (* z z)) (= z (+ (* x x) 1)) (= w (* t t))))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+        val plan = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 4096)
+            .prepare(atoms, source.realCount, mapOf(5 to BigFraction.ofLong(7))))
+        val seed = assertNotNull(plan.point())
+
+        val first = assertNotNull(plan.point(0, BigFraction.ofLong(2)))
+        val second = assertNotNull(plan.point(3, BigFraction.ofLong(3)))
+
+        assertEquals(BigFraction.ofLong(5), first.getValue(1))
+        assertEquals(BigFraction.ofLong(25), first.getValue(2))
+        assertEquals(BigFraction.ONE, first.getValue(4))
+        assertEquals(BigFraction.ONE, second.getValue(0))
+        assertEquals(BigFraction.ofLong(4), second.getValue(2))
+        assertEquals(BigFraction.ofLong(9), second.getValue(4))
+        assertEquals(BigFraction.ofLong(7), second.getValue(5))
+        assertEquals(seed, plan.point())
+    }
+
+    @Test
+    fun `mutating returned points leaves later seed and axis proposals independent`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (assert (= y (* x x)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+        val plan = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 4096)
+            .prepare(atoms, source.realCount, emptyMap()))
+        val seed = assertNotNull(plan.point()) as MutableMap<Int, BigFraction>
+        seed.clear()
+
+        val proposal = assertNotNull(plan.point(0, BigFraction.ofLong(2))) as MutableMap<Int, BigFraction>
+        val dependent = proposal.getValue(1)
+        proposal.clear()
+
+        assertEquals(BigFraction.ofLong(4), dependent)
+        assertEquals(mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), plan.point())
+    }
+
+    @Test
+    fun `a declined proposal leaves a completed seed available within the same bit admission`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (assert (= y (* x x)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+        val plan = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 3)
+            .prepare(atoms, source.realCount, emptyMap()))
+        val seed = assertNotNull(plan.point())
+
+        val declined = plan.point(0, BigFraction.ofLong(3))
+        val accepted = assertNotNull(plan.point(0, BigFraction.ofLong(2)))
+
+        assertNull(declined)
+        assertEquals(BigFraction.ofLong(4), accepted.getValue(1))
+        assertEquals(seed, plan.point())
+    }
+
+    @Test
+    fun `an interrupted proposal leaves its completed seed independent for later reconstruction`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const z Real) (declare-const y Real)
+            (assert (and (= y (* z z)) (= z (+ (* x x) 1))))
+            """.trimIndent(),
+        )
+        var spent = 0L
+        var ceiling = Long.MAX_VALUE
+        val arithmetic = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= ceiling
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        })
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+        val plan = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 4096)
+            .prepare(atoms, source.realCount, emptyMap()))
+        val seed = assertNotNull(plan.point())
+        val before = spent
+        assertNotNull(plan.point(0, BigFraction.ofLong(3)))
+        ceiling = spent + (spent - before) / 2
+
+        assertFailsWith<PolynomialInterrupted> { plan.point(0, BigFraction.ofLong(4)) }
+        ceiling = Long.MAX_VALUE
+        val completed = assertNotNull(plan.point(0, BigFraction.ofLong(2)))
+
+        assertEquals(BigFraction.ofLong(25), completed.getValue(2))
+        assertEquals(seed, plan.point())
+    }
+
+    @Test
     fun `opposing proportional bounds reconstruct a required definition`() {
         for (constraints in listOf(
             "(<= y (+ (* x x) 2)) (>= (* 2 y) (+ (* 2 x x) 4))",

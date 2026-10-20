@@ -94,12 +94,19 @@ internal class PolynomialWitnessDefinitions(
         private val definitions: List<Pair<Int, Polynomial>>,
         private val protectedVariables: Set<Int>,
     ) {
+        private var seedPoint: Map<Int, BigFraction>? = null
+
         val residualAtoms: List<PolynomialAtom> get() {
             repeat(residual.size + 1) { arithmetic.step() }
             return residual.toList()
         }
 
-        fun point(): Map<Int, BigFraction>? = reconstruct(null, null)
+        fun point(): Map<Int, BigFraction>? {
+            seedPoint?.let { return copyPoint(it) }
+            val point = reconstruct(null, null) ?: return null
+            seedPoint = copyPoint(point)
+            return point
+        }
 
         fun point(variable: Int, value: BigFraction): Map<Int, BigFraction>? {
             arithmetic.step()
@@ -120,14 +127,22 @@ internal class PolynomialWitnessDefinitions(
         }
 
         private fun reconstruct(variable: Int?, value: BigFraction?): Map<Int, BigFraction>? {
-            repeat(seed.size + 1) { arithmetic.step() }
-            val point = LinkedHashMap(seed)
+            val retained = seedPoint
+            val point = copyPoint(retained ?: seed)
+            val changed = if (retained != null && variable != null) hashSetOf(variable) else null
             if (variable != null) point[variable] = requireNotNull(value)
             for ((id, polynomial) in definitions.asReversed()) {
                 arithmetic.step()
+                if (changed != null && polynomial.variables.none { arithmetic.step(); it in changed }) continue
                 point[id] = evaluate(polynomial, point) ?: return null
+                changed?.add(id)
             }
             return point
+        }
+
+        private fun copyPoint(point: Map<Int, BigFraction>): LinkedHashMap<Int, BigFraction> {
+            repeat(point.size + 1) { arithmetic.step() }
+            return LinkedHashMap(point)
         }
     }
 

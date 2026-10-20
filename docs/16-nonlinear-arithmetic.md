@@ -262,8 +262,10 @@ unconditional guides. Admission uses the original coordinate and atom counts
 before guidance extraction. Witness reconstruction substitutes explicit required
 definitions first, then intersects signs of proportional residual predicates to
 expose further equalities. Its raw term admission precedes this intersection, and
-all inference uses the containing work scope. The probe is limited to small formulas
-and one 65,536-unit slice; a decline leaves complete CAD available.
+all inference uses the containing work scope. A prepared reconstruction keeps an
+owned complete seed point; each free-coordinate proposal copies it and reevaluates
+the transitively affected definitions under the same work scope. The probe is limited
+to small formulas and one 65,536-unit slice; a decline leaves complete CAD available.
 
 **2. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
 enumerates source implicants: assignments of Boolean leaves and signed numeric
