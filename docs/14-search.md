@@ -40,20 +40,13 @@ Four owners divide the work:
   contains the single traversal loop and owns frames, decisions, restarts,
   cancellation cadence and resumable/terminal state.
 
-Retraction removes trail facts and restores integer premises before clamping the
-learned propagation cursor and notifying components. Root rebuild clears facts while
-retaining learned clauses and reawakening units. Native CP clause state remains
-CP-owned.
-
-Components obtain the invocation token, native allowance accounting and typed stop
-diagnostics from `SearchContext.executionControls`; alternate coordinators supply
-those services through the same contract. [Resource allowances](11-resources.md#component-execution-controls)
-owns their units, cancellation scopes and diagnostic precedence. Internal components
-with retained root preparation implement `PreparingSearchComponent`: their cursor
-returns no verdict until preparation completes, a suspended cursor does not enter
-propagation, branching or model assembly, and closing discards it.
-[Portfolio preparation](16.2-portfolio-scheduling.md#polynomial-root-preparation) defines the
-distinction between slice suspension and solve-wide cancellation.
+Retraction removes trail facts and restores integer premises before notifying
+components; a root rebuild keeps learned clauses. Components obtain their token,
+accounting and stop diagnostics from `SearchContext.executionControls`; see
+[resource allowances](11-resources.md#component-execution-controls). Components with
+retained root preparation implement `PreparingSearchComponent` and return no verdict
+until it completes; see
+[portfolio preparation](16.2-portfolio-scheduling.md#polynomial-root-preparation).
 
 ## Chapter outline
 
