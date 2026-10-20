@@ -424,7 +424,8 @@ class OpenTheoryEngine internal constructor(
                 it.observePrimaryLpWith(stats.lp.certificationObserver(LpRoute.STANDALONE))
                 it.observeCompleteTraversal()
                 it.useMixedPointCompletion()
-                val proposals = WholeSourcePointOffer(model, prepared.source, prepared.mapping, cancellation)
+                val proposals = WholeSourcePointOffer(model, prepared.source, prepared.mapping, cancellation,
+                    onDecline = { reason -> state.smt.observeCompleteSearchStage("WHOLE_SOURCE_POINT_DECLINE_$reason") })
                 if (proposals.applicable) {
                     if (it.useWholeSourcePoints(model, proposals::completeBooleans, proposals::offer,
                             proposals::invalidate)

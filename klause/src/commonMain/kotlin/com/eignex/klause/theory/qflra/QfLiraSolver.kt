@@ -384,7 +384,8 @@ class ExactLiraSearchComponent private constructor(
         val pins = IntArray(source.numBoolVars) { variable ->
             context.boolValue(variable)?.let { if (it) 1 else 0 } ?: -1
         }
-        val candidate = completeWholeRealPoint(source, point(), pins, stop, complete)
+        val candidate = completeWholeRealPoint(source, point(), pins, stop,
+            onDecline = { observeCompleteStage("WHOLE_SOURCE_POINT_DECLINE_$it") }, completeBooleans = complete)
         if (candidate == null || stop()) {
             observeCompleteStage(if (stop()) "WHOLE_SOURCE_POINT_CANCELLED" else "WHOLE_SOURCE_POINT_DECLINED")
             return false

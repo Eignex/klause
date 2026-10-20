@@ -29,6 +29,7 @@ internal class WholeSourcePointOffer(
     private val original: Problem,
     private val mapping: SourceMapping,
     private val publicationCancellation: Cancellation,
+    private val onDecline: ((String) -> Unit)? = null,
 ) {
     private val witnesses = SourceWitnessAssembler(source, original)
     private var booleanPreparationAttempted = false
@@ -45,7 +46,7 @@ internal class WholeSourcePointOffer(
         !source.semantics.isApproximate && !original.semantics.isApproximate
 
     fun completeBooleans(guesses: IntArray, stop: Cancellation): BooleanArray? {
-        if (!applicable || guesses.size != source.numBoolVars || stop()) return null
+        if (!applicable || guesses.size != source.numBoolVars || stop()) return declined("BOOLEAN_SCOPE")
         if (!booleanPreparationAttempted) {
             booleanPreparationAttempted = true
             try {
@@ -54,8 +55,8 @@ internal class WholeSourcePointOffer(
                 return null
             }
         }
-        val model = booleanModel ?: return null
-        val referenced = used ?: return null
+        val model = booleanModel ?: return declined("BOOLEAN_PREPARATION")
+        val referenced = used ?: return declined("BOOLEAN_REFERENCES")
         stop.charge(8L * (guesses.size + 1L))
         if (stop()) return null
         for (variable in guesses.indices) {
@@ -68,9 +69,10 @@ internal class WholeSourcePointOffer(
         val session = PropagationSession.forPointCheck(model,
             Assumptions(keys, values, intArrayOf(), longArrayOf()), stop)
         return try {
-            if (session.isUnsatAtRoot || session.fixpointCancelled || stop()) return null
-            val result = BooleanArray(source.numBoolVars) { session.boolValue(it) ?: return null }
-            if (stop() || session.checkSelectedProjection() != ComponentCheck.Feasible) return null
+            if (session.isUnsatAtRoot) return declined("BOOLEAN_ROOT_CONFLICT")
+            if (session.fixpointCancelled || stop()) return null
+            val result = BooleanArray(source.numBoolVars) { session.boolValue(it) ?: return declined("BOOLEAN_UNRESOLVED") }
+            if (stop() || session.checkSelectedProjection() != ComponentCheck.Feasible) return declined("BOOLEAN_CHECK")
             result.takeUnless { stop() }
         } finally {
             stop.charge(session.work)
@@ -144,7 +146,7 @@ internal class WholeSourcePointOffer(
                     clauses += factor
                 }
                 is ExactLinear -> Unit
-                else -> return null
+                else -> return declined("BOOLEAN_FACTOR_${factor::class.simpleName}")
             }
         }
         val problem = Problem(source.numBoolVars, 0, emptyArray(), Array<Factor>(clauses.size) { clauses[it] },
@@ -153,6 +155,11 @@ internal class WholeSourcePointOffer(
         if (stop()) return null
         used = referenced
         return baked
+    }
+
+    private fun declined(reason: String): Nothing? {
+        onDecline?.invoke(reason)
+        return null
     }
 
     private fun rootAccounting(stop: Cancellation): Cancellation = object : Cancellation {

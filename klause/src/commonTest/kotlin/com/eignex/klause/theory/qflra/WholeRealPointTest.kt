@@ -47,18 +47,22 @@ class WholeRealPointTest {
                 BigFraction.ZERO, activator = 0),
         ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
         var calls = 0
+        val declines = ArrayList<String>()
 
         val conflicting = completeWholeRealPoint(source, listOf(BigFraction.ZERO), intArrayOf(0, -1),
-            Cancellation.Never) { _, _ -> calls++; booleanArrayOf(true, false) }
+            Cancellation.Never, onDecline = { declines += it }) { _, _ -> calls++; booleanArrayOf(true, false) }
         val compatible = completeWholeRealPoint(source, listOf(BigFraction.ZERO), intArrayOf(1, 1),
-            Cancellation.Never) { _, _ -> calls++; booleanArrayOf(true, true) }
+            Cancellation.Never, onDecline = { declines += it }) { _, _ -> calls++; booleanArrayOf(true, true) }
         val changed = completeWholeRealPoint(source, listOf(BigFraction.ZERO), intArrayOf(1, 1),
-            Cancellation.Never) { guesses, _ -> calls++; guesses.fill(-1); booleanArrayOf(true, false) }
+            Cancellation.Never, onDecline = { declines += it }) { guesses, _ ->
+                calls++; guesses.fill(-1); booleanArrayOf(true, false)
+            }
 
         assertNull(conflicting)
         assertContentEquals(booleanArrayOf(true, true), assertNotNull(compatible).bools)
         assertNull(changed)
         assertEquals(2, calls)
+        assertEquals(listOf("PIN_DISAGREEMENT", "BOOLEAN_VALUE_CHANGED"), declines)
     }
 
     @Test

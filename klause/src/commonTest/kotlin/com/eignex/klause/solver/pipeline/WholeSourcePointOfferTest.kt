@@ -62,12 +62,15 @@ class WholeSourcePointOfferTest {
         val source = Problem(2, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
         ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val declines = ArrayList<String>()
         val offer = WholeSourcePointOffer(source, source,
-            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never)
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onDecline = { declines += it })
 
         val result = offer.completeBooleans(intArrayOf(-1, -1), Cancellation.Never)
 
         assertNull(result)
+        assertEquals(listOf("BOOLEAN_UNRESOLVED"), declines)
         assertContentEquals(booleanArrayOf(false, true),
             offer.completeBooleans(intArrayOf(0, -1), Cancellation.Never))
     }
@@ -77,10 +80,13 @@ class WholeSourcePointOfferTest {
         val source = Problem(2, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
         ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val declines = ArrayList<String>()
         val offer = WholeSourcePointOffer(source, source,
-            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never)
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), Cancellation.Never,
+            onDecline = { declines += it })
 
         assertNull(offer.completeBooleans(intArrayOf(1, 0), Cancellation.Never))
+        assertEquals(listOf("BOOLEAN_ROOT_CONFLICT"), declines)
         assertContentEquals(booleanArrayOf(false, false),
             offer.completeBooleans(intArrayOf(0, 0), Cancellation.Never))
     }
