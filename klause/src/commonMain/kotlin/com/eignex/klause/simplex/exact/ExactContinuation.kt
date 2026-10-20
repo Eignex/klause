@@ -382,6 +382,7 @@ private class RationalContinuationLane<F>(
     private var headings = MutableList(input.m) { input.n + it }
     private var seats: MutableList<F>
     private val seatEpsilon: MutableList<F>?
+    private val nonzeroColumns: IntArray
     private var statuses = MutableList(input.total) { j -> canonical(j) }
     private val lower: List<F?>
     private val upper: List<F?>
@@ -398,7 +399,8 @@ private class RationalContinuationLane<F>(
     override val normalizedScalarPeak get() = scalarPeak
 
     init {
-        budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + input.total * 48L)
+        budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + input.total * 52L)
+        nonzeroColumns = IntArray(input.total)
         lower = input.lower.map { it?.let { value -> fromBig(value, budget) } }
         upper = input.upper.map { it?.let { value -> fromBig(value, budget) } }
         table = List(input.m) { row ->
@@ -549,13 +551,15 @@ private class RationalContinuationLane<F>(
     private fun values(budget: ContinuationBudget): List<F> {
         budget.step(bytes = input.total * 8L)
         val result = seats.toMutableList()
+        val count = indexNonzeroSeats(seats, budget)
         for (row in headings.indices) {
+            budget.step()
             var value = table[row][width - 1]
-            for (j in 0 until input.total) {
+            for (index in 0 until count) {
                 budget.step()
-                if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(seats[j])) {
-                    value = subtract(value, multiply(table[row][j], seats[j], budget), budget)
-                }
+                val j = nonzeroColumns[index]
+                if (ops.isZero(table[row][j])) continue
+                value = subtract(value, multiply(table[row][j], seats[j], budget), budget)
             }
             result[headings[row]] = value
         }
@@ -566,17 +570,28 @@ private class RationalContinuationLane<F>(
         val epsilon = seatEpsilon ?: return null
         budget.step(bytes = input.total * 8L)
         val result = epsilon.toMutableList()
+        val count = indexNonzeroSeats(epsilon, budget)
         for (row in headings.indices) {
+            budget.step()
             var value = ops.zero
-            for (j in 0 until input.total) {
+            for (index in 0 until count) {
                 budget.step()
-                if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(epsilon[j])) {
-                    value = subtract(value, multiply(table[row][j], epsilon[j], budget), budget)
-                }
+                val j = nonzeroColumns[index]
+                if (ops.isZero(table[row][j])) continue
+                value = subtract(value, multiply(table[row][j], epsilon[j], budget), budget)
             }
             result[headings[row]] = value
         }
         return result
+    }
+
+    private fun indexNonzeroSeats(values: List<F>, budget: ContinuationBudget): Int {
+        var count = 0
+        for (j in 0 until input.total) {
+            budget.step()
+            if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(values[j])) nonzeroColumns[count++] = j
+        }
+        return count
     }
 
     private fun materialize(values: List<F>, epsilon: List<F>?, budget: ContinuationBudget): List<BigFraction> {
@@ -638,10 +653,20 @@ private class RationalContinuationLane<F>(
         budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L)
         val next = table.map { it.toMutableList() }
         val inverse = reciprocal(table[row][enter], budget)
-        for (j in 0 until width) next[row][j] = multiply(table[row][j], inverse, budget)
+        for (j in 0 until width) {
+            if (ops.isZero(table[row][j])) {
+                budget.step()
+                continue
+            }
+            next[row][j] = multiply(table[row][j], inverse, budget)
+        }
         for (i in headings.indices) {
             if (i == row || ops.isZero(table[i][enter])) continue
             for (j in 0 until width) {
+                if (ops.isZero(next[row][j])) {
+                    budget.step()
+                    continue
+                }
                 next[i][j] = subtract(table[i][j], multiply(table[i][enter], next[row][j], budget), budget)
             }
         }

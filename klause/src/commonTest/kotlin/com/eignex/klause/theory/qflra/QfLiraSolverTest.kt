@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
@@ -17,6 +18,10 @@ import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
@@ -50,6 +55,43 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `a reduced general conflict should retain its Boolean premises before the primary solve`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
+                List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
+                List(3) { BigFraction.MINUS_ONE }, LinearOp.LE, BigFraction.MINUS_ONE),
+        ), numRealVars = 4,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY,
+                Double.NEGATIVE_INFINITY, 0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY,
+                Double.POSITIVE_INFINITY, 0.0))
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        solves = 0
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+            assertNotNull(conflict.explanation).literals.toSet())
+        assertEquals(0, solves)
+        session.popTo(1)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+        assertIs<SearchResult.Satisfied>(session.solve(0))
+    }
+
     @Test
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")
@@ -152,6 +194,192 @@ class QfLiraSolverTest {
 
         assertContentEquals(intArrayOf(Lit.make(0, positive = false)), conflict.explanation?.literals)
         assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+    }
+
+    @Test
+    fun `pure real conflicts should retain signed guards across sibling retraction`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                List(2) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ONE, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                LinearOp.GE, BigFraction.ONE, activator = 2),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ofLong(4), activator = 3),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val component = ExactLiraSearchComponent(source)
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        for (variable in listOf(3, 0, 1)) {
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+        }
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true)),
+            assertNotNull(conflict.explanation).literals.toSet())
+        session.popTo(3)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+        assertIs<SearchResult.Satisfied>(session.solve(0))
+    }
+
+    @Test
+    fun `assigned equations should conflict before unrelated Boolean choices without a numerical solve`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                List(2) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ONE, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ONE, strict = true),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ofLong(4), activator = 2),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        solves = 0
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+            assertNotNull(conflict.explanation).literals.toSet())
+        assertNull(session.boolValue(2))
+        assertEquals(0, solves)
+    }
+
+    @Test
+    fun `unassigned Boolean coefficients should remain open during equality refutation`() {
+        val declaration = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                TaggedLinearRow(intArrayOf(Term.ofRealVar(0), Term.ofLit(Lit.make(0, true))),
+                    IntegerConstants(UnitConsts(2), 0L), LinearOp.EQ),
+            ))
+        }
+        val source = Problem(1, 0, emptyArray(), arrayOf(declaration,
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO, strict = true)),
+            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val component = ExactLiraSearchComponent(source)
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertNull(session.boolValue(0))
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+        assertEquals(BigFraction.ofLong(-1),
+            assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single())
+    }
+
+    @Test
+    fun `unselected real alternatives should not hide an independent source contradiction`() {
+        val alternatives = listOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                LinearOp.NE, BigFraction.ZERO),
+            object : Factor by ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO) {
+                override val linearForm: LinearForm = LinearForm.Disjunction(listOf(
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                        LinearOp.LE, BigFraction.ZERO).linearRows.single(),
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                        LinearOp.GE, BigFraction.ONE).linearRows.single(),
+                ))
+            },
+        )
+        for (alternative in alternatives) {
+            val source = Problem(0, 0, emptyArray(), arrayOf(alternative,
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    List(2) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ONE),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.EQ, BigFraction.ZERO),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ONE, strict = true)),
+                numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+            val component = ExactLiraSearchComponent(source)
+            val session = SearchSession(listOf(component))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.initialize())
+
+            assertTrue(assertNotNull(conflict.explanation).literals.isEmpty())
+        }
+    }
+
+    @Test
+    fun `a reduced cycle should conflict before unrelated Boolean choices without a numerical solve`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(2)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                LinearOp.LE, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2)),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), LinearOp.LE, BigFraction.MINUS_ONE),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ofLong(4), activator = 2),
+        ), numRealVars = 4,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY,
+                Double.NEGATIVE_INFINITY, 0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY,
+                Double.POSITIVE_INFINITY, 0.0))
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        solves = 0
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+            assertNotNull(conflict.explanation).literals.toSet())
+        assertNull(session.boolValue(2))
+        assertEquals(0, solves)
+    }
+
+    @Test
+    fun `a complete equality contradiction should avoid a numerical solve`() {
+        val factors = listOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+            List(2) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ZERO)) + (1 until 130).map { variable ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(variable)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO)
+        } + ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ZERO, strict = true)
+        val source = Problem(0, 0, emptyArray(), factors.toTypedArray(), numRealVars = 130,
+            realLower = DoubleArray(130) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(130) { Double.POSITIVE_INFINITY })
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+
+        val result = assertIs<ComponentResult.Conflict>(session.initialize())
+
+        assertTrue(assertNotNull(result.explanation).literals.isEmpty())
+        assertEquals(0, solves)
     }
 
     @Test

@@ -112,6 +112,19 @@ Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
 [LP certification](17-linear-programming.md#lp-certification); a floating status alone is
 insufficient. Strict infeasibility requires a completed strict-feasibility check.
 
+Pure-real checks can first eliminate paired opposite closed source rows as equations
+over a necessary subset with known Boolean and branch premises. Inconsistent
+equations, a false reduced constant or a negative reduced difference cycle reject
+only that prefix. Once all source Booleans are assigned, general reduced components
+can compact surviving coordinates and proportional rows before using the reduction
+owner's existing source-LP budget and dimension limit. A necessary difference subset
+can refute a component but supplies no feasible point. Every input is admitted before
+negative authority, and residual conflicts retain all original row and equation
+premises; an internal unguarded cycle is not a source clause. Unknown source choices,
+unsupported premises or cancellation withhold the proof. Capture retains the
+65,536-entry, 4,096-bit arithmetic and 4,096-node explanation bounds under the current
+operation, without renewing a numerical allowance.
+
 Open real objectives with complete affine source capture use
 `RationalTheoryDescent`. Attained witnesses, strict approach paths and feasible
 improving rays determine its result; `OpenTheoryOptimum.linearResult` separates the
@@ -335,6 +348,12 @@ tries to turn that float point into an exact witness:
    rows: by the difference checker where the rows form a difference graph,
    otherwise by an exact point from the [source LP owner](17-linear-programming.md).
    Completion is attempted only up to 65,536 row entries.
+
+Real completion compacts surviving coordinates before partitioning and restores
+their original positions in a returned point. Oversized components can merge
+positively proportional inequalities at the strongest exact endpoint, preserving
+strictness, before the existing source-LP dimension check. Guessed-integer recovery
+consumes points only; an infeasible or declined component is a failed guess.
 
 The full rows, strictness, integrality and source reconstruction still gate
 acceptance. A failed guess supplies no conflict or bound; the component returns to
