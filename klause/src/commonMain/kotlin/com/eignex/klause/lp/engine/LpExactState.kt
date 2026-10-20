@@ -103,14 +103,10 @@ internal class LpExactState internal constructor(
     val trailStorageUnits: Long
 
     init {
-        require(listOf(matrixRevision, boundRevision, objectiveRevision, popRevision, rowRevision).all { it >= 0L })
-        require(rows.size == baseModel.m)
-        require(scopeMarks.all { it in 0..activeAssertions.size })
-        require(scopeMarks.zipWithNext().all { (a, b) -> a <= b })
-        require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
+        validateStructure()
         val source = previous?.takeIf { it.baseModel.sharesRegion(baseModel) && it.rows === rows }
         if (source == null) {
-            trailStorageUnits = activeAssertions.sumOf { it.storageUnits() } + scopeMarks.size
+            trailStorageUnits = initialStorageUnits()
             validateRows()
             validateAssertions(0)
             lower = arrayOfNulls(baseModel.numVars)
@@ -122,16 +118,9 @@ internal class LpExactState internal constructor(
         } else {
             if (source.baseModel.objective !== baseModel.objective) validateRowCosts()
             val shared = sharedPrefix(source.activeAssertions)
-            var storage = source.trailStorageUnits - source.scopeMarks.size + scopeMarks.size
-            for (index in shared until source.activeAssertions.size) {
-                storage -= source.activeAssertions[index].storageUnits()
-            }
-            for (index in shared until activeAssertions.size) storage += activeAssertions[index].storageUnits()
-            trailStorageUnits = storage
+            trailStorageUnits = updatedStorageUnits(source, shared)
             validateAssertions(shared)
-            val touched = HashSet<Int>()
-            for (index in shared until source.activeAssertions.size) touched.add(source.activeAssertions[index].column)
-            for (index in shared until activeAssertions.size) touched.add(activeAssertions[index].column)
+            val touched = changedAssertionColumns(source, shared)
             lower = if (touched.isEmpty()) source.lower else source.lower.copyOf()
             upper = if (touched.isEmpty()) source.upper else source.upper.copyOf()
             for (j in touched) seedDeclared(j)
@@ -153,6 +142,32 @@ internal class LpExactState internal constructor(
         conflict = inconsistent.indexOfFirst { it }.takeIf { it >= 0 }?.let {
             LpBoundConflict(it, requireNotNull(lower[it]), requireNotNull(upper[it]))
         }
+    }
+
+    private fun validateStructure() {
+        require(listOf(matrixRevision, boundRevision, objectiveRevision, popRevision, rowRevision).all { it >= 0L })
+        require(rows.size == baseModel.m)
+        require(scopeMarks.all { it in 0..activeAssertions.size })
+        require(scopeMarks.zipWithNext().all { (a, b) -> a <= b })
+        require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
+    }
+
+    private fun initialStorageUnits(): Long = activeAssertions.sumOf { it.storageUnits() } + scopeMarks.size
+
+    private fun updatedStorageUnits(source: LpExactState, shared: Int): Long {
+        var storage = source.trailStorageUnits - source.scopeMarks.size + scopeMarks.size
+        for (index in shared until source.activeAssertions.size) {
+            storage -= source.activeAssertions[index].storageUnits()
+        }
+        for (index in shared until activeAssertions.size) storage += activeAssertions[index].storageUnits()
+        return storage
+    }
+
+    private fun changedAssertionColumns(source: LpExactState, shared: Int): HashSet<Int> {
+        val touched = HashSet<Int>()
+        for (index in shared until source.activeAssertions.size) touched.add(source.activeAssertions[index].column)
+        for (index in shared until activeAssertions.size) touched.add(activeAssertions[index].column)
+        return touched
     }
 
     private fun validateRows() {

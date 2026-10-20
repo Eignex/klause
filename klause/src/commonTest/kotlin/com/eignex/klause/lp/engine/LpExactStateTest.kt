@@ -15,6 +15,37 @@ import kotlin.test.assertTrue
 
 class LpExactStateTest {
     @Test
+    fun `replacing an assertion suffix should restore bounds and discard its conflict`() {
+        val source = assertNotNull(
+            LpBuilder().apply { repeat(3) { addVar(0L, 10L) } }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
+        val shared = LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), 1L, 0)
+        val previous = LpExactState(
+            source,
+            listOf(
+                shared,
+                LpBoundAssertion(1, false, ExactLpSide(ExactLpNumber.of(4L)), 2L, 0),
+                LpBoundAssertion(2, false, ExactLpSide(ExactLpNumber.of(8L)), 3L, 0),
+                LpBoundAssertion(2, true, ExactLpSide(ExactLpNumber.of(6L)), 4L, 0),
+            ),
+        )
+        assertNotNull(previous.conflict)
+        val replacement = LpBoundAssertion(2, true, ExactLpSide(ExactLpNumber.of(7L), strict = true), 5L, 0)
+        val assertions = listOf(shared, replacement, shared.copy(witness = 6L))
+
+        val state = LpExactState(source, assertions, rows = previous.rows, previous = previous)
+        val fresh = LpExactState(source, assertions, rows = previous.rows)
+
+        assertTrue(state.fullAuthorityEquals(fresh))
+        assertEquals(fresh.trailStorageUnits, state.trailStorageUnits)
+        assertNull(state.conflict)
+        assertEquals(ExactLpSide(ExactLpNumber.of(0L)), state.model.column(1).bounds.lower)
+        assertEquals(ExactLpSide(ExactLpNumber.of(0L)), state.model.column(2).bounds.lower)
+        assertSame(shared, state.activeSide(0, false))
+        assertSame(replacement, state.activeSide(2, true))
+    }
+
+    @Test
     fun `cached owner views should respect cancellation and caller projection isolation`() {
         val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
         val state = LpExactState(source)

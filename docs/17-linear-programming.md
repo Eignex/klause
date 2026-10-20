@@ -126,6 +126,12 @@ intersects assertions exactly and keeps a source premise for each accepted side.
 Batches publish witnesses only for a committed prefix; crossed bounds cite both
 sides, and pop restores bounds and deactivates scoped rows.
 
+Exact state construction validates structure before selecting a compatible
+predecessor. A shared assertion prefix retains its witnesses; storage accounting
+removes the old suffix before adding the replacement. Changed columns are collected
+from both suffixes before their bounds are rebuilt, so removing an assertion can
+restore a declared bound and clear a conflict.
+
 A nonbasic bound change updates the basic values by `-B^-1 A(j) delta(x(j))`; pop
 reseats nonbasics and recomputes `x(B) = B^-1 (b - N x(N))`. Compatible edits and
 pops retain factors; missing sides require status and dual-feasibility repair, and
