@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -102,7 +103,7 @@ class SmtLibCompilerTest {
         val builder = Compiler.Builder(Long.MIN_VALUE, Long.MAX_VALUE, false)
         val target = builder.newBool()
         val alias = builder.newBool()
-        val definition = listOf(
+        val definition = listOf<Factor>(
             Clause(intArrayOf(Lit.make(alias, false), Lit.make(target, true))),
             Clause(intArrayOf(Lit.make(alias, true), Lit.make(target, false))),
         )
@@ -124,7 +125,7 @@ class SmtLibCompilerTest {
         val builder = Compiler.Builder(Long.MIN_VALUE, Long.MAX_VALUE, false)
         val target = builder.newBool()
         val alias = builder.newBool()
-        val definition = listOf(
+        val definition = listOf<Factor>(
             Clause(intArrayOf(Lit.make(alias, false), Lit.make(target, true))),
             Clause(intArrayOf(Lit.make(alias, true), Lit.make(target, false))),
         )
@@ -148,7 +149,7 @@ class SmtLibCompilerTest {
         val target = builder.newBool()
         val alias = builder.newBool()
         builder.boolNames["r"] = alias
-        val definition = listOf(
+        val definition = listOf<Factor>(
             Clause(intArrayOf(Lit.make(alias, false), Lit.make(target, true))),
             Clause(intArrayOf(Lit.make(alias, true), Lit.make(target, false))),
         )
@@ -176,7 +177,7 @@ class SmtLibCompilerTest {
         val builder = Compiler.Builder(Long.MIN_VALUE, Long.MAX_VALUE, false, sourceCancellation = stop)
         val target = builder.newBool()
         val alias = builder.newBool()
-        val definition = listOf(
+        val definition = listOf<Factor>(
             Clause(intArrayOf(Lit.make(alias, false), Lit.make(target, true))),
             Clause(intArrayOf(Lit.make(alias, true), Lit.make(target, false))),
         )
