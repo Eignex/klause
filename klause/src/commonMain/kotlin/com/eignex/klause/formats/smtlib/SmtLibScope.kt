@@ -5,20 +5,11 @@ import com.eignex.klause.util.Cancellation
 
 internal class SmtLibScope(private val cancellation: Cancellation) {
     private class Signature(val parameters: List<Sort>, val result: Sort)
-    private class Locals(val values: Map<String, Sort>, val parent: Locals?) {
-        fun get(name: String): Sort? {
-            var scope: Locals? = this
-            while (scope != null) {
-                scope.values[name]?.let { return it }
-                scope = scope.parent
-            }
-            return null
-        }
-    }
     private sealed interface Frame {
-        class Evaluate(val expression: SExpr, val locals: Locals?) : Frame
+        class Evaluate(val expression: SExpr) : Frame
         class Combine(val head: String, val count: Int, val signature: Signature?) : Frame
-        class Let(val names: List<String>, val body: SExpr, val locals: Locals?) : Frame
+        class Let(val names: List<String>, val body: SExpr) : Frame
+        class Leave(val names: List<String>) : Frame
     }
     private val globals = HashMap<String, Signature>()
     private var querySeen = false
@@ -62,14 +53,14 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
                 }
                 val result = polynomialSort(command.polynomialAtom(3))
                 val body = sort(command.items.getOrNull(4) ?: return false,
-                    Locals(names.zip(sorts).toMap(), null)) ?: return false
+                    names.zip(sorts).toMap()) ?: return false
                 if (!accepts(result, body)) return false
                 globals[name] = Signature(sorts, result)
                 true
             }
             "assert", "minimize", "maximize" -> {
                 command.polynomialSize(2)
-                val result = sort(command.items[1], null) ?: return false
+                val result = sort(command.items[1]) ?: return false
                 if (head == "assert") result == Sort.BOOL else numeric(result)
             }
             "set-logic" -> {
@@ -99,10 +90,15 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
         }
     }
 
-    private fun sort(root: SExpr, locals: Locals?): Sort? {
+    private fun sort(root: SExpr, parameters: Map<String, Sort> = emptyMap()): Sort? {
+        val bindings = HashMap<String, ArrayDeque<Sort>>()
+        for ((name, type) in parameters) {
+            cancellation.polynomialSourceCheckpoint(1)
+            bindings.getOrPut(name) { ArrayDeque() }.addLast(type)
+        }
         val work = ArrayDeque<Frame>()
         val values = ArrayDeque<Sort>()
-        work.addLast(Frame.Evaluate(root, locals))
+        work.addLast(Frame.Evaluate(root))
         fun pop(count: Int): List<Sort> = List(count) { values.removeLast() }.reversed()
         while (work.isNotEmpty()) {
             cancellation.polynomialSourceCheckpoint(1)
@@ -110,7 +106,7 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
                 is Frame.Evaluate -> when (val node = frame.expression) {
                     is SExpr.Atom -> {
                         val name = polynomialSymbol(node.text)
-                        val result = literal(node.text) ?: frame.locals?.get(name) ?: globals[name]
+                        val result = literal(node.text) ?: bindings[name]?.lastOrNull() ?: globals[name]
                             ?.takeIf { it.parameters.isEmpty() }?.result ?: return null
                         values.addLast(result)
                     }
@@ -131,24 +127,37 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
                                 names += name
                                 arguments += pair.items[1]
                             }
-                            work.addLast(Frame.Let(names, node.items[2], frame.locals))
+                            work.addLast(Frame.Let(names, node.items[2]))
                             for (argument in arguments.asReversed()) {
-                                work.addLast(Frame.Evaluate(argument, frame.locals))
+                                work.addLast(Frame.Evaluate(argument))
                             }
                         } else {
                             val name = polynomialSymbol(head)
-                            if (frame.locals?.get(name) != null) return null
+                            if (name in bindings) return null
                             val signature = globals[name]
                             work.addLast(Frame.Combine(head, node.items.size - 1, signature))
                             for (argument in node.items.drop(1).asReversed()) {
-                                work.addLast(Frame.Evaluate(argument, frame.locals))
+                                work.addLast(Frame.Evaluate(argument))
                             }
                         }
                     }
                 }
                 is Frame.Let -> {
-                    val bindings = frame.names.zip(pop(frame.names.size)).toMap()
-                    work.addLast(Frame.Evaluate(frame.body, Locals(bindings, frame.locals)))
+                    val sorts = pop(frame.names.size)
+                    for ((index, name) in frame.names.withIndex()) {
+                        cancellation.polynomialSourceCheckpoint(1)
+                        bindings.getOrPut(name) { ArrayDeque() }.addLast(sorts[index])
+                    }
+                    work.addLast(Frame.Leave(frame.names))
+                    work.addLast(Frame.Evaluate(frame.body))
+                }
+                is Frame.Leave -> {
+                    for (name in frame.names) {
+                        cancellation.polynomialSourceCheckpoint(1)
+                        val stack = bindings.getValue(name)
+                        stack.removeLast()
+                        if (stack.isEmpty()) bindings.remove(name)
+                    }
                 }
                 is Frame.Combine -> {
                     val args = pop(frame.count)

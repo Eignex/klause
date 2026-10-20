@@ -179,7 +179,8 @@ rejected.
 ### Lexical scope and refusals
 
 Admission checks declarations and expression sorts with an iterative lexical type
-walk. Integer-to-real promotion is allowed; Boolean/numeric and real-to-integer
+walk. A name index keeps local sort shadows and restores them when each scope
+exits. Integer-to-real promotion is allowed; Boolean/numeric and real-to-integer
 coercions are rejected. Logic declarations do not choose a representation. Quoted
 and bare spellings of a symbol share one identity, and a negative numeral must be
 written `(- n)`.

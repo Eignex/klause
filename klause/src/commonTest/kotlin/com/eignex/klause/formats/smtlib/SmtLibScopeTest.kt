@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -8,12 +9,150 @@ import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.executionKind
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SmtLibScopeTest {
+    @Test
+    fun `parallel values should read the enclosing sort before their own shadows enter`() {
+        val commands = SExprReader("(declare-const x Int) " +
+            "(assert (let ((x false) (copy x)) (< copy 1)))").readAll()
+        val scope = SmtLibScope(Cancellation.Never)
+
+        val admitted = commands.all(scope::command)
+
+        assertTrue(admitted)
+    }
+
+    @Test
+    fun `an unbound parallel peer should remain outside its sibling value scope`() {
+        val command = SExprReader("(assert (let ((fresh 1) (copy fresh)) (= copy 1)))").readAll().single()
+        val scope = SmtLibScope(Cancellation.Never)
+
+        val admitted = scope.command(command)
+
+        assertFalse(admitted)
+    }
+
+    @Test
+    fun `a local sort shadow should leave before a sibling expression is checked`() {
+        val commands = SExprReader("(declare-const x Int) " +
+            "(assert (and (let ((x true)) x) (= x 1)))").readAll()
+        val scope = SmtLibScope(Cancellation.Never)
+
+        val admitted = commands.all(scope::command)
+
+        assertTrue(admitted)
+    }
+
+    @Test
+    fun `nested repeated names should restore each enclosing sort`() {
+        val command = SExprReader("(assert (let ((x 1)) " +
+            "(and (let ((x true)) (and (let ((x 2.0)) (> x 1.0)) x)) (= x 1))))").readAll().single()
+        val scope = SmtLibScope(Cancellation.Never)
+
+        val admitted = scope.command(command)
+
+        assertTrue(admitted)
+    }
+
+    @Test
+    fun `a helper parameter should regain its sort after a nested shadow`() {
+        val commands = SExprReader("(define-fun f ((x Int)) Int " +
+            "(+ (let ((x false)) (ite x 1 2)) x)) (assert (= (f 1) 3))").readAll()
+        val scope = SmtLibScope(Cancellation.Never)
+
+        val admitted = commands.all(scope::command)
+
+        assertTrue(admitted)
+    }
+
+    @Test
+    fun `local quoted symbols should share shadows without capturing numeral literals`() {
+        val command = SExprReader("(assert (let ((|0| true) (|x| 1)) " +
+            "(and |0| (let ((x false)) (not |x|)) (= x 1) (= 0 0))))").readAll().single()
+        val scope = SmtLibScope(Cancellation.Never)
+
+        val admitted = scope.command(command)
+
+        assertTrue(admitted)
+    }
+
+    @Test
+    fun `a local value shadow should prevent calling the global helper of the same name`() {
+        val commands = SExprReader("(define-fun f () Int 1) " +
+            "(assert (let ((f 2)) (= (f) 1)))").readAll()
+        val scope = SmtLibScope(Cancellation.Never)
+
+        val admitted = commands.all(scope::command)
+
+        assertFalse(admitted)
+    }
+
+    @Test
+    fun `an unused let value should still have its complete sort checked`() {
+        val command = SExprReader("(assert (let ((unused (+ true 1))) true))").readAll().single()
+        val scope = SmtLibScope(Cancellation.Never)
+
+        val admitted = scope.command(command)
+
+        assertFalse(admitted)
+    }
+
+    @Test
+    fun `local bindings should not remain visible to a later command`() {
+        val commands = SExprReader("(assert (let ((local true)) local)) (assert local)").readAll()
+        val scope = SmtLibScope(Cancellation.Never)
+        assertTrue(scope.command(commands[0]))
+
+        val admitted = scope.command(commands[1])
+
+        assertFalse(admitted)
+    }
+
+    @Test
+    fun `helper parameters should not remain visible to later assertions`() {
+        val commands = SExprReader("(define-fun identity ((private Int)) Int private) (assert (= private 0))").readAll()
+        val scope = SmtLibScope(Cancellation.Never)
+        assertTrue(scope.command(commands[0]))
+
+        val admitted = scope.command(commands[1])
+
+        assertFalse(admitted)
+    }
+
+    @Test
+    fun `deep references to an outer sort should remain iterative`() {
+        val depth = 2048
+        val text = buildString {
+            append("(assert (let ((anchor true)) ")
+            repeat(depth) { append("(let ((b$it anchor)) ") }
+            append("(and anchor b${depth - 1})")
+            repeat(depth) { append(')') }
+            append("))")
+        }
+        val command = SExprReader(text).readAll().single()
+        val scope = SmtLibScope(Cancellation.Never)
+
+        val admitted = scope.command(command)
+
+        assertTrue(admitted)
+    }
+
+    @Test
+    fun `cancellation during nested scope traversal should withhold admission`() {
+        val command = SExprReader("(assert (let ((a true)) (let ((b a)) (let ((c b)) c))))").readAll().single()
+        var polls = 0
+        val scope = SmtLibScope(Cancellation { ++polls > 16 })
+
+        assertFailsWith<PolynomialSourceInterrupted> { scope.command(command) }
+    }
+
     @Test
     fun `unused helper result sorts should be checked independently of logic declarations`() {
         for (logic in listOf("", "(set-logic QF_LIA)", "(set-logic QF_NRA)", "(set-logic ALL)")) {
