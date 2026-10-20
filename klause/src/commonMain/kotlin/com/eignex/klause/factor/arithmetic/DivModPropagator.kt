@@ -119,11 +119,26 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
                 for (role in roles.indices) supports.getValue(roles[role]).add(values[role])
             }
         }
+        return filterSupportedDomains(state, variables, supports, reason)
+    }
+
+    private fun filterSupportedDomains(
+        state: PropagationState,
+        variables: List<Int>,
+        supports: Map<Int, Set<Long>>,
+        reason: IntArray?,
+    ): Boolean {
         for (v in variables) {
             val values = supports.getValue(v)
             if (values.isEmpty()) return false
-            if (!state.tightenIntMin(v, values.min(), reason) ||
-                !state.tightenIntMax(v, values.max(), reason)) return false
+            var minimum = Long.MAX_VALUE
+            var maximum = Long.MIN_VALUE
+            for (value in values) {
+                if (value < minimum) minimum = value
+                if (value > maximum) maximum = value
+            }
+            if (!state.tightenIntMin(v, minimum, reason) ||
+                !state.tightenIntMax(v, maximum, reason)) return false
             val domain = state.intDomains[v].spanOrNull(MAX_PAIRS.toLong()) ?: continue
             for (i in 0 until domain.size) {
                 val value = domain.valueAt(i)
