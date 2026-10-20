@@ -35,6 +35,9 @@ internal val flatZincGlobalCases: List<Triple<String, String, String?>> = listOf
     Triple("diffn_nonstrict", "diffn_nonstrict([0,x],[0,0],[1,1],[1,1])", "Diffn"),
     Triple("diffn-variable", "fzn_diffn([0,x],[0,0],[d,d],[d,d])", "Diffn"),
     Triple("diffn_nonstrict-variable", "fzn_diffn_nonstrict([0,x],[0,0],[d,d],[d,d])", "Diffn"),
+    Triple("diffn-zero", "fzn_diffn([0,v],[0,0],[2,0],[1,1])", "Diffn"),
+    Triple("diffn-variable-zero", "fzn_diffn([0,v],[0,0],[two,z],[1,1]); " +
+        "constraint int_eq(two,2); constraint int_eq(z,0)", "Diffn"),
     Triple("table_int", "klause_table_int([x],[1,2])", "Table"),
     Triple("regular", "klause_regular([x],1,2,[1,0],1,{1})", "Regular"),
     Triple("mdd", "klause_mdd([x],1,[1],1,[1],[{1}],[0])", "Mdd"),

@@ -34,13 +34,13 @@ class MiniZincModeExactGlobalsTest(
 
     @Test
     fun `exact execution should enforce the advertised global through source completion`() {
-        val realConstraints = when (coupling) {
+        val realConstraints = if (coupling == "finite") "" else "constraint int2float(x,r); " + when (coupling) {
             "linear" -> "constraint float_lin_eq([3.0,-1.0],[y,r],0.0);"
             "polynomial" -> "constraint float_times(y,y,r);"
             else -> ""
         }
         val realDeclarations = if (coupling == "finite") "" else
-            "var 0.0..2.0: r :: output_var; var 0.0..2.0: y :: output_var; constraint int2float(x,r);"
+            "var 0.0..2.0: r :: output_var; var 0.0..2.0: y :: output_var; "
         val pin = if (verdict == "optimum") "" else {
             val value = if (verdict == "refutation") 0 else 1
             if (coupling == "finite") "constraint int_eq(x,$value);" else "constraint float_eq(r,$value.0);"
@@ -52,9 +52,9 @@ class MiniZincModeExactGlobalsTest(
                 "var bool: b; var bool: c; " else ""
             writeText("var 0..2: x :: output_var; var 1..3: v; var 1..2: d; " +
                 "var 1..2: two; var 0..1: z; " +
-                sets +
+                sets + realDeclarations +
                 "constraint int_plus(x,1,v); constraint int_eq(d,1); " +
-                "constraint ${global.second}; $realDeclarations $realConstraints $pin solve $solve;")
+                "constraint ${global.second}; $realConstraints $pin solve $solve;")
         }
         val common = CommonOptions().apply {
             engine = "cp"

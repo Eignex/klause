@@ -233,6 +233,11 @@ Cumulative edge-finding runs in both time directions over fixed durations, deman
 and capacity, declining the reversed pass when its arithmetic is not safely
 representable.
 
+Diffn's constant-size sweep filters positive-area compulsory parts. Strict boxes
+with a zero dimension also receive the pairwise separation check, so the sweep's
+empty-area shortcut cannot admit an invalid complete assignment. Non-strict boxes
+with a zero dimension impose no overlap restriction.
+
 ### Complete finite checks
 
 Complete finite checks pin the full assignment and run a completed CP fixpoint;
