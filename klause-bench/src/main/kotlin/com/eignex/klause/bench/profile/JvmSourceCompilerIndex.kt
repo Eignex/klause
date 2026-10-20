@@ -50,6 +50,7 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
     )
     private val insertMethodLink = db.prepareStatement("INSERT INTO method_links VALUES (?,?,?,?,?)")
     private val linkCache = JvmSavedReferenceCache<LinkKey, Long>()
+    private val staticMethods = JvmStaticMethods(db, ::checkSize)
     private var linkReferences = 0L
     private var methodReferences = 0L
 
@@ -173,6 +174,7 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
     }
 
     fun link(binding: String, observed: JsonElement, candidate: JsonObject): JsonObject {
+        val static = staticMethods.link(binding, observed, candidate)
         findClass.setString(1, binding)
         findClass.setString(2, candidate.savedString("studySourceHead"))
         findClass.setLong(3, candidate.savedLong("syntaxClassOrdinal"))
@@ -208,6 +210,8 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
             stored.filterKeys { it !in setOf("internalName", "originalClassOrigin", "methodCount") }
                 .forEach { (name, value) -> put(name, value) }
             put("originalDeclarationCandidateCopiedVerbatim", candidate)
+            put("originalStaticClassReference", static)
+            put("completeStaticMethodIdentityAgreement", true)
             put("recordedOwnerAgreement", if (owner == JsonNull) JsonNull else JsonPrimitive(true))
             put(
                 "formalAlternativeStatus",
@@ -227,6 +231,14 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
     fun finish() {
         db.commit()
         checkSize()
+    }
+
+    fun addStatic(binding: String, member: String, ordinal: Long, row: JsonObject, identity: JsonObject) =
+        staticMethods.add(binding, member, ordinal, row, identity)
+
+    fun sealStaticMethods() {
+        staticMethods.seal()
+        finish()
     }
 
     fun visitClasses(owner: String? = null, consume: (JsonObject) -> Unit) {

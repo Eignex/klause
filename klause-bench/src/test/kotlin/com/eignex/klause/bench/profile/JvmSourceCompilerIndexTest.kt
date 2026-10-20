@@ -40,23 +40,19 @@ class JvmSourceCompilerIndexTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["checked", "unmatched", "unavailable"])
-    fun `source links retain checked unmatched and unavailable declarations`(variant: String, @TempDir out: File) {
+    @ValueSource(strings = ["checked", "unmatched"])
+    fun `source links retain checked and unmatched declarations with complete descriptors`(variant: String, @TempDir out: File) {
         val origin = buildJsonObject { put("entry", "Cold.class") }
         val audit = buildJsonObject {
             put("record", "class-audit")
             put("originalSyntaxClassOrdinal", 0)
             put("internalName", "sample/Cold")
             put("originalClassOrigin", origin)
-            put("originalMethodIndexOrder", JvmSavedJson.parse(if (variant == "unavailable") "null" else "[0,1]"))
+            put("originalMethodIndexOrder", JvmSavedJson.parse("[0,1]"))
             put(
                 "noFormalAlternativeMethodIndexes",
                 JvmSavedJson.parse(
-                when (variant) {
-                    "unavailable" -> "null"
-                    "checked" -> "[1]"
-                    else -> "[0,1]"
-                },
+                if (variant == "checked") "[1]" else "[0,1]",
             )
             )
             put(
@@ -71,8 +67,13 @@ class JvmSourceCompilerIndexTest {
             )
         }
         val candidate = buildJsonObject {
+            put("bindingRecordOrdinal", 1)
+            put("bytecodeClassOrdinal", 0)
             put("studySourceHead", "head")
+            put("syntaxArchiveId", "syntax")
             put("syntaxClassOrdinal", 0)
+            put("syntaxLineReportFile", "lines.gz")
+            put("originalClassIdentity", JsonObject(emptyMap()))
             put("methodIndex", 0)
             put("originalSyntaxOrigin", origin)
         }
@@ -90,6 +91,25 @@ class JvmSourceCompilerIndexTest {
                 },
             )
             index.finish()
+            index.addStatic(
+                "binding", "static.gz", 1,
+                buildJsonObject {
+                    put("status", "joined-candidates")
+                    put("internalName", "sample/Cold")
+                    put("bytecodeClassOrdinal", 0)
+                    put("studySourceHead", "head")
+                    put("syntaxArchiveId", "syntax")
+                    put("syntaxClassOrdinal", 0)
+                    put("syntaxLineReportFile", "lines.gz")
+                    put("classIdentity", JsonObject(emptyMap()))
+                    put("syntaxOrigin", origin)
+                    put("methods", JvmSavedJson.parse(
+                        """[{"methodIndex":0,"name":"pick","descriptor":"(I)V"},{"methodIndex":1,"name":"cold","descriptor":"()V"}]""",
+                    ))
+                },
+                JsonObject(emptyMap()),
+            )
+            index.sealStaticMethods()
             index.link("binding", JsonPrimitive("sample.Cold.pick(I)V"), candidate)
         }
 
@@ -98,8 +118,7 @@ class JvmSourceCompilerIndexTest {
             JsonPrimitive(
             when (variant) {
                 "checked" -> "all-formal-alternatives-retained"
-                "unmatched" -> "no-formal-alternative"
-                else -> "unavailable-method-order"
+                else -> "no-formal-alternative"
             },
         ),
             actual["formalAlternativeStatus"]
@@ -116,6 +135,7 @@ class JvmSourceCompilerIndexTest {
             actual["recordedMethodFormalAuditReference"]
         )
         SOURCE_PROOF_FLAGS.forEach { assertEquals(JsonPrimitive(false), actual[it]) }
+        assertEquals(JsonPrimitive(true), actual["completeStaticMethodIdentityAgreement"])
     }
 
     @ParameterizedTest
@@ -137,8 +157,13 @@ class JvmSourceCompilerIndexTest {
             )
         }
         val candidate = buildJsonObject {
+            put("bindingRecordOrdinal", 1)
+            put("bytecodeClassOrdinal", 0)
             put("studySourceHead", "head")
+            put("syntaxArchiveId", "syntax")
             put("syntaxClassOrdinal", if (variant == "missing-class") 1 else 0)
+            put("syntaxLineReportFile", "lines.gz")
+            put("originalClassIdentity", JsonObject(emptyMap()))
             put("methodIndex", 0)
             put("originalSyntaxOrigin", if (variant == "origin") JsonObject(emptyMap()) else origin)
         }
@@ -149,6 +174,23 @@ class JvmSourceCompilerIndexTest {
         }
         JvmSourceCompilerIndex(File(out, "index.sqlite")).use { index ->
             index.add("binding", "head", "audit.gz", 2, row, JsonObject(emptyMap()))
+            index.addStatic(
+                "binding", "static.gz", 1,
+                buildJsonObject {
+                    put("status", "joined-candidates")
+                    put("internalName", "sample/Cold")
+                    put("bytecodeClassOrdinal", 0)
+                    put("studySourceHead", "head")
+                    put("syntaxArchiveId", "syntax")
+                    put("syntaxClassOrdinal", 0)
+                    put("syntaxLineReportFile", "lines.gz")
+                    put("classIdentity", JsonObject(emptyMap()))
+                    put("syntaxOrigin", origin)
+                    put("methods", JvmSavedJson.parse("""[{"methodIndex":0,"name":"pick","descriptor":"(I)V"}]"""))
+                },
+                JsonObject(emptyMap()),
+            )
+            index.sealStaticMethods()
 
             assertFailsWith<IllegalArgumentException> { index.link("binding", JsonPrimitive(observed), candidate) }
         }

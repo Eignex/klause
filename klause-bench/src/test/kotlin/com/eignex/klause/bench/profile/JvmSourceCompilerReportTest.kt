@@ -107,6 +107,22 @@ class JvmSourceCompilerReportTest {
         val actual = JvmSourceCompilerIndex(File(out, "source-index.sqlite")).use { index ->
             index.add("binding", "head", "audit.gz", 2, audit, JsonObject(emptyMap()))
             index.finish()
+            index.addStatic(
+                "binding", "static.gz", 1,
+                buildJsonObject {
+                    reference.filterKeys { it !in setOf("bindingRecordOrdinal", "originalClassIdentity", "originalSyntaxOrigin") }
+                        .forEach { (key, value) -> put(key, value) }
+                    put("status", "joined-candidates")
+                    put("internalName", "sample/Cold")
+                    put("classIdentity", reference.getValue("originalClassIdentity"))
+                    put("syntaxOrigin", reference.getValue("originalSyntaxOrigin"))
+                    put("methods", JvmSavedJson.parse(
+                        """[{"methodIndex":0,"name":"pick","descriptor":"(I)V"},{"methodIndex":1,"name":"cold","descriptor":"()V"},{"methodIndex":2,"name":"pick","descriptor":"(I)V"}]""",
+                    ))
+                },
+                JsonObject(emptyMap()),
+            )
+            index.sealStaticMethods()
             listOf(false, true).map { direct ->
                 val file = File(out, "links-$direct.jsonl.gz")
                 val output = JvmSavedReport(file, JvmSavedReportBudget())
@@ -148,8 +164,13 @@ class JvmSourceCompilerReportTest {
         ).jsonObject
         val candidates = listOf(true, false).map { unknown ->
             buildJsonObject {
+                put("bindingRecordOrdinal", 1)
+                put("bytecodeClassOrdinal", 0)
                 put("studySourceHead", "head")
+                put("syntaxArchiveId", "syntax")
                 put("syntaxClassOrdinal", 0)
+                put("syntaxLineReportFile", "lines.gz")
+                put("originalClassIdentity", JsonObject(emptyMap()))
                 put("methodIndex", 0)
                 put("originalSyntaxOrigin", origin)
                 put("unknown", unknown)
@@ -180,6 +201,19 @@ class JvmSourceCompilerReportTest {
         JvmSourceCompilerIndex(File(out, "index.sqlite")).use { index ->
             index.add("binding", "head", "audit.gz", 2, audit, JsonObject(emptyMap()))
             index.finish()
+            index.addStatic(
+                "binding", "static.gz", 1,
+                JvmSavedJson.parse(
+                    """{
+                        "status":"joined-candidates","internalName":"sample/Cold","bytecodeClassOrdinal":0,
+                        "studySourceHead":"head","syntaxArchiveId":"syntax","syntaxClassOrdinal":0,
+                        "syntaxLineReportFile":"lines.gz","classIdentity":{},"syntaxOrigin":{"entry":"Cold.class"},
+                        "methods":[{"methodIndex":0,"name":"pick","descriptor":"(I)V"}]
+                    }""",
+                ).jsonObject,
+                JsonObject(emptyMap()),
+            )
+            index.sealStaticMethods()
             repeat(reports) { arm ->
                 val file = File(out, "links-$arm.jsonl.gz")
                 val output = JvmSavedReport(file, JvmSavedReportBudget())
@@ -194,7 +228,7 @@ class JvmSourceCompilerReportTest {
                     reader.readLines().map { JvmSavedJson.parse(it).jsonObject }
                 }
                 assertEquals(input, actual.first()["originalInputCatalogEntryCopiedVerbatim"])
-                assertEquals(JsonPrimitive("source-compiler-links-v3"), actual.first()["encoding"])
+                assertEquals(JsonPrimitive("source-compiler-links-v4"), actual.first()["encoding"])
                 assertEquals(proof, actual.first()["originalReportProofCopiedVerbatim"])
                 val denied = actual.first().getValue("deniedProofFlags").jsonObject
                 (SOURCE_PROOF_FLAGS + COHORT_PROOF_FLAGS).forEach {
@@ -251,8 +285,13 @@ class JvmSourceCompilerReportTest {
                         put("methodIdentityParsed", true)
                         put("declarationCandidates", JsonArray(sequence.map { unknown ->
                             buildJsonObject {
+                                put("bindingRecordOrdinal", 1)
+                                put("bytecodeClassOrdinal", 0)
                                 put("studySourceHead", "head")
+                                put("syntaxArchiveId", "syntax")
                                 put("syntaxClassOrdinal", 0)
+                                put("syntaxLineReportFile", "lines.gz")
+                                put("originalClassIdentity", JsonObject(emptyMap()))
                                 put("methodIndex", 0)
                                 put("originalSyntaxOrigin", origin)
                                 put("unknown", unknown)
@@ -267,6 +306,19 @@ class JvmSourceCompilerReportTest {
         JvmSourceCompilerIndex(File(out, "index.sqlite")).use { index ->
             index.add("binding", "head", "audit.gz", 2, audit, JsonObject(emptyMap()))
             index.finish()
+            index.addStatic(
+                "binding", "static.gz", 1,
+                JvmSavedJson.parse(
+                    """{
+                        "status":"joined-candidates","internalName":"sample/Cold","bytecodeClassOrdinal":0,
+                        "studySourceHead":"head","syntaxArchiveId":"syntax","syntaxClassOrdinal":0,
+                        "syntaxLineReportFile":"lines.gz","classIdentity":{},"syntaxOrigin":{"entry":"Cold.class"},
+                        "methods":[{"methodIndex":0,"name":"pick","descriptor":"(I)V"}]
+                    }""",
+                ).jsonObject,
+                JsonObject(emptyMap()),
+            )
+            index.sealStaticMethods()
             val output = JvmSavedReport(file, JvmSavedReportBudget())
             val writer = JvmSourceCompilerReport(
                 index, "binding", JsonObject(emptyMap()), "candidates.gz",

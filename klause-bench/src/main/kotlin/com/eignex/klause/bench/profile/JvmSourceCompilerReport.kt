@@ -29,7 +29,7 @@ internal class JvmSourceCompilerReport(
         output.write(
             buildJsonObject {
                 put("record", "schema")
-                put("encoding", "source-compiler-links-v3")
+                put("encoding", "source-compiler-links-v4")
                 put("originalInputCatalogEntryCopiedVerbatim", input)
                 put("originalReportMember", member)
                 put("originalReportProofCopiedVerbatim", originalProof)

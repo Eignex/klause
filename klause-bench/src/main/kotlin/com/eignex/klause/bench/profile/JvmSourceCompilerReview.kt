@@ -165,6 +165,12 @@ internal object JvmSourceCompilerReview {
             JvmSourceCompilerIndex(File(scratch, "source-compiler-links.sqlite")).use { index ->
                 recordStage(out, "source-audits")
                 indexAudits(index, descriptor, paths, completion, contexts)
+                recordStage(out, "static-methods")
+                catalog.getValue("bindingInputs").jsonArray.forEach { value ->
+                    val item = value.jsonObject
+                    JvmStaticMethods.read(index, item, saved.getValue(item.savedString("id")))
+                }
+                index.sealStaticMethods()
                 val observations = catalog.getValue("observationInputs").jsonArray.map { it.jsonObject }
                 val cohorts = observations.filter { it["role"] == JsonPrimitive("compiler-cohort") }
                 val bindings = catalog.getValue("bindingInputs").jsonArray.map { it.jsonObject }
@@ -234,7 +240,8 @@ internal object JvmSourceCompilerReview {
             return buildJsonObject {
                 put("completed", true)
                 put("reports", JsonArray(proofs))
-                put("reportEncoding", "source-compiler-links-v3")
+                put("reportEncoding", "source-compiler-links-v4")
+                put("completeOriginalStaticMethodIdentityAudit", true)
                 put("recordedOriginReportEncoding", "recorded-source-origin-candidates-v1")
                 put("recordedOriginReport", "source-recorded-origin-candidates.jsonl.gz")
                 put("completeOriginalRecordedOriginCandidateAudit", true)
@@ -344,7 +351,7 @@ internal object JvmSourceCompilerReview {
 
     private val PROOF_FLAGS = (SOURCE_PROOF_FLAGS + COHORT_PROOF_FLAGS).distinct()
     private val STAGES = setOf(
-        "catalog", "authenticate-inputs", "validate-source-universe", "source-audits", "candidate-links",
+        "catalog", "authenticate-inputs", "validate-source-universe", "source-audits", "static-methods", "candidate-links",
         "output-round-trip", "input-reverification", "completion-metadata", "complete",
     )
 }

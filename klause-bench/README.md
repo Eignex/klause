@@ -1505,7 +1505,18 @@ inputs require every context reference, original binding order, proof default an
 final census; version 2 inputs retain their original values. Missing formal
 alternatives and unavailable method order remain distinct uncredited dispositions.
 
-Output encoding `source-compiler-links-v3` binds each report to its complete input
+Before observations, the reader validates the complete static binding reports and
+their key/string-table encoding, including unselected fields. Every static class
+must correspond to exactly one source audit in the same binding and source
+context. All original class/context rows, methods and formal descriptor checks
+must agree. Candidates must match their original static record, context, class
+identity, owner, method index, name and full descriptor, including methods with
+no formal source alternative. Unavailable static metadata remains explicit and
+cannot supply an observed method candidate. These tables share the existing
+source index allowance. Static descriptor agreement does not prove source phase
+semantics or loaded class selection.
+
+Output encoding `source-compiler-links-v4` binds each report to its complete input
 catalog entry, original member and authenticated report proof. Every raw input row,
 including context definitions and the original end record, retains its ordered
 ordinal and exact byte identity. Its complete fields and unknown values remain in
