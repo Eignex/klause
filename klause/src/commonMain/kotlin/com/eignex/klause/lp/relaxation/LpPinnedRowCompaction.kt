@@ -12,11 +12,16 @@ import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpProjectionMeter
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 
-internal fun LpRelaxation.compactPinnedRows(cancellation: Cancellation, onWork: (Long) -> Unit): LpRelaxation? {
+internal fun LpRelaxation.compactPinnedRows(
+    session: PropagationSession,
+    cancellation: Cancellation,
+    onWork: (Long) -> Unit,
+): LpRelaxation? {
     val state = model.exactState ?: return null
     val source = state.model
     if (source.n !in 0..10000 || source.m !in 0..10000) return null
@@ -70,6 +75,7 @@ internal fun LpRelaxation.compactPinnedRows(cancellation: Cancellation, onWork: 
                 upper = previousLower?.let { work.side(work.negate(it.number.value), it.strict) }
             }
             val group = groups.getOrPut(terms) { PinnedRowGroup(terms) }
+            group.sourceRows.add(row)
             group.lower = work.stronger(group.lower, lower, upper = false)
             group.upper = work.stronger(group.upper, upper, upper = true)
             val metadata = source.row(row)
@@ -86,6 +92,7 @@ internal fun LpRelaxation.compactPinnedRows(cancellation: Cancellation, onWork: 
         val columns = MutableList(source.n) { source.column(it) }
         val compactRows = ArrayList<ExactLpRow>()
         val compactRhs = ArrayList<ExactLpNumber>()
+        val sourceRows = ArrayList<IntArray>()
         for (group in groups.values) {
             work.step(8L + group.terms.size + group.bounds.size + group.literals.size)
             val lower = group.lower
@@ -113,6 +120,7 @@ internal fun LpRelaxation.compactPinnedRows(cancellation: Cancellation, onWork: 
             val premises = if (group.bounds.isEmpty() && group.literals.isEmpty()) null else
                 ExactLpPremises(group.bounds, group.literals.toList())
             compactRows.add(ExactLpRow(group.global, strict, premises))
+            sourceRows.add(group.sourceRows.toIntArray())
         }
         work.step(8L * (columns.size + compactRows.size) + 4L * entries)
         val objective = source.objective
@@ -124,6 +132,7 @@ internal fun LpRelaxation.compactPinnedRows(cancellation: Cancellation, onWork: 
         work.step(projection.work)
         if (working == null) return null
         LpRelaxation(working, colVarId, colIsBool, objectiveConstant, intColOf, boolColOf,
+            pinnedExplanation = LpPinnedExplanation.capture(this, sourceRows, session, cancellation, onWork),
             circuitArcs = circuitArcs, colReq = colReq, colPresentUpper = colPresentUpper,
             colRealId = colRealId, colRealSign = colRealSign, colPresence = colPresence,
             rowFactorIds = IntArray(compact.m) { -1 })
@@ -135,6 +144,7 @@ internal fun LpRelaxation.compactPinnedRows(cancellation: Cancellation, onWork: 
 private data class PinnedRowTerm(val column: Int, val value: BigFraction)
 
 private class PinnedRowGroup(val terms: List<PinnedRowTerm>) {
+    val sourceRows = ArrayList<Int>()
     var lower: ExactLpSide? = null
     var upper: ExactLpSide? = null
     var global = true

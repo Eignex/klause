@@ -180,8 +180,8 @@ It does not reuse a root layout or optional cuts on this path.
 `LpLeafRelaxation` stages the selected rows and bounds through immutable exact
 authority before solver construction. Ordinary retained real-leaf solving shares
 that assembly mechanism. An infeasible oversized-root leaf stays local to its
-finite decision prefix and contributes no pooled nogood. Original source point
-validation still gates a witness.
+finite decision prefix unless compaction retains a complete mapped source
+explanation. Original source point validation still gates a witness.
 Source and declaration visits are prepaid to the containing LP work ledger;
 completed row/column/nonzero storage is charged before admission. Cancellation
 retains those charges and withholds the model. `PINNED_REAL_LEAF_ADMISSION`
@@ -197,8 +197,20 @@ Strictness follows each endpoint into the new slack bounds. Constant tautologies
 are omitted; conflicting intervals retain an explicit contradictory numerical row.
 Every merged row retains the union of its source row premises and global flags.
 Structural columns, origins and source-coordinate maps stay intact. The private
-model absorbs the current column bounds, so its refutation remains local to the
-complete finite prefix and supplies no pooled nogood.
+model absorbs the current column bounds. Each compacted row retains its original
+source row IDs and the fresh parent relaxation with its source maps. A completed
+refutation can map its row support back to that parent, cite every original row
+premise and both current bounds of each structural column touching those rows.
+These bounds cover the fixed-coordinate substitutions and the residual numerical
+bounds. Bound-only support conservatively cites every structural column. The
+explanation also captures and cites the whole finite prefix, including folded
+source inputs that have no remaining matrix coefficient. It admits at most 4,096
+finite coordinates and requires the same source identity and unchanged pins when
+mapping the conflict. Every literal must be false in the current finite session. An unsupported source parent,
+auxiliary bound, storage limit or cancellation withholds the explanation and keeps
+the conflict local. Only a complete source explanation enters the existing pooled
+nogood path; the numerical certificate and engine dependencies are unchanged.
+`PINNED_REAL_LEAF_EXPLANATION` distinguishes pooled, declined and unpooled outcomes.
 Compaction inspects at most 10,000 rows and structural columns and 65,536 sparse
 entries or premise units, with 4,096-bit normalized scalar admission and charged
 intermediate arithmetic. The current construction owner also pays projection work; cancellation or incomplete conversion withholds the compacted model.
