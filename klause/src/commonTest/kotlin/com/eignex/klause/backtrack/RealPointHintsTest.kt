@@ -32,7 +32,8 @@ class RealPointHintsTest {
             val source = Problem(1, 0, emptyArray(), arrayOf(
                 ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
                     op, BigFraction.ZERO, strict = strict, activator = 0),
-            ), numRealVars = 1)
+            ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
             for ((index, value) in listOf(-1L, 0L, 1L).withIndex()) {
                 val hints = realPointHints(source, listOf(BigFraction.ofLong(value)), { null }, Cancellation.Never)
 
@@ -50,7 +51,8 @@ class RealPointHintsTest {
                 LinearOp.GE, BigFraction.ONE, activator = 0),
             ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
                 LinearOp.EQ, BigFraction.ZERO, activator = 1),
-        ), numRealVars = 1)
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
 
         val hints = realPointHints(source, listOf(BigFraction.ZERO), { null }, Cancellation.Never)
 
@@ -64,7 +66,8 @@ class RealPointHintsTest {
                 LinearOp.LE, BigFraction.ZERO, activator = 0),
             ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
                 LinearOp.GE, BigFraction.ONE),
-        ), numRealVars = 1)
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val point = listOf(BigFraction.ZERO)
 
         val hints = realPointHints(source, point, { null }, Cancellation.Never)
@@ -79,7 +82,8 @@ class RealPointHintsTest {
         val source = Problem(1, 0, emptyArray(), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
                 LinearOp.LE, BigFraction.ZERO, activator = 0),
-        ), numRealVars = 1)
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
 
         val hints = realPointHints(source, listOf(BigFraction.ZERO), { null }, Cancellation { true })
 
@@ -93,7 +97,8 @@ class RealPointHintsTest {
         val source = Problem(1, 0, emptyArray(), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
                 LinearOp.LE, BigFraction.ZERO, activator = 0),
-        ), numRealVars = 1)
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val huge = BigFraction.of(BIG_ONE shl 4096, BIG_ONE)
 
         for (point in listOf(emptyList(), listOf(huge))) {
