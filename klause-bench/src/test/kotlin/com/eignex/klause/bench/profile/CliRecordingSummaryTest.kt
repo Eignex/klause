@@ -25,6 +25,28 @@ class CliRecordingSummaryTest {
     }
 
     @Test
+    fun `a complete recording selection should fit in one summary request`() {
+        val hash = "a".repeat(64)
+        val uuid = "8e3d2767-0164-469c-a5b3-ebd4d8b64462"
+        val cases = (0 until CliRecordingSummary.MAX_RECORDINGS).reversed()
+        val args = listOf("sourceJob=5433") + cases.map { "recording=$it:$uuid:$hash" }
+
+        val request = CliRecordingSummary.parse(args.toTypedArray())
+
+        assertEquals(cases.toList(), request.recordings.map { it.caseIndex })
+    }
+
+    @Test
+    fun `oversized recording selections should fail before file access`() {
+        val hash = "a".repeat(64)
+        val uuid = "8e3d2767-0164-469c-a5b3-ebd4d8b64462"
+        val args = listOf("sourceJob=5433") +
+            (0..CliRecordingSummary.MAX_RECORDINGS).map { "recording=$it:$uuid:$hash" }
+
+        assertFailsWith<IllegalArgumentException> { CliRecordingSummary.parse(args.toTypedArray()) }
+    }
+
+    @Test
     fun `invalid and duplicate identifiers should be rejected before file access`() {
         val hash = "a".repeat(64)
         val uuid = "8e3d2767-0164-469c-a5b3-ebd4d8b64462"
@@ -39,7 +61,6 @@ class CliRecordingSummaryTest {
             arrayOf("sourceJob=1", "recording=0:1-1-1-1-1:$hash"),
             arrayOf("sourceJob=1", "recording=0:$uuid:not-a-hash"),
             arrayOf("sourceJob=1", recording, "path=/tmp/input.jfr"),
-            arrayOf("sourceJob=1", *Array(9) { recording }),
         )) {
             assertFailsWith<IllegalArgumentException> { CliRecordingSummary.parse(args) }
         }

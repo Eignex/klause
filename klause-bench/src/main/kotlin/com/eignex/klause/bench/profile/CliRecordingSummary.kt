@@ -24,6 +24,7 @@ import kotlinx.serialization.json.put
 /** Summarize retained CLI recordings on their remote lab host without executing a solver. */
 object CliRecordingSummary {
     internal const val MAX_RECORDING_BYTES = 16L * 1024 * 1024
+    internal const val MAX_RECORDINGS = 64
     private const val MAX_METADATA_BYTES = 4L * 1024 * 1024
 
     /** Resolve hash-pinned recordings from the sibling job store exposed by `JOB_DIR`. */
@@ -88,7 +89,7 @@ object CliRecordingSummary {
         val job = jobs.single().substringAfter('=')
         require(job.matches(Regex("[1-9][0-9]*")) && job.toIntOrNull() != null) { "Invalid sourceJob" }
         val inputs = args.filter { it.startsWith("recording=") }
-        require(inputs.size in 1..8) { "Select one to eight recordings" }
+        require(inputs.size in 1..MAX_RECORDINGS) { "Select one to $MAX_RECORDINGS recordings" }
         val recordings = inputs.map { argument ->
             val parts = argument.substringAfter('=').split(':')
             require(parts.size == 3) { "Use recording=case:measurementUUID:sha256" }

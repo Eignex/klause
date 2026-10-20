@@ -5,6 +5,62 @@ import kotlin.test.assertEquals
 
 class ProfilerTest {
     @Test
+    fun `polynomial checkpoint callers should retain the operation beneath cancellation adapters`() {
+        val callers = Profiler.cliPolynomialCheckpointCallers(listOf(
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.solver.pipeline.QuadraticNativeScope.getStopped",
+            "com.eignex.klause.theory.qfnra.QfNraWork.isCancelled",
+            "com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.step",
+            "com.eignex.klause.theory.qfnra.PolynomialSignPropagationKt.possibleSigns",
+            "com.eignex.klause.theory.qfnra.PolynomialBooleanSigns.prepare",
+        ))
+
+        assertEquals(
+            "com.eignex.klause.theory.qfnra.PolynomialSignPropagationKt.possibleSigns <- " +
+                "com.eignex.klause.theory.qfnra.PolynomialBooleanSigns.prepare",
+            callers,
+        )
+    }
+
+    @Test
+    fun `polynomial checkpoint callers should retain arithmetic frames and bounded ancestry`() {
+        val stack = listOf(
+            "arithmetic.polynomial.PolynomialArithmetic.step",
+            "arithmetic.polynomial.RationalPolynomialArithmetic.divide",
+            "arithmetic.polynomial.RationalPolynomialArithmetic.sturm",
+            "arithmetic.polynomial.RationalPolynomialArithmetic.refine",
+            "arithmetic.polynomial.AlgebraicArithmetic.compare",
+            "theory.qfnra.QfNraSolverKt.liftFrame",
+        ).map { "com.eignex.klause.$it" }
+
+        val callers = Profiler.cliPolynomialCheckpointCallers(stack)
+
+        assertEquals(stack.drop(1).take(4).joinToString(" <- "), callers)
+    }
+
+    @Test
+    fun `missing polynomial checkpoints should leave operation attribution unknown`() {
+        for (stack in listOf(emptyList(), listOf(
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.theory.qfnra.PolynomialBooleanSigns.prepare",
+        ), listOf("com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.stepExtra"))) {
+            val callers = Profiler.cliPolynomialCheckpointCallers(stack)
+
+            assertEquals("unknown: no captured polynomial checkpoint", callers)
+        }
+    }
+
+    @Test
+    fun `truncated polynomial checkpoint ancestors should remain unknown`() {
+        val callers = Profiler.cliPolynomialCheckpointCallers(listOf(
+            "com.eignex.klause.theory.qfnra.QfNraWork.isCancelled",
+            "com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.step",
+        ))
+
+        assertEquals("unknown: no captured caller below polynomial checkpoint", callers)
+    }
+
+    @Test
     fun `context markers should recognize concrete entry frames`() {
         for ((frame, expected) in listOf(
             "solver.pipeline.ResumableOpenTheory.runSlice" to "open-theory entry",

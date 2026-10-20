@@ -1139,6 +1139,13 @@ not establish a unique owner or cause, and counts overlap the phase and self tab
 Both CPU counts and estimated allocation weights are summarized after CLI timing;
 recorder settings and solver execution are unchanged.
 
+The polynomial checkpoint caller table starts after a captured
+`PolynomialArithmetic.step` frame and retains the next four Klause frames, including
+arithmetic mechanisms. This exposes the operation polling a cancellation token when
+the first captured frames belong to cancellation adapters. Missing checkpoints and
+missing ancestors have separate unknown labels. Each CPU sample contributes once;
+this table overlaps the other CPU views and does not reconstruct omitted frames.
+
 Captured context-marker tables join each event's model-facing caller tuple with
 observed concrete entry methods: `ResumableOpenTheory.runSlice` or
 `OpenTheoryEngine.OpenTheoryRun.advance`, `RetainedLinearQueries` check/preparation,
@@ -1153,7 +1160,7 @@ all context/caller groups are printed. Tables are overlapping facets of the same
 samples and allocation weights, so their totals must not be added together.
 
 `com.eignex.klause.bench.profile.CliRecordingSummary` replays retained recordings
-on the remote lab host. Pass one positive `sourceJob=<id>` and one to eight
+on the remote lab host. Pass one positive `sourceJob=<id>` and one to 64
 `recording=<case>:<measurementUUID>:<rawSHA256>` arguments. It derives sibling jobs
 from the lab's `JOB_DIR`, reads only the selected fixed recording/metadata paths,
 rejects symlink escapes and files over 16 MiB, and verifies recording identity
