@@ -7,12 +7,10 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSets
 import com.eignex.klause.bench.metric.ArmMining
 import com.eignex.klause.bench.metric.BenchCache
-import com.eignex.klause.bench.metric.BooleanSourceChecker
 import com.eignex.klause.bench.metric.ClaspReference
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.InstanceClassifier
 import com.eignex.klause.bench.metric.InstanceFeatures
-import com.eignex.klause.bench.metric.RecordComparison
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.MiniZincSourceValidation
 import com.eignex.klause.bench.metric.ReferenceEntry
@@ -42,7 +40,6 @@ import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
 import java.io.File
 import java.time.Instant
-import kotlin.system.exitProcess
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -84,8 +81,6 @@ object BenchCli {
 
             "validate-solution" -> validateSolution(args.drop(1))
 
-            "verify-boolean" -> exitProcess(BooleanSourceChecker.run(args.drop(1)))
-
             "provenance" -> {
                 val output = args.drop(1).singleOrNull()?.takeIf { it.startsWith("out=") }?.substringAfter('=')
                 require(!output.isNullOrBlank()) { "Use provenance out=<file>" }
@@ -100,15 +95,13 @@ object BenchCli {
 
             "mine" -> mine(args.drop(1))
 
-            "compare" -> compare(args.drop(1))
-
             "corpus" -> corpus(args.drop(1))
 
             else ->
                 error(
                     "unknown command '$cmd' " +
-                        "(commands: solve, solve-one, validate-solution, verify-boolean, select, preview, reference, " +
-                        "classify, credit, mine, compare, corpus, provenance, list)",
+                        "(commands: solve, solve-one, validate-solution, select, preview, reference, " +
+                        "classify, credit, mine, corpus, provenance, list)",
                 )
         }
     }
@@ -198,16 +191,6 @@ object BenchCli {
         require(files.size >= 2) { "credit needs >= 2 result CSVs (got ${files.size})" }
         files.firstOrNull { !it.isFile }?.let { error("no such result CSV: $it") }
         print(ResultCredit.credit(files, by))
-    }
-
-    private fun compare(args: List<String>) {
-        val (modes, paths) = args.partition { it.startsWith("--") }
-        require(paths.size == 2 && modes.size <= 1 && modes.all { it == "--complete" || it == "--incomplete" }) {
-            "Use compare [--complete|--incomplete] <dirA> <dirB>"
-        }
-        val dirs = paths.map { File(it) }
-        dirs.firstOrNull { !it.isDirectory }?.let { error("no such record directory: $it") }
-        print(RecordComparison.render(dirs[0], dirs[1], complete = "--incomplete" !in args))
     }
 
     private fun mine(args: List<String>) {
