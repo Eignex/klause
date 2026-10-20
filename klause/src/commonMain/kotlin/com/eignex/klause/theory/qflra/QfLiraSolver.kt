@@ -2130,10 +2130,12 @@ private class ExactLiraReductionCache(
     onWork: (SourceLpWorkStats) -> Unit,
 ) : AutoCloseable {
     private val budget = SourceLpBudget(solveContext = solveContext, onWork = onWork)
+    private val refutations = RealResidualRefutationCache()
 
     override fun close() {
         val owners = results.values.filterIsInstance<ExactLiraReduction.Bounded>()
         results.clear()
+        refutations.clear()
         closeSourceLpOwners(owners)
     }
     private val results = HashMap<ExactLiraReductionKey, ExactLiraReduction>()
@@ -2151,7 +2153,7 @@ private class ExactLiraReductionCache(
         stop: Cancellation,
         onStage: (String) -> Unit,
         onSupport: (IntArray) -> Unit,
-    ): Boolean = refuteRealResidualComponents(columns, rows, budget, stop, onStage, onSupport)
+    ): Boolean = refuteRealResidualComponents(columns, rows, budget, stop, onStage, onSupport, refutations)
 
     fun reduce(
         bools: IntArray,

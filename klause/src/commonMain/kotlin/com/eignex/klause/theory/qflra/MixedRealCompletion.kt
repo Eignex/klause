@@ -27,10 +27,11 @@ internal fun refuteRealResidualComponents(
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
     onSupport: ((IntArray) -> Unit)? = null,
+    cache: RealResidualRefutationCache? = null,
 ): Boolean {
     if (budget.context.certificationPolicy !== ProductionLpCertificationPolicy) return false
     onStage?.invoke("PURE_REAL_EQUALITY_GENERAL_ATTEMPT")
-    val result = solveRealComponents(columns, rows, budget, stop, onStage, negativeOnly = true)
+    val result = solveRealComponents(columns, rows, budget, stop, onStage, negativeOnly = true, cache = cache)
     if (stop() || result !is RealComponents.Refuted) return false
     onStage?.invoke("PURE_REAL_EQUALITY_GENERAL_REFUTED")
     stop.charge(result.rows.size.toLong() + 1L)
@@ -53,6 +54,7 @@ private fun solveRealComponents(
     stop: Cancellation,
     onStage: ((String) -> Unit)?,
     negativeOnly: Boolean = false,
+    cache: RealResidualRefutationCache? = null,
 ): RealComponents {
     if (columns < 0 || columns.toLong() * columns > 65536L || rows.size > 65536) return RealComponents.Declined
     stop.charge(4L * columns + rows.size + 1L)
@@ -83,6 +85,13 @@ private fun solveRealComponents(
     }
     if (stop()) return RealComponents.Declined
     if (falseConstant >= 0) return RealComponents.Refuted(intArrayOf(falseConstant))
+    val cached = cache?.find(normalized, stop)
+    if (stop()) return RealComponents.Declined
+    if (cached != null) {
+        onStage?.invoke("PURE_REAL_EQUALITY_GENERAL_MEMO_HIT")
+        return if (stop()) RealComponents.Declined else
+            RealComponents.Refuted(IntArray(cached.size) { origins[cached[it]] })
+    }
     val original = used.indices.filter { used[it] }
     stop.charge(4L * columns + 4L * entries)
     if (stop()) return RealComponents.Declined
@@ -93,6 +102,7 @@ private fun solveRealComponents(
     }
     val result = solveCompactRealComponents(original.size, compact, budget, stop, onStage, negativeOnly)
     if (!stop() && result is RealComponents.Refuted) {
+        cache?.remember(normalized, result.rows, stop)
         stop.charge(result.rows.size.toLong() + 1L)
         if (stop()) return RealComponents.Declined
         return RealComponents.Refuted(IntArray(result.rows.size) { origins[result.rows[it]] })

@@ -170,6 +170,13 @@ strictness. Certified row and slack-bound support selects the residual rows whos
 pivot dependencies explain the conflict; unavailable support keeps every admitted
 row of the refuting component. Unrelated components and weaker parallel rows add
 no proof condition.
+The reduction owner retains at most one verified residual refutation core. Exact
+coefficients, column IDs, bounds and strictness must match a subset of the current
+fully admitted residual rows. A hit reuses the numerical contradiction without an
+LP operation and expands the current row origins and equation dependencies; it
+retains no Boolean premises from an earlier prefix. The immutable core fits the
+source-LP envelope of 128 rows plus used coordinates, 512 entries and 8,192 total
+scalar bits. Copying, lookup and publication use the current cancellation allowance.
 This negative check can reject a selected prefix while unrelated Boolean choices
 remain open; rows with unknown conditions stay outside the subset.
 The same prepared equations can also determine open guards of general affine

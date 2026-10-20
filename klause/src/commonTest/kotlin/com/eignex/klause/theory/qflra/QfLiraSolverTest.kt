@@ -60,6 +60,48 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `a cached residual refutation should rebuild source guards after retraction`() {
+        val source = Problem(5, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 3),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2)),
+                listOf(BigFraction.ofLong(-2), BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.MINUS_ONE),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val stats = SmtStatsSink()
+        val component = ExactLiraSearchComponent(source)
+        component.observeWith(stats)
+        component.observeCompleteTraversal()
+        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(5))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        val first = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+            assertNotNull(first.explanation).literals.toSet())
+        session.popTo(0)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(3, true))))
+        val operations = stats.snapshot().sourceLp.operations
+
+        val result = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertEquals(setOf(Lit.make(3, false), Lit.make(1, false)),
+            assertNotNull(result.explanation).literals.toSet())
+        assertNull(session.boolValue(0))
+        assertEquals(operations, stats.snapshot().sourceLp.operations)
+        assertTrue((stats.snapshot().completeSearchStages?.get("PURE_REAL_EQUALITY_GENERAL_MEMO_HIT") ?: 0L) > 0L)
+        session.popTo(1)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        assertIs<SearchResult.Satisfied>(session.solve(5))
+    }
+
+    @Test
     fun `a selected general residual should conflict before unrelated Boolean assignments`() {
         val source = Problem(3, 0, emptyArray(), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
