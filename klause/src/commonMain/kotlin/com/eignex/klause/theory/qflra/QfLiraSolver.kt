@@ -211,6 +211,14 @@ class ExactLiraSearchComponent private constructor(
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
+    private val necessaryDifference by lazy {
+        RealDifferenceSystem.prepareNecessary(model, exactForms, operationStop) {
+            observeCompleteStage("PURE_REAL_DIFFERENCE_SUBSET_$it")
+        }.also {
+            observeCompleteStage(if (it == null) "PURE_REAL_DIFFERENCE_SUBSET_DECLINED" else
+                "PURE_REAL_DIFFERENCE_SUBSET_ADMITTED")
+        }
+    }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -1179,6 +1187,25 @@ class ExactLiraSearchComponent private constructor(
                     }
                 }
                 else -> Unit
+            }
+        }
+        if (!graphFirst && !hasPrivateReals && model.numIntVars == 0 && node.sourceBranches.isEmpty() &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+        ) {
+            val subset = necessaryDifference
+            if (operationStop()) return ComponentResult.Indeterminate
+            if (subset != null) {
+                if (!context.consumeCheck()) return ComponentResult.Indeterminate
+                checked = true
+                observeCompleteStage("PURE_REAL_DIFFERENCE_SUBSET_CHECK")
+                val conflict = subset.conflict(bools, operationStop)
+                if (operationStop()) return ComponentResult.Indeterminate
+                if (conflict != null) {
+                    differenceConflict(conflict, context)?.let {
+                        if (it is ComponentResult.Conflict) observeCompleteStage("PURE_REAL_DIFFERENCE_SUBSET_REFUTED")
+                        return it
+                    }
+                }
             }
         }
         val asserted = assertSource(context)
