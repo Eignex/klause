@@ -331,6 +331,7 @@ internal object Compiler {
             val removed = conditionalEqualities.retainNeededDefinitions(
                 factors, intNames.values, boolNames.values, compiledObjective,
             )
+            conditionalEqualities.appendQueryExclusions(removed.bools, this)
             val objective = compactConditionalColumns(removed, compiledObjective)
             factors.addAll(affineRealTables.infer())
             val sourceBounds = modelIntBounds()

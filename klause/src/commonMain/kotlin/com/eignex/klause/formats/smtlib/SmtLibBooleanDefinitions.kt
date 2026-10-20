@@ -50,7 +50,7 @@ private fun Compiler.Builder.reifyLogical(literals: List<Int>, conjunction: Bool
     }
 }
 
-private fun Compiler.Builder.booleanWork(units: Long) {
+internal fun Compiler.Builder.booleanWork(units: Long) {
     sourceCancellation.charge(units)
     if (sourceCancellation()) throw PolynomialSourceInterrupted()
 }

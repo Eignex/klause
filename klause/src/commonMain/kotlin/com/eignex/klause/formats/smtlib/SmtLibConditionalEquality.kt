@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.ReifiedFactor
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
@@ -225,6 +226,29 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
             replaced.add(equality.factor)
         }
         builder.factors.removeAll { it in replaced }
+    }
+
+    fun appendQueryExclusions(removedBooleans: Set<Int>, builder: Compiler.Builder) {
+        if (builder.sourceCancellation()) throw PolynomialSourceInterrupted()
+        builder.booleanWork(pendingEqualities.size.toLong() + 1L)
+        val groups = LinkedHashMap<Int, MutableList<Int>>()
+        for ((key, equality) in pendingEqualities) {
+            builder.booleanWork(2L)
+            if (Lit.variable(equality.literal) in removedBooleans) continue
+            groups.getOrPut(key.variable) { ArrayList() }.add(equality.literal)
+        }
+        for (literals in groups.values) {
+            builder.booleanWork(1L)
+            if (literals.size < 2) continue
+            builder.booleanWork(3L * literals.size + 4L)
+            // Distinct map keys already give distinct values of this scalar, even without a finite image.
+            builder.factors += if (literals.size == 2) {
+                Clause(intArrayOf(Lit.negate(literals[0]), Lit.negate(literals[1])))
+            } else {
+                Cardinality.atMostOne(literals.toIntArray())
+            }
+        }
+        if (builder.sourceCancellation()) throw PolynomialSourceInterrupted()
         pendingEqualities.clear()
     }
 

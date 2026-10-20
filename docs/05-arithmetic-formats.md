@@ -207,6 +207,12 @@ A result with an open bound instead keeps guarded exact equalities to its branch
 Affine real conditionals retain `RealElement`. Comparisons against a conditional
 can lower to Boolean tests of its branches when the branch images are small, and
 definitions no surviving constraint needs are dropped after a dependency fixpoint.
+Surviving original equality queries for distinct values of one conditional scalar
+also receive an at-most-one relation. It uses their existing Boolean literals and
+needs no finite image or new comparisons. Emission follows dependency retention,
+so it cannot revive discarded predicates; its linear scan and literal storage
+charge the containing Boolean-lowering work token. The conditional image and branch
+expansion allowance remains separate and unchanged.
 For up to eight Boolean inputs, a scalar defined by consistent, complete cases also
 supplies a verified affine row beside the source factors.
 

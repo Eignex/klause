@@ -2,10 +2,15 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -21,6 +26,7 @@ import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.StringCharSource
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,6 +37,197 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
+    @Test
+    fun `distinct queries of an open conditional should conflict without arithmetic checks`() {
+        for ((first, second) in listOf("1" to "2", "(- 9223372036854775808)" to "9223372036854775807")) {
+            val builder = Compiler.Builder(
+                Long.MIN_VALUE,
+                Long.MAX_VALUE,
+                false,
+                conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+            )
+            val reader = SExprReader(
+                StringCharSource(
+                    """
+                    (declare-const b Bool) (declare-const x Int)
+                    (declare-const a Bool) (declare-const c Bool)
+                    (assert (let ((v (ite b x 0)))
+                        (and (= a (= v $first)) (= c (= v $second)))))
+                    (assert a) (assert c)
+                    """.trimIndent(),
+                ),
+            )
+            while (true) builder.command(reader.readCommandOrNull() ?: break)
+            val parsed = builder.build()
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            val result = session.initialize()
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
+    fun `one of three open conditional queries should exclude the other values`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const b Bool) (declare-const x Int)
+                (declare-const r1 Bool) (declare-const r2 Bool) (declare-const r3 Bool)
+                (assert (let ((v (ite b x 0)))
+                    (and (= r1 (= v 1)) (= r2 (= v 2)) (= r3 (= v 3)))))
+                (assert r1)
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val booleanProblem = Problem(
+            parsed.model.numBoolVars,
+            0,
+            emptyArray(),
+            parsed.model.factors.filter { it is Clause || it is Cardinality }.toTypedArray(),
+        )
+        val session = SearchSession(
+            listOf(CpSearchComponent(PropagationSession(booleanProblem))),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        val result = session.initialize()
+
+        assertIs<ComponentResult.Consistent>(result)
+        assertEquals(false, session.boolValue(parsed.boolVarNames.getValue("r2")))
+        assertEquals(false, session.boolValue(parsed.boolVarNames.getValue("r3")))
+    }
+
+    @Test
+    fun `repeated queries of the same conditional value should remain satisfiable`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const x Int)
+            (declare-const a Bool) (declare-const c Bool)
+            (assert (let ((v (ite b x 0))) (and (= a (= v 1)) (= c (= v 1)))))
+            (assert a) (assert c) (assert b) (assert (= x 1))
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+        assertEquals("1", sample.intValue(parsed.intVarNames.getValue("x")))
+        assertEquals(true, sample.boolValue(parsed.boolVarNames.getValue("a")))
+        assertEquals(true, sample.boolValue(parsed.boolVarNames.getValue("c")))
+    }
+
+    @Test
+    fun `conditional queries in separate lexical scopes should permit different values`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const d Bool)
+            (declare-const x Int) (declare-const y Int)
+            (declare-const a1 Bool) (declare-const a2 Bool)
+            (declare-const c1 Bool) (declare-const c2 Bool)
+            (assert (let ((v (ite b x 0))) (and (= a1 (= v 1)) (= a2 (= v 2)))))
+            (assert (let ((v (ite d y 0))) (and (= c1 (= v 1)) (= c2 (= v 2)))))
+            (assert a1) (assert c2) (assert b) (assert d)
+            (assert (= x 1)) (assert (= y 2))
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+        assertEquals("1", sample.intValue(parsed.intVarNames.getValue("x")))
+        assertEquals("2", sample.intValue(parsed.intVarNames.getValue("y")))
+        assertEquals(false, sample.boolValue(parsed.boolVarNames.getValue("a2")))
+        assertEquals(false, sample.boolValue(parsed.boolVarNames.getValue("c1")))
+    }
+
+    @Test
+    fun `query exclusions should preserve an independent numeric objective consumer`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const x Int) (declare-const y Int)
+            (declare-const r1 Bool) (declare-const r2 Bool)
+            (assert (let ((v (ite b x 0)))
+                (and (= y v) (= r1 (= v 1)) (= r2 (= v 2)))))
+            (assert r1) (assert b) (assert (= x 1))
+            (minimize y)
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(parsed.model).optimize(
+            assertNotNull(parsed.objective).toLinearObjective(),
+        )
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result.result)
+        assertEquals(BigFraction.ofLong(1), optimum.incumbent.value.rational)
+    }
+
+    @Test
+    fun `discarded conditional queries should leave declared inputs unrestricted`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const x Int)
+            (assert (or true (let ((v (ite b x 0))) (and (= v 1) (= v 2)))))
+            (assert b) (assert (= x 1))
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+        assertEquals(true, sample.boolValue(parsed.boolVarNames.getValue("b")))
+        assertEquals("1", sample.intValue(parsed.intVarNames.getValue("x")))
+    }
+
+    @Test
+    fun `cancellation in query exclusion scanning should retain spent source work`() {
+        var charged = 0L
+        var stopAt = Long.MAX_VALUE
+        val meter = WorkMeter { charged += it }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= stopAt
+            override fun workMeter(): WorkMeter = meter
+        }
+        val queries = SmtLibConditionalEquality(workLimit = 0)
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = queries,
+            sourceCancellation = stop,
+        )
+        val input = builder.newInt(null, null)
+        val scalar = builder.newInt(null, null)
+        queries.define(scalar, emptyList(), emptyList(), LinComb(mapOf(input to 1L), 0), emptyList(), emptyList())
+        assertNotNull(queries.reify(scalar, 1, builder))
+        assertNotNull(queries.reify(scalar, 2, builder))
+        val factors = builder.factors.toList()
+        val before = charged
+        stopAt = before + 5
+
+        assertFailsWith<PolynomialSourceInterrupted> { queries.appendQueryExclusions(emptySet(), builder) }
+
+        assertEquals(factors, builder.factors)
+        assertEquals(stopAt, charged)
+        val spent = charged
+        assertFailsWith<PolynomialSourceInterrupted> { queries.appendQueryExclusions(emptySet(), builder) }
+        assertEquals(spent, charged)
+    }
+
     @Test
     fun `late child images should reject multiple values within one shared allowance`() {
         val builder = Compiler.Builder(
