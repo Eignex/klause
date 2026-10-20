@@ -103,8 +103,10 @@ Solution-guided LP bounding may also order values by verified peer incumbents un
 its first local witness. Hints supply no incumbent, pruning or publication authority.
 
 Finite real completion can use an available exact partial-LP point to guide Boolean
-comparison heads and finite integer values. Each opening may prepare hints at existing prefix queries 1, 4,
-16 and 64. Exact guard evaluation shares the numerical owner's current work ledger
+comparison heads and finite integer values. An existing positive prefix query may
+refresh absent guidance, within four point-mapping attempts over the numerical
+owner's lifetime. Retraction, restart and solver retirement do not renew that limit.
+Exact guard evaluation shares the numerical owner's current work ledger
 and uses at most one fifth of its parent deadline's remaining time. The point keeps
 real coordinates followed by finite integer relaxation values, without rounding
 or treating integrality as established. Uncarried integers take a value from their

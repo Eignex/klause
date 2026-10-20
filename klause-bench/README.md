@@ -669,8 +669,8 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PREFIX_REAL_ADMISSION_ROOT`, `lpPhase_PREFIX_REAL_COMPACTION_ROOT` | Optional selected-prefix assembly and actual row admission with open finite coordinates |
 | `lpPhase_PREFIX_REAL_CHECK_ROOT`, `lpPhase_PREFIX_REAL_EXPLANATION_ROOT` | Exact prefix query verdict and emitted source clause length; positive points carry no source witness authority |
 | `lpPhase_PREFIX_REAL_HANDOFF_ROOT` | Native conflict handling for a checked selected-prefix source clause |
-| `lpPhase_PREFIX_REAL_POINT_ROOT` | Available real and finite integer relaxation coordinates reused from an existing positive prefix query, or a missing exact primal; fractional integers remain guidance, with no additional numerical query |
-| `lpPhase_PREFIX_REAL_HINT_ROOT` | Optional point-hint preparation; ready vectors report open and total Boolean heads. Selections distinguish integers, matching Boolean heads and missing Boolean heads; matching candidates report retained-phase precedence or Boolean/integer fallback use. Replacement, retraction, restart, leaf checking and close report vector disposal |
+| `lpPhase_PREFIX_REAL_POINT_ROOT` | Positive-primal mapping attempts, their four-attempt lifetime limit, available real and finite integer relaxation coordinates, or a missing exact primal; fractional integers remain guidance, with no additional numerical query |
+| `lpPhase_PREFIX_REAL_HINT_ROOT` | Optional preparation when guidance is absent; ready vectors report open and total Boolean heads. Selections distinguish integers, matching Boolean heads and missing Boolean heads; matching candidates report retained-phase precedence or Boolean/integer fallback use. Retraction, restart, leaf checking and close report vector disposal |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Pinned-leaf shape outcomes use `N` for structural columns, `M` for stored rows,

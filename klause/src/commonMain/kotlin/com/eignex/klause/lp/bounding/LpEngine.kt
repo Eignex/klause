@@ -665,6 +665,7 @@ internal class LpEngine(
     private var leafShapeObserved = false
     internal var pinnedLeafClause: IntArray? = null
         private set
+    private var prefixPointAttempts = 0
 
     private fun leafRelaxation(
         relaxer: CpToLpRelaxation,
@@ -761,7 +762,11 @@ internal class LpEngine(
         ) {
             val primal = certified.exactPrimal
             if (primal == null) sink.lp.observePrimalPhase("PREFIX_REAL_POINT", "NO_EXACT_PRIMAL", 0L)
-            else offerPrefixRealPoint(relaxation, primal, session, onPoint)
+            else if (prefixPointAttempts < MAX_PREFIX_POINT_ATTEMPTS) {
+                prefixPointAttempts++
+                sink.lp.observePrimalPhase("PREFIX_REAL_POINT", "MAPPING_ATTEMPT", 0L)
+                offerPrefixRealPoint(relaxation, primal, session, onPoint)
+            } else sink.lp.observePrimalPhase("PREFIX_REAL_POINT", "MAPPING_LIMIT", 0L)
         }
         if (params.cancellation() || certified.verdict != LpVerdict.INFEASIBLE) return false
         val support = certified.farkasRay?.let { ray ->
@@ -1155,6 +1160,8 @@ internal class LpEngine(
     }
 
     private companion object {
+        const val MAX_PREFIX_POINT_ATTEMPTS = 4
+
         /** A root optimum this close to the all-hulls optimum counts as "no strength added". */
         const val HULL_PRUNE_TOL = 1e-6
 

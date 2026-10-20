@@ -44,6 +44,32 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `prefix point attempts should remain bounded across solver retirement`() {
+        val source = Problem(1, 0, emptyArray(), Array(1001) {
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.GE, BigFraction.ONE)
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val session = PropagationSession(source)
+        val engine = LpEngine(source, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, learn = true)),
+            SolveStatsSink(backend = "bounded-prefix-points"))
+        var points = 0
+
+        engine.use {
+            repeat(6) { query ->
+                assertFalse(it.prefixRealInfeasible(session) { _, stop ->
+                    assertFalse(stop())
+                    points++
+                })
+                if (query == 2) it.releasePersistentSolvers()
+            }
+        }
+
+        assertEquals(4, points)
+    }
+
+    @Test
     fun `positive prefix coordinates should retain fractional integers and unmapped live domains`() {
         val source = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(7, 9)), Array<Factor>(1001) {
             ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },

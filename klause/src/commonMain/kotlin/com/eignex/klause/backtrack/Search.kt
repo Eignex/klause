@@ -869,8 +869,7 @@ private class ResidualRealComponent(
                 "_B_${problem.numBoolVars}_F_${problem.numFactors}"
             sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", shape, 0L)
         }
-        val requestPoint = pointHintsEnabled && prefixQueries in listOf(1, 4, 16, 64)
-        if (requestPoint) discardPointHints("REPLACED")
+        val requestPoint = pointHintsEnabled && pointHints == null
         val onPoint: ((List<BigFraction>, Cancellation) -> Unit)? = if (!requestPoint) null else { point, stop ->
             sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "ATTEMPT", 0L)
             val integers = if (integerPhaseTracking) {

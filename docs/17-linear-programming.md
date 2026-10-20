@@ -142,7 +142,9 @@ integer phase proposal takes the exact ceiling within the live domain bounds;
 it supplies no integrality certificate and retains both search intervals. Mapping
 and guard evaluation charge the same node and total work
 ledger; admission keeps 4,096-bit scalars and a 65,536-unit hint workspace. This
-guidance supplies no source witness or deduction. Required
+guidance refreshes only when absent, within four mapping attempts over the LP
+owner's lifetime, including failed transformations. Solver retirement and search
+undo do not replenish them. It supplies no source witness or deduction. Required
 leaf completion still waits for all finite pins and checks the original source.
 
 A compacted refutation maps each supported interval to the original rows that
