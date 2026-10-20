@@ -555,7 +555,9 @@ private class RationalContinuationLane<F>(
             var value = table[row][width - 1]
             for (j in 0 until input.total) {
                 budget.step()
-                if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(seats[j])) {
+                if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(seats[j]) &&
+                    !ops.isZero(table[row][j])
+                ) {
                     value = subtract(value, multiply(table[row][j], seats[j], budget), budget)
                 }
             }
@@ -572,7 +574,9 @@ private class RationalContinuationLane<F>(
             var value = ops.zero
             for (j in 0 until input.total) {
                 budget.step()
-                if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(epsilon[j])) {
+                if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(epsilon[j]) &&
+                    !ops.isZero(table[row][j])
+                ) {
                     value = subtract(value, multiply(table[row][j], epsilon[j], budget), budget)
                 }
             }
@@ -640,11 +644,17 @@ private class RationalContinuationLane<F>(
         budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L)
         val next = table.map { it.toMutableList() }
         val inverse = reciprocal(table[row][enter], budget)
-        for (j in 0 until width) next[row][j] = multiply(table[row][j], inverse, budget)
+        for (j in 0 until width) {
+            budget.step()
+            if (!ops.isZero(table[row][j])) next[row][j] = multiply(table[row][j], inverse, budget)
+        }
         for (i in headings.indices) {
             if (i == row || ops.isZero(table[i][enter])) continue
             for (j in 0 until width) {
-                next[i][j] = subtract(table[i][j], multiply(table[i][enter], next[row][j], budget), budget)
+                budget.step()
+                if (!ops.isZero(next[row][j])) {
+                    next[i][j] = subtract(table[i][j], multiply(table[i][enter], next[row][j], budget), budget)
+                }
             }
         }
         budget.step()

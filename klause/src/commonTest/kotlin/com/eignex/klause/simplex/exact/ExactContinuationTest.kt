@@ -2,6 +2,7 @@ package com.eignex.klause.simplex.exact
 
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -9,6 +10,58 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExactContinuationTest {
+    @Test
+    fun `sparse wide equality systems should finish within their containing work allowance`() {
+        val rows = 16
+        val columns = 64
+        val total = columns + rows
+        val huge = BigFraction.of(BIG_ONE shl 130, BIG_ONE)
+        val limits = ExactContinuationLimits(maxWork = 300_000)
+        for (coupled in listOf(false, true)) {
+            val input = ExactContinuationInput(
+                List(columns) { column ->
+                    buildList {
+                        if (column < rows) {
+                            add(column to BigFraction.ONE)
+                            if (coupled && column + 1 < rows) add(column + 1 to BigFraction.MINUS_ONE)
+                        }
+                    }
+                },
+                List(rows) { if (!coupled || it == 0) huge else BigFraction.ZERO },
+                List(total) { if (it < rows || it >= columns) BigFraction.ZERO else BigFraction.ONE },
+                List(total) {
+                    when {
+                        it < rows -> null
+                        it >= columns -> BigFraction.ZERO
+                        else -> BigFraction.ONE
+                    }
+                },
+                List(rows) { columns + it },
+                List(total) {
+                    when {
+                        it < rows -> ContinuationStatus.LOWER
+                        it < columns -> ContinuationStatus.FIXED
+                        else -> ContinuationStatus.BASIC
+                    }
+                },
+            )
+
+            val result = ExactContinuation(input).resume(limits)
+
+            val expected = List(total) {
+                when {
+                    it < rows -> huge
+                    it < columns -> BigFraction.ONE
+                    else -> BigFraction.ZERO
+                }
+            }
+            assertEquals(expected, assertNotNull(result.values, result.metrics.toString()))
+            assertNull(result.ray)
+            assertNull(result.metrics.decline)
+            assertTrue(result.metrics.work <= limits.maxWork)
+        }
+    }
+
     @Test
     fun `already seated logical targets should complete within a bounded import allowance`() {
         val n = 32
