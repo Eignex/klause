@@ -1,12 +1,15 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.LpCertificationPolicy
@@ -14,11 +17,14 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,6 +32,26 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class BacktrackSolverRealTest {
+    @Test
+    fun `required real completion should learn its compacted source conflict and preserve a sibling`() {
+        val source = Problem(2, 0, emptyArray(), Array(1002) { row ->
+            if (row == 0) ExactLinear.of(IntArray(3) { Term.ofRealVar(it) },
+                List(3) { BigFraction.ONE }, LinearOp.LE,
+                BigFraction.ZERO, activator = 0)
+            else ExactLinear.of(IntArray(3) { Term.ofRealVar(it) },
+                List(3) { BigFraction.ONE }, LinearOp.GE,
+                BigFraction.ONE)
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+
+        val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 1, valueSelector = IndomainMax))
+
+        val sat = assertIs<SolveResult.Sat>(result)
+        assertEquals(false, sat.assignment.bools[0])
+        assertTrue(sat.stats.search.learnedClauses.sum > 0.0)
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
+    }
+
     private fun problem(numInt: Int, intDoms: Array<IntDomain>, realLo: Double, realHi: Double, row: Linear) = Problem(
         numBoolVars = 0,
         numIntVars = numInt,
@@ -138,18 +164,18 @@ class BacktrackSolverRealTest {
 
     @Test
     fun `a leaf no theory could decide should report unknown rather than unsat`() {
-        // Past RESIDUAL_MAX_ROWS the leaf certify declines deterministically rather than by cancellation.
-        val rows = Array<Factor>(1001) {
-            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.LE, 5L)
+        val rows = Array<Factor>(1001) { row ->
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, (row + 1).toDouble()),
+                intArrayOf(0, 1), LinearOp.LE, 5L)
         }
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 1)),
             factors = rows,
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(10.0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(10.0, 10.0),
         )
         val result = BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 1L))
         val unknown = assertIs<SolveResult.Unknown>(result)

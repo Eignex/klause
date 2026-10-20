@@ -36,6 +36,57 @@ import kotlin.test.assertSame
 
 class CpSearchComponentTest {
     @Test
+    fun `an external integer clause should retain native learning across source remapping`() {
+        val native = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()))
+        val cp = CpSearchComponent(native, intArrayOf(4))
+        val shared = SearchSession(listOf(cp))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(4, 1)))
+        val clause = intArrayOf(native.equalityLit(0, 1, positive = false))
+
+        val resolution = assertIs<SearchConflictResolution.Backjump>(cp.resolveClause(clause, shared))
+        shared.popTo(resolution.conflict.decisionLevel)
+        val applied = resolution.conflict.apply(shared)
+
+        assertEquals(SearchLearnedConflictResult.Resume, applied)
+        assertEquals(0L, native.intDomain(0).min)
+        assertEquals(0L, native.intDomain(0).max)
+        assertEquals(0L, shared.intUpperBound(4))
+    }
+
+    @Test
+    fun `a nonconflicting external clause should retain chronological handling`() {
+        val native = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()))
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(cp))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(0, 1)))
+
+        val resolution = cp.resolveClause(intArrayOf(native.equalityLit(0, 0, positive = false)), shared)
+
+        assertEquals(SearchConflictResolution.Chronological, resolution)
+        assertEquals(1L, native.intDomain(0).min)
+    }
+
+    @Test
+    fun `a cancelled external clause should supply no native backjump`() {
+        var cancelled = false
+        val native = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()))
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(cp), cancellation = Cancellation { cancelled })
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(0, 1)))
+        val clause = intArrayOf(native.equalityLit(0, 1, positive = false))
+        cancelled = true
+
+        val resolution = cp.resolveClause(clause, shared)
+
+        assertEquals(SearchConflictResolution.Chronological, resolution)
+        cancelled = false
+        assertIs<SearchConflictResolution.Backjump>(cp.resolveClause(clause, shared))
+    }
+
+    @Test
     fun `shared native bound chains should preserve source coordinates and their Boolean premise`() {
         val mapping = intArrayOf(4, 7, 9, 12, 14)
         val native = PropagationSession(

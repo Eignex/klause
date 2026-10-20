@@ -2,12 +2,10 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
@@ -27,11 +25,9 @@ internal class LeafRealSolver(
     pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
     private val encoders = problem.selectedFactorProjections()
-    private val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, objective, projections = null))
-    private var trail = LpBoundTrail(LpRetainedSources.emptyModel())
+    private val assembly = LpLeafRelaxation(problem, CpToLpRelaxation(problem, objective, projections = null))
     private val solvers = LpSolveSession(context, pricing, componentSplit)
     private var integers = arrayOfNulls<IntDomain>(problem.numIntVars)
-    private var nextWitness = 0L
     private var closed = false
 
     fun solve(
@@ -73,34 +69,9 @@ internal class LeafRealSolver(
             override fun intDomain(varId: Int): IntDomain = pins[varId]
             override fun boolValue(varId: Int): Boolean = sample.boolValue(varId)
         }
-        val staged = LpBoundTrail(trail.state)
-        var edit = sources.prepare(staged.state, domains, cancellation) ?: return null
-        val weakens = (0 until staged.state.model.n).any { column ->
-            val previous = staged.state.model.column(column).bounds
-            val requested = edit.bounds[column]
-            previous.lower?.let { requested.lower == null || it.strongerThan(requested.lower, false) } == true ||
-                previous.upper?.let { requested.upper == null || it.strongerThan(requested.upper, true) } == true
-        }
-        if (weakens) {
-            if (!staged.resetRoot(cancellation)) return null
-            edit = sources.prepare(staged.state, domains, cancellation) ?: return null
-        }
-        val assertions = edit.boundAssertions(nextWitness, cancellation) ?: return null
-        val before = staged.state.assertions.size
-        if (!staged.replaceRows(edit.retired, edit.columns, edit.rows, false, cancellation,
-                edit.permanentRows, edit.objective, assertions) || !edit.isCurrent() || cancellation()
-        ) {
-            return null
-        }
-        val count = staged.state.assertions.size - before
-        edit.commit()
-        trail = staged
-        nextWitness += count
+        val relaxation = assembly.build(domains, cancellation) ?: return null
         integers = Array(pins.size) { pins[it] }
-        sources.prepareCompaction(trail.state, cancellation)?.let { compaction ->
-            if (compaction.isCurrent() && trail.compact(compaction.remap, cancellation)) compaction.commit()
-        }
-        return sources.relaxation(trail.state, domains)
+        return relaxation
     }
 
     fun releaseSolvers() = solvers.releaseSolvers()

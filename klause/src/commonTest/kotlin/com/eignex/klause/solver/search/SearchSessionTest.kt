@@ -12,6 +12,23 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SearchSessionTest {
+    @Test
+    fun `an infeasible complete check should retain its producing conflict resolver`() {
+        val resolver = object : SearchConflictResolver {
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
+
+            override fun resolveConflict(context: SearchContext): SearchConflictResolution =
+                SearchConflictResolution.Chronological
+        }
+        val session = SearchSession(listOf(resolver))
+
+        val result = session.check()
+
+        assertIs<ComponentCheck.Infeasible>(result)
+        assertTrue(session.hasNativeConflictResolver)
+        assertEquals(resolver, session.conflictResolution()?.first)
+        assertEquals(false, session.hasNativeConflictResolver)
+    }
 
     @Test
     fun `open work should count each committed public decision kind`() {

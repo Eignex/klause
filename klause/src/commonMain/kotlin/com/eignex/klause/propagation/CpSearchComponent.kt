@@ -12,6 +12,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchConflictResolver
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExplanation
@@ -381,6 +382,19 @@ class CpSearchComponent(
             return SearchConflictResolution.Exhausted
         }
         return SearchConflictResolution.Backjump(CpLearnedConflict(learned))
+    }
+
+    internal fun resolveClause(clause: IntArray, context: SearchContext): SearchConflictResolution {
+        val stop = context.executionControls.cancellation
+        if (clause.size > 4096) return SearchConflictResolution.Chronological
+        stop.charge(4L * clause.size + 1L)
+        if (stop() || clause.any { it < 0 || session.litTruth(it) != false }) {
+            return SearchConflictResolution.Chronological
+        }
+        val result = session.externalConflict(clause)
+        if (stop()) return SearchConflictResolution.Chronological
+        lastResult = result
+        return resolveConflict(context)
     }
 
     /** Shared level corresponding to the latest native level not above [nativeLevel]. */
