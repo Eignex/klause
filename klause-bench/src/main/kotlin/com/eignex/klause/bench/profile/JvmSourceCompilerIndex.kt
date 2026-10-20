@@ -154,7 +154,7 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
         insertClass.setLong(3, classOrdinal)
         insertClass.setString(4, stored.toString())
         val owner = row.getValue("internalName")
-        require(owner == JsonNull || owner is JsonPrimitive && owner.isString)
+        require(owner == JsonNull || (owner is JsonPrimitive && owner.isString))
         insertClass.setString(5, if (owner == JsonNull) null else owner.savedString())
         insertClass.executeUpdate()
         checks.forEachIndexed { position, value ->
