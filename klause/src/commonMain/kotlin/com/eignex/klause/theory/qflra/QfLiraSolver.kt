@@ -970,7 +970,9 @@ class ExactLiraSearchComponent private constructor(
                 val variable = decision.literal ushr 1
                 if (bools[variable] == UNASSIGNED) {
                     unassignedBooleans--
-                    if (completeTraversalObserved) smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
+                    if (completeTraversalObserved) {
+                        smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
+                    }
                 }
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
