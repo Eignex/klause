@@ -17,9 +17,10 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
     private val db = savedIndex(file).apply {
         createStatement().use { statement ->
             statement.execute(
-                "CREATE TABLE classes(binding TEXT, head TEXT, ordinal INTEGER, body TEXT, " +
+                "CREATE TABLE classes(binding TEXT, head TEXT, ordinal INTEGER, body TEXT, owner TEXT, " +
                     "PRIMARY KEY(binding,head,ordinal))",
             )
+            statement.execute("CREATE INDEX class_owners ON classes(owner)")
             statement.execute(
                 "CREATE TABLE methods(binding TEXT, head TEXT, ordinal INTEGER, method INTEGER, " +
                     "position INTEGER, name TEXT, descriptor TEXT, PRIMARY KEY(binding,head,ordinal,method))",
@@ -34,7 +35,7 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
             )
         }
     }
-    private val insertClass = db.prepareStatement("INSERT INTO classes VALUES (?,?,?,?)")
+    private val insertClass = db.prepareStatement("INSERT INTO classes VALUES (?,?,?,?,?)")
     private val insertMethod = db.prepareStatement("INSERT INTO methods VALUES (?,?,?,?,?,?,?)")
     private val findClass = db.prepareStatement("SELECT body FROM classes WHERE binding=? AND head=? AND ordinal=?")
     private val findMethod = db.prepareStatement(
@@ -152,6 +153,9 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
         insertClass.setString(2, head)
         insertClass.setLong(3, classOrdinal)
         insertClass.setString(4, stored.toString())
+        val owner = row.getValue("internalName")
+        require(owner == JsonNull || owner is JsonPrimitive && owner.isString)
+        insertClass.setString(5, if (owner == JsonNull) null else owner.savedString())
         insertClass.executeUpdate()
         checks.forEachIndexed { position, value ->
             val check = value.jsonObject
@@ -223,6 +227,25 @@ internal class JvmSourceCompilerIndex(private val file: File) : AutoCloseable {
     fun finish() {
         db.commit()
         checkSize()
+    }
+
+    fun visitClasses(owner: String? = null, consume: (JsonObject) -> Unit) {
+        val selection = if (owner == null) "" else " WHERE owner=?"
+        db.prepareStatement(
+            "SELECT binding,head,ordinal,body FROM classes$selection ORDER BY binding,head,ordinal",
+        ).use { query ->
+            if (owner != null) query.setString(1, owner)
+            query.executeQuery().use { rows ->
+                while (rows.next()) {
+                    consume(buildJsonObject {
+                        put("bindingInputId", rows.getString(1))
+                        put("studySourceHead", rows.getString(2))
+                        put("originalSyntaxClassOrdinal", rows.getLong(3))
+                        JvmSavedJson.parse(rows.getString(4)).jsonObject.forEach { (key, value) -> put(key, value) }
+                    })
+                }
+            }
+        }
     }
 
     private fun checkSize() = check(file.length() <= MAX_SAVED_INDEX_BYTES) { "Source index exceeds bounds" }

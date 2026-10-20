@@ -173,7 +173,8 @@ internal object JvmSourceCompilerReview {
                     cohorts.size == bindings.size &&
                         cohorts.map { it.savedString("studySourceHead") }.toSet() == bindings.keys,
                 )
-                val census = observations.single { it["role"] == JsonPrimitive("compiler-census") }.savedString("id")
+                val censusInput = observations.single { it["role"] == JsonPrimitive("compiler-census") }
+                val census = censusInput.savedString("id")
                 val budget = JvmSavedReportBudget()
                 cohorts.forEachIndexed { arm, item ->
                     recordStage(out, "candidate-links", arm)
@@ -220,6 +221,10 @@ internal object JvmSourceCompilerReview {
                     }
                     check(candidateIndex.delete()) { "Cannot remove closed candidate index" }
                 }
+                recordStage(out, "source-audits")
+                val originReport = JvmSavedReport(File(out, "source-recorded-origin-candidates.jsonl.gz"), budget)
+                reports.add(originReport)
+                JvmRecordedOrigins(index, censusInput, saved.getValue(census), originReport).review()
             }
             recordStage(out, "output-round-trip")
             val proofs = reports.map { it.verify() }
@@ -230,6 +235,11 @@ internal object JvmSourceCompilerReview {
                 put("completed", true)
                 put("reports", JsonArray(proofs))
                 put("reportEncoding", "source-compiler-links-v3")
+                put("recordedOriginReportEncoding", "recorded-source-origin-candidates-v1")
+                put("recordedOriginReport", "source-recorded-origin-candidates.jsonl.gz")
+                put("completeOriginalRecordedOriginCandidateAudit", true)
+                put("classLoaderIdentityProven", false)
+                put("actualLoadedByteDigestProven", false)
                 put("allOriginalRawRecordReferencesRetainedInOriginalOrder", true)
                 put("allOriginalFieldsRetainedByAuthenticatedWholeInputReferences", true)
                 put("inputArchiveProofs", JsonArray(inputs.proofs))

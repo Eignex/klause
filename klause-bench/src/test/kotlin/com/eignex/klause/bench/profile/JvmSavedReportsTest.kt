@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
@@ -16,6 +17,50 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class JvmSavedReportsTest {
+    @Test
+    fun `a complete compressed object retains unknown and failed source metadata`(@TempDir out: File) {
+        val raw = """ {"completed":false,"unknown":[null,{"future":1}]} """.encodeToByteArray()
+        val file = File(out, "object.json.gz")
+        GZIPOutputStream(file.outputStream()).use { it.write(raw) }
+        val proof = buildJsonObject {
+            put("compressed", savedIdentity(file))
+            put("uncompressed", JvmSavedReports.identity(raw))
+        }
+
+        val value = JvmSavedReports.readObject(file, proof)
+
+        assertEquals(JvmSavedJson.parse(raw.decodeToString()).jsonObject, value)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["compressed", "uncompressed", "size", "duplicate", "utf8", "truncated"])
+    fun `a compressed object requires whole identities and strict JSON`(variant: String, @TempDir out: File) {
+        val raw = when (variant) {
+            "duplicate" -> """{"x":1,"x":2}""".encodeToByteArray()
+            "utf8" -> byteArrayOf(0xff.toByte())
+            else -> "{}".encodeToByteArray()
+        }
+        val file = File(out, "object.json.gz")
+        GZIPOutputStream(file.outputStream()).use { it.write(raw) }
+        if (variant == "truncated") file.writeBytes(file.readBytes().dropLast(3).toByteArray())
+        val proof = buildJsonObject {
+            put("compressed", if (variant == "compressed") {
+                JsonObject(savedIdentity(file) + ("sha256" to JsonPrimitive("a".repeat(64))))
+            } else {
+                savedIdentity(file)
+            })
+            put("uncompressed", when (variant) {
+                "uncompressed" -> JsonObject(
+                    JvmSavedReports.identity(raw) + ("sha256" to JsonPrimitive("a".repeat(64))),
+                )
+                "size" -> JsonObject(JvmSavedReports.identity(raw) + ("size" to JsonPrimitive(1)))
+                else -> JvmSavedReports.identity(raw)
+            })
+        }
+
+        assertFails { JvmSavedReports.readObject(file, proof) }
+    }
+
     @Test
     fun `all raw record bytes and ordinals survive complete report reading`(@TempDir out: File) {
         val raw = " {\"first\":null}\r\n{\"unknown\":[false,0]}".encodeToByteArray()

@@ -2,11 +2,13 @@ package com.eignex.klause.bench.profile
 
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FilterOutputStream
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.util.HexFormat
@@ -14,6 +16,28 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
 internal object JvmSavedReports {
+    fun readObject(file: File, proof: JsonObject): JsonObject {
+        require(savedIdentity(file) == savedExpectedIdentity(proof.getValue("compressed").jsonObject))
+        val expected = savedExpectedIdentity(proof.getValue("uncompressed").jsonObject)
+        val maximum = expected.savedLong("size")
+        require(maximum <= MAX_ROW_BYTES) { "Complete JSON report exceeds record bound" }
+        val bytes = ByteArrayOutputStream(minOf(maximum, 64 * 1024L).toInt())
+        GZIPInputStream(Files.newInputStream(file.toPath(), LinkOption.NOFOLLOW_LINKS).buffered()).use { source ->
+            val buffer = ByteArray(64 * 1024)
+            var count = 0L
+            while (true) {
+                val read = source.read(buffer)
+                if (read < 0) break
+                count += read
+                require(count <= maximum) { "Complete JSON report exceeds its original byte identity" }
+                bytes.write(buffer, 0, read)
+            }
+        }
+        val raw = bytes.toByteArray()
+        require(identity(raw) == expected) { "Complete JSON report identity differs" }
+        return JvmSavedJson.parse(raw.decodeToString(throwOnInvalidSequence = true)).jsonObject
+    }
+
     fun read(file: File, proof: JsonObject, consume: (Long, ByteArray) -> Unit) {
         require(savedIdentity(file) == savedExpectedIdentity(proof)) { "Compressed report identity differs" }
         val digest = MessageDigest.getInstance("SHA-256")

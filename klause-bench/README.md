@@ -1542,6 +1542,22 @@ This path avoids constructing expanded proof-default JSON; the complete raw inpu
 record and unknown fields remain bound by their authenticated whole-input reference.
 The expanded candidate API and legacy input path retain their original values.
 
+The additional `source-recorded-origin-candidates.jsonl.gz` report uses
+`recorded-source-origin-candidates-v1`. It emits the complete static class inventory
+from every source context before reading class-load observations. Every original
+case, class-origin input, parsed origin and unparsed line remains in order. Each
+recorded class name links to all static owner alternatives across all contexts,
+including conflicting JAR hashes; absent matches remain explicit. JAR hash
+agreement is nullable when either side lacks a valid recorded JAR hash, including
+module and CDS origins. It does not select a loaded class, identify a loader or
+prove a loaded class-byte digest. The completion's `reports` includes this report
+alongside both source-link reports, under the same shared output allowance.
+Compressed JSON origin inputs require complete compressed and logical byte/hash
+agreement, strict UTF-8 and duplicate-key rejection within the existing 128 MiB
+record bound. Their complete case order and origin-member census must agree.
+Unknown fields and failed original origin parses remain retained; no successful
+subset substitutes for a whole original input.
+
 `source-compiler-links-stage.json` records the latest owned reader phase and an
 optional input-arm ordinal. It contains no original measurements or elapsed costs.
 A stage tag, including `complete`, supplies lifecycle diagnostics; completion
