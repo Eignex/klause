@@ -18,7 +18,7 @@ class PolynomialPhaseProfileTest {
         assertEquals(0, shape.declaredBooleans)
         val modelReals = requireNotNull(shape.modelReals)
         assertTrue(modelReals > shape.declaredReals)
-        assertTrue(requireNotNull(shape.modelBooleans) > shape.declaredBooleans)
+        assertEquals(0, shape.modelBooleans)
         assertTrue(requireNotNull(shape.theoryReals) >= modelReals)
         assertEquals(shape.modelBooleans, shape.theoryBooleans)
         assertEquals("Sat", trace.result)
@@ -40,16 +40,16 @@ class PolynomialPhaseProfileTest {
     }
 
     @Test
-    fun `a preparation refutation retains declaration dimensions without a theory query`() {
+    fun `linear refutations retain unused declared coordinates`() {
         val source = "(declare-const x Real) (assert false)"
 
         val trace = PolynomialPhaseProfile.pipeline(source, timeoutMs = 10_000)
 
         val shape = requireNotNull(trace.sourceShape)
-        assertEquals("SourceRefuted", trace.result)
+        assertEquals("Unsat", trace.result)
         assertEquals(1, shape.declaredReals)
         assertNull(shape.theoryReals)
-        assertEquals("not started", trace.nativeStats)
+        assertEquals("not a polynomial execution", trace.nativeStats)
     }
 
     @Test
