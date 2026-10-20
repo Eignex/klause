@@ -437,7 +437,11 @@ class SearchSession(
             when (val result = component.check(this)) {
                 ComponentCheck.Feasible -> Unit
 
-                is ComponentCheck.Infeasible -> return result
+                is ComponentCheck.Infeasible -> {
+                    conflictResolver = component as? SearchConflictResolver
+                    conflictOwner = component
+                    return result
+                }
 
                 ComponentCheck.Indeterminate -> {
                     reportRepresentationDecline()

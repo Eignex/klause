@@ -15,6 +15,10 @@ caller assumptions; [presolve](presolve.md) owns reconstruction;
 [local search](local-search.md) and [portfolios](portfolio.md) own their strategy
 state and scheduling. [Model ownership](../model.md) defines the engine views.
 
+Both propagation conflicts and infeasible complete checks retain their producing
+component's resolver and explanation ownership. A fresh complete check clears
+earlier conflict ownership before recording any current failure.
+
 Required finite real completion can supply a completed source-mapped conflict
 clause to the CP component's native resolver. CP retains ownership of integer-bound
 atoms, first-UIP analysis, learned constraints and native/shared level translation.
