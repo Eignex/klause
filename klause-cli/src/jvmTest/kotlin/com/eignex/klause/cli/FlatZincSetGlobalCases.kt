@@ -23,6 +23,13 @@ internal val flatZincSetGlobalCases: List<Triple<String, String, String?>> = lis
     Triple("all_disjoint", "all_disjoint([s,{1}]); constraint set_in_reif(1,s,b); " +
         "constraint bool_not(b,c); constraint bool2int(c,x)", null),
     Triple("set_partition_into", "set_partition_into([s],{1})$SET_MEMBERSHIP", null),
+    Triple("set_in_reif-false", "set_in_reif(1,{},b)$NEGATED_SET_RESULT", null),
+    Triple("set_subset_reif-false", "set_subset_reif({1},{},b)$NEGATED_SET_RESULT", null),
+    Triple("set_eq_reif-false", "set_eq_reif({1},{},b)$NEGATED_SET_RESULT", null),
+    Triple("set_ne_reif-false", "set_ne_reif({1},{1},b)$NEGATED_SET_RESULT", null),
+    Triple("set_le_reif-false", "set_le_reif({1},{},b)$NEGATED_SET_RESULT", null),
+    Triple("set_lt_reif-false", "set_lt_reif({1},{1},b)$NEGATED_SET_RESULT", null),
 )
 
 private const val SET_MEMBERSHIP = "; constraint set_in_reif(1,s,b); constraint bool2int(b,x)"
+private const val NEGATED_SET_RESULT = "; constraint bool_not(b,c); constraint bool2int(c,x)"

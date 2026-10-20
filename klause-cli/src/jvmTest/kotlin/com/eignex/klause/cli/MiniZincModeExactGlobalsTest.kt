@@ -25,10 +25,10 @@ class MiniZincModeExactGlobalsTest(
         @Parameterized.Parameters(name = "{0} {1} {2}")
         fun cases(): List<Array<Any>> = (flatZincGlobalCases + flatZincSetGlobalCases).flatMap { global ->
             listOf("finite", "linear", "polynomial").flatMap { coupling ->
-                listOf("witness", "refutation", "optimum").map { verdict -> arrayOf(global, coupling, verdict) }
+                listOf("witness", "refutation", "optimum").map { verdict -> arrayOf<Any>(global, coupling, verdict) }
             }
         } + listOf("finite", "linear", "polynomial").map { coupling ->
-            arrayOf(Triple("count_eq-empty-invalid", "klause_count_eq([],1,1)", null), coupling, "refutation")
+            arrayOf<Any>(Triple("count_eq-empty-invalid", "klause_count_eq([],1,1)", null), coupling, "refutation")
         }
     }
 
