@@ -38,6 +38,25 @@ internal object PolynomialWitnessProbeProfile {
         val request = Base64.getDecoder().decode(args[0].substringAfter('='))
         require(request.size <= 48 * 1024)
         val catalog = args[0].startsWith("catalog64=")
+        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        if (System.getenv("KLAUSE_POLYNOMIAL_PROBE_CHILD") != "1") {
+            launch(args, out)
+            return
+        }
+        File(out, "request.json").writeBytes(request)
+        Reports.writeJson(File(out, "provenance.json").path, InstalledBuild.reference)
+        File(out, "settings.json").writeText(
+            buildJsonObject {
+            put("revision", Reports.readGitSha())
+            put("javaCores", Runtime.getRuntime().availableProcessors())
+            put("jvmOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
+            put("containingTimeoutMs", 60000)
+            put("preparationCheckpoints", 2)
+            put("sourceMode", mode)
+            put("chargeScope", chargeScope)
+            put("sourceInput", if (catalog) "catalog" else "embedded")
+        }.toString() + "\n"
+        )
         val cases = if (catalog) {
             val sources = Json.decodeFromString<List<ProbeCatalogSource>>(request.toString(Charsets.UTF_8))
             require(sources.size in 1..18 && sources.map { it.suite to it.problem }.distinct().size == sources.size)
@@ -54,21 +73,6 @@ internal object PolynomialWitnessProbeProfile {
         } else Json.decodeFromString<List<ProbeSource>>(request.toString(Charsets.UTF_8)).also { sources ->
             require(sources.size in 1..8 && sources.map { it.id }.distinct().size == sources.size)
         }
-        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
-        File(out, "request.json").writeBytes(request)
-        Reports.writeJson(File(out, "provenance.json").path, InstalledBuild.reference)
-        File(out, "settings.json").writeText(
-            buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("javaCores", Runtime.getRuntime().availableProcessors())
-            put("jvmOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
-            put("containingTimeoutMs", 60000)
-            put("preparationCheckpoints", 2)
-            put("sourceMode", mode)
-            put("chargeScope", chargeScope)
-            put("sourceInput", if (catalog) "catalog" else "embedded")
-        }.toString() + "\n"
-        )
         val access = ProbeAccess()
         for ((index, source) in cases.withIndex()) {
             val bytes = Base64.getDecoder().decode(source.base64)
@@ -90,6 +94,25 @@ internal object PolynomialWitnessProbeProfile {
                 "Observation changed the selected polynomial input for ${source.id}"
             }
         }
+    }
+
+    private fun launch(args: Array<String>, out: File) {
+        val command = listOf(
+            File(System.getProperty("java.home"), "bin/java").absolutePath,
+            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
+            "-Dklause.workspace.root=${CorpusFetcher.workspaceRoot()}",
+            "-Dklause.bench.corpusCache=${CorpusFetcher.cacheRoot}",
+            "-cp", System.getProperty("java.class.path"), PolynomialWitnessProbeProfile::class.java.name,
+        ) + args
+        out.resolve("command.json").writeText(Json.encodeToString(command))
+        val process = ProcessBuilder(command).apply {
+            environment()["KLAUSE_POLYNOMIAL_PROBE_CHILD"] = "1"
+            redirectOutput(out.resolve("measured.out"))
+            redirectError(out.resolve("measured.err"))
+        }.start()
+        val exit = process.waitFor()
+        out.resolve("measured.exit").writeText("$exit\n")
+        check(exit == 0) { "Measured polynomial probe diagnostic exited $exit" }
     }
 
     internal class ProbeAccess {

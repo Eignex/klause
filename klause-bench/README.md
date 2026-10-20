@@ -1321,6 +1321,8 @@ through the lab without host or machine placement overrides.
 The output retains original bytes, request, installed provenance
 and revision, including installed harness hashes and actual JVM options/core count,
 plus alternating plain/observed producer records.
+The measured child uses one active processor, Serial GC and a 3 GiB heap; its command,
+streams and actual exit are retained separately from the lab's parent recording.
 
 The JVM-only observer reflects the existing root query and native owner. It records
 the stack and cumulative charge at the existing coupled-work stop checkpoint without
