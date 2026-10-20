@@ -381,8 +381,9 @@ class ExactLiraSearchComponent private constructor(
         wholePointVisits[origin]++
         if (wholePointVisits[origin] != nextWholePointVisit[origin]) return false
         wholePointAttempts[origin]++
-        nextWholePointVisit[origin] *= 4
+        nextWholePointVisit[origin] *= 8
         observeCompleteStage(if (graph) "WHOLE_SOURCE_GRAPH_PROPOSAL" else "WHOLE_SOURCE_LP_PROPOSAL")
+        observeCompleteStage("WHOLE_SOURCE_POINT_VISIT_${wholePointVisits[origin]}")
         val stop = operationStop.shorten(0.2)
         stop.charge(8L * (source.numBoolVars + source.numRealVars + 1L))
         if (stop()) return false

@@ -217,7 +217,7 @@ admits at most 65,536 entries and 4,096-bit normalized rationals.
 
 Whole-source proposals admit at most 10,000 reals, 100,000 Booleans or factors,
 1,000,000 numeric or clause entries and 4,096-bit arithmetic. Each opening permits
-four attempts per existing point origin, on visits 1, 4, 16 and 64. With a deadline,
+four attempts per existing point origin, on visits 1, 8, 64 and 512. With a deadline,
 an attempt uses at most one fifth of the current operation's remaining time. It charges preparation,
 arithmetic and private propagation to that operation; it opens no extra LP query or
 allowance. Declared real bounds remain arithmetic bounds.
