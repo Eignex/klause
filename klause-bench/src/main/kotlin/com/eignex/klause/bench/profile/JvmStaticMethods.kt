@@ -38,12 +38,14 @@ internal class JvmStaticMethods(private val db: Connection, private val checkSiz
     fun add(binding: String, member: String, ordinal: Long, row: JsonObject, identity: JsonObject) {
         check(!complete)
         val joined = row["status"] == JsonPrimitive("joined-candidates")
-        require(joined || row["status"] == JsonPrimitive("bytecode-metadata-unavailable"))
+        require(joined || row["status"] == JsonPrimitive("bytecode-metadata-unavailable")) {
+            "Original static class disposition is unsupported"
+        }
         val head = row.savedString("studySourceHead")
         val syntaxOrdinal = row.savedLong("syntaxClassOrdinal")
-        require(ordinal > 0 && syntaxOrdinal >= 0)
+        require(ordinal > 0 && syntaxOrdinal >= 0) { "Original static record or syntax class ordinal is invalid" }
         val methods = if (joined) row.getValue("methods").jsonArray else null
-        if (joined) require(row.savedString("internalName").isNotEmpty())
+        if (joined) require(row.savedString("internalName").isNotEmpty()) { "Joined static class owner is empty" }
         val reference = buildJsonObject {
             put("originalStaticMember", member)
             put("originalStaticRecordOrdinal", ordinal)
@@ -59,10 +61,10 @@ internal class JvmStaticMethods(private val db: Connection, private val checkSiz
         insertClass.executeUpdate()
         methods?.forEachIndexed { position, value ->
             val method = value.jsonObject
-            require(method.savedLong("methodIndex") == position.toLong())
+            require(method.savedLong("methodIndex") == position.toLong()) { "Original static method order differs" }
             val name = method.savedString("name")
             val descriptor = method.savedString("descriptor")
-            require(name.isNotEmpty() && descriptor.startsWith('('))
+            require(name.isNotEmpty() && descriptor.startsWith('(')) { "Original static method identity is invalid" }
             insertMethod.setString(1, binding)
             insertMethod.setString(2, head)
             insertMethod.setLong(3, syntaxOrdinal)
@@ -151,17 +153,21 @@ internal class JvmStaticMethods(private val db: Connection, private val checkSiz
                 paths.getValue(item.savedString("completionMember")), JvmSavedJson.Kind.PRODUCER_COMPLETION,
             ).jsonObject
             val classes = completion.savedLong("bytecodeClasses")
-            require(classes in 1..100_000)
+            require(classes in 1..100_000) { "Whole original static class count exceeds bounds" }
             val contexts = completion.getValue("sourceContexts").jsonArray.map { it.jsonObject }
             val heads = contexts.map { it.savedString("studySourceHead") }
-            require(heads.isNotEmpty() && heads.size < 8 && heads.distinct().size == heads.size)
+            require(heads.isNotEmpty() && heads.size < 8 && heads.distinct().size == heads.size) {
+                "Original static source contexts are absent, excessive or repeated"
+            }
             val member = item.savedString("reportMember")
             val proofs = completion.getValue("reports").jsonArray.map { it.jsonObject }
             val expected = contexts.flatMap { context ->
                 listOf("syntaxLineReportFile", "syntaxNodeCoverageFile").map { context.savedString(it) }
             } + member.substringAfterLast('/')
-            require(proofs.map { it.savedString("file") }.sorted() == expected.sorted())
-            require(expected.distinct().size == expected.size)
+            require(proofs.map { it.savedString("file") }.sorted() == expected.sorted()) {
+                "Whole original static report inventory differs"
+            }
+            require(expected.distinct().size == expected.size) { "Original static report names are repeated" }
             val proof = proofs.single { it["file"] == JsonPrimitive(member.substringAfterLast('/')) }
             readClasses(index, item, paths.getValue(member), proof, completion, contexts)
             proofs.filter { it !== proof }.forEach { original ->
@@ -190,12 +196,14 @@ internal class JvmStaticMethods(private val db: Connection, private val checkSiz
                     require(
                         encoded["record"] == JsonPrimitive("schema") &&
                             encoded["encoding"] == JsonPrimitive("bytecode-source-bindings-v1"),
-                    )
+                    ) { "Whole original static report schema differs" }
                 } else {
                     val row = declaration(encoded)
                     val classOrdinal = row.savedLong("bytecodeClassOrdinal")
                     val head = row.savedString("studySourceHead")
-                    require(classOrdinal in 0 until classes && head in heads && seen.add(classOrdinal to head))
+                    require(classOrdinal in 0 until classes && head in heads && seen.add(classOrdinal to head)) {
+                        "Original static class ordinal or source context is invalid or repeated"
+                    }
                     index.addStatic(
                         item.savedString("id"), item.savedString("reportMember"), ordinal, row,
                         JvmSavedReports.identity(raw),
@@ -204,11 +212,15 @@ internal class JvmStaticMethods(private val db: Connection, private val checkSiz
                     count++
                 }
             }
-            require(count == completion.savedLong("sourceContextClassRows"))
-            require(seen.map { it.first }.toSet().size.toLong() == classes)
+            require(count == completion.savedLong("sourceContextClassRows")) {
+                "Whole static class-context count differs"
+            }
+            require(seen.map { it.first }.toSet().size.toLong() == classes) {
+                "Whole static bytecode class census differs"
+            }
             require(contexts.all {
                 counts.getValue(it.savedString("studySourceHead")) == it.savedLong("classContextRows")
-            })
+            }) { "Original static per-context class census differs" }
         }
 
         private fun declaration(encoded: JsonObject): JsonObject {

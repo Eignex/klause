@@ -13,13 +13,19 @@ internal class JvmSavedTables(envelope: JsonObject) {
     private val root: JsonElement
 
     init {
-        require(envelope.keys == setOf("encoding", "objectKeys", "strings", "value"))
-        require(envelope["encoding"] == JsonPrimitive("canonical-json-key-and-string-tables-v1"))
+        require(envelope.keys == setOf("encoding", "objectKeys", "strings", "value")) {
+            "Saved table envelope fields differ"
+        }
+        require(envelope["encoding"] == JsonPrimitive("canonical-json-key-and-string-tables-v1")) {
+            "Saved table encoding differs"
+        }
         keys = envelope.getValue("objectKeys").jsonArray.map { row ->
-            row.jsonArray.map { it.savedString() }.also { require(it.distinct().size == it.size) }
+            row.jsonArray.map { it.savedString() }.also {
+                require(it.distinct().size == it.size) { "Saved object key row contains duplicates" }
+            }
         }
         strings = envelope.getValue("strings").jsonArray.map { JsonPrimitive(it.savedString()) }
-        require(strings.distinct().size == strings.size)
+        require(strings.distinct().size == strings.size) { "Saved string table contains duplicates" }
         root = envelope.getValue("value")
         validate(root)
     }
@@ -28,7 +34,7 @@ internal class JvmSavedTables(envelope: JsonObject) {
 
     fun objectArray(name: String, fields: Set<String>): JsonArray {
         val value = objectValues(root).single { it.first == name }.second
-        require(value is JsonArray && savedInteger(value.first()) == 0L)
+        require(value is JsonArray && savedInteger(value.first()) == 0L) { "Saved object-array field has another tag" }
         return JsonArray(value.drop(1).map { projectObject(it, fields) })
     }
 
@@ -38,13 +44,13 @@ internal class JvmSavedTables(envelope: JsonObject) {
         })
 
     private fun objectValues(value: JsonElement): List<Pair<String, JsonElement>> {
-        require(value is JsonArray && savedInteger(value.first()) < 0)
+        require(value is JsonArray && savedInteger(value.first()) < 0) { "Saved object projection has another tag" }
         return keys[objectIndex(savedInteger(value.first()))].mapIndexed { index, name -> name to value[index + 1] }
     }
 
     private fun objectIndex(tag: Long): Int {
         val index = -(tag + 1)
-        require(tag < 0 && index >= 0 && index < keys.size)
+        require(tag < 0 && index >= 0 && index < keys.size) { "Saved object key reference is outside its table" }
         return index.toInt()
     }
 
@@ -56,10 +62,14 @@ internal class JvmSavedTables(envelope: JsonObject) {
                     require(child.isNotEmpty()) { "Missing saved value tag" }
                     val tag = savedInteger(child.first())
                     if (tag == 1L) {
-                        require(child.size == 2)
-                        require(savedInteger(child[1]) >= 0 && savedInteger(child[1]) < strings.size)
+                        require(child.size == 2) { "Saved string reference arity differs" }
+                        require(savedInteger(child[1]) >= 0 && savedInteger(child[1]) < strings.size) {
+                            "Saved string reference is outside its table"
+                        }
                     } else {
-                        require(tag == 0L || (tag < 0 && child.size == keys[objectIndex(tag)].size + 1))
+                        require(tag == 0L || (tag < 0 && child.size == keys[objectIndex(tag)].size + 1)) {
+                            "Saved value tag or object arity differs"
+                        }
                         stack.addLast(ValidationFrame(child))
                         require(stack.size <= 4096) { "Saved table nesting exceeds bounds" }
                     }
