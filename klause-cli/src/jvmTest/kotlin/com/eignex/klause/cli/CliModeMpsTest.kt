@@ -63,11 +63,11 @@ class CliModeMpsTest {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)))
         }
 
-        assertTrue("s SATISFIABLE" in out.lines(), out)
+        assertTrue("s OPTIMUM FOUND" in out.lines(), out)
         assertTrue("o 0.333333333333333314829616256247390992939472198486328125" in out.lines(), out)
         assertTrue("v X=0.333333333333333314829616256247390992939472198486328125" in out.lines(), out)
-        assertTrue("c workingModelOptimizationStatus=tolerance-optimum" in out.lines(), out)
-        assertTrue("tolerance-accepted optimality unproved" in out, out)
+        assertTrue("c optimizationStatus=tolerance-optimum" in out.lines(), out)
+        assertFalse("tolerance-accepted optimality unproved" in out, out)
     }
 
     @Test

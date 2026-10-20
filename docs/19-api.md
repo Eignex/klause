@@ -93,6 +93,11 @@ values, bounds, rays and telemetry; captured interpretation never upgrades a nat
 claim beyond its proof scope. Source arrays stay borrowed read-only, and fresh
 controls cannot resume a stopped invocation.
 
+Linear source outcomes record their terminal policy in
+`LinearSourceOutcome.numericalClaims`: positive source tolerance permits numerical
+optimality and infeasibility statuses; zero tolerance requires exact source
+certification. Incumbents retain checked original coordinates and objective units.
+
 ### Objectives and native arithmetic sources
 
 `OpenTheoryPipeline.minimize` accepts a finite `LinearObjective` or an exact

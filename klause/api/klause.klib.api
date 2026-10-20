@@ -13814,6 +13814,8 @@ final class com.eignex.klause.solver.pipeline/LinearSourceOutcome { // com.eigne
         final fun <get-nominalConstraintsExact>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalConstraintsExact.<get-nominalConstraintsExact>|<get-nominalConstraintsExact>(){}[0]
     final val nominalSourceExact // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalSourceExact|{}nominalSourceExact[0]
         final fun <get-nominalSourceExact>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalSourceExact.<get-nominalSourceExact>|<get-nominalSourceExact>(){}[0]
+    final val numericalClaims // com.eignex.klause.solver.pipeline/LinearSourceOutcome.numericalClaims|{}numericalClaims[0]
+        final fun <get-numericalClaims>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.numericalClaims.<get-numericalClaims>|<get-numericalClaims>(){}[0]
     final val objectiveScale // com.eignex.klause.solver.pipeline/LinearSourceOutcome.objectiveScale|{}objectiveScale[0]
         final fun <get-objectiveScale>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/LinearSourceOutcome.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
     final val source // com.eignex.klause.solver.pipeline/LinearSourceOutcome.source|{}source[0]

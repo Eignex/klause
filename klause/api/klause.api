@@ -11771,6 +11771,7 @@ public final class com/eignex/klause/solver/pipeline/LinearSourceOutcome {
 	public final fun getNativeConclusion ()Lcom/eignex/klause/solver/pipeline/LinearSourceConclusion;
 	public final fun getNominalConstraintsExact ()Z
 	public final fun getNominalSourceExact ()Z
+	public final fun getNumericalClaims ()Z
 	public final fun getObjectiveScale ()Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun getSource ()Lcom/eignex/klause/ir/LinearSourceProblem;
 }

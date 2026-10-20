@@ -258,7 +258,11 @@ internal class MpsOutput(
         linearSource?.let { source ->
             if (best == null) return null
             if (verdict == Verdict.OPTIMAL && source.conclusion == LinearSourceConclusion.OPTIMAL) {
-                return "optimizationStatus=attained-optimum"
+                val attained = source.incumbent?.objective?.let { it == source.acceptedObjectiveBound } == true ||
+                    (source.nominalSourceExact && source.claimsCoverTolerance && source.incumbent?.exact == true &&
+                        nativeOptimumExact)
+                val status = if (source.numericalClaims && !attained) "tolerance-optimum" else "attained-optimum"
+                return "optimizationStatus=$status"
             }
             if (source.nativeConclusion != LinearSourceConclusion.OPTIMAL) return null
             val status = if (source.nominalSourceExact && source.incumbent?.exact == true && nativeOptimumExact) {
@@ -329,7 +333,11 @@ internal class MpsOutput(
                 "$scope unboundedness; source recession proof unproved"
             else -> null
         }
-        return listOfNotNull(declaration, qualification, witness, cause).joinToString("; ").ifEmpty { null }
+        val numerical = if (source.numericalClaims && source.conclusion in setOf(
+                LinearSourceConclusion.OPTIMAL, LinearSourceConclusion.UNSATISFIABLE,
+            )) "MPS numerical status under configured tolerances" else null
+        return listOfNotNull(declaration, numerical, qualification, witness, cause)
+            .joinToString("; ").ifEmpty { null }
     }
 
     private val sourceScope: String get() = if (effectiveDeclarations) "effective" else "original"

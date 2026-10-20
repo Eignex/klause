@@ -10,12 +10,13 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
+import com.eignex.klause.solver.validation.capturedSourceSlack
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 
-/** Mathematical conclusion after checking the original linear source and its acceptance policy. */
+/** Conclusion under the captured linear source certification and acceptance policy. */
 enum class LinearSourceConclusion {
     /** No accepted source conclusion is available. */
     UNKNOWN,
@@ -23,10 +24,10 @@ enum class LinearSourceConclusion {
     /** An original-source point is accepted. */
     SATISFIABLE,
 
-    /** An accepted source point attains a checked global original-unit bound. */
+    /** An accepted source point is optimal under the captured certification policy. */
     OPTIMAL,
 
-    /** The accepted source has no feasible assignment. */
+    /** The source is infeasible under the captured certification policy. */
     UNSATISFIABLE,
 
     /** A checked source trajectory improves the original objective without limit. */
@@ -44,7 +45,7 @@ class LinearSourceOutcome internal constructor(
     val incumbent: LinearSourceWitness?,
     /** Native conclusion in its own retained model scope. */
     val nativeConclusion: LinearSourceConclusion,
-    /** Conclusion established for the original accepted source. */
+    /** Conclusion established under the original source certification and acceptance policy. */
     val conclusion: LinearSourceConclusion,
     /** Whether the native view retains the nominal rational source exactly. */
     val nominalSourceExact: Boolean,
@@ -58,7 +59,10 @@ class LinearSourceOutcome internal constructor(
     val nativeClaimsUnrestricted: Boolean,
     /** Positive multiplier from original objective units to the retained working objective. */
     val objectiveScale: BigFraction,
-)
+) {
+    /** Whether terminal statuses use numerical tolerance policy rather than exact source certification. */
+    val numericalClaims: Boolean get() = source.semantics.effective.feasibilityTolerance?.isExact == false
+}
 
 internal fun PreparedLinearSource.check(sample: Sample, stop: Cancellation): LinearSourceCheck {
     val values = ArrayList<BigFraction>(view.columns.size)
@@ -195,17 +199,20 @@ internal fun executeLinearSource(
     }
     var native = LinearSourceConclusion.UNKNOWN
     var nativeOptimalValue: BigFraction? = null
+    var nativeOptimum: LinearSourceWitness? = null
     var unboundedBaseExact = false
-    fun sample(sample: Sample?) {
-        if (sample != null) accept(prepared.check(sample, stop))
+    fun checked(check: LinearSourceCheck): LinearSourceWitness? {
+        accept(check)
+        return (check as? LinearSourceCheck.Accepted)?.witness
     }
-    fun assignment(assignment: OpenTheoryAssignment?) {
-        if (assignment != null) accept(prepared.check(assignment, stop))
-    }
+    fun sample(sample: Sample?): LinearSourceWitness? = sample?.let { checked(prepared.check(it, stop)) }
+    fun assignment(assignment: OpenTheoryAssignment?): LinearSourceWitness? =
+        assignment?.let { checked(prepared.check(it, stop)) }
     fun linear(result: com.eignex.klause.solver.result.LinearOptimizationResult) {
-        sample(result.incumbent)
+        val point = sample(result.incumbent)
         native = when (val claim = result.terminal?.claim) {
             is SourceClaim.Optimal -> {
+                nativeOptimum = point
                 nativeOptimalValue = when (val value = claim.value) {
                     is SourceValue.Rational -> value.value
                     is SourceValue.Algebraic -> value.value.linearRational()
@@ -230,9 +237,10 @@ internal fun executeLinearSource(
     when (result) {
         is SourceExecutionResult.Prepared -> return result
         is SourceExecutionResult.Finite -> (result.result.outcome as? FiniteSolveOutcome.Completed)?.let { completed ->
-            sample(completed.bestSample)
+            val point = sample(completed.bestSample)
             native = when (completed.verdict) {
                 FiniteSolveVerdict.OPTIMAL -> {
+                    nativeOptimum = point
                     nativeOptimalValue = completed.bestSample?.let { prepared.objective?.evaluateExact(it) }
                     LinearSourceConclusion.OPTIMAL
                 }
@@ -273,7 +281,7 @@ internal fun executeLinearSource(
                 } else {
                     when (optimum) {
                         is OpenTheoryOptimum.Optimal -> {
-                            assignment(optimum.assignment)
+                            nativeOptimum = assignment(optimum.assignment)
                             nativeOptimalValue = optimum.value
                             native = LinearSourceConclusion.OPTIMAL
                         }
@@ -310,9 +318,10 @@ internal fun executeLinearSource(
 
         is SourceExecutionResult.Quadratic -> {
             val optimum = result.result.result
-            (optimum as? QuadraticOptimizationResult.WithIncumbent)?.let { sample(it.incumbent.sample) }
+            val point = (optimum as? QuadraticOptimizationResult.WithIncumbent)?.let { sample(it.incumbent.sample) }
             native = when (optimum) {
                 is QuadraticOptimizationResult.Optimal -> {
+                    nativeOptimum = point
                     nativeOptimalValue = optimum.bound.value.linearRational()
                     LinearSourceConclusion.OPTIMAL
                 }
@@ -344,21 +353,22 @@ internal fun executeLinearSource(
     } else {
         true
     }
+    val numerical = prepared.view.source.semantics.effective.feasibilityTolerance?.isExact == false
     val equivalent = prepared.view.exact && prepared.claimsCoverTolerance && nativeClaimsUnrestricted
     val acceptedOptimal = incumbent?.objective?.let { value -> value == prepared.acceptedObjectiveBound } == true
-    val nativeOptimalAttained = incumbent?.objective?.let { value ->
-        value * prepared.view.objectiveScale == nativeOptimalValue
+    val nativeOptimalAttained = nativeOptimum?.let { point ->
+        point.objective == incumbent?.objective && prepared.matchesNativeObjective(point, nativeOptimalValue, stop)
     } == true
     val conclusion = when {
         acceptedOptimal -> LinearSourceConclusion.OPTIMAL
 
-        native == LinearSourceConclusion.UNSATISFIABLE && prepared.view.constraintsExact &&
-            prepared.claimsCoverTolerance && nativeClaimsUnrestricted -> native
+        native == LinearSourceConclusion.UNSATISFIABLE && incumbent == null && nativeClaimsUnrestricted &&
+            (numerical || (prepared.view.constraintsExact && prepared.claimsCoverTolerance)) -> native
 
         invocation.operation != ExecutionOperation.OPTIMIZE && incumbent != null -> LinearSourceConclusion.SATISFIABLE
 
-        native == LinearSourceConclusion.OPTIMAL && equivalent && incumbent?.exact == true &&
-            nativeOptimalAttained -> native
+        native == LinearSourceConclusion.OPTIMAL && nativeClaimsUnrestricted && nativeOptimalAttained &&
+            (numerical || (equivalent && incumbent?.exact == true)) -> native
 
         native == LinearSourceConclusion.LIMIT && equivalent -> native
 
@@ -386,3 +396,29 @@ internal fun executeLinearSource(
         is SourceExecutionResult.Transcendental -> error("linear source selected function execution")
     }
 }
+
+private fun PreparedLinearSource.matchesNativeObjective(
+    point: LinearSourceWitness,
+    nativeValue: BigFraction?,
+    stop: Cancellation,
+): Boolean {
+    val value = point.objective ?: return false
+    val native = nativeValue?.let { it * view.objectiveScale.reciprocal() } ?: return false
+    val difference = (value - native).magnitude()
+    if (difference.isZero) return !stop()
+    val objective = view.source.objective ?: return false
+    val policy = view.source.semantics.effective.feasibilityTolerance
+    if (policy == null || policy.isExact) return false
+    val values = point.values
+    var magnitude = native.magnitude() + BigFraction.of(objective.constant.numerator, objective.constant.denominator)
+        .magnitude()
+    for (term in objective.terms) {
+        stop.charge(1L)
+        if (stop()) return false
+        magnitude += (BigFraction.of(term.coefficient.numerator, term.coefficient.denominator) * values[term.column])
+            .magnitude()
+    }
+    return !stop() && difference <= capturedSourceSlack(policy, native, magnitude)
+}
+
+private fun BigFraction.magnitude(): BigFraction = if (signum() < 0) negated() else this
