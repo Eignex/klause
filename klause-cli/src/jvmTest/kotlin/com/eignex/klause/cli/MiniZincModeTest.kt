@@ -5,6 +5,7 @@ import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.prepareFiniteCompatibility
 import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -114,6 +115,43 @@ class MiniZincModeTest(private val direction: String) {
         assertTrue("klause-grid-verdict: OPTIMAL" in text, text)
         assertTrue("declared finite grid" in text, text)
         assertFalse("=====UNKNOWN=====" in text.lines(), text)
+    }
+
+    @Test
+    fun `exact nonlinear float optimization should retain continuous semantics without a grid`() {
+        val source = File.createTempFile("exact-nonlinear-flatzinc", ".fzn").apply {
+            writeText("var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; " +
+                "constraint float_eq(x,0.25); constraint float_times(x,x,y); solve $direction y;")
+        }
+        val common = CommonOptions().apply {
+            engine = "cp"
+            parallel = 1
+            randomSeed = 17
+        }
+        parseArgs(arrayOf("--exact"), commonFlagSpecs(common)) {}
+        val session = MiniZincMode.newSession()
+        val bytes = ByteArrayOutputStream()
+        val previous = System.out
+        val stream = PrintStream(bytes)
+
+        try {
+            val solvable = session.load(source.absolutePath, common)
+            val invocation = assertNotNull(solvable.sourceInvocation)
+            assertEquals(FloatSemantics.Continuous, invocation.source.semantics.effective.floats)
+            assertNull(invocation.floatProjection)
+            System.setOut(stream)
+            SolveCore.solve(solvable, common, session.output(common))
+        } finally {
+            System.setOut(previous)
+            stream.close()
+            source.delete()
+        }
+
+        val text = bytes.toString(Charsets.UTF_8.name())
+        assertTrue("y = 0.0625;" in text.lines(), text)
+        assertTrue("==========" in text.lines(), text)
+        assertFalse("klause-grid-verdict" in text, text)
+        assertFalse("declared finite grid" in text, text)
     }
 
     @Test
