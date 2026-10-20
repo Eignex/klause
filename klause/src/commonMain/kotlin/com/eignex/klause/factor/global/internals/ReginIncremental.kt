@@ -43,6 +43,29 @@ private fun reginRebuild(
     val valuesPerVar = buildValuesPerVar(state, vars, cache, n)
 
     // Pigeonhole over distinct current values.
+    if (countPresentReginValues(valuesPerVar, n, cap) < n) return vars.copyOf()
+
+    // Warm-start the matching from the reversible matching, then augment the rest.
+    val matchVar = IntArray(n) { -1 }
+    val matchVal = IntArray(cap) { -1 }
+    seedRebuiltReginMatching(state, vars, cache, inc, matchVar, matchVal, n, cap)
+    // Complete the seed to a maximum matching in one Hopcroft-Karp pass (O(|E|·√n)) rather than a
+    // per-variable augmenting search — the dominant cost when the matching is built cold at the root
+    // bake with no warm start. On a non-perfect matching, one augmenting search on a still-free variable
+    // recovers the Hall violator in its visited set.
+    if (!reginHopcroftKarp(n, valuesPerVar, matchVar, matchVal, IntArray(n), IntArray(n))) {
+        val hall = reginUnmatchedHallVars(vars, valuesPerVar, matchVar, matchVal, n, cap)
+        if (hall != null) return hall
+    }
+    publishRebuiltReginMatching(inc, matchVar, matchVal, n, cap)
+
+    val conflict = reginSccReachPrune(state, vars, cache, inc, valuesPerVar, dirtyLabels = null, premises = premises)
+    if (conflict != null) return conflict
+    recordRebuiltReginFixpoint(state, vars, cache, inc, n)
+    return null
+}
+
+private fun countPresentReginValues(valuesPerVar: Array<IntArray>, n: Int, cap: Int): Int {
     val present = BooleanArray(cap)
     var distinct = 0
     for (i in 0 until n) {
@@ -53,11 +76,20 @@ private fun reginRebuild(
             }
         }
     }
-    if (distinct < n) return vars.copyOf()
+    return distinct
+}
 
-    // Warm-start the matching from the reversible matching, then augment the rest.
-    val matchVar = IntArray(n) { -1 }
-    val matchVal = IntArray(cap) { -1 }
+@Suppress("LongParameterList")
+private fun seedRebuiltReginMatching(
+    state: PropagationState,
+    vars: IntArray,
+    cache: ReginCache,
+    inc: ReginIncrementalState,
+    matchVar: IntArray,
+    matchVal: IntArray,
+    n: Int,
+    cap: Int,
+) {
     for (i in 0 until n) {
         val j = inc.matchVar[i]
         if (j in 0 until cap && matchVal[j] == -1 && cache.valueOfId[j] in state.intDomains[vars[i]]) {
@@ -65,30 +97,49 @@ private fun reginRebuild(
             matchVal[j] = i
         }
     }
-    // Complete the seed to a maximum matching in one Hopcroft-Karp pass (O(|E|·√n)) rather than a
-    // per-variable augmenting search — the dominant cost when the matching is built cold at the root
-    // bake with no warm start. On a non-perfect matching, one augmenting search on a still-free variable
-    // recovers the Hall violator in its visited set.
-    if (!reginHopcroftKarp(n, valuesPerVar, matchVar, matchVal, IntArray(n), IntArray(n))) {
-        val visited = BooleanArray(cap)
-        for (i in 0 until n) {
-            if (matchVar[i] != -1) continue
-            reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)
-            val hall = IntArrayList()
-            hall.add(vars[i])
-            for (j in 0 until cap) if (visited[j] && matchVal[j] >= 0) hall.add(vars[matchVal[j]])
-            return hall.toIntArray()
-        }
+}
+
+private fun reginUnmatchedHallVars(
+    vars: IntArray,
+    valuesPerVar: Array<IntArray>,
+    matchVar: IntArray,
+    matchVal: IntArray,
+    n: Int,
+    cap: Int,
+): IntArray? {
+    val visited = BooleanArray(cap)
+    for (i in 0 until n) {
+        if (matchVar[i] != -1) continue
+        reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)
+        val hall = IntArrayList()
+        hall.add(vars[i])
+        for (j in 0 until cap) if (visited[j] && matchVal[j] >= 0) hall.add(vars[matchVal[j]])
+        return hall.toIntArray()
     }
+    return null
+}
+
+private fun publishRebuiltReginMatching(
+    inc: ReginIncrementalState,
+    matchVar: IntArray,
+    matchVal: IntArray,
+    n: Int,
+    cap: Int,
+) {
     for (i in 0 until n) inc.matchVar[i] = matchVar[i]
     for (j in 0 until cap) inc.matchVal[j] = matchVal[j]
+}
 
-    val conflict = reginSccReachPrune(state, vars, cache, inc, valuesPerVar, dirtyLabels = null, premises = premises)
-    if (conflict != null) return conflict
+private fun recordRebuiltReginFixpoint(
+    state: PropagationState,
+    vars: IntArray,
+    cache: ReginCache,
+    inc: ReginIncrementalState,
+    n: Int,
+) {
     inc.valid.set(1)
     for (i in 0 until n) inc.domRef[i].set(state.intDomains[vars[i]])
     cache.recordFixpoint(state, vars)
-    return null
 }
 
 /** Delta fire: with the matching intact, patch only the SCC components touched by the values that
