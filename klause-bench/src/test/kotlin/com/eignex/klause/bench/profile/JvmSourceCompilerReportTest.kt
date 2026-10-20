@@ -110,14 +110,18 @@ class JvmSourceCompilerReportTest {
             index.addStatic(
                 "binding", "static.gz", 1,
                 buildJsonObject {
-                    reference.filterKeys { it !in setOf("bindingRecordOrdinal", "originalClassIdentity", "originalSyntaxOrigin") }
+                    reference.filterKeys {
+                        it !in setOf("bindingRecordOrdinal", "originalClassIdentity", "originalSyntaxOrigin")
+                    }
                         .forEach { (key, value) -> put(key, value) }
                     put("status", "joined-candidates")
                     put("internalName", "sample/Cold")
                     put("classIdentity", reference.getValue("originalClassIdentity"))
                     put("syntaxOrigin", reference.getValue("originalSyntaxOrigin"))
                     put("methods", JvmSavedJson.parse(
-                        """[{"methodIndex":0,"name":"pick","descriptor":"(I)V"},{"methodIndex":1,"name":"cold","descriptor":"()V"},{"methodIndex":2,"name":"pick","descriptor":"(I)V"}]""",
+                        """[{"methodIndex":0,"name":"pick","descriptor":"(I)V"},
+                            {"methodIndex":1,"name":"cold","descriptor":"()V"},
+                            {"methodIndex":2,"name":"pick","descriptor":"(I)V"}]""",
                     ))
                 },
                 JsonObject(emptyMap()),

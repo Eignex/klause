@@ -32,7 +32,9 @@ class JvmSavedTablesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["[1,1]", "[2]", "[]", "[1,true]", "[1,-1]", "[-2]", "[-1]", "\"text\"", "{\"x\":1}", "1e9999"])
+    @ValueSource(strings = [
+        "[1,1]", "[2]", "[]", "[1,true]", "[1,-1]", "[-2]", "[-1]", "\"text\"", "{\"x\":1}", "1e9999",
+    ])
     fun `invalid unselected values reject the entire encoded record`(hidden: String) {
         val envelope = JvmSavedJson.parse(
             """{
@@ -79,7 +81,8 @@ class JvmSavedTablesTest {
 
         assertEquals(
             JvmSavedJson.parse(
-                """[{"methodIndex":0,"name":"pick","descriptor":"(I)V"},{"methodIndex":1,"name":"pick","descriptor":"(J)V"}]""",
+                """[{"methodIndex":0,"name":"pick","descriptor":"(I)V"},
+                    {"methodIndex":1,"name":"pick","descriptor":"(J)V"}]""",
             ),
             actual,
         )

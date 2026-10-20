@@ -351,7 +351,8 @@ internal object JvmSourceCompilerReview {
 
     private val PROOF_FLAGS = (SOURCE_PROOF_FLAGS + COHORT_PROOF_FLAGS).distinct()
     private val STAGES = setOf(
-        "catalog", "authenticate-inputs", "validate-source-universe", "source-audits", "static-methods", "candidate-links",
+        "catalog", "authenticate-inputs", "validate-source-universe", "source-audits", "static-methods",
+        "candidate-links",
         "output-round-trip", "input-reverification", "completion-metadata", "complete",
     )
 }

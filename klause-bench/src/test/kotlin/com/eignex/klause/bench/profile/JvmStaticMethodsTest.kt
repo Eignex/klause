@@ -29,7 +29,8 @@ class JvmStaticMethodsTest {
             """{
                 "encoding":"canonical-json-key-and-string-tables-v1",
                 "objectKeys":[["status","internalName","bytecodeClassOrdinal","studySourceHead","syntaxArchiveId",
-                               "syntaxClassOrdinal","syntaxLineReportFile","classIdentity","syntaxOrigin","methods","unknown"],
+                               "syntaxClassOrdinal","syntaxLineReportFile","classIdentity","syntaxOrigin",
+                               "methods","unknown"],
                               ["methodIndex","name","descriptor"],[]],
                 "strings":["joined-candidates","sample/Cold","head","syntax","lines.gz","pick","(I)V"],
                 "value":[-1,[1,0],[1,1],0,[1,2],[1,3],0,[1,4],[-3],[-3],[0,[-2,0,[1,5],[1,6]]],$hidden]
@@ -57,7 +58,11 @@ class JvmStaticMethodsTest {
         }
         File(out, "completion.json").writeText(completion.toString())
         val paths = out.listFiles().orEmpty().associateBy { it.name }
-        val item = buildJsonObject { put("id", "binding"); put("completionMember", "completion.json"); put("reportMember", "static.gz") }
+        val item = buildJsonObject {
+            put("id", "binding")
+            put("completionMember", "completion.json")
+            put("reportMember", "static.gz")
+        }
 
         JvmSourceCompilerIndex(File(out, "index.sqlite")).use { index ->
             index.add("binding", "head", "audit.gz", 2, audit, JsonObject(emptyMap()))
@@ -73,7 +78,10 @@ class JvmStaticMethodsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
-    fun `unavailable static classes remain in the whole universe without method credit`(observe: Boolean, @TempDir out: File) {
+    fun `unavailable static classes remain in the whole universe without method credit`(
+        observe: Boolean,
+        @TempDir out: File,
+    ) {
         val audit = JvmSavedJson.parse(
             """{
                 "record":"class-audit","originalSyntaxClassOrdinal":0,"internalName":null,
@@ -82,7 +90,8 @@ class JvmStaticMethodsTest {
             }""",
         ).jsonObject
         val static = JvmSavedJson.parse(
-            """{"status":"bytecode-metadata-unavailable","studySourceHead":"head","syntaxClassOrdinal":0,"syntaxOrigin":{}}""",
+            """{"status":"bytecode-metadata-unavailable","studySourceHead":"head",
+                "syntaxClassOrdinal":0,"syntaxOrigin":{}}""",
         ).jsonObject
         val candidate = JvmSavedJson.parse(
             """{"studySourceHead":"head","syntaxClassOrdinal":0,"methodIndex":0}""",
@@ -102,7 +111,9 @@ class JvmStaticMethodsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["complete", "descriptor", "name", "record", "class", "archive", "bytecode", "method", "unsealed"])
+    @ValueSource(strings = [
+        "complete", "descriptor", "name", "record", "class", "archive", "bytecode", "method", "unsealed",
+    ])
     fun `generated methods require their complete original static identity`(variant: String, @TempDir out: File) {
         val audit = JvmSavedJson.parse(
             """{
@@ -128,7 +139,10 @@ class JvmStaticMethodsTest {
             put("syntaxArchiveId", if (variant == "archive") "other" else "syntax")
             put("syntaxClassOrdinal", 0)
             put("syntaxLineReportFile", "lines.gz")
-            put("originalClassIdentity", if (variant == "class") JsonObject(emptyMap()) else static.getValue("classIdentity"))
+            put(
+                "originalClassIdentity",
+                if (variant == "class") JsonObject(emptyMap()) else static.getValue("classIdentity"),
+            )
             put("originalSyntaxOrigin", static.getValue("syntaxOrigin"))
             put("methodIndex", if (variant == "method") 0 else 1)
         }
@@ -184,7 +198,9 @@ class JvmStaticMethodsTest {
             "owner" -> JsonObject(static + ("internalName" to JsonPrimitive("sample/Other")))
             "origin" -> JsonObject(static + ("syntaxOrigin" to JsonObject(emptyMap())))
             "count" -> JsonObject(static + ("methods" to JsonArray(emptyList())))
-            "formal" -> JsonObject(static + ("methods" to JvmSavedJson.parse("""[{"methodIndex":0,"name":"pick","descriptor":"(J)V"}]""")))
+            "formal" -> JsonObject(static + ("methods" to JvmSavedJson.parse(
+                """[{"methodIndex":0,"name":"pick","descriptor":"(J)V"}]""",
+            )))
             else -> static
         }
 
@@ -218,7 +234,8 @@ class JvmStaticMethodsTest {
         }
         val row = JvmSavedJson.parse(
             """{
-                "status":"joined-candidates","internalName":"sample/Cold","studySourceHead":"head","syntaxClassOrdinal":0,
+                "status":"joined-candidates","internalName":"sample/Cold","studySourceHead":"head",
+                "syntaxClassOrdinal":0,
                 "methods":[{"methodIndex":0,"name":"pick","descriptor":"(I)V"},
                            {"methodIndex":$indexValue,"name":"other","descriptor":"()V"}]
             }""",

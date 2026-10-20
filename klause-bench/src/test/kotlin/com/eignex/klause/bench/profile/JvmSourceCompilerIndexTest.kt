@@ -41,7 +41,10 @@ class JvmSourceCompilerIndexTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["checked", "unmatched"])
-    fun `source links retain checked and unmatched declarations with complete descriptors`(variant: String, @TempDir out: File) {
+    fun `source links retain checked and unmatched declarations with complete descriptors`(
+        variant: String,
+        @TempDir out: File,
+    ) {
         val origin = buildJsonObject { put("entry", "Cold.class") }
         val audit = buildJsonObject {
             put("record", "class-audit")
@@ -104,7 +107,8 @@ class JvmSourceCompilerIndexTest {
                     put("classIdentity", JsonObject(emptyMap()))
                     put("syntaxOrigin", origin)
                     put("methods", JvmSavedJson.parse(
-                        """[{"methodIndex":0,"name":"pick","descriptor":"(I)V"},{"methodIndex":1,"name":"cold","descriptor":"()V"}]""",
+                        """[{"methodIndex":0,"name":"pick","descriptor":"(I)V"},
+                            {"methodIndex":1,"name":"cold","descriptor":"()V"}]""",
                     ))
                 },
                 JsonObject(emptyMap()),

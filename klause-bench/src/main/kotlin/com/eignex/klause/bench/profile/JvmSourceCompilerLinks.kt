@@ -22,8 +22,8 @@ internal object JvmSourceCompilerLinks {
             for (name in listOf(
                 "JvmSourceCompilerLinks", "JvmSourceCompilerReview", "JvmSourceCompilerIndex",
                 "JvmSourceCompilerReport", "JvmCompilerCandidates", "JvmSavedJson", "JvmSavedInputs", "JvmSavedReports",
-                "JvmSavedReferenceCache", "JvmRecordedOrigins", "JvmSavedTables", "JvmStaticMethods", "ProfileRunBudget",
-                "ProfileCaptureArchive",
+                "JvmSavedReferenceCache", "JvmRecordedOrigins", "JvmSavedTables", "JvmStaticMethods",
+                "ProfileRunBudget", "ProfileCaptureArchive",
             )) {
                 File(root, "klause-bench/src/main/kotlin/com/eignex/klause/bench/profile/$name.kt")
                     .copyTo(File(out, "$name.kt"))

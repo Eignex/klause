@@ -33,7 +33,9 @@ internal class JvmSavedTables(envelope: JsonObject) {
     }
 
     private fun projectObject(value: JsonElement, fields: Set<String>): JsonObject =
-        JsonObject(objectValues(value).filter { it.first in fields }.associate { (name, child) -> name to expand(child) })
+        JsonObject(objectValues(value).filter { it.first in fields }.associate { (name, child) ->
+            name to expand(child)
+        })
 
     private fun objectValues(value: JsonElement): List<Pair<String, JsonElement>> {
         require(value is JsonArray && savedInteger(value.first()) < 0)

@@ -206,13 +206,16 @@ internal class JvmStaticMethods(private val db: Connection, private val checkSiz
             }
             require(count == completion.savedLong("sourceContextClassRows"))
             require(seen.map { it.first }.toSet().size.toLong() == classes)
-            require(contexts.all { counts.getValue(it.savedString("studySourceHead")) == it.savedLong("classContextRows") })
+            require(contexts.all {
+                counts.getValue(it.savedString("studySourceHead")) == it.savedLong("classContextRows")
+            })
         }
 
         private fun declaration(encoded: JsonObject): JsonObject {
             val tables = JvmSavedTables(encoded)
             val row = tables.project(CONTEXT_FIELDS + setOf(
-                "status", "internalName", "classIdentity", "syntaxOrigin", "bytecodeArchiveId", "bytecodeArchiveClassOrdinal",
+                "status", "internalName", "classIdentity", "syntaxOrigin",
+                "bytecodeArchiveId", "bytecodeArchiveClassOrdinal",
             ))
             if (row["status"] != JsonPrimitive("joined-candidates")) return row
             return JsonObject(
