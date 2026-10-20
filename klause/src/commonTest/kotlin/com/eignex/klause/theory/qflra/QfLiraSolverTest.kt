@@ -18,6 +18,10 @@ import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
@@ -182,6 +186,32 @@ class QfLiraSolverTest {
         session.popTo(3)
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
         assertIs<SearchResult.Satisfied>(session.solve(0))
+    }
+
+    @Test
+    fun `a complete equality contradiction should avoid a numerical solve`() {
+        val factors = listOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+            List(2) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ZERO)) + (1 until 130).map { variable ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(variable)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO)
+        } + ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ZERO, strict = true)
+        val source = Problem(0, 0, emptyArray(), factors.toTypedArray(), numRealVars = 130,
+            realLower = DoubleArray(130) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(130) { Double.POSITIVE_INFINITY })
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+
+        val result = assertIs<ComponentResult.Conflict>(session.initialize())
+
+        assertTrue(assertNotNull(result.explanation).literals.isEmpty())
+        assertEquals(0, solves)
     }
 
     @Test

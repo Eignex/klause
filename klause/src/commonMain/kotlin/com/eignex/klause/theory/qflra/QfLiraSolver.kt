@@ -646,6 +646,28 @@ class ExactLiraSearchComponent private constructor(
         return context.explainAtoms(SearchAtomPremise.All(leaves)).takeUnless { operationStop() }
     }
 
+    private fun equalityRefutationEligible(): Boolean = unassignedBooleans == 0 && model.numIntVars == 0 &&
+        !model.semantics.isApproximate && solveContext.certificationPolicy === ProductionLpCertificationPolicy
+
+    private fun equalityRefutation(context: SearchContext): ComponentCheck? {
+        if (!equalityRefutationEligible()) return null
+        if (operationStop()) return ComponentCheck.Indeterminate
+        observeCompleteStage("PURE_REAL_EQUALITY_ATTEMPT")
+        val origins = ArrayList<EqualityRowOrigin>()
+        val rows = agreementSourceRows(context, origins)
+        var support: IntArray? = null
+        val refuted = rows != null && equalityRowsRefute(model.numRealVars, rows, lpStop, ::observeCompleteStage,
+            onSupport = { support = it })
+        if (operationStop()) return ComponentCheck.Indeterminate
+        if (!refuted) return null
+        val explanation = support?.let { equalityExplanation(it, origins, context) }
+        if (operationStop()) return ComponentCheck.Indeterminate
+        smtStats?.observeConflict(explanation)
+        observeCompleteStage("PURE_REAL_EQUALITY_REFUTED")
+        if (explanation != null) observeCompleteStage("PURE_REAL_EQUALITY_EXPLAINED")
+        return ComponentCheck.Infeasible(explanation)
+    }
+
     private fun coordinateDeclined(context: SearchContext): ComponentCheck {
         if (!operationStop()) context.executionControls.reportStop(SearchStopCause.RepresentationDecline)
         return ComponentCheck.Indeterminate
@@ -946,9 +968,9 @@ class ExactLiraSearchComponent private constructor(
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
-                if (completeTraversalObserved && bools[variable] == UNASSIGNED) {
+                if (bools[variable] == UNASSIGNED) {
                     unassignedBooleans--
-                    smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
+                    if (completeTraversalObserved) smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
                 }
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
@@ -1235,6 +1257,17 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Indeterminate
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
+        if (equalityRefutationEligible()) {
+            observeCompleteStage("PURE_REAL_EQUALITY_BEFORE_LP")
+            equalityRefutation(context)?.let { result ->
+                if (result !is ComponentCheck.Infeasible) return ComponentResult.Indeterminate
+                dirty = false
+                candidate = null
+                assignment = null
+                outcome = result
+                return ComponentResult.Conflict(result.explanation)
+            }
+        }
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = lp.solve(sparsePointRecovery = true)
@@ -1370,26 +1403,9 @@ class ExactLiraSearchComponent private constructor(
                 observeCompleteStage("RECOVERY_NO_FLOAT")
             }
         }
-        if (candidate == null && model.numIntVars == 0 && !model.semantics.isApproximate &&
-            solveContext.certificationPolicy === ProductionLpCertificationPolicy && !operationStop()
-        ) {
-            observeCompleteStage("PURE_REAL_EQUALITY_ATTEMPT")
-            val origins = ArrayList<EqualityRowOrigin>()
-            val rows = agreementSourceRows(context, origins)
-            var support: IntArray? = null
-            if (rows != null && equalityRowsRefute(model.numRealVars, rows, lpStop, ::observeCompleteStage,
-                    onSupport = { support = it }) &&
-                !operationStop()
-            ) {
-                val explanation = support?.let { equalityExplanation(it, origins, context) }
-                if (operationStop()) {
-                    outcome = ComponentCheck.Indeterminate
-                    return null
-                }
-                outcome = ComponentCheck.Infeasible(explanation)
-                smtStats?.observeConflict(explanation)
-                observeCompleteStage("PURE_REAL_EQUALITY_REFUTED")
-                if (explanation != null) observeCompleteStage("PURE_REAL_EQUALITY_EXPLAINED")
+        if (candidate == null) {
+            equalityRefutation(context)?.let { result ->
+                outcome = result
                 return null
             }
         }
@@ -1566,7 +1582,7 @@ class ExactLiraSearchComponent private constructor(
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
-                if (completeTraversalObserved) unassignedBooleans++
+                unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
             }
@@ -2005,6 +2021,7 @@ private class ExactLiraReductionCache(
             } else {
                 null
             }
+            if (origins != null && comparison.op == LinearOp.NE && direction == null) return null
             val start = rows.size
             comparison.rowsInto(rows, direction)
             if (origins != null && !recordOrigin(start,
