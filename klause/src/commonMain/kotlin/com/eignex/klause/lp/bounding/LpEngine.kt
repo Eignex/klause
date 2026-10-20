@@ -732,17 +732,21 @@ internal class LpEngine(
         pinnedLeafClause = null
         if (!residualOversized || !params.lpPlan.realResidual || problem.semantics.isApproximate ||
             solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
-            params.cancellation() || lpWorkAllowanceSpent()
+            params.cancellation() || lpWorkAllowanceSpent(sink.lp.standaloneWork)
         ) return false
         val relaxer = selectedSourceRelaxation ?: lpRelaxer ?: return false
         val relaxation = leafRelaxation(relaxer, session, requirePins = false) ?: return false
-        if (params.cancellation() || lpWorkAllowanceSpent()) return false
+        if (params.cancellation() || lpWorkAllowanceSpent(sink.lp.standaloneWork)) return false
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
             .also { leafSolver = it }
         val budget = nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { it > 0L }
             ?: sizeBudget(model.n, model.m)
-        val certified = solver.solve(model, cancellation = params.cancellation, workLimit = budget,
+        val remaining = lpEffortGovernor.remainingWork()?.let {
+            (it - minOf(it, sink.lp.standaloneWork)).coerceAtLeast(1L)
+        }
+        val certified = solver.solve(model, cancellation = params.cancellation,
+            workLimit = remaining?.let { minOf(budget, it) } ?: budget,
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE), counterResults = lpCounterResults)
         sink.lp.observePrimalPhase("PREFIX_REAL_CHECK", certified.verdict.name, 0L)
         if (params.cancellation() || certified.verdict != LpVerdict.INFEASIBLE) return false

@@ -800,11 +800,12 @@ private class ResidualRealComponent(
     )
     private var completed: Sample? = null
     private var conflictClause: IntArray? = null
-    private var prefixConflict = false
+    private var prefixResolution: SearchConflictResolution? = null
     private var prefixVisits = 0L
     private var prefixQueries = 0
 
     override fun propagate(context: SearchContext): ComponentResult {
+        prefixResolution = null
         if (absCompletion != null || toleranceCheck != null || !engine.residualOversized ||
             context.decisionLevel == 0 || context.cancelled() || prefixQueries >= MAX_PREFIX_QUERIES
         ) return ComponentResult.Consistent
@@ -813,8 +814,8 @@ private class ResidualRealComponent(
         if (!context.consumeCheck()) return ComponentResult.Consistent
         prefixQueries++
         if (!engine.prefixRealInfeasible(cp.session) || context.cancelled()) return ComponentResult.Consistent
-        conflictClause = engine.pinnedLeafClause
-        prefixConflict = true
+        val clause = engine.pinnedLeafClause ?: return ComponentResult.Consistent
+        prefixResolution = cp.resolveClause(clause, context)
         completed = null
         return ComponentResult.Conflict()
     }
@@ -822,7 +823,7 @@ private class ResidualRealComponent(
     override fun check(context: SearchContext): ComponentCheck {
         completed = null
         conflictClause = null
-        prefixConflict = false
+        prefixResolution = null
         if (context.cancelled()) return ComponentCheck.Indeterminate
         absCompletion?.let { completion ->
             val discrete = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
@@ -874,19 +875,20 @@ private class ResidualRealComponent(
     override fun retract(decisionLevel: Int) {
         completed = null
         conflictClause = null
-        prefixConflict = false
+        // Propagation conflicts retain their native analysis across the traversal's initial retraction.
     }
 
     override fun resolveConflict(context: SearchContext): SearchConflictResolution {
+        val prefix = prefixResolution
+        prefixResolution = null
         val clause = conflictClause
         conflictClause = null
-        val phase = if (prefixConflict) "PREFIX_REAL_HANDOFF" else "PINNED_REAL_LEAF_HANDOFF"
-        prefixConflict = false
-        if (clause == null) {
+        val phase = if (prefix != null) "PREFIX_REAL_HANDOFF" else "PINNED_REAL_LEAF_HANDOFF"
+        if (prefix == null && clause == null) {
             sink?.lp?.observePrimalPhase(phase, "NO_CLAUSE", 0L)
             return SearchConflictResolution.Chronological
         }
-        val result = cp.resolveClause(clause, context)
+        val result = prefix ?: cp.resolveClause(checkNotNull(clause), context)
         val outcome = when (result) {
             is SearchConflictResolution.Backjump -> "BACKJUMP"
             SearchConflictResolution.Exhausted -> "EXHAUSTED"
@@ -899,7 +901,7 @@ private class ResidualRealComponent(
     override fun onRestart(context: SearchContext) {
         completed = null
         conflictClause = null
-        prefixConflict = false
+        prefixResolution = null
     }
 
     fun sample(): Sample = requireNotNull(completed)

@@ -132,8 +132,9 @@ For exact satisfaction, selected-prefix checks use the same fresh assembly and
 compaction while unrelated finite coordinates remain open. They retain live
 immutable finite domains, their bound intervals and tri-state Boolean snapshots;
 every conditional row premise must already be assigned. The unchanged 1,000-row numerical cap and node
-work allowance bound each query. Only an infeasible result with a checked source
-clause can prune the prefix; positive points remain relaxation values. Required
+work allowance, including prior standalone solves, bound each query. Only an
+infeasible result with a checked source clause can prune the prefix; positive
+points remain relaxation values. Required
 leaf completion still waits for all finite pins and checks the original source.
 
 A compacted refutation maps each supported interval to the original rows that

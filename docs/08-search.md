@@ -226,6 +226,8 @@ finite CP branching. Only a certified refutation with a complete source clause c
 prune early; a feasible partial relaxation contributes no accepted assignment.
 These checks share the traversal's work and stop controls, attempt at most 64
 queries per search, and follow four initial visits with a cadence of 32 visits.
+Native analysis captures a prefix conflict before retraction; the resolver retains
+that analysis until the traversal can apply its learned consequence.
 Successful fixpoints deliver new deductions to propagation-aware selectors. Phase
 saving captures values before
 retraction, so propagated as well as decided polarities survive backjumps and

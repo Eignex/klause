@@ -30,6 +30,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.util.Cancellation
@@ -42,6 +43,30 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `standalone solves spending the allowance should leave real prefixes to finite search`() {
+        val problem = Problem(1, 0, emptyArray(), Array(1001) {
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ofLong(10))
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink(backend = "partial-real-allowance")
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, lpWorkBudgetFraction = 0.25),
+                solveBudgetMillis = 1000L), sink, LpSolveContext(engineFactory = factory))
+        sink.lp.observeEngineCost(LpRoute.STANDALONE, LpSolveMetrics(workOps = 5_000_000L))
+        val before = engine.totalSolveWork()
+
+        engine.use {
+            assertFalse(it.prefixRealInfeasible(PropagationSession(problem)))
+
+            assertTrue(factory.calls.isEmpty())
+            assertNull(it.pinnedLeafClause)
+            assertEquals(before, it.totalSolveWork())
+        }
+    }
+
     @Test
     fun `a selected real prefix should refute before unrelated finite coordinates are pinned`() {
         val problem = Problem(3, 1, arrayOf(IntDomain(0, 1)), Array(1002) { row ->
