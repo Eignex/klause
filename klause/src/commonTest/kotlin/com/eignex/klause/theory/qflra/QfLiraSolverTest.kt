@@ -57,7 +57,7 @@ import kotlin.test.assertTrue
 class QfLiraSolverTest {
     @Test
     fun `a residual cycle should exclude unrelated retained guards from its source conflict`() {
-        val source = Problem(5, 0, emptyArray(), arrayOf(
+        val source = Problem(6, 0, emptyArray(), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
                 listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO, activator = 0),
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(2)),
@@ -91,6 +91,7 @@ class QfLiraSolverTest {
         assertEquals(0, solves)
         session.popTo(4)
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(5, false))))
         assertIs<SearchResult.Satisfied>(session.solve(0))
     }
 

@@ -110,14 +110,12 @@ private fun refutesDifferenceResidual(
     if (stop()) return false
     if (graph == null) {
         onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_UNAVAILABLE")
-        if (refutesGeneral != null) {
-            onStage?.invoke("PURE_REAL_EQUALITY_SUBSET_GRAPH_ATTEMPT")
-            if (RealDifferenceSystem.refutesSubset(columns, rows, stop, onSupport)) {
-                onStage?.invoke("PURE_REAL_EQUALITY_SUBSET_GRAPH_REFUTED")
-                return !stop()
-            }
-            if (stop()) return false
+        onStage?.invoke("PURE_REAL_EQUALITY_SUBSET_GRAPH_ATTEMPT")
+        if (RealDifferenceSystem.refutesSubset(columns, rows, stop, onSupport)) {
+            onStage?.invoke("PURE_REAL_EQUALITY_SUBSET_GRAPH_REFUTED")
+            return !stop()
         }
+        if (stop()) return false
         return refutesGeneral?.invoke(columns, rows, stop) == true && !stop()
     }
     onStage?.invoke("PURE_REAL_EQUALITY_GRAPH_ATTEMPT")

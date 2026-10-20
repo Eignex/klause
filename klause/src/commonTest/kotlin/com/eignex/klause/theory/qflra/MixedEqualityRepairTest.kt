@@ -265,7 +265,7 @@ class MixedEqualityRepairTest {
     }
 
     @Test
-    fun `an unsupported residual row should withhold graph refutation support`() {
+    fun `a valid general residual should preserve a necessary cycle refutation`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1),
                 listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
@@ -281,8 +281,10 @@ class MixedEqualityRepairTest {
 
         val refuted = equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { support = it })
 
-        assertFalse(refuted)
-        assertNull(support)
+        assertTrue(refuted)
+        val selected = assertNotNull(support)
+        assertEquals(setOf(0, 1, 2, 3), selected.toSet())
+        assertTrue(equalityRowsRefute(4, selected.map(rows::get), Cancellation.Never))
     }
 
     @Test

@@ -123,6 +123,8 @@ negative authority. A bounded dependency graph reconstructs the original rows us
 by equation pivots and retained residual rows; discarded tautologies add no premises.
 A reduced difference cycle cites only its cycle rows and their pivot dependencies,
 including when general residual rows accompany the necessary difference subset.
+This negative check can reject a selected prefix while unrelated Boolean choices
+remain open; rows with unknown conditions stay outside the subset.
 An internal unguarded cycle is not a source clause. Unknown source choices,
 unsupported premises or cancellation withhold the proof. Capture retains the
 65,536-entry, 4,096-bit arithmetic and 4,096-node explanation bounds under the current
