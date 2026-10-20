@@ -209,6 +209,9 @@ class ExactLiraSearchComponent private constructor(
     private val hasSourceDisjunctions = model.factors.any { it.linearForm is LinearForm.Disjunction }
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
+    private var equationGuardRows: List<List<PreparedSourceRow>>? = null
+    private var equationGuardIndexAttempted = false
+    private var equationGuardCursor = 0
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifferenceState = lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private val realDifference by realDifferenceState
@@ -726,29 +729,118 @@ class ExactLiraSearchComponent private constructor(
         admitsEqualityRepairColumns(model.numRealVars) && preparedRows.size <= 65536 &&
         !model.semantics.isApproximate && solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
-    private fun equalityRefutation(context: SearchContext): ComponentCheck? {
+    private fun equalityRefutation(context: SearchContext): ComponentResult? {
         if (!equalityRefutationEligible()) return null
-        if (operationStop()) return ComponentCheck.Indeterminate
+        if (operationStop()) return ComponentResult.Indeterminate
         observeCompleteStage("PURE_REAL_EQUALITY_ATTEMPT")
         lpStop.charge(model.numRealVars.toLong() + model.factors.size + preparedRows.size + bools.size + 1L)
-        if (operationStop()) return ComponentCheck.Indeterminate
+        if (operationStop()) return ComponentResult.Indeterminate
         val snapshot = reduction.refutationRows(bools, node, lpStop)
         var support: IntArray? = null
+        var propagation: ComponentResult? = null
         val general: ((Int, List<ExactRationalInequality>, Cancellation, (IntArray) -> Unit) -> Boolean)? =
             if (bools.any { it == UNASSIGNED }) null else { columns, rows, token, onSupport ->
                 reduction.refuteReals(columns, rows, token, ::observeCompleteStage, onSupport)
             }
         val refuted = snapshot != null && equalityRowsRefute(model.numRealVars, snapshot.rows,
             lpStop, ::observeCompleteStage,
-            onSupport = { support = it }, refutesGeneral = general)
-        if (operationStop()) return ComponentCheck.Indeterminate
-        if (!refuted) return null
+            onSupport = { support = it }, refutesGeneral = general, onUnrefutedRepair = { repair ->
+                if (bools.any { it == UNASSIGNED }) {
+                    propagation = implyEquationGuard(repair, snapshot.origins, context)
+                }
+            })
+        if (operationStop()) return ComponentResult.Indeterminate
+        if (!refuted) return propagation
         val explanation = support?.let { equalityExplanation(it, checkNotNull(snapshot).origins, context) }
-        if (operationStop()) return ComponentCheck.Indeterminate
+        if (operationStop()) return ComponentResult.Indeterminate
         smtStats?.observeConflict(explanation)
         observeCompleteStage("PURE_REAL_EQUALITY_REFUTED")
         if (explanation != null) observeCompleteStage("PURE_REAL_EQUALITY_EXPLAINED")
-        return ComponentCheck.Infeasible(explanation)
+        dirty = false
+        candidate = null
+        assignment = null
+        outcome = ComponentCheck.Infeasible(explanation)
+        return ComponentResult.Conflict(explanation)
+    }
+
+    private fun prepareEquationGuards(): List<List<PreparedSourceRow>>? {
+        if (equationGuardIndexAttempted) return equationGuardRows
+        if (bools.size > 100000) return null
+        val groups = LinkedHashMap<Int, MutableList<PreparedSourceRow>>()
+        var entries = 0L
+        for (prepared in preparedRows) {
+            lpStop.charge(prepared.row.size.toLong() + 2L)
+            if (operationStop()) return null
+            val guard = prepared.row.activator
+            if (guard == LinearRow.ALWAYS) continue
+            if (guard !in bools.indices) return null
+            entries += prepared.row.size + 1L
+            if (entries > 65536L) {
+                equationGuardIndexAttempted = true
+                return null
+            }
+            groups.getOrPut(guard) { ArrayList() }.add(prepared)
+        }
+        lpStop.charge(entries + groups.size + 1L)
+        if (operationStop()) return null
+        equationGuardRows = groups.values.filter { rows ->
+            rows.none { it.disjunction || (0 until it.row.size).any { index -> Term.isBool(it.row.ref(index)) } } &&
+                rows.any { it.form.comparison(true) { false }.terms.size > 2 }
+        }.map { it.toList() }
+        equationGuardIndexAttempted = true
+        return equationGuardRows
+    }
+
+    private fun implyEquationGuard(
+        repair: MixedEqualityRepair,
+        origins: List<EqualityRowOrigin>,
+        context: SearchContext,
+    ): ComponentResult? {
+        val groups = prepareEquationGuards() ?: return null
+        var checked = 0
+        repeat(groups.size) {
+            lpStop.charge(1L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            val rows = groups[equationGuardCursor]
+            equationGuardCursor = (equationGuardCursor + 1) % groups.size
+            val guard = rows.first().row.activator
+            if (bools[guard] != UNASSIGNED || context.boolValue(guard) != null) return@repeat
+            if (checked++ >= 64) return null
+            observeCompleteStage("PURE_REAL_EQUALITY_GUARD_ATTEMPT")
+            val selected = HashSet<Int>()
+            var truth: Boolean? = null
+            for (prepared in rows) {
+                lpStop.charge(2L * prepared.row.size + 1L)
+                if (operationStop()) return ComponentResult.Indeterminate
+                val comparison = prepared.form.comparison(true) { false }
+                val constant = repair.constant(comparison.ordered.row(comparison.bound, comparison.strict))
+                    ?: return@repeat
+                val holds = when (comparison.op) {
+                    LinearOp.LE -> if (comparison.strict) BigFraction.ZERO < constant.bound
+                        else BigFraction.ZERO <= constant.bound
+                    LinearOp.GE -> if (comparison.strict) BigFraction.ZERO > constant.bound
+                        else BigFraction.ZERO >= constant.bound
+                    LinearOp.EQ -> constant.bound.isZero
+                    LinearOp.NE -> !constant.bound.isZero
+                }
+                if (truth != null && truth != holds) return@repeat
+                truth = holds
+                lpStop.charge(constant.rows.size.toLong() + 1L)
+                if (operationStop()) return ComponentResult.Indeterminate
+                for (index in constant.rows) selected.add(index)
+                if (selected.size > 4096) return@repeat
+            }
+            val explanation = equalityExplanation(selected.toIntArray(), origins, context) ?: return@repeat
+            val literal = Lit.make(guard, checkNotNull(truth))
+            lpStop.charge(explanation.literals.size.toLong() + 2L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            val result = context.imply(literal, SearchExplanation(explanation.literals + literal))
+            if (result !is ComponentResult.Consistent) return result
+            observeCompleteStage("PURE_REAL_EQUALITY_GUARD_IMPLIED")
+            // Search publishes to peers; retain this owner's new source selection before its next check.
+            return accept(SearchDecision.Bool(literal), context)
+        }
+        return null
     }
 
     private fun coordinateDeclined(context: SearchContext): ComponentCheck {
@@ -1386,14 +1478,7 @@ class ExactLiraSearchComponent private constructor(
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         if (equalityRefutationEligible()) {
             observeCompleteStage("PURE_REAL_EQUALITY_BEFORE_LP")
-            equalityRefutation(context)?.let { result ->
-                if (result !is ComponentCheck.Infeasible) return ComponentResult.Indeterminate
-                dirty = false
-                candidate = null
-                assignment = null
-                outcome = result
-                return ComponentResult.Conflict(result.explanation)
-            }
+            equalityRefutation(context)?.let { return it }
         }
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
@@ -1701,6 +1786,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        equationGuardCursor = 0
         if (realDifferenceState.isInitialized()) realDifferenceState.value?.retractGuards()
         if (necessaryDifferenceState.isInitialized()) necessaryDifferenceState.value?.retractGuards()
         invalidateWholePoint?.invoke()

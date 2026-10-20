@@ -20,6 +20,74 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `a constant query should cite equation premises without treating the query as an axiom`() {
+        val rows = listOf(exactColumnUpper(3, BigFraction.ofLong(7)), exactColumnLower(3, BigFraction.ofLong(7)),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ofLong(6)),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.ofLong(-6)))
+        val query = ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ofLong(2) },
+            BigFraction.ofLong(13))
+        var constant: EqualityConstant? = null
+
+        val refuted = equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { },
+            onUnrefutedRepair = { constant = it.constant(query) })
+
+        assertFalse(refuted)
+        assertEquals(BigFraction.ONE, assertNotNull(constant).bound)
+        assertEquals(setOf(2, 3), assertNotNull(constant).rows.toSet())
+        assertTrue(listOf(BigFraction.ofLong(6), BigFraction.ZERO, BigFraction.ZERO, BigFraction.ofLong(7))
+            .satisfiesSourceRows(rows + query))
+    }
+
+    @Test
+    fun `an open real coordinate should withhold a constant query without poisoning a later query`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.ZERO))
+        var incomplete: EqualityConstant? = null
+        var complete: EqualityConstant? = null
+
+        equalityRowsRefute(4, rows, Cancellation.Never, onSupport = { }, onUnrefutedRepair = {
+            incomplete = it.constant(ExactRationalInequality(intArrayOf(0, 1, 3),
+                List(3) { BigFraction.ONE }, BigFraction.ONE))
+            complete = it.constant(rows.first())
+        })
+
+        assertNull(incomplete)
+        assertEquals(BigFraction.ZERO, assertNotNull(complete).bound)
+        assertEquals(setOf(0, 1), assertNotNull(complete).rows.toSet())
+    }
+
+    @Test
+    fun `a stopped constant query should withhold its equation support`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.ZERO))
+        var querying = false
+        var queryWork = 0L
+        val meter = object : WorkMeter {
+            override fun charge(units: Long) { if (querying) queryWork += units }
+        }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = querying && queryWork >= 40L
+            override fun workMeter(): WorkMeter = meter
+        }
+        var constant: EqualityConstant? = null
+
+        equalityRowsRefute(3, rows, stop, onSupport = { }, onUnrefutedRepair = {
+            querying = true
+            constant = it.constant(rows.first())
+        })
+
+        assertNull(constant)
+        assertTrue(queryWork >= 40L)
+        assertTrue(stop())
+        equalityRowsRefute(3, rows, Cancellation.Never, onSupport = { },
+            onUnrefutedRepair = { constant = it.constant(rows.first()) })
+        assertEquals(BigFraction.ZERO, assertNotNull(constant).bound)
+        assertEquals(setOf(0, 1), assertNotNull(constant).rows.toSet())
+    }
+
+    @Test
     fun `a compacted general refutation should retain only the used equation dependencies`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1),

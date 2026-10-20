@@ -168,6 +168,16 @@ row of the refuting component. Unrelated components and weaker parallel rows add
 no proof condition.
 This negative check can reject a selected prefix while unrelated Boolean choices
 remain open; rows with unknown conditions stay outside the subset.
+The same prepared equations can also determine open guards of general affine
+comparisons. A bounded sweep visits at most 64 open heads; every comparison sharing
+a head must reduce to a constant and agree on its truth. Disjunction members and
+comparisons containing Boolean coefficients defer. Only the nonzero equation
+pivots used by each reduction contribute source premises; the queried comparison
+contributes none. The shared Boolean fixpoint receives the resulting signed clause,
+and the originating arithmetic owner retains its new selection before checking
+again. Retraction resets sweep progress. The elimination remains local to the
+current check, with the same dimension, scalar, support and work limits and no
+additional numerical query. A stopped or incomplete reduction supplies no guard.
 An internal unguarded cycle is not a source clause. Unknown source choices,
 unsupported premises or cancellation withhold the proof. Capture retains the
 65,536-entry, 4,096-bit arithmetic and 4,096-node explanation bounds under the current

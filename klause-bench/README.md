@@ -650,6 +650,8 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `stats.solvePipeline`, `declaredTheoryRoute`, `reportedBackend` | Selected CLI solve entry point, pre-preparation theory declaration, and final backend snapshot; distinct stages |
 | `smtCompleteSearchStage_PURE_REAL_DIFFERENCE_SUBSET_*` | Optional necessary graph admission, checks and source conflicts before the full linear query; no positive source coverage |
 | `smtCompleteSearchStage_PURE_REAL_DIFFERENCE_GUARD_IMPLIED` | Source guard consequences published from exact scaled difference paths before the next shared Boolean fixpoint |
+| `smtCompleteSearchStage_PURE_REAL_EQUALITY_GUARD_ATTEMPT` | Open general affine comparison heads queried against the current selected equation pivots |
+| `smtCompleteSearchStage_PURE_REAL_EQUALITY_GUARD_IMPLIED` | Constant comparison truths published with their selected equation premises before the next shared Boolean fixpoint |
 | `smtCompleteSearchStage_WHOLE_SOURCE_*` | Source binding, graph or LP proposal attempts, cancellation and full original-source acceptance; `POINT_DECLINE_*` identifies source shape, factor kind, exact arithmetic, row truth, pin agreement and Boolean fixpoint failures; acceptance counts proposals checked before publication |
 | `smtCompleteSearchStage_WHOLE_SOURCE_BOOLEAN_CLAUSE_L_*` | Source Boolean clauses offered to shared propagation after a disposable point trial refutes a bounded Boolean pin prefix |
 | `smtCompleteSearchStage_WHOLE_SOURCE_POINT_DECLINE_BOOLEAN_CUBE_SUPPORT_*_FROM_*` | Causal or conservative trial support retained from a rejected Boolean prefix; the rejected numerical point supplies no arithmetic deduction |

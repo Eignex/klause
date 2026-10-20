@@ -34,6 +34,7 @@ internal fun equalityRowsRefute(
     onStage: ((String) -> Unit)? = null,
     onSupport: ((IntArray) -> Unit)? = null,
     refutesGeneral: ((Int, List<ExactRationalInequality>, Cancellation, (IntArray) -> Unit) -> Boolean)? = null,
+    onUnrefutedRepair: ((MixedEqualityRepair) -> Unit)? = null,
 ): Boolean {
     val support = if (onSupport != null) IntArrayList() else null
     val proofs = if (onSupport != null) EqualityRowSupport(rows.size, stop) else null
@@ -52,18 +53,22 @@ internal fun equalityRowsRefute(
     var residualRefuted = false
     var residualSupport: IntArray? = null
     var proof = -1
+    var repair: MixedEqualityRepair? = null
     val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage, paired,
         proofs, onRefutationProof = { proof = it })) {
-        is EqualityRows.Prepared -> when (val residual = prepared.repair.reduceRows(rows,
-            onReducedRow = if (support == null) null else { original, origin ->
-                residualOrigins?.add(original)
-                residualProofs?.add(origin)
-            }, onFalseProof = if (proofs == null) null else { value -> proof = value },
-            onFalseRow = { falseRow = it })) {
-            EqualityResidual.Refuted -> true
-            EqualityResidual.Declined -> false
-            is EqualityResidual.Reduced -> refutesDifferenceResidual(columns, residual.rows, stop, onStage,
-                refutesGeneral, onSupport = { residualSupport = it }).also { residualRefuted = it }
+        is EqualityRows.Prepared -> {
+            repair = prepared.repair
+            when (val residual = prepared.repair.reduceRows(rows,
+                onReducedRow = if (support == null) null else { original, origin ->
+                    residualOrigins?.add(original)
+                    residualProofs?.add(origin)
+                }, onFalseProof = if (proofs == null) null else { value -> proof = value },
+                onFalseRow = { falseRow = it })) {
+                EqualityResidual.Refuted -> true
+                EqualityResidual.Declined -> false
+                is EqualityResidual.Reduced -> refutesDifferenceResidual(columns, residual.rows, stop, onStage,
+                    refutesGeneral, onSupport = { residualSupport = it }).also { residualRefuted = it }
+            }
         }
         EqualityRows.Refuted -> true
         EqualityRows.Declined -> false
@@ -95,6 +100,7 @@ internal fun equalityRowsRefute(
         onStage?.invoke("PURE_REAL_EQUALITY_SUPPORT_R_${selected.size}_FROM_${rows.size}")
         if (!stop()) onSupport?.invoke(selected)
     }
+    if (!refuted && !stop()) repair?.let { onUnrefutedRepair?.invoke(it) }
     return refuted && !stop()
 }
 
@@ -239,6 +245,34 @@ internal class MixedEqualityRepair(
 ) {
     private val work = MixedPointArithmetic(stop)
 
+    fun constant(row: ExactRationalInequality): EqualityConstant? {
+        val support = proofs ?: return null
+        stop.charge(3L * row.columns.size + pivots.size + 1L)
+        if (stop() || !admittedEqualityRow(row, pivots.size, work)) return null
+        val coefficients = row.columns.indices.associate { row.columns[it] to row.coefficients[it] }
+            .filterValues { !it.isZero }.toMutableMap()
+        var bound = row.rhs
+        // The queried comparison is a conclusion; only selected equation pivots are premises.
+        var proof = support.empty()
+        for (pivot in pivots.indices) {
+            val coefficient = coefficients[pivot] ?: continue
+            val equation = pivots[pivot] ?: continue
+            val scale = work.quotient(coefficient, equation.coefficients.first()) ?: return null
+            proof = support.combine(proof, checkNotNull(pivotProofs)[pivot])
+            coefficients.remove(pivot)
+            bound = work.subtractProduct(bound, scale, equation.rhs) ?: return null
+            for (index in 1 until equation.columns.size) {
+                val column = equation.columns[index]
+                val value = work.subtractProduct(coefficients[column] ?: BigFraction.ZERO,
+                    scale, equation.coefficients[index]) ?: return null
+                if (value.isZero) coefficients.remove(column) else coefficients[column] = value
+            }
+        }
+        if (coefficients.isNotEmpty() || stop()) return null
+        val rows = support.expand(proof) ?: return null
+        return if (stop()) null else EqualityConstant(bound, rows)
+    }
+
     fun point(guess: List<BigFraction>): List<BigFraction>? {
         stop.charge(2L * guess.size)
         if (guess.size != pivots.size || stop() || !guess.all(work::admitted)) return null
@@ -339,11 +373,15 @@ internal class MixedEqualityRepair(
     }
 }
 
+internal class EqualityConstant(val bound: BigFraction, val rows: IntArray)
+
 internal class EqualityRowSupport(private val rows: Int, private val stop: Cancellation) {
     private val first = IntArrayList()
     private val second = IntArrayList()
 
     fun row(index: Int): Int = if (index !in 0 until rows) -1 else append(-1, index)
+
+    fun empty(): Int = append(-2, -1)
 
     fun combine(left: Int, right: Int): Int = when {
         left < 0 || right < 0 -> -1
@@ -379,7 +417,9 @@ internal class EqualityRowSupport(private val rows: Int, private val stop: Cance
             seen[node] = true
             val left = first[node]
             val right = second[node]
-            if (left < 0) {
+            if (left == -2) {
+                if (right != -1) return null
+            } else if (left < 0) {
                 if (right !in 0 until rows) return null
                 selected += right
                 if (selected.size > 4096) return null

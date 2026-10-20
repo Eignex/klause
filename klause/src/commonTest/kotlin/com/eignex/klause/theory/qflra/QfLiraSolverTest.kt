@@ -59,6 +59,90 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `selected general equations should imply exact comparison guards at either side of a boundary`() {
+        for (op in LinearOp.entries) for (strict in if (op == LinearOp.LE || op == LinearOp.GE) {
+            listOf(false, true)
+        } else listOf(false)) for (bound in -1L..1L) {
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                    LinearOp.EQ, BigFraction.ZERO, activator = 0),
+                ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ofLong(2) },
+                    op, BigFraction.ofLong(bound), strict = strict, activator = 1),
+            ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+            val expected = when (op) {
+                LinearOp.LE -> if (strict) 0L < bound else 0L <= bound
+                LinearOp.GE -> if (strict) 0L > bound else 0L >= bound
+                LinearOp.EQ -> bound == 0L
+                LinearOp.NE -> bound != 0L
+            }
+            val session = SearchSession(listOf(ExactLiraSearchComponent(source)))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(expected, session.boolValue(1), "$op strict=$strict bound=$bound")
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, expected)),
+                assertNotNull(session.reasonFor(1)).literals.toSet())
+            assertNull(session.boolValue(2))
+        }
+    }
+
+    @Test
+    fun `equation guard consequences should reach Boolean peers and retract with their premises`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ofLong(2) },
+                LinearOp.LE, BigFraction.ZERO, activator = 1),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val request = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute()).request
+        request.componentPlan.search(request.model, emptyMap()).use { planned ->
+            val session = planned.session
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(true, session.boolValue(1))
+            assertEquals(true, session.boolValue(2))
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)),
+                assertNotNull(session.reasonFor(1)).literals.toSet())
+            session.popTo(0)
+            assertNull(session.boolValue(1))
+            assertNull(session.boolValue(2))
+            assertNull(session.reasonFor(1))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertIs<SearchResult.Satisfied>(session.solve(4))
+        }
+    }
+
+    @Test
+    fun `shared equation query guards should require every comparison to have the same known truth`() {
+        for (kind in listOf("agree", "disagree", "open")) {
+            val secondColumns = if (kind == "open") intArrayOf(0, 1, 3) else intArrayOf(0, 1, 2)
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                    LinearOp.EQ, BigFraction.ZERO, activator = 0),
+                ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                    LinearOp.LE, BigFraction.ZERO, activator = 1),
+                ExactLinear.of(IntArray(3) { Term.ofRealVar(secondColumns[it]) }, List(3) { BigFraction.ONE },
+                    LinearOp.LE, if (kind == "disagree") BigFraction.MINUS_ONE else BigFraction.ONE, activator = 1),
+            ), numRealVars = 4, realLower = DoubleArray(4) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(4) { Double.POSITIVE_INFINITY })
+            val session = SearchSession(listOf(ExactLiraSearchComponent(source)))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(if (kind == "agree") true else null, session.boolValue(1))
+            assertNull(session.boolValue(2))
+        }
+    }
+
+    @Test
     fun `a compacted general conflict should exclude weaker guards and preserve a source sibling`() {
         val rows = listOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
