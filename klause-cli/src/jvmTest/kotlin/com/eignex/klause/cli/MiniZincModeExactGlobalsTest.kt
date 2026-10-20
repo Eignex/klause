@@ -61,7 +61,6 @@ class MiniZincModeExactGlobalsTest(
             exact = true
             parallel = 1
             randomSeed = 17
-            sourceOptions.floatBuckets = 2
         }
         val session = MiniZincMode.newSession()
         val previous = System.out
@@ -89,9 +88,12 @@ class MiniZincModeExactGlobalsTest(
             assertFalse("----------" in output.lines(), output)
         } else {
             assertTrue("----------" in output.lines(), output)
-            assertTrue("x = 1;" in output.lines(), output)
-            if (coupling == "linear") assertTrue("% klause-exact: y = 1/3;" in output.lines(), output)
-            if (coupling == "polynomial") assertTrue("% klause-exact: y = 1;" in output.lines(), output)
+            assertEquals("x = 1;", output.lineSequence().lastOrNull { it.startsWith("x = ") }, output)
+            if (coupling != "finite") {
+                val value = if (coupling == "linear") "1/3" else "1"
+                assertEquals("% klause-exact: y = $value;",
+                    output.lineSequence().lastOrNull { it.startsWith("% klause-exact: y = ") }, output)
+            }
             if (verdict == "optimum") assertTrue("==========" in output.lines(), output)
         }
     }

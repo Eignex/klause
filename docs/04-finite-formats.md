@@ -282,11 +282,12 @@ scheduling permits it there.
 These compositions require supported finite declarations and admitted real
 relations. They do not establish complete support for open integers in CP-only
 globals, variable or negative powers, or arbitrary real functions.
-Set universes and constant set members must fit signed 32-bit integers; set
+Set-variable universes and set-predicate constant members must fit signed 32-bit integers; set
 ordering additionally requires every universe member to exceed `Int.MIN_VALUE`.
 Automaton state indexes, inverse offsets and constant GCC occurrence bounds use
 signed 32-bit parameters and decline wider values; window sums preserve signed-word
-bounds. Exact arithmetic and objective completion can return UNKNOWN on resource or representation limits;
+bounds. Exact arithmetic and objective completion can return UNKNOWN on resource
+or representation limits;
 unsupported source forms decline explicitly. No such limit permits a grid,
 an omitted global or a relaxation to acquire enforcement authority. A heuristic
 worker's failure supplies no refutation or optimum.

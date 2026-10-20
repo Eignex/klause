@@ -251,7 +251,7 @@ internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
     emitAllDifferentCore(vars, exceptSet = EmptyLongArray, boundsConsistent = bc)
 }
 
-/** Emit one-based FlatZinc successors through the native zero-based relation. */
+// Successor values refer to FlatZinc positions, independently of their declared bounds.
 internal fun FlatZincCompiler.emitCircuit(c: FznConstraint, sub: Boolean) {
     expectArity(c, 1)
     val srcIds = evalIntVarArray(c.args[0])
