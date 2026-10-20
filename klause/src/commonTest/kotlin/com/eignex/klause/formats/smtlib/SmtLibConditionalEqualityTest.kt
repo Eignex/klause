@@ -32,6 +32,98 @@ import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `late numeric images should complete before unrelated guard images`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 6),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const b Bool) (declare-const s Int) (declare-const t Int) (declare-const r Bool)
+                (assert (<= 0 s 1)) (assert (<= 0 t 1))
+                (assert (let ((g (ite b (ite (= t 0) 4 5) 6)))
+                    (let ((v (ite (= g 4) (ite (= s 0) 1 2) 3))) (= r (= v 9)))))
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertEquals(false, session.boolValue(parsed.boolVarNames.getValue("r")))
+    }
+
+    @Test
+    fun `numeric image completion should preserve independent source values`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 6),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const b Bool) (declare-const s Int) (declare-const t Int)
+                (declare-const x Int) (declare-const r Bool)
+                (assert b) (assert (= s 0)) (assert (= t 0))
+                (assert (<= 0 s 1)) (assert (<= 0 t 1))
+                (assert (let ((g (ite b (ite (= t 0) 4 5) 6)))
+                    (let ((v (ite (= g 4) (ite (= s 0) 1 2) 3))) (and (= x v) (= r (= v 9))))))
+                (assert (= x 1))
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+        assertEquals("1", sample.intValue(parsed.intVarNames.getValue("x")))
+        assertEquals(false, sample.boolValue(parsed.boolVarNames.getValue("r")))
+    }
+
+    @Test
+    fun `numeric image completion should not admit unreachable alternatives`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 6),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const b Bool) (declare-const s Int) (declare-const t Int)
+                (declare-const x Int) (declare-const r Bool)
+                (assert b) (assert (= s 0)) (assert (= t 0))
+                (assert (<= 0 s 1)) (assert (<= 0 t 1))
+                (assert (let ((g (ite b (ite (= t 0) 4 5) 6)))
+                    (let ((v (ite (= g 4) (ite (= s 0) 1 2) 3))) (and (= x v) (= r (= v 9))))))
+                (assert (= x 3))
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertIs<OpenTheoryResult.Unsat>(result, result.toString())
+    }
+
+    @Test
     fun `late child images should reject multiple values within one shared allowance`() {
         val builder = Compiler.Builder(
             Long.MIN_VALUE,

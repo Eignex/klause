@@ -207,6 +207,11 @@ A result with an open bound instead keeps guarded exact equalities to its branch
 Affine real conditionals retain `RealElement`. Comparisons against a conditional
 can lower to Boolean tests of its branches when the branch images are small, and
 definitions no surviving constraint needs are dropped after a dependency fixpoint.
+After definitions close, a missing image first completes its numeric branch and
+default dependencies. A finite nonempty union covers the result even when guard
+images remain unknown; guard-image dependencies are completed only when that first
+attempt declines. Both attempts share the original expansion allowance, and a
+decline retains the exact numeric relation.
 For up to eight Boolean inputs, a scalar defined by consistent, complete cases also
 supplies a verified affine row beside the source factors.
 

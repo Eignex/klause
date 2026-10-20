@@ -52,7 +52,11 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     }
     private sealed interface ImageFrame {
         class Eval(val variable: Int) : ImageFrame
-        class Complete(val variable: Int, val definition: Definition) : ImageFrame
+        class Complete(
+            val variable: Int,
+            val definition: Definition,
+            val guardsPrepared: Boolean = false,
+        ) : ImageFrame
     }
 
     private val definitions = HashMap<Int, Definition>()
@@ -335,19 +339,28 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                                 if (!scheduleImageDependency(arm.asSimpleVar(), builder, pending)) return
                             }
                             if (!scheduleImageDependency(definition.default.asSimpleVar(), builder, pending)) return
-                            for (guard in definition.guardTests.asReversed()) {
-                                if (!scheduleImageDependency(guard?.variable, builder, pending)) return
-                            }
                         }
                     }
                 }
                 is ImageFrame.Complete -> {
-                    active.remove(frame.variable)
-                    if (frame.variable !in cyclic && frame.definition.image == null) {
-                        val definition = frame.definition
-                        val image = constantImage(definition.arms, definition.default, definition.guardTests)
-                        if (builder.sourceCancellation()) throw PolynomialSourceInterrupted()
-                        if (!image.isNullOrEmpty()) definition.image = image
+                    if (frame.variable in cyclic || frame.definition.image != null) {
+                        active.remove(frame.variable)
+                        continue
+                    }
+                    val definition = frame.definition
+                    val image = constantImage(definition.arms, definition.default, definition.guardTests)
+                    if (builder.sourceCancellation()) throw PolynomialSourceInterrupted()
+                    if (!image.isNullOrEmpty()) {
+                        // Guard images can prune the union; a complete numeric union already covers every result.
+                        definition.image = image
+                        active.remove(frame.variable)
+                    } else if (!frame.guardsPrepared) {
+                        pending.addLast(ImageFrame.Complete(frame.variable, definition, guardsPrepared = true))
+                        for (guard in definition.guardTests.asReversed()) {
+                            if (!scheduleImageDependency(guard?.variable, builder, pending)) return
+                        }
+                    } else {
+                        active.remove(frame.variable)
                     }
                 }
             }
