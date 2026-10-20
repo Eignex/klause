@@ -9,11 +9,13 @@ import com.eignex.klause.util.Cancellation
 
 internal class PartialDifferenceRelaxation private constructor(
     private val columns: Int,
-    private val graph: RealDifferenceSystem,
+    private val rows: List<ExactRationalInequality>,
     private val comparisons: List<ExactComparison>,
 ) {
     fun check(stop: Cancellation): Result {
         if (stop()) return Result.Interrupted
+        val graph = RealDifferenceSystem.prepareRows(columns, rows, stop)
+            ?: return if (stop()) Result.Interrupted else Result.Declined
         return when (val result = graph.check(intArrayOf(), stop, stop::charge)) {
             RealDifferenceSystem.Result.Interrupted -> Result.Interrupted
             is RealDifferenceSystem.Result.Infeasible -> Result.Declined
@@ -63,10 +65,9 @@ internal class PartialDifferenceRelaxation private constructor(
                 if (rows.size > 100000 - added) return null
                 comparison.rowsInto(rows)
             }
-            val graph = RealDifferenceSystem.prepareRows(columns, rows, stop) ?: return null
             stop.charge(comparisons.size.toLong() + 1L)
             if (stop()) return null
-            return PartialDifferenceRelaxation(columns, graph, comparisons.toList())
+            return PartialDifferenceRelaxation(columns, rows, comparisons.toList())
         }
     }
 }

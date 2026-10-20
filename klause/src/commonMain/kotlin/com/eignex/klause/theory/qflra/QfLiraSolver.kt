@@ -1014,10 +1014,10 @@ class ExactLiraSearchComponent private constructor(
                 comparisons += ExactComparison(terms, it.asFraction(), LinearOp.LE, false, false)
             }
             context.intLowerBound(integer)?.let {
-                comparisons += ExactComparison(terms, it.asFraction(), LinearOp.GE, false, false)
+                comparisons += ExactComparison(terms, BigFraction.ofLong(it), LinearOp.GE, false, false)
             }
             context.intUpperBound(integer)?.let {
-                comparisons += ExactComparison(terms, it.asFraction(), LinearOp.LE, false, false)
+                comparisons += ExactComparison(terms, BigFraction.ofLong(it), LinearOp.LE, false, false)
             }
         }
         return PartialDifferenceRelaxation.prepare(model.numIntVars, comparisons, operationStop)
