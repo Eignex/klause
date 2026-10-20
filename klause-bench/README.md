@@ -248,6 +248,16 @@ can contain only declined preferences. Release counts a live default consultatio
 not avoided registration or capture work. These observations add no numerical
 invocation and establish neither a timing cause nor a whole-source witness gain.
 
+`smtCompleteSearchStage_INTEGER_EQUALITY_IMPLICATION` counts source Boolean
+consequences accepted by the complete integer arithmetic owner. The
+`ALIASED_ORDER_ATOM_` stages distinguish retained `WEAK_BOUND` keys, alias-derived
+`TIGHTENED` sides for pending disequalities and a constructed `MATCH` proof.
+`PUBLISHED` requires session acceptance of a new source-bound implication;
+`RECEIVED` also requires ordinary arithmetic acceptance. `REGISTER_DECLINED` marks
+unsupported naming. These are cumulative callback events, not distinct predicates,
+LP queries, source witnesses or CPU costs. Reported native claims still require
+[original-source validation](#source-validation).
+
 `lab files` lists a job's files and `lab cat <id> <path> [tail-bytes]` prints one, such as
 `job.log`, `setup.log` or `cases/<index>/record.json`, over HTTP: reading a job needs no SSH.
 `lab ssh <id> [instance] [command]` reaches a running AWS job's instance. Measure as a lab

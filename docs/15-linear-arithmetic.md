@@ -165,7 +165,20 @@ before publishing a completed point.
 Assertion, partial checks and conflict explanations work as in the
 [linear real component](#solving-and-composition). Integer
 coordinates enter the LP as columns with their exact source bounds, including
-values beyond `Long`. Once every Boolean is assigned, the complete check decides
+values beyond `Long`.
+
+Complete production integer-only openings normalize active signed unit equalities
+in a private snapshot and imply source comparisons whose activity becomes constant.
+A pending disequality can also combine with an aliased weak order: `E != b` and
+`E <= b` prove `E <= b - 1`, with the symmetric rule for a lower bound. Different
+raw source expressions must require the alias rewrite; direct matches remain with
+ordinary arithmetic side selection. The consequence names a source-bound atom over
+the original disequality coordinates, with both fact premises and their alias
+paths. It consumes no decision and supplies no coordinate or feasibility verdict.
+The component checks every premise before implication and receives the named bound
+through ordinary arithmetic assertion, even without an adjacent source order guard.
+
+Once every Boolean is assigned, the complete check decides
 the remaining integer alternatives in a fixed order:
 
 1. **Finite integers.** An unfixed finite integer is decided first, trying its
@@ -179,9 +192,9 @@ the remaining integer alternatives in a fixed order:
 4. **Plain branching.** When the reduction declines, a fractional open integer
    `x = v` splits at `x <= floor(v)` and `x >= floor(v) + 1`.
 
-The theory adds no cutting planes: integrality is enforced only by these
-exhaustive splits and the reduction. Every split is a named source-bound atom, so
-conflict learning can cite it like any Boolean.
+The theory adds no cutting planes: integrality follows from source-proved
+propagation, these exhaustive splits and the reduction. Every split is a named
+source-bound atom, so conflict learning can cite it like any Boolean.
 
 #### The double-bounded reduction
 
@@ -250,6 +263,13 @@ Source rows and forms are prepared read-only. The invocation owns asserted scope
 integer branches, reduction caches and LP state. Integer publications invalidate the
 retained reduction; retraction restores the shared facts and component scope before
 evidence can be reused.
+The private unit snapshot admits at most 65,536 native unit conjunction rows,
+65,536 retained equality-premise occurrences and 1,048,576 visits per callback.
+Indexing, proof construction, registration and arithmetic reception charge the
+containing token. Overflow or unsupported registration declines the optional
+deduction, while a containing stop remains incomplete. Source LP installation and
+level binding precede bound reception. Retraction removes the implied fact and its
+scoped assertion; stable source atom names survive, while alias state does not.
 [TheoryParams](../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/TheoryParams.kt)
 separates theory checks, open work, decisions and cancellation; native LP work
 follows the [LP certification](17-linear-programming.md#lp-certification) resource contract.
