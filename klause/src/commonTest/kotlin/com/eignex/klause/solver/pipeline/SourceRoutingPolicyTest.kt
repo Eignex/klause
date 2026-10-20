@@ -57,7 +57,7 @@ class SourceRoutingPolicyTest {
             ))
 
             assertIs<SourceProblemRoute.Finite>(invocation.route)
-            assertSame(source, invocation.preparedPlan.originalSource)
+            assertSame(source, assertNotNull(invocation.preparedPlan).originalSource)
         }
     }
 
