@@ -105,8 +105,10 @@ its first local witness. Hints supply no incumbent, pruning or publication autho
 Finite real completion can use an available exact partial-LP point to guide Boolean
 comparison heads. Each opening may prepare hints at existing prefix queries 1, 4,
 16 and 64. Exact guard evaluation shares the numerical owner's current work ledger
-and uses at most one fifth of its parent deadline's remaining time. Source integer
-models, unsafe scalars and oversized indexes decline this optional guidance.
+and uses at most one fifth of its parent deadline's remaining time. The point keeps
+real coordinates followed by finite integer relaxation values, without rounding
+or treating integrality as established. Uncarried integers take a value from their
+current finite domain. Unsafe scalars and oversized indexes decline this optional guidance.
 Disagreeing comparisons sharing a head omit that head. Saved phases, target phases,
 solution phases and forced rephasing retain precedence; disabled phase tracking
 keeps the value selector's order. Retraction and restart discard active point hints.

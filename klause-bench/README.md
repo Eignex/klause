@@ -669,7 +669,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PREFIX_REAL_ADMISSION_ROOT`, `lpPhase_PREFIX_REAL_COMPACTION_ROOT` | Optional selected-prefix assembly and actual row admission with open finite coordinates |
 | `lpPhase_PREFIX_REAL_CHECK_ROOT`, `lpPhase_PREFIX_REAL_EXPLANATION_ROOT` | Exact prefix query verdict and emitted source clause length; positive points carry no source witness authority |
 | `lpPhase_PREFIX_REAL_HANDOFF_ROOT` | Native conflict handling for a checked selected-prefix source clause |
-| `lpPhase_PREFIX_REAL_POINT_ROOT` | Available exact primal coordinates reused from an existing positive prefix query, or a missing exact primal; no additional numerical query |
+| `lpPhase_PREFIX_REAL_POINT_ROOT` | Available real and finite integer relaxation coordinates reused from an existing positive prefix query, or a missing exact primal; fractional integers remain guidance, with no additional numerical query |
 | `lpPhase_PREFIX_REAL_HINT_ROOT` | Optional guard-hint preparation, ready or declined vectors, and numerical phase fallbacks below retained phase sources |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 

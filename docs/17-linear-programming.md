@@ -135,8 +135,10 @@ every conditional row premise must already be assigned. The unchanged 1,000-row 
 work allowance, including prior standalone solves, bound each query. Only an
 infeasible result with a checked source clause can prune the prefix; positive
 points remain relaxation values. An already available exact primal can supply
-source-real coordinates for Boolean phase guidance without another solve or point
-recovery request. Mapping and guard evaluation charge the same node and total work
+source real and finite integer coordinates for Boolean phase guidance without
+another solve or point recovery request. Integer columns retain fractional
+relaxation values; uncarried integers take their current domain minimum. Mapping
+and guard evaluation charge the same node and total work
 ledger; admission keeps 4,096-bit scalars and a 65,536-unit hint workspace. This
 guidance supplies no source witness or deduction. Required
 leaf completion still waits for all finite pins and checks the original source.

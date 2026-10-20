@@ -9,9 +9,11 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qflra.MixedPointArithmetic
 import com.eignex.klause.util.Cancellation
 
-internal fun supportsRealPointHints(problem: Problem): Boolean = problem.numIntVars == 0 &&
-    problem.numRealVars in 1..10000 && problem.numBoolVars in 1..65536 && problem.numFactors <= 100000 &&
-    problem.numBoolVars.toLong() + problem.numRealVars <= 65536L && !problem.semantics.isApproximate
+internal fun supportsRealPointHints(problem: Problem): Boolean = problem.numRealVars > 0 &&
+    problem.numRealVars.toLong() + problem.numIntVars <= 10000L &&
+    problem.numBoolVars in 1..65536 && problem.numFactors <= 100000 &&
+    problem.numBoolVars.toLong() + problem.numRealVars + problem.numIntVars <= 65536L &&
+    !problem.semantics.isApproximate
 
 internal fun realPointHints(
     problem: Problem,
@@ -19,13 +21,15 @@ internal fun realPointHints(
     booleanValue: (Int) -> Boolean?,
     stop: Cancellation,
 ): IntArray? {
-    if (!supportsRealPointHints(problem) || point.size != problem.numRealVars || stop()) return null
-    stop.charge(8L * (problem.numBoolVars + problem.numRealVars + problem.numFactors + 1L))
+    if (!supportsRealPointHints(problem) || point.size != problem.numRealVars + problem.numIntVars || stop()) {
+        return null
+    }
+    stop.charge(8L * (problem.numBoolVars + problem.numRealVars + problem.numIntVars + problem.numFactors + 1L))
     if (stop()) return null
     val work = MixedPointArithmetic(stop)
     if (!point.all(work::admitted)) return null
     val hints = IntArray(problem.numBoolVars) { -1 }
-    var entries = problem.numBoolVars.toLong() + problem.numRealVars
+    var entries = problem.numBoolVars.toLong() + problem.numRealVars + problem.numIntVars
     for (factor in problem.factors) {
         stop.charge(1L)
         if (stop()) return null

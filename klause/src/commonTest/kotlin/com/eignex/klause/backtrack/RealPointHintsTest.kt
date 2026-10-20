@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
@@ -18,6 +19,23 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class RealPointHintsTest {
+    @Test
+    fun `mixed guard preferences should use real then integer coordinates without rounding`() {
+        val source = Problem(2, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ofLong(2)), LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.GE, BigFraction.ZERO, activator = 1),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val point = listOf(BigFraction.MINUS_ONE, BigFraction.ofLong(1) / BigFraction.ofLong(2))
+
+        val hints = realPointHints(source, point, { null }, Cancellation.Never)
+
+        assertEquals(listOf(1, 0), assertNotNull(hints).toList())
+        assertNull(realPointHints(source, point.take(1), { null }, Cancellation.Never))
+    }
+
     @Test
     fun `comparison preferences should preserve strict and exact boundaries`() {
         val cases = listOf(

@@ -44,6 +44,37 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `positive prefix coordinates should retain fractional integers and unmapped live domains`() {
+        val source = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(7, 9)), Array<Factor>(1001) {
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.GE, BigFraction.ZERO)
+        } + ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
+            listOf(BigFraction.ONE, BigFraction.ofLong(2)), LinearOp.EQ, BigFraction.ONE),
+            numRealVars = 3, realLower = doubleArrayOf(0.0, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(0.0, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY))
+        val session = PropagationSession(source)
+        assertIs<PropagationResult.Implied>(session.pinIntAtLeast(1, 8))
+        val supplied = ArrayList<List<BigFraction>>()
+        val engine = LpEngine(source, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, learn = true)),
+            SolveStatsSink(backend = "mixed-prefix-point"))
+
+        val refuted = engine.use { it.prefixRealInfeasible(session) { point, stop ->
+            assertFalse(stop())
+            supplied += point
+        } }
+
+        assertFalse(refuted)
+        val point = supplied.single()
+        assertEquals(5, point.size)
+        assertEquals(BigFraction.ZERO, point[0])
+        assertEquals(BigFraction.ONE / BigFraction.ofLong(2), point[3])
+        assertEquals(BigFraction.ofLong(8), point[4])
+        assertEquals(IntDomain(0, 1), session.intDomain(0))
+        assertNull(session.boolValue(0))
+    }
+
+    @Test
     fun `an existing positive prefix query should expose source coordinates without pinning Booleans`() {
         val source = Problem(3, 0, emptyArray(), Array(1002) { row ->
             ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(3), Term.ofRealVar(4)),

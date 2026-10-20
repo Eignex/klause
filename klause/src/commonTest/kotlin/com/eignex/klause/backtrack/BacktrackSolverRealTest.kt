@@ -40,21 +40,25 @@ import kotlin.test.assertTrue
 class BacktrackSolverRealTest {
     @Test
     fun `a partial real point should guide an unobserved Boolean phase without a conflict`() {
-        val source = Problem(3, 0, emptyArray(), Array<Factor>(1002) { row ->
-            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
-                LinearOp.GE, BigFraction.ONE, activator = if (row == 0) 1 else -1)
-        } + Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-            numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        for (integers in 0..1) {
+            val source = Problem(3, integers, Array(integers) { IntDomain(0, 1) }, Array<Factor>(1002) { row ->
+                ExactLinear.of(IntArray(3 + integers) { if (it < 3) Term.ofRealVar(it) else Term.ofIntVar(0) },
+                    List(3 + integers) { BigFraction.ONE },
+                    LinearOp.GE, BigFraction.ONE, activator = if (row == 0) 1 else -1)
+            } + Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
 
-        val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 1,
-            variableSelector = InputOrder, valueSelector = IndomainMin, phaseSaving = true, nodeBudget = NodeBudget(8)))
+            val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 1,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
+                phaseSaving = true, nodeBudget = NodeBudget(8)))
 
-        val sat = assertIs<SolveResult.Sat>(result)
-        assertEquals(true, sat.assignment.bools[1])
-        assertEquals(0L, sat.stats.search.fails.sum.toLong())
-        assertTrue((sat.stats.lp.phases["PREFIX_REAL_HINT_ROOT"]?.outcomes?.get("PHASE_FALLBACK") ?: 0L) > 0L)
-        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
+            val sat = assertIs<SolveResult.Sat>(result)
+            assertEquals(true, sat.assignment.bools[1])
+            assertEquals(0L, sat.stats.search.fails.sum.toLong())
+            assertTrue((sat.stats.lp.phases["PREFIX_REAL_HINT_ROOT"]?.outcomes?.get("PHASE_FALLBACK") ?: 0L) > 0L)
+            assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
+        }
     }
 
     @Test

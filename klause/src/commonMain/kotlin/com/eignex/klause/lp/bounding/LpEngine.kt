@@ -761,7 +761,7 @@ internal class LpEngine(
         ) {
             val primal = certified.exactPrimal
             if (primal == null) sink.lp.observePrimalPhase("PREFIX_REAL_POINT", "NO_EXACT_PRIMAL", 0L)
-            else offerPrefixRealPoint(relaxation, primal, onPoint)
+            else offerPrefixRealPoint(relaxation, primal, session, onPoint)
         }
         if (params.cancellation() || certified.verdict != LpVerdict.INFEASIBLE) return false
         val support = certified.farkasRay?.let { ray ->
@@ -781,9 +781,12 @@ internal class LpEngine(
     private fun offerPrefixRealPoint(
         relaxation: LpRelaxation,
         primal: List<BigFraction>,
+        session: PropagationSession,
         offer: (List<BigFraction>, Cancellation) -> Unit,
     ) {
-        if (problem.numIntVars != 0 || problem.numRealVars !in 1..10000 || primal.size < relaxation.model.n) return
+        if (problem.numRealVars <= 0 || problem.numRealVars.toLong() + problem.numIntVars > 10000L ||
+            primal.size < relaxation.model.n || relaxation.intColOf.size != problem.numIntVars
+        ) return
         val parent = params.cancellation.shorten(0.2)
         val meter = object : WorkMeter {
             override fun charge(units: Long) = noteNodeOverhead(units)
@@ -793,7 +796,7 @@ internal class LpEngine(
             override fun deadline() = parent.deadline()
             override fun workMeter(): WorkMeter = meter
         }
-        stop.charge(8L * (problem.numRealVars + relaxation.colRealId.size + 1L))
+        stop.charge(8L * (problem.numRealVars + problem.numIntVars + relaxation.colRealId.size + 1L))
         if (stop()) return
         val carried = IntArray(problem.numRealVars)
         for (column in relaxation.colRealId.indices) {
@@ -812,6 +815,21 @@ internal class LpEngine(
         }
         if (stop()) return
         val point = relaxation.exactReals(primal, problem)
+        for (integer in 0 until problem.numIntVars) {
+            stop.charge(1L)
+            if (stop()) return
+            val column = relaxation.intColOf[integer]
+            if (column < -1 || column >= primal.size) return
+            val value = if (column < 0) {
+                BigFraction.ofLong(session.intDomain(integer).min)
+            } else {
+                if (relaxation.colIsBool[column] || relaxation.colRealId[column] >= 0 ||
+                    relaxation.colVarId[column] != integer
+                ) return
+                primal[column]
+            }
+            point += value
+        }
         if (stop() || !point.admittedSourcePoint()) return
         sink.lp.observePrimalPhase("PREFIX_REAL_POINT", "AVAILABLE", 0L)
         offer(point, stop)
