@@ -10,6 +10,72 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `already seated logical targets should complete within a bounded import allowance`() {
+        val n = 32
+        val input = ExactContinuationInput(
+            List(n) { listOf(it to BigFraction.ONE) }, List(n) { BigFraction.ZERO },
+            List(2 * n) { BigFraction.ZERO }, List(2 * n) { null },
+            List(n) { n + it },
+            List(2 * n) { if (it < n) ContinuationStatus.LOWER else ContinuationStatus.BASIC },
+        )
+        val limits = ExactContinuationLimits(maxWork = 40_000)
+
+        val result = ExactContinuation(input).resume(limits)
+
+        assertEquals(List(2 * n) { BigFraction.ZERO }, assertNotNull(result.values))
+        assertNull(result.ray)
+        assertNull(result.metrics.decline)
+        assertEquals(0, result.metrics.imports)
+        assertEquals(0, result.metrics.pivots)
+        assertTrue(result.metrics.work <= limits.maxWork)
+    }
+
+    @Test
+    fun `a refuted row after an import pivot should retain its exact conflict`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)),
+            listOf(BigFraction.ONE, BigFraction.ZERO),
+            listOf(null, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(null, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(0, 2),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.BASIC),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        assertNull(result.values)
+        val ray = assertNotNull(result.ray)
+        assertEquals(1, result.metrics.imports)
+        assertEquals(BigFraction.ZERO, ray[0] + ray[1])
+        assertTrue(!ray[0].isZero)
+    }
+
+    @Test
+    fun `an interrupted seated target pass should resume its completed position`() {
+        val n = 32
+        val input = ExactContinuationInput(
+            List(n) { listOf(it to BigFraction.ONE) }, List(n) { BigFraction.ZERO },
+            List(2 * n) { BigFraction.ZERO }, List(2 * n) { null },
+            List(n) { n + it },
+            List(2 * n) { if (it < n) ContinuationStatus.LOWER else ContinuationStatus.BASIC },
+        )
+        val completed = ExactContinuation(input).resume()
+        val inputWork = completed.metrics.workByPhase.getValue(ContinuationPhase.INPUT)
+        val limit = ExactContinuationLimits(maxWork = inputWork + 512)
+        val session = ExactContinuation(input)
+
+        val interrupted = session.resume(limit)
+        val resumed = session.resume()
+
+        assertEquals(ContinuationDecline.WORK, interrupted.metrics.decline)
+        assertTrue(interrupted.metrics.importPosition in 1 until n)
+        assertNull(interrupted.values)
+        assertNull(interrupted.ray)
+        assertEquals(List(2 * n) { BigFraction.ZERO }, assertNotNull(resumed.values))
+        assertEquals(interrupted.metrics.work + resumed.metrics.work, session.usedWork)
+    }
+
+    @Test
     fun `strict endpoints should materialize interior coordinates in either direction`() {
         for (upper in listOf(false, true)) {
             val input = ExactContinuationInput(

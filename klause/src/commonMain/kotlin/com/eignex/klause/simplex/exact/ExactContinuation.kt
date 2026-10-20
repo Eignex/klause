@@ -438,9 +438,11 @@ private class RationalContinuationLane<F>(
         if (scalarPeak > budget.limits.maxBits) throw ContinuationStop(ContinuationDecline.BITS)
         budget.phase = ContinuationPhase.IMPORT
         while (position < input.m) {
-            findConflict(budget)?.let { return it }
+            budget.step(headings.size.toLong() + 1L)
             val target = input.headings[position]
+            // Already seated targets leave every conflict premise unchanged.
             if (target !in headings) {
+                findConflict(budget)?.let { return it }
                 val row = headings.indices.firstOrNull {
                     budget.step()
                     headings[it] !in input.headings && !ops.isZero(table[it][target])

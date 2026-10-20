@@ -300,6 +300,11 @@ stall heuristics only schedule work; they never authorize proofs.
 | Rational basis verification | Exact FTRAN gives basics; BTRAN gives duals or Farkas candidates. Singularity requests repair. |
 | Exact continuation | Import the numerical basis pivot by pivot, repairing unseatable basics with logicals, then run Bland feasibility. |
 
+During import, exact conflict checks precede basis-changing pivots and follow the
+completed target pass. An already seated target leaves the tableau, bounds and
+nonbasic seats unchanged, so advancing past it only charges progress and polls
+cancellation. Interrupted passes retain their completed target position.
+
 Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
 restarts the operation from authority, and every attempt is charged. Owner-local
 exact factors require the same matrix and ordered basis. An off-status feasible
