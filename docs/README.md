@@ -1,98 +1,98 @@
-# Internal developer documentation
+# Klause internals
+
+This book explains how Klause works, from the shape of the system down to the
+contracts each component keeps. Read it front to back the first time: every
+chapter relies only on the ones before it. Later, use it as a reference and follow
+the links between chapters. User-facing documentation is maintained separately at
+[eignex.com/docs/klause](https://eignex.com/docs/klause/).
 
 Klause uses one source model across finite search, local search and arithmetic
-services. These docs explain that system from the overall solving flow down to
-component contracts and diagnostic tools. User-facing documentation is maintained
-separately at [eignex.com/docs/klause](https://eignex.com/docs/klause/).
+services. Part I gives the overall picture. Part II describes the model and the
+input formats that produce it. Part III follows a solve through its stages, Part
+IV covers the arithmetic theories search consults, and Part V the numerical
+kernels underneath them. Part VI describes the public surfaces built on all of
+this, and Part VII how the code base is built and tested.
 
-## Start here
+## Part I — Overview
 
-1. Read [system architecture](architecture.md) for the source-to-result flow and
-   the responsibilities of each layer.
-2. Read [solver vision](vision.md) for the intended model breadth,
-   [high-level factors and composed reasoning](vision.md#high-level-factors-and-composed-reasoning),
-   paired portfolios and independent proof verification, with [current execution contracts](vision.md#current-execution-contracts)
-   and [remaining work](vision.md#active-work-toward-the-vision) distinguished from
-   [current coverage](formats.md#solving-coverage).
-3. Use [development](development.md) to build and contribute, or follow the
-   subsystem links below for the contract you are changing.
+1. [Introduction](01-introduction.md): what Klause sets out to do and which
+   guarantees every route shares.
+2. [System architecture](02-architecture.md): the flow from source to result,
+   the layers and the package boundaries.
 
-## Models and inputs
+## Part II — Models and sources
 
-| Page | Purpose |
-|---|---|
-| [Model representation and ownership](model.md) | Source declarations, [typed semantics](model.md#typed-source-semantics), [integer division](model.md#integer-division-relations), engine views, immutable results and configuration capture |
-| [Library API](api.md) | Supported entry points, extension contracts, mappings and public value ownership |
-| [Input semantics](formats.md) | Shared routing, current coverage and a directory of source-format contracts |
-| [CLI](cli.md) | Build and run, format dispatch, engine selection and control flags |
-| [MiniZinc integration](minizinc.md) | Solver registration, wrappers and native predicate coverage |
+3. [Model representation and ownership](03-model.md): source declarations,
+   factors, engine views and immutable results.
+   - [3.1 Source relations](03.1-source-relations.md)
+   - [3.2 Engine projections](03.2-engine-projections.md)
+4. [Input semantics](04-input-semantics.md): what every frontend preserves,
+   how routes are selected and the current solving coverage.
+5. [Schema lowering](05-schema.md): the Kotlin DSL frontend.
+6. [Finite input formats](06-finite-formats.md): DIMACS, WCNF, OPB/WBO and XCSP3.
+7. [FlatZinc](07-flatzinc.md): FlatZinc semantics, lowering and output rendering.
+8. [MPS source semantics](08-mps.md): decimal sources, tolerances and claims.
+9. [SMT-LIB source semantics](09-smtlib.md): logics, lowering and model output.
 
-## Solving lifecycle
+## Part III — Solving
 
-| Stage | Contract |
-|---|---|
-| Caller scope | [Sessions and streams](solver/sessions.md): assumptions, active operations and retained state |
-| Preparation | [Presolve](solver/presolve.md): sound reductions, reconstruction and phase accounting |
-| Witness checking | [Source validation](solver/validation.md): shared finite/open coordinate checks and private verification state |
-| Complete traversal | [Search and propagation](solver/search.md): decisions, finite fixpoints, theory checks and explanations |
-| Heuristic search | [Local search](solver/local-search.md): assignments, definitions, moves, scoring and restarts |
-| Combined execution | [Portfolios](solver/portfolio.md): result admission, scheduling, shared incumbents and worker lifetimes |
-| Evidence | [Original-source derivations](solver/evidence.md): typed claims, premise checking, imports and branch coverage |
-| Interruption | [Resource allowances](solver/resources.md): scope lifetimes, work currencies and parallel quotas |
+10. [Sessions and streams](10-sessions.md): caller scopes, assumptions and
+    active operations.
+11. [Resource allowances](11-resources.md): deadlines, work currencies and how
+    scopes share them.
+12. [Presolve and reconstruction](12-presolve.md): sound reductions and mapping
+    results back to the source.
+13. [Source witness validation](13-validation.md): checking a proposed
+    assignment against the source.
+14. [Search and propagation](14-search.md): complete traversal, finite
+    propagation, theory checks and learning.
+    - [14.1 Traversal and branching](14.1-traversal.md)
+    - [14.2 Finite propagation](14.2-propagation.md)
+    - [14.3 Explanations and conflict learning](14.3-learning.md)
+    - [14.4 Theory completion](14.4-theory-completion.md)
+    - [14.5 Primal heuristics and statistics](14.5-primal-and-statistics.md)
+15. [Local search](15-local-search.md): incremental scores, moves and restarts.
+    - [15.1 Strategies and moves](15.1-strategies.md)
+    - [15.2 Preparation and definitions](15.2-preparation.md)
+    - [15.3 Scoring and neighborhoods](15.3-scoring.md)
+    - [15.4 Completion, restarts and ownership](15.4-lifetime.md)
+16. [Portfolios](16-portfolio.md): running workers together and admitting their
+    results.
+    - [16.1 Witnesses and proof scope](16.1-portfolio-witnesses.md)
+    - [16.2 Scheduling](16.2-portfolio-scheduling.md)
+    - [16.3 Worker recipes](16.3-portfolio-recipes.md)
+17. [Original-source derivations](17-evidence.md): typed claims checked against
+    the original source.
 
-## Theory contracts
+## Part IV — Theories
 
-[Theory services](theories.md) defines the shared composition and result contract.
-The theories below are peers, with the same overview structure: scope, solving and
-composition, result authority, state/resources and implementation.
+18. [Theory services](18-theories.md): the contract every theory shares.
+19. [Difference logic](19-difference.md)
+20. [Linear real arithmetic](20-linear-real.md)
+21. [Linear integer arithmetic](21-linear-integer.md)
+22. [Linear mixed arithmetic](22-linear-mixed.md)
+23. [Nonlinear integer arithmetic](23-nonlinear-integer.md)
+24. [Polynomial real arithmetic](24-polynomial-real.md)
+25. [Transcendental real arithmetic](25-transcendental.md)
 
-| Theory | Contract |
-|---|---|
-| [Difference logic](theories/difference.md) | Integer and real difference constraints, graph checks and explanations |
-| [Linear integer arithmetic](theories/linear-integer.md) | Exact integer constraints, open bounds and integer branching |
-| [Linear real arithmetic](theories/linear-real.md) | Rational feasibility, Boolean structure and strict inequalities |
-| [Linear mixed arithmetic](theories/linear-mixed.md) | Coupled integer/real constraints, integrality and reconstruction |
-| [Nonlinear integer arithmetic](theories/nonlinear-integer.md) | Exact integer candidate search, real completion and source witness validation |
-| [Polynomial real arithmetic](theories/polynomial-real.md) | Exact nonlinear completion, finite composition and algebraic witnesses |
-| [Transcendental real arithmetic](theories/transcendental.md) | Sound incomplete function constraints, symbolic witnesses and paired execution |
+## Part V — Numerical mechanisms
 
-## Numerical mechanisms
+26. [LP architecture](26-lp-architecture.md): the simplex engine, its state and
+    its consumers.
+27. [LP certification](27-lp-certification.md): exact checks for witnesses,
+    bounds, conflicts and rays.
+28. [Exact arithmetic kernels](28-exact-arithmetic.md): quadratic certificates,
+    polynomials, transcendental enclosures and analytic reals.
+29. [Numerical dependencies](29-numerical-dependencies.md): external kernels and
+    their integration contracts.
 
-These mechanisms supply the theory and search layers. Their implementation detail
-does not change the relative place of each theory in the model or support contract.
+## Part VI — Using and extending Klause
 
-| Page | Purpose |
-|---|---|
-| [LP architecture](lp/architecture.md) | Linear model authority, numerical engine boundaries, basis state and consumers |
-| [LP certification](lp/certification.md) | Exact checks for witnesses, bounds, conflicts and rays |
-| [Exact quadratic certificates](arithmetic/quadratic.md) | Rational quadratic bounds, attainment, approach paths and rays |
-| [Exact polynomial arithmetic](arithmetic/polynomial.md) | Polynomial operations, algebraic scalars, root isolation and arithmetic limits |
-| [Certified transcendental enclosures](arithmetic/transcendental.md) | Rational function enclosures, range reduction and affine relaxations |
-| [Exact analytic real coordinates](arithmetic/real.md) | Authoritative symbolic function expressions with rational and algebraic leaves |
-| [Numerical dependencies](lp/dependencies.md) | Kernel provenance, integration contracts and runtime support |
+30. [Library API](30-api.md): entry points, extension roles and value ownership.
+31. [Command-line interface](31-cli.md): building, dispatch and control flags.
 
-## Validation and diagnostics
+## Part VII — Working on the code
 
-| Page | Purpose |
-|---|---|
-| [Development](development.md#validation) | Local checks, CI responsibilities and test conventions |
-| [Benchmark README](../klause-bench/README.md) | Harness, corpus sets, source validation and measurement workflows |
-| [LP capture and replay](lp/replay.md) | Basis traces and retained/fresh consumer diagnostics |
-| [Fixture provenance](testing/fixtures.md) | Input identities, hashes, licenses and capture exclusions |
-| [Portfolio slice evidence](evidence/slice-policy.md) | Evidence supporting scheduling defaults |
-| [Numerical kernel evidence](evidence/numerical-kernels.md) | Evidence supporting arithmetic implementation choices |
-| [State ownership evidence](evidence/coordinator-ownership.md) | Evidence supporting concrete lifecycle owners |
-| [Source derivation evidence](evidence/source-scoped-derivations.md) | Evidence supporting scoped mathematical admission |
+32. [Development](32-development.md): modules, building, tests and source style.
 
-## Maintaining this documentation
-
-Give each page a short explanation of its role before its detailed contract. Keep
-architecture, intended requirements, source semantics and mechanism details in
-their respective owners; link across boundaries instead of repeating them.
-Update the affected contracts whenever implementation changes those guarantees.
-
-[Development rules](development.md#documentation) define placement and maintenance.
-Standalone system documentation lives under `docs/`; benchmark workflows live in
-`klause-bench/README.md`. Preserve fixture attribution and keep generated measurement
-archives outside the repository. Commands run from the repository root unless
-stated otherwise.
+Commands run from the repository root unless stated otherwise.
