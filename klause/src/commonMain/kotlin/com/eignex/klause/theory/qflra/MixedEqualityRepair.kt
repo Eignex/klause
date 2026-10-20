@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 
 internal fun prepareMixedEqualityRepair(
     columns: Int,
@@ -28,11 +29,28 @@ internal fun equalityRowsRefute(
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
+    onSupport: ((IntArray) -> Unit)? = null,
 ): Boolean {
-    val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage)) {
-        is EqualityRows.Prepared -> prepared.repair.reduceRows(rows) == EqualityResidual.Refuted
+    val support = if (onSupport != null) IntArrayList() else null
+    val paired: ((Int, Int) -> Unit)? = support?.let { indices ->
+        { first, second ->
+            stop.charge(4L)
+            if (!stop()) {
+                indices.add(first)
+                indices.add(second)
+            }
+        }
+    }
+    var falseRow = -1
+    val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage, paired)) {
+        is EqualityRows.Prepared -> prepared.repair.reduceRows(rows) { falseRow = it } == EqualityResidual.Refuted
         EqualityRows.Refuted -> true
         EqualityRows.Declined -> false
+    }
+    if (refuted && support != null && !stop()) {
+        stop.charge(support.size.toLong() + 2L)
+        if (falseRow >= 0) support.add(falseRow)
+        if (!stop()) onSupport?.invoke(support.toIntArray())
     }
     return refuted && !stop()
 }
@@ -42,6 +60,7 @@ internal fun prepareEqualityRows(
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
+    onPairedRows: ((Int, Int) -> Unit)? = null,
 ): EqualityRows {
     if (columns <= 0 || columns.toLong() * columns > MAX_REPAIR_ENTRIES) {
         onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
@@ -50,9 +69,10 @@ internal fun prepareEqualityRows(
     if (stop()) return EqualityRows.Declined
     val work = MixedPointArithmetic(stop)
     val directions = HashMap<MixedEqualityKey, Int>()
+    val firstRows = if (onPairedRows != null) HashMap<MixedEqualityKey, Int>() else null
     val equalities = ArrayList<MixedEqualityKey>()
     var entries = 0L
-    for (row in rows) {
+    for ((rowIndex, row) in rows.withIndex()) {
         stop.charge(4L * row.columns.size + 3L)
         entries += row.columns.size + 1L
         if (entries > MAX_REPAIR_ENTRIES) {
@@ -68,9 +88,17 @@ internal fun prepareEqualityRows(
         }
         val key = MixedEqualityKey(terms, if (reversed) row.rhs.negated() else row.rhs)
         val previous = directions[key] ?: 0
+        if (firstRows != null) {
+            stop.charge(2L)
+            if (stop()) return EqualityRows.Declined
+            if (previous == 0) firstRows[key] = rowIndex
+        }
         val next = previous or if (reversed) 2 else 1
         directions[key] = next
-        if (next == 3 && previous != 3) equalities += key
+        if (next == 3 && previous != 3) {
+            equalities += key
+            if (firstRows != null) onPairedRows?.invoke(firstRows.getValue(key), rowIndex)
+        }
     }
     if (equalities.isEmpty()) {
         onStage?.invoke("RECOVERY_EQUALITY_NO_PAIRS")
@@ -164,10 +192,13 @@ internal class MixedEqualityRepair(
         return point(free)
     }
 
-    fun reduceRows(rows: List<ExactRationalInequality>): EqualityResidual {
+    fun reduceRows(
+        rows: List<ExactRationalInequality>,
+        onFalseRow: ((Int) -> Unit)? = null,
+    ): EqualityResidual {
         val residual = ArrayList<ExactRationalInequality>()
         var entries = 0L
-        for (row in rows) {
+        for ((rowIndex, row) in rows.withIndex()) {
             stop.charge(3L * row.columns.size + pivots.size + 1L)
             if (stop() || !admittedEqualityRow(row, pivots.size, work)) return EqualityResidual.Declined
             val coefficients = row.columns.indices.associate { row.columns[it] to row.coefficients[it] }.toMutableMap()
@@ -190,6 +221,8 @@ internal class MixedEqualityRepair(
             if (coefficients.isEmpty()) {
                 if (if (row.strict) BigFraction.ZERO >= bound else BigFraction.ZERO > bound) {
                     onStage?.invoke("RECOVERY_EQUALITY_RESIDUAL_FALSE")
+                    if (stop()) return EqualityResidual.Declined
+                    onFalseRow?.invoke(rowIndex)
                     return if (stop()) EqualityResidual.Declined else EqualityResidual.Refuted
                 }
                 continue

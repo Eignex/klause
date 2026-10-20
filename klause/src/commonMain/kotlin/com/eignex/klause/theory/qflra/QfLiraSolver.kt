@@ -590,11 +590,60 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun agreementSourceRows(context: SearchContext): List<ExactRationalInequality>? {
+    private fun agreementSourceRows(
+        context: SearchContext,
+        origins: MutableList<EqualityRowOrigin>? = null,
+    ): List<ExactRationalInequality>? {
         lpStop.charge(model.numIntVars.toLong() + model.numRealVars + preparedRows.size + 1L)
         if (operationStop()) return null
         val bounded = node.withPublishedBounds(model.numIntVars, context::intLowerBound, context::intUpperBound)
-        return reduction.sourceRows(bools, bounded, lpStop)
+        return reduction.sourceRows(bools, bounded, lpStop, origins)
+    }
+
+    private fun equalityExplanation(
+        support: IntArray,
+        origins: List<EqualityRowOrigin>,
+        context: SearchContext,
+    ): SearchExplanation? {
+        if (support.size > 4096 || operationStop()) return null
+        lpStop.charge(2L * support.size + 1L)
+        if (operationStop()) return null
+        val visited = HashSet<EqualityRowOrigin>()
+        val leaves = ArrayList<SearchAtomPremise>()
+        for (index in support) {
+            lpStop.charge(1L)
+            if (operationStop()) return null
+            val origin = origins.getOrNull(index) ?: return null
+            if (!visited.add(origin)) continue
+            when (origin) {
+                EqualityRowOrigin.Declared -> Unit
+                is EqualityRowOrigin.Branch -> {
+                    val branch = branchNames[origin.atom] ?: return null
+                    leaves += SearchAtomPremise.Asserted(branch)
+                }
+                is EqualityRowOrigin.Selected -> {
+                    if (origin.row.size > 4096) return null
+                    lpStop.charge(2L * origin.row.size + 4L)
+                    if (operationStop()) return null
+                    val variables = origin.row.booleanVariables()
+                    if (variables.size + leaves.size > 4096) return null
+                    for (variable in variables) {
+                        if (bools[variable] == UNASSIGNED) return null
+                        leaves += SearchAtomPremise.Asserted(
+                            SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)),
+                        )
+                    }
+                    node.rowAssertions[origin.address]?.let {
+                        leaves += SearchAtomPremise.Asserted(SearchDecision.Theory(it))
+                    }
+                    if (origin.disequality) leaves += node.directionPremises[origin.address] ?: return null
+                }
+            }
+            if (leaves.size > 4096) return null
+        }
+        lpStop.charge(4096L + leaves.size)
+        if (operationStop()) return null
+        return context.explainAtoms(SearchAtomPremise.All(leaves)).takeUnless { operationStop() }
     }
 
     private fun coordinateDeclined(context: SearchContext): ComponentCheck {
@@ -1325,13 +1374,22 @@ class ExactLiraSearchComponent private constructor(
             solveContext.certificationPolicy === ProductionLpCertificationPolicy && !operationStop()
         ) {
             observeCompleteStage("PURE_REAL_EQUALITY_ATTEMPT")
-            val rows = agreementSourceRows(context)
-            if (rows != null && equalityRowsRefute(model.numRealVars, rows, lpStop, ::observeCompleteStage) &&
+            val origins = ArrayList<EqualityRowOrigin>()
+            val rows = agreementSourceRows(context, origins)
+            var support: IntArray? = null
+            if (rows != null && equalityRowsRefute(model.numRealVars, rows, lpStop, ::observeCompleteStage,
+                    onSupport = { support = it }) &&
                 !operationStop()
             ) {
-                outcome = ComponentCheck.Infeasible()
-                smtStats?.observeConflict(null)
+                val explanation = support?.let { equalityExplanation(it, origins, context) }
+                if (operationStop()) {
+                    outcome = ComponentCheck.Indeterminate
+                    return null
+                }
+                outcome = ComponentCheck.Infeasible(explanation)
+                smtStats?.observeConflict(explanation)
                 observeCompleteStage("PURE_REAL_EQUALITY_REFUTED")
+                if (explanation != null) observeCompleteStage("PURE_REAL_EQUALITY_EXPLAINED")
                 return null
             }
         }
@@ -1903,8 +1961,22 @@ private class ExactLiraReductionCache(
         }
     } ?: ExactLiraReduction.Interrupted
 
-    fun sourceRows(bools: IntArray, node: SearchNode, cancellation: Cancellation): List<ExactRationalInequality>? {
+    fun sourceRows(
+        bools: IntArray,
+        node: SearchNode,
+        cancellation: Cancellation,
+        origins: MutableList<EqualityRowOrigin>? = null,
+    ): List<ExactRationalInequality>? {
+        if (origins != null && (model.numIntVars != 0 || origins.isNotEmpty())) return null
         val rows = ArrayList<ExactRationalInequality>()
+        fun recordOrigin(start: Int, origin: EqualityRowOrigin): Boolean {
+            if (origins == null) return true
+            val count = rows.size - start
+            cancellation.charge(count.toLong() + 2L)
+            if (rows.size > 65536 || cancellation()) return false
+            repeat(count) { origins.add(origin) }
+            return true
+        }
         val published = node.branches.associateBy { it.variable }
         for (integer in 0 until model.numIntVars) {
             if (cancellation()) return null
@@ -1919,8 +1991,10 @@ private class ExactLiraReductionCache(
         }
         for (real in 0 until model.numRealVars) {
             if (cancellation()) return null
+            val start = rows.size
             model.realLower[real].takeIf(Double::isFinite)?.let { rows += exactColumnLower(real, it.asFraction()) }
             model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
+            if (!recordOrigin(start, EqualityRowOrigin.Declared)) return null
         }
         val complete = node.forEachSelectedRow(model, disjunctionAtoms) { factor, index, row ->
             if (cancellation()) return null
@@ -1931,11 +2005,17 @@ private class ExactLiraReductionCache(
             } else {
                 null
             }
+            val start = rows.size
             comparison.rowsInto(rows, direction)
+            if (origins != null && !recordOrigin(start,
+                    EqualityRowOrigin.Selected(RowAddress(factor, index), row, comparison.op == LinearOp.NE))
+            ) return null
         }
         for (atom in node.sourceBranches) {
             if (cancellation()) return null
+            val start = rows.size
             rows += atom.sourceRows(model.numRealVars)
+            if (origins != null && !recordOrigin(start, EqualityRowOrigin.Branch(atom))) return null
         }
         return rows.takeIf { complete }
     }
@@ -2185,6 +2265,12 @@ private class PreparedSourceRow(
     val booleans: IntArray,
     val disjunction: Boolean,
 )
+
+private sealed interface EqualityRowOrigin {
+    data object Declared : EqualityRowOrigin
+    class Selected(val address: RowAddress, val row: LinearRow, val disequality: Boolean) : EqualityRowOrigin
+    class Branch(val atom: SourceBoundAtom) : EqualityRowOrigin
+}
 
 private data class SearchNode(
     val branches: List<IntegerBranch> = emptyList(),

@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
@@ -152,6 +153,35 @@ class QfLiraSolverTest {
 
         assertContentEquals(intArrayOf(Lit.make(0, positive = false)), conflict.explanation?.literals)
         assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+    }
+
+    @Test
+    fun `pure real conflicts should retain signed guards across sibling retraction`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                List(2) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ONE, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                LinearOp.GE, BigFraction.ONE, activator = 2),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ofLong(4), activator = 3),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val component = ExactLiraSearchComponent(source)
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        for (variable in listOf(3, 0, 1)) {
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+        }
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true)),
+            assertNotNull(conflict.explanation).literals.toSet())
+        session.popTo(3)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+        assertIs<SearchResult.Satisfied>(session.solve(0))
     }
 
     @Test

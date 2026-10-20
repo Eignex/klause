@@ -89,7 +89,14 @@ At a complete exact pure-real leaf under production certification, a missing LP
 point can also trigger source equality elimination. Paired opposite closed rows
 provide equations. An inconsistent equation combination, or a source inequality
 reduced to a false constant, refutes only the current Boolean and private-branch
-prefix. This path supplies no learned clause or numerical certificate. Unpaired
+prefix. A completed proof retains both original directions of every paired equation
+and the source inequality reduced to a false constant, when present. The same row
+capture retains immutable declared bounds and each selected row or branch origin.
+Learning resolves all cited folded Boolean values, selected disjuncts, disequality
+directions and registered source branches against the current search context. A
+missing or oversized explanation retains chronological conflict handling. The
+65,536-row capture and 4,096-node explanation bounds charge the containing operation;
+cancellation withholds the result. No numerical certificate is exported. Unpaired
 rows, unsupported input and interrupted arithmetic retain an indeterminate result.
 The sparse repair kernel keeps its 65,536-entry and 4,096-bit limits and charges
 the current complete-check operation; it creates no LP query or renewed allowance.

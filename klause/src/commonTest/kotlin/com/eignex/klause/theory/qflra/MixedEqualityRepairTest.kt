@@ -110,12 +110,68 @@ class MixedEqualityRepairTest {
             override fun workMeter(): WorkMeter = WorkMeter { work += it }
         }
 
-        val stopped = equalityRowsRefute(1, rows, stop)
-        val fresh = equalityRowsRefute(1, rows, Cancellation.Never)
+        var interruptedSupport: IntArray? = null
+        var freshSupport: IntArray? = null
+        val stopped = equalityRowsRefute(1, rows, stop, onSupport = { interruptedSupport = it })
+        val fresh = equalityRowsRefute(1, rows, Cancellation.Never, onSupport = { freshSupport = it })
 
         assertFalse(stopped)
         assertTrue(work >= 8L)
         assertTrue(fresh)
+        assertNull(interruptedSupport)
+        assertEquals(setOf(0, 1, 2, 3), assertNotNull(freshSupport).toSet())
+    }
+
+    @Test
+    fun `strict residual support should exclude unrelated inequalities`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ONE, strict = true),
+            ExactRationalInequality(intArrayOf(2), listOf(BigFraction.ONE), BigFraction.ofLong(4)),
+        )
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(3, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertTrue(refuted)
+        val indices = assertNotNull(support)
+        assertEquals(setOf(0, 1, 2, 3, 4), indices.toSet())
+        assertTrue(equalityRowsRefute(3, indices.map(rows::get), Cancellation.Never))
+    }
+
+    @Test
+    fun `inconsistent equation support should retain both original directions`() {
+        val rows = listOf(0L, 0L, 1L).flatMap { bound ->
+            listOf(
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ofLong(bound)),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ofLong(-bound)),
+            )
+        }
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(1, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertTrue(refuted)
+        assertEquals(setOf(0, 1, 4, 5), assertNotNull(support).toSet())
+    }
+
+    @Test
+    fun `invalid input after contradictory equations should withhold support`() {
+        val rows = listOf(0L, 1L).flatMap { bound ->
+            listOf(
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ofLong(bound)),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ofLong(-bound)),
+            )
+        } + ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ZERO)
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(1, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertFalse(refuted)
+        assertNull(support)
     }
 
     @Test

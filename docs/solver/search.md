@@ -841,7 +841,10 @@ and source branchers offering no further choice. `RECOVERY_*` records an actual 
 and its existing return path. Equality repair distinguishes paired equations,
 pivots, reconstructed guesses and failed full-row checks. Its residual observations
 separate unsupported rows, false constants, graph admission and graph points. A false
-residual belongs to guessed integers and establishes no source refutation. Real
+residual belongs to guessed integers and establishes no source refutation.
+The pure-real negative caller separately counts exact equality refutations and
+those with a complete current source-premise explanation. These observations do not
+export numerical certificates or establish whole-source exhaustion. Real
 component observations identify graph checks, source-LP dimension declines and requests,
 and points returned across every component. `RECOVERY_REAL_COMPONENT_SHAPE_<columns>_<rows>`
 records the compact dimensions of a general component before LP admission.
