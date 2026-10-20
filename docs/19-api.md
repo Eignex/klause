@@ -4,8 +4,8 @@ Library callers construct a source model, choose an operation and consume owned
 results. Extensions can add factors, search components, objectives or theories,
 provided they uphold the same source semantics and publication checks.
 
-Part VI turns from how Klause solves to how it is used. This chapter describes the
-library surface built on the previous parts: which contracts are supported, how a
+Part VI turns from how Klause solves to how it is used and built. This chapter
+describes the library surface: which contracts are supported, how a
 caller moves from a model to a result, which roles extensions can fill, and who owns
 the values that cross the boundary. The underlying lifetimes come from
 [model representation](02-model.md) and [sessions](06-sessions.md); the

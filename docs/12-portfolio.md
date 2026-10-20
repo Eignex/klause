@@ -8,25 +8,17 @@ authority required for that claim. One worker's failure to find a solution does 
 refute the model.
 
 Execution has three parts: prepare retained workers, give them bounded slices of
-the allowance from [chapter 11](06-sessions.md#resource-allowances), and verify their publications
-with the [source validation](07-presolve.md#source-witness-validation) service before sharing or returning
-them. Slices preserve state; reseeding or retiring a worker has its own lifetime and
-accounting rules. [LP certification](17-linear-programming.md#lp-certification) owns numerical proof
-checks.
+the [resource allowance](06-sessions.md#resource-allowances), and verify their
+publications with [source validation](07-presolve.md#source-witness-validation)
+before sharing or returning them. The [solver vision](01-introduction.md#shared-model-breadth)
+requires a complete-search/local-search pair for every supported model; current
+admission gaps are implementation limits.
 
-The [solver vision](01-introduction.md#shared-model-breadth) requires an available
-complete-search/local-search pair for every supported model. Current admission gaps
-remain implementation limits.
-
-This chapter describes how an invocation is assembled and which strategies it
-admits. Its subchapters follow the life of a worker's output:
-
-1. [Witnesses and proof scope](#witnesses-and-proof-scope): which results a worker
-   may publish, how the pool checks them, and what exhaustion establishes.
-2. [Scheduling](#scheduling): slices, deferred preparation,
-   coverage before the first witness, reseeding and incumbent guidance.
-3. [Worker recipes](#worker-recipes): the pools chosen for particular model
-   structures, and exact theory strategy execution.
+The chapter starts with how an invocation is assembled and which strategies it
+admits, then follows a worker's output: which [witnesses](#witnesses-and-proof-scope)
+it may publish and what exhaustion establishes, how the [scheduler](#scheduling)
+hands out slices, and the [worker recipes](#worker-recipes) chosen for particular
+model structures.
 
 ## Invocations and recipes
 
@@ -60,7 +52,7 @@ Portfolios bind `EngineInvocation` to the retained plan, actual execution model 
 objective, and captured pins. Terminal admission consumes `CompletedEngineResult`
 with the actual result, so a conditioned or foreign completion cannot finish a weaker
 invocation. Original-source derivation capture is the subject of
-[chapter 17](13-evidence.md).
+[original-source derivations](13-evidence.md).
 
 ## Statistics
 
@@ -81,12 +73,11 @@ accounting.
 
 ## Witnesses and proof scope
 
-A portfolio is only as sound as what it lets workers share. This subchapter defines
-the identity every publication carries, the three outcomes of checking it, and the
-extra evidence that bounds, refutations and exhaustion require. Reusable finite and
-exact-coordinate checks belong to [source validation](07-presolve.md#source-witness-validation); the
-portfolio supplies publication scope and source tolerance policy without owning a
-second checker.
+A portfolio is only as sound as what it lets workers share. Every publication
+carries an identity, checking it has three outcomes, and bounds, refutations and
+exhaustion need extra evidence. The checks themselves are
+[source validation](07-presolve.md#source-witness-validation); the portfolio
+supplies publication scope and tolerance policy.
 
 ### Publication identity
 
@@ -190,7 +181,7 @@ and for how long. It hands out bounded slices of one shared schedule, lets expen
 preparation proceed across slices, guarantees complete search a share of time before
 the first witness, and reseeds workers whose progress has stalled. None of these
 decisions carries witness or proof authority; they only order work under the
-allowances of [chapter 11](06-sessions.md#resource-allowances).
+[resource allowances](06-sessions.md#resource-allowances).
 
 ### Slice accounting and coverage
 
@@ -283,10 +274,10 @@ learned state.
 
 ## Worker recipes
 
-The previous subchapters apply to every pool. This one describes which workers a
+Publication and scheduling apply to every pool. Recipes decide which workers a
 curated pool contains for particular model structures, and how exact arithmetic
-sources supply their workers. Each recipe works within the shared scheduling and
-publication contract: it changes pool composition, never witness or proof authority.
+sources supply their workers. A recipe changes pool composition, never witness or
+proof authority.
 Explicit pools, backtrack edits and source annotations keep their requested
 composition throughout, and containing time, work and LP allowances stay shared.
 

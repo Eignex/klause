@@ -10,10 +10,10 @@ relaxation checks. A view never authorizes a result by itself.
 
 One ownership rule runs through the chapter: source data stays unchanged while any
 solve uses it, each live operation owns its own mutable state, and results are
-published as immutable assignments. [Section 3.1](#source-relations) goes
-through the factor relations the solver understands, and
-[section 3.2](#engine-projections) describes how preparation turns a source
-model into engine views.
+published as immutable assignments. The chapter covers declarations and
+results first, then the [source relations](#source-relations) factors can hold,
+and finally the [engine projections](#engine-projections) preparation builds
+from them.
 
 ## Source declarations and factor data
 
@@ -99,9 +99,6 @@ apart from floating telemetry. Missing traversal or bound data is explicit;
 [derivation checking](13-evidence.md) owns coverage checks.
 
 ## Source relations
-
-[Chapter 3](#) described what a source model is and who owns it. This
-subchapter goes through the factor relations it can hold.
 
 Factors retain the relation the source stated, not an encoding chosen for one
 engine. Each relation below follows the same pattern: the factor keeps its exact
@@ -265,11 +262,10 @@ optimization prove only private-grid claims, kept in
 
 ## Engine projections
 
-The source model of [chapter 3](#) and the relations of
-[section 3.1](#source-relations) are never searched directly. Before a solve,
+The source model and its relations are never searched directly. Before a solve,
 preparation decides which engine owns each variable and factor, and each engine
-builds its own projection of the factors it receives. This subchapter describes
-the execution plan, how factor capabilities are selected, and how engine state and
+builds its own projection of the factors it receives. This section describes the
+execution plan, how factor capabilities are selected, and how engine state and
 options stay separate from the source.
 
 ### Engine projections and factor capabilities

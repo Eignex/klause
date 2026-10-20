@@ -1,10 +1,15 @@
 # 9. Learning and theory completion
 
-A deduction is only useful to learning if its reason can be read back later. This
-subchapter starts with the reasons propagators record and how long they stay valid,
-then follows a conflict through first-UIP analysis, minimization and the two
-specialized learning lanes, and ends with how learned constraints are retained and how
-restarts and inprocessing use them.
+The previous chapter followed the traversal loop up to the finite fixpoint. This
+chapter covers what search does with the reasons that fixpoint records, and how
+arithmetic owners finish the assignments finite search leaves open.
+
+A deduction is only useful to learning if its reason can be read back later. The
+chapter starts with the reasons propagators record and how long they stay valid,
+follows a conflict through first-UIP analysis, minimization and the two specialized
+learning lanes, and covers how learned constraints are retained and how restarts
+and inprocessing use them. It then describes theory completion and closes with the
+primal heuristics and statistics of complete search.
 
 ## Explanation lifetime
 
@@ -160,7 +165,7 @@ inprocessing, since derivations under assumption pins would not hold globally.
 ## Theory completion
 
 Finite search assigns Boolean and integer variables; arithmetic theories complete or
-refute the remaining coordinates. This subchapter describes how those theory owners
+refute the remaining coordinates. This section describes how those theory owners
 take part in the shared traversal: the encoders they install, how several owners agree
 on shared coordinates, and how completed values reach the published model. The
 theories themselves are the subject of [Part IV](14-theories.md).
@@ -234,7 +239,7 @@ whose payloads must be immutable. See
 ## Primal heuristics and statistics
 
 Complete search proves results, but it can also find good incumbents early. This
-subchapter describes the two primal heuristics that run inside complete search, the
+section describes the two primal heuristics that run inside complete search, the
 root LP proposals on mixed models and the monotone clausal probe on pure-Boolean
 optimization, and closes with the counters search reports. Neither heuristic carries
 proof authority: every proposal passes full source verification before it becomes an

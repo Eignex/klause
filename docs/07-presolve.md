@@ -9,10 +9,12 @@ optimization and counting need different contracts.
 
 Preparation applies only reductions justified for that query, records
 reconstruction and objective mappings, and charges its work to the preparation
-phase of the allowance from [chapter 11](06-sessions.md#resource-allowances). This chapter gives the
-shape of the pipeline, then the guarantees each reduction must declare, and finally
-how rebuilt models and phase accounting are owned. The search that runs on the
-prepared model is the subject of [chapter 14](08-search.md).
+phase of the [resource allowance](06-sessions.md#resource-allowances). This
+chapter gives the shape of the pipeline, the guarantees each reduction must
+declare, and how rebuilt models and phase accounting are owned. It closes with
+source witness validation, the check every engine's assignments must pass. The
+search that runs on the prepared model is the subject of the
+[next chapter](08-search.md).
 
 ## Pipeline
 
@@ -223,10 +225,9 @@ authoritative after selection.
 
 Presolve hands search a transformed model, and the following chapters describe
 the engines that look for assignments of it. Before any of those engines can
-publish an assignment, it must be checked against the original source. This
-chapter describes that check, because every engine in the rest of this part relies
-on it: a solver's own view of the model is never the authority on whether a point
-is a solution.
+publish an assignment, it must be checked against the original source. Every engine
+in the rest of this part relies on this check: a solver's own view of the model is
+never the authority on whether a point is a solution.
 
 `solver.validation` owns reusable checks of proposed source coordinates. Search,
 local search, LP adapters, evidence and pipeline or portfolio orchestration call

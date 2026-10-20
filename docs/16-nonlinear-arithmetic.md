@@ -1,14 +1,25 @@
 # 16. Nonlinear arithmetic
 
-Nonlinear integer constraints multiply or raise integer coordinates to powers,
-alongside real and Boolean coordinates. Unlike the linear fragments of the previous
-chapters, this fragment is undecidable in general, so the theory makes no
-termination promise. Instead it searches integer candidates and, for each one, asks
-the [polynomial real theory](#polynomial-real-arithmetic) of the next chapter to complete
-the real coordinates exactly. This theory owns integer proposals and integrality;
-the polynomial theory owns exact real completion.
+Nonlinear constraints multiply coordinates, raise them to powers or apply
+transcendental functions. These fragments are undecidable in general or need far
+heavier machinery than an LP, and all three theories in this chapter meet in one
+place: exact polynomial real completion. Nonlinear integer arithmetic searches
+integer candidates and asks the polynomial real theory to complete the reals;
+polynomial real arithmetic decides polynomial formulas exactly with a cylindrical
+algebraic decomposition; transcendental arithmetic relaxes exp, log, sin and cos
+into polynomial constraints and repairs candidates against the original functions.
 
-## Scope and boundaries
+## Nonlinear integer arithmetic
+
+Nonlinear integer constraints multiply or raise integer coordinates to powers,
+alongside real and Boolean coordinates. Unlike the linear fragments, this fragment
+is undecidable in general, so the theory makes no termination promise. It searches
+integer candidates and, for each one, asks the
+[polynomial real theory](#polynomial-real-arithmetic) to complete the real
+coordinates exactly. This theory owns integer proposals and integrality; the
+polynomial theory owns exact real completion.
+
+### Scope and boundaries
 
 `theory.qfnia` searches `ir.NonlinearIntegerProblem`, a neutral polynomial source
 snapshot with separate original integer, real and Boolean identities. The snapshot
@@ -21,7 +32,7 @@ open integer declarations and every factor has a complete selected polynomial
 encoding. The projection emits declared endpoints and membership holes exactly and
 creates no finite CP domains for open integers; unsupported scopes decline.
 
-## Solving and composition
+### Solving and composition
 
 Every strategy starts from the same two facts about the source.
 
@@ -39,7 +50,7 @@ to complete real coordinates and correlated Booleans. Failure refutes only that
 candidate. Wide exponents use compact squaring DAGs, so values such as zero and
 signed units stay checkable without expanding the polynomial degree.
 
-### Strategies
+#### Strategies
 
 Candidate traversal enumerates integer tuples around zero and source constants,
 then widens; these are search choices, never source bounds. Heuristic strategies
@@ -53,7 +64,7 @@ MIXED supplies retained whole-source traversal, LS and ALNS factories to the
 [common invocation](12-portfolio.md). Defaults are 1,024 whole-source candidates,
 256 heuristic moves and 50 ALNS iterations.
 
-## Results and proof authority
+### Results and proof authority
 
 Witness publication requires integral original integer coordinates and exact
 completion of the entire formula. A separate evaluator checks the original
@@ -64,7 +75,7 @@ replaces an exact coordinate.
 Only a completed real-relaxation refutation or an empty intersection of proved
 bounds refutes the whole source. No finite-box exhaustion claims UNSAT.
 
-### Quadratic objectives
+#### Quadratic objectives
 
 `OpenTheoryPipeline.minimize` accepts the same request with an exact source
 `QuadraticObjectiveSpec`. Every incumbent checks integrality, the original formula
@@ -82,7 +93,7 @@ fixed-integer unbounded completion is sufficient, as is, with affine constraints
 checked quadratic recession ray scaled to integer direction coordinates from an
 integral base. A neighborhood proof never becomes a whole-source proof.
 
-## State and resources
+### State and resources
 
 `NonlinearIntegerCursor` keeps source bounds, tuple enumeration, visited candidates,
 proposal randomness, widening radius and the polynomial invocation across slices. A
@@ -92,7 +103,7 @@ work scope spans candidate generation, all completion queries and the final sour
 check. Conditioned calls keep original Boolean pins and numeric windows; candidate
 fixings never widen them.
 
-## Implementation
+### Implementation
 
 `theory.qfnia` owns integer proposals, exact bounds and source checking.
 `solver.pipeline.NonlinearIntegerTheoryRequest` adapts them to the shared strategy
@@ -102,12 +113,12 @@ delegates bound classification to the quadratic pipeline policy.
 ## Polynomial real arithmetic
 
 Polynomial real constraints multiply real coordinates, such as `x*y >= 1` or
-`x^2 + y^2 = 2`. Where the linear theories of chapters 20–22 check rows with an
-LP, this theory checks nonlinear real formulas exactly and completes continuous
-coordinates beside finite search. The previous chapter already used it as the real
-completion service for fixed integer candidates; the
-[transcendental theory](#transcendental-real-arithmetic) in the next chapter relaxes its
-functions into it. Its decision procedure is a cylindrical algebraic decomposition
+`x^2 + y^2 = 2`. Where the [linear theories](15-linear-arithmetic.md) check rows
+with an LP, this theory checks nonlinear real formulas exactly and completes
+continuous coordinates beside finite search. Nonlinear integer arithmetic uses it as
+the real completion service for fixed integer candidates, and the
+[transcendental theory](#transcendental-real-arithmetic) relaxes its functions into
+it. Its decision procedure is a cylindrical algebraic decomposition
 (CAD) over exact algebraic numbers. Real values remain theory-owned; CP remains
 Bool+Int only.
 
@@ -116,7 +127,7 @@ Bool+Int only.
 The complete fragment is polynomial real satisfaction with rational coefficients
 and Boolean structure (QF_NRA). Shared composition supports finite integer domains
 and exact quadratic objectives over Boolean, integer and real coordinates. Open
-integer domains belong to [nonlinear integer arithmetic](#).
+integer domains belong to [nonlinear integer arithmetic](#nonlinear-integer-arithmetic).
 [SMT-LIB semantics](05-arithmetic-formats.md#polynomial-source-lowering) owns source admission
 and the [exact polynomial kernel](18-exact-arithmetic.md#exact-polynomial-and-algebraic-arithmetic)
 owns mathematical operations. Resource limits can interrupt even this complete
@@ -274,7 +285,7 @@ sectors with invariant source feasibility. Those cells justify the
 
 ## Transcendental real arithmetic
 
-The last theory in this part checks constraints over exp, natural log, sin and cos,
+The transcendental theory checks constraints over exp, natural log, sin and cos,
 with Boolean, integer and continuous coordinates. Real arithmetic with these
 functions is not decidable in general, so the theory provides sound but incomplete
 satisfaction. It builds directly on the [polynomial real theory](#polynomial-real-arithmetic):

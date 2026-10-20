@@ -83,57 +83,24 @@ Read `klause-bench/README.md` before benchmarking. In short:
 
 ## Documentation
 
-- `docs/` is the maintained internal developer documentation and architecture contract for the
-  Kotlin code, written as a book: `docs/README.md` is the table of contents and each chapter is a
-  numbered file (`NN-topic.md`); a large chapter is an overview plus subchapters (`NN.M-topic.md`).
-  Chapters are ordered so every concept is introduced before later chapters rely on it; read the
-  relevant chapters before changing a subsystem. User-facing documentation is hosted at
-  `https://eignex.com/docs/klause/` and is maintained separately.
-- Solver contracts are split by ownership: `docs/08-search.md` for traversal, propagation and
-  explanations; `docs/06-sessions.md` for invocation scopes; `docs/10-local-search.md` for heuristic
-  state and moves; `docs/12-portfolio.md` for scheduling and publication; `docs/07-presolve.md` for
-  reductions and source mappings. Extend the chapter that owns a contract and link across
-  boundaries. A new chapter goes where its prerequisites have been introduced; renumber the files
-  after it and update the table of contents.
-- Keep peer chapters and peer sections balanced: each piece of a modular system (theories, formats,
-  kernels, worker kinds) gets about as much text as its peers. Do not let newer features accumulate
-  detail in shared chapters; put mechanism detail in the owning chapter and keep shared chapters
-  general.
-- Update the affected docs in the same change whenever implementation changes architecture,
-  ownership, dependencies, invariants, result/proof semantics, resource policy or developer
-  workflows. Reconcile docs with the implemented system; do not leave competing descriptions or
-  obsolete plans.
-- `docs/` covers the Kotlin code only: no benchmarking, measurement, scripts, campaign evidence,
-  fixture provenance, wrapper setup or contribution process. Benchmark usage, records, validation,
-  diagnostic workflows and design evidence live in `klause-bench/README.md`; do not create separate
-  benchmark guides. Fixture provenance and license notices live in READMEs beside the fixtures;
-  MiniZinc wrapper setup lives in `klause-mzn-lib/README.md`. Agent instruction files and functional
-  GitHub templates retain their required locations; public API KDoc stays with source. Inputs,
-  manifests, scripts and raw evidence are artifacts, not guides.
-- Document only the current Klause system. Exclude references/comparisons to other solvers,
-  historical campaign narratives and speculative implementation plans. Preserve fixture attribution.
-- Keep `klause-bench` focused on the active harness, corpus inputs, named sets and reusable tools.
-  Do not commit generated solve outputs, historical campaign bundles or one-off evidence reports
-  there; keep measurement archives outside the repository.
-- Do not commit generated lab/campaign archives, raw records, payloads, manifests or campaign-only
-  scripts anywhere in the repository, including compressed or encoded bundles.
-  `klause-bench/README.md` may contain short summaries supporting current design decisions, never
-  lab archives.
-- Keep `.github` limited to the build/release workflows and issue/PR templates. Do not add campaign,
-  lab or benchmark-evidence workflows, dispatch inputs, jobs or artifact uploads to existing
-  workflows. Run measurement checking outside the repository's GitHub workflows; do not add
-  companion guides for campaign CI dispatch. Reusable local analysis tools and regression fixtures
-  belong in `klause-bench`.
-- Store temporary campaign notes, scripts, manifests, raw results and reports in
-  `klause-evidence/campaigns/<name>/`, alongside the primary checkout and outside this repository.
-  All worktrees share that evidence directory; do not create separate archives beside each worktree.
-  Promote reusable tooling and fixtures into `klause-bench`, and consolidate architectural
-  conclusions into the relevant `docs/` pages. Reserve the design evidence in
-  `klause-bench/README.md` for small, durable evidence supporting a current design decision; do not
-  use it as campaign staging or an archive of raw results. Retain only evidence needed for active
-  work. Delete obsolete campaign bundles after promoting their useful conclusions, tooling or
-  regression fixtures; do not relocate historical archives.
-- Keep `docs/README.md` and links current. Remove superseded files when consolidating documentation.
+- `docs/` is a book about the Kotlin code: `docs/README.md` is the table of contents and chapters are
+  numbered files (`NN-topic.md`), ordered so every concept is introduced before it is used. A new
+  chapter goes after its prerequisites; renumber the files after it and update the contents and
+  navigation. User documentation lives at `https://eignex.com/docs/klause/`.
+- Read the owning chapter before changing a subsystem, and update it in the same change when
+  architecture, ownership, dependencies, invariants, result semantics, resources or workflows change.
+  Describe only the current system: no history, plans or comparisons with other solvers.
+- Keep chapters tight and peers balanced: each theory, format, kernel or worker kind gets about as
+  much text as its peers. Mechanism detail belongs in the owning chapter, API detail in KDoc.
+- `docs/` excludes benchmarking, measurement, scripts, fixture provenance, wrapper setup and process.
+  Benchmark workflows and short design-evidence summaries live in `klause-bench/README.md`, fixture
+  provenance and licences in READMEs beside the fixtures, MiniZinc setup in `klause-mzn-lib/README.md`.
+  Other READMEs are short entry points.
+- Never commit campaign archives, raw records, payloads or one-off scripts, compressed or not. Keep
+  them in `klause-evidence/campaigns/<name>/` beside the primary checkout (shared by all worktrees),
+  promote reusable tools and fixtures into `klause-bench`, and delete bundles once their conclusions
+  have landed.
+- Keep `.github` to build/release workflows and issue/PR templates; no campaign or benchmark jobs.
 
 ## Solver boundaries
 
