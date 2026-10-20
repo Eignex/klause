@@ -18,7 +18,8 @@ internal fun wholeRealPointTruths(
 ): IntArray? {
     if (source.numIntVars != 0 || source.numRealVars !in 1..10000 || source.numBoolVars > 100000 ||
         source.numFactors > 100000 || source.semantics.isApproximate || point.size != source.numRealVars || stop()
-    ) return pointDeclined(onDecline, "SOURCE_SHAPE_N_${source.numRealVars}_B_${source.numBoolVars}_F_${source.numFactors}")
+    ) return pointDeclined(onDecline,
+        "SOURCE_SHAPE_N_${source.numRealVars}_B_${source.numBoolVars}_F_${source.numFactors}")
     stop.charge(8L * (source.numBoolVars + source.numRealVars + source.numFactors + 1L))
     if (stop()) return null
     val work = MixedPointArithmetic(stop)

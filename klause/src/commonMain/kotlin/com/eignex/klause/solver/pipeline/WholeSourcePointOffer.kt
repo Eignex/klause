@@ -71,7 +71,9 @@ internal class WholeSourcePointOffer(
         return try {
             if (session.isUnsatAtRoot) return declined("BOOLEAN_ROOT_CONFLICT")
             if (session.fixpointCancelled || stop()) return null
-            val result = BooleanArray(source.numBoolVars) { session.boolValue(it) ?: return declined("BOOLEAN_UNRESOLVED") }
+            val result = BooleanArray(source.numBoolVars) {
+                session.boolValue(it) ?: return declined("BOOLEAN_UNRESOLVED")
+            }
             if (stop() || session.checkSelectedProjection() != ComponentCheck.Feasible) return declined("BOOLEAN_CHECK")
             result.takeUnless { stop() }
         } finally {
