@@ -880,17 +880,24 @@ Checker time is separate from native solve and incumbent time. SAT checks issue 
 solver query; incomplete reference output leaves the completed query count unknown.
 Raw cache hits are checked afresh; use `-Dklause.bench.cache=false` for a fresh solve.
 
-`bench.profile.SmtSourceReplay` delegates a complete set of saved SAT models to
-the same Dolmen adapter without running Klause. Supply `input64=<base64 zstd JSON>`
+`bench.profile.SmtSourceReplay` delegates complete sets of saved SMT claims to
+the same external adapters without running Klause. Supply `input64=<base64 zstd JSON>`
 and `sha256=<compressed digest>`. Schema 1 contains `sources` metadata and `models`
 with catalog `suite`/`problem`, exact `producerJson`/`stdout`, source/model hashes,
 and preserved producer `bindings`. Each model uses the complete unchanged catalog
 source and printed model. The replay records tool startup, per-model receipts and
 a final complete/partial summary; non-SAT source markers stay outside Dolmen's
-model-checking scope. Requests are limited to 128 KiB encoded/16 MiB expanded.
-The main stops starting models after two minutes; individual checks retain the
-ordinary 35-second process limit. Source checking supplies no native solver,
-UNSAT, optimization or performance credit.
+model-checking scope. Schema 2 uses `claims` with the same fields and a `scope`:
+`ground-original-smt-witness` for SAT models or
+`independent-original-smt-refutation` for already reported native UNSAT claims.
+The latter supplies a null model hash and uses the pinned Z3 CLI. Its completed
+reference-query count stays separate from native solver invocations; incomplete
+answers remain unverified. Both tools retain memory receipts. Mac replay checks
+the RSS guard with a below-baseline process allowance before checking claims.
+Requests are limited to 128 KiB encoded/16 MiB expanded. The main stops starting
+claims after two minutes; individual checks retain the ordinary 35-second process
+limit. Replay supplies no new native decision, proof certificate, optimization or
+performance credit.
 
 ### MPS independent point validation
 
