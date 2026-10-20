@@ -20,7 +20,16 @@ Klause is a constraint solver written in Kotlin Multiplatform. It solves satisfa
 
 ## What it is for
 
-Klause is for applications that need one solver for many kinds of models and want to run it inside a Kotlin or JVM process. A model is described once. Complete search, local search, LP relaxations and arithmetic theories then work on that same model, alone or together in a portfolio, and every result they publish is checked against the original model before it is returned.
+Klause is built for applications that ask many questions of the same model, not only for one-shot solving. A model is compiled once and then queried repeatedly inside a Kotlin or JVM process:
+
+- Solve again under different assumptions, keeping learned and heuristic state between queries.
+- Enumerate solutions without repetition, or draw diverse samples across the feasible region.
+- Count solutions exactly or approximately, with proven lower and upper bounds.
+- Check a proposed assignment against the original model.
+
+Typical uses are constraint-aware test and fuzz input generation, configuration synthesis, scheduling and assignment, and long-running services that re-solve and re-sample one model.
+
+Complete search, local search, LP relaxations and arithmetic theories all work on that same model, alone or together in a portfolio, and every result they publish is checked against the original model before it is returned.
 
 It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc models through the included solver integration.
 
