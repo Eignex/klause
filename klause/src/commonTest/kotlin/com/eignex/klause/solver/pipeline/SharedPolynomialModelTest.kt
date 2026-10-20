@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -23,6 +24,7 @@ import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.qfnra.PolynomialCondition
+import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -37,6 +39,35 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SharedPolynomialModelTest {
+    @Test
+    fun `reified opposing bounds reconstruct a complete shared polynomial witness`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (declare-const b Bool) (declare-const c Bool)
+            (assert (= b (<= y (+ (* x x) 2))))
+            (assert (= c (>= y (+ (* x x) 2))))
+            (assert b) (assert c)
+            (assert (> x 2)) (assert (< x 3)) (assert (> (* x x) 5))
+            """.trimIndent(),
+        )
+        val model = assertNotNull(SharedPolynomialModel.assemble(parsed.model))
+
+        val result = model.service.invocation(QfNraParams(maximumWork = 65_536))
+            .use { it.check(PolynomialCondition()) }
+
+        val completed = assertIs<QfNraResult.Satisfiable>(result)
+        val point = completed.assignment
+        val x = assertNotNull(point.realValue(parsed.realVarNames.getValue("x")).rational)
+        val y = assertNotNull(point.realValue(parsed.realVarNames.getValue("y")).rational)
+        assertTrue(x > BigFraction.ofLong(2) && x < BigFraction.ofLong(3))
+        assertTrue(x * x > BigFraction.ofLong(5))
+        assertEquals(x * x + BigFraction.ofLong(2), y)
+        assertTrue(point.boolValue(parsed.boolVarNames.getValue("b")))
+        assertTrue(point.boolValue(parsed.boolVarNames.getValue("c")))
+        assertEquals(0L, completed.stats.projectedPolynomials)
+    }
+
     @Test
     fun `an ineligible polynomial scope should install no supported prefix in either source order`() {
         for (support in listOf(EncoderSupport.UNSUPPORTED, EncoderSupport.RELAXATION_ONLY,

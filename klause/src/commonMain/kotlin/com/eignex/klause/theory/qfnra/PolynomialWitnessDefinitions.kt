@@ -30,7 +30,16 @@ internal class PolynomialWitnessDefinitions(
         val definitions = ArrayList<Pair<Int, Polynomial>>()
         if (!admitted(residual.map { it.polynomial })) return null
         while (true) {
-            val pivot = pivot(residual, fixed) ?: break
+            val pivot = pivot(residual, fixed)
+            if (pivot == null) {
+                val simplifying = preparePolynomialConjunction(residual, arithmetic)
+                var conjunction: PolynomialConjunction? = null
+                while (conjunction == null) conjunction = simplifying.next()
+                if (conjunction.inconsistent) return null
+                if (!conjunction.changed) break
+                residual = conjunction.atoms
+                continue
+            }
             arithmetic.step()
             val polynomial = residual[pivot.atom].polynomial
             val term = arithmetic.scale(Polynomial.variable(pivot.variable), pivot.coefficient)

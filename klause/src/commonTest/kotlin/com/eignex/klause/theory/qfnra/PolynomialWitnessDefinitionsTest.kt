@@ -17,6 +17,123 @@ import kotlin.test.assertTrue
 
 class PolynomialWitnessDefinitionsTest {
     @Test
+    fun `opposing proportional bounds reconstruct a required definition`() {
+        for (constraints in listOf(
+            "(<= y (+ (* x x) 2)) (>= (* 2 y) (+ (* 2 x x) 4))",
+            "(>= (- y) (- (+ (* x x) 2))) (<= (* (- 3) y) (- (+ (* 3 x x) 6)))",
+            "(= z (+ (* x x) 2)) (<= y z) (>= y (+ (* x x) 2))",
+        )) {
+            val source = SmtLibPolynomial.parse(
+                """
+                (declare-const x Real) (declare-const y Real) (declare-const z Real)
+                (assert (and $constraints))
+                """.trimIndent(),
+            )
+            val arithmetic = PolynomialArithmetic()
+            val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+                .conjunctiveAtoms(arithmetic, 128))
+
+            val point = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 4096)
+                .point(atoms, source.realCount, emptyMap()))
+
+            assertEquals(BigFraction.ONE, point.getValue(0), constraints)
+            assertEquals(BigFraction.ofLong(3), point.getValue(1), constraints)
+            assertEquals(if (constraints.startsWith("(= z")) BigFraction.ofLong(3) else BigFraction.ZERO,
+                point.getValue(2), constraints)
+        }
+    }
+
+    @Test
+    fun `contradictory required signs withhold a definition plan`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (assert (and (> y (+ (* x x) 2)) (<= y (+ (* x x) 2))))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+
+        val plan = PolynomialWitnessDefinitions(arithmetic, 2048, 8, 4096)
+            .prepare(atoms, source.realCount, emptyMap())
+
+        assertNull(plan)
+    }
+
+    @Test
+    fun `raw term admission precedes consolidation of opposing bounds`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (assert (and (<= y (+ (* x x) 2)) (>= y (+ (* x x) 2))))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+
+        val plan = PolynomialWitnessDefinitions(arithmetic, 3, 8, 4096)
+            .prepare(atoms, source.realCount, emptyMap())
+
+        assertNull(plan)
+    }
+
+    @Test
+    fun `interrupted equality inference exposes no partial plan to a fresh invocation`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (assert (and (<= y (+ (* x x) 2)) (>= y (+ (* x x) 2))))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+        var completedWork = 0L
+        val counter = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { completedWork += it }
+        }
+        assertNotNull(PolynomialWitnessDefinitions(PolynomialArithmetic(counter), 2048, 8, 4096)
+            .prepare(atoms, source.realCount, emptyMap()))
+        var spent = 0L
+        val interrupted = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= completedWork - 1
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+
+        assertFailsWith<PolynomialInterrupted> {
+            PolynomialWitnessDefinitions(PolynomialArithmetic(interrupted), 2048, 8, 4096)
+                .prepare(atoms, source.realCount, emptyMap())
+        }
+
+        val point = assertNotNull(PolynomialWitnessDefinitions(PolynomialArithmetic(), 2048, 8, 4096)
+            .point(atoms, source.realCount, emptyMap()))
+        assertEquals(BigFraction.ofLong(3), point.getValue(1))
+    }
+
+    @Test
+    fun `fixed coordinates survive reconstruction from opposing bounds`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (assert (and (<= y (+ (* x x) 2)) (>= y (+ (* x x) 2))))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+        val fixed = mapOf(0 to BigFraction.ofLong(3))
+
+        val point = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 4096)
+            .point(atoms, source.realCount, fixed))
+
+        assertEquals(fixed.getValue(0), point.getValue(0))
+        assertEquals(BigFraction.ofLong(11), point.getValue(1))
+    }
+
+    @Test
     fun `prepared definitions reconstruct each proposal independently`() {
         val source = SmtLibPolynomial.parse(
             """

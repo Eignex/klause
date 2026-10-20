@@ -257,8 +257,11 @@ complete original-formula check. Witness guidance also retains numeric predicate
 forced by unit propagation through the full Boolean formula, including reified
 requirements. It makes no Boolean decisions, and optional alternatives supply no
 unconditional guides. Admission uses the original coordinate and atom counts
-before guidance extraction. The probe is limited to small formulas and one
-65,536-unit slice; a decline leaves complete CAD available.
+before guidance extraction. Witness reconstruction substitutes explicit required
+definitions first, then intersects signs of proportional residual predicates to
+expose further equalities. Its raw term admission precedes this intersection, and
+all inference uses the containing work scope. The probe is limited to small formulas
+and one 65,536-unit slice; a decline leaves complete CAD available.
 
 **2. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
 enumerates source implicants: assignments of Boolean leaves and signed numeric
