@@ -59,6 +59,32 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `a bounded equation guard sweep should revisit the first head beyond its limit`() {
+        val rows = listOf(ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+            LinearOp.EQ, BigFraction.ZERO, activator = 0)) + List(64) { index ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
+                List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ZERO, activator = index + 1)
+        } + listOf(
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ZERO, activator = 65),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(4)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO, activator = 66),
+        )
+        val source = Problem(67, 0, emptyArray(), Array<Factor>(rows.size) { rows[it] }, numRealVars = 5,
+            realLower = DoubleArray(5) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(5) { Double.POSITIVE_INFINITY })
+        val session = SearchSession(listOf(ExactLiraSearchComponent(source)))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(66, true))))
+
+        assertEquals(true, session.boolValue(65))
+        assertEquals(setOf(Lit.make(0, false), Lit.make(65, true)),
+            assertNotNull(session.reasonFor(65)).literals.toSet())
+    }
+
+    @Test
     fun `several equation guard consequences should retain their own signed source reasons`() {
         val source = Problem(4, 0, emptyArray(), arrayOf(
             ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },

@@ -800,13 +800,14 @@ class ExactLiraSearchComponent private constructor(
         var checked = 0
         var implied = false
         repeat(groups.size) {
+            if (checked >= 64) return if (implied) ComponentResult.Consistent else null
             lpStop.charge(1L)
             if (operationStop()) return ComponentResult.Indeterminate
             val rows = groups[equationGuardCursor]
             equationGuardCursor = (equationGuardCursor + 1) % groups.size
             val guard = rows.first().row.activator
             if (bools[guard] != UNASSIGNED || context.boolValue(guard) != null) return@repeat
-            if (checked++ >= 64) return if (implied) ComponentResult.Consistent else null
+            checked++
             observeCompleteStage("PURE_REAL_EQUALITY_GUARD_ATTEMPT")
             val selected = HashSet<Int>()
             var truth: Boolean? = null

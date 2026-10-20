@@ -20,6 +20,26 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `unresolved queries should preserve proof capacity for a later equation consequence`() {
+        val rows = (0 until 128).flatMap { column ->
+            listOf(exactColumnUpper(column, BigFraction.ZERO), exactColumnLower(column, BigFraction.ZERO))
+        }
+        val open = ExactRationalInequality(IntArray(129) { it }, List(129) { BigFraction.ONE }, BigFraction.ZERO)
+        val closed = ExactRationalInequality(IntArray(128) { it }, List(128) { BigFraction.ONE }, BigFraction.ZERO)
+        var unexpected = false
+        var constant: EqualityConstant? = null
+
+        equalityRowsRefute(129, rows, Cancellation.Never, onSupport = { }, onUnrefutedRepair = { repair ->
+            repeat(63) { if (repair.constant(open) != null) unexpected = true }
+            constant = repair.constant(closed)
+        })
+
+        assertFalse(unexpected)
+        assertEquals(BigFraction.ZERO, assertNotNull(constant).bound)
+        assertEquals(rows.indices.toSet(), assertNotNull(constant).rows.toSet())
+    }
+
+    @Test
     fun `a constant query should cite equation premises without treating the query as an axiom`() {
         val rows = listOf(exactColumnUpper(3, BigFraction.ofLong(7)), exactColumnLower(3, BigFraction.ofLong(7)),
             ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ofLong(6)),

@@ -172,6 +172,9 @@ The same prepared equations can also determine open guards of general affine
 comparisons. A bounded sweep visits at most 64 open heads; every comparison sharing
 a head must reduce to a constant and agree on its truth. Consequences in one sweep
 reuse the same prepared equations, and each retains its own source explanation.
+The cursor resumes at the first head beyond the sweep limit. A nonconstant query
+uses local pivot references and consumes no shared proof nodes; constant queries
+combine their equation premises only after completing exact reduction.
 Disjunction members and
 comparisons containing Boolean coefficients defer. Only the nonzero equation
 pivots used by each reduction contribute source premises; the queried comparison

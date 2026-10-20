@@ -252,13 +252,14 @@ internal class MixedEqualityRepair(
         val coefficients = row.columns.indices.associate { row.columns[it] to row.coefficients[it] }
             .filterValues { !it.isZero }.toMutableMap()
         var bound = row.rhs
-        // The queried comparison is a conclusion; only selected equation pivots are premises.
-        var proof = support.empty()
+        val used = IntArrayList()
         for (pivot in pivots.indices) {
             val coefficient = coefficients[pivot] ?: continue
             val equation = pivots[pivot] ?: continue
             val scale = work.quotient(coefficient, equation.coefficients.first()) ?: return null
-            proof = support.combine(proof, checkNotNull(pivotProofs)[pivot])
+            stop.charge(1L)
+            if (stop()) return null
+            used.add(checkNotNull(pivotProofs)[pivot])
             coefficients.remove(pivot)
             bound = work.subtractProduct(bound, scale, equation.rhs) ?: return null
             for (index in 1 until equation.columns.size) {
@@ -269,6 +270,12 @@ internal class MixedEqualityRepair(
             }
         }
         if (coefficients.isNotEmpty() || stop()) return null
+        // Nonconstant queries must not consume shared proof capacity; the query contributes no axiom.
+        var proof = support.empty()
+        for (index in 0 until used.size) {
+            proof = support.combine(proof, used[index])
+            if (stop()) return null
+        }
         val rows = support.expand(proof) ?: return null
         return if (stop()) null else EqualityConstant(bound, rows)
     }
