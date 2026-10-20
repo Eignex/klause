@@ -317,6 +317,12 @@ edges and ordinary graph checks spend the current invocation's controls; a rebui
 guard index grants no new allowance. Closing releases private interval and graph
 state. See [difference logic](../theories/difference.md).
 
+Unit affine equality propagation charges source scans, forest construction, path
+visits and captured reason entries to the current operation. A private representation
+decline supplies no new deduction. An admitted publication prefix returns through
+shared peer reconciliation; a containing stop remains indeterminate and retains
+spent work. Forests and their source premises belong to one callback.
+
 Exact-linear partial-point polarity hints reuse a completed arithmetic check. Source
 comparison visits and bounded rational operations charge that check's current operation
 token, including its native meter; they create no numerical invocation or allowance.

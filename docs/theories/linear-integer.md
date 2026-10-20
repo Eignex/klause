@@ -33,6 +33,14 @@ and ceiling thresholds. Finite variables receive scoped fixings from their finit
 owner, preserving bounds and holes. Shared search owns decision levels, retraction and conflict
 learning; the arithmetic component owns row assertions and numerical checks.
 
+Complete production integer-only openings can infer comparison guards from active
+unit affine equalities. Each callback constructs a private signed-offset forest
+from the currently asserted equality premises and checks unresolved comparisons
+within that snapshot. Consequences retain shared false-premise clauses and return
+through the ordinary arithmetic assertion path before peer propagation. This
+optional deduction owns no source assignment; all remaining source, LP and integer
+checks retain their authority.
+
 With null `openHintFlips`, one exact-linear completion owner can reuse a completed
 partial LP point for direct primitive Boolean preferences, including integer-only
 sources. Registration charges the opening token; capture and bounded comparison

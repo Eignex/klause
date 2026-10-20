@@ -211,6 +211,11 @@ class ExactLiraSearchComponent private constructor(
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
+    private val integerEqualities by lazy {
+        if (completeTraversalObserved && model.numRealVars == 0 &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+        ) ExactIntegerEqualityPropagation.prepare(model, operationStop) else null
+    }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -1132,6 +1137,12 @@ class ExactLiraSearchComponent private constructor(
         if (!dirty) return ComponentResult.Consistent
         floatCandidate = null
         pointHintValues = null
+        val equalityResult = integerEqualities?.propagate(context, operationStop) { literal ->
+            accept(SearchDecision.Bool(literal), context).also { result ->
+                if (result is ComponentResult.Consistent) observeCompleteStage("INTEGER_EQUALITY_IMPLICATION")
+            }
+        }
+        equalityResult?.let { return it }
         // Root publications precede their delivery to components during shared initialization.
         if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
             bools.indices.all { context.boolValue(it) != null }

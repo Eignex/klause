@@ -567,6 +567,9 @@ with ordinary order; it is not a source witness or a committed-decision count.
 Primitive and gate selections classify outer consultations, not recursive leaf
 reads. Missing fields in older records are unavailable rather than observed zero.
 Use the same record's route, index outcome and usage to establish feature coverage.
+`smtCompleteSearchStage_INTEGER_EQUALITY_IMPLICATION` counts admitted affine-equality
+consequences received by the complete integer arithmetic owner. It supplies no
+source verdict, CPU attribution or count of distinct guards.
 With absent `open-hint-flips`, one exact-linear completion owner can supply direct
 primitive preferences from an existing partial point without source-clause indexing.
 Index observations require actual construction through the explicit allowance. Explicit zero permits bounded construction observations
