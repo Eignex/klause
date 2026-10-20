@@ -24,6 +24,7 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 
 internal object SmtSourceReplay {
@@ -43,6 +44,8 @@ internal object SmtSourceReplay {
         val request = Reports.json.parseToJsonElement(bytes.decodeToString(throwOnInvalidSequence = true)).jsonObject
         val schema = request.getValue("schema").jsonPrimitive.int
         require(schema in 1..2)
+        val claimStartTimeoutMs = request["claimStartTimeoutMs"]?.jsonPrimitive?.long ?: 120_000L
+        require(claimStartTimeoutMs in 1L..240_000L) { "claim start timeout must be between 1 and 240000 ms" }
         val refutationSolver = when (request["refutationSolver"]?.jsonPrimitive?.content ?: "z3") {
             "z3" -> SmtSourceValidation.RefutationSolver.Z3
             "cvc5" -> SmtSourceValidation.RefutationSolver.CVC5
@@ -69,6 +72,7 @@ internal object SmtSourceReplay {
                 put("refutationCount", claims.size - modelCount)
                 put("claimCount", claims.size)
                 put("elapsedMs", (System.nanoTime() - started) / 1_000_000)
+                put("claimStartTimeoutMs", claimStartTimeoutMs)
                 val completedModels = results.count {
                     it.getValue("scope").jsonPrimitive.content == SmtSourceValidation.GROUND
                 }
@@ -130,7 +134,8 @@ internal object SmtSourceReplay {
                 }
             }
             for ((index, element) in claims.withIndex()) {
-                check(!Thread.currentThread().isInterrupted && System.nanoTime() - started < 120_000_000_000) {
+                check(!Thread.currentThread().isInterrupted &&
+                    System.nanoTime() - started < claimStartTimeoutMs * 1_000_000) {
                     "whole replay interrupted or timed out"
                 }
                 val model = element.jsonObject
