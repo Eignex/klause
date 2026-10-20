@@ -8,6 +8,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlinx.serialization.encodeToString
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty
 import org.junit.jupiter.api.condition.EnabledOnOs
@@ -178,18 +179,21 @@ class SmtSourceReceiptTest {
     @ParameterizedTest
     @ValueSource(strings = ["missing", "duplicate", "malformed", "over-limit"])
     fun `incomplete or excessive kernel high water withholds memory qualification`(case: String) {
-        val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
-        val line = "2048  maximum resident set size\n"
-        when (case) {
-            "duplicate" -> memory.timingFile.writeText(line + line)
-            "malformed" -> memory.timingFile.writeText("unknown maximum resident set size\n")
-            "over-limit" -> memory.timingFile.writeText("${SourceToolMemory.LIMIT + 1} maximum resident set size\n")
+        for (terminalSample in listOf(false, true)) {
+            val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
+            val line = "2048  maximum resident set size\n"
+            when (case) {
+                "duplicate" -> memory.timingFile.writeText(line + line)
+                "malformed" -> memory.timingFile.writeText("unknown maximum resident set size\n")
+                "over-limit" -> memory.timingFile.writeText("${SourceToolMemory.LIMIT + 1} maximum resident set size\n")
+            }
+            if (terminalSample) assertTrue(memory.recordSample("1 0\n", setOf(1L), { emptySet() }))
+
+            val result = memory.finish()
+
+            assertFalse(result.qualified())
+            assertEquals(case == "over-limit", result.exceeded)
         }
-
-        val result = memory.finish()
-
-        assertFalse(result.qualified())
-        assertEquals(case == "over-limit", result.exceeded)
     }
 
     @Test
@@ -205,5 +209,97 @@ class SmtSourceReceiptTest {
         assertEquals(0, result.samples)
         assertEquals(null, result.samplePeakBytes)
         assertEquals(sha256(bytes), result.timingSha256)
+    }
+
+    @Test
+    fun `an exiting zero RSS observation retains the preceding positive sample`() {
+        val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
+        memory.timingFile.writeText("2048 maximum resident set size\n")
+        assertTrue(memory.recordSample("1 1\n", setOf(1L), { setOf(1L) }))
+        var waited = false
+
+        assertTrue(memory.recordSample("1 0\n", setOf(1L), { setOf(1L) }) {
+            waited = true
+            emptySet()
+        })
+        val result = memory.finish()
+
+        assertTrue(waited)
+        assertTrue(result.qualified())
+        assertEquals(1, result.samples)
+        assertEquals(1024L, result.samplePeakBytes)
+        assertEquals(2048L, result.kernelPeakBytes)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `terminal zero RSS relies on kernel high water without inventing a sample`(initiallyLive: Boolean) {
+        val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
+        memory.timingFile.writeText("2048 maximum resident set size\n")
+
+        assertTrue(memory.recordSample("1 0\n", setOf(1L), {
+            if (initiallyLive) setOf(1L) else emptySet()
+        }) { emptySet() })
+        val result = memory.finish()
+
+        assertTrue(result.qualified())
+        assertEquals(0, result.samples)
+        assertEquals(null, result.samplePeakBytes)
+        assertEquals(2048L, result.kernelPeakBytes)
+    }
+
+    @Test
+    fun `zero RSS from a live process withholds qualification`() {
+        val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
+        memory.timingFile.writeText("2048 maximum resident set size\n")
+
+        assertFalse(memory.recordSample("1 0\n", setOf(1L), { setOf(1L) }))
+
+        assertFalse(memory.finish().qualified())
+    }
+
+    @Test
+    fun `a missing live process cannot be hidden by a later exit`() {
+        val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
+        memory.timingFile.writeText("2048 maximum resident set size\n")
+        var waited = false
+
+        assertFalse(memory.recordSample("1 0\n", setOf(1L, 2L), { setOf(1L, 2L) }) {
+            waited = true
+            emptySet()
+        })
+
+        assertFalse(waited)
+        assertFalse(memory.finish().qualified())
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["", "bad 0", "1", "1 -1", "1 0 extra", "2 0", "1 1\n1 0", "1 9223372036854775807"])
+    fun `failed RSS observations retain rejection after terminal zero RSS`(text: String) {
+        val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
+        memory.timingFile.writeText("2048 maximum resident set size\n")
+        assertTrue(memory.recordSample("1 1\n", setOf(1L), { setOf(1L) }))
+        assertFalse(memory.recordSample(text, setOf(1L), { setOf(1L) }))
+
+        assertTrue(memory.recordSample("1 0\n", setOf(1L), { emptySet() }))
+
+        val result = memory.finish()
+        assertFalse(result.qualified())
+        assertEquals(1, result.samples)
+        assertEquals(1024L, result.samplePeakBytes)
+    }
+
+    @Test
+    fun `an excessive observation remains excessive after terminal zero RSS`() {
+        val memory = DarwinToolMemory(directory, SourceToolMemory.LIMIT)
+        memory.timingFile.writeText("2048 maximum resident set size\n")
+        assertFalse(memory.recordSample("1 4194305\n", setOf(1L), { setOf(1L) }))
+
+        assertFalse(memory.recordSample("1 0\n", setOf(1L), { emptySet() }))
+
+        val result = memory.finish()
+        assertFalse(result.qualified())
+        assertTrue(result.exceeded)
+        assertEquals(4294968320L, result.samplePeakBytes)
     }
 }
