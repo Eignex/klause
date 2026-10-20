@@ -255,9 +255,12 @@ on the attachment, and private helpers stay distinct from original coordinates.
 Unsupported factors or resource stops decline only this view.
 
 Publication reconstructs engine coordinates into the private grid, then into
-original real coordinates, and checks the original model. Grid exhaustion and
-optimization prove only private-grid claims, kept in
-`FiniteSolveResult.nativeGridOutcome`. See [source checking](07-presolve.md#source-witness-validation) and
+original real coordinates. Source-qualified consumers check the original model;
+FlatZinc consumers publish under their declared grid semantics instead. Grid
+exhaustion and optimization prove only grid claims, kept in
+`FiniteSolveResult.nativeGridOutcome`. FlatZinc also reports these through
+`outcome`, with `SourceFloatProjection.declaredGridSemantics` recording the scope.
+See [source checking](07-presolve.md#source-witness-validation) and
 [reconstruction](07-presolve.md#guarantees-and-source-mappings).
 
 ## Engine projections

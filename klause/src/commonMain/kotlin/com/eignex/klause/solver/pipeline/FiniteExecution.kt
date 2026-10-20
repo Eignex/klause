@@ -213,7 +213,7 @@ class FiniteSolveResult(
     val preparation: FinitePipelinePreparation,
     /** Time spent preparing [preparation]. */
     val preparationElapsed: Duration,
-    /** Terminal result after preparation. */
+    /** Terminal result, scoped to the grid when [SourceFloatProjection.declaredGridSemantics] is true. */
     val outcome: FiniteSolveOutcome,
 ) {
     private var completeSearch: Boolean? = null
@@ -251,7 +251,7 @@ class FiniteSolveResult(
 
     private var grid: NativeGridOutcome? = null
 
-    /** Native private-grid claims, retained independently of [outcome]'s original-source qualification. */
+    /** Native private-grid claims, retained independently of [outcome] publication qualification. */
     val nativeGridOutcome: NativeGridOutcome? get() = grid
 
     internal fun bindNativeGridOutcome(value: NativeGridOutcome) {

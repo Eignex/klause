@@ -21,6 +21,7 @@ internal enum class FloatGridConsumerPurpose {
 internal class SelectedFloatGridConsumer(
     val invocation: PreparedSourceInvocation,
     val purpose: FloatGridConsumerPurpose,
+    val declaredGridSemantics: Boolean,
 ) {
     val providers = invocation.request.providers
     val operation = invocation.operation
@@ -50,7 +51,8 @@ internal fun SourceSetup.prepareSelectedFloatGrid(
     variables: List<FloatGridVariable>,
     purpose: FloatGridConsumerPurpose,
     truncatedRows: Set<Int> = emptySet(),
-): SelectedFloatGridPreparation = selectFloatGrid(invocation, purpose) { consumer, stop ->
+    declaredGridSemantics: Boolean = false,
+): SelectedFloatGridPreparation = selectFloatGrid(invocation, purpose, declaredGridSemantics) { consumer, stop ->
     prepareFloatGrid(FloatGridRequest(invocation.source.problem, variables, consumer, truncatedRows), stop)
 }
 
@@ -58,7 +60,8 @@ internal fun SourceSetup.prepareSelectedFloatGrid(
     invocation: PreparedSourceInvocation,
     definition: FloatGridDefinition,
     purpose: FloatGridConsumerPurpose,
-): SelectedFloatGridPreparation = selectFloatGrid(invocation, purpose) { consumer, stop ->
+    declaredGridSemantics: Boolean = false,
+): SelectedFloatGridPreparation = selectFloatGrid(invocation, purpose, declaredGridSemantics) { consumer, stop ->
     require(definition.source === invocation.source.factorProblem) { "grid definition belongs to a foreign source" }
     definition.bind(consumer, stop)
 }
@@ -66,6 +69,7 @@ internal fun SourceSetup.prepareSelectedFloatGrid(
 private fun selectFloatGrid(
     invocation: PreparedSourceInvocation,
     purpose: FloatGridConsumerPurpose,
+    declaredGridSemantics: Boolean,
     prepare: (SelectedFloatGridConsumer, Cancellation) -> FloatGridPreparation,
 ): SelectedFloatGridPreparation {
     invocation.requireUnselectedFloatGrid()
@@ -84,7 +88,7 @@ private fun selectFloatGrid(
             ExecutionOperation.ENUMERATE) ||
         (purpose == FloatGridConsumerPurpose.HEURISTIC_VIEW && !invocation.request.engine.pureLocalSearch)
     ) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
-    val consumer = SelectedFloatGridConsumer(invocation, purpose)
+    val consumer = SelectedFloatGridConsumer(invocation, purpose, declaredGridSemantics)
     val projection = when (val result = prepare(consumer, stop)) {
         is FloatGridPreparation.Prepared -> result
         is FloatGridPreparation.Declined -> return SelectedFloatGridPreparation.Declined(

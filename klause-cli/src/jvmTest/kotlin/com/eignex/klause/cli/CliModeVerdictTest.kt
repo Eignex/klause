@@ -126,7 +126,7 @@ class CliModeVerdictTest {
     }
 
     @Test
-    fun `a published checked grid point should retain its source witness qualification`() {
+    fun `a declared grid solution should report completed search within grid scope`() {
         val program = parseFlatZinc("var 0.0..1.0: x :: output_var; " +
             "constraint float_le(x,0.5); solve satisfy;", floatBuckets = 3)
         val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
@@ -142,19 +142,19 @@ class CliModeVerdictTest {
         val out = capture { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
 
         assertTrue("x = " in out, out)
-        assertTrue("original source points checked" in out, out)
-        assertTrue("no global source proof" in out, out)
-        assertTrue("==========" !in out.lines(), out)
+        assertTrue("declared finite grid" in out, out)
+        assertTrue("no global continuous-source proof" in out, out)
+        assertTrue("==========" in out.lines(), out)
     }
 
     @Test
-    fun `a private grid result without source publications should not report checked original points`() {
+    fun `a rounded grid witness should publish under declared semantics`() {
         val program = parseFlatZinc("var 0.0..1.0: x; var 0.0..1.0: y; " +
             "constraint float_eq(x,0.5); constraint float_times(x,x,y); solve satisfy;", floatBuckets = 3)
         val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
             ExecutionOperation.SATISFY, FiniteEngine.FIXED))
         assertNotNull(invocation.floatProjection)
-        val solvable = Solvable(invocation.finiteShape(), { "unexpected source point" }, null)
+        val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it) }, null)
         val common = CommonOptions().apply {
             engine = "fixed"
             parallel = 1
@@ -163,35 +163,55 @@ class CliModeVerdictTest {
 
         val out = capture { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
 
-        assertTrue("=====UNKNOWN=====" in out, out)
+        assertTrue("==========" in out.lines(), out)
         assertTrue("scope=private-grid" in out, out)
         assertTrue("original source points checked" !in out, out)
-        assertTrue("unexpected source point" !in out, out)
+        assertTrue("x = 0.5;" in out && "y = 0.0;" in out, out)
     }
 
     @Test
-    fun `grid completion should not publish source refutation or unboundedness`() {
-        for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED)) {
-            val out = capture { MiniZincOutput(floatApproximation = true).onComplete(verdict) }
-
-            assertTrue("=====UNKNOWN=====" in out, out)
-            assertTrue("no global source proof" in out, out)
-            assertTrue("=====UNSATISFIABLE=====" !in out && "=====UNBOUNDED=====" !in out, out)
+    fun `declared grid refutation should report unsatisfiable within grid scope`() {
+        val program = parseFlatZinc("var 0.0..1.0: x; var 0.0..1.0: y; " +
+            "constraint float_eq(x,0.25); constraint float_times(x,x,y); solve satisfy;", floatBuckets = 3)
+        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+        assertTrue(assertNotNull(invocation.floatProjection).declaredGridSemantics)
+        val solvable = Solvable(invocation.finiteShape(), { "unexpected grid point" }, null)
+        val common = CommonOptions().apply {
+            engine = "fixed"
+            parallel = 1
+            randomSeed = 17
         }
+
+        val out = capture { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
+
+        assertTrue("=====UNSATISFIABLE=====" in out.lines(), out)
+        assertTrue("klause-grid-verdict: UNSAT" in out, out)
+        assertTrue("declared finite grid" in out, out)
+        assertTrue("unexpected grid point" !in out, out)
     }
 
     @Test
-    fun `grid incumbent should not publish a source optimum marker`() {
+    fun `a finite grid should withhold an unboundedness claim`() {
+        val out = capture { MiniZincOutput(floatApproximation = true).onComplete(Verdict.UNBOUNDED) }
+
+        assertTrue("=====UNKNOWN=====" in out.lines(), out)
+        assertTrue("=====UNBOUNDED=====" !in out, out)
+    }
+
+    @Test
+    fun `an interrupted grid incumbent should withhold an optimum marker`() {
         val out = capture {
             MiniZincOutput(floatApproximation = true).apply {
                 onSolution("x = 0.5;\n----------\n", 1L, null)
-                onComplete(Verdict.OPTIMAL)
+                onVerdictContext(VerdictContext(budgetExhausted = true))
+                onComplete(Verdict.BEST_FOUND)
             }
         }
 
         assertTrue("x = 0.5;\n----------" in out, out)
         assertTrue("==========" !in out, out)
-        assertTrue("source witness check required" in out, out)
+        assertTrue("declared finite grid" in out, out)
     }
 
     @Test

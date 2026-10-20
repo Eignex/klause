@@ -31,6 +31,9 @@ class SourceFloatGridCoordinate internal constructor(
 
 /** Immutable correspondence for a selected approximation, without source proof authority. */
 class SourceFloatProjection internal constructor(binding: SelectedFloatGridBinding) {
+    /** Whether publication reports claims under the declared grid interpretation. */
+    val declaredGridSemantics: Boolean = binding.consumer.declaredGridSemantics
+
     /** Original source attachment, whose real declarations remain authoritative. */
     val source: SourceAttachment = binding.consumer.invocation.source
 
@@ -67,7 +70,7 @@ class SourceFloatProjection internal constructor(binding: SelectedFloatGridBindi
     val maximize: Boolean = binding.consumer.invocation.request.maximize
 }
 
-/** Native private-grid result retained independently of original-source claim qualification. */
+/** Native private-grid result retained independently of publication claim qualification. */
 class NativeGridOutcome internal constructor(
     /** Immutable namespace and value correspondence for this result. */
     val projection: SourceFloatProjection,
