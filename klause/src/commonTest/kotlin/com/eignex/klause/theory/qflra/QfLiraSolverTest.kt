@@ -59,6 +59,51 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `independent equation blocks should expose a guarded cycle before unrelated Boolean choices`() {
+        val factors = arrayOf<Factor>(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(3)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(2)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                LinearOp.LE, BigFraction.ZERO, activator = 1),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2)),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), LinearOp.LE, BigFraction.MINUS_ONE),
+        ) + Array(148) { index ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(4 + 2 * index), Term.ofRealVar(5 + 2 * index)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO)
+        }
+        val source = Problem(3, 0, emptyArray(), factors, numRealVars = 300,
+            realLower = DoubleArray(300) { if (it == 3) 0.0 else Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(300) { if (it == 3) 0.0 else Double.POSITIVE_INFINITY })
+        val stats = SmtStatsSink()
+        var solves = 0
+        val component = ExactLiraSearchComponent(source)
+        component.observeWith(stats)
+        component.observeCompleteTraversal()
+        component.observePrimaryLpWith(object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { solves++ }
+        })
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        solves = 0
+
+        val result = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+            assertNotNull(result.explanation).literals.toSet())
+        assertNull(session.boolValue(2))
+        assertEquals(0, solves)
+        assertTrue((stats.snapshot().completeSearchStages?.get("PURE_REAL_EQUALITY_BLOCKS_ADMITTED") ?: 0L) > 0L)
+        session.popTo(1)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+        assertIs<SearchResult.Satisfied>(session.solve(3))
+    }
+
+    @Test
     fun `equation reduced paths should imply signed source guards through peers and retract their premises`() {
         val third = BigFraction.ofLong(3).reciprocal()
         val source = Problem(5, 0, emptyArray(), arrayOf(

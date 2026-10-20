@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntDisjointSet
 
 internal fun prepareMixedEqualityRepair(
     columns: Int,
@@ -57,7 +58,7 @@ internal fun equalityRowsRefute(
     var repair: MixedEqualityRepair? = null
     var reducedRows: List<ExactRationalInequality>? = null
     val refuted = when (val prepared = prepareEqualityRows(columns, rows, stop, onStage, paired,
-        proofs, onRefutationProof = { proof = it })) {
+        proofs, onRefutationProof = { proof = it }, independentBlocks = true)) {
         is EqualityRows.Prepared -> {
             repair = prepared.repair
             when (val residual = prepared.repair.reduceRows(rows,
@@ -148,8 +149,9 @@ internal fun prepareEqualityRows(
     onPairedRows: ((Int, Int) -> Unit)? = null,
     proofs: EqualityRowSupport? = null,
     onRefutationProof: ((Int) -> Unit)? = null,
+    independentBlocks: Boolean = false,
 ): EqualityRows {
-    if (!admitsEqualityRepairColumns(columns)) {
+    if (!admitsEqualityRepairColumns(columns) && (!independentBlocks || columns !in 1..10000)) {
         onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
         return EqualityRows.Declined
     }
@@ -193,6 +195,9 @@ internal fun prepareEqualityRows(
     }
     if (equalities.isEmpty()) {
         onStage?.invoke("RECOVERY_EQUALITY_NO_PAIRS")
+        return EqualityRows.Declined
+    }
+    if (!admitsEqualityRepairColumns(columns) && !admitEqualityBlocks(columns, equalities, stop, onStage)) {
         return EqualityRows.Declined
     }
     onStage?.invoke("RECOVERY_EQUALITY_PAIRED")
@@ -474,6 +479,52 @@ internal class EqualityRowSupport(private val rows: Int, private val stop: Cance
 }
 
 private data class MixedEqualityKey(val terms: List<Pair<Int, BigFraction>>, val bound: BigFraction)
+
+private fun admitEqualityBlocks(
+    columns: Int,
+    equalities: List<MixedEqualityKey>,
+    stop: Cancellation,
+    onStage: ((String) -> Unit)?,
+): Boolean {
+    val depth = Int.SIZE_BITS - columns.countLeadingZeroBits() + 1L
+    stop.charge(8L * columns * depth + 1L)
+    if (stop()) return false
+    val groups = IntDisjointSet(columns)
+    val sizes = IntArray(columns) { 1 }
+    var squares = columns.toLong()
+    var maximum = 1
+    for (equality in equalities) {
+        stop.charge(8L * equality.terms.size * depth + 1L)
+        if (stop()) return false
+        val first = equality.terms.first().first
+        for ((column, _) in equality.terms) {
+            var smaller = groups.find(first)
+            var larger = groups.find(column)
+            if (smaller == larger) continue
+            if (sizes[smaller] > sizes[larger]) {
+                val previous = smaller
+                smaller = larger
+                larger = previous
+            }
+            val next = squares + 2L * sizes[smaller] * sizes[larger]
+            if (next > MAX_REPAIR_ENTRIES) {
+                onStage?.invoke("PURE_REAL_EQUALITY_BLOCK_LIMIT")
+                return false
+            }
+            groups.union(smaller, larger)
+            sizes[larger] += sizes[smaller]
+            sizes[smaller] = 0
+            squares = next
+            maximum = maxOf(maximum, sizes[larger])
+        }
+    }
+    // Pivot fill stays inside a paired equation block; union by size bounds every parent walk.
+    stop.charge(squares + columns)
+    if (stop()) return false
+    onStage?.invoke("PURE_REAL_EQUALITY_BLOCKS_ADMITTED")
+    onStage?.invoke("PURE_REAL_EQUALITY_BLOCK_MAX_$maximum")
+    return !stop()
+}
 
 private fun admittedEqualityRow(row: ExactRationalInequality, columns: Int, work: MixedPointArithmetic): Boolean =
     row.columns.size == row.coefficients.size && row.columns.all { it in 0 until columns } &&

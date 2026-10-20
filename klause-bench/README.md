@@ -651,6 +651,9 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `smtCompleteSearchStage_PURE_REAL_DIFFERENCE_SUBSET_*` | Optional necessary graph admission, checks and source conflicts before the full linear query; no positive source coverage |
 | `smtCompleteSearchStage_PURE_REAL_DIFFERENCE_GUARD_IMPLIED` | Source guard consequences published from exact scaled difference paths before the next shared Boolean fixpoint |
 | `smtCompleteSearchStage_PURE_REAL_EQUALITY_GUARD_ATTEMPT` | Open general affine comparison heads queried against the current selected equation pivots |
+| `smtCompleteSearchStage_PURE_REAL_EQUALITY_BLOCKS_ADMITTED` | Large source namespaces whose paired equation blocks fit the shared 65,536-entry squared-size envelope |
+| `smtCompleteSearchStage_PURE_REAL_EQUALITY_BLOCK_MAX_*` | Maximum paired equation block width in an admitted large namespace, at most 256 |
+| `smtCompleteSearchStage_PURE_REAL_EQUALITY_BLOCK_LIMIT` | Equation partitions declined because their aggregate squared block sizes exceed the existing fill envelope |
 | `smtCompleteSearchStage_PURE_REAL_EQUALITY_GUARD_IMPLIED` | Constant comparison truths published with their selected equation premises before the next shared Boolean fixpoint |
 | `smtCompleteSearchStage_PURE_REAL_EQUALITY_REDUCED_GUARD_GRAPH` | Necessary residual difference rows and equation-reduced source comparison arms admitted to a check-local guard graph |
 | `smtCompleteSearchStage_PURE_REAL_EQUALITY_REDUCED_GUARD_IMPLIED` | Source guard deductions from reduced negative-cycle queries, retaining selected prefix and guarded path premises |

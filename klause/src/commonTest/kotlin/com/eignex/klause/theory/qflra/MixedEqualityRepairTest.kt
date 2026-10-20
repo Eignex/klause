@@ -20,6 +20,112 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `independent equation blocks should refute a large source with only its causal rows`() {
+        val rows = List(150) { index ->
+            listOf(
+                ExactRationalInequality(intArrayOf(2 * index, 2 * index + 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(2 * index, 2 * index + 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            )
+        }.flatten() + listOf(
+            exactColumnUpper(0, BigFraction.ZERO),
+            exactColumnLower(1, BigFraction.ONE),
+        )
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(300, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertTrue(refuted)
+        assertEquals(setOf(0, 1, 300, 301), assertNotNull(support).toSet())
+        assertNull(prepareMixedEqualityRepair(300, rows, Cancellation.Never))
+        assertFalse(equalityRowsRefute(300, rows.dropLast(1), Cancellation.Never))
+    }
+
+    @Test
+    fun `a connected equation block above the dense limit should withhold refutation`() {
+        val rows = List(256) { index ->
+            listOf(
+                ExactRationalInequality(intArrayOf(index, index + 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(index, index + 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            )
+        }.flatten() + listOf(exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(256, BigFraction.ONE))
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(257, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertFalse(refuted)
+        assertNull(support)
+    }
+
+    @Test
+    fun `independent equation blocks should share the aggregate dense storage limit`() {
+        val rows = List(4) { block ->
+            List(127) { offset ->
+                val index = 128 * block + offset
+                listOf(
+                    ExactRationalInequality(intArrayOf(index, index + 1),
+                        listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                    ExactRationalInequality(intArrayOf(index, index + 1),
+                        listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+                )
+            }.flatten()
+        }.flatten() + listOf(exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(127, BigFraction.ONE))
+
+        for ((columns, expected) in listOf(512 to true, 513 to false)) {
+            val refuted = equalityRowsRefute(columns, rows, Cancellation.Never)
+
+            assertEquals(expected, refuted)
+        }
+    }
+
+    @Test
+    fun `invalid input after independent equations should withhold a constant refutation`() {
+        val rows = List(150) { index ->
+            listOf(
+                ExactRationalInequality(intArrayOf(2 * index, 2 * index + 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(2 * index, 2 * index + 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            )
+        }.flatten() + listOf(
+            ExactRationalInequality(intArrayOf(), emptyList(), BigFraction.MINUS_ONE),
+            exactColumnUpper(300, BigFraction.ZERO),
+        )
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(300, rows, Cancellation.Never, onSupport = { support = it })
+
+        assertFalse(refuted)
+        assertNull(support)
+    }
+
+    @Test
+    fun `cancellation after equation block admission should withhold all source support`() {
+        val rows = List(150) { index ->
+            listOf(
+                ExactRationalInequality(intArrayOf(2 * index, 2 * index + 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(2 * index, 2 * index + 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            )
+        }.flatten() + listOf(exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(1, BigFraction.ONE))
+        var cancelled = false
+        var support: IntArray? = null
+
+        val refuted = equalityRowsRefute(300, rows, Cancellation { cancelled },
+            onStage = { if (it == "PURE_REAL_EQUALITY_BLOCKS_ADMITTED") cancelled = true },
+            onSupport = { support = it })
+
+        assertTrue(cancelled)
+        assertFalse(refuted)
+        assertNull(support)
+        assertTrue(equalityRowsRefute(300, rows, Cancellation.Never))
+    }
+
+    @Test
     fun `a reduced query should retain its free coordinates rational bound and strictness`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1, 2),

@@ -726,7 +726,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun equalityRefutationEligible(): Boolean = model.numIntVars == 0 &&
-        admitsEqualityRepairColumns(model.numRealVars) && preparedRows.size <= 65536 &&
+        model.numRealVars in 1..10000 && preparedRows.size <= 65536 &&
         !model.semantics.isApproximate && solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
     private fun equalityRefutation(context: SearchContext): ComponentResult? {
@@ -2304,7 +2304,7 @@ private class ExactLiraReductionCache(
     ): List<ExactRationalInequality>? = captureRows(bools, node, cancellation)
 
     fun refutationRows(bools: IntArray, node: SearchNode, cancellation: Cancellation): SourceRefutationRows? {
-        if (model.numIntVars != 0 || !admitsEqualityRepairColumns(model.numRealVars)) return null
+        if (model.numIntVars != 0 || model.numRealVars !in 1..10000) return null
         val origins = ArrayList<EqualityRowOrigin>()
         val rows = captureRows(bools, node, cancellation, origins, partial = true) ?: return null
         return SourceRefutationRows(rows, origins)
@@ -2319,11 +2319,13 @@ private class ExactLiraReductionCache(
     ): List<ExactRationalInequality>? {
         if (origins != null && (model.numIntVars != 0 || origins.isNotEmpty())) return null
         val rows = ArrayList<ExactRationalInequality>()
+        var capturedEntries = 0L
         fun recordOrigin(start: Int, origin: EqualityRowOrigin): Boolean {
             if (origins == null) return true
             val count = rows.size - start
             cancellation.charge(count.toLong() + 2L)
-            if (rows.size > 65536 || cancellation()) return false
+            for (index in start until rows.size) capturedEntries += rows[index].columns.size + 1L
+            if (rows.size > 65536 || capturedEntries > 65536L || cancellation()) return false
             repeat(count) { origins.add(origin) }
             return true
         }
@@ -2360,6 +2362,11 @@ private class ExactLiraReductionCache(
             if (origins != null && comparison.op == LinearOp.NE && direction == null) {
                 if (partial) return@forEachSelectedRow else return null
             }
+            if (origins != null) {
+                val count = if (comparison.op == LinearOp.EQ) 2L else 1L
+                cancellation.charge(count * (comparison.terms.size + 1L))
+                if (capturedEntries + count * (comparison.terms.size + 1L) > 65536L || cancellation()) return null
+            }
             val start = rows.size
             comparison.rowsInto(rows, direction)
             if (origins != null && !recordOrigin(start,
@@ -2368,6 +2375,10 @@ private class ExactLiraReductionCache(
         }
         for (atom in node.sourceBranches) {
             if (cancellation()) return null
+            if (origins != null) {
+                cancellation.charge(model.numRealVars.toLong() + 1L)
+                if (cancellation() || capturedEntries + atom.terms.size + 1L > 65536L) return null
+            }
             val start = rows.size
             rows += atom.sourceRows(model.numRealVars)
             if (origins != null && !recordOrigin(start, EqualityRowOrigin.Branch(atom))) return null

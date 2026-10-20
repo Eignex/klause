@@ -150,8 +150,15 @@ Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
 insufficient. Strict infeasibility requires a completed strict-feasibility check.
 
 Pure-real checks can first eliminate paired opposite closed source rows as equations
-over a necessary subset with known Boolean and branch premises. Inconsistent
-equations, a false reduced constant or a negative reduced difference cycle reject
+over a necessary subset with known Boolean and branch premises. A source namespace
+of at most 10,000 real columns can admit independent equation blocks within a
+shared 65,536-entry worst-case fill envelope:
+the sum of squared block sizes must fit, including singleton columns. Each block
+therefore retains the 256-column maximum. Pivot fill cannot cross these blocks.
+Full source-row admission precedes partitioning, and partition metadata, sparse
+elimination and proof expansion use the current allowance. Positive mixed-point
+preparation and general residual LP dimensions retain their separate admission.
+Inconsistent equations, a false reduced constant or a negative reduced difference cycle reject
 only that prefix. Once all source Booleans are assigned, general reduced components
 can compact surviving coordinates and proportional rows before using the reduction
 owner's existing source-LP budget and dimension limit. A necessary difference subset
