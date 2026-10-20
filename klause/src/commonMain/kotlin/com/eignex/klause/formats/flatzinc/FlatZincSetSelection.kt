@@ -12,10 +12,12 @@ internal fun FlatZincCompiler.emitSetSelection(constraint: FznConstraint, variab
     val result = resolveSetVar(constraint.args[2])
     val variableRows = if (variableArray) resolveSetVarArray(constraint.args[1]) else null
     val constantRows = if (variableArray) null else {
-        val name = (constraint.args[1] as? FznExpr.Ident)?.name
-            ?: failHere("array_set_element: second arg must be an array identifier")
-        (arrays[name] as? FlatZincArray.IntSetParam)?.values
-            ?: failHere("array_set_element: expected array of set-of-int parameters")
+        when (val argument = constraint.args[1]) {
+            is FznExpr.ArrayLit -> argument.elements.map { resolveSetLiteral(it) }
+            is FznExpr.Ident -> (arrays[argument.name] as? FlatZincArray.IntSetParam)?.values
+                ?: failHere("array_set_element: expected array of set-of-int parameters")
+            else -> failHere("array_set_element: expected a constant set array")
+        }
     }
     val count = variableRows?.size ?: checkNotNull(constantRows).size
     if (count == 0) {

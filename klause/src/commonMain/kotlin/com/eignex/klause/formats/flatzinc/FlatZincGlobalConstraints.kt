@@ -90,13 +90,13 @@ internal fun FlatZincCompiler.emitSymmetricAllDifferent(c: FznConstraint) {
 internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
     expectArity(c, 6)
     val seq = evalIntVarArray(c.args[0])
-    val numStates = evalIntConst(c.args[1]).toInt()
-    val numSymbols = evalIntConst(c.args[2]).toInt()
+    val numStates = checkedIntConstant(evalIntConst(c.args[1]))
+    val numSymbols = checkedIntConstant(evalIntConst(c.args[2]))
     val transitions = evalIntConstArrayLong(c.args[3])
-    val q0 = evalIntConst(c.args[4]).toInt()
+    val q0 = checkedIntConstant(evalIntConst(c.args[4]))
     val accepting: IntArray = when (val fSet = c.args[5]) {
-        is FznExpr.IntSetLit -> IntArray(fSet.values.size) { fSet.values[it].toInt() }
-        is FznExpr.IntRangeLit -> IntArray((fSet.hi - fSet.lo + 1).toInt()) { (fSet.lo + it).toInt() }
+        is FznExpr.IntSetLit -> IntArray(fSet.values.size) { checkedIntConstant(fSet.values[it]) }
+        is FznExpr.IntRangeLit -> resolveSetLiteral(fSet)
         else -> failHere("regular: expected set literal for F, got ${fSet::class.simpleName}")
     }
     factors.add(Regular(seq, numStates, numSymbols, transitions, q0, accepting))
@@ -232,9 +232,9 @@ internal fun FlatZincCompiler.emitInverse(c: FznConstraint, withOffsets: Boolean
     if (withOffsets) {
         expectArity(c, 4)
         val f = evalIntVarArray(c.args[0])
-        val fOff = evalIntConst(c.args[1]).toInt()
+        val fOff = checkedIntConstant(evalIntConst(c.args[1]))
         val g = evalIntVarArray(c.args[2])
-        val gOff = evalIntConst(c.args[3]).toInt()
+        val gOff = checkedIntConstant(evalIntConst(c.args[3]))
         factors.add(Inverse(f, g, fOff, gOff))
     } else {
         expectArity(c, 2)
@@ -293,14 +293,15 @@ internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
 
 internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
     expectArity(c, 4)
-    val low = evalIntConst(c.args[0]).toInt()
-    val up = evalIntConst(c.args[1]).toInt()
-    val seq = evalIntConst(c.args[2]).toInt()
+    val low = evalIntConst(c.args[0])
+    val up = evalIntConst(c.args[1])
+    val seq = checkedIntConstant(evalIntConst(c.args[2]))
+    if (seq <= 0) unsupportedHere("sliding_sum requires a positive window length")
     val vs = evalIntVarArray(c.args[3])
     for (w in 0..vs.size - seq) {
         val window = IntArray(seq) { vs[w + it] }
-        factors.add(Linear(IntArray(seq) { 1 }, window.copyOf(), LinearOp.GE, low))
-        factors.add(Linear(IntArray(seq) { 1 }, window, LinearOp.LE, up))
+        factors.add(Linear(LongArray(seq) { 1 }, window.copyOf(), LinearOp.GE, low))
+        factors.add(Linear(LongArray(seq) { 1 }, window, LinearOp.LE, up))
     }
 }
 
