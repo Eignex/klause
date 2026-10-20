@@ -76,6 +76,12 @@ and stores into the native clause database. The shared first-UIP analyzer in
 asserts and backjumps, while a sound resolvent that cannot assert keeps chronological
 fallback. Unexplained component publications cannot supply missing antecedents.
 
+Before choosing a shared conflict's backjump level, direct self-subsuming resolution
+removes a lower-level guard when its current reason resolves to a strict subset of
+the retained clause. Each deletion uses the clause left by earlier deletions, and
+the asserting literal is retained. The pass charges the containing cancellation
+token and keeps its last proved clause if interrupted.
+
 ## Native SAT lane
 
 A pure-Boolean model whose factors are all clauses runs on a dedicated lane. The

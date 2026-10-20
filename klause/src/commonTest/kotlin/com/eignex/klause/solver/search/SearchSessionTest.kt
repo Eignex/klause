@@ -387,6 +387,167 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `shared minimization removes a lower guard justified by retained literals`() {
+        for ((premise, consequence) in listOf(0 to 2, 1 to 3)) {
+            val session = SearchSession(listOf(ClauseSearchComponent(listOf(
+                Clause(intArrayOf(premise xor 1, consequence)),
+            ))))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(premise)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(4)))
+
+            val result = session.explainedConflict(SearchExplanation(intArrayOf(premise xor 1, consequence xor 1, 5)))
+
+            val learned = assertIs<SearchConflictResolution.Backjump>(result).conflict
+            assertEquals(setOf(premise xor 1, 5), learned.guardLiterals.toSet())
+        }
+    }
+
+    @Test
+    fun `shared minimization retains a guard with a reason outside the clause`() {
+        val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(1, 2))))))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(4)))
+
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(3, 5)))
+
+        assertEquals(setOf(3, 5), assertIs<SearchConflictResolution.Backjump>(result).conflict.guardLiterals.toSet())
+    }
+
+    @Test
+    fun `shared minimization retains lower decisions without reasons`() {
+        val session = SearchSession(emptyList())
+        for (literal in listOf(0, 2, 4)) {
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(literal)))
+        }
+
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(1, 3, 5)))
+
+        assertEquals(setOf(1, 3, 5), assertIs<SearchConflictResolution.Backjump>(result).conflict.guardLiterals.toSet())
+    }
+
+    @Test
+    fun `each shared minimization deletion uses the clause left by earlier deletions`() {
+        val session = SearchSession(listOf(ClauseSearchComponent(listOf(
+            Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)),
+        ))))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(6)))
+
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(1, 3, 5, 7)))
+
+        assertEquals(setOf(1, 5, 7), assertIs<SearchConflictResolution.Backjump>(result).conflict.guardLiterals.toSet())
+    }
+
+    @Test
+    fun `shared minimization preserves the asserting literal with a lower level reason`() {
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(4)))
+        assertIs<ComponentResult.Consistent>(session.imply(2, SearchExplanation(intArrayOf(1, 2))))
+
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(1, 3)))
+
+        assertEquals(setOf(1, 3), assertIs<SearchConflictResolution.Backjump>(result).conflict.guardLiterals.toSet())
+    }
+
+    @Test
+    fun `shared minimization computes the backjump from the retained clause`() {
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(6)))
+        assertIs<ComponentResult.Consistent>(session.imply(2, SearchExplanation(intArrayOf(1, 2))))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(4)))
+
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(1, 3, 5)))
+
+        val learned = assertIs<SearchConflictResolution.Backjump>(result).conflict
+        assertEquals(1, learned.decisionLevel)
+        assertEquals(setOf(1, 3), learned.decisionLevels.toSet())
+        assertEquals(2, learned.lbd)
+    }
+
+    @Test
+    fun `shared minimization uses publisher reasons only when available`() {
+        for (explains in listOf(false, true)) {
+            val session = SearchSession(listOf(ExplainingPublisher(explains)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(8)))
+
+            val result = session.explainedConflict(SearchExplanation(intArrayOf(5, 7, 9)))
+
+            val expected = if (explains) setOf(5, 9) else setOf(5, 7, 9)
+            assertEquals(expected, assertIs<SearchConflictResolution.Backjump>(result).conflict.guardLiterals.toSet())
+        }
+    }
+
+    @Test
+    fun `shared minimization refuses a reason with a currently true antecedent`() {
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(6)))
+        assertIs<ComponentResult.Consistent>(session.imply(2, SearchExplanation(intArrayOf(1, 2, 6))))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(4)))
+
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(1, 3, 5, 7)))
+
+        val learned = assertIs<SearchConflictResolution.Backjump>(result).conflict
+        assertEquals(setOf(1, 3, 5, 7), learned.guardLiterals.toSet())
+    }
+
+    @Test
+    fun `cancelled shared minimization retains the already proved clause`() {
+        var stopped = false
+        val session = SearchSession(emptyList(), cancellation = Cancellation { stopped })
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(6)))
+        assertIs<ComponentResult.Consistent>(session.imply(2, SearchExplanation(intArrayOf(1, 2))))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(4)))
+        stopped = true
+
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(1, 3, 5)))
+
+        val learned = assertIs<SearchConflictResolution.Backjump>(result).conflict
+        assertEquals(setOf(1, 3, 5), learned.guardLiterals.toSet())
+        assertEquals(2, learned.decisionLevel)
+    }
+
+    @Test
+    fun `shared minimization does not reuse a reason after its assignment is retracted`() {
+        val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(1, 2))))))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(4)))
+        session.explainedConflict(SearchExplanation(intArrayOf(1, 3, 5)))
+        session.popTo(0)
+        for (literal in listOf(1, 2, 4)) {
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(literal)))
+        }
+
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(0, 3, 5)))
+
+        assertEquals(setOf(0, 3, 5), assertIs<SearchConflictResolution.Backjump>(result).conflict.guardLiterals.toSet())
+    }
+
+    @Test
+    fun `a minimized shared clause asserts after the backjump`() {
+        val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(1, 2))))))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(4)))
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(1, 3, 5)))
+        val learned = assertIs<SearchConflictResolution.Backjump>(result).conflict
+        session.popTo(learned.decisionLevel)
+
+        assertIs<SearchLearnedConflictResult.Resume>(learned.apply(session))
+
+        assertEquals(false, session.boolValue(2))
+        assertEquals(1, session.learnedClauseCount)
+    }
+
+    @Test
     fun `shared analysis should identify a root explanation as exhausted`() {
         val session = SearchSession(emptyList())
         session.learn(SearchExplanation(intArrayOf(0)))

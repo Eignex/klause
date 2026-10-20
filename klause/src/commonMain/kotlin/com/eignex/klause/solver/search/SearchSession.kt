@@ -481,6 +481,7 @@ class SearchSession(
             val conflictLevel = clause.maxOf { literal -> levelOf(literal) }
             if (conflictLevel == 0) return SearchConflictResolution.Exhausted
             if (clause.count { literal -> levelOf(literal) == conflictLevel } == 1) {
+                clause = minimizeConflict(clause, conflictLevel)
                 val levels = clause.map { literal -> levelOf(literal) }
                     .distinct()
                     .sorted()
@@ -495,6 +496,25 @@ class SearchSession(
             val pivot = latestResolvableLiteral(clause, conflictLevel) ?: return retainUnasserting(clause)
             clause = resolve(clause, pivot.first, pivot.second) ?: return retainUnasserting(clause)
         }
+    }
+
+    private fun minimizeConflict(clause: List<Int>, conflictLevel: Int): List<Int> {
+        var retained = clause
+        val stop = executionControls.cancellation
+        for (literal in clause) {
+            stop.charge(retained.size.toLong() + 1L)
+            if (stop() || executionControls.exhausted) break
+            if (levelOf(literal) == conflictLevel) continue
+            val reason = reasonOf(literal ushr 1, literal xor 1) ?: continue
+            stop.charge(retained.size.toLong() + reason.literals.size.toLong() + 1L)
+            if (stop() || executionControls.exhausted) break
+            val resolvent = resolve(retained, literal, reason) ?: continue
+            stop.charge(resolvent.size.toLong() * retained.size + 1L)
+            if (stop() || executionControls.exhausted) break
+            // Each deletion uses the retained clause, so removed guards cannot justify each other.
+            if (resolvent.size < retained.size && resolvent.all { it in retained }) retained = resolvent
+        }
+        return retained
     }
 
     /**
