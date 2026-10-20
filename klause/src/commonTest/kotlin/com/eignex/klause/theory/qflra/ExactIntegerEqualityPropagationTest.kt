@@ -335,6 +335,7 @@ class ExactIntegerEqualityPropagationTest {
             ),
         )
         ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
