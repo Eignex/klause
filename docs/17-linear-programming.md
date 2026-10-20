@@ -38,6 +38,13 @@ the default factory; `ComponentLpSolver` composes it for component-wise OBBT.
 outside it, and consumers use interfaces and factories. See
 [system boundaries](01-introduction.md#system-architecture).
 
+`lp.lattice` also owns the bounded native
+[UnitEqualityBasis](../klause/src/commonMain/kotlin/com/eignex/klause/lp/lattice/UnitEqualityBasis.kt).
+Its sparse echelon rows use unit leading coefficients and checked integer
+elimination, retaining generic input-row support. Source adapters interpret that
+support; the kernel knows no factors, guards or search state. Storage or arithmetic
+decline establishes no contradiction, bound or witness.
+
 ## Exact source row projections
 
 Native exact linear rows keep their rational source meaning independently of

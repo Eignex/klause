@@ -165,7 +165,17 @@ before publishing a completed point.
 Assertion, partial checks and conflict explanations work as in the
 [linear real component](#solving-and-composition). Integer
 coordinates enter the LP as columns with their exact source bounds, including
-values beyond `Long`. Once every Boolean is assigned, the complete check decides
+values beyond `Long`.
+
+Complete production integer-only openings can combine active native equalities in
+a sparse unit-pivot basis. A source comparison whose reduced activity is constant
+can imply its Boolean guard or conflict with its assigned guard. Every deduction
+uses a stored pivot over at least three remaining coordinates and carries the original
+equality guards as premises. The basis is rebuilt per callback; retraction cannot
+retain its facts. Nonunit pivots, overflow, storage limits and exhausted work
+withhold optional deductions. This supplies no point or feasibility verdict.
+
+Once every Boolean is assigned, the complete check decides
 the remaining integer alternatives in a fixed order:
 
 1. **Finite integers.** An unfixed finite integer is decided first, trying its
@@ -179,8 +189,8 @@ the remaining integer alternatives in a fixed order:
 4. **Plain branching.** When the reduction declines, a fractional open integer
    `x = v` splits at `x <= floor(v)` and `x >= floor(v) + 1`.
 
-The theory adds no cutting planes: integrality is enforced only by these
-exhaustive splits and the reduction. Every split is a named source-bound atom, so
+The theory adds no cutting planes: integrality follows from source-proved
+propagation, these exhaustive splits and the reduction. Every split is a named source-bound atom, so
 conflict learning can cite it like any Boolean.
 
 #### The double-bounded reduction

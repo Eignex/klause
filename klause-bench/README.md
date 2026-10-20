@@ -248,6 +248,16 @@ can contain only declined preferences. Release counts a live default consultatio
 not avoided registration or capture work. These observations add no numerical
 invocation and establish neither a timing cause nor a whole-source witness gain.
 
+`smtCompleteSearchStage_SPARSE_EQUALITY_*` records unit-pivot equality preparation
+and source guard deductions. `PIVOT` counts stored equations; `WIDE_PIVOT` counts
+those retaining at least three coordinates after reduction.
+`ROW_UNSTORED` includes dependent and nonunit rows. `ROW_DECLINED`,
+`TARGET_DECLINED`, `DECLINED_STORAGE` and `DECLINED_WORK` withhold optional work.
+`MATCH` names a needed constant consequence supported by a wider equality;
+`PUBLISHED` and `RECEIVED` distinguish Boolean implication and arithmetic delivery.
+`CONFLICT` carries a checked source clause. These counts establish neither a native
+verdict recovery nor CPU attribution.
+
 `lab files` lists a job's files and `lab cat <id> <path> [tail-bytes]` prints one, such as
 `job.log`, `setup.log` or `cases/<index>/record.json`, over HTTP: reading a job needs no SSH.
 `lab ssh <id> [instance] [command]` reaches a running AWS job's instance. Measure as a lab
