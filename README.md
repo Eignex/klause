@@ -47,6 +47,15 @@ Compared with the others:
 - **Z3** runs its simplex in exact rational arithmetic throughout. Klause does the heavy work in floating point and spends exact arithmetic only on certification.
 - **CP-SAT** also runs an LP inside its search, but over integer variables only. Klause's LP carries continuous columns too, so the same engine serves MIP, CP relaxations and real arithmetic.
 
+## Limitations
+
+- Klause is young. On problems squarely in another solver's domain, such as large MIPs, hard SAT instances or SMT benchmarks, the established solvers are usually much faster.
+- Nonlinear integer and transcendental arithmetic are incomplete: Klause can find and check solutions, but may stop with an unknown result instead of a proof. Nonconvex quadratic objectives get no global optimality claim when a branch stays unresolved.
+- SMT-LIB support covers quantifier-free arithmetic only. Bit-vectors, arrays, strings, quantifiers, uninterpreted functions and incremental solving are rejected.
+- Nonlinear float constraints in FlatZinc can run on a finite grid approximation, which never proves an exact optimum or infeasibility.
+- Proofs are checked in memory, but Klause cannot yet export proof files for an independent checker.
+- Not every kind of model has every search style yet; local search and portfolio coverage still have gaps.
+
 ## Documentation
 
 User documentation is at [eignex.com/docs/klause](https://eignex.com/docs/klause/). The internal developer documentation is a book; start at its [table of contents](docs/README.md).
