@@ -9,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty
 import org.junit.jupiter.api.condition.EnabledOnOs
@@ -71,6 +72,41 @@ class SmtSourceReceiptTest {
         assertEquals(status == "valid", SmtSourceValidation.apply(record, result).proven)
         assertEquals("1", result.stats["sourceValidationSolverQueries"])
         assertEquals("false", result.stats["sourceValidationProofChecked"])
+    }
+
+    @ParameterizedTest
+    @CsvSource("Z3,z3-reference", "CVC5,cvc5-reference")
+    @EnabledOnOs(OS.LINUX)
+    fun `selected refutation solvers retain their command and producer bindings`(name: String, checker: String) {
+        val source = "(set-logic QF_LIA)\n(assert false)\n(check-sat)\n".toByteArray()
+        val raw = "unsat\n"
+        val record = SolveRecord("original", "klause", "cp", 1, "free", 3, 10_000,
+            "satisfy", false, false, null, null, proven = true, stats = mapOf("exit" to "0"),
+            gitSha = "producer", timestamp = "t", command = "cli original.smt2",
+            sourceHashes = mapOf("model" to sha256(source)), sourceOutputSha256 = sha256(raw.toByteArray()),
+            validationPolicy = SMT_SOURCE_POLICY)
+        val binary = File(directory, "tool").absoluteFile.apply {
+            writeText("#!/bin/sh\nprintf '%s\\n' \"\$@\" > arguments.txt\nprintf 'unsat\\n'\n")
+            check(setExecutable(true, true))
+        }
+        val solver = SmtSourceValidation.RefutationSolver.valueOf(name)
+        val tool = SmtSourceValidation.Tool(binary, sha256(binary.readBytes()), refutationSolver = solver)
+        val out = File(directory, "check")
+
+        val result = SmtSourceValidation.validateOriginal(source, record, raw, out, tool)
+        val receipt = Reports.json.decodeFromString<SmtSourceValidation.Receipt>(
+            result.stats.getValue("sourceValidationReceiptJson"))
+
+        assertEquals("valid", result.validation.status)
+        assertEquals(checker, receipt.checker)
+        assertEquals(tool.binarySha256, receipt.executableSha256)
+        assertEquals(listOf("source.smt2", "model.smt2", "response.rsmt2", "stdout.txt", "record.json")
+            .associateWith { sha256(File(out, it).readBytes()) }, receipt.bindings)
+        val expected = if (name == "Z3") listOf("-smt2", "-T:30", "-memory:4096")
+            else listOf("--lang=smt2", "--tlimit=30000")
+        assertEquals(expected + File(out, "source.smt2").absolutePath, File(out, "arguments.txt").readLines())
+        assertEquals("1", result.stats["sourceValidationSolverQueries"])
+        assertTrue(SmtSourceValidation.apply(record, result).proven)
     }
 
     @ParameterizedTest

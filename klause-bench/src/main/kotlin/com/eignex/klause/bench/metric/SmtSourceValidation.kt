@@ -22,12 +22,23 @@ internal object SmtSourceValidation {
 
     internal data class Result(val validation: SourceValidation, val stats: Map<String, String> = emptyMap())
 
+    internal enum class RefutationSolver(val checker: String, val displayName: String) {
+        Z3("z3-reference", "Z3"),
+        CVC5("cvc5-reference", "cvc5");
+
+        fun arguments(source: File): List<String> = when (this) {
+            Z3 -> listOf("-smt2", "-T:30", "-memory:4096", source.absolutePath)
+            CVC5 -> listOf("--lang=smt2", "--tlimit=30000", source.absolutePath)
+        }
+    }
+
     internal data class Tool(
         val executable: File,
         val binarySha256: String,
         val artifactUrl: String? = null,
         val artifactSha256: String? = null,
         val owned: Boolean = false,
+        val refutationSolver: RefutationSolver = RefutationSolver.Z3,
     ) : AutoCloseable {
         fun verify() {
             require(executable.isAbsolute && executable.isFile && executable.canExecute()) {
@@ -146,7 +157,7 @@ internal object SmtSourceValidation {
             listOf("--time=30s", "--size=4G", "--strict=false", "--check-model=true",
                 "--report-style=minimal", "--warn=-all", File(out, "source.smt2").absolutePath)
         } else {
-            listOf("-smt2", "-T:30", "-memory:4096", File(out, "source.smt2").absolutePath)
+            tool.refutationSolver.arguments(File(out, "source.smt2"))
         }
         val process = SmtSourceReceipt.run(arguments, File(out, "response.rsmt2"), out, 35_000)
         tool.verify()
@@ -154,7 +165,7 @@ internal object SmtSourceValidation {
             "checker inputs changed"
         }
         val status = interpret(scope, process)
-        val checker = if (scope == GROUND) "dolmen" else "z3-reference"
+        val checker = if (scope == GROUND) "dolmen" else tool.refutationSolver.checker
         val queries = if (scope == GROUND) 0 else if (process.exit == 0 && !process.timedOut &&
             process.cleanupComplete && process.stdout.trim() in setOf("sat", "unsat", "unknown")) 1 else null
         val receipt = Receipt(SMT_SOURCE_POLICY, checker, scope, inputs.mapValues { sha256(it.value) },
@@ -166,7 +177,7 @@ internal object SmtSourceValidation {
             "valid" -> if (scope == GROUND) {
                 "Dolmen accepted the original-source model"
             } else {
-                "Z3 returned UNSAT on the original source"
+                "${tool.refutationSolver.displayName} returned UNSAT on the original source"
             }
             "invalid" -> "Dolmen rejected the original-source model"
             else -> when {

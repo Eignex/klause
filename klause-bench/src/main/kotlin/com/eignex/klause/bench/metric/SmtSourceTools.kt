@@ -11,17 +11,25 @@ internal object SmtSourceTools {
 
     private data class Artifact(val url: String, val digest: String, val entry: String? = null)
 
-    fun resolve(scope: String, directory: File): SmtSourceValidation.Tool {
-        val name = if (scope == SmtSourceValidation.GROUND) "DOLMEN" else "Z3"
+    fun resolve(
+        scope: String,
+        directory: File,
+        refutationSolver: SmtSourceValidation.RefutationSolver = SmtSourceValidation.RefutationSolver.Z3,
+    ): SmtSourceValidation.Tool {
+        val name = if (scope == SmtSourceValidation.GROUND) "DOLMEN" else refutationSolver.name
         val executable = System.getenv("KLAUSE_$name")
         val digest = System.getenv("KLAUSE_${name}_SHA256")
         require((executable == null) == (digest == null)) { "KLAUSE_$name and its SHA256 must be configured together" }
-        return if (executable == null) provision(scope, directory) else {
-            SmtSourceValidation.Tool(File(executable), requireNotNull(digest))
+        return if (executable == null) provision(scope, directory, refutationSolver) else {
+            SmtSourceValidation.Tool(File(executable), requireNotNull(digest), refutationSolver = refutationSolver)
         }
     }
 
-    fun provision(scope: String, directory: File): SmtSourceValidation.Tool {
+    fun provision(
+        scope: String,
+        directory: File,
+        refutationSolver: SmtSourceValidation.RefutationSolver = SmtSourceValidation.RefutationSolver.Z3,
+    ): SmtSourceValidation.Tool {
         require(scope in setOf(SmtSourceValidation.GROUND, SmtSourceValidation.REFUTATION))
         val mac = System.getProperty("os.name") == "Mac OS X"
         val linux = System.getProperty("os.name") == "Linux"
@@ -38,6 +46,19 @@ internal object SmtSourceTools {
                     "2141ed2e479f4a0fd97723f34f42cae66156a8c5a20d29da919b12b373da47a1")
                 else -> error("no pinned Dolmen release for this platform; configure an external executable")
             }
+        } else if (refutationSolver == SmtSourceValidation.RefutationSolver.CVC5) {
+            val (name, digest) = when {
+                linux && x64 -> "cvc5-Linux-x86_64-static" to
+                    "7eb18f8c814c36a46c5a7d003983e9cfbc4b0a9828d6dd596239291bd4cc61d8"
+                linux && arm -> "cvc5-Linux-arm64-static" to
+                    "765ebee59d9e5efccb60a445fa66fbddfb07a8de9fe7a5b6d128e5c2aafec974"
+                mac && arm -> "cvc5-macOS-arm64-static" to
+                    "24397f7d022e755876ca836193d4c5f9c1d4326f0f6c01f7d7fc1ddd6bc5096c"
+                mac && x64 -> "cvc5-macOS-x86_64-static" to
+                    "f2bbbfe089c77c4a676dd05f262eee86b9718c32374c424138c416024ff42477"
+                else -> error("no pinned cvc5 release for this platform; configure an external executable")
+            }
+            Artifact("https://github.com/cvc5/cvc5/releases/download/cvc5-1.4.2/$name.zip", digest, "$name/bin/cvc5")
         } else {
             val (name, digest) = when {
                 linux && x64 -> "z3-4.15.3-x64-glibc-2.39" to
@@ -63,9 +84,10 @@ internal object SmtSourceTools {
         }
         require(bytes.size in 1..MAX_BINARY_BYTES) { "external checker executable exceeds limit" }
         check(directory.isDirectory || directory.mkdirs())
-        val binary = File(directory, if (dolmen) "dolmen" else "z3").absoluteFile
+        val binary = File(directory, if (dolmen) "dolmen" else refutationSolver.name.lowercase()).absoluteFile
         check(!binary.exists()) { "external checker staging path exists" }
-        val tool = SmtSourceValidation.Tool(binary, sha256(bytes), artifact.url, artifact.digest, owned = true)
+        val tool = SmtSourceValidation.Tool(binary, sha256(bytes), artifact.url, artifact.digest, owned = true,
+            refutationSolver = refutationSolver)
         var complete = false
         try {
             binary.writeBytes(bytes)
