@@ -210,8 +210,9 @@ class ExactLiraSearchComponent private constructor(
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
-    private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
-    private val necessaryDifference by lazy {
+    private val realDifferenceState = lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
+    private val realDifference by realDifferenceState
+    private val necessaryDifferenceState = lazy {
         RealDifferenceSystem.prepareNecessary(model, exactForms, operationStop) {
             observeCompleteStage("PURE_REAL_DIFFERENCE_SUBSET_$it")
         }.also {
@@ -219,6 +220,7 @@ class ExactLiraSearchComponent private constructor(
                 "PURE_REAL_DIFFERENCE_SUBSET_ADMITTED")
         }
     }
+    private val necessaryDifference by necessaryDifferenceState
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -1318,6 +1320,12 @@ class ExactLiraSearchComponent private constructor(
                 }
                 is RealDifferenceSystem.Result.Feasible -> {
                     if (bools.any { it == UNASSIGNED }) {
+                        var implied = false
+                        val propagation = realDifference?.implyGuards(context, operationStop) {
+                            implied = true
+                            observeCompleteStage("PURE_REAL_DIFFERENCE_GUARD_IMPLIED")
+                        } ?: ComponentResult.Consistent
+                        if (propagation != ComponentResult.Consistent || implied) return propagation
                         if (pointHintRows != null) {
                             operationStop.charge(model.numRealVars.toLong() + 1L)
                             if (!operationStop()) capturePointHints(result.point, context, graph = true)
@@ -1364,6 +1372,14 @@ class ExactLiraSearchComponent private constructor(
                         if (it is ComponentResult.Conflict) observeCompleteStage("PURE_REAL_DIFFERENCE_SUBSET_REFUTED")
                         return it
                     }
+                }
+                if (bools.any { it == UNASSIGNED }) {
+                    var implied = false
+                    val propagation = subset.implyGuards(context, operationStop) {
+                        implied = true
+                        observeCompleteStage("PURE_REAL_DIFFERENCE_GUARD_IMPLIED")
+                    }
+                    if (propagation != ComponentResult.Consistent || implied) return propagation
                 }
             }
         }
@@ -1689,6 +1705,8 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        if (realDifferenceState.isInitialized()) realDifferenceState.value?.retractGuards()
+        if (necessaryDifferenceState.isInitialized()) necessaryDifferenceState.value?.retractGuards()
         invalidateWholePoint?.invoke()
         for (index in sourceAssertionLevels.indices) {
             if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1

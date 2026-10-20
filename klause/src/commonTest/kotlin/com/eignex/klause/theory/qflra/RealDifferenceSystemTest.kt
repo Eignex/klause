@@ -16,6 +16,8 @@ import com.eignex.klause.lp.exactForm
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
@@ -29,6 +31,85 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RealDifferenceSystemTest {
+    @Test
+    fun `a rational strict cycle should imply either signed guard without assigning unused real columns`() {
+        val third = BigFraction.ofLong(3).reciprocal()
+        for (truth in listOf(false, true)) {
+            val model = Problem(1, 0, emptyArray(), arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(2)),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE, third),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(2)),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE),
+                    if (truth) LinearOp.GE else LinearOp.LE, third.negated(), strict = !truth, activator = 0),
+            ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+            val forms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(3) } }
+            val system = assertNotNull(RealDifferenceSystem.prepare(model, forms))
+            val context = SearchSession(emptyList())
+            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1), Cancellation.Never))
+
+            val result = system.implyGuards(context, Cancellation.Never) {}
+
+            assertIs<ComponentResult.Consistent>(result)
+            assertEquals(truth, context.boolValue(0))
+            assertContentEquals(intArrayOf(Lit.make(0, truth)), assertNotNull(context.reasonFor(0)).literals)
+        }
+    }
+
+    @Test
+    fun `a strict cycle with positive rational slack should leave its guard open`() {
+        val model = Problem(1, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE,
+                BigFraction.ofLong(3).reciprocal(), strict = true),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), LinearOp.LE,
+                BigFraction.ofLong(6).reciprocal().negated(), activator = 0),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val forms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(2) } }
+        val system = assertNotNull(RealDifferenceSystem.prepare(model, forms))
+        val context = SearchSession(emptyList())
+        assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1), Cancellation.Never))
+
+        assertIs<ComponentResult.Consistent>(system.implyGuards(context, Cancellation.Never) {})
+
+        assertNull(context.boolValue(0))
+        for (value in intArrayOf(0, 1)) {
+            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(value), Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `an interrupted guard sweep should withhold its consequence and permit a later check`() {
+        val model = Problem(1, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE, BigFraction.ZERO),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.GE,
+                BigFraction.ONE, activator = 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val forms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } }
+        val system = assertNotNull(RealDifferenceSystem.prepare(model, forms))
+        assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1), Cancellation.Never))
+        assertIs<ComponentResult.Consistent>(system.implyGuards(SearchSession(emptyList()), Cancellation.Never) {})
+        system.retractGuards()
+        assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1), Cancellation.Never))
+        val context = SearchSession(emptyList())
+        var work = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = work > 0L
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+
+        assertIs<ComponentResult.Indeterminate>(system.implyGuards(context, stop) {})
+
+        assertTrue(work > 0L)
+        assertNull(context.boolValue(0))
+        assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1), Cancellation.Never))
+        assertIs<ComponentResult.Consistent>(system.implyGuards(context, Cancellation.Never) {})
+        assertEquals(false, context.boolValue(0))
+    }
+
     @Test
     fun `a necessary difference cycle should cite only its original rows`() {
         for (strict in listOf(false, true)) {

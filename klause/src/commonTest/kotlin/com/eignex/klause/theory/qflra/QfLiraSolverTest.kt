@@ -24,6 +24,9 @@ import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -55,6 +58,40 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `a necessary real path should propagate through Boolean peers and retract its conditions`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.ZERO, activator = 0),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE), LinearOp.LE,
+                BigFraction.ZERO, strict = true, activator = 1),
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                LinearOp.LE, BigFraction.ofLong(100)),
+            Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val request = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute()).request
+        request.componentPlan.search(request.model, emptyMap()).use { planned ->
+            val session = planned.session
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(false, session.boolValue(1))
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+                assertNotNull(session.reasonFor(1)).literals.toSet())
+            assertEquals(false, session.boolValue(2))
+            assertNull(session.boolValue(3))
+            session.popTo(0)
+            assertNull(session.boolValue(1))
+            assertNull(session.boolValue(2))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertEquals(false, session.boolValue(0))
+            assertNull(session.boolValue(3))
+        }
+    }
+
     @Test
     fun `a residual cycle should exclude unrelated retained guards from its source conflict`() {
         val source = Problem(6, 0, emptyArray(), arrayOf(

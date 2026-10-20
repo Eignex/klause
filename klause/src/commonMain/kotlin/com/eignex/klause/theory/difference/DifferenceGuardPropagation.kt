@@ -57,10 +57,16 @@ internal class DifferenceGuardPropagation private constructor(
         scratch.completion = DifferencePathCompletion.Declined
     }
 
-    fun propagate(fragment: DifferenceFragment, values: LongArray, context: SearchContext): ComponentResult {
+    fun propagate(
+        fragment: DifferenceFragment,
+        values: LongArray,
+        context: SearchContext,
+        cancellation: Cancellation? = null,
+        onImplied: (() -> Unit)? = null,
+    ): ComponentResult {
         var interrupted = false
         var remaining = POLL_INTERVAL
-        fun token(): Cancellation = context.executionControls.cancellation
+        fun token(): Cancellation = cancellation ?: context.executionControls.cancellation
         fun nativeStop(): Boolean {
             if (!interrupted) interrupted = context.executionControls.exhausted
             return interrupted
@@ -131,7 +137,7 @@ internal class DifferenceGuardPropagation private constructor(
         reset = false
         // No reduced distance crosses calls: completed origins describe the original active graph only.
         scratch.completion = DifferencePathCompletion.Declined
-        val result = sweep(context, stop, ::forcePoll)
+        val result = sweep(context, stop, ::forcePoll, onImplied)
         if (result is ComponentResult.Indeterminate) {
             reset = true
             scratch.completion = DifferencePathCompletion.Declined
@@ -139,7 +145,12 @@ internal class DifferenceGuardPropagation private constructor(
         return result
     }
 
-    private fun sweep(context: SearchContext, stop: Cancellation, forcePoll: () -> Boolean): ComponentResult {
+    private fun sweep(
+        context: SearchContext,
+        stop: Cancellation,
+        forcePoll: () -> Boolean,
+        onImplied: (() -> Unit)?,
+    ): ComponentResult {
         var heads = 0
         while (cursor < base.numNodes && heads < HEAD_SWEEP_BUDGET) {
             if (stop()) return ComponentResult.Indeterminate
@@ -186,7 +197,10 @@ internal class DifferenceGuardPropagation private constructor(
                 // The implied guard changes the source snapshot; let the ordinary fixpoint reconcile it first.
                 reset = true
                 scratch.completion = DifferencePathCompletion.Declined
-                return context.imply(Lit.negate(guard), reason)
+                if (forcePoll()) return ComponentResult.Indeterminate
+                val result = context.imply(Lit.negate(guard), reason)
+                onImplied?.invoke()
+                return result
             }
         }
         return if (forcePoll()) ComponentResult.Indeterminate else ComponentResult.Consistent

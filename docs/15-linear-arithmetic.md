@@ -56,7 +56,10 @@ A check proceeds in four steps:
    out until search selects a disjunct.
 2. **Check.** An admitted difference fragment runs the graph check first. A necessary
    difference subset can also reject a partial assignment before the general LP
-   query, but supplies no positive coverage for omitted rows. Otherwise
+   query, but supplies no positive coverage for omitted rows. A feasible graph also
+   propagates open comparison guards whose edges close negative source cycles,
+   retaining the active path guards in each reason. The shared Boolean fixpoint
+   receives these consequences before the component checks its updated rows. Otherwise
    the LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
 3. **Explain.** An infeasible system produces a conflict from the certified
@@ -68,6 +71,11 @@ A check proceeds in four steps:
 
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
+
+Guard propagation reuses the difference path queries on the graph's exact scaled
+rational and strict edges. Its optional index admits at most 65,536 edges and a
+sweep visits at most 64 open heads under the current arithmetic operation allowance.
+Retraction resets query progress; a stopped query publishes no consequence.
 
 #### Disjunctions and disequalities
 

@@ -1,5 +1,7 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.arithmetic.difference.DifferenceGraph
 import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.factor.bool.Cardinality
@@ -15,7 +17,10 @@ import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.theory.EncodedTheoryFactor
+import com.eignex.klause.theory.difference.DifferenceGuardPropagation
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -26,10 +31,18 @@ internal class RealDifferenceSystem private constructor(
     private val guards: IntArray,
     private val scale: Long,
     private val rowOrigins: IntArray?,
+    private val guardEdges: List<DifferenceEdge>?,
 ) {
     private var potentials: LongArray? = null
+    private var latestPoint: LongArray? = null
+    private var booleanVariables = 0
+    private var guardPreparationAttempted = false
+    private var guardFragment: DifferenceFragment? = null
+    private var guardPropagation: DifferenceGuardPropagation? = null
 
     fun check(bools: IntArray, stop: Cancellation, onWork: ((Long) -> Unit)? = null): Result {
+        latestPoint = null
+        booleanVariables = bools.size
         onWork?.invoke(guards.size.toLong() + graph.numVars)
         val active = BooleanArray(guards.size) { index ->
             val guard = guards[index]
@@ -59,11 +72,41 @@ internal class RealDifferenceSystem private constructor(
                 potentials = normalized.takeIf { values ->
                     values.all { it in -Long.MAX_VALUE / 8L..Long.MAX_VALUE / 8L }
                 }
+                latestPoint = normalized
                 Result.Feasible { List(graph.numVars - 1) { column ->
                     BigFraction.of(bigIntOf(result.values[column] - zero), bigIntOf(scale))
                 } }
             }
         }
+    }
+
+    fun implyGuards(context: SearchContext, stop: Cancellation, onImplied: () -> Unit): ComponentResult {
+        val edges = guardEdges ?: return ComponentResult.Consistent
+        val point = latestPoint ?: return ComponentResult.Consistent
+        if (stop()) return ComponentResult.Indeterminate
+        if (!guardPreparationAttempted) {
+            stop.charge(edges.size * 8L + graph.numVars * 32L)
+            if (stop()) return ComponentResult.Indeterminate
+            val fragment = DifferenceFragment(edges)
+            val propagation = DifferenceGuardPropagation.create(fragment, booleanVariables, stop)
+            if (stop()) return ComponentResult.Indeterminate
+            guardFragment = fragment
+            guardPropagation = propagation
+            guardPreparationAttempted = true
+        }
+        val propagation = guardPropagation ?: return ComponentResult.Consistent
+        val fragment = checkNotNull(guardFragment)
+        stop.charge(fragment.numNodes.toLong())
+        if (stop()) return ComponentResult.Indeterminate
+        val values = LongArray(fragment.numNodes) { node ->
+            point[if (node == fragment.zeroNode) graph.numVars - 1 else fragment.nodes[node]]
+        }
+        return propagation.propagate(fragment, values, context, stop, onImplied)
+    }
+
+    fun retractGuards() {
+        latestPoint = null
+        guardPropagation?.retract()
     }
 
     sealed interface Result {
@@ -280,18 +323,29 @@ internal class RealDifferenceSystem private constructor(
             val scale = cycleScale * denominator
             val room = Long.MAX_VALUE / (4L * (zero + 2L) * (edges.size + 1L))
             val graph = DifferenceGraph(zero + 1)
+            val guarded = if (edges.size <= 65536 && edges.any { it.guard != ALWAYS }) {
+                stop.charge(edges.size * 8L)
+                if (stop()) return null
+                ArrayList<DifferenceEdge>(edges.size)
+            } else null
             for (edge in edges) {
                 stop.charge(1)
                 if (stop()) return null
                 val multiplier = cycleScale * (denominator / edge.denominator)
                 if (edge.bound < -room / multiplier || edge.bound > room / multiplier) return null
-                graph.addEdge(edge.source, edge.target, edge.bound * multiplier - if (edge.strict) 1L else 0L)
+                val bound = edge.bound * multiplier - if (edge.strict) 1L else 0L
+                graph.addEdge(edge.source, edge.target, bound)
+                guarded?.add(DifferenceEdge(
+                    if (edge.source == zero) DifferenceFragment.ZERO else edge.source,
+                    if (edge.target == zero) DifferenceFragment.ZERO else edge.target,
+                    bound, edge.guard,
+                ))
             }
             if (stop()) return null
             stop.charge(2L * edges.size)
             if (stop()) return null
             val origins = if (edges.all { it.origin >= 0 }) edges.map { it.origin }.toIntArray() else null
-            return RealDifferenceSystem(graph, edges.map { it.guard }.toIntArray(), scale, origins)
+            return RealDifferenceSystem(graph, edges.map { it.guard }.toIntArray(), scale, origins, guarded)
         }
 
         private fun exactBound(column: Int, value: Double, upper: Boolean): ExactRationalInequality =
@@ -337,6 +391,11 @@ internal class RealDifferenceSystem private constructor(
 }
 
 internal class RealDifferenceRefuter(private val system: RealDifferenceSystem) {
+    fun implyGuards(context: SearchContext, stop: Cancellation, onImplied: () -> Unit): ComponentResult =
+        system.implyGuards(context, stop, onImplied)
+
+    fun retractGuards() = system.retractGuards()
+
     fun conflict(
         bools: IntArray,
         stop: Cancellation,

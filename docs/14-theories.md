@@ -208,6 +208,11 @@ zero-weight strict cycles, and the scaled-back potentials are rational witnesses
 that pass the complete source-row check. A verified negative cycle supplies a
 conflict clause of the complements of its active guards.
 
+The real component reuses the guard path queries on these scaled edges, including
+when they cover only a necessary subset of a general linear source. A negative
+cycle through an open guarded edge refutes that edge with the active path guards
+as premises; it supplies no positive conclusion for rows outside the graph.
+
 Admitted pure-real components defer LP construction and check the graph at partial
 and complete Boolean states. Missing cycle evidence, declined source validation and
 private source-bound branches fall back to the shared LP route. Admission is capped
