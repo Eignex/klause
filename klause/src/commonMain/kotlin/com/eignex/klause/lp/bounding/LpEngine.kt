@@ -762,9 +762,7 @@ internal class LpEngine(
                 relaxation.exactLeafResult(certified, problem, objective, leafSample(session, EmptyDoubleArray))
 
             LpVerdict.INFEASIBLE -> {
-                // Pool the theory lemma for restart-time registration: the leaf itself just rejects
-                // (the engine backtracks chronologically), and the next restart makes the lemma a
-                // permanent clause pruning the dead region everywhere.
+                // Source-mapped lemmas survive restart; required completion also forwards them to native analysis.
                 val clause = if (residualOversized) {
                     val support = certified.farkasRay?.let { ray ->
                         ray.indices.filter { ray[it] != 0L }.toIntArray()
@@ -781,6 +779,8 @@ internal class LpEngine(
                     pinnedLeafClause = clause
                     sink.lp.observePrimalPhase("PINNED_REAL_LEAF_EXPLANATION",
                         if (pooled) "POOLED" else if (clause == null) "DECLINED" else "NOT_POOLED", 0L)
+                    if (clause != null) sink.lp.observePrimalPhase("PINNED_REAL_LEAF_EXPLANATION_SIZE",
+                        "L_${clause.size}", 0L)
                 }
                 LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
             }

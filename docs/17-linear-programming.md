@@ -128,8 +128,10 @@ origins and original row IDs remain mapped. Construction and projection share th
 containing work ledger, with 10,000 rows and columns, 65,536 sparse or premise units
 and 4,096-bit scalar admission.
 
-A compacted refutation maps its support to the original rows and cites their
-validity premises and both bounds of touched structural columns. A freshness
+A compacted refutation maps each supported interval to the original rows that
+establish its strongest lower and upper endpoints, retaining a strict parent at
+equal endpoints. It cites those rows' validity premises and both bounds of touched
+structural columns. Weaker coincident rows contribute no proof condition. A freshness
 snapshot retains at most 4,096 finite coordinates referenced by structural columns
 or original row premises; its size is independent of unrelated source coordinates.
 Source identity and captured pins must still match, and every emitted literal must

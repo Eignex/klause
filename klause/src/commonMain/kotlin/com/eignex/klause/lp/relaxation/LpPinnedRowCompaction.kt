@@ -76,9 +76,10 @@ internal fun LpRelaxation.compactPinnedRows(
                 upper = previousLower?.let { work.side(work.negate(it.number.value), it.strict) }
             }
             val group = groups.getOrPut(terms) { PinnedRowGroup(terms) }
-            group.sourceRows.add(row)
             group.lower = work.stronger(group.lower, lower, upper = false)
             group.upper = work.stronger(group.upper, upper, upper = true)
+            if (lower != null && group.lower === lower) group.lowerRow = row
+            if (upper != null && group.upper === upper) group.upperRow = row
             val metadata = source.row(row)
             group.global = group.global && metadata.global
             metadata.premises?.let { premises ->
@@ -121,7 +122,7 @@ internal fun LpRelaxation.compactPinnedRows(
             val premises = if (group.bounds.isEmpty() && group.literals.isEmpty()) null else
                 ExactLpPremises(group.bounds, group.literals.toList())
             compactRows.add(ExactLpRow(group.global, strict, premises))
-            sourceRows.add(group.sourceRows.toIntArray())
+            sourceRows.add(intArrayOf(group.lowerRow, group.upperRow).filter { it >= 0 }.distinct().toIntArray())
         }
         work.step(8L * (columns.size + compactRows.size) + 4L * entries)
         val objective = source.objective
@@ -146,7 +147,8 @@ internal fun LpRelaxation.compactPinnedRows(
 private data class PinnedRowTerm(val column: Int, val value: BigFraction)
 
 private class PinnedRowGroup(val terms: List<PinnedRowTerm>) {
-    val sourceRows = ArrayList<Int>()
+    var lowerRow = -1
+    var upperRow = -1
     var lower: ExactLpSide? = null
     var upper: ExactLpSide? = null
     var global = true
@@ -199,7 +201,7 @@ private class PinnedRowArithmetic(private val stop: Cancellation, private val on
         if (first == null || second == null) return first ?: second
         val order = compare(first.number.value, second.number.value)
         return when {
-            order == 0 -> first.copy(strict = first.strict || second.strict)
+            order == 0 -> if (second.strict && !first.strict) second else first
             (order < 0) == upper -> first
             else -> second
         }

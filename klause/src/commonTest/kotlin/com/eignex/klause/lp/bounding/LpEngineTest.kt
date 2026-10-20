@@ -42,6 +42,46 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `a compacted source conflict should exclude weaker guards and preserve a satisfying sibling`() {
+        val problem = Problem(3, 0, emptyArray(), Array(1002) { row ->
+            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+                if (row == 1001) LinearOp.GE else LinearOp.LE,
+                when (row) {
+                    0 -> BigFraction.ZERO
+                    1001 -> BigFraction.ONE
+                    else -> BigFraction.ofLong(10)
+                }, activator = when (row) {
+                    0 -> 0
+                    1001 -> 2
+                    else -> 1
+                })
+        }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val sink = SolveStatsSink(backend = "tight-pinned-source-parents")
+        val engine = LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, learn = true)), sink)
+        val rejected = PropagationSession(problem)
+        for (variable in 0 until 3) assertIs<PropagationResult.Implied>(rejected.pinBool(variable, true))
+
+        engine.use {
+            assertEquals(LpVerdict.INFEASIBLE, it.leafCertify(rejected).verdict)
+            val clause = assertNotNull(it.lpNogoods).drain().single().literals
+
+            assertEquals(setOf(Lit.make(0, false), Lit.make(2, false)), clause.toSet())
+            val sibling = PropagationSession(problem)
+            assertIs<PropagationResult.Implied>(sibling.addLearnedClause(Clause(clause), lbd = 2, permanent = true))
+            assertIs<PropagationResult.Implied>(sibling.pinBool(1, true))
+            assertIs<PropagationResult.Implied>(sibling.pinBool(2, true))
+            assertEquals(false, sibling.boolValue(0))
+            val leaf = it.leafCertify(sibling)
+            assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+            val point = Sample(booleanArrayOf(false, true, true), longArrayOf(), leaf.reals,
+                exactReals = assertNotNull(leaf.exactReals))
+            assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(problem, point))
+        }
+    }
+
+    @Test
     fun `a compacted conflict above the total prefix limit should preserve a feasible sibling`() {
         val problem = Problem(5000, 0, emptyArray(), Array(1002) { row ->
             if (row == 0) ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },

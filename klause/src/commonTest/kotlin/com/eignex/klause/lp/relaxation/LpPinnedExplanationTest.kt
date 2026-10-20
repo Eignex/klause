@@ -19,6 +19,100 @@ import kotlin.test.assertTrue
 
 class LpPinnedExplanationTest {
     @Test
+    fun `weaker coincident row guards should be absent from a compacted refutation`() {
+        for (reversed in listOf(false, true)) {
+            val problem = Problem(3, 0, emptyArray(), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            val session = PropagationSession(problem)
+            for (variable in 0 until 3) session.pinBool(variable, true)
+            val sign = if (reversed) -1.0 else 1.0
+            val source = LpBuilder().apply {
+                val r = addRealVar(null, null)
+                addRealRow(intArrayOf(r), doubleArrayOf(sign), if (reversed) Relation.GE else Relation.LE,
+                    0.0, premiseLits = intArrayOf(Lit.make(0, true)))
+                addRealRow(intArrayOf(r), doubleArrayOf(1.0), Relation.LE, 10.0,
+                    premiseLits = intArrayOf(Lit.make(1, true)))
+                addRealRow(intArrayOf(r), doubleArrayOf(1.0), Relation.GE, 1.0,
+                    premiseLits = intArrayOf(Lit.make(2, true)))
+            }.build(Sense.MINIMIZE)
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+            val parent = LpRelaxation(model, intArrayOf(-1), booleanArrayOf(false), 0L, intArrayOf(),
+                IntArray(3) { -1 }, colRealId = intArrayOf(0))
+
+            val compact = assertNotNull(parent.compactPinnedRows(session, Cancellation.Never) {})
+            val clause = assertNotNull(assertNotNull(compact.pinnedExplanation)
+                .clause(intArrayOf(0), session, Cancellation.Never) {})
+
+            assertEquals(setOf(Lit.make(0, false), Lit.make(2, false)), clause.toSet())
+            assertTrue(clause.all { session.litTruth(it) == false })
+        }
+    }
+
+    @Test
+    fun `equal endpoint ties should retain an original strict parent in either row order`() {
+        for (strictFirst in listOf(false, true)) {
+            for (reversed in listOf(false, true)) {
+                val problem = Problem(3, 0, emptyArray(), emptyArray(), numRealVars = 1,
+                    realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                    realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+                val session = PropagationSession(problem)
+                for (variable in 0 until 3) session.pinBool(variable, true)
+                val source = LpBuilder().apply {
+                    val r = addRealVar(null, null)
+                    for (strict in listOf(strictFirst, !strictFirst)) {
+                        addRealRow(intArrayOf(r), doubleArrayOf(if (reversed) -1.0 else 1.0),
+                            if (reversed) Relation.GE else Relation.LE, 0.0, strict = strict,
+                            premiseLits = intArrayOf(Lit.make(if (strict) 1 else 0, true)))
+                    }
+                    addRealRow(intArrayOf(r), doubleArrayOf(1.0), Relation.GE, 0.0,
+                        premiseLits = intArrayOf(Lit.make(2, true)))
+                }.build(Sense.MINIMIZE)
+                val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+                val parent = LpRelaxation(model, intArrayOf(-1), booleanArrayOf(false), 0L, intArrayOf(),
+                    IntArray(3) { -1 }, colRealId = intArrayOf(0))
+
+                val compact = assertNotNull(parent.compactPinnedRows(session, Cancellation.Never) {})
+                val clause = assertNotNull(assertNotNull(compact.pinnedExplanation)
+                    .clause(intArrayOf(0), session, Cancellation.Never) {})
+
+                assertEquals(setOf(Lit.make(1, false), Lit.make(2, false)), clause.toSet())
+                assertTrue(clause.all { session.litTruth(it) == false })
+            }
+        }
+    }
+
+    @Test
+    fun `a tight substituted parent should retain its finite endpoints without loose row conditions`() {
+        val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val session = PropagationSession(problem)
+        session.pinBool(0, true)
+        session.pinBool(1, true)
+        session.pinInt(0, 1)
+        val source = LpBuilder().apply {
+            val x = addVar(1L, 1L)
+            val r = addRealVar(null, null)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(1.0, 1.0), Relation.LE, 0.0,
+                premiseLits = intArrayOf(Lit.make(0, true)))
+            addRealRow(intArrayOf(r), doubleArrayOf(1.0), Relation.LE, 10.0,
+                premiseLits = intArrayOf(Lit.make(1, true)))
+            addRealRow(intArrayOf(r), doubleArrayOf(1.0), Relation.GE, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val parent = LpRelaxation(model, intArrayOf(0, -1), booleanArrayOf(false, false), 0L,
+            intArrayOf(0), intArrayOf(-1, -1), colRealId = intArrayOf(-1, 0))
+
+        val compact = assertNotNull(parent.compactPinnedRows(session, Cancellation.Never) {})
+        val clause = assertNotNull(assertNotNull(compact.pinnedExplanation)
+            .clause(intArrayOf(0), session, Cancellation.Never) {})
+
+        assertEquals(setOf(Lit.make(0, false), session.boundGeLit(0, 1, positive = false),
+            session.boundLeLit(0, 1, positive = false)), clause.toSet())
+        assertTrue(clause.all { session.litTruth(it) == false })
+    }
+
+    @Test
     fun `an oversized referenced prefix should withhold its compacted explanation`() {
         val problem = Problem(4097, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
