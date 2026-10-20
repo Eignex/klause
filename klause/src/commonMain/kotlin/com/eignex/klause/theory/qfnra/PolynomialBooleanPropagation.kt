@@ -10,6 +10,7 @@ internal class PolynomialBooleanPropagation(
     private val root: Int,
     private val arithmetic: PolynomialArithmetic,
     private val skipConfirmedParents: Boolean = false,
+    private val valueChanged: ((Int) -> Unit)? = null,
 ) {
     private val values = IntArray(nodes.size) { UNASSIGNED }
     private val parents = List(nodes.size) {
@@ -25,6 +26,8 @@ internal class PolynomialBooleanPropagation(
     val trailSize: Int get() = trail.size
 
     fun value(index: Int): Int = values[index]
+
+    fun parentsOf(index: Int): List<Int> = parents[index]
 
     fun decide(): Boolean {
         val leaf = unassignedLeaf() ?: return false
@@ -71,6 +74,7 @@ internal class PolynomialBooleanPropagation(
         if (values[index] != UNASSIGNED) return values[index] == value
         values[index] = value
         trail.add(index)
+        valueChanged?.invoke(index)
         enqueue(index)
         for (parent in parents[index]) {
             if (skipConfirmedParents) {
@@ -153,7 +157,9 @@ internal class PolynomialBooleanPropagation(
             }
             while (trail.size > choice.mark) {
                 arithmetic.step()
-                values[trail.removeAt(trail.lastIndex)] = UNASSIGNED
+                val index = trail.removeAt(trail.lastIndex)
+                values[index] = UNASSIGNED
+                valueChanged?.invoke(index)
             }
             if (!choice.triedTrue) {
                 choice.triedTrue = true
