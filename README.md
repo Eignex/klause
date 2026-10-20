@@ -37,13 +37,15 @@ It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc m
 
 - Klause has its own revised simplex written in Kotlin: a floating-point dual simplex with Devex pricing, sparse LU factorization and Forrest-Tomlin updates.
 - The LP lives inside search. Bound changes and backtracking update the same warm basis instead of starting a new solve at every node.
-- Every LP result is checked in exact rational arithmetic before it counts, whether it is a feasible point, an objective bound, an infeasibility proof or an unbounded ray.
+- The heavy work runs in floating point, and exact rational arithmetic is spent only on certification. Every LP result is checked exactly before it counts, whether it is a feasible point, an objective bound, an infeasibility proof or an unbounded ray, and a result that fails the check is never used as a proof.
+- The same engine carries integer and continuous columns, so it serves MIP, CP relaxations and SMT real arithmetic, and works alongside propagation and local search.
 - LP bounds and conflicts are explained by the source constraints, so they feed conflict learning the same way propagation does.
+- Strict inequalities are handled exactly, as SMT linear arithmetic requires.
 - Exact mode extends this to floating-point formats. FlatZinc floats are solved by exact theory search instead of a grid, MPS models are solved with zero tolerance, and every reported point satisfies the source constraints exactly.
 
 ## Compared with other solvers
 
-Specialised solvers are mature and usually faster on problems squarely in their own domain. Klause trades some of that speed for breadth and checked results, and bundles no native solver library.
+Specialised solvers are mature and usually faster on problems squarely in their own domain. Klause trades some of that speed for breadth and checked results. It bundles no native solver library, so it runs wherever Kotlin Multiplatform does.
 
 - CP-SAT works over Booleans and integers; Klause also handles reals, unbounded integers and nonlinear arithmetic in the same model.
 - Z3 decides logical theories; Klause adds optimization, global constraints and local search while still deciding linear integer and real arithmetic exactly.
