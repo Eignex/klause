@@ -15,7 +15,7 @@ class JvmSavedTablesTest {
     fun `selected fields retain nested values and integer precision`() {
         val envelope = JvmSavedJson.parse(
             """{
-                "encoding":"canonical-json-key-and-string-tables-v1",
+                "encoding":"key-and-string-tables-v1",
                 "objectKeys":[["selected","hidden"],["value"]],"strings":["text"],
                 "value":[-1,[-2,[0,[1,0],null,false,123456789012345678901234567890,0.125]],[0]]
             }""",
@@ -38,7 +38,7 @@ class JvmSavedTablesTest {
     fun `invalid unselected values reject the entire encoded record`(hidden: String) {
         val envelope = JvmSavedJson.parse(
             """{
-                "encoding":"canonical-json-key-and-string-tables-v1",
+                "encoding":"key-and-string-tables-v1",
                 "objectKeys":[["selected","hidden"]],"strings":["kept"],
                 "value":[-1,[1,0],$hidden]
             }""",
@@ -48,11 +48,11 @@ class JvmSavedTablesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["keys", "strings", "encoding", "extra"])
+    @ValueSource(strings = ["keys", "strings", "encoding", "identity-format", "extra"])
     fun `malformed dictionaries cannot define a saved record`(variant: String) {
         val original = JvmSavedJson.parse(
             """{
-                "encoding":"canonical-json-key-and-string-tables-v1",
+                "encoding":"key-and-string-tables-v1",
                 "objectKeys":[["value"]],"strings":["kept"],"value":[-1,[1,0]]
             }""",
         ).jsonObject
@@ -60,6 +60,7 @@ class JvmSavedTablesTest {
             "keys" -> "objectKeys" to JvmSavedJson.parse("[[\"value\",\"value\"]]")
             "strings" -> "strings" to JvmSavedJson.parse("[\"kept\",\"kept\"]")
             "encoding" -> "encoding" to JsonPrimitive("other")
+            "identity-format" -> "encoding" to JsonPrimitive("canonical-json-key-and-string-tables-v1")
             else -> "extra" to JsonPrimitive(false)
         }
 
@@ -70,7 +71,7 @@ class JvmSavedTablesTest {
     fun `method projection preserves every ordered descriptor and ignores no invalid field`() {
         val envelope = JvmSavedJson.parse(
             """{
-                "encoding":"canonical-json-key-and-string-tables-v1",
+                "encoding":"key-and-string-tables-v1",
                 "objectKeys":[["methods"],["methodIndex","name","descriptor","unknown"]],
                 "strings":["pick","(I)V","(J)V"],
                 "value":[-1,[0,[-2,0,[1,0],[1,1],[0,false]],[-2,1,[1,0],[1,2],null]]]
@@ -95,7 +96,7 @@ class JvmSavedTablesTest {
         repeat(depth) { nested = JsonArray(listOf(JsonPrimitive(0), nested).take(if (it == 0) 1 else 2)) }
         val envelope = JsonObject(
             mapOf(
-                "encoding" to JsonPrimitive("canonical-json-key-and-string-tables-v1"),
+                "encoding" to JsonPrimitive("key-and-string-tables-v1"),
                 "objectKeys" to JvmSavedJson.parse("[[\"value\"]]"),
                 "strings" to JsonArray(emptyList()),
                 "value" to JsonArray(listOf(JsonPrimitive(-1), nested)),

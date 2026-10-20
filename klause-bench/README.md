@@ -1506,7 +1506,8 @@ final census; version 2 inputs retain their original values. Missing formal
 alternatives and unavailable method order remain distinct uncredited dispositions.
 
 Before observations, the reader validates the complete static binding reports and
-their key/string-table encoding, including unselected fields. Every static class
+their `key-and-string-tables-v1` encoding, including unselected fields. The
+canonical record-identity format is a separate label. Every static class
 must correspond to exactly one source audit in the same binding and source
 context. All original class/context rows, methods and formal descriptor checks
 must agree. Candidates must match their original static record, context, class

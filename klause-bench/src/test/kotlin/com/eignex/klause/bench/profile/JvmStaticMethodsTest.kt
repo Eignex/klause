@@ -27,7 +27,7 @@ class JvmStaticMethodsTest {
         val hidden = if (variant == "hidden") "[1,99]" else "[0,false,null]"
         val encoded = JvmSavedJson.parse(
             """{
-                "encoding":"canonical-json-key-and-string-tables-v1",
+                "encoding":"key-and-string-tables-v1",
                 "objectKeys":[["status","internalName","bytecodeClassOrdinal","studySourceHead","syntaxArchiveId",
                                "syntaxClassOrdinal","syntaxLineReportFile","classIdentity","syntaxOrigin",
                                "methods","unknown"],

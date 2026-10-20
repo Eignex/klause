@@ -16,7 +16,7 @@ internal class JvmSavedTables(envelope: JsonObject) {
         require(envelope.keys == setOf("encoding", "objectKeys", "strings", "value")) {
             "Saved table envelope fields differ"
         }
-        require(envelope["encoding"] == JsonPrimitive("canonical-json-key-and-string-tables-v1")) {
+        require(envelope["encoding"] == JsonPrimitive("key-and-string-tables-v1")) {
             "Saved table encoding differs"
         }
         keys = envelope.getValue("objectKeys").jsonArray.map { row ->
