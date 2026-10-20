@@ -875,7 +875,13 @@ a final complete/partial summary; non-SAT source markers stay outside Dolmen's
 model-checking scope. Schema 2 uses `claims` with the same fields and a `scope`:
 `ground-original-smt-witness` for SAT models or
 `independent-original-smt-refutation` for already reported native UNSAT claims.
-The latter supplies a null model hash and uses the pinned Z3 CLI. Its completed
+The latter supplies a null model hash and uses the pinned Z3 CLI. A request can
+select `refutationSolver: "cvc5"` to use upstream cvc5 1.4.2 instead. The adapter
+passes the unchanged original to `--lang=smt2 --tlimit=30000`, with the same process,
+memory, stream, cleanup and receipt requirements. Hash-pinned static release ZIPs
+cover Linux and macOS x86-64/ARM64; `KLAUSE_CVC5` and `KLAUSE_CVC5_SHA256` can
+select an explicit executable. Selection performs one check with the named tool
+and does not try an alternative after an incomplete answer. Its completed
 reference-query count stays separate from native solver invocations; incomplete
 answers remain unverified. Both tools retain memory receipts. Mac replay checks
 the RSS guard with a below-baseline process allowance before checking claims.

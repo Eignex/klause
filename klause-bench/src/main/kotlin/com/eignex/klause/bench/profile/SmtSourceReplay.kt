@@ -43,6 +43,11 @@ internal object SmtSourceReplay {
         val request = Reports.json.parseToJsonElement(bytes.decodeToString(throwOnInvalidSequence = true)).jsonObject
         val schema = request.getValue("schema").jsonPrimitive.int
         require(schema in 1..2)
+        val refutationSolver = when (request["refutationSolver"]?.jsonPrimitive?.content ?: "z3") {
+            "z3" -> SmtSourceValidation.RefutationSolver.Z3
+            "cvc5" -> SmtSourceValidation.RefutationSolver.CVC5
+            else -> error("unknown refutation solver")
+        }
         val claims = request.getValue(if (schema == 1) "models" else "claims").jsonArray
         fun scope(claim: JsonObject): String = if (schema == 1) SmtSourceValidation.GROUND
             else claim.getValue("scope").jsonPrimitive.content
@@ -77,6 +82,7 @@ internal object SmtSourceReplay {
                 put("failure", failure)
                 put("nativeSolverInvocations", 0)
                 put("referenceCheckAttempts", results.size - completedModels)
+                put("refutationSolver", refutationSolver.name.lowercase())
                 put("solverInvocations", results.size - completedModels)
                 val queries = results.map {
                     it.getValue("stats").jsonObject["sourceValidationSolverQueries"]?.jsonPrimitive?.content
@@ -96,7 +102,7 @@ internal object SmtSourceReplay {
         try {
             for (scope in scopes) {
                 val name = if (scope == SmtSourceValidation.GROUND) "tool" else "reference-tool"
-                val resolved = SmtSourceTools.resolve(scope, File(out, name))
+                val resolved = SmtSourceTools.resolve(scope, File(out, name), refutationSolver)
                 tools[scope] = resolved
                 Reports.writeJson(File(out, "$name-identity.json").path, mapOf(
                     "executablePath" to resolved.executable.absolutePath,
