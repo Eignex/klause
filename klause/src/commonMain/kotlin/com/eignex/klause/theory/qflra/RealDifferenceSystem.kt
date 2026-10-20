@@ -127,6 +127,44 @@ internal class RealDifferenceSystem private constructor(
             return build(realColumns, edges, stop)
         }
 
+        fun refutesSubset(
+            realColumns: Int,
+            rows: List<ExactRationalInequality>,
+            stop: Cancellation,
+        ): Boolean {
+            if (realColumns !in 1..10000 || rows.size > 65536 || stop()) return false
+            val work = MixedPointArithmetic(stop)
+            val edges = ArrayList<Edge>()
+            var entries = 0L
+            for (row in rows) {
+                entries += row.columns.size + 1L
+                stop.charge(8L * (row.columns.size + 1L))
+                if (entries > 65536L || stop() || row.columns.size != row.coefficients.size ||
+                    row.columns.any { it !in 0 until realColumns } ||
+                    row.columns.indices.any { it > 0 && row.columns[it - 1] >= row.columns[it] } ||
+                    !work.admitted(row.rhs) || !row.coefficients.all(work::admitted)
+                ) return false
+                if (row.columns.isEmpty()) {
+                    if (!append(row, ALWAYS, realColumns, edges, stop)) return false
+                    continue
+                }
+                if (row.columns.size > 2) continue
+                val first = row.coefficients[0]
+                if (first.isZero || (row.columns.size == 2 && first != row.coefficients[1].negated())) continue
+                val positive = first.signum() > 0
+                val magnitude = if (positive) first else first.negated()
+                val bound = work.quotient(row.rhs, magnitude) ?: continue
+                val sign = if (positive) BigFraction.ONE else BigFraction.MINUS_ONE
+                val normalized = ExactRationalInequality(row.columns,
+                    if (row.columns.size == 1) listOf(sign) else listOf(sign, sign.negated()), bound, row.strict)
+                if (!append(normalized, ALWAYS, realColumns, edges, stop) && stop()) return false
+            }
+            if (stop()) return false
+            val graph = build(realColumns, edges, stop) ?: return false
+            val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
+            return result is Result.Infeasible && !stop()
+        }
+
         private fun build(zero: Int, edges: List<Edge>, stop: Cancellation): RealDifferenceSystem? {
             if (edges.isEmpty() || edges.size > 100000) return null
             var denominator = 1L
