@@ -886,8 +886,11 @@ reference-query count stays separate from native solver invocations; incomplete
 answers remain unverified. Both tools retain memory receipts. Mac replay checks
 the RSS guard with a below-baseline process allowance before checking claims.
 Requests are limited to 128 KiB encoded/16 MiB expanded. The main stops starting
-claims after two minutes; individual checks retain the ordinary 35-second process
-limit. Replay supplies no new native decision, proof certificate, optimization or
+claims after two minutes by default. Set `claimStartTimeoutMs` in the request to
+allow up to four minutes, including tool setup, and record that limit in the summary.
+Individual checks retain the ordinary 35-second process limit. Allow separately
+for harness setup, the final check, retrieval and cleanup in the enclosing job limit.
+Replay supplies no new native decision, proof certificate, optimization or
 performance credit.
 
 ### MPS independent point validation
