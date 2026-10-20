@@ -19,11 +19,14 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExecutionAccounting
+import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchResult
@@ -50,6 +53,174 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `integer model checks should postpone a prefix until its remaining Boolean is assigned`() {
+        for (observed in listOf(false, true)) {
+            var checks = 0
+            val accounting = object : SearchExecutionAccounting {
+                override fun consumeCheck(): Boolean {
+                    checks++
+                    return true
+                }
+            }
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(partialModel()).use { component ->
+                component.deferIntegerPrefixChecks()
+                component.observeWith(stats)
+                if (observed) component.observeCompleteTraversal()
+                val session = SearchSession(
+                    listOf(component),
+                    atoms = SearchAtomRegistry(2),
+                    executionControls = SearchExecutionControlAdapter(accounting = accounting),
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val rootChecks = checks
+                assertTrue(rootChecks > 0)
+
+                val prefix = session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+                assertIs<ComponentResult.Consistent>(prefix)
+                assertEquals(rootChecks, checks)
+                assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+                val deferred = stats.snapshot().completeSearchStages?.containsKey("INTEGER_PREFIX_DEFERRED") == true
+                assertEquals(observed, deferred)
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+                assertTrue(checks > rootChecks)
+            }
+        }
+    }
+
+    @Test
+    fun `integer model checks should retain root refutations with unknown Booleans`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.deferIntegerPrefixChecks()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            val result = session.initialize()
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
+    fun `an explicit check should refute postponed integer arithmetic`() {
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.deferIntegerPrefixChecks()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val result = session.check()
+
+            assertIs<ComponentCheck.Infeasible>(result)
+        }
+    }
+
+    @Test
+    fun `an explicit branch request should check postponed integer arithmetic`() {
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.deferIntegerPrefixChecks()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val branches = component.nextBranch(session)
+
+            assertNull(branches)
+            assertIs<ComponentCheck.Infeasible>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `a sibling integer model should use its current Boolean facts after rollback`() {
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.deferIntegerPrefixChecks()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val result = session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            assertIs<ComponentResult.Consistent>(result)
+            assertIs<ComponentCheck.Feasible>(session.check())
+            val assignment = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertContentEquals(booleanArrayOf(false, true), assignment.bools)
+            assertTrue(assignment.ints.single() >= BIG_ONE)
+        }
+    }
+
+    @Test
+    fun `integer model checks should never accept a fractional leaf`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.deferIntegerPrefixChecks()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            val result = session.solve(2)
+
+            assertIs<SearchResult.Exhausted>(result)
+            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        }
+    }
+
+    @Test
+    fun `integer model checks should wait for authoritative finite coordinates`() {
+        val open = Bits(2).also { it.set(1) }
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 0), open, open),
+            factors = arrayOf(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
+        )
+        val prepared = assertNotNull(prepareExactLiraSource(model, Cancellation.Never))
+        prepared.open(intArrayOf(0)).use { component ->
+            component.deferIntegerPrefixChecks()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            val result = session.check()
+
+            assertIs<ComponentCheck.Indeterminate>(result)
+        }
+    }
+
+    @Test
+    fun `cancellation should withhold a postponed integer check`() {
+        var cancelled = false
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.deferIntegerPrefixChecks()
+            component.useSolveStop(Cancellation { cancelled })
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            cancelled = true
+
+            val result = component.propagate(session)
+
+            assertIs<ComponentResult.Indeterminate>(result)
+            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        }
+    }
+
     @Test
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")

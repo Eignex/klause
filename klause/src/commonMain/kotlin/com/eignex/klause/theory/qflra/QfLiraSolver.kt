@@ -200,6 +200,7 @@ class ExactLiraSearchComponent private constructor(
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private var unassignedBooleans = model.numBoolVars
     private var completeTraversalObserved = false
+    private var deferIntegerPrefixes = false
     private var mixedPointCompletion = false
     private var defaultDisjunctionHints = false
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
@@ -322,6 +323,11 @@ class ExactLiraSearchComponent private constructor(
     internal fun useDefaultDisjunctionHints() {
         check(context == null)
         defaultDisjunctionHints = model.numIntVars > 0 && model.numRealVars > 0
+    }
+
+    internal fun deferIntegerPrefixChecks() {
+        check(context == null && model.numIntVars > 0 && model.numRealVars == 0)
+        deferIntegerPrefixes = true
     }
 
     internal fun observeCompleteTraversal() {
@@ -518,10 +524,23 @@ class ExactLiraSearchComponent private constructor(
         }
     }
     override fun propagate(context: SearchContext): ComponentResult = lp.propagate(context)
-    override fun check(context: SearchContext): ComponentCheck = if (finiteIntVars.any { variable ->
+    override fun check(context: SearchContext): ComponentCheck {
+        if (finiteIntVars.any { variable ->
             context.intLowerBound(variable) == null ||
                 context.intLowerBound(variable) != context.intUpperBound(variable)
-        }) ComponentCheck.Indeterminate else lp.check(context)
+        }) return ComponentCheck.Indeterminate
+        if (!deferIntegerPrefixes || !dirty) return lp.check(context)
+        beginOperation()
+        return try {
+            if (relaxWithin(context, allowPrefixDeferral = false) is ComponentResult.Indeterminate || operationStop()) {
+                ComponentCheck.Indeterminate
+            } else {
+                lp.check(context)
+            }
+        } finally {
+            endOperation(context)
+        }
+    }
     override fun shareSourcePredicates(context: SearchContext): ComponentResult {
         beginOperation()
         return try {
@@ -614,6 +633,9 @@ class ExactLiraSearchComponent private constructor(
                 outcome = ComponentCheck.Indeterminate
                 null
             } else {
+                if (deferIntegerPrefixes && dirty &&
+                    relaxWithin(context, allowPrefixDeferral = false) !is ComponentResult.Consistent
+                ) return null
                 val branches = lp.nextBranch(context)
                 if (operationStop()) {
                     outcome = ComponentCheck.Indeterminate
@@ -897,9 +919,11 @@ class ExactLiraSearchComponent private constructor(
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
-                if (completeTraversalObserved && bools[variable] == UNASSIGNED) {
+                if (bools[variable] == UNASSIGNED) {
                     unassignedBooleans--
-                    smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
+                    if (completeTraversalObserved) {
+                        smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
+                    }
                 }
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
@@ -1127,7 +1151,7 @@ class ExactLiraSearchComponent private constructor(
         return ComponentResult.Conflict(explanation)
     }
 
-    private fun relaxWithin(context: SearchContext): ComponentResult {
+    private fun relaxWithin(context: SearchContext, allowPrefixDeferral: Boolean = true): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
         floatCandidate = null
@@ -1145,6 +1169,10 @@ class ExactLiraSearchComponent private constructor(
             }
         ) {
             return ComponentResult.Consistent
+        }
+        if (deferIntegerPrefixes && allowPrefixDeferral && context.decisionLevel > 0 && unassignedBooleans > 0) {
+            observeCompleteStage("INTEGER_PREFIX_DEFERRED")
+            return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
         }
         var checked = false
         // Partial graph consistency needs no numerical guide; complete points still check source rows.
@@ -1494,7 +1522,7 @@ class ExactLiraSearchComponent private constructor(
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
-                if (completeTraversalObserved) unassignedBooleans++
+                unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
             }
