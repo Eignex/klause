@@ -1,14 +1,14 @@
-# 31. Command-line interface
+# 20. Command line and development
 
 The command-line interface is the second public surface built on the
-[library API](30-api.md). It reads one input instance, admits its source model
+[library API](19-api.md). It reads one input instance, admits its source model
 through the frontends of Part II, runs the selected solve route and renders
 assignments or a terminal verdict. All formats share the solve-control flags and
 driver; each frontend owns parsing and output semantics.
 
 The chapter starts with building and running the CLI, then covers format dispatch
 and how arithmetic results are published, and ends with the flags and the
-statistics it reports. [Input semantics](04-input-semantics.md) explains coverage and
+statistics it reports. [Input semantics](03-input-semantics.md) explains coverage and
 result strength.
 
 ## Build and run
@@ -30,7 +30,7 @@ klause-cli/build/bin/linuxX64/releaseExecutable/klause-cli.kexe [flags] <file>
 ```
 
 Numerical kernel selection at run time is described in
-[numerical dependencies](29-numerical-dependencies.md#runtime-support).
+[numerical dependencies](18-exact-arithmetic.md#runtime-support).
 
 ## Formats and dispatch
 
@@ -59,7 +59,7 @@ optimality. Quadratic results separate the exact incumbent objective from its
 certified `objectiveBound`; unattained boundaries report `unattained-infimum` or
 `unattained-supremum`. FlatZinc carries that status in `%` comments and omits the
 `==========` terminator, which would assert an attained optimum. See
-[SMT-LIB result semantics](09-smtlib.md).
+[SMT-LIB result semantics](05-arithmetic-formats.md#smt-lib-source-semantics).
 
 ## Arithmetic publication adapter
 
@@ -75,7 +75,7 @@ and flushes each one before returning. Source refinement runs before duplicate
 handling, so a source veto cannot be bypassed and a vetoed rendering emits nothing.
 MPS witnesses use original units, exact decimals and their exact-source or tolerance
 qualification. The adapter performs no solver work or admission:
-[portfolio admission](16-portfolio.md) owns acceptance.
+[portfolio admission](12-portfolio.md) owns acceptance.
 
 Frontend solve paths keep a `PreparedSourceInvocation` and consume
 `SourceExecutionResult` from `SourceSetup.execute` without selecting another solver
@@ -113,9 +113,9 @@ Solver-control flags are common to every mode; `--help` lists every parameter.
 - `--param <key>=<value>`: repeatable engine parameters. Unknown keys exit with
   status 2. The families are CP and LS strategy settings, portfolio slice policy
   (`slice-work`, `slice-max-work`, `slice-growth`), resource work
-  (`node-limit`, `presolve-work-limit`, see [resource allowances](11-resources.md)),
+  (`node-limit`, `presolve-work-limit`, see [resource allowances](06-sessions.md#resource-allowances)),
   `dry-run-presolve=true` for a preparation summary without solving, and presolve
-  effort ([presolve](12-presolve.md)).
+  effort ([presolve](07-presolve.md)).
 - `--ozn FILE` (MiniZinc mode): render output with the native `.ozn` applier
   instead of `solns2out`.
 
@@ -128,11 +128,11 @@ has its own work currency, separate from `node-limit`:
 
 | Route | Parameters | Chapter |
 |---|---|---|
-| Open linear | `open-work-limit`, `open-branching`, `open-hint-flips`, `open-hint-min-splits` | [20](20-linear-real.md)–[22](22-linear-mixed.md) |
-| Polynomial real | `nra-work-limit`, `nra-dense-coefficients`, `nra-matrix-cells` | [24](24-polynomial-real.md) |
-| Nonlinear integer | `nia-candidates`, `nia-moves`, plus the polynomial limits | [23](23-nonlinear-integer.md) |
-| Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [28](28-exact-arithmetic.md#exact-quadratic-certificates) |
-| Transcendental | shared exact-satisfaction controls | [25](25-transcendental.md) |
+| Open linear | `open-work-limit`, `open-branching`, `open-hint-flips`, `open-hint-min-splits` | [20](15-linear-arithmetic.md)–[22](15-linear-arithmetic.md#linear-mixed-arithmetic) |
+| Polynomial real | `nra-work-limit`, `nra-dense-coefficients`, `nra-matrix-cells` | [24](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) |
+| Nonlinear integer | `nia-candidates`, `nia-moves`, plus the polynomial limits | [23](16-nonlinear-arithmetic.md) |
+| Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [28](18-exact-arithmetic.md#exact-quadratic-certificates) |
+| Transcendental | shared exact-satisfaction controls | [25](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
 
 Omitted work limits are unlimited. Exhausted candidates or work yield UNKNOWN; LS and
 ALNS keep checked incumbents, and neighborhood exhaustion supplies no global claim.
@@ -146,14 +146,14 @@ entry point or terminal admission outcome (`finite-cp`, `open-theory`,
 `reportedBackend` the final backend; these labels describe stages and do not prove
 that a theory check executed. Arithmetic routes report their work under their own
 prefix (`open*`, `nra*`, `quadratic*`, `transcendental*`) and, on a resource stop,
-the limit that stopped them. The [search statistics](14.5-primal-and-statistics.md#statistics)
+the limit that stopped them. The [search statistics](09-learning.md#statistics)
 define the conflict counters.
 
 `frontendLoadMs` covers parsing, lowering, routing and solvable construction; the
 nested `frontendRoutingMs` must not be added to it. An omitted native work block is
 not a zero. `armFailure.<label>` reports a caught arm exception as one-line JSON; a
 sibling's accepted result can still be the verdict. See
-[portfolio failures](16.2-portfolio-scheduling.md#reseeding-and-arm-failures).
+[portfolio failures](12-portfolio.md#reseeding-and-arm-failures).
 
 ### Source interpretation controls
 
@@ -173,9 +173,9 @@ replaces its default independently, and explicit source bounds stay authoritativ
 Values accept exact decimals, scientific notation and rationals; a value that cannot
 be represented is rejected rather than rounded. Tolerance uses
 `max(absolute, relative * scale)` with exact integrality, as defined in
-[typed source semantics](03-model.md#typed-source-semantics). A nondefault effective
+[typed source semantics](02-model.md#typed-source-semantics). A nondefault effective
 interpretation is printed as a protocol comment before results; it adds no proof
-authority. [FlatZinc floats](07-flatzinc.md#flatzinc-floats) define the grid contract.
+authority. [FlatZinc floats](04-finite-formats.md#flatzinc-floats) define the grid contract.
 
 ## Environment knobs
 
@@ -186,10 +186,99 @@ read as a JVM system property or as the uppercased environment variable
 They cover the default engine, arm-pool size, LP ceiling, LP and domain resource
 limits, and the preparation budget (`klause.presolve.budget.ms`,
 `klause.presolve.budget.fraction`; see
-[resource allowances](11-resources.md#configuration-and-lifetime)). Source
+[resource allowances](06-sessions.md#configuration-and-lifetime)). Source
 interpretation is never an environment setting: it belongs to the format's typed
 `SemanticOverrides`.
 
+## Development
+
+Part VII is about working on the Kotlin code itself. This chapter covers the module
+layout, building and checking the code, a first program against the Kotlin DSL, and
+the conventions for tests and source. The [repository modules](01-introduction.md#repository-modules)
+and [package boundaries](01-introduction.md#package-boundaries) from chapter 2 are
+the map; the chapters in between describe the contract of each component you might
+change.
+
+### Modules and building
+
+The Gradle build includes `:klause` (model, DSL, compilation, formats and solving),
+`:klause-cli` (the command-line driver of [chapter 31](#)) and
+`:klause-bench`, a JVM module that is not published. The default build targets JVM
+and Linux x64; releases opt into Linux arm64 and macOS arm64 with `-Ptargets.full`.
+
+```sh
+./gradlew :klause-cli:installJvmDist
+klause-cli/build/install/klause-cli-jvm/bin/klause-cli --help
+```
+
+`./gradlew check` compiles and runs the tests and light checks; `./gradlew lintDocs`
+runs detekt and Dokka link linting over the Kotlin sources and their KDoc. Kotlin
+test tasks report and fail individually through
+`kotlin.tests.individualTaskReports=true`. Exact arithmetic and lattice tests belong
+to `klause`; native tests run in CI alongside a smoke start of the release CLI
+executable.
+
+### Kotlin DSL
+
+Declare a schema, compile it and decode solutions:
+
+```kotlin
+class Order : VariableSchema() {
+    val a by intVar(min = 1, max = 3)
+    val b by intVar(min = 1, max = 3)
+    val c by intVar(min = 1, max = 3)
+    val unique by constraint { allDifferent(a, b, c) }
+}
+
+val schema = Order()
+val compiled = schema.compile()
+for (sample in BacktrackSolver(compiled).enumerate().take(5)) {
+    println(compiled.decode(schema.a, sample))
+}
+```
+
+The [schema DSL](../klause/src/commonMain/kotlin/com/eignex/klause/schema) and
+[solver APIs](../klause/src/commonMain/kotlin/com/eignex/klause/solver) provide
+schema construction, compilation, decoding and solving. Variables can be optional;
+constraints lower to reified or aggregation-aware forms. Sets and non-linear float
+wrappers compile to supported finite encodings.
+
+The [library API](19-api.md) describes supported extension surfaces, experimental
+composition, typed identities and compatible migration.
+
+### Result requirements
+
+Enumeration and sampling operate over compiled finite problems; counting and
+near-uniform sampling mechanisms live under
+[count](../klause/src/commonMain/kotlin/com/eignex/klause/count).
+Select the API and engine for the required result. A local-search witness does
+not establish exhaustive search or optimality; an interrupted complete search
+can remain undecided. LP result strength and source reconstruction follow the
+[certification contract](17-linear-programming.md#proof-packages).
+
+### Tests
+
+Unit tests define focused behavior and subsystem contracts: parsing and lowering,
+state ownership, rollback, explanations, exact arithmetic, result publication and
+resource limits. Keep a small set of representative examples for each contract
+rather than a separate toy solve for every DSL operator, search policy or frontend
+feature. Add a unit test when it clarifies a distinct contract; extend an existing
+case for a variant of the same behavior.
+
+Use the surrounding framework, layout and assertions. Name classes after the
+file under test and name tests in backticks with plain ASCII describing behavior.
+Keep one observable behavior per test, using arrange, act, assert. Parameterize
+variants of one behavior and separate semantically different behaviors.
+Reuse existing fixtures/helpers. JVM tests must stay below 300 ms.
+
+### Source style and boundaries
+
+Prefer clear names and types. Comments explain soundness, performance or lifecycle
+reasons rather than narrating code or changes. Public APIs receive KDoc; use
+`[Symbol]` links and functional math notation such as `succ(i)`.
+Follow the [package boundaries](01-introduction.md#package-boundaries), especially
+the closed numerical-engine dependency list.
+
 ---
 
-Previous: [30. Library API](30-api.md) · [Contents](README.md) · Next: [32. Development](32-development.md)
+Previous: [19. Library API](19-api.md) · [Contents](README.md)

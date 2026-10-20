@@ -1,4 +1,4 @@
-# 30. Library API
+# 19. Library API
 
 Library callers construct a source model, choose an operation and consume owned
 results. Extensions can add factors, search components, objectives or theories,
@@ -8,8 +8,8 @@ Part VI turns from how Klause solves to how it is used. This chapter describes t
 library surface built on the previous parts: which contracts are supported, how a
 caller moves from a model to a result, which roles extensions can fill, and who owns
 the values that cross the boundary. The underlying lifetimes come from
-[model representation](03-model.md) and [sessions](10-sessions.md); the
-[next chapter](31-cli.md) describes the command-line frontend built on this API.
+[model representation](02-model.md) and [sessions](06-sessions.md); the
+[next chapter](20-cli.md) describes the command-line frontend built on this API.
 
 ## Supported library and extension surfaces
 
@@ -24,14 +24,14 @@ the values that cross the boundary. The underlying lifetimes come from
 | `solver.search` component protocols | Decisions, explanations, context, component/brancher/blocker interfaces, contributed model keys and immutable assembled reads |
 | `theory` protocols | Batch `Theory`, its fragment-check contract and authoritative exact assignment values; incremental participants use `SearchComponent` |
 | `lp` projection protocols | `RelaxationBuilder`, factor relaxation/hull interfaces and typed source/CP/LP mapping handles |
-| Format entry points | Public parsing, compilation and solution-writing facades; meaning follows [input semantics](04-input-semantics.md) |
+| Format entry points | Public parsing, compilation and solution-writing facades; meaning follows [input semantics](03-input-semantics.md) |
 | Exported numerical contracts | `BigInt`, `BigFraction`, `AlgebraicReal`, `Cancellation` and `WorkMeter` |
 
 Supported extensions supply the behavior their interfaces document. A custom factor
 keeps borrowed arrays and structural keys stable; a custom component supplies complete
 checks and sound explanations; a custom objective agrees at feasible assignments.
 The type system does not certify these obligations. The
-[custom factor publication check](14.2-propagation.md#custom-factor-publication-checks)
+[custom factor publication check](08-search.md#custom-factor-publication-checks)
 pins every candidate coordinate when a propagation-only factor has no local checker.
 
 ## Model construction and solving
@@ -75,7 +75,7 @@ linear integer objectives whose range exceeds binary64's exact integers; other f
 models keep finite execution. Native snapshots (`PolynomialRealProblem`,
 `NonlinearIntegerProblem`, `TranscendentalProblem`, `LinearSourceProblem`) attach
 with explicit `ProblemSettings` and keep their exact formula and objective. Hints are
-described under [source definition materialization](15.2-preparation.md#source-definition-materialization).
+described under [source definition materialization](10-local-search.md#source-definition-materialization).
 
 `PreparedSourceInvocation` retains the selected route, source plan and operation
 admission. When preparation selects a private float grid, `FiniteSolveResult.outcome`
@@ -98,9 +98,9 @@ Complete traversal can prove optimality, nonattainment, unboundedness or
 infeasibility; local search and ALNS keep checked incumbents without global claims.
 `NonlinearIntegerProblem.pipelineRequest()` and SMT-LIB's `SmtLibProblem.source`
 expose the native arithmetic sources through the same verdict and witness surface.
-Coverage is defined by [nonlinear integer](23-nonlinear-integer.md),
-[polynomial composition](24-polynomial-real.md#shared-model-composition) and
-[quadratic representation](03-model.md#quadratic-objective-representation).
+Coverage is defined by [nonlinear integer](16-nonlinear-arithmetic.md),
+[polynomial composition](16-nonlinear-arithmetic.md#shared-model-composition) and
+[quadratic representation](02-model.md#quadratic-objective-representation).
 
 ## Compatibility and implementation surfaces
 
@@ -112,7 +112,7 @@ warning-level deprecations rather than an immediate break.
 `FiniteSolveRequest` and the portfolio plan requests accept immutable
 `ExecutionOptions`, for example `ExecutionOptions(ExecutionOption.seed(7L))`; the
 `List<String>` constructors remain as compatibility adapters.
-[Finite execution options](03.2-engine-projections.md#finite-execution-options)
+[Finite execution options](02-model.md#finite-execution-options)
 define capture and worker lifetimes. Telemetry snapshots supply no result authority.
 
 `PreparedSourcePlan`, component and strategy admission, CP projection planning,
@@ -122,7 +122,7 @@ recipes can evolve. Local-search strategies, restart policies and LP bounding po
 are experimental tuning surfaces. Propagation workspaces, trails, presolve passes,
 numerical bases, `lp.lattice` and portfolio coordination are implementation
 mechanisms; the engine's dependency list is in
-[architecture](02-architecture.md#package-boundaries).
+[architecture](01-introduction.md#package-boundaries).
 
 ## Theory and search extension roles
 
@@ -131,13 +131,13 @@ Implement `Theory<A>` for a batch fragment-checking service and use
 `SearchComponent` directly for incremental finite or arithmetic state, adding
 brancher, blocker or conflict capabilities as needed. Supply `SearchBranchProposal`
 when an extension only proposes splits;
-[lazy branch selection](14.1-traversal.md#lazy-branch-selection) defines categories
+[lazy branch selection](08-search.md#lazy-branch-selection) defines categories
 and exhaustive-alternative obligations.
 
 A participating service can remain incomplete: an unresolved answer reports
 indeterminate checking without a witness or refutation, and decided answers apply
 only to the checked fragment. See
-[theory roles](18-theories.md#extension-roles-and-completeness).
+[theory roles](14-theories.md#extension-roles-and-completeness).
 
 ## Typed contributions and migration
 
@@ -158,7 +158,7 @@ publication. The open executor decodes source scalar keys through a source-bound
 witness assembler: every declared coordinate must be present, and foreign mappings,
 unmapped ids or multiple real representations withhold publication. Assembly
 establishes no independent feasibility or proof authority; source checks and
-[evidence admission](17-evidence.md) keep their scope.
+[evidence admission](13-evidence.md) keep their scope.
 
 ## Identities at mapping boundaries
 
@@ -191,7 +191,7 @@ checks and exact rendering; an approximate coordinate is display or heuristic da
   `root(index;[c0,c1,...])` with ascending coefficients and a one-based root index.
   `Sample.algebraicReals` carries the same coordinates.
 - `TranscendentalAssignment.exactRealValue(id)` and `symbolicRealValue(id)` expose
-  [exact analytic real](28-exact-arithmetic.md#exact-analytic-real-coordinates)
+  [exact analytic real](18-exact-arithmetic.md#exact-analytic-real-coordinates)
   expressions, also captured by `Sample.symbolicReals`.
 
 Open optimization observers receive `SourceIncumbentPublication` with an owned
@@ -221,4 +221,4 @@ installing an encoding supplies no proof certificate by itself.
 
 ---
 
-Previous: [29. Numerical dependencies](29-numerical-dependencies.md) · [Contents](README.md) · Next: [31. Command-line interface](31-cli.md)
+Previous: [18. Exact arithmetic](18-exact-arithmetic.md) · [Contents](README.md) · Next: [20. Command line and development](20-cli.md)

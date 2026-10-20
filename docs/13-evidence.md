@@ -1,4 +1,4 @@
-# 17. Original-source derivations
+# 13. Original-source derivations
 
 The previous chapters established that every published witness is checked against
 the original source. Bounds, refutations and optimality claims need more than a
@@ -32,7 +32,7 @@ justification. Other frontend semantics require their own checker. The native in
 Abs checker evaluates affine magnitudes at exact source coordinates together with
 their accompanying linear constraints; implied magnitude inequalities alone are not
 a complete source check. Witness contexts call
-[shared source validation](13-validation.md) for finite and rational coordinate checks.
+[shared source validation](07-presolve.md#source-witness-validation) for finite and rational coordinate checks.
 
 ## Derivations and checks
 
@@ -84,7 +84,7 @@ unavailable, and the resulting claim still requires original-context verificatio
 
 ## Transformations
 
-[Presolve](12-presolve.md) can attach typed justifications to each mapping stage, so
+[Presolve](07-presolve.md) can attach typed justifications to each mapping stage, so
 a claim about the reduced model can be carried back to the original.
 
 `SourceTransformationVerifier` requires a total coordinate image, original-source
@@ -123,9 +123,9 @@ bound.
 
 ## In-search publications
 
-Workers in a [portfolio](16-portfolio.md) share bounds and witnesses while they run.
+Workers in a [portfolio](12-portfolio.md) share bounds and witnesses while they run.
 Those publications carry the runtime binding that lets a consumer check them; the
-admission rules are in [chapter 16.1](16.1-portfolio-witnesses.md).
+admission rules are in [chapter 16.1](12-portfolio.md#witnesses-and-proof-scope).
 
 `EngineInvocation` keeps the prepared plan, its original source and objective
 direction, the execution model and owned assumption snapshots, plus an optional
@@ -148,7 +148,7 @@ point but no global bound, and unbound workers withhold shared root deductions.
 set equals its nominal set. It keeps individual terms, since combining cancelling
 terms would change relative slack, and uses single-term intervals and integer
 activity lattices to justify equivalence or derive an accepted objective bound.
-[MPS publication](08-mps.md#tolerance-publication) uses the checked qualification to
+[MPS publication](05-arithmetic-formats.md#tolerance-publication) uses the checked qualification to
 scope native terminal and bound output.
 
 ## Independent acceptance
@@ -160,4 +160,4 @@ retained inputs or checker reports cannot supply that acceptance.
 
 ---
 
-Previous: [16.3 Worker recipes](16.3-portfolio-recipes.md) · [Contents](README.md) · Next: [18. Theory services](18-theories.md)
+Previous: [12. Portfolios](12-portfolio.md) · [Contents](README.md) · Next: [14. Theory services and difference logic](14-theories.md)
