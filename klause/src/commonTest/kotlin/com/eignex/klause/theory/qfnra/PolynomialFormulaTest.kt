@@ -22,6 +22,29 @@ import kotlin.test.assertNull
 
 class PolynomialFormulaTest {
     @Test
+    fun `decisive numeric facts retain false defaults without completing an irrelevant Boolean subtree`() {
+        val names = (0 until 64).map { "b$it" }
+        val clauses = names.flatMapIndexed { left, name ->
+            names.mapIndexedNotNull { right, other -> if (left == right) null else "(or $name (not $other))" }
+        }
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) " + names.joinToString(" ") { "(declare-const $it Bool)" } +
+                " (assert (or (> x 0) (and ${clauses.joinToString(" ")})))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        var spent = 0L
+        val arithmetic = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 32_768
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        })
+
+        val completed = assertNotNull(formula.completeBooleans(source.boolCount,
+            IntArray(formula.atoms.size) { PolynomialFormula.TRUE }, arithmetic))
+
+        assertEquals(List(64) { false }, completed.toList())
+    }
+
+    @Test
     fun `fixed numeric truths complete reified Booleans with their required polarity`() {
         for (negated in listOf(false, true)) for (value in listOf(false, true)) {
             val predicate = if (negated) "(not (> x 0))" else "(> x 0)"

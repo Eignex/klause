@@ -213,11 +213,11 @@ internal class PolynomialFormula private constructor(
         atomValues: IntArray,
         arithmetic: PolynomialArithmetic,
     ): BooleanArray? {
-        if (booleanVariables.isEmpty()) {
-            val values = IntArray(boolCount) { arithmetic.step(); UNASSIGNED }
-            arithmetic.step()
-            if (truth(values, atomValues, arithmetic) != TRUE) return null
-            return BooleanArray(boolCount) { arithmetic.step(); false }
+        val values = IntArray(boolCount) { arithmetic.step(); UNASSIGNED }
+        arithmetic.step()
+        when (truth(values, atomValues, arithmetic)) {
+            TRUE -> return BooleanArray(boolCount) { arithmetic.step(); false }
+            FALSE -> return null
         }
         val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
         if (!state.initialize()) return null
