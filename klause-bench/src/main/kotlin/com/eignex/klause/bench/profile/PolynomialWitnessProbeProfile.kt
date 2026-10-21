@@ -33,7 +33,7 @@ internal object PolynomialWitnessProbeProfile {
             put("javaCores", Runtime.getRuntime().availableProcessors())
             put("jvmOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
             put("containingTimeoutMs", 60000)
-            put("preparationCheckpoints", 2)
+            put("completionBoundary", "query-probe-completed")
         }.toString() + "\n"
         )
         val access = ProbeAccess()
@@ -83,6 +83,7 @@ internal object PolynomialWitnessProbeProfile {
             conditionType,
         )
         private val next = queryType.getMethod("next")
+        private val probeCompleted = queryType.getMethod("getProbeCompleted")
         private val stats = queryType.getMethod("getStats")
         private val work = queryType.getDeclaredField("work").apply { isAccessible = true }
         private val workType = Class.forName(prefix + "QfNraWork")
@@ -152,8 +153,10 @@ internal object PolynomialWitnessProbeProfile {
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed),
             )
             owner = work.get(preparedQuery)
-            val normalized = next.invoke(preparedQuery)
-            val result = normalized ?: next.invoke(preparedQuery)
+            var result: Any?
+            do {
+                result = next.invoke(preparedQuery)
+            } while (result == null && !(probeCompleted.invoke(preparedQuery) as Boolean))
             val snapshot = stats.invoke(preparedQuery)
             val nativeWork = snapshot.javaClass.getMethod("getWorkSpent").invoke(snapshot) as Long
             if (meter != null) check(charges.values.sum() == nativeWork) { "Native charge attribution is incomplete" }
