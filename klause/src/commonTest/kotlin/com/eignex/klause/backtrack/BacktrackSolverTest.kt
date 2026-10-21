@@ -77,7 +77,7 @@ class BacktrackSolverTest {
 
             assertIs<SolveResult.Sat>(result)
             assertEquals(1, starts)
-            assertTrue(result.sample.boolValue(1))
+            assertTrue(result.assignment.boolValue(1))
         }
     }
 
