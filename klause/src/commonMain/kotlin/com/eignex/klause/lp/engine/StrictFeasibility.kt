@@ -16,19 +16,34 @@ internal fun LpModel.hasStrictSides(meter: RefinementMeter): Boolean {
     return strict
 }
 
-// Auxiliary structural coordinates include source logicals; source origins are restored only on export.
+// Substituting logical sides keeps the margin auxiliary in structural source coordinates.
 internal class StrictFeasibility(private val source: RefinementAuthority) {
     private val meter = source.meter
-    val marginColumn = source.source.numVars
+    private val sourceRows: IntArray
+    private val sourceSigns: IntArray
+    val marginColumn = source.source.n
     val model: ExactLpModel
 
     init {
-        val count = source.source.numVars
-        val strictCount = source.bounds.sumOf { bounds ->
-            (if (bounds.lower?.strict == true) 1 else 0) + (if (bounds.upper?.strict == true) 1 else 0)
+        val count = source.source.n
+        meter.charge(source.bounds.size.toLong() + source.source.m, source.source.m * 4L)
+        val rowSizes = IntArray(source.source.m)
+        var structuralEntries = 0L
+        for (column in 0 until count) for ((row, _) in source.matrix[column]) {
+            meter.charge()
+            rowSizes[row]++
+            structuralEntries++
+        }
+        var strictCount = 0
+        var entries = structuralEntries
+        for (column in source.bounds.indices) {
+            val bounds = source.bounds[column]
+            val sides = (if (bounds.lower?.strict == true) 1 else 0) +
+                (if (bounds.upper?.strict == true) 1 else 0)
+            strictCount += sides
+            entries += sides * if (column < count) 2L else rowSizes[column - count] + 1L
         }
         val rows = source.source.m.toLong() + strictCount
-        val entries = source.matrix.sumOf { it.size.toLong() } + 2L * strictCount
         if (count.toLong() + 1L + rows > meter.limits.maxCoordinates ||
             entries + rows > meter.limits.maxEntries
         ) {
@@ -42,35 +57,62 @@ internal class StrictFeasibility(private val source: RefinementAuthority) {
                 meter.stop(LpRefinementDecline.AUTHORITY)
             }
         }
-        meter.charge(count.toLong() + rows + entries, 128L * (count + 1L + rows) + 32L * entries)
+        meter.charge(count.toLong() + rows + entries,
+            128L * (count + 1L + rows) + 32L * (entries + structuralEntries) + source.source.m * 32L)
+        val rowTerms = Array(source.source.m) { ArrayList<Pair<Int, BigFraction>>(rowSizes[it]) }
         val matrix = List(count + 1) { column ->
             if (column < count) {
-                source.matrix[column].map { (row, value) -> ExactLpEntry(row, ExactLpNumber.of(value)) }.toMutableList()
+                source.matrix[column].map { (row, value) ->
+                    rowTerms[row].add(column to value)
+                    ExactLpEntry(row, ExactLpNumber.of(value))
+                }.toMutableList()
             } else {
                 ArrayList<ExactLpEntry>()
             }
         }
         val rhs = source.rhs.map(ExactLpNumber::of).toMutableList()
-        for (column in 0 until count) {
+        sourceRows = IntArray(rows.toInt()) { if (it < source.source.m) it else -1 }
+        sourceSigns = IntArray(rows.toInt()) { 1 }
+        fun appendMargin(terms: List<Pair<Int, BigFraction>>, bound: BigFraction, original: Int, sign: Int) {
+            val row = rhs.size
+            for ((column, value) in terms) {
+                val coefficient = if (sign > 0) value else meter.number(value.negated())
+                matrix[column] += ExactLpEntry(row, ExactLpNumber.of(coefficient))
+            }
+            matrix[count] += ExactLpEntry(row, ExactLpNumber.of(1L))
+            rhs += ExactLpNumber.of(meter.number(bound))
+            sourceRows[row] = original
+            sourceSigns[row] = sign
+        }
+        for (column in source.bounds.indices) {
             for (upper in listOf(false, true)) {
                 val side = (if (upper) source.bounds[column].upper else source.bounds[column].lower)
                     ?.takeIf { it.strict } ?: continue
-                val row = rhs.size
-                matrix[column] += ExactLpEntry(row, ExactLpNumber.of(if (upper) 1L else -1L))
-                matrix[count] += ExactLpEntry(row, ExactLpNumber.of(1L))
-                rhs += ExactLpNumber.of(meter.number(if (upper) side.number.value else side.number.value.negated()))
+                if (column < count) {
+                    appendMargin(listOf(column to BigFraction.ONE),
+                        if (upper) side.number.value else meter.number(side.number.value.negated()),
+                        -1, if (upper) 1 else -1)
+                } else {
+                    val original = column - count
+                    val bound = if (upper) {
+                        meter.add(side.number.value, meter.number(source.rhs[original].negated()))
+                    } else {
+                        meter.add(source.rhs[original], meter.number(side.number.value.negated()))
+                    }
+                    appendMargin(rowTerms[original], bound, original, if (upper) -1 else 1)
+                }
             }
         }
         val zero = ExactLpSide(ExactLpNumber.of(0L))
         val columns = List(count + 1 + rows.toInt()) { column ->
             val bounds = when {
-                column < count -> source.bounds[column].let { bounds ->
+                column < count || column in count + 1 until count + 1 + source.source.m -> {
+                    val original = if (column < count) column else column - 1
+                    val bounds = source.bounds[original]
                     ExactLpBounds(bounds.lower?.copy(strict = false), bounds.upper?.copy(strict = false))
                 }
 
                 column == count -> ExactLpBounds(zero, ExactLpSide(ExactLpNumber.of(1L)))
-
-                column < count + 1 + source.source.m -> ExactLpBounds(zero, zero)
 
                 else -> ExactLpBounds(zero)
             }
@@ -96,6 +138,14 @@ internal class StrictFeasibility(private val source: RefinementAuthority) {
     fun sourceRay(dual: List<BigFraction>): List<BigFraction>? {
         if (dual.size != model.m) return null
         meter.charge(source.source.m.toLong(), source.source.m * 8L)
-        return dual.take(source.source.m)
+        val ray = MutableList(source.source.m) { BigFraction.ZERO }
+        for (row in dual.indices) {
+            meter.charge()
+            val original = sourceRows[row]
+            if (original < 0 || dual[row].isZero) continue
+            val value = if (sourceSigns[row] > 0) dual[row] else meter.number(dual[row].negated())
+            ray[original] = meter.add(ray[original], value)
+        }
+        return ray
     }
 }

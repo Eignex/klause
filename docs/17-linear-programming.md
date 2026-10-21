@@ -366,7 +366,10 @@ Floating solves the closure of strict rows, so a boundary point proves neither
 strict feasibility nor refutation. The strict-margin auxiliary adds
 `a(i) x + t <= b(i)` to strict rows and maximizes `0 <= t <= 1`: an exact witness
 at positive `t` proves strict feasibility, an exact `t <= 0` refutes it, and other
-outcomes decline. Zero-objective continuation instead keeps an infinitesimal beside
+outcomes decline. Source logical sides are substituted through `s(i) = b(i) - A(i)x`,
+and each margin row retains its signed source-row map for Farkas reconstruction.
+The first margin solve can spend the remaining pivot allowance while reserving
+half the work for checking and correction. Zero-objective continuation keeps an infinitesimal beside
 each strict seat, then picks a positive rational epsilon below every slack crossing
 and verifies the point against the exact source. A strict infimum need not be
 attained.

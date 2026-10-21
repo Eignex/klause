@@ -377,11 +377,11 @@ internal class RefinementMeter(
         proofLimits(),
     )
 
-    fun allowance(first: Boolean): LpFloatAllowance {
+    fun allowance(first: Boolean, fullPivots: Boolean = false): LpFloatAllowance {
         poll()
         val divisor = if (first) 2 else 1
         val work = remainingWork / divisor
-        val pivots = remainingPivots / divisor
+        val pivots = if (fullPivots) remainingPivots else remainingPivots / divisor
         if (work <= 0L) stop(LpRefinementDecline.WORK)
         if (pivots <= 0) stop(LpRefinementDecline.PIVOTS)
         return LpFloatAllowance(work, pivots)
@@ -906,11 +906,12 @@ private class RefinementRun(
     private fun <T> withChild(
         working: LpWorkingModel,
         anchor: LpWorkingScope?,
+        fullPivots: Boolean = false,
         block: (LpWorkingScope, LpFloatAllowance) -> T,
     ): T {
         val previousStage = meter.diagnostic?.stage
         meter.diagnostic?.stage = LpRefinementStage.CHILD_ADMISSION
-        val allowance = meter.allowance(true)
+        val allowance = meter.allowance(true, fullPivots)
         previousStage?.let { meter.diagnostic?.stage = it }
         return if (anchor == null) {
             request.source.withWorkingModel(working, meter.token, allowance) { block(it, allowance) }
@@ -1066,7 +1067,8 @@ private class RefinementRun(
             val strict = StrictFeasibility(source)
             meter.metrics = meter.metrics.copy(auxiliaries = meter.metrics.auxiliaries + 1)
             val output = RefinedCandidate()
-            withChild(refinementWorking(source.state, strict.model, meter), null) { scope, allowance ->
+            withChild(refinementWorking(source.state, strict.model, meter), null,
+                fullPivots = true) { scope, allowance ->
                 val attempt = numerical(scope, null, allowance, true) ?: return@withChild
                 val a = RefinementAuthority(scope.state, meter)
                 val result = attempt.second
