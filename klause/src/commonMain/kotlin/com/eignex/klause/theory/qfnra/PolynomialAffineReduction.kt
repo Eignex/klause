@@ -49,6 +49,7 @@ internal class PolynomialAffineReduction private constructor(
             region: PolynomialBooleanRegion,
             realCount: Int,
             arithmetic: PolynomialArithmetic,
+            onSignRefutation: ((List<Int>) -> Unit)? = null,
             onGraph: (() -> Unit)? = null,
         ): Iterator<PolynomialAffineReduction?> = sequence {
             var current = region.atoms.map { (index, truth) ->
@@ -56,7 +57,13 @@ internal class PolynomialAffineReduction private constructor(
                 val atom = formula.atoms[index]
                 if (truth) atom else PolynomialAtom(atom.polynomial, complement(atom.relation))
             }
-            val signChecking = preparePolynomialSignRefutation(current, realCount, arithmetic)
+            val sourceIndices = onSignRefutation?.let {
+                region.atoms.keys.map { index -> arithmetic.step(); index }
+            }
+            val receive: ((List<Int>) -> Unit)? = if (onSignRefutation == null) null else { core ->
+                onSignRefutation(core.map { index -> arithmetic.step(); checkNotNull(sourceIndices)[index] })
+            }
+            val signChecking = preparePolynomialSignRefutation(current, realCount, arithmetic, receive)
             var signConflict: Boolean? = null
             while (signConflict == null) {
                 signConflict = signChecking.next()

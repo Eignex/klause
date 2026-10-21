@@ -1,9 +1,11 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,6 +16,60 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialSignPropagationTest {
+    @Test
+    fun `a sign conflict reports only its connected numeric premises`() {
+        for (relation in listOf(PolynomialRelation.LT, PolynomialRelation.GT)) {
+            val arithmetic = PolynomialArithmetic()
+            val definition = arithmetic.subtract(Polynomial.variable(1), arithmetic.power(Polynomial.variable(0), 2))
+            val atoms = listOf(PolynomialAtom(Polynomial.variable(0), relation),
+                PolynomialAtom(Polynomial.variable(2), PolynomialRelation.GE),
+                PolynomialAtom(definition, PolynomialRelation.EQ),
+                PolynomialAtom(Polynomial.variable(1), PolynomialRelation.LT))
+            var core: List<Int>? = null
+
+            val refuted = preparePolynomialSignRefutation(atoms, 3, arithmetic) { core = it }
+                .asSequence().filterNotNull().single()
+
+            assertTrue(refuted)
+            assertEquals(listOf(0, 2, 3), core)
+        }
+    }
+
+    @Test
+    fun `a zero fiber conflict retains every premise excluding a strict sign`() {
+        for (relation in listOf(PolynomialRelation.LT, PolynomialRelation.GT)) {
+            val arithmetic = PolynomialArithmetic()
+            val definition = arithmetic.subtract(Polynomial.variable(1), arithmetic.power(Polynomial.variable(0), 2))
+            val atoms = listOf(PolynomialAtom(definition, PolynomialRelation.EQ),
+                PolynomialAtom(Polynomial.variable(2), PolynomialRelation.NE),
+                PolynomialAtom(Polynomial.variable(1), PolynomialRelation.LE),
+                PolynomialAtom(Polynomial.variable(0), relation))
+            var core: List<Int>? = null
+
+            val refuted = preparePolynomialSignRefutation(atoms, 3, arithmetic) { core = it }
+                .asSequence().filterNotNull().single()
+
+            assertTrue(refuted)
+            assertEquals(listOf(0, 2, 3), core)
+        }
+    }
+
+    @Test
+    fun `feasible sign propagation reports no conflict core`() {
+        val arithmetic = PolynomialArithmetic()
+        val definition = arithmetic.subtract(Polynomial.variable(1), arithmetic.power(Polynomial.variable(0), 2))
+        val atoms = listOf(PolynomialAtom(definition, PolynomialRelation.EQ),
+            PolynomialAtom(Polynomial.variable(1), PolynomialRelation.LE),
+            PolynomialAtom(Polynomial.variable(0), PolynomialRelation.EQ))
+        val cores = ArrayList<List<Int>>()
+
+        val refuted = preparePolynomialSignRefutation(atoms, 2, arithmetic) { cores.add(it) }
+            .asSequence().filterNotNull().single()
+
+        assertEquals(false, refuted)
+        assertTrue(cores.isEmpty())
+    }
+
     @Test
     fun `complete regions propagate strict signs through polynomial definitions`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
@@ -97,11 +153,13 @@ class PolynomialSignPropagationTest {
         val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
         var stopped = false
         val interrupted = PolynomialArithmetic(Cancellation { stopped })
-        val pending = preparePolynomialSignRefutation(atoms, source.realCount, interrupted)
+        val cores = ArrayList<List<Int>>()
+        val pending = preparePolynomialSignRefutation(atoms, source.realCount, interrupted) { cores.add(it) }
         repeat(3) { assertNull(pending.next()) }
 
         stopped = true
 
         assertFailsWith<PolynomialInterrupted> { pending.next() }
+        assertTrue(cores.isEmpty())
     }
 }

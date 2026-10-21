@@ -13,7 +13,7 @@ internal class PolynomialBooleanRegions(
     private val root: Int,
     private val atoms: List<PolynomialAtom>,
     private val arithmetic: PolynomialArithmetic,
-) {
+) : Iterator<PolynomialBooleanRegion?> {
     private val proofValues = IntArray(nodes.size) { arithmetic.step(); UNASSIGNED }
     private val trueChildren = IntArray(nodes.size) { arithmetic.step(); 0 }
     private val falseChildren = IntArray(nodes.size) { arithmetic.step(); 0 }
@@ -25,8 +25,43 @@ internal class PolynomialBooleanRegions(
     private val exclusions = ArrayList<List<Literal>>()
     private val signs = PolynomialBooleanSigns(nodes, atoms, state, arithmetic)
     private var decision: Literal? = null
+    private var issued: Proof? = null
+    private var refutation: List<Literal>? = null
+    private val traversal = prepare()
 
-    fun prepare(): Iterator<PolynomialBooleanRegion?> = sequence<PolynomialBooleanRegion?> {
+    override fun hasNext(): Boolean = traversal.hasNext()
+
+    override fun next(): PolynomialBooleanRegion? {
+        if (!hasNext()) throw NoSuchElementException()
+        return traversal.next()
+    }
+
+    fun refuted(region: PolynomialBooleanRegion, atomIndices: List<Int>) {
+        arithmetic.step()
+        val proof = checkNotNull(issued)
+        check(proof.region === region && refutation == null)
+        val selected = HashSet<Int>()
+        for (index in atomIndices) {
+            arithmetic.step()
+            require(index in region.atoms)
+            selected.add(index)
+        }
+        require(selected.isNotEmpty())
+        val captured = HashSet<Int>()
+        val literals = proof.literals.filter { literal ->
+            arithmetic.step()
+            val node = nodes[literal.node]
+            if (node is FormulaNode.Atom && node.atom in selected) {
+                captured.add(node.atom)
+                true
+            } else false
+        }
+        arithmetic.step()
+        check(captured == selected)
+        refutation = literals
+    }
+
+    private fun prepare(): Iterator<PolynomialBooleanRegion?> = sequence<PolynomialBooleanRegion?> {
         if (!initialize()) return@sequence
         for (ready in signs.prepare()) {
             if (ready == false) return@sequence
@@ -44,10 +79,13 @@ internal class PolynomialBooleanRegions(
                 val next = decision
                 check(if (next == null) state.decide() else state.decide(next.node, next.value))
             } else {
+                arithmetic.step()
+                issued = proof
                 yield(proof.region)
                 arithmetic.step()
-                // Exclusions record visited regions; only the numeric caller can certify their exhaustion.
-                exclusions.add(proof.literals)
+                exclusions.add(refutation ?: proof.literals)
+                issued = null
+                refutation = null
             }
             yield(null)
         }

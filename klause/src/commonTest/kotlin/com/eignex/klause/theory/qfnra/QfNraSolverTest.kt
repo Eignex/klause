@@ -21,6 +21,48 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `numeric sign conflicts retain a feasible Boolean alternative with unrelated supports`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val bools = (0 until 32).joinToString(" ") {
+            "(declare-const a$it Bool) (declare-const c$it Bool)"
+        }
+        val supports = (0 until 32).joinToString(" ") { "(or a$it c$it)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) $bools " +
+                "(assert (and (or (and (not b) (> x1 0) (> (* x0 x1) 0) (<= x0 0)) " +
+                "(and b (< x1 0) (> (* x0 x1) 0) (< x0 0))) $supports))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 500_000))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(witness.boolValue(0))
+        assertTrue(algebraic.sign(witness.realValue(0)) < 0)
+        assertTrue(algebraic.sign(witness.realValue(1)) < 0)
+        assertEquals(33, witness.realCount)
+    }
+
+    @Test
+    fun `numeric sign conflicts exhaust both guarded regions with unrelated supports`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val bools = (0 until 32).joinToString(" ") {
+            "(declare-const a$it Bool) (declare-const c$it Bool)"
+        }
+        val supports = (0 until 32).joinToString(" ") { "(or a$it c$it)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) $bools " +
+                "(assert (and (or (and (not b) (> x0 0) (= x1 (* x0 x0)) (< x1 0)) " +
+                "(and b (< x2 0) (= x3 (* x2 x2)) (< x3 0))) $supports))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 500_000, polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
     fun `an exact sample can satisfy predicates before their full projection fits`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

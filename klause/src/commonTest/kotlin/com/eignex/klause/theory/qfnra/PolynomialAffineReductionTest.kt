@@ -11,8 +11,27 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PolynomialAffineReductionTest {
+    @Test
+    fun `sign conflict indices refer to the source region atom order`() {
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.conjunction(listOf(
+            PolynomialAtom(Polynomial.variable(1), PolynomialRelation.GT),
+            PolynomialAtom(Polynomial.variable(0), PolynomialRelation.LT),
+            PolynomialAtom(Polynomial.variable(0), PolynomialRelation.GT),
+        ), arithmetic)
+        val region = PolynomialBooleanRegion(linkedMapOf(2 to true, 0 to true, 1 to true), emptyMap())
+        var core: List<Int>? = null
+
+        val reduction = PolynomialAffineReduction.prepare(formula, region, 2, arithmetic,
+            onSignRefutation = { core = it }).asSequence().filterNotNull().single()
+
+        assertTrue(reduction.inconsistent)
+        assertEquals(listOf(2, 1), core)
+    }
+
     @Test
     fun `coincident weak graph bounds eliminate a coordinate with nonlinear occurrences`() {
         val arithmetic = PolynomialArithmetic()
