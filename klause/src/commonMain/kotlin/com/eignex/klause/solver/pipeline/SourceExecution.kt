@@ -371,17 +371,19 @@ fun SourceSetup.execute(
     val result = if (request.invocation.linearSource != null) {
         executeLinearSource(request, callbacks, ::executeCapturedSource)
     } else executeCapturedSource(request, callbacks)
-    if (result.preparationStats == null && kind != SourceExecutionKind.FINITE) {
-        val observed = when (result) {
+    if (kind != SourceExecutionKind.FINITE) {
+        val observed = result.preparationStats ?: when (result) {
             is SourceExecutionResult.Linear -> when (val execution = result.result) {
                 is OpenTheoryExecution.Satisfy -> execution.result.stats.presolve
                 is OpenTheoryExecution.Optimize -> execution.result.stats.presolve
             }
             else -> null
         }
-        result.preparationStats = observed ?: PresolveStats(
-            effort = (request.presolveConfig ?: PresolveConfig.DEFAULT).effortStats(request.presolveBudget, Duration.ZERO),
-        )
+        val config = request.presolveConfig ?: PresolveConfig.DEFAULT
+        val effort = if (request.presolveBudget == null && observed?.effort != null) {
+            observed.effort
+        } else config.effortStats(request.presolveBudget, observed?.effort?.elapsed ?: Duration.ZERO)
+        result.preparationStats = (observed ?: PresolveStats()).copy(effort = effort)
     }
     return result
 }

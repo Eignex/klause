@@ -56,7 +56,7 @@ internal fun solveCapturedSource(
     )
     val reporting = object : OutputProtocol by output {
         override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
-            output.onStatistics(stats.copy(presolve = stats.presolve ?: result.preparationStats), solveTimeMs, solutions)
+            output.onStatistics(stats.copy(presolve = result.preparationStats ?: stats.presolve), solveTimeMs, solutions)
         }
     }
     val complete = result.completeSearchAdmitted
@@ -171,7 +171,10 @@ internal fun solveCapturedSource(
 
         is SourceExecutionResult.Finite -> error("finite source execution requires its finite renderer")
         is SourceExecutionResult.Prepared -> error("preparation diagnostics require their diagnostic renderer")
-    }(
+    }
+}
+
+internal fun reportNativeSatisfaction(
     execution: PolynomialTheoryExecution,
     rendering: SourceRendering.ExactSource,
     output: OutputProtocol,
