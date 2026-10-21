@@ -244,10 +244,13 @@ object BenchCli {
 
     /** Print the [filterArgs] selection one JSON object per line: the suite and problem that name each instance
      *  exactly for `solve-one`, its reference-table suite (`collection`), family, format and category. Resolving
-     *  a dynamic suite fetches its collection, so a selection also leaves every instance it names on disk. */
+     *  a dynamic suite fetches its collection, so a selection also leaves every instance it names on disk.
+     *  `files=true` adds the absolute `model` and `data` files and MiniZinc `includeDirs`, which lets a runner
+     *  outside the bench solve the instance. */
     private fun printSelection(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val features = f["features"] == "true"
+        val files = f["files"] == "true"
         for (selected in selectProblems(f)) {
             val line = buildJsonObject {
                 put("suite", selected.suite)
@@ -259,6 +262,13 @@ object BenchCli {
                 if (selected.suite == "mzn-bench-compatible-v1" && f["set"] == null) {
                     put("selectionPolicy", MZN_COMPATIBILITY_POLICY)
                     put("compilerIdentity", Reports.json.encodeToJsonElement(MiniZincCompatibility.compiler))
+                }
+                if (files) {
+                    put("model", CorpusFetcher.resolve(selected.ref.source).absolutePath)
+                    selected.ref.data?.let { put("data", CorpusFetcher.resolve(it).absolutePath) }
+                    putJsonArray("includeDirs") {
+                        CorpusFetcher.includeDirs(selected.ref.source).forEach { add(it.absolutePath) }
+                    }
                 }
                 if (features) {
                     InstanceClassifier.classify(selected.ref)?.let { feat ->

@@ -75,6 +75,14 @@ internal object CorpusFetcher {
         is ProblemSource.InCode -> error("InCode sources have no file")
     }
 
+    /** The MiniZinc include directories [source]'s collection ships, which `minizinc -I` needs beside the model. */
+    fun includeDirs(source: ProblemSource): List<File> = if (source is ProblemSource.External) {
+        val root = ensure(source.collection)
+        source.collection.includeDirs.map { File(root, it) }.filter { it.isDirectory }
+    } else {
+        emptyList()
+    }
+
     /** [file] when present, otherwise its plain or compressed counterpart. Catalog paths may name either form. */
     private fun stored(file: File): File {
         if (file.isFile) return file
