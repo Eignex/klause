@@ -59,7 +59,9 @@ internal fun <T> PresolveBudget?.observe(
         val elapsed = invocation.start.elapsedNow()
         activeInvocation = parent
         parent?.let { it.childrenElapsed += elapsed }
-        val outcome = if ((!completed || invocation.interrupted) && invocation.outcome != PresolveInvocationOutcome.REFUTED) {
+        val outcome = if (
+            (!completed || invocation.interrupted) && invocation.outcome != PresolveInvocationOutcome.REFUTED
+        ) {
             PresolveInvocationOutcome.INTERRUPTED
         } else invocation.outcome
         recordInvocation(PresolveInvocationStats(

@@ -126,6 +126,7 @@ class PresolveInvocationTest {
         assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, budget.invocations.last().outcome)
         assertTrue(budget.invocations.all { it.input.factors == it.output.factors })
     }
+
     @Test
     fun `nested construction charges should reconcile without billing the parent twice`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
@@ -167,6 +168,7 @@ class PresolveInvocationTest {
         assertTrue(budget.invocations.all { it.outcome == PresolveInvocationOutcome.COMPLETE_MISS })
         assertEquals(2, budget.invocations.size)
     }
+
     @Test
     fun `source reductions should report factor and occurrence yield from their delta`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
@@ -187,6 +189,7 @@ class PresolveInvocationTest {
         assertEquals(2L, changed.input.occurrences)
         assertEquals(1L, changed.output.occurrences)
     }
+
     @Test
     fun `an affine rerun without touched equality shapes should charge only candidate visits`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
@@ -209,6 +212,7 @@ class PresolveInvocationTest {
         assertEquals(null, calls.last().input.occurrences)
         assertEquals(2L, budget.entrySizeVisits)
     }
+
     @Test
     fun `effort snapshots should reconcile invocation work with shared construction`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
@@ -238,6 +242,7 @@ class PresolveInvocationTest {
 
         assertTrue(budget.rootConstructionEntries > construction)
     }
+
     @Test
     fun `a complete miss that spends the final unit should remain complete`() {
         val problem = Problem(
@@ -246,10 +251,14 @@ class PresolveInvocationTest {
         )
         val config = PresolveConfig.parse("off,+strengthen")
         val reference = PresolveBudget(Long.MAX_VALUE)
-        Presolver.runSource(problem, config, PresolveContext(presolveBudget = reference), reference.orSpent(Cancellation.Never))
+        Presolver.runSource(
+            problem, config, PresolveContext(presolveBudget = reference), reference.orSpent(Cancellation.Never),
+        )
         val budget = PresolveBudget(reference.spent())
 
-        Presolver.runSource(problem, config, PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+        Presolver.runSource(
+            problem, config, PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never),
+        )
 
         assertEquals(0L, budget.remaining())
         assertEquals(PresolveInvocationOutcome.COMPLETE_MISS, budget.invocations.single().outcome)
