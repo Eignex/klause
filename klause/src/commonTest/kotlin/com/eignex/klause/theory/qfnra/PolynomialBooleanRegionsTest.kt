@@ -14,6 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
@@ -478,7 +479,7 @@ class PolynomialBooleanRegionsTest {
             condition = PolynomialCondition(lower = fixed, upper = fixed))
 
         assertIs<QfNraResult.Unsatisfiable>(result)
-        assertEquals(0L, result.stats.booleanTheoryRegions)
+        assertNull(result.stats.booleanTheoryRegions)
     }
 
     @Test

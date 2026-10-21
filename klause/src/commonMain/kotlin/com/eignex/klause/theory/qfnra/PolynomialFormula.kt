@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.ir.PolynomialDistinct
@@ -10,6 +11,10 @@ import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.lowering.polynomialDistinctEncoding
 import com.eignex.klause.lowering.polynomialSelectionEncoding
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.theory.qfnra.PolynomialSigns.ALL_SIGNS
+import com.eignex.klause.theory.qfnra.PolynomialSigns.POSITIVE_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.negateSigns
+import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
 
 internal data class PolynomialAtom(val polynomial: Polynomial, val relation: PolynomialRelation) {
     fun holds(sign: Int): Boolean = when (relation) {
@@ -31,9 +36,15 @@ internal class PolynomialFormula private constructor(
     fun booleanRegions(arithmetic: PolynomialArithmetic): Iterator<PolynomialBooleanRegion?> =
         PolynomialBooleanRegions(nodes, root, atoms, arithmetic).prepare()
 
-    fun withAtoms(replacements: List<PolynomialAtom>): PolynomialFormula {
+    fun withAtoms(replacements: List<PolynomialAtom>, arithmetic: PolynomialArithmetic): PolynomialFormula {
         require(replacements.size == atoms.size)
-        return PolynomialFormula(nodes, root, replacements.toList(), booleanVariables)
+        return PolynomialFormula(nodes, root, replacements.toList(), booleanVariables).sharePredicates(arithmetic)
+    }
+
+    private fun sharePredicates(arithmetic: PolynomialArithmetic): PolynomialFormula {
+        val sharing = PolynomialPredicateSharing(nodes, atoms, arithmetic)
+        val sharedRoot = sharing.rewrite(root)
+        return PolynomialFormula(sharing.nodes, sharedRoot, sharing.atoms, booleanVariables)
     }
 
     fun forcedAtoms(arithmetic: PolynomialArithmetic): List<PolynomialAtom>? {
@@ -217,7 +228,7 @@ internal class PolynomialFormula private constructor(
             }
             arithmetic.step()
             nodes.add(FormulaNode.Junction(children, true))
-            return PolynomialFormula(nodes, nodes.lastIndex, atoms.toList(), emptyList())
+            return PolynomialFormula(nodes, nodes.lastIndex, atoms.toList(), emptyList()).sharePredicates(arithmetic)
         }
 
         fun normalize(
@@ -291,10 +302,85 @@ internal class PolynomialFormula private constructor(
                 arithmetic.step()
                 left.compareTo(right)
             })
-            return PolynomialFormula(nodes, indices.getValue(formula), atoms, variables)
+            return PolynomialFormula(nodes, indices.getValue(formula), atoms, variables).sharePredicates(arithmetic)
         }
     }
 }
+
+private class PolynomialPredicateSharing(
+    private val originalNodes: List<FormulaNode>,
+    private val originalAtoms: List<PolynomialAtom>,
+    private val arithmetic: PolynomialArithmetic,
+) {
+    val nodes = ArrayList<FormulaNode>()
+    val atoms = ArrayList<PolynomialAtom>()
+    private val normalized = HashMap<Polynomial, ScaledPredicate>()
+    private val representatives = HashMap<PredicateKey, PredicateRepresentative>()
+    private val negations = HashMap<Int, Int>()
+    private val constants = HashMap<Boolean, Int>()
+
+    fun rewrite(root: Int): Int {
+        val indices = IntArray(originalNodes.size)
+        for ((index, node) in originalNodes.withIndex()) {
+            arithmetic.step()
+            indices[index] = when (node) {
+                is FormulaNode.Atom -> predicate(originalAtoms[node.atom])
+                is FormulaNode.Not -> negate(indices[node.child])
+                is FormulaNode.Constant -> constant(node.value)
+                is FormulaNode.BooleanVariable -> append(node)
+                is FormulaNode.Junction -> append(FormulaNode.Junction(IntArray(node.children.size) {
+                    arithmetic.step()
+                    indices[node.children[it]]
+                }, node.conjunction))
+            }
+        }
+        arithmetic.step()
+        return indices[root]
+    }
+
+    private fun predicate(atom: PolynomialAtom): Int {
+        arithmetic.step()
+        val terms = atom.polynomial.terms
+        if (terms.isEmpty() || terms.singleOrNull()?.monomial == Monomial.ONE) {
+            return constant(atom.holds(terms.firstOrNull()?.coefficient?.signum() ?: 0))
+        }
+        val scaled = normalized.getOrPut(atom.polynomial) {
+            val coefficient = terms.first().coefficient
+            ScaledPredicate(arithmetic.scale(atom.polynomial, coefficient.reciprocal()), coefficient.signum() > 0)
+        }
+        val signs = relationSigns(atom.relation).let { if (scaled.sameSign) it else negateSigns(it) }
+        val truth = signs and POSITIVE_SIGN == 0
+        val key = PredicateKey(scaled.polynomial, if (truth) signs else ALL_SIGNS xor signs)
+        val previous = representatives[key]
+        if (previous != null) return if (previous.truth == truth) previous.node else negate(previous.node)
+        arithmetic.step()
+        atoms.add(atom)
+        val index = append(FormulaNode.Atom(atoms.lastIndex))
+        representatives[key] = PredicateRepresentative(index, truth)
+        return index
+    }
+
+    private fun negate(index: Int): Int {
+        arithmetic.step()
+        return when (val node = nodes[index]) {
+            is FormulaNode.Constant -> constant(!node.value)
+            is FormulaNode.Not -> node.child
+            else -> negations.getOrPut(index) { append(FormulaNode.Not(index)) }
+        }
+    }
+
+    private fun constant(value: Boolean): Int = constants.getOrPut(value) { append(FormulaNode.Constant(value)) }
+
+    private fun append(node: FormulaNode): Int {
+        arithmetic.step()
+        nodes.add(node)
+        return nodes.lastIndex
+    }
+}
+
+private data class ScaledPredicate(val polynomial: Polynomial, val sameSign: Boolean)
+private data class PredicateKey(val polynomial: Polynomial, val signs: Int)
+private data class PredicateRepresentative(val node: Int, val truth: Boolean)
 
 internal sealed interface FormulaNode {
     data class Constant(val value: Boolean) : FormulaNode
