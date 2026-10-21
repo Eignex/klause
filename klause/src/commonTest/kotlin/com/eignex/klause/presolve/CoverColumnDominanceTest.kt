@@ -6,8 +6,8 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
-import com.eignex.klause.formats.opb.Opb
-import com.eignex.klause.formats.opb.toProblem
+import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -204,8 +204,9 @@ class CoverColumnDominanceTest {
     }
 
     @Test
-    fun `an original OPB optimum should retain its source witness and objective after cover fixing`() {
-        val source = Opb.parse("min: 2 x1 +1 x2 ; +1 x1 +1 x2 >= 1 ;").toProblem()
+    fun `an original WCNF optimum should retain its source witness and objective after cover fixing`() {
+        val document = Dimacs.parseWcnf("p wcnf 2 4 10\n10 1 2 0\n1 -1 0\n1 -1 0\n1 -2 0\n")
+        val source = document.toProblem()
         val objective = assertNotNull(source.objective).toLinearObjective()
 
         val prepared = PresolvePipeline.run(source.problem, objective, PresolveConfig.DEFAULT, false)
@@ -218,6 +219,10 @@ class CoverColumnDominanceTest {
         assertFalse(witness.boolValue(0))
         assertTrue(witness.boolValue(1))
         assertEquals(1L, objective.evaluateLong(witness))
+        val mask = (if (witness.boolValue(0)) 1 else 0) or (if (witness.boolValue(1)) 2 else 0)
+        assertTrue(document.hardClauses.all { holds(Clause(it), mask) })
+        assertEquals(objective.evaluateLong(witness), document.fixedCost + document.softClauses
+            .filter { !holds(Clause(it.literals), mask) }.sumOf { it.weight })
         val assumptions = Assumptions.None.withBool(0, witness.boolValue(0)).withBool(1, witness.boolValue(1))
         assertFalse(source.problem.propagate(assumptions) is PropagationResult.Unsat)
     }
