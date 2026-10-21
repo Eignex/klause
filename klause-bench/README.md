@@ -338,6 +338,11 @@ factor kinds, exact-row predicate counts and binary Real selection selector coun
 Selector identity groups finite `0..1` indexes with a single unit reified equality
 or disequality at one by their signed Boolean guard. It reports duplicate columns
 and guard fanout in the prepared model without changing the model.
+Boolean gate counts recognize complete two-input AND/OR and IFF clause families.
+Signatures preserve signed inputs; IFF also folds simultaneous input negation.
+Private counts exclude declared Booleans and heads read by non-clause factors.
+These are inferred functional definitions in the inspected model, not compiler
+cache hits or evidence that a default solve retains those columns.
 Predicate identity removes only the
 activator before using `ExactLinear` structural keys; it does not reason about
 signs, implications or source satisfiability. Raw coordinate/activated-row entry

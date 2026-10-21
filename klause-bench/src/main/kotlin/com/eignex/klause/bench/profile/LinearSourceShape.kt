@@ -8,11 +8,13 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -26,6 +28,7 @@ import java.lang.management.ManagementFactory
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -111,6 +114,7 @@ internal object LinearSourceShape {
             put("compiledIntegers", model.numIntVars)
             put("compiledReals", model.numRealVars)
             put("compiledFactors", model.factors.size)
+            put("booleanGateShapes", booleanGateShapes(model, parsed.boolVarNames.values))
             put("realSelections", realSelections.size)
             put("binaryRealSelectionIndexes", binarySelectionIndexes.size)
             put("singleGuardBinarySelectionIndexes", guardSelectors.values.sumOf { it.size })
@@ -147,5 +151,63 @@ internal object LinearSourceShape {
         }
         out.resolve("shape.json").writeText(shape.toString() + "\n")
         println(shape)
+    }
+
+    private fun booleanGateShapes(model: Problem, declaredBooleans: Collection<Int>): JsonObject {
+        val clauses = model.factors.filterIsInstance<Clause>()
+        val binary = clauses.filter { it.literals.size == 2 }.map { it.literals.sorted() }.toSet()
+        val ternary = clauses.filter { it.literals.size == 3 }.map { it.literals.sorted() }
+            .filter { row -> row.map(Lit::variable).distinct().size == 3 }.toSet()
+        val definitions = HashMap<Pair<String, List<Int>>, MutableSet<Int>>()
+        fun record(operator: String, inputs: List<Int>, head: Int) {
+            definitions.getOrPut(operator to inputs) { HashSet() } += Lit.variable(head)
+        }
+        for (row in ternary) for (position in row.indices) {
+            val head = row[position]
+            val inputs = row.filterIndexed { index, _ -> index != position }
+            val left = inputs[0]
+            val right = inputs[1]
+            if (listOf(Lit.negate(head), Lit.negate(left)).sorted() in binary &&
+                listOf(Lit.negate(head), Lit.negate(right)).sorted() in binary
+            ) {
+                if (Lit.isPositive(head)) record("and", inputs.map(Lit::negate).sorted(), head)
+                else record("or", inputs.sorted(), head)
+            }
+            val result = Lit.make(Lit.variable(head), true)
+            for (other in listOf(right, Lit.negate(right))) {
+                val clausesForIff = listOf(
+                    listOf(Lit.negate(result), Lit.negate(left), other),
+                    listOf(Lit.negate(result), left, Lit.negate(other)),
+                    listOf(result, Lit.negate(left), Lit.negate(other)),
+                    listOf(result, left, other),
+                )
+                if (clausesForIff.all { it.sorted() in ternary }) {
+                    val ordered = listOf(left, other).sorted()
+                    val canonical = if (Lit.isPositive(ordered[0])) ordered else ordered.map(Lit::negate)
+                    record("iff", canonical, result)
+                }
+            }
+        }
+        val externalHeads = declaredBooleans.toMutableSet()
+        for (factor in model.factors) if (factor !is Clause) externalHeads += factor.variables.boolVars.toList()
+        return buildJsonObject {
+            put("scope", "Complete CNF gate families in the inspected model; inferred definitions, not cache hits")
+            put("iffIdentity", "Commutative signed inputs with simultaneous negation normalized")
+            for (operator in listOf("and", "or", "iff")) {
+                val groups = definitions.filterKeys { it.first == operator }.values
+                val privateGroups = groups.map { heads -> heads.filter { it !in externalHeads } }
+                    .filter { it.isNotEmpty() }
+                put(operator, buildJsonObject {
+                    put("completeDefinitionEntries", groups.sumOf { it.size })
+                    put("distinctOutputHeads", groups.flatten().toSet().size)
+                    put("distinctInputSignatures", groups.size)
+                    put("duplicateEquivalentHeadEntries", groups.sumOf { it.size - 1 })
+                    put("maxEquivalentHeads", groups.maxOfOrNull { it.size } ?: 0)
+                    put("purePrivateDefinitionEntries", privateGroups.sumOf { it.size })
+                    put("purePrivateInputSignatures", privateGroups.size)
+                    put("purePrivateDuplicateHeadEntries", privateGroups.sumOf { it.size - 1 })
+                })
+            }
+        }
     }
 }
