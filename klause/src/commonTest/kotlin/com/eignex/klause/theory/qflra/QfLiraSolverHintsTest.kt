@@ -50,6 +50,88 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `successive root guards should preserve earlier real bounds`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(4.0, 0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 1.0), LinearOp.GE, 1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 1.0), LinearOp.LE, 2.0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 3.0),
+            ),
+        )
+        for (guided in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                if (guided) assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                for (head in 0..2) {
+                    assertIs<ComponentResult.Consistent>(session.publish(Lit.make(head, true)))
+                    assertIs<ComponentResult.Consistent>(session.propagate())
+                }
+
+                assertEquals(ComponentCheck.Feasible, session.check())
+            }
+        }
+    }
+
+    @Test
+    fun `a later root guard should conflict with an earlier asserted real bound`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(4.0, 0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 2.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.GE, 3.0),
+            ),
+        )
+        for (guided in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                if (guided) assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.publish(Lit.make(0, true)))
+                assertIs<ComponentResult.Consistent>(session.propagate())
+
+                assertIs<ComponentResult.Consistent>(session.publish(Lit.make(1, true)))
+
+                assertIs<ComponentResult.Conflict>(session.propagate())
+            }
+        }
+    }
+
+    @Test
+    fun `private openings should require complete Booleans after retraction`() {
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertEquals(ComponentCheck.Feasible, session.check())
+
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertEquals(ComponentCheck.Indeterminate, session.check())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertEquals(ComponentCheck.Feasible, session.check())
+        }
+    }
+
+    @Test
     fun `deferred source batches should preserve conflicts and feasible backjump siblings`() {
         val heads = 130
         val model = Problem(

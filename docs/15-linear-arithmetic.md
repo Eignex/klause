@@ -51,6 +51,10 @@ appends its missing shared definitions together, then asserts signed bounds with
 their individual premises. Root comparisons remain in source order so each one
 can use fixed columns established by earlier rows. A crossed-bound batch retains
 only its committed prefix; uncommitted source rows receive no assertion stamp.
+Completed assertion stamps also survive subsequent root publications: a row whose
+Boolean inputs are fixed keeps the same meaning, and tighter root bounds preserve
+its earlier assertion. Newly resolved rows still follow source order and use the
+fixed-column substitutions available when they are first asserted.
 
 #### A check
 
@@ -160,6 +164,8 @@ factory only after complete, uncancelled preparation; each opening binds fresh
 callbacks, cancellation and mutable arithmetic owners. Scoped assertions, graph
 potentials, LP bases and candidates remain invocation-owned. Optional hint storage
 admits at most 65,536 entries and 4,096-bit normalized rationals.
+Each opening maintains its unassigned-Boolean count across assertions and retraction;
+complete-traversal observations expose that progress only for public traversal.
 
 ### Implementation
 

@@ -658,7 +658,7 @@ class ExactLiraSearchComponent private constructor(
         if (!canReusePoint()) return false
         val point = pointReusePoint ?: return false
         candidate = point
-        if (bools.none { it == UNASSIGNED }) {
+        if (unassignedBooleans == 0) {
             observeCompleteStage("POINT_REUSE_COMPLETE_CHECKED")
             captureCompleteWitness(point)
             if (operationStop() || outcome != ComponentCheck.Feasible) return false
@@ -1155,9 +1155,11 @@ class ExactLiraSearchComponent private constructor(
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
-                if (completeTraversalObserved && bools[variable] == UNASSIGNED) {
+                if (bools[variable] == UNASSIGNED) {
                     unassignedBooleans--
-                    smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
+                    if (completeTraversalObserved) {
+                        smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
+                    }
                 }
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
@@ -1166,7 +1168,7 @@ class ExactLiraSearchComponent private constructor(
                     disequalityDirections = emptyMap(),
                     directionPremises = emptyMap(),
                 )
-                if (variable !in arithmeticVariables && bools.any { it == UNASSIGNED }) {
+                if (variable !in arithmeticVariables && unassignedBooleans > 0) {
                     nodesByLevel.put(context.decisionLevel, node)
                     dirty = wasDirty
                     if (!dirty) {
@@ -1252,11 +1254,8 @@ class ExactLiraSearchComponent private constructor(
         val batch = ArrayList<ResolvedSourceAssertion>()
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
-            // Root checks still permit substitution through newly published root-fixed columns.
             val assertedLevel = sourceAssertionLevels[index]
-            if ((deferPoint && assertedLevel != -1) ||
-                (context.decisionLevel > 0 && assertedLevel >= 0)
-            ) continue
+            if ((deferPoint && assertedLevel != -1) || assertedLevel >= 0) continue
             val address = prepared.address
             val asserted = node.rowAssertions[address]
             if (prepared.disjunction && asserted == null) continue
@@ -1423,7 +1422,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintValues = null
         pointHintPoint = null
         // Root publications precede their delivery to components during shared initialization.
-        if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
+        if (context.decisionLevel == 0 && unassignedBooleans > 0 &&
             bools.indices.all { context.boolValue(it) != null }
         ) return ComponentResult.Consistent
         val enforced = enforceDisjunctions(context)
@@ -1436,7 +1435,7 @@ class ExactLiraSearchComponent private constructor(
             retirePointReuse()
             return ComponentResult.Consistent
         }
-        if (!graphFirst && bools.any { it == UNASSIGNED } && arithmeticRows.none {
+        if (!graphFirst && unassignedBooleans > 0 && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
         ) {
@@ -1453,7 +1452,7 @@ class ExactLiraSearchComponent private constructor(
                     differenceConflict(result, context)?.let { return it }
                 }
                 is RealDifferenceSystem.Result.Feasible -> {
-                    if (bools.any { it == UNASSIGNED }) {
+                    if (unassignedBooleans > 0) {
                         if (pointHintRows != null || pointHintIndex != null) {
                             operationStop.charge(model.numRealVars.toLong() + 1L)
                             if (!operationStop()) capturePointHints(result.point, context, graph = true)
@@ -1524,7 +1523,7 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Conflict(explanation)
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
-        if (bools.any { it == UNASSIGNED }) {
+        if (unassignedBooleans > 0) {
             candidate?.let { capturePointHints(it, context) }
         } else if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
             model.numIntVars > 0 && model.numRealVars > 0 &&
@@ -1556,7 +1555,7 @@ class ExactLiraSearchComponent private constructor(
             observeCompleteStage("FINITE_PENDING")
             return finitePointBranch(finite, context)
         }
-        if (bools.any { it == UNASSIGNED } || outcome != null) return null
+        if (unassignedBooleans > 0 || outcome != null) return null
         observeCompleteStage("FINITE_BOOLEAN_COMPLETE")
         if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
@@ -1701,7 +1700,7 @@ class ExactLiraSearchComponent private constructor(
         ) return null
         val point = candidate ?: return null
         lpStop.charge(model.numIntVars.toLong() + model.numBoolVars + preparedRows.size + 1L)
-        if (operationStop() || bools.any { it == UNASSIGNED } ||
+        if (operationStop() || unassignedBooleans > 0 ||
             node.nextDisequality(model, disjunctionAtoms, bools) != null || !context.consumeCheck()
         ) return null
         sourceIntegerSplit(point, context)?.let { return it }
@@ -1759,7 +1758,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun captureCompleteWitness(point: List<BigFraction>?) {
-        if (point == null || operationStop() || bools.any { it == UNASSIGNED } ||
+        if (point == null || operationStop() || unassignedBooleans > 0 ||
             !node.selectsEveryDisjunction(model, disjunctionAtoms) ||
             node.nextDisequality(model, disjunctionAtoms, bools) != null
         ) return
@@ -1802,7 +1801,7 @@ class ExactLiraSearchComponent private constructor(
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
-                if (completeTraversalObserved) unassignedBooleans++
+                unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
             }
