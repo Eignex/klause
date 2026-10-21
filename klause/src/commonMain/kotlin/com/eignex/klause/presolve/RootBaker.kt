@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongHashSet
 import kotlin.random.Random
 
@@ -117,8 +118,8 @@ object RootBaker {
                 }
                 token() -> base
                 else -> action(base as PropagationResult.Implied, token).also { result ->
-                    if (result is PropagationResult.Implied) {
-                        invocation?.fixedColumns = result.numBools + result.numInts - base.numBools - base.numInts
+                    if (result is PropagationResult.Implied && result !== base) {
+                        invocation?.recordTierYield(problem, base, result)
                     }
                     if (result is PropagationResult.Unsat) {
                         invocation?.outcome = PresolveInvocationOutcome.REFUTED
@@ -128,6 +129,26 @@ object RootBaker {
                 }
             }
         }
+    }
+
+    private fun PresolveInvocation.recordTierYield(
+        problem: BakedProblem,
+        base: PropagationResult.Implied,
+        result: PropagationResult.Implied,
+    ) {
+        fixedColumns = result.numBools + result.numInts - base.numBools - base.numInts
+        val narrowed = IntHashSet()
+        for (i in result.intMinKeys.indices) {
+            val v = result.intMinKeys[i]
+            val previous = base.intMinOrNullCompat(v) ?: problem.rootIntDomain(v).min
+            if (result.intMinValues[i] > previous && result.intValueOrNull(v) == null) narrowed.add(v)
+        }
+        for (i in result.intMaxKeys.indices) {
+            val v = result.intMaxKeys[i]
+            val previous = base.intMaxOrNullCompat(v) ?: problem.rootIntDomain(v).max
+            if (result.intMaxValues[i] < previous && result.intValueOrNull(v) == null) narrowed.add(v)
+        }
+        narrowedColumns = result.numInts - base.numInts + narrowed.size
     }
 
     /** Interior-value SAC: probe every value strictly between each multi-value int var's current min
