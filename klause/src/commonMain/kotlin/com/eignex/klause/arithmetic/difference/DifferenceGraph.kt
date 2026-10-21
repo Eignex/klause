@@ -40,10 +40,12 @@ internal class DifferenceGraph(val numVars: Int) {
     private val from = IntArrayList()
     private val to = IntArrayList()
     private val weight = LongArrayList()
+    private var outgoing: Outgoing? = null
 
     val size: Int get() = from.size
 
     fun addEdge(source: Int, target: Int, bound: Long): Int {
+        outgoing = null
         from.add(source)
         to.add(target)
         weight.add(bound)
@@ -113,37 +115,101 @@ internal class DifferenceGraph(val numVars: Int) {
         onWork: ((Long) -> Unit)? = null,
     ): Potentials {
         require(initial == null || initial.size == numVars)
-        onWork?.invoke(numVars.toLong() * 2L)
+        onWork?.invoke(numVars.toLong() * 5L)
+        if (cancelled()) return Potentials.Abandoned
+        val adjacency = outgoing(cancelled, onWork) ?: return Potentials.Abandoned
         val dist = initial?.copyOf() ?: LongArray(numVars)
         val predecessor = IntArray(numVars) { -1 }
+        var frontier = IntArray(numVars) { it }
+        var next = IntArray(numVars)
+        val queued = BooleanArray(numVars)
+        var frontierSize = numVars
         var untilPoll = POLL_INTERVAL
         repeat(numVars) {
-            onWork?.invoke(size.toLong())
+            onWork?.invoke(size.toLong() + frontierSize.toLong())
             if (cancelled()) return Potentials.Abandoned
-            var changed = false
-            for (e in 0 until size) {
+            var nextSize = 0
+            for (position in 0 until frontierSize) {
                 if (--untilPoll <= 0) {
                     untilPoll = POLL_INTERVAL
                     if (cancelled()) return Potentials.Abandoned
                 }
-                if (active != null && !active[e]) continue
-                val u = from[e]
-                val v = to[e]
-                if (addOverflows(dist[u], weight[e])) return Potentials.Abandoned
-                val relaxed = dist[u] + weight[e]
-                if (relaxed < dist[v]) {
-                    dist[v] = relaxed
-                    predecessor[v] = e
-                    changed = true
+                val u = frontier[position]
+                for (offset in adjacency.starts[u] until adjacency.starts[u + 1]) {
+                    if (--untilPoll <= 0) {
+                        untilPoll = POLL_INTERVAL
+                        if (cancelled()) return Potentials.Abandoned
+                    }
+                    val e = adjacency.edges[offset]
+                    if (active != null && !active[e]) continue
+                    val v = to[e]
+                    if (addOverflows(dist[u], weight[e])) return Potentials.Abandoned
+                    val relaxed = dist[u] + weight[e]
+                    if (relaxed < dist[v]) {
+                        dist[v] = relaxed
+                        predecessor[v] = e
+                        if (!queued[v]) {
+                            queued[v] = true
+                            next[nextSize++] = v
+                        }
+                    }
                 }
             }
-            if (!changed) return Potentials.Found(dist)
+            if (nextSize == 0) return Potentials.Found(dist)
+            onWork?.invoke(nextSize.toLong())
             val negative = hasNegativePredecessorCycle(predecessor, cancelled, onNegativeCycle, onWork)
                 ?: return Potentials.Abandoned
             if (cancelled()) return Potentials.Abandoned
             if (negative) return Potentials.Infeasible
+            // Only a lowered source potential can invalidate a previously satisfied outgoing edge.
+            for (position in 0 until nextSize) {
+                if (--untilPoll <= 0) {
+                    untilPoll = POLL_INTERVAL
+                    if (cancelled()) return Potentials.Abandoned
+                }
+                queued[next[position]] = false
+            }
+            val previous = frontier
+            frontier = next
+            next = previous
+            frontierSize = nextSize
         }
         return Potentials.Infeasible
+    }
+
+    private class Outgoing(val starts: IntArray, val edges: IntArray)
+
+    private fun outgoing(cancelled: () -> Boolean, onWork: ((Long) -> Unit)?): Outgoing? {
+        outgoing?.let { return it }
+        onWork?.invoke(numVars.toLong() * 4L + size.toLong() * 3L + 1L)
+        if (cancelled()) return null
+        val starts = IntArray(numVars + 1)
+        var untilPoll = POLL_INTERVAL
+        for (edge in 0 until size) {
+            if (--untilPoll <= 0) {
+                untilPoll = POLL_INTERVAL
+                if (cancelled()) return null
+            }
+            starts[from[edge] + 1]++
+        }
+        for (vertex in 0 until numVars) {
+            if (--untilPoll <= 0) {
+                untilPoll = POLL_INTERVAL
+                if (cancelled()) return null
+            }
+            starts[vertex + 1] += starts[vertex]
+        }
+        val cursor = starts.copyOf()
+        val edges = IntArray(size)
+        for (edge in 0 until size) {
+            if (--untilPoll <= 0) {
+                untilPoll = POLL_INTERVAL
+                if (cancelled()) return null
+            }
+            edges[cursor[from[edge]]++] = edge
+        }
+        if (cancelled()) return null
+        return Outgoing(starts, edges).also { outgoing = it }
     }
 
     private fun hasNegativePredecessorCycle(
