@@ -1532,6 +1532,33 @@ independent proof checking was unavailable. DIMACS/MaxSAT point checking was als
 unavailable in these comparisons. These candidate-revision measurements support
 the narrow gate and its exceptions, not a final-revision or corpus-wide speedup.
 
+### Presolve rerun spending
+
+The [round scheduler](../docs/07-presolve.md#pipeline) uses charged work per retained
+reduction to defer costly low-yield reruns, alongside its minimum model-change
+threshold. Entry weights and reduction counts are spending heuristics; their effect
+on search needs complete-solve comparisons.
+
+[7122](https://lab.eignex.com/jobs/7122) compared metered CLI revisions
+`559577c0a0` and `4013917d4a` in 384 cases: eight inputs, two seeds and two repeats,
+with CP/mixed default and aggressive, plus LS/FIXED default. Default preparation
+work fell about 0.9–4.1% on HRC, Euler, stable-goods and ais8; FlexibleJobshop and
+set-covering retained their work. Preparation and full-process time varied, as did
+deadline-limited objectives: 11 paired improvements and nine regressions, with no
+feasibility loss and one reported proof gain and loss each. These observations
+establish reduced charged analysis on those controls, without a general speedup.
+
+All 192 pairs matched source hashes, compiler and runtime identities; dependency
+hashes matched outside the changed solver library. There were 264 source-checked
+points and no invalid checks. The 48 ais8 points lacked independent checks; 24
+finite LS runs and 48 polynomial `parallel-let-sat` runs returned no point.
+The canonical polynomial degree-drop control retained 48 checked points and unchanged
+preparation work. Polynomial runs keep their native route regardless of engine
+label. Reported proofs were not independently certified. The measured candidate
+also collected observations for unmetered library calls; that collection is excluded
+from the implementation to preserve their entry cost. Every measured CLI had a
+shared work allowance.
+
 ### Original-clause subsumption
 
 Keep `clause-subsume` opt-in. [Lab comparison 7082](https://lab.eignex.com/jobs/7082)

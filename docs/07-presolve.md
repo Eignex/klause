@@ -29,7 +29,7 @@ tier reruns only after other passes changed at least 1% of the model and met its
 observed cost/yield threshold. Charged analysis and rebuild work, divided by the
 pass's entry weight and retained yield, estimates the intervening changes needed
 before another analysis. Yield is the largest of net occurrences removed, factors
-removed, columns narrowed or columns fixed, with a floor of one. Empty and
+removed, reported columns narrowed or columns fixed, with a floor of one. Empty and
 interrupted calls retain their cost; only completed misses can park a pass. These
 signals are deterministic spending heuristics, not predictions or proofs of search
 savings. Unmetered calls use the 1% change threshold without adding accounting
