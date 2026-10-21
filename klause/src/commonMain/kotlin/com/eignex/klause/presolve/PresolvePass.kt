@@ -161,6 +161,21 @@ enum class PresolvePass(
             Presolve.aggregateSourceSubSums(problem, ctx.cancellation)
     },
 
+    /** Exact row subtraction with retained equality premises and strictly fewer nonzero terms.
+     *  Opt-in because row density alone does not predict preparation and search cost. */
+    SPARSIFY_LINEAR_ROWS(
+        "sparsify",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = true,
+        autoEligible = false,
+        skipAfterEmpty = true,
+    ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.sparsifySourceLinearRows(problem, ctx.cancellation)
+    },
+
     /** Constraint subsumption / redundant-constraint removal — drops duplicate factors and
      *  dominated linear inequalities. Runs after the simplifying passes so proportional rows are
      *  already GCD-normalised. */

@@ -14,6 +14,8 @@ import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
+import kotlin.math.abs
 
 /**
  * Common linear sub-sum extraction (the contract-direction counterpart of [AffineSingletons], which
@@ -52,8 +54,8 @@ internal object LinearSubSumAggregation {
             return true
         }
 
-        fun boundScan(terms: Long) {
-            limit = visits + minOf(MAX_SCAN_WORK, SCAN_WORK_PER_TERM * terms)
+        fun boundScan(terms: Long, workPerTerm: Long = SCAN_WORK_PER_TERM) {
+            limit = visits + minOf(MAX_SCAN_WORK, workPerTerm * terms)
         }
 
         fun canScan(estimate: Long): Boolean = estimate <= limit - visits
@@ -73,6 +75,165 @@ internal object LinearSubSumAggregation {
      *  constant [b] (`B`), and the partner form `x_j ↦ A_j` in [form]. [defIndex] is the equality's own
      *  factor index, so it is never rewritten against itself. */
     private class Definition(val defIndex: Int, val y: Int, val b: Long, val form: Map<Int, Long>)
+
+    private const val MAX_SPARSE_WIDTH = 4096
+    private const val MAX_RATIOS = 8
+    private const val MAX_SCALE = 4L
+    private const val SPARSE_WORK_PER_TERM = 128L
+
+    private class SparseRow(val linear: Linear, val terms: Map<Int, Long>, val magnitude: Long)
+
+    fun sparsifyRows(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+        if (problem.factors.size > MAX_FACTORS || cancellation()) return PassDelta()
+        val work = Work(cancellation)
+        val rows = arrayOfNulls<SparseRow>(problem.factors.size)
+        val equalities = IntArrayList()
+        for (i in rows.indices) {
+            if (!work.visit()) return PassDelta()
+            val linear = problem.factors[i].equivalentLinear() ?: continue
+            val constants = linear.integerConstants ?: continue
+            if (linear.vars.size > MAX_SPARSE_WIDTH || constants.bound !in -OVERFLOW_GUARD..OVERFLOW_GUARD) continue
+            val terms = LinkedHashMap<Int, Long>()
+            var magnitude = 0L
+            var safe = true
+            for (j in linear.vars.indices) {
+                if (!work.visit()) return PassDelta()
+                val coefficient = constants.coeff(j)
+                if (coefficient !in -OVERFLOW_GUARD..OVERFLOW_GUARD) safe = false
+                if (coefficient != 0L) terms[linear.vars[j]] = coefficient
+                if (safe) magnitude = maxOf(magnitude, abs(coefficient))
+            }
+            if (!safe || terms.isEmpty()) continue
+            rows[i] = SparseRow(linear, terms, magnitude)
+            if (linear.op == LinearOp.EQ) equalities.add(i)
+        }
+        if (equalities.isEmpty()) return PassDelta()
+
+        val incidence = MutableIntObjectMap<Incidence>()
+        var indexedTerms = 0L
+        for (i in rows.indices) {
+            if (!work.visit()) return PassDelta()
+            val row = rows[i] ?: continue
+            for (variable in row.terms.keys) {
+                if (!work.visit()) return PassDelta()
+                incidence.getOrPut(variable) { Incidence() }.add(i, row.terms.size)
+                indexedTerms++
+            }
+        }
+        work.boundScan(indexedTerms, SPARSE_WORK_PER_TERM)
+        val dropped = IntArrayList()
+        val added = ArrayList<Factor>()
+        val rewritten = HashSet<Int>()
+        val retained = HashSet<Int>()
+        for (e in 0 until equalities.size) {
+            if (!work.visit()) break
+            val premise = equalities[e]
+            if (premise in rewritten) continue
+            val equality = checkNotNull(rows[premise])
+            val estimate = sparseScanEstimate(equality, incidence, work) ?: break
+            if (!work.canScan(estimate)) continue
+            val seen = HashSet<Int>()
+            for (variable in equality.terms.keys) {
+                if (!work.visit()) break
+                val candidates = checkNotNull(incidence[variable]).rows
+                for (r in 0 until candidates.size) {
+                    if (!work.visit()) break
+                    val target = candidates[r]
+                    if (target == premise || target in rewritten || target in retained || !seen.add(target)) continue
+                    val row = checkNotNull(rows[target])
+                    val replacement = sparsify(row, equality, work) ?: continue
+                    dropped.add(target)
+                    added.add(replacement)
+                    rewritten.add(target)
+                    // A premise used by any completed replacement must survive unchanged.
+                    retained.add(premise)
+                }
+            }
+        }
+        return PassDelta(droppedIndices = dropped.toIntArray(), addedFactors = added)
+    }
+
+    private fun sparseScanEstimate(
+        equality: SparseRow,
+        incidence: MutableIntObjectMap<Incidence>,
+        work: Work,
+    ): Long? {
+        var estimate = 0L
+        for (variable in equality.terms.keys) {
+            if (!work.visit()) return null
+            val bucket = checkNotNull(incidence[variable])
+            estimate += (MAX_RATIOS + 2L) *
+                (bucket.termVisits + bucket.rows.size.toLong() * equality.terms.size)
+        }
+        return estimate
+    }
+
+    private fun sparsify(row: SparseRow, equality: SparseRow, work: Work): Linear? {
+        val ratios = LinkedHashSet<Pair<Long, Long>>()
+        for ((variable, coefficient) in row.terms) {
+            if (!work.visit()) return null
+            val pivot = equality.terms[variable] ?: continue
+            var a = abs(coefficient)
+            var b = abs(pivot)
+            while (b != 0L) {
+                val remainder = a % b
+                a = b
+                b = remainder
+            }
+            val scale = abs(pivot) / a
+            if (scale > MAX_SCALE) continue
+            val multiplier = (coefficient / a) * if (pivot < 0L) -1L else 1L
+            ratios.add(scale to multiplier)
+            if (ratios.size == MAX_RATIOS) break
+        }
+        for ((scale, multiplier) in ratios) {
+            if (!work.visit()) return null
+            subtractEquality(row, equality, scale, multiplier, work)?.let { return it }
+        }
+        return null
+    }
+
+    // Positive scaling preserves every comparison, including disequality. No column is eliminated.
+    private fun subtractEquality(
+        row: SparseRow,
+        equality: SparseRow,
+        scale: Long,
+        multiplier: Long,
+        work: Work,
+    ): Linear? {
+        return try {
+            val terms = LinkedHashMap<Int, Long>()
+            for ((variable, coefficient) in row.terms) {
+                if (!work.visit()) return null
+                terms[variable] = mulExact(scale, coefficient)
+            }
+            for ((variable, coefficient) in equality.terms) {
+                if (!work.visit()) return null
+                val difference = subExact(terms[variable] ?: 0L, mulExact(multiplier, coefficient))
+                if (difference == 0L) terms.remove(variable) else terms[variable] = difference
+            }
+            if (terms.size >= row.terms.size) {
+                null
+            } else {
+                val growthLimit = minOf(OVERFLOW_GUARD, MAX_SCALE * maxOf(row.magnitude, equality.magnitude))
+                for (coefficient in terms.values) {
+                    if (!work.visit()) return null
+                    if (coefficient !in -growthLimit..growthLimit) return null
+                }
+                val bound = subExact(
+                    mulExact(scale, checkNotNull(row.linear.integerConstants).bound),
+                    mulExact(multiplier, checkNotNull(equality.linear.integerConstants).bound),
+                )
+                if (bound !in -OVERFLOW_GUARD..OVERFLOW_GUARD || !work.visit()) {
+                    null
+                } else {
+                    Linear(terms.values.toLongArray(), terms.keys.toIntArray(), row.linear.op, bound)
+                }
+            }
+        } catch (_: CheckedLongOverflowException) {
+            null
+        }
+    }
 
     fun aggregateSubSums(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
         val factors = problem.factors

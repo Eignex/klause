@@ -9170,6 +9170,7 @@ public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field REDUCE_DIOPHANTINE Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REDUCE_STRUCTURAL Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REMOVE_REDUNDANT Lcom/eignex/klause/presolve/PresolvePass;
+	public static final field SPARSIFY_LINEAR_ROWS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field STRENGTHEN_COEFFICIENTS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field SUBSTITUTE_BINARY_COLUMNS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field VALUE_PRECEDENCE Lcom/eignex/klause/presolve/PresolvePass;
