@@ -9,6 +9,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
@@ -182,13 +183,49 @@ class OpenTheorySolverHintTest {
                 ),
             )
 
-            val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve(TheoryParams())
+            val result = OpenTheoryEngine(
+                model, ProblemPipeline.DIFFERENCE_THEORY,
+                PresolveConfig.parse("default,-project-booleans"), false, Cancellation.Never, null,
+            ).solve(TheoryParams())
 
             val sat = assertIs<OpenTheoryResult.Sat>(result)
             assertEquals(false, sat.assignment.boolValue(0))
             assertTrue(satisfiesClauses(model, sat.assignment))
             assertEquals(1L, sat.stats.openHints.usage.noProvider)
             assertEquals(0L, sat.stats.openHints.usage.componentSelections)
+        }
+    }
+
+    @Test
+    fun `source projection should preserve signed equality gates in reconstructed witnesses`() {
+        for ((negativeInput, negativeTarget) in listOf(false to false, false to true, true to false, true to true)) {
+            val target = Lit.make(0, !negativeTarget)
+            val left = Lit.make(1, !negativeInput)
+            val right = Lit.make(2, true)
+            val skeleton = clausedModel(
+                3,
+                Clause(intArrayOf(Lit.negate(target), left)),
+                Clause(intArrayOf(right, Lit.negate(target))),
+                Clause(intArrayOf(Lit.negate(right), target, Lit.negate(left))),
+            )
+            val model = Problem(
+                numBoolVars = 3,
+                intBounds = skeleton.intBounds,
+                factors = arrayOf<Factor>(
+                    *skeleton.factors,
+                    ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    ReifiedLinear(2, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
+                ),
+            )
+
+            val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve(TheoryParams())
+
+            val sat = assertIs<OpenTheoryResult.Sat>(result)
+            assertTrue(satisfiesClauses(model, sat.assignment))
+            assertEquals(
+                Lit.evaluate(left, sat.assignment.boolValue(1)) && sat.assignment.boolValue(2),
+                Lit.evaluate(target, sat.assignment.boolValue(0)),
+            )
         }
     }
 
@@ -361,13 +398,28 @@ class OpenTheorySolverHintTest {
     fun `a hinted open route should answer with the theory witness`() {
         val model = clausedDifferenceModel()
 
-        val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve(hinted())
+        val result = OpenTheoryEngine(
+            model, ProblemPipeline.DIFFERENCE_THEORY,
+            PresolveConfig.parse("default,-project-booleans"), false, Cancellation.Never, null,
+        ).solve(hinted())
 
         val sat = assertIs<OpenTheoryResult.Sat>(result)
         assertTrue(satisfiesClauses(model, sat.assignment))
         assertEquals(1L, sat.stats.openHints.produced)
         assertEquals(3L, sat.stats.openHints.hintedVars)
         assertTrue(sat.stats.openHints.steeredSplits > 0)
+    }
+
+    @Test
+    fun `projection should keep hinted source witnesses valid with a reduced hint frame`() {
+        val model = clausedDifferenceModel()
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve(hinted())
+
+        val sat = assertIs<OpenTheoryResult.Sat>(result)
+        assertTrue(satisfiesClauses(model, sat.assignment))
+        assertEquals(1L, sat.stats.openHints.produced)
+        assertEquals(2L, sat.stats.openHints.hintedVars)
     }
 
     @Test
