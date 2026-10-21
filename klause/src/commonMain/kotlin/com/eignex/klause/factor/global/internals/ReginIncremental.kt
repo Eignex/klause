@@ -55,6 +55,27 @@ private fun reginRebuild(
     }
     if (distinct < n) return vars.copyOf()
 
+    val matchingConflict = rebuildReginMatching(state, vars, cache, inc, valuesPerVar, n, cap)
+    if (matchingConflict != null) return matchingConflict
+
+    val conflict = reginSccReachPrune(state, vars, cache, inc, valuesPerVar, dirtyLabels = null, premises = premises)
+    if (conflict != null) return conflict
+    inc.valid.set(1)
+    for (i in 0 until n) inc.domRef[i].set(state.intDomains[vars[i]])
+    cache.recordFixpoint(state, vars)
+    return null
+}
+
+@Suppress("LongParameterList")
+private fun rebuildReginMatching(
+    state: PropagationState,
+    vars: IntArray,
+    cache: ReginCache,
+    inc: ReginIncrementalState,
+    valuesPerVar: Array<IntArray>,
+    n: Int,
+    cap: Int,
+): IntArray? {
     // Warm-start the matching from the reversible matching, then augment the rest.
     val matchVar = IntArray(n) { -1 }
     val matchVal = IntArray(cap) { -1 }
@@ -82,12 +103,6 @@ private fun reginRebuild(
     }
     for (i in 0 until n) inc.matchVar[i] = matchVar[i]
     for (j in 0 until cap) inc.matchVal[j] = matchVal[j]
-
-    val conflict = reginSccReachPrune(state, vars, cache, inc, valuesPerVar, dirtyLabels = null, premises = premises)
-    if (conflict != null) return conflict
-    inc.valid.set(1)
-    for (i in 0 until n) inc.domRef[i].set(state.intDomains[vars[i]])
-    cache.recordFixpoint(state, vars)
     return null
 }
 
