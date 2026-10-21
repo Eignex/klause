@@ -13,9 +13,60 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
+import kotlin.test.assertNotNull
+import kotlin.test.assertFalse
+import kotlin.time.Duration
 import kotlin.test.assertTrue
 
 class PreparedSourceTest {
+    @Test
+    fun `unchanged source preparation should retain attempted pass effort`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray())
+        val budget = PresolveBudget(1_000_000)
+        val config = PresolveConfig.parse("off,+strengthen")
+
+        val prepared = PresolvePipeline.prepareSource(problem, config, presolveBudget = budget)
+
+        assertSame(problem, prepared.problem)
+        assertFalse(prepared.changed)
+        val effort = assertNotNull(prepared.stats.effort)
+        assertEquals(budget.spent(), effort.work)
+        assertEquals(1, effort.passCalls[PresolvePass.STRENGTHEN_COEFFICIENTS.id])
+        assertEquals(budget.rounds, effort.rounds)
+        assertTrue(effort.elapsed >= Duration.ZERO)
+    }
+
+    @Test
+    fun `allowance stopped source preparation should retain its ledger`() {
+        val problem = aggregatable()
+        val budget = PresolveBudget(1)
+        val config = PresolveConfig.parse("off,+subsume")
+
+        val prepared = PresolvePipeline.prepareSource(problem, config, presolveBudget = budget)
+
+        assertSame(problem, prepared.problem)
+        assertSame(budget, prepared.budget)
+        val effort = assertNotNull(prepared.stats.effort)
+        assertEquals(1L, effort.allowance)
+        assertEquals(budget.spent(), effort.work)
+        assertTrue(budget.spent() >= budget.allowance)
+        assertEquals(budget.passCalls, effort.passCalls)
+    }
+
+    @Test
+    fun `disabled source preparation should consume no pass work`() {
+        val budget = PresolveBudget(17)
+
+        val prepared = PresolvePipeline.prepareSource(aggregatable(), PresolveConfig.NONE, presolveBudget = budget)
+
+        assertSame(prepared.source, prepared.problem)
+        val effort = assertNotNull(prepared.stats.effort)
+        assertEquals("off", effort.emphasis)
+        assertEquals(0L, effort.work)
+        assertEquals(0, effort.rounds)
+        assertTrue(effort.passCalls.isEmpty())
+    }
+
     private fun aggregatable(): Problem {
         val open = Bits(3).also { bits -> repeat(3) { bits.set(it) } }
         return Problem(

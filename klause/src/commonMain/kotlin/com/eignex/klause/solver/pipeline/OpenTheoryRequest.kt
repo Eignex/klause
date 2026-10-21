@@ -26,7 +26,7 @@ import com.eignex.klause.util.Cancellation
  *
  * @property model the prepared model over the bounds the closing proved, or the request's own where
  *  nothing fired.
- * @property stats what the source passes did, or `null` where they left the model alone.
+ * @property stats source preparation reductions and effort, including unchanged phases.
  * @property closedSides how many open sides the bound closing proved a bound for.
  * @property infeasible whether preparation refuted the model, which is the model's own verdict.
  */
@@ -169,7 +169,7 @@ object OpenTheoryPipeline {
             request.preparedPlan.factorProjections,
         )
         val prepared = source.prepared
-        val sourceStats = prepared.stats.takeIf { prepared.changed || it.infeasible }
+        val sourceStats = prepared.stats
         val planned = source as? OpenSourcePreparation.Planned
             ?: return OpenPreparation(prepared.problem, sourceStats, closedSides = 0, infeasible = true)
         val lpStats = LpStatsSink(LpRoute.STANDALONE)

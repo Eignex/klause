@@ -65,7 +65,11 @@ fun OpenTheoryPipeline.minimize(
     onAccepted: ((QuadraticIncumbentPublication) -> Unit)?,
 ): QuadraticOptimizationExecution {
     require(cores > 0)
-    val publication = QuadraticPublicationObserver(onAccepted)
+    val publication = QuadraticPublicationObserver { accepted ->
+        request.reconstructSource(accepted.incumbent, params)?.let {
+            onAccepted?.invoke(accepted.copy(incumbent = it))
+        }
+    }
     return publication.execute {
         val native = QuadraticNativeScope(params)
         var result: QuadraticOptimizationResult = QuadraticOptimizationResult.Unknown(
@@ -88,10 +92,14 @@ fun OpenTheoryPipeline.minimize(
             }
         }
         QuadraticOptimizationExecution(
-            result, native.polynomialStats, native.numericalWork, native.work,
+            request.publishSource(result, params), native.polynomialStats, native.numericalWork, native.work,
             if (result is QuadraticOptimizationResult.Unknown || result is QuadraticOptimizationResult.BestFound) {
                 native.declinedResource
             } else native.resource,
-        ).also { it.retainPublication(publication.latest) }
+        ).also { execution ->
+            execution.retainPublication(publication.latest?.let { accepted ->
+                request.reconstructSource(accepted.incumbent, params)?.let { accepted.copy(incumbent = it) }
+            })
+        }
     }.withSourceSemantics(request.preparedPlan.sourceSemantics)
 }

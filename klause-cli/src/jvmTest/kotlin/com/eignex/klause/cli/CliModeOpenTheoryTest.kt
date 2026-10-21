@@ -10,6 +10,22 @@ import kotlin.test.assertTrue
 
 class CliModeOpenTheoryTest {
     @Test
+    fun `native nonlinear integers should accept the disabled presolve baseline`() {
+        val smt = File.createTempFile("clinativepresolve", ".smt2").apply {
+            writeText("(declare-const x Int) (assert (= (* x x) 2)) (check-sat)")
+            deleteOnExit()
+        }
+        var code = -1
+
+        val out = capture {
+            code = runCli(arrayOf("--presolve", "off", "--param", "nra-work-limit=0", smt.absolutePath))
+        }
+
+        assertEquals(0, code, out)
+        assertTrue("unknown" in out, out)
+    }
+
+    @Test
     fun `unknown execution parameters should be refused across captured source families`() {
         for (source in listOf(
             "(declare-const b Bool) (assert b)",

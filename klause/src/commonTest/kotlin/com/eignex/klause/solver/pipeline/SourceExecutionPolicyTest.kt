@@ -13,11 +13,44 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceExecutionPolicyTest {
+    @Test
+    fun `native formula sources should accept disabled preparation`() {
+        val sources = listOf(
+            "(declare-const x Real) (assert (= (* x x) 2))",
+            "(declare-const x Int) (assert (= (* x x) 2))",
+            "(declare-const x Real) (assert (= (sin x) 0))",
+        )
+        for (source in sources) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SmtLib.parse(source).source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            ))
+
+            val request = SourceExecutionRequest(invocation, ExecutionOptions(), presolveConfig = PresolveConfig.NONE)
+
+            assertSame(PresolveConfig.NONE, request.presolveConfig)
+        }
+    }
+
+    @Test
+    fun `native formula sources should explain unavailable individual reductions`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+
+        val failure = assertFailsWith<PipelineConfigException> {
+            SourceExecutionRequest(invocation, ExecutionOptions(), presolveConfig = PresolveConfig.parse("off,+probe-open"))
+        }
+
+        assertTrue("canonical factor model" in assertNotNull(failure.message))
+    }
+
     @Test
     fun `LP ceilings should capture caller overrides independently`() {
         val overrides = mutableMapOf(LpTechnique.CUTS to false)

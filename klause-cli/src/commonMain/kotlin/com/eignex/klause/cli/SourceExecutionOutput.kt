@@ -54,12 +54,17 @@ internal fun solveCapturedSource(
             )
         }),
     )
+    val reporting = object : OutputProtocol by output {
+        override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+            output.onStatistics(stats.copy(presolve = stats.presolve ?: result.preparationStats), solveTimeMs, solutions)
+        }
+    }
     val complete = result.completeSearchAdmitted
     when (result) {
         is SourceExecutionResult.Linear -> {
             when (val execution = result.result) {
                 is OpenTheoryExecution.Optimize -> reportOpenTheoryOptimum(
-                    execution, solvable.maximize, rendering.render, common.statistics, output,
+                    execution, solvable.maximize, rendering.render, common.statistics, reporting,
                     solvable.routingLpStats, solvable.routingElapsedMs,
                     completePool = complete,
                     publication = publication, budgetExhausted = budgetSpent,
@@ -68,19 +73,19 @@ internal fun solveCapturedSource(
                 is OpenTheoryExecution.Satisfy -> {
                     val outcome = execution.result
                     val stats = outcome.stats.copy(lp = outcome.stats.lp.mergedWith(solvable.routingLpStats))
-                    output.onVerdictContext(VerdictContext(
+                    reporting.onVerdictContext(VerdictContext(
                         budgetExhausted = budgetSpent(stats.run.timedOut),
                         terminationReason = (outcome as? OpenTheoryResult.Unknown)?.reason,
                     ))
                     when (outcome) {
                         is OpenTheoryResult.Sat -> {
-                            output.onSolution(rendering.render(outcome.assignment), null)
-                            output.onComplete(Verdict.SATISFIABLE)
+                            reporting.onSolution(rendering.render(outcome.assignment), null)
+                            reporting.onComplete(Verdict.SATISFIABLE)
                         }
-                        is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
-                        is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+                        is OpenTheoryResult.Unsat -> reporting.onComplete(Verdict.UNSATISFIABLE)
+                        is OpenTheoryResult.Unknown -> reporting.onComplete(Verdict.UNKNOWN)
                     }
-                    if (common.statistics) output.onStatistics(
+                    if (common.statistics) reporting.onStatistics(
                         stats, stats.run.wallMs + solvable.routingElapsedMs,
                         if (outcome is OpenTheoryResult.Sat) 1L else 0L,
                     )
@@ -92,9 +97,10 @@ internal fun solveCapturedSource(
         }
 
         is SourceExecutionResult.Refuted -> {
-            output.onComplete(Verdict.UNSATISFIABLE)
-            if (common.statistics) output.onStatistics(
-                SolveStats(lp = solvable.routingLpStats), solvable.routingElapsedMs, 0L,
+            reporting.onComplete(Verdict.UNSATISFIABLE)
+            if (common.statistics) reporting.onStatistics(
+                SolveStats(lp = solvable.routingLpStats, presolve = result.preparationStats),
+                solvable.routingElapsedMs + (result.preparationStats?.effort?.elapsed?.inWholeMilliseconds ?: 0L), 0L,
             )
         }
 
@@ -102,20 +108,20 @@ internal fun solveCapturedSource(
             val outcome = result.result
             if (solvable.optimize) {
                 reportLinearOptimization(
-                    outcome, { rendering.render(OpenTheoryAssignment.Sampled(it)) }, output, publication,
+                    outcome, { rendering.render(OpenTheoryAssignment.Sampled(it)) }, reporting, publication,
                     common.statistics, solvable.routingElapsedMs, complete, solvable.routingLpStats,
                 )
             } else {
-                output.onVerdictContext(VerdictContext(terminationReason = outcome.reason))
+                reporting.onVerdictContext(VerdictContext(terminationReason = outcome.reason))
                 val point = outcome.incumbent
-                if (point != null) output.onSolution(rendering.render(OpenTheoryAssignment.Sampled(point)), null)
-                output.onComplete(when {
+                if (point != null) reporting.onSolution(rendering.render(OpenTheoryAssignment.Sampled(point)), null)
+                reporting.onComplete(when {
                     point != null -> Verdict.SATISFIABLE
                     outcome.terminal?.claim == com.eignex.klause.solver.evidence.SourceClaim.Refutation ->
                         Verdict.UNSATISFIABLE
                     else -> Verdict.UNKNOWN
                 })
-                if (common.statistics) output.onStatistics(
+                if (common.statistics) reporting.onStatistics(
                     outcome.stats, outcome.stats.run.wallMs + solvable.routingElapsedMs,
                     if (point == null) 0L else 1L,
                 )
@@ -125,7 +131,7 @@ internal fun solveCapturedSource(
         is SourceExecutionResult.Quadratic -> reportQuadraticOptimization(
             result.result,
             { rendering.render(polynomialAssignment(it)) },
-            output,
+            reporting,
             common.statistics,
             solvable.routingElapsedMs,
             complete,
@@ -135,7 +141,7 @@ internal fun solveCapturedSource(
         is SourceExecutionResult.Polynomial -> reportNativeSatisfaction(
             result.result,
             rendering,
-            output,
+            reporting,
             common.statistics,
             solvable.routingElapsedMs,
             complete,
@@ -149,24 +155,23 @@ internal fun solveCapturedSource(
                 nativeResource = if (result.result.representationDeclined) "RepresentationLimit" else null,
             ),
             rendering,
-            output,
+            reporting,
             common.statistics,
             solvable.routingElapsedMs,
             complete,
         )
 
         is SourceExecutionResult.Declined -> {
-            output.onVerdictContext(VerdictContext(terminationReason = result.reason, completePool = complete))
-            output.onComplete(Verdict.UNKNOWN)
-            if (common.statistics) output.onStatistics(SolveStats.EMPTY, solvable.routingElapsedMs, 0L)
+            reporting.onVerdictContext(VerdictContext(terminationReason = result.reason, completePool = complete))
+            reporting.onComplete(Verdict.UNKNOWN)
+            if (common.statistics) reporting.onStatistics(
+                SolveStats(presolve = result.preparationStats), solvable.routingElapsedMs, 0L,
+            )
         }
 
         is SourceExecutionResult.Finite -> error("finite source execution requires its finite renderer")
         is SourceExecutionResult.Prepared -> error("preparation diagnostics require their diagnostic renderer")
-    }
-}
-
-internal fun reportNativeSatisfaction(
+    }(
     execution: PolynomialTheoryExecution,
     rendering: SourceRendering.ExactSource,
     output: OutputProtocol,

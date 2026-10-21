@@ -9,6 +9,7 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.util.Cancellation
+import kotlin.time.TimeSource
 
 /** An open source model after the shared preparation phase, with the route selected from the result. */
 internal sealed interface OpenSourcePreparation {
@@ -48,6 +49,7 @@ internal fun Problem.prepareOpenSource(
     presolveCancellation: Cancellation = cancellation,
 ): OpenSourcePreparation {
     projections?.requireSource(this)
+    val mark = TimeSource.Monotonic.markNow()
     val preparation = budget?.orSpent(presolveCancellation) ?: presolveCancellation
     val prepared = PresolvePipeline.prepareSource(
         this,
@@ -58,7 +60,9 @@ internal fun Problem.prepareOpenSource(
         budget,
     )
     if (prepared.infeasible) return OpenSourcePreparation.Refuted(prepared)
-    return prepared.planned(prepared.problem, projections, cancellation)
+    return prepared.planned(prepared.problem, projections, cancellation).also {
+        prepared.elapsed = mark.elapsedNow()
+    }
 }
 
 /**

@@ -343,7 +343,7 @@ internal fun executeLinearSource(
         }
 
         is SourceExecutionResult.Transcendental -> error("linear source selected function execution")
-    }
+    }.also { it.preparationStats = result.preparationStats }
     val strategy = request.polynomial.strategy
     val nativeClaimsUnrestricted = finiteUnrestricted && if (result is SourceExecutionResult.Polynomial ||
         result is SourceExecutionResult.Quadratic

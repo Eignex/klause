@@ -72,6 +72,7 @@ object PresolvePipeline {
         // An already-baked model reached this boundary through a finite preparation that ran the phase,
         // so running it again would re-derive the same fixpoint at full cost.
         if (problem is BakedProblem) return PreparedSource.unchanged(problem, presolveBudget)
+        val mark = TimeSource.Monotonic.markNow()
         val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
             .withPresolveBudget(presolveBudget)
         val presolved = Presolver.runSource(problem, config, context, phaseCancellation(cancellation, presolveBudget))
@@ -83,6 +84,8 @@ object PresolvePipeline {
             passesFired = presolved.passesFired,
             rebuild = presolved.rebuild,
             budget = presolveBudget,
+            config = config,
+            elapsed = mark.elapsedNow(),
         )
     }
 

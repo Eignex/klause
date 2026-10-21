@@ -250,7 +250,7 @@ data class PresolveStats(
     val effort: PresolveEffortStats? = null,
 )
 
-/** Request-local finite preparation observation; probe caps apply per bake tier, not to this aggregate. */
+/** Request-local preparation observation; probe caps apply per bake tier, not to this aggregate. */
 data class PresolveEffortStats(
     /** Effective effort preset. */
     val emphasis: String,
@@ -262,7 +262,7 @@ data class PresolveEffortStats(
     val probeBudgetPerVar: Int,
     /** Integer probe cap per tier on each bake. */
     val probeTotalBudget: Int,
-    /** Finite preparation time, excluding frontend routing and engine construction. */
+    /** Preparation time, excluding frontend routing and theory search. */
     val elapsed: Duration,
     /** Metered work across source and finite preparation; null without a meter. */
     val work: Long?,

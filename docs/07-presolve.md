@@ -128,6 +128,11 @@ host speed. `presolve-work-limit=unlimited` removes only the work cap. Effort
 telemetry reports construction, propagation work, converted `presolveWork` and probe
 calls separately.
 
+Unchanged and allowance-stopped source phases retain the same effort ledger as
+successful reductions. Source preparation time excludes theory search; polynomial
+encoder rebuilding belongs to preparation. Routes without a factor preparation
+report the retained allowance and counters with zero time for that phase.
+
 ## Selected reductions
 
 The passes listed under [Pipeline](#pipeline) share the guarantees above. This
@@ -254,6 +259,13 @@ phase can forgo reductions, but never skips a required encoder or turns an uncov
 source into a supported fragment. Source rewrites reselect encoders against the new
 canonical factors; original value sets, reconstruction and assertion premises stay
 authoritative after selection.
+
+Factor-backed polynomial execution runs the same source-safe schedule before
+rebuilding polynomial ownership and encodings. Its typed source mapping reconstructs
+Boolean and integer coordinates before original-source checking and publication,
+including streamed optimization incumbents. Native formulas without a canonical
+factor view keep their native preparation; disabling presolve is accepted on every
+route, while individual reductions require their input representation.
 
 ## Source witness validation
 

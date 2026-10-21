@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -18,6 +19,8 @@ class PolynomialTheoryRequest internal constructor(
     val problem: PolynomialRealProblem,
     /** Shared source ownership and exact completion used by every strategy. */
     val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan(),
+    internal val sourcePreparation: PreparedSource? = null,
+    internal val originalPlan: PreparedSourcePlan = preparedPlan,
 ) {
     internal val sharedModel: SharedPolynomialModel?
         get() = preparedPlan.execution.polynomial?.completion
@@ -311,8 +314,9 @@ private fun executePolynomial(
     }
     val shared = request.resolvedModel()
     val scope = PolynomialInvocationScope(shared.service, params)
-    val result = PolynomialStrategyAdapters(request.preparedPlan, shared, scope, params.strategy, stop, cores)
+    val solved = PolynomialStrategyAdapters(request.preparedPlan, shared, scope, params.strategy, stop, cores)
         .solve(engine)
+    val result = solved.withStats(request.preparationStats(solved.stats))
     val stats = scope.stats
     if (stop()) {
         return incomplete(
@@ -323,7 +327,9 @@ private fun executePolynomial(
     }
     return when (result) {
         is SolveResult.Sat -> {
-            val sample = result.assignment
+            val sample = request.reconstructSource(result.assignment, params) ?: return incomplete(
+                TerminationReason.Unsupported, stats, result.stats,
+            )
             val assignment = ExactNraAssignment(
                 BooleanArray(source.sourceBoolCount) { sample.boolValue(it) },
                 List(source.sourceRealCount) { requireNotNull(sample.algebraicReals)[it] },
