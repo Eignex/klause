@@ -47,8 +47,7 @@ internal class PreparedSource(
         passes = passesFired.map { it.id },
         constraintsRemoved = source.factors.size - problem.factors.size,
         infeasible = infeasible,
-        clauseLiteralsRemoved = budget?.clauseLiteralsRemoved,
-    )
+    ).also { it.clauseLiteralsRemoved = budget?.clauseLiteralsRemoved }
 
     /** Preparations that did not run a pass. */
     companion object {

@@ -184,7 +184,7 @@ object PresolvePipeline {
                 prepared.stats.copy(
                     infeasible = true,
                     lpStats = prepared.stats.lpStats.mergedWith(rootInfeasible.stats),
-                ),
+                ).also { it.clauseLiteralsRemoved = presolveBudget?.clauseLiteralsRemoved },
                 changed = true,
                 objective = refit(linearObjective, sourceProblem),
             ).also { it.mapping = prepared.mapping }
@@ -304,8 +304,7 @@ object PresolvePipeline {
                 PresolveStats(
                     bakeElapsed = bakeElapsed,
                     lpStats = harvestStats,
-                    clauseLiteralsRemoved = presolveBudget?.clauseLiteralsRemoved,
-                ),
+                ).also { it.clauseLiteralsRemoved = presolveBudget?.clauseLiteralsRemoved },
                 changed = false,
             ).also { it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY) }
         }
@@ -324,8 +323,7 @@ object PresolvePipeline {
             lpHarvest = harvest.takeUnless { it.isEmpty },
             lpStats = harvestStats,
             bakeElapsed = bakeElapsed,
-            clauseLiteralsRemoved = presolveBudget?.clauseLiteralsRemoved,
-        )
+        ).also { it.clauseLiteralsRemoved = presolveBudget?.clauseLiteralsRemoved }
         if (posted !== current) mappings.add(SourceMapping(current, posted, TransformationGuarantees.IDENTITY))
         val mapping = mappings.reduce { acc, next -> acc.then(next) }
         return PresolveOutcome(posted, { mapping.reconstructFrom(posted, it) }, stats,

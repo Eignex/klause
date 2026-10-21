@@ -552,7 +552,7 @@ internal object SolveCore {
                     output,
                     withModelObjective(
                         outcome.stats.copy(
-                            presolve = (outcome.stats.presolve ?: PresolveStats()).copy(
+                            presolve = (outcome.stats.presolve ?: PresolveStats()).withEffort(
                                 effort = presolveEffortStats(
                                     request.presolveConfig,
                                     request.presolveBudget,

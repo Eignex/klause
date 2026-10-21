@@ -9020,6 +9020,7 @@ public final class com/eignex/klause/presolve/PresolveBudget : com/eignex/klause
 	public fun <init> (J)V
 	public fun charge (J)V
 	public final fun getAllowance ()J
+	public final fun getClauseLiteralsRemoved ()J
 	public final fun getPassCalls ()Ljava/util/Map;
 	public final fun getProbeCalls ()J
 	public final fun getRootConstructionEntries ()J
@@ -9170,6 +9171,7 @@ public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field REDUCE_DIOPHANTINE Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REDUCE_STRUCTURAL Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REMOVE_REDUNDANT Lcom/eignex/klause/presolve/PresolvePass;
+	public static final field STRENGTHEN_CLAUSES Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field STRENGTHEN_COEFFICIENTS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field SUBSTITUTE_BINARY_COLUMNS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field VALUE_PRECEDENCE Lcom/eignex/klause/presolve/PresolvePass;
@@ -13982,6 +13984,7 @@ public final class com/eignex/klause/solver/result/PresolveStats {
 	public static synthetic fun copy-x2RqbK4$default (Lcom/eignex/klause/solver/result/PresolveStats;Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLcom/eignex/klause/solver/result/PresolveEffortStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/PresolveStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBakeElapsed-UwyO8pc ()J
+	public final fun getClauseLiteralsRemoved ()Ljava/lang/Long;
 	public final fun getConstraintsRemoved ()I
 	public final fun getEffort ()Lcom/eignex/klause/solver/result/PresolveEffortStats;
 	public final fun getInfeasible ()Z
@@ -13990,6 +13993,7 @@ public final class com/eignex/klause/solver/result/PresolveStats {
 	public final fun getPasses ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+	public final fun withEffort (Lcom/eignex/klause/solver/result/PresolveEffortStats;)Lcom/eignex/klause/solver/result/PresolveStats;
 }
 
 public final class com/eignex/klause/solver/result/QuadraticCertificate {

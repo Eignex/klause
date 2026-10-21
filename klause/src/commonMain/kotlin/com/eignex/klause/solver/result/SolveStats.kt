@@ -248,9 +248,15 @@ data class PresolveStats(
     val bakeElapsed: Duration = Duration.ZERO,
     /** Finite preparation settings and observed effort, when supplied by the caller. */
     val effort: PresolveEffortStats? = null,
-    /** Literals removed by completed source clause-strengthening replacements; null without a meter. */
-    val clauseLiteralsRemoved: Long? = null,
-)
+) {
+    /** Literals removed by completed clause replacements; null without a meter. Retained by [withEffort]. */
+    var clauseLiteralsRemoved: Long? = null
+        internal set
+
+    /** Attach effort telemetry while retaining source-preparation observations. */
+    fun withEffort(effort: PresolveEffortStats): PresolveStats =
+        copy(effort = effort).also { it.clauseLiteralsRemoved = clauseLiteralsRemoved }
+}
 
 /** Request-local finite preparation observation; probe caps apply per bake tier, not to this aggregate. */
 data class PresolveEffortStats(

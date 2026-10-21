@@ -167,7 +167,6 @@ class CliStatsTest {
         val stats = SolveStats(
             presolve = PresolveStats(
                 effort = presolveEffortStats(PresolveConfig.NONE, budget, Duration.ZERO),
-                clauseLiteralsRemoved = budget.clauseLiteralsRemoved,
             ),
         )
 
@@ -175,7 +174,6 @@ class CliStatsTest {
 
         assertEquals("1", pairs["presolveRootConstructionEntries"])
         assertEquals("0", pairs["presolveRootPropagationWork"])
-        assertEquals("0", pairs["presolveClauseLiteralsRemoved"])
         assertEquals("53", pairs["presolveWork"])
         assertEquals("0", pairs["presolveProbeCalls"])
     }

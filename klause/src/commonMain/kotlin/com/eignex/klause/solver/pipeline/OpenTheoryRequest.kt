@@ -180,6 +180,7 @@ object OpenTheoryPipeline {
         } else {
             val base = sourceStats ?: PresolveStats()
             base.copy(lpStats = base.lpStats.mergedWith(closingStats))
+                .also { it.clauseLiteralsRemoved = base.clauseLiteralsRemoved }
         }
         return when (closed) {
             OpenPresolveResult.Refuted ->

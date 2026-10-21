@@ -989,6 +989,7 @@ open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex
     enum entry REDUCE_DIOPHANTINE // com.eignex.klause.presolve/PresolvePass.REDUCE_DIOPHANTINE|null[0]
     enum entry REDUCE_STRUCTURAL // com.eignex.klause.presolve/PresolvePass.REDUCE_STRUCTURAL|null[0]
     enum entry REMOVE_REDUNDANT // com.eignex.klause.presolve/PresolvePass.REMOVE_REDUNDANT|null[0]
+    enum entry STRENGTHEN_CLAUSES // com.eignex.klause.presolve/PresolvePass.STRENGTHEN_CLAUSES|null[0]
     enum entry STRENGTHEN_COEFFICIENTS // com.eignex.klause.presolve/PresolvePass.STRENGTHEN_COEFFICIENTS|null[0]
     enum entry SUBSTITUTE_BINARY_COLUMNS // com.eignex.klause.presolve/PresolvePass.SUBSTITUTE_BINARY_COLUMNS|null[0]
     enum entry VALUE_PRECEDENCE // com.eignex.klause.presolve/PresolvePass.VALUE_PRECEDENCE|null[0]
@@ -12463,6 +12464,8 @@ final class com.eignex.klause.presolve/PresolveBudget : com.eignex.klause.util/W
     final val passCalls // com.eignex.klause.presolve/PresolveBudget.passCalls|{}passCalls[0]
         final fun <get-passCalls>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.presolve/PresolveBudget.passCalls.<get-passCalls>|<get-passCalls>(){}[0]
 
+    final var clauseLiteralsRemoved // com.eignex.klause.presolve/PresolveBudget.clauseLiteralsRemoved|{}clauseLiteralsRemoved[0]
+        final fun <get-clauseLiteralsRemoved>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.clauseLiteralsRemoved.<get-clauseLiteralsRemoved>|<get-clauseLiteralsRemoved>(){}[0]
     final var probeCalls // com.eignex.klause.presolve/PresolveBudget.probeCalls|{}probeCalls[0]
         final fun <get-probeCalls>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.probeCalls.<get-probeCalls>|<get-probeCalls>(){}[0]
     final var rootConstructionEntries // com.eignex.klause.presolve/PresolveBudget.rootConstructionEntries|{}rootConstructionEntries[0]
@@ -15706,6 +15709,9 @@ final class com.eignex.klause.solver.result/PresolveStats { // com.eignex.klause
     final val passes // com.eignex.klause.solver.result/PresolveStats.passes|{}passes[0]
         final fun <get-passes>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.result/PresolveStats.passes.<get-passes>|<get-passes>(){}[0]
 
+    final var clauseLiteralsRemoved // com.eignex.klause.solver.result/PresolveStats.clauseLiteralsRemoved|{}clauseLiteralsRemoved[0]
+        final fun <get-clauseLiteralsRemoved>(): kotlin/Long? // com.eignex.klause.solver.result/PresolveStats.clauseLiteralsRemoved.<get-clauseLiteralsRemoved>|<get-clauseLiteralsRemoved>(){}[0]
+
     final fun component1(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.result/PresolveStats.component1|component1(){}[0]
     final fun component2(): kotlin/Int // com.eignex.klause.solver.result/PresolveStats.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.eignex.klause.solver.result/PresolveStats.component3|component3(){}[0]
@@ -15717,6 +15723,7 @@ final class com.eignex.klause.solver.result/PresolveStats { // com.eignex.klause
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/PresolveStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/PresolveStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/PresolveStats.toString|toString(){}[0]
+    final fun withEffort(com.eignex.klause.solver.result/PresolveEffortStats): com.eignex.klause.solver.result/PresolveStats // com.eignex.klause.solver.result/PresolveStats.withEffort|withEffort(com.eignex.klause.solver.result.PresolveEffortStats){}[0]
 }
 
 final class com.eignex.klause.solver.result/QuadraticCertificate { // com.eignex.klause.solver.result/QuadraticCertificate|null[0]
