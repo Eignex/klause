@@ -105,7 +105,8 @@ class PresolvePassTest {
             pass.applyFinite(problem, PresolveContext(cancellation = unlimited.orSpent(Cancellation.Never)))
 
             assertTrue(limited.remaining() == 0L, pass.id)
-            assertTrue(limited.rootConstructionEntries > 0, pass.id)
+            assertEquals(0L, limited.rootConstructionEntries, pass.id)
+            assertEquals(10L, limited.spent(), pass.id)
             assertTrue(limited.rootConstructionEntries < unlimited.rootConstructionEntries, pass.id)
         }
     }

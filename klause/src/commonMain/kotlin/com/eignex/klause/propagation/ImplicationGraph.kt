@@ -2,7 +2,6 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 
@@ -17,14 +16,10 @@ internal fun Problem.propagatedImplicationGraph(
     cancellation: Cancellation = Cancellation.Never,
 ): Array<IntArray> {
     val adjacency = Array(2 * numBoolVars) { IntArrayList() }
-    var candidates = 0
-    var variable = 0
-    while (variable < numBoolVars && candidates < maxCandidates) {
+    for (variable in freeBooleanProbeCandidates(maxCandidates, cancellation)) {
         if (cancellation()) break
-        candidates++
         recordImplications(variable, value = true, adjacency, cancellation)
         recordImplications(variable, value = false, adjacency, cancellation)
-        variable++
     }
     return Array(adjacency.size) { adjacency[it].toIntArray() }
 }
@@ -35,10 +30,14 @@ private fun Problem.recordImplications(
     adjacency: Array<IntArrayList>,
     cancellation: Cancellation,
 ) {
+    if (cancellation()) return
     val implied = propagate(Assumptions.None.withBool(variable, value), cancellation)
     if (implied !is PropagationResult.Implied) return
     val from = Lit.make(variable, value)
-    implied.forEachBool { other, otherValue ->
-        if (other != variable) adjacency[from].add(Lit.make(other, otherValue))
+    for (k in implied.boolKeys.indices) {
+        cancellation.charge(10L)
+        if (cancellation()) return
+        val other = implied.boolKeys[k]
+        if (other != variable) adjacency[from].add(Lit.make(other, implied.boolValues[k]))
     }
 }

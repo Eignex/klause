@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.freeBooleanProbeCandidates
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatedImplicationGraph
 import com.eignex.klause.util.Cancellation
@@ -15,6 +16,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.klause.util.PollStride
 
 /**
  * Binary implication graph presolve. Harvests `lit -> lit` implications the way [Probing] pins a
@@ -67,7 +69,8 @@ internal object ImplicationGraph {
         objectiveBoolVars: Set<Int> = emptySet(),
     ): SourceDelta {
         if (problem.numBoolVars == 0) return SourceDelta()
-        val implications = binaryClauseImplications(problem, problem.factors.asList(), cancellation)
+        val implications = binaryClauseImplications(problem, problem.factors.asList(), GraphWork(cancellation))
+            ?: return SourceDelta()
         val reduction = reduceOver(problem, implications, objectiveBoolVars, cancellation) ?: return SourceDelta()
         return PresolveShared.sourceIdentityDelta(problem.factors, reduction.factors, reduction.merges.asRebuilds())
     }
@@ -80,13 +83,14 @@ internal object ImplicationGraph {
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
     ): Reduction? {
-        val merges = compatibleMerges(
-            problem,
-            equivalentVariableMerges(problem.numBoolVars, implications, objectiveBoolVars),
-        )
+        val work = GraphWork(cancellation)
+        if (!work.check()) return null
+        val candidates = equivalentVariableMerges(problem.numBoolVars, implications, objectiveBoolVars, work)
+            ?: return null
+        val merges = compatibleMerges(problem, candidates, work) ?: return null
         val original = problem.factors.asList()
-        val substituted = if (merges.isEmpty()) original else applyMerges(problem, merges)
-        val reduced = dropTransitivelyRedundantBinaries(problem, substituted, cancellation)
+        val substituted = if (merges.isEmpty()) original else applyMerges(problem, merges, work) ?: return null
+        val reduced = dropTransitivelyRedundantBinaries(problem, substituted, work)
         // A rename/drop leaves survivors identity-equal to inputs; a pure no-op keeps the same list.
         if (merges.isEmpty() && reduced === original) return null
         return Reduction(reduced, merges)
@@ -98,14 +102,17 @@ internal object ImplicationGraph {
     private fun binaryClauseImplications(
         problem: Problem,
         factors: List<Factor>,
-        cancellation: Cancellation,
-    ): Adjacency {
+        work: GraphWork,
+    ): Adjacency? {
+        if (!work.check()) return null
         val adj = Adjacency(2 * problem.numBoolVars)
-        cancellation.charge(IMPLICATION_GRAPH_WORK_WEIGHT * (1L + factors.size))
         for (f in factors) {
+            if (!work.visit()) return null
             if (!isCleanBinary(f, problem.numBoolVars)) continue
             val (a, b) = implicationEdges(f as Clause)
+            if (!work.visit()) return null
             adj.addEdge(a.first, a.second)
+            if (!work.visit()) return null
             adj.addEdge(b.first, b.second)
         }
         return adj
@@ -126,14 +133,10 @@ internal object ImplicationGraph {
      */
     private fun harvestImplications(problem: Problem, maxCandidates: Int, cancellation: Cancellation): Adjacency {
         val adj = Adjacency(2 * problem.numBoolVars)
-        var probed = 0
-        var v = 0
-        while (v < problem.numBoolVars && probed < maxCandidates) {
+        for (v in problem.freeBooleanProbeCandidates(maxCandidates, cancellation)) {
             if (cancellation()) break
-            probed++
             recordPolarity(problem, v, value = true, adj, cancellation)
             recordPolarity(problem, v, value = false, adj, cancellation)
-            v++
         }
         return adj
     }
@@ -151,11 +154,15 @@ internal object ImplicationGraph {
     /** Pin `v = [value]`, propagate, and record `pinned -> forced` for every other Boolean the
      *  propagation forces. A self-edge (the pin itself) is never emitted. */
     private fun recordPolarity(problem: Problem, v: Int, value: Boolean, adj: Adjacency, cancellation: Cancellation) {
+        if (cancellation()) return
         val result = problem.propagate(Assumptions.None.withBool(v, value), cancellation)
         if (result !is PropagationResult.Implied) return
         val from = Lit.make(v, value)
-        result.forEachBool { w, b ->
-            if (w != v) adj.addEdge(from, Lit.make(w, b))
+        for (k in result.boolKeys.indices) {
+            cancellation.charge(IMPLICATION_GRAPH_WORK_WEIGHT)
+            if (cancellation()) return
+            val w = result.boolKeys[k]
+            if (w != v) adj.addEdge(from, Lit.make(w, result.boolValues[k]))
         }
     }
 
@@ -180,12 +187,14 @@ internal object ImplicationGraph {
         numBoolVars: Int,
         adj: Adjacency,
         objectiveBoolVars: Set<Int>,
-    ): List<BoolMerge> {
-        val componentOf = stronglyConnectedComponents(adj)
+        work: GraphWork,
+    ): List<BoolMerge>? {
+        val componentOf = stronglyConnectedComponents(adj, work) ?: return null
         // Representative variable per literal-SCC: the smallest variable id whose positive literal sits
         // in that component. A component is mergeable only through positive literals (same polarity).
         val repVarOfComponent = MutableIntIntMap()
         for (vv in 0 until numBoolVars) {
+            if (!work.visit()) return null
             if (vv in objectiveBoolVars) continue
             val pos = componentOf[Lit.make(vv, true)]
             val neg = componentOf[Lit.make(vv, false)]
@@ -196,6 +205,7 @@ internal object ImplicationGraph {
         }
         val merges = ArrayList<BoolMerge>()
         for (vv in 0 until numBoolVars) {
+            if (!work.visit()) return null
             if (vv in objectiveBoolVars) continue
             val pos = componentOf[Lit.make(vv, true)]
             val neg = componentOf[Lit.make(vv, false)]
@@ -211,37 +221,67 @@ internal object ImplicationGraph {
      *  binary clause that the rename turns into a tautology (`r ⇒ r`). Bool variable count is
      *  preserved; a merged variable simply stops appearing in any factor and is rebuilt on the way
      *  back. */
-    private fun applyMerges(problem: Problem, merges: List<BoolMerge>): List<Factor> {
-        val boolMap = IntArray(problem.numBoolVars) { it }
-        for (m in merges) boolMap[m.from] = m.into
-        val intMap = IntArray(problem.numIntVars) { it }
+    private fun applyMerges(problem: Problem, merges: List<BoolMerge>, work: GraphWork): List<Factor>? {
+        val boolMap = IntArray(problem.numBoolVars)
+        for (v in boolMap.indices) {
+            if (!work.visit()) return null
+            boolMap[v] = v
+        }
+        for (m in merges) {
+            if (!work.visit()) return null
+            boolMap[m.from] = m.into
+        }
+        val intMap = IntArray(problem.numIntVars)
+        for (v in intMap.indices) {
+            if (!work.visit()) return null
+            intMap[v] = v
+        }
         val mapping = VarRemap(boolMap, intMap)
         val out = ArrayList<Factor>(problem.factors.size)
         for (f in problem.factors) {
+            if (!work.visit()) return null
             val remapped = f.remap(mapping)
-            if (remapped is Clause && isTautology(remapped)) continue
+            if (remapped is Clause && isTautology(remapped, work)) continue
             out.add(remapped)
         }
-        return out
+        return if (work.check()) out else null
     }
 
     /** [candidates] minus any merge that would rename a [ReifiedPseudoBoolean]'s auxiliary and one of its
      *  body variables onto the same variable; both are kept as themselves instead. */
-    private fun compatibleMerges(problem: Problem, candidates: List<BoolMerge>): List<BoolMerge> {
+    private fun compatibleMerges(
+        problem: Problem,
+        candidates: List<BoolMerge>,
+        work: GraphWork,
+    ): List<BoolMerge>? {
         if (candidates.isEmpty()) return candidates
-        val boolMap = IntArray(problem.numBoolVars) { it }
-        for (merge in candidates) boolMap[merge.from] = merge.into
+        val boolMap = IntArray(problem.numBoolVars)
+        for (v in boolMap.indices) {
+            if (!work.visit()) return null
+            boolMap[v] = v
+        }
+        for (merge in candidates) {
+            if (!work.visit()) return null
+            boolMap[merge.from] = merge.into
+        }
         for (factor in problem.factors) {
+            if (!work.visit()) return null
             when (factor) {
-                is ReifiedPseudoBoolean -> restoreAuxiliarySeparation(factor, boolMap)
+                is ReifiedPseudoBoolean -> restoreAuxiliarySeparation(factor, boolMap, work)
             }
         }
-        return candidates.filter { boolMap[it.from] == it.into }
+        val compatible = ArrayList<BoolMerge>()
+        for (candidate in candidates) {
+            if (!work.visit()) return null
+            if (boolMap[candidate.from] == candidate.into) compatible.add(candidate)
+        }
+        return compatible
     }
 
-    private fun restoreAuxiliarySeparation(factor: ReifiedPseudoBoolean, boolMap: IntArray) {
+    private fun restoreAuxiliarySeparation(factor: ReifiedPseudoBoolean, boolMap: IntArray, work: GraphWork) {
         val auxiliary = factor.auxBoolVar
         for (literal in factor.literals) {
+            if (!work.visit()) return
             val bodyVariable = Lit.variable(literal)
             if (boolMap[auxiliary] == boolMap[bodyVariable]) {
                 boolMap[auxiliary] = auxiliary
@@ -251,9 +291,10 @@ internal object ImplicationGraph {
     }
 
     /** A clause that holds in every assignment because some variable appears in both polarities. */
-    private fun isTautology(clause: Clause): Boolean {
+    private fun isTautology(clause: Clause, work: GraphWork): Boolean {
         val seen = IntHashSet(clause.literals.size)
         for (lit in clause.literals) {
+            if (!work.visit()) return false
             if (Lit.negate(lit) in seen) return true
             seen.add(lit)
         }
@@ -278,15 +319,19 @@ internal object ImplicationGraph {
     private fun dropTransitivelyRedundantBinaries(
         problem: Problem,
         factors: List<Factor>,
-        cancellation: Cancellation,
+        work: GraphWork,
     ): List<Factor> {
         val binaryIndices = IntArrayList()
-        factors.forEachIndexed { i, f -> if (isCleanBinary(f, problem.numBoolVars)) binaryIndices.add(i) }
+        factors.forEachIndexed { i, f ->
+            if (!work.visit()) return factors
+            if (isCleanBinary(f, problem.numBoolVars)) binaryIndices.add(i)
+        }
         if (binaryIndices.size < 2) return factors
 
-        val adj = binaryClauseImplications(problem, factors, cancellation)
+        val adj = binaryClauseImplications(problem, factors, work) ?: return factors
         val live = MutableLongIntMap()
         binaryIndices.forEach { i ->
+            if (!work.visit()) return factors
             val (e1, e2) = implicationEdges(factors[i] as Clause)
             live.addTo(e1.key, 1)
             live.addTo(e2.key, 1)
@@ -294,23 +339,28 @@ internal object ImplicationGraph {
 
         val drop = IntHashSet()
         for (k in 0 until binaryIndices.size) {
-            if (cancellation()) break
+            if (!work.visit()) break
             val i = binaryIndices[k]
             val (e1, e2) = implicationEdges(factors[i] as Clause)
             live.addTo(e1.key, -1)
             live.addTo(e2.key, -1)
             // Checking one direction suffices: the contrapositive is reachable iff the forward one is.
-            if (reachable(adj, live, e1.first, e1.second, cancellation)) {
+            val reachable = reachable(adj, live, e1.first, e1.second, work)
+            if (reachable == true) {
                 drop.add(i)
             } else {
                 live.addTo(e1.key, 1)
                 live.addTo(e2.key, 1)
             }
+            if (reachable == null) break
         }
         if (drop.isEmpty()) return factors
 
         val kept = ArrayList<Factor>(factors.size - drop.size)
-        factors.forEachIndexed { i, f -> if (i !in drop) kept.add(f) }
+        factors.forEachIndexed { i, f ->
+            if (!work.visit()) return factors
+            if (i !in drop) kept.add(f)
+        }
         return kept
     }
 
@@ -327,17 +377,18 @@ internal object ImplicationGraph {
         live: MutableLongIntMap,
         source: Int,
         target: Int,
-        cancellation: Cancellation,
-    ): Boolean {
+        work: GraphWork,
+    ): Boolean? {
         val stack = IntArrayList()
         val seen = IntHashSet()
         stack.add(source)
         seen.add(source)
         while (!stack.isEmpty()) {
+            if (!work.visit()) return null
             val node = stack.last()
             stack.removeAt(stack.size - 1)
-            cancellation.charge(IMPLICATION_GRAPH_WORK_WEIGHT)
-            adj.forEachNeighbor(node) { next ->
+            adj.neighbours(node).forEach { next ->
+                if (!work.visit()) return null
                 if (next !in seen && live.getOrDefault(Edge(node, next).key, 0) > 0) {
                     if (next == target) return true
                     seen.add(next)
@@ -353,7 +404,8 @@ internal object ImplicationGraph {
      *  component id shared by exactly the literals on a mutual-implication cycle with `l`. A literal
      *  with no edges is its own singleton component. Iterative (explicit stack) so a deep implication
      *  chain cannot overflow the call stack on the native targets. */
-    private fun stronglyConnectedComponents(adj: Adjacency): IntArray {
+    private fun stronglyConnectedComponents(adj: Adjacency, work: GraphWork): IntArray? {
+        if (!work.check()) return null
         val n = adj.nodeCount
         val index = IntArray(n) { -1 }
         val low = IntArray(n)
@@ -367,10 +419,12 @@ internal object ImplicationGraph {
         val callNode = IntArrayList()
         val callNeighbour = IntArrayList()
         for (root in 0 until n) {
+            if (!work.visit()) return null
             if (index[root] != -1) continue
             callNode.add(root)
             callNeighbour.add(0)
             while (!callNode.isEmpty()) {
+                if (!work.visit()) return null
                 val node = callNode[callNode.size - 1]
                 if (callNeighbour[callNeighbour.size - 1] == 0 && index[node] == -1) {
                     index[node] = nextIndex
@@ -383,6 +437,7 @@ internal object ImplicationGraph {
                 var ni = callNeighbour[callNeighbour.size - 1]
                 var descended = false
                 while (ni < neighbours.size) {
+                    if (!work.visit()) return null
                     val next = neighbours[ni]
                     if (index[next] == -1) {
                         callNeighbour[callNeighbour.size - 1] = ni + 1
@@ -398,6 +453,7 @@ internal object ImplicationGraph {
                 if (descended) continue
                 if (index[node] == low[node]) {
                     while (true) {
+                        if (!work.visit()) return null
                         val w = tarjanStack.last()
                         tarjanStack.removeAt(tarjanStack.size - 1)
                         onStack[w] = false
@@ -414,7 +470,23 @@ internal object ImplicationGraph {
                 }
             }
         }
-        return component
+        return if (work.check()) component else null
+    }
+
+    private class GraphWork(private val cancellation: Cancellation) {
+        private val poll = PollStride()
+        private var stopped = false
+
+        fun check(): Boolean {
+            if (!stopped && cancellation()) stopped = true
+            return !stopped
+        }
+
+        fun visit(): Boolean {
+            if (stopped) return false
+            cancellation.charge(IMPLICATION_GRAPH_WORK_WEIGHT)
+            return if (cancellation.workMeter() != null || poll.due()) check() else true
+        }
     }
 
     private data class Edge(val first: Int, val second: Int) {
@@ -423,20 +495,15 @@ internal object ImplicationGraph {
 
     /** Adjacency list over literal nodes `0 until [nodeCount]`, built incrementally. */
     private class Adjacency(val nodeCount: Int) {
-        private val out = Array(nodeCount) { IntArrayList() }
+        private val out = arrayOfNulls<IntArrayList>(nodeCount)
+        private val empty = IntArrayList()
 
         fun addEdge(from: Int, to: Int) {
             if (from == to) return
-            out[from].add(to)
+            (out[from] ?: IntArrayList().also { out[from] = it }).add(to)
         }
 
-        fun neighbours(node: Int): IntArray = out[node].toIntArray()
-
-        fun toArrays(): Array<IntArray> = Array(nodeCount) { neighbours(it) }
-
-        inline fun forEachNeighbor(node: Int, action: (Int) -> Unit) {
-            out[node].forEach { next -> action(next) }
-        }
+        fun neighbours(node: Int): IntArrayList = out[node] ?: empty
     }
 }
 

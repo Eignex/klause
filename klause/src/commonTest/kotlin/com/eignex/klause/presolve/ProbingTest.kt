@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
@@ -104,8 +105,7 @@ class ProbingTest {
     }
 
     @Test
-    fun `the candidate cap should stop probing before a later failed literal`() {
-        // A cap of 1 spends the only candidate slot on the unconstrained b0.
+    fun `unused columns should not consume the candidate cap`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -116,7 +116,8 @@ class ProbingTest {
             ),
         )
         assertTrue(Lit.make(1, false) in units(probed(problem)))
-        assertTrue(Presolve.probe(problem.bake(), 1, Cancellation.Never).isEmpty)
+        val delta = Presolve.probe(problem.bake(), 1, Cancellation.Never)
+        assertEquals(listOf(Lit.make(1, false)), delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() })
     }
 
     @Test
@@ -215,5 +216,119 @@ class ProbingTest {
         )
 
         assertTrue(Presolve.probeSource(problem, cap, Cancellation.Never).isEmpty)
+    }
+    @Test
+    fun `root fixed columns should not consume the candidate cap or emit redundant units`() {
+        val problem = Problem(
+            4, 0, emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
+            ),
+        ).bake()
+
+        val delta = Presolve.probe(problem, 1, Cancellation.Never)
+
+        assertEquals(listOf(Lit.make(2, true)), delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() })
+    }
+
+    @Test
+    fun `unused columns should cause no finite probe construction`() {
+        val problem = Problem(16, 0, emptyArray(), emptyList()).bake()
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val delta = Presolve.probe(problem, 4, budget.orSpent(Cancellation.Never))
+
+        assertTrue(delta.isEmpty)
+        assertEquals(0L, budget.rootConstructionEntries)
+    }
+
+    @Test
+    fun `the candidate cap should stop before a later live failed literal`() {
+        val problem = Problem(
+            4, 0, emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
+            ),
+        ).bake()
+
+        assertTrue(Presolve.probe(problem, 1, Cancellation.Never).isEmpty)
+    }
+
+    @Test
+    fun `source preparation and root rows should stop at the next metered visit`() {
+        val problem = Problem(
+            0, 8, Array(8) { IntDomain(0, 1) },
+            List(8) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
+        )
+        for (allowance in listOf(1L, 81L, 331L, 481L, 561L, 721L, 801L)) {
+            val budget = PresolveBudget(allowance)
+
+            val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+
+            assertTrue(delta.isEmpty, "allowance=$allowance")
+            assertFalse(delta.infeasible)
+            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+        }
+    }
+
+    @Test
+    fun `source root interruption should retain a proved bound`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 10) },
+            listOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 5),
+            ),
+        )
+        val budget = PresolveBudget(220)
+
+        val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+
+        assertFalse(delta.infeasible)
+        assertEquals(5L, delta.bounds!!.upper(0))
+        assertEquals(10L, delta.bounds.upper(1))
+        assertEquals(220L, budget.spent())
+    }
+
+    @Test
+    fun `interrupted hypothetical propagation should never publish its assumption`() {
+        val problem = Problem(
+            4, 0, emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true))),
+            ),
+        )
+        for (allowance in listOf(451L, 491L, 531L, 581L, 631L, 681L)) {
+            val budget = PresolveBudget(allowance)
+
+            val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
+
+            assertTrue(delta.isEmpty, "allowance=$allowance")
+            assertFalse(delta.infeasible)
+            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+        }
+    }
+
+    @Test
+    fun `external cancellation should stop source compilation without deductions`() {
+        val problem = Problem(
+            0, 128, Array(128) { IntDomain(0, 1) },
+            List(128) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
+        )
+        var polls = 0
+        val token = Cancellation { ++polls == 3 }
+
+        val delta = Presolve.probeSource(problem, cap, token)
+
+        assertEquals(3, polls)
+        assertTrue(delta.isEmpty)
+        assertFalse(delta.infeasible)
     }
 }
