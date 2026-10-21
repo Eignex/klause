@@ -103,7 +103,7 @@ internal fun Compiler.Builder.hasOpenProductOperand(): Boolean {
 
 private class ProductOperand(val constant: Boolean, val open: Boolean)
 
-internal class SmtLibRefutedPremises : RuntimeException()
+internal class SmtLibRefutedPremises(val premises: Problem) : RuntimeException()
 
 internal fun Compiler.Builder.closeProductBounds() {
     if (productBoundsClosed || intDomains.none { it is PresolveDomain.Open }) return
@@ -118,7 +118,7 @@ internal fun Compiler.Builder.closeProductBounds() {
     val outcome = premises.closeOpenBounds(sourceCancellation)
     sourceCancellation.polynomialSourceCheckpoint()
     val closed = when (outcome) {
-        OpenPresolveResult.Refuted -> throw SmtLibRefutedPremises()
+        OpenPresolveResult.Refuted -> throw SmtLibRefutedPremises(premises)
         is OpenPresolveResult.Tightened -> outcome.spec
     }
     for (id in intDomains.indices) {

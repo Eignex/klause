@@ -115,7 +115,7 @@ private fun parseLinearAdmission(
     }
     return try {
         buildLinearAdmission(builder, commands, cancellation, semantics)
-    } catch (_: SmtLibRefutedPremises) {
+    } catch (refuted: SmtLibRefutedPremises) {
         // Refutation does not excuse unsupported syntax elsewhere in the source.
         val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
             allowFunctions = true, semantics = semantics)
@@ -124,7 +124,7 @@ private fun parseLinearAdmission(
         if (captured.transcendental?.hasObjective == true) {
             smtUnsupported("function objective requires its source expression")
         }
-        val source = builder.refutedSource()
+        val source = builder.refutedSource(refuted.premises)
         if (captured.objective != null) captured.bindObjective(source, cancellation) else source
     }
 }
