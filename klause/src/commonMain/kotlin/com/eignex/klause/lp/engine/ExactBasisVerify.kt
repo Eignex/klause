@@ -21,7 +21,12 @@ internal data class ExactBasisLimits(
     val factor: RationalBasisLimits = RationalBasisLimits(),
     val verification: ReconstructionLimits = ReconstructionLimits(),
     val sparse: Boolean = false,
-)
+    val maxRecoveryPivots: Int = 10000,
+) {
+    init {
+        require(maxRecoveryPivots >= 0)
+    }
+}
 
 internal enum class ExactBasisPhase {
     ASSEMBLY,
@@ -32,6 +37,7 @@ internal enum class ExactBasisPhase {
     PRIMAL,
     DUAL,
     RAY,
+    FEASIBILITY,
     VERIFICATION,
     PROJECTION,
 }
@@ -48,6 +54,7 @@ internal enum class ExactBasisDecline {
     CANCELLED,
     CANDIDATE,
     PROJECTION,
+    PIVOTS,
 }
 
 internal data class ExactBasisWork(val phase: ExactBasisPhase, val work: Long, val allocation: Long)
@@ -307,6 +314,36 @@ internal fun verifyExactBasis(
                         integerRay = projectBasisConflict(model.m, requireNotNull(conflict), meter)
                         break
                     }
+                }
+            }
+            if (witness == null && conflict == null && sparseRecovery) {
+                val timer = LpPhaseTimer(observer, LpSolvePhase.SPARSE_BASIS_RECOVERY)
+                val before = meter.totalWork
+                var recovery: SparseExactBasisRecovery? = null
+                var outcome = "CANDIDATE"
+                try {
+                    meter.phase = ExactBasisPhase.FEASIBILITY
+                    val search = SparseExactBasisRecovery(authority, factors)
+                    recovery = search
+                    val candidate = search.recover()
+                    val verified = verifyBasisCandidates(
+                        model, authority, candidate.primal, null, candidate.ray, meter, withBasis = false,
+                    )
+                    witness = verified.witness
+                    conflict = verified.conflict
+                    support = verified.conflictSupport
+                    outcome = when {
+                        witness != null -> "WITNESS"
+                        conflict != null -> "CONFLICT"
+                        else -> verified.metrics.decline?.name ?: "CANDIDATE"
+                    }
+                    verified.metrics.decline?.let { meter.stop(it) }
+                    if (conflict != null) integerRay = projectBasisConflict(model.m, requireNotNull(conflict), meter)
+                } catch (stop: ExactBasisStop) {
+                    outcome = stop.reason.name
+                    throw stop
+                } finally {
+                    timer.finish(outcome, meter.totalWork - before, pivots = recovery?.pivots ?: 0)
                 }
             }
             checked.metrics.decline?.let { meter.stop(it) }

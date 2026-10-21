@@ -153,8 +153,8 @@ class SparseExactBasisFactorsTest {
 
         val recovered = verifyExactBasis(model, basis, limits = ExactBasisLimits(sparse = true))
 
-        assertNull(recovered.witness)
         assertNull(recovered.conflict)
+        assertNotNull(checkedLpWitness(model, assertNotNull(recovered.witness).primal))
         assertNotNull(checkedLpWitness(model, List(130) { if (it < 129) BigFraction.ONE else BigFraction.ZERO }))
     }
 

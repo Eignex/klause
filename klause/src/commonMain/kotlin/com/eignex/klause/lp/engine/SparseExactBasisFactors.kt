@@ -99,10 +99,12 @@ private class SparseExactBasisFactorization(
     }
 }
 
-internal fun buildSparseExactBasis(authority: ExactBasisAuthority): ExactBasisFactorization =
-    SparseExactBasisBuilder(authority).build()
+internal fun buildSparseExactBasis(
+    authority: ExactBasisAuthority,
+    headings: IntArray = authority.headings,
+): ExactBasisFactorization = SparseExactBasisBuilder(authority, headings).build()
 
-private class SparseExactBasisBuilder(private val authority: ExactBasisAuthority) {
+private class SparseExactBasisBuilder(private val authority: ExactBasisAuthority, headings: IntArray) {
     private val meter = authority.meter
     private val size = authority.model.m
     private val rows: Array<ArrayList<Pair<Int, BigFraction>>>
@@ -131,8 +133,8 @@ private class SparseExactBasisBuilder(private val authority: ExactBasisAuthority
         rowQueue = IntArray(size)
         columnQueue = IntArray(size)
         pivots = ArrayList(size)
-        for (column in authority.headings.indices) {
-            for ((row, value) in authority.matrix[authority.headings[column]]) {
+        for (column in headings.indices) {
+            for ((row, value) in authority.matrix[headings[column]]) {
                 meter.charge()
                 if (value.isZero) continue
                 if (++fill > meter.limits.factor.fill) meter.stop(ExactBasisDecline.FILL)

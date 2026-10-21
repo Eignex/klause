@@ -30,6 +30,7 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
     var orderAttempts = 0
     var orderFallbacks = 0
     var orderDecline: ExactBasisOrderDecline? = null
+    val totalWork: Long get() = work.sum()
 
     val token = if (limits.factor.time.isInfinite()) {
         cancellation

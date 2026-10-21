@@ -2,7 +2,11 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 
-internal class ExactBasisPointRecovery(val primal: List<BigFraction>?, val violatedRow: Int?)
+internal class ExactBasisPointRecovery(
+    val primal: List<BigFraction>?,
+    val violatedRow: Int?,
+    val ray: List<BigFraction>? = null,
+)
 
 internal fun ExactBasisAuthority.violatedBasic(basics: List<BigFraction>): Int? {
     for (slot in headings.indices) {
@@ -45,13 +49,18 @@ internal fun ExactBasisAuthority.strictPrimal(
     }
     val directions = solveExactBasis(factors, rhs, false, meter)
     val values = seats.toMutableList()
-    val slots = IntArray(model.numVars) { -1 }
     for (slot in headings.indices) {
         val column = headings[slot]
-        slots[column] = slot
         values[column] = basics[slot]
         epsilon[column] = directions[slot]
     }
+    return materializeBasisPoint(values, epsilon)
+}
+
+internal fun ExactBasisAuthority.materializeBasisPoint(
+    values: List<BigFraction>,
+    epsilon: List<BigFraction>,
+): ExactBasisPointRecovery {
     var step = BigFraction.ONE
     val two = BigFraction.ofLong(2L)
     for (column in values.indices) {
@@ -64,7 +73,8 @@ internal fun ExactBasisAuthority.strictPrimal(
             val slope = if (upper) meter.multiply(BigFraction.MINUS_ONE, epsilon[column]) else epsilon[column]
             val blocked = slope.signum() < 0 || (side.strict && slope.isZero)
             if (slack.signum() < 0 || (slack.isZero && blocked)) {
-                return ExactBasisPointRecovery(null, slots[column].takeIf { it >= 0 })
+                meter.charge(headings.size.toLong())
+                return ExactBasisPointRecovery(null, headings.indexOf(column).takeIf { it >= 0 })
             }
             if (slack.signum() > 0 && slope.signum() < 0) {
                 val crossing = meter.divide(slack, meter.multiply(BigFraction.MINUS_ONE, slope))

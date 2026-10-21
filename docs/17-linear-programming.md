@@ -341,6 +341,15 @@ accepts a refutation; a bad point, failed factorization or singular basis suppli
 none. Recovery requests try this basis verification before spending fallback
 refinement work. Optional selected-prefix calls keep their ordinary admission.
 
+If endpoint perturbations leave basic bounds violated, requested sparse recovery
+uses Bland feasibility pivots with a zero objective. Strict sides shift their
+symbolic endpoints inward by an infinitesimal; forward solves compute basic
+values and directions, and transpose solves select the smallest movable entering
+column or propose a Farkas row. Each changed basis is factored within the same
+invocation ledger and residual dense limit before publishing the pivot. A finite
+interior step or conflict then requires complete source verification. Exhausting
+the pivot or arithmetic allowance preserves an independently checked bound.
+
 ### Farkas and recession checks
 
 For `M = [A | I]`, a Farkas contradiction requires
