@@ -167,13 +167,15 @@ internal class QfNraQuery(
                     }
                     if (reduction.inconsistent) continue
                     reducedRegionObserver?.invoke(reduction.atoms)
-                    val activeFormula = if (reduction.eliminatedCount == 0) normalized
-                    else PolynomialFormula.conjunction(reduction.atoms, arithmetic)
-                    val activeRegion = if (reduction.eliminatedCount == 0) region
-                    else PolynomialBooleanRegion(activeFormula.atoms.indices.associateWith {
-                        arithmetic.step()
-                        true
-                    }, region.bools)
+                    val activeFormula = if (reduction.changed) {
+                        PolynomialFormula.conjunction(reduction.atoms, arithmetic)
+                    } else normalized
+                    val activeRegion = if (reduction.changed) {
+                        PolynomialBooleanRegion(activeFormula.atoms.indices.associateWith {
+                            arithmetic.step()
+                            true
+                        }, region.bools)
+                    } else region
                     val nonzero = ArrayList<Polynomial>()
                     val polynomials = activeRegion.atoms.map { (index, truth) ->
                         arithmetic.step()
@@ -237,7 +239,7 @@ internal class QfNraQuery(
                             val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
                                 arithmetic, algebraic, work, fixed, if (complete) null else family)
                             if (assignment != null) {
-                                val checked = if (reduction.eliminatedCount == 0) assignment else {
+                                val checked = if (!reduction.changed) assignment else {
                                     val point = reduction.reconstruct(assignment, arithmetic, algebraic)
                                     checkRegionSample(normalized, region, point, boolCount, arithmetic, algebraic)
                                 }
