@@ -153,11 +153,7 @@ internal object LinearSubSumAggregation {
         return PassDelta(droppedIndices = dropped.toIntArray(), addedFactors = added)
     }
 
-    private fun sparseScanEstimate(
-        equality: SparseRow,
-        incidence: MutableIntObjectMap<Incidence>,
-        work: Work,
-    ): Long? {
+    private fun sparseScanEstimate(equality: SparseRow, incidence: MutableIntObjectMap<Incidence>, work: Work): Long? {
         var estimate = 0L
         for (variable in equality.terms.keys) {
             if (!work.visit()) return null

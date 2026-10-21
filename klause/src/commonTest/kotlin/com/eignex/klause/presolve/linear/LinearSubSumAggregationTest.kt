@@ -14,8 +14,8 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveContext
 import com.eignex.klause.presolve.PresolvePass
-import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
@@ -125,10 +125,17 @@ class LinearSubSumAggregationTest {
         val target = Linear(intArrayOf(4, 6, 7), intArrayOf(0, 1, 2), LinearOp.LE, 12)
         val reader = Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0)
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(-5, 5) }, listOf(equality, target, reader),
-            openIntLo = BooleanArray(3) { true }, openIntHi = BooleanArray(3) { true },
+            0,
+            3,
+            Array(3) { IntDomain(-5, 5) },
+            listOf(equality, target, reader),
+            openIntLo = BooleanArray(3) { true },
+            openIntHi = BooleanArray(3) { true },
         )
-        val context = PresolveContext(objectiveIntCoeffs = mapOf(0 to 2L, 1 to -3L, 2 to 5L), solutionSetSensitive = true)
+        val context = PresolveContext(
+            objectiveIntCoeffs = mapOf(0 to 2L, 1 to -3L, 2 to 5L),
+            solutionSetSensitive = true,
+        )
 
         val delta = PresolvePass.SPARSIFY_LINEAR_ROWS.applySource(problem, context)
 
@@ -138,7 +145,7 @@ class LinearSubSumAggregationTest {
         assertEquals(listOf(-3L), replacement.integerConstants?.coeffs?.toList())
         assertEquals(-2L, replacement.integerConstants?.bound)
         assertTrue((0..2).all { !problem.intBounds.hasLower(it) && !problem.intBounds.hasUpper(it) })
-        val remaining = arrayOf(equality, reader, replacement)
+        val remaining = arrayOf<Factor>(equality, reader, replacement)
         assertEquals(
             feasible(problem.factors, LongArray(3) { -5 }, LongArray(3) { 5 }),
             feasible(remaining, LongArray(3) { -5 }, LongArray(3) { 5 }),
@@ -149,8 +156,13 @@ class LinearSubSumAggregationTest {
     fun `signed and fractional row ratios should preserve every comparison`() {
         for (op in LinearOp.entries) {
             for (sign in listOf(-1, 1)) {
-                val equality = Linear(intArrayOf(4 * sign, 6 * sign, 5 * sign), intArrayOf(0, 1, 2), LinearOp.EQ, 7 * sign)
-                val target = Linear(intArrayOf(2, 3, 4), intArrayOf(0, 1, 2), op, 8)
+                val equality = Linear(
+                    intArrayOf(4 * sign, 6 * sign, 5 * sign),
+                    intArrayOf(0, 1, 2),
+                    LinearOp.EQ,
+                    7 * sign,
+                )
+                val target = Linear(intArrayOf(2, 3, 4), intArrayOf(0, 1, 2), op, 5)
                 val problem = Problem(0, 3, Array(3) { IntDomain(-2, 2) }, listOf(equality, target))
 
                 val delta = LinearSubSumAggregation.sparsifyRows(problem)
@@ -192,7 +204,9 @@ class LinearSubSumAggregationTest {
                 LinearForm.Disjunction(row.linearRows),
                 LinearForm.Conjunction(listOf(activated)),
             )) {
-                val wrapper = object : Factor by row { override val linearForm: LinearForm = form }
+                val wrapper = object : Factor by row {
+                    override val linearForm: LinearForm = form
+                }
                 val factors = if (row === equality) listOf(wrapper, target) else listOf(equality, wrapper)
                 val problem = Problem(1, 3, Array(3) { IntDomain(-5, 5) }, factors)
 
@@ -222,15 +236,22 @@ class LinearSubSumAggregationTest {
         for (row in listOf(equality, target)) {
             val constants = checkNotNull(row.integerConstants)
             val wide = Linear(
-                row.vars, Array(3) { bigIntOf(constants.coeff(it)) * bigIntOf(Long.MAX_VALUE) },
-                row.op, bigIntOf(constants.bound),
+                row.vars,
+                Array(3) { bigIntOf(constants.coeff(it)) * bigIntOf(Long.MAX_VALUE) },
+                row.op,
+                bigIntOf(constants.bound),
             )
             val real = Linear(constants.coeffs, row.vars, doubleArrayOf(1.0), intArrayOf(0), row.op, constants.bound)
             for (unsupported in listOf(wide, real)) {
                 val factors = if (row === equality) listOf(unsupported, target) else listOf(equality, unsupported)
                 val problem = Problem(
-                    0, 3, Array(3) { IntDomain(-5, 5) }, factors, numRealVars = 1,
-                    realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+                    0,
+                    3,
+                    Array(3) { IntDomain(-5, 5) },
+                    factors,
+                    numRealVars = 1,
+                    realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                    realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
                 )
 
                 assertTrue(LinearSubSumAggregation.sparsifyRows(problem).isEmpty)
@@ -272,8 +293,10 @@ class LinearSubSumAggregationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val result = Presolver.runSource(
-            problem, PresolveConfig.parse("off,+sparsify").withEffort(maxRounds = 1),
-            PresolveContext(presolveBudget = budget, solutionSetSensitive = true), budget.orSpent(Cancellation.Never),
+            problem,
+            PresolveConfig.parse("off,+sparsify").withEffort(maxRounds = 1),
+            PresolveContext(presolveBudget = budget, solutionSetSensitive = true),
+            budget.orSpent(Cancellation.Never),
         )
 
         assertEquals(2, result.problem.numFactors)
@@ -322,7 +345,8 @@ class LinearSubSumAggregationTest {
             val expected = feasible(problem.factors, LongArray(3) { -2 }, LongArray(3) { 2 })
             repeat(3) {
                 val delta = LinearSubSumAggregation.sparsifyRows(problem)
-                val remaining = problem.factors.filterIndexed { i, _ -> i !in delta.droppedIndices } + delta.addedFactors
+                val remaining =
+                    problem.factors.filterIndexed { i, _ -> i !in delta.droppedIndices } + delta.addedFactors
                 problem = problem.withFactors(remaining.toTypedArray())
 
                 assertEquals(expected, feasible(problem.factors, LongArray(3) { -2 }, LongArray(3) { 2 }))
@@ -357,7 +381,9 @@ class LinearSubSumAggregationTest {
     fun `sparsification input visits should stop within one allowance poll interval`() {
         val width = 128
         val problem = Problem(
-            0, width, Array(width) { IntDomain(0, 2) },
+            0,
+            width,
+            Array(width) { IntDomain(0, 2) },
             listOf(Linear(IntArray(width) { 2 }, IntArray(width) { it }, LinearOp.EQ, 0)),
         )
         val budget = PresolveBudget(16)
