@@ -51,6 +51,9 @@ When running the full gate locally:
 
 ## Tests
 
+- Unit tests and their resource/setup tasks must not make network requests or provision external tools.
+  Use local deterministic fixtures or fakes; external-reference integration runs belong in klause-lab.
+  Ordinary Gradle dependency resolution is separate from test execution.
 - Test names within backticks, plain ascii, describing the behavior under test.
 - Class almost always named after the file under test (`<FileUnderTest>Test`).
 - One observable behavior per test; assert behavior, not implementation. Follow arrange → act → assert.

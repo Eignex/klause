@@ -7,6 +7,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.report.Reports
 import kotlinx.serialization.decodeFromString
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -16,12 +17,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.test.Test
 
 class MpsSourceValidationTest {
     @TempDir
     lateinit var directory: File
 
+    @Tag("external-source-checker")
     @ParameterizedTest
     @CsvSource(
         "mps/blend-tiny,3,1,9,valid",
@@ -67,6 +70,7 @@ class MpsSourceValidationTest {
         assertFalse(directory.walkTopDown().any { it.name == "solchecker" })
     }
 
+    @Tag("external-source-checker")
     @ParameterizedTest
     @CsvSource("false,valid,false", "true,invalid,true")
     fun `default MIPLIB tolerance should remain distinct from exact feasibility`(
@@ -106,6 +110,7 @@ class MpsSourceValidationTest {
         if (!exact) assertEquals(true, receipt.toleranceAccepted)
     }
 
+    @Tag("external-source-checker")
     @ParameterizedTest
     @ValueSource(strings = ["v X1=3", "v X1=3 Z=1", "v X1=3 X2=1 Z=0"])
     fun `missing or unknown coordinates should remain unverified`(point: String) {
@@ -130,6 +135,7 @@ class MpsSourceValidationTest {
         assertNull(result.validation.checkedWitness)
     }
 
+    @Tag("external-source-checker")
     @ParameterizedTest
     @CsvSource(
         delimiter = '|',
@@ -170,6 +176,7 @@ class MpsSourceValidationTest {
         assertEquals(expected, result.validation.status, result.validation.reason)
     }
 
+    @Tag("external-source-checker")
     @Test
     fun `omitted source name should retain original byte custody`() {
         val ref = ProblemRef(
@@ -214,6 +221,31 @@ class MpsSourceValidationTest {
 
         assertEquals("unknown", result.validation.status)
         assertNull(result.validation.checkedWitness)
+    }
+
+    @Test
+    fun `unavailable checker should withhold feasibility and retain original inputs`() {
+        val ref = ProblemRef(
+            "fixture", Format.MPS,
+            ProblemSource.Vendored("klause-bench/smoke-corpus/mps/blend-tiny.mps"),
+            Category.OPTIMIZATION, Expected.Unknown,
+        )
+        val raw = "o 9\nv X1=3 X2=1\n"
+        val record = SolveRecord(
+            ref.name, "klause", null, 1, "free", 1, 10_000, "optimize", false,
+            true, 9.0, 1, proven = true, gitSha = "test", timestamp = "test", command = "cli --exact",
+            validationPolicy = MPS_SOURCE_POLICY, sourceHashes = SolveEvidence.sourceHashes(ref),
+            sourceOutputSha256 = sha256(raw.toByteArray()), finalWitness = "v X1=3 X2=1", exactObjective = "9",
+        )
+
+        val result = MpsSourceValidation.validate(ref, record, raw, true, directory)
+
+        assertEquals("unknown", result.validation.status)
+        assertNull(result.validation.checkedWitness)
+        assertTrue(result.validation.reason.contains("missing packaged MIPLIB solchecker"))
+        val retained = File(assertNotNull(result.stats["sourceValidationDirectory"]))
+        assertEquals(raw, File(retained, "stdout.txt").readText())
+        assertEquals(record.sourceHashes.getValue("model"), sha256(File(retained, "source.mps").readBytes()))
     }
 
     @Test
