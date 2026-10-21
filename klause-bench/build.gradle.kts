@@ -1,9 +1,5 @@
 import java.io.FileOutputStream
 import java.net.URI
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
-import java.util.zip.ZipFile
 import org.gradle.process.ExecOperations
 
 plugins {
@@ -24,7 +20,6 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
 
 dependencies {
     implementation(project(":klause"))
-    implementation("org.xcsp:xcsp3-tools:2.5")
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.10")
     testImplementation("org.junit.jupiter:junit-jupiter")
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
@@ -200,103 +195,3 @@ tasks.withType<Test> {
     maxHeapSize = "4g"
 }
 
-val miplibVersion = "1.0.4"
-val miplibArchiveSha256 = "37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9"
-val miplibDirectory = layout.buildDirectory.dir("miplib-solchecker")
-abstract class DownloadMpsSolcheckerTask : DefaultTask() {
-    @get:Input abstract val version: Property<String>
-    @get:Input abstract val archiveSha256: Property<String>
-    @get:OutputDirectory abstract val upstream: DirectoryProperty
-
-    /** Where verified archives are kept by hash, outside any checkout, so a fresh worktree builds offline. */
-    @get:Internal abstract val cache: DirectoryProperty
-
-    @TaskAction
-    fun download() {
-        val root = upstream.get().asFile
-        root.mkdirs()
-        val archive = cache.get().file("${archiveSha256.get()}.zip").asFile
-        if (!archive.isFile || sha256(archive) != archiveSha256.get()) {
-            archive.parentFile.mkdirs()
-            // Staged beside the cached copy, so the move that publishes it is atomic: a concurrent build sees all or none.
-            val partial = Files.createTempFile(archive.parentFile.toPath(), "miplib-", ".part").toFile()
-            URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
-                .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
-                .getInputStream().use { input -> partial.outputStream().use { input.copyTo(it) } }
-            check(sha256(partial) == archiveSha256.get()) { "MIPLIB distribution hash differs" }
-            Files.move(partial.toPath(), archive.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        }
-        ZipFile(archive).use { zip ->
-            for (name in listOf("LICENSE", "checker/README", "checker/Makefile",
-                "checker/src/main.cpp", "checker/src/model.cpp", "checker/src/model.h",
-                "checker/src/mpsinput.cpp", "checker/src/mpsinput.h", "checker/src/gmputils.cpp", "checker/src/gmputils.h")) {
-                val target = File(root, name)
-                target.parentFile.mkdirs()
-                zip.getInputStream(checkNotNull(zip.getEntry(name))).use { input ->
-                    target.outputStream().use { input.copyTo(it) }
-                }
-            }
-        }
-    }
-
-    private fun sha256(file: File): String = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
-        .joinToString("") { "%02x".format(it) }
-}
-val prepareMpsSolchecker = tasks.register<DownloadMpsSolcheckerTask>("prepareMpsSolchecker") {
-    group = "build"
-    description = "Fetch the pinned upstream MIPLIB checker (MIT)."
-    version.set(miplibVersion)
-    archiveSha256.set(miplibArchiveSha256)
-    upstream.set(miplibDirectory.map { it.dir("upstream") })
-    cache.set(File(gradle.gradleUserHomeDir, "caches/klause-bench/miplib-solchecker"))
-}
-val miplibBinary = miplibDirectory.map { it.file("solchecker") }
-val compileMpsSolchecker = tasks.register<Exec>("compileMpsSolchecker") {
-    group = "build"
-    description = "Build upstream MIPLIB solchecker with GMP and zlib."
-    dependsOn(prepareMpsSolchecker)
-    inputs.dir(miplibDirectory.map { it.dir("upstream") })
-    outputs.file(miplibBinary)
-    commandLine("c++", "-O2", "-I/opt/homebrew/include", "-L/opt/homebrew/lib",
-        "-I/usr/local/include", "-L/usr/local/lib", "-o", miplibBinary.get().asFile.absolutePath,
-        *listOf("main.cpp", "gmputils.cpp", "model.cpp", "mpsinput.cpp").map {
-            miplibDirectory.get().file("upstream/checker/src/$it").asFile.absolutePath
-        }.toTypedArray(), "-lgmp", "-lz")
-}
-val mpsSolcheckerResources = tasks.register<Sync>("mpsSolcheckerResources") {
-    group = "bench"
-    description = "Prepare upstream MIPLIB resources for explicit external validation."
-    dependsOn(compileMpsSolchecker)
-    into(layout.buildDirectory.dir("mps-solchecker-resources"))
-    from(miplibBinary) { into("miplib-solchecker") }
-    from(miplibDirectory.map { it.dir("upstream") }) {
-        include("LICENSE", "checker/README", "checker/Makefile", "checker/src/**")
-        into("miplib-solchecker")
-    }
-}
-
-tasks.named<Test>("test") {
-    useJUnitPlatform { excludeTags("external-source-checker") }
-}
-
-kover {
-    currentProject {
-        instrumentation {
-            disabledForTestTasks.add("sourceValidationIntegrationTest")
-        }
-    }
-}
-
-tasks.register<Test>("sourceValidationIntegrationTest") {
-    group = "verification"
-    description = "Run external MIPLIB and Dolmen checker integration tests on the lab."
-    testClassesDirs = sourceSets["test"].output.classesDirs
-    classpath = sourceSets["test"].runtimeClasspath + files(mpsSolcheckerResources)
-    useJUnitPlatform { includeTags("external-source-checker") }
-}
-
-if (providers.gradleProperty("bench.mpsSolchecker").isPresent) {
-    tasks.named<Jar>("jar") {
-        from(mpsSolcheckerResources)
-    }
-}

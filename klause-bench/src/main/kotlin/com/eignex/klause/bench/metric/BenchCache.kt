@@ -23,7 +23,6 @@ internal object BenchCache {
         budget: Budget,
         provenance: BuildProvenance? = if (solver.startsWith("klause")) InstalledBuild.current else null,
         settings: SolverInvocation.Settings? = null,
-        validationPolicy: String = REPORTED_RESULT_POLICY,
     ): String = keyFor(
         CorpusFetcher.resolve(ref.source),
         ref.data?.let { CorpusFetcher.resolve(it) },
@@ -31,7 +30,6 @@ internal object BenchCache {
         budget,
         provenance,
         settings,
-        validationPolicy,
     )
 
     /** Key for solving the instance in [model] (plus its optional [data] file) with [solver] under [budget]. */
@@ -42,7 +40,6 @@ internal object BenchCache {
         budget: Budget,
         provenance: BuildProvenance? = if (solver.startsWith("klause")) InstalledBuild.current else null,
         settings: SolverInvocation.Settings? = null,
-        validationPolicy: String = REPORTED_RESULT_POLICY,
     ): String {
         val md = MessageDigest.getInstance("SHA-256")
         CorpusFiles.update(md, model)
@@ -50,7 +47,7 @@ internal object BenchCache {
         md.update("|$solver|t=${budget.timeoutMillis}".toByteArray())
         provenance?.let { md.update("|build=${it.fingerprint}".toByteArray()) }
         settings?.let { md.update(Reports.json.encodeToString(it).toByteArray()) }
-        md.update("|validation=$validationPolicy|timing=elapsed-v1|objective=exact-v1".toByteArray())
+        md.update("|validation=$REPORTED_RESULT_POLICY|timing=elapsed-v1|objective=exact-v1".toByteArray())
         return md.digest().joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
     }
 

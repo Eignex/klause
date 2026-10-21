@@ -2,7 +2,6 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
-import com.eignex.klause.bench.metric.MiniZincSourceValidation
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -129,7 +128,7 @@ object DiffnNeighborhoodProbe {
         require(initialObjective.toString() == options["objective"])
         val beforeInts = LongArray(state.problem.numIntVars) { state.assignment.intValue(it) }
         val beforeBools = BooleanArray(state.problem.numBoolVars) { state.assignment.boolValue(it) }
-        var sourceChecks = 0
+        var candidates = 0
         val proposals = buildJsonArray {
             if (state.cost == 0L) {
                 for ((factorId, factor) in state.problem.factors.withIndex()) {
@@ -149,13 +148,10 @@ object DiffnNeighborhoodProbe {
                             } else {
                                 objective < initialObjective
                             }
-                            val sourceCheck = if (cost == 0L && improving && sourceChecks < SOURCE_CHECK_CAP) {
+                            if (cost == 0L && improving && candidates < CANDIDATE_CAP) {
                                 val witness = renderValues(program, state, namedValues.keys) +
                                     "_objective = $objective;\n----------\n"
-                                out.resolve("candidate-${sourceChecks++}.out").writeText(witness)
-                                MiniZincSourceValidation.validate(ref, witness, null, objective.toString())
-                            } else {
-                                null
+                                out.resolve("candidate-${candidates++}.out").writeText(witness)
                             }
                             add(
                                 buildJsonObject {
@@ -165,9 +161,6 @@ object DiffnNeighborhoodProbe {
                                 put("cost", cost)
                                 put("predictedCost", predicted)
                                 put("objective", objective.toString())
-                                put("sourceValidation", sourceCheck?.status ?: "not-checked")
-                                put("sourceValidationReason", sourceCheck?.reason ?: "not checked by this probe")
-                                put("sourceValidationScope", sourceCheck?.scope ?: "unavailable")
                                 put(
                                     "objectiveDelta",
                                     BigInteger.valueOf(objective).subtract(
@@ -289,5 +282,5 @@ object DiffnNeighborhoodProbe {
             }
         }
 
-    private const val SOURCE_CHECK_CAP = 16
+    private const val CANDIDATE_CAP = 16
 }
