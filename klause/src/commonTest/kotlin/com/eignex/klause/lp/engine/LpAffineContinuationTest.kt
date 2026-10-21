@@ -63,12 +63,20 @@ class LpAffineContinuationTest {
             decline = ContinuationDecline.DIMENSION,
         )
         val conflict = continueExactLp(
-            assertNotNull(before.toWorkingModel()), null, cache, limits = limits, targetMetrics = target,
+            assertNotNull(before.toWorkingModel()),
+            null,
+            cache,
+            limits = limits,
+            targetMetrics = target,
         )
         assertTrue(trail.pop())
 
         val feasible = continueExactLp(
-            assertNotNull(trail.state.toWorkingModel()), null, cache, limits = limits, targetMetrics = target,
+            assertNotNull(trail.state.toWorkingModel()),
+            null,
+            cache,
+            limits = limits,
+            targetMetrics = target,
         )
 
         assertNotNull(conflict.conflict)

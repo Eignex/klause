@@ -165,7 +165,11 @@ private fun verifyAffineContinuation(
         budget.step()
         if (checked.witness == null && checked.conflict == null) {
             decline = when (checked.metrics.decline) {
-                ReconstructionDecline.CANCELLED -> ContinuationDecline.CANCELLED
+                ReconstructionDecline.CANCELLED -> if (cancellation()) {
+                    ContinuationDecline.CANCELLED
+                } else {
+                    ContinuationDecline.TIME
+                }
                 ReconstructionDecline.WORK -> ContinuationDecline.WORK
                 ReconstructionDecline.ALLOCATION -> ContinuationDecline.ALLOCATION
                 ReconstructionDecline.BITS -> ContinuationDecline.BITS

@@ -25,10 +25,10 @@ internal class LpExactContinuationCache {
     private var inputWork = 0L
     private var inputAllocation = 0L
     private var inputTimeNs = 0L
-    val usedWork get() = affine?.cache?.usedWork ?: continuation?.usedWork ?: inputWork
-    val usedAllocation get() = affine?.cache?.usedAllocation ?: continuation?.usedAllocation ?: inputAllocation
-    val usedTimeNs get() = affine?.cache?.usedTimeNs ?: continuation?.usedTimeNs ?: inputTimeNs
-    val scalarPeak get() = affine?.cache?.scalarPeak ?: continuation?.normalizedScalarPeak ?: 0
+    val usedWork: Long get() = affine?.cache?.usedWork ?: continuation?.usedWork ?: inputWork
+    val usedAllocation: Long get() = affine?.cache?.usedAllocation ?: continuation?.usedAllocation ?: inputAllocation
+    val usedTimeNs: Long get() = affine?.cache?.usedTimeNs ?: continuation?.usedTimeNs ?: inputTimeNs
+    val scalarPeak: Int get() = affine?.cache?.scalarPeak ?: continuation?.normalizedScalarPeak ?: 0
 
     fun accountInput(work: Long, allocation: Long, timeNs: Long) {
         require(work >= 0L && allocation >= 0L && timeNs >= 0L)

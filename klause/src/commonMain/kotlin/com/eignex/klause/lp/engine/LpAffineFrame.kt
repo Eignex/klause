@@ -125,9 +125,11 @@ internal class LpAffineFrame private constructor(
             val used = BooleanArray(model.n)
             for (row in matrix.indices) {
                 budget.step()
-                if (!removedRows[row]) for (column in matrix[row].keys) {
-                    budget.step()
-                    used[column] = true
+                if (!removedRows[row]) {
+                    for (column in matrix[row].keys) {
+                        budget.step()
+                        used[column] = true
+                    }
                 }
             }
             val columns = (0 until model.n).filter { column ->
@@ -144,9 +146,11 @@ internal class LpAffineFrame private constructor(
             val rowIndices = IntArray(model.m) { -1 }
             for ((index, row) in rows.withIndex()) rowIndices[row] = index
             val entriesByColumn = Array(model.n) { ArrayList<ExactLpEntry>() }
-            for (row in rows) for ((column, value) in matrix[row]) {
-                budget.step(bytes = 64L)
-                entriesByColumn[column] += ExactLpEntry(rowIndices[row], ExactLpNumber.of(value))
+            for (row in rows) {
+                for ((column, value) in matrix[row]) {
+                    budget.step(bytes = 64L)
+                    entriesByColumn[column] += ExactLpEntry(rowIndices[row], ExactLpNumber.of(value))
+                }
             }
             val layout = ExactLpModel(
                 columns.map { entriesByColumn[it] },
