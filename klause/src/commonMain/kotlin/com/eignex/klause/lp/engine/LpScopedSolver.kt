@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisOperationWork
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.Cancellation
 
@@ -49,6 +50,8 @@ internal class LpScopedSolver(
     private var closed = false
     private var workingActive = false
     var lastWorkingMetrics: LpWorkingMetrics? = null
+        private set
+    var lastObjectivePreparationWork: Long = 0L
         private set
     private var editAttempts = 0L
     private var editSuccesses = 0L
@@ -300,6 +303,46 @@ internal class LpScopedSolver(
 
     internal fun requireAvailable() {
         check(!workingActive) { "source owner is suspended by a working scope" }
+    }
+
+    fun objectiveBound(
+        objective: ExactLpObjective,
+        token: Cancellation = cancellation,
+        continuationLimits: ExactContinuationLimits = ExactContinuationLimits(),
+        fullContinuation: Boolean = true,
+        observer: LpCertificationObserver? = null,
+    ): BigFraction? {
+        requireAvailable()
+        lastWorkingMetrics = null
+        lastObjectivePreparationWork = 0L
+        val parent = state
+        if (closed || token() || objective.size != parent.model.numVars) return null
+        val model = parent.model
+        var copying = 16L * (model.numVars.toLong() + model.m) + 1L
+        for (column in 0 until model.n) {
+            token.charge(1L)
+            lastObjectivePreparationWork++
+            if (token()) return null
+            copying += 8L * model.columnEntries(column).size
+        }
+        token.charge(copying)
+        lastObjectivePreparationWork += copying
+        if (token()) return null
+        val working = LpWorkingModel.overrides(parent, objective)
+        val saved = lastResult
+        return try {
+            withWorkingModel(working, token) { scope ->
+                scope.solve(
+                    token = token,
+                    continuationLimits = continuationLimits,
+                    fullContinuation = fullContinuation,
+                    observer = observer,
+                )?.bound?.value?.takeUnless { token() }
+            }
+        } finally {
+            // A private objective supplies no authority for the parent's objective or feasibility.
+            if (state === parent) lastResult = saved
+        }
     }
 
     fun <T> withWorkingModel(

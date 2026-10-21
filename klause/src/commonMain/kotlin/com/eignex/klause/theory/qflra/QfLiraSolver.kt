@@ -28,6 +28,7 @@ import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.closeSourceLpOwners
 import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
@@ -209,6 +210,7 @@ class ExactLiraSearchComponent private constructor(
     private val hasSourceDisjunctions = model.factors.any { it.linearForm is LinearForm.Disjunction }
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
+    private var guardBoundCursor = 0
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
@@ -1216,6 +1218,9 @@ class ExactLiraSearchComponent private constructor(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
+        if (bools.any { it == UNASSIGNED }) {
+            propagateGuardBound(context)?.let { return it }
+        }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
         if (bools.any { it == UNASSIGNED }) {
             candidate?.let { capturePointHints(it, context) }
@@ -1233,6 +1238,101 @@ class ExactLiraSearchComponent private constructor(
         captureCompleteWitness(candidate)
         // Source integer branching requires an independently checked continuous witness.
         return ComponentResult.Consistent
+    }
+
+    private fun propagateGuardBound(context: SearchContext): ComponentResult? {
+        val state = lp.state ?: return null
+        repeat(preparedRows.size) {
+            operationStop.charge(1L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            val prepared = preparedRows[guardBoundCursor]
+            guardBoundCursor = (guardBoundCursor + 1) % preparedRows.size
+            val row = prepared.row
+            if (prepared.disjunction || row.activator == LinearRow.ALWAYS ||
+                bools[row.activator] != UNASSIGNED
+            ) return@repeat
+            operationStop.charge(row.size.toLong() + 1L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            if ((0 until row.size).any { Term.isBool(row.ref(it)) }) return@repeat
+            val comparison = prepared.form.comparison(true) { false }
+            operationStop.charge(comparison.terms.size.toLong() + 1L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            if (comparison.terms.keys.any { column ->
+                    column !in 0 until state.model.n || column in sourceRealCount until model.numRealVars ||
+                        !state.model.column(column).origin.value.isZero
+                }
+            ) return@repeat
+            val premise = lp.explainRegion(state, context) ?: return null
+            var lower: BigFraction? = null
+            var upper: BigFraction? = null
+            for (negate in listOf(false, true)) {
+                operationStop.charge(4L * state.model.numVars + comparison.terms.size + 1L)
+                if (operationStop() || !context.consumeCheck()) return ComponentResult.Indeterminate
+                val objective = ExactLpObjective(
+                    List(state.model.numVars) { column ->
+                        val coefficient = comparison.terms[column] ?: BigFraction.ZERO
+                        val bits = maxOf(coefficient.num.magnitudeBitLength(), coefficient.den.magnitudeBitLength())
+                        val words = (bits.toLong() + 63L) / 64L
+                        operationStop.charge(words * words + 1L)
+                        if (operationStop()) return ComponentResult.Indeterminate
+                        ExactLpNumber.of(if (negate) coefficient.negated() else coefficient)
+                    },
+                )
+                if (operationStop()) return ComponentResult.Indeterminate
+                observeCompleteStage("LP_GUARD_BOUND_QUERY")
+                val bound = lp.objectiveBound(objective)
+                if (operationStop()) return ComponentResult.Indeterminate
+                if (bound != null && bound.state === state) {
+                    if (negate) upper = bound.value.negated() else lower = bound.value
+                    observeCompleteStage("LP_GUARD_BOUND_CERTIFIED")
+                }
+                val truth = forcedGuardTruth(comparison, lower, upper) ?: continue
+                if (lp.state !== state || operationStop()) return ComponentResult.Indeterminate
+                val literal = Lit.make(row.activator, truth)
+                operationStop.charge(premise.literals.size.toLong() + 1L)
+                if (operationStop()) return ComponentResult.Indeterminate
+                val reason = SearchExplanation(premise.literals + literal)
+                val decision = SearchDecision.Bool(literal)
+                val accepted = accept(decision, context)
+                if (accepted !is ComponentResult.Consistent) return accepted
+                observeCompleteStage("LP_GUARD_BOUND_IMPLICATION")
+                return context.imply(literal, reason)
+            }
+            return null
+        }
+        return null
+    }
+
+    private fun forcedGuardTruth(
+        comparison: ExactComparison,
+        lower: BigFraction?,
+        upper: BigFraction?,
+    ): Boolean? {
+        val bits = listOfNotNull(lower, upper, comparison.bound).maxOf {
+            maxOf(it.num.magnitudeBitLength(), it.den.magnitudeBitLength()).toLong()
+        }
+        val words = (bits + 63L) / 64L
+        operationStop.charge(16L * words * words + 1L)
+        if (operationStop()) return null
+        val threshold = comparison.bound
+        return when (comparison.op) {
+            LinearOp.LE -> when {
+                lower != null && (lower > threshold || comparison.strict && lower == threshold) -> false
+                upper != null && (upper < threshold || !comparison.strict && upper == threshold) -> true
+                else -> null
+            }
+            LinearOp.GE -> when {
+                upper != null && (upper < threshold || comparison.strict && upper == threshold) -> false
+                lower != null && (lower > threshold || !comparison.strict && lower == threshold) -> true
+                else -> null
+            }
+            LinearOp.EQ, LinearOp.NE -> when {
+                lower != null && lower > threshold || upper != null && upper < threshold ->
+                    comparison.op == LinearOp.NE
+                lower == threshold && upper == threshold -> comparison.op == LinearOp.EQ
+                else -> null
+            }
+        }
     }
 
     private fun observeCompleteStage(stage: String) {

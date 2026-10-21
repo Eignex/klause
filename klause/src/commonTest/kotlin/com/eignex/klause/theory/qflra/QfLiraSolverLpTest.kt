@@ -1,18 +1,22 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.constsOf
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
@@ -63,6 +67,223 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
+    @Test
+    fun `LP bounds should imply a guard from combined rows before Boolean completion`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val source = Problem(
+            4,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+                ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
+                ReifiedLinear(2, intArrayOf(2), intArrayOf(0), LinearOp.LE, 1),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertIs<ComponentResult.Consistent>(session.propagate())
+
+            assertEquals(false, session.boolValue(2))
+            assertNull(session.boolValue(3))
+            assertContentEquals(intArrayOf(1, 3, 5), assertNotNull(session.reasonFor(2)).literals.sortedArray())
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("LP_GUARD_BOUND_IMPLICATION"))
+        }
+    }
+
+    @Test
+    fun `LP guard implications should retract when a contributing row changes on a sibling`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val source = Problem(
+            4,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+                ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
+                ReifiedLinear(2, intArrayOf(2), intArrayOf(0), LinearOp.LE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            session.propagate()
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+            session.propagate()
+            assertEquals(false, session.boolValue(2))
+
+            session.popTo(1)
+
+            assertNull(session.boolValue(2))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertEquals(true, session.boolValue(2))
+        }
+    }
+
+    @Test
+    fun `certified guard bounds should preserve exact comparison boundaries and polarity`() {
+        for (op in LinearOp.entries) for (threshold in 1L..3L) for (negative in listOf(false, true)) {
+            val sign = if (negative) -1L else 1L
+            val source = Problem(
+                2,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), Bits(1).also { it.set(0) },
+                    Bits(1).also { it.set(0) }),
+                numRealVars = 1,
+                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+                factors = arrayOf(
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.EQ,
+                        BigFraction.ofLong(2L)),
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(sign)), op,
+                        BigFraction.ofLong(sign * threshold), activator = 0),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val left = sign * 2L
+                val right = sign * threshold
+                val expected = when (op) {
+                    LinearOp.LE -> left <= right
+                    LinearOp.GE -> left >= right
+                    LinearOp.EQ -> left == right
+                    LinearOp.NE -> left != right
+                }
+                assertEquals(expected, session.boolValue(0))
+                assertNull(session.boolValue(1))
+                assertContentEquals(intArrayOf(Lit.make(0, expected)), assertNotNull(session.reasonFor(0)).literals)
+            }
+        }
+    }
+
+    @Test
+    fun `strict guard comparisons should distinguish equality from a closed boundary`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) for (strict in listOf(false, true)) {
+            val source = Problem(
+                2,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
+                numRealVars = 1,
+                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+                factors = arrayOf(
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.EQ,
+                        BigFraction.ofLong(2L)),
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                        op, 2.0, strict),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertEquals(!strict, session.boolValue(0))
+                assertNull(session.boolValue(1))
+            }
+        }
+    }
+
+    @Test
+    fun `an interval crossing a guard threshold should leave its Boolean unresolved`() {
+        val source = Problem(
+            2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.GE,
+                    BigFraction.MINUS_ONE),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+                    BigFraction.ZERO, activator = 0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(session.boolValue(0))
+            assertNull(session.reasonFor(0))
+        }
+    }
+
+    @Test
+    fun `guard bounds should exclude unresolved Boolean arithmetic terms`() {
+        val guarded = object : Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {
+            override val variables = MixedVars(boundInts = intArrayOf(0), boolVars = intArrayOf(0, 1))
+            override val linearForm = LinearForm.Conjunction(
+                listOf(TaggedLinearRow(intArrayOf(Term.ofIntVar(0), Term.ofLit(Lit.make(1, true))),
+                    IntegerConstants(constsOf(longArrayOf(1L, 1L)), 0L), LinearOp.LE, 0)),
+            )
+        }
+        val source = Problem(
+            2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0), guarded),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(session.boolValue(0))
+            assertNull(session.boolValue(1))
+            assertNull(stats.snapshot().completeSearchStages?.get("LP_GUARD_BOUND_QUERY"))
+        }
+    }
+
+    @Test
+    fun `guard bounds should exclude comparisons inside an unresolved disjunction`() {
+        val disjunction = object : Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {
+            override val variables = MixedVars(boundInts = intArrayOf(0), boolVars = intArrayOf(0))
+            override val linearForm = LinearForm.Disjunction(
+                listOf(
+                    TaggedLinearRow(intArrayOf(Term.ofIntVar(0)),
+                        IntegerConstants(constsOf(longArrayOf(1L)), -1L), LinearOp.LE, 0),
+                    TaggedLinearRow(intArrayOf(Term.ofIntVar(0)),
+                        IntegerConstants(constsOf(longArrayOf(1L)), 0L), LinearOp.GE),
+                ),
+            )
+        }
+        val source = Problem(
+            1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0), disjunction),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(session.boolValue(0))
+            assertNull(stats.snapshot().completeSearchStages?.get("LP_GUARD_BOUND_QUERY"))
+        }
+    }
+
     @Test
     fun `LP cancellation should retain its parent meter and distinct session stop`() {
         var stopped = false
