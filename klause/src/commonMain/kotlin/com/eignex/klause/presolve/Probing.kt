@@ -173,6 +173,12 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val rowSign = LongArrayList()
     private val rowGuard = IntArrayList()
     private val rowGuardValue = LongArrayList()
+    private val rootRows = IntArrayList()
+    private val clauses = ArrayList<IntArray>()
+    private val firstWatch = IntArrayList()
+    private val secondWatch = IntArrayList()
+    private val clauseColumns = BooleanArray(numCols)
+    private var watchers = emptyArray<IntArrayList>()
     private var incidenceStart = IntArray(0)
     private var incidence = IntArray(0)
     private var prepared = false
@@ -189,7 +195,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private var conflict = false
     override val crossed: Boolean get() = conflict
 
-    val hasRows: Boolean get() = prepared && rowCols.isNotEmpty()
+    val hasRows: Boolean get() = prepared && (rowCols.isNotEmpty() || clauses.isNotEmpty())
 
     init {
         prepare()
@@ -215,12 +221,13 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
             if (!visit()) return
             hi[v] = 1L
         }
+        watchers = Array(2 * problem.numBoolVars) {
+            if (!visit()) return
+            IntArrayList(1)
+        }
         for (factor in problem.factors) {
             if (!visit()) return
-            for (row in factor.impliedLinearRows) {
-                if (!visit()) return
-                compile(row)
-            }
+            compileFactor(factor)
         }
         val counts = IntArray(numCols + 1)
         if (!forEachIncidence { col, _ -> counts[col + 1]++ }) return
@@ -231,6 +238,121 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         incidenceStart = counts.copyOf()
         incidence = IntArray(counts[numCols])
         prepared = forEachIncidence { col, row -> incidence[counts[col]++] = row }
+    }
+
+    private fun compileFactor(factor: Factor) {
+        if (factor is Clause) {
+            var plain = true
+            for (literal in factor.literals) {
+                if (!visit()) return
+                if (Lit.variable(literal) >= problem.numBoolVars) plain = false
+            }
+            if (plain) {
+                addClause(factor.literals)
+                return
+            }
+        }
+        for (row in factor.impliedLinearRows) {
+            if (!visit()) return
+            compile(row)
+        }
+    }
+
+    private fun addClause(literals: IntArray) {
+        for (literal in literals) {
+            if (!visit()) return
+            clauseColumns[numInts + Lit.variable(literal)] = true
+        }
+        rootRows.add(-clauses.size - 1)
+        clauses.add(literals)
+        firstWatch.add(-1)
+        secondWatch.add(-1)
+    }
+
+    private fun literalTruth(literal: Int): Boolean? {
+        val col = numInts + Lit.variable(literal)
+        return if (fixed(col)) (lo[col] == 1L) == Lit.isPositive(literal) else null
+    }
+
+    private fun implyLiteral(literal: Int) {
+        val col = numInts + Lit.variable(literal)
+        if (Lit.isPositive(literal)) setLo(col, 1L) else setHi(col, 0L)
+    }
+
+    private fun initializeClause(index: Int) {
+        val literals = clauses[index]
+        var first = -1
+        var second = -1
+        for (position in literals.indices) {
+            if (!visit()) return
+            if (literalTruth(literals[position]) == false) continue
+            if (first < 0) first = position else {
+                second = position
+                break
+            }
+        }
+        if (first < 0) {
+            conflict = true
+            return
+        }
+        if (!visit()) return
+        firstWatch[index] = first
+        watchers[literals[first]].add(index)
+        if (literals.size > 1) {
+            secondWatch[index] = if (second >= 0) second else if (first == 0) 1 else 0
+            watchers[literals[secondWatch[index]]].add(index)
+        }
+        if (second < 0) implyLiteral(literals[first])
+    }
+
+    // Relocated watches remain valid when undo widens the assignment; only bounds belong on the trail.
+    private fun propagateClauses(col: Int, priorVisits: Long, cap: Long): Long {
+        if (col < numInts || !fixed(col)) return priorVisits
+        val falsified = Lit.make(col - numInts, lo[col] == 0L)
+        val watching = watchers[falsified]
+        var position = 0
+        var visits = priorVisits
+        while (position < watching.size && !crossed && !stopped) {
+            if (!visit()) break
+            if (++visits > cap) {
+                stopped = true
+                break
+            }
+            val index = watching[position]
+            val literals = clauses[index]
+            val first = firstWatch[index]
+            val second = secondWatch[index]
+            val replaceFirst = literals[first] == falsified
+            val other = if (replaceFirst) second else first
+            if (!visit()) break
+            val otherTruth = if (other >= 0) literalTruth(literals[other]) else false
+            if (otherTruth == true) {
+                position++
+                continue
+            }
+            val replacement = replacementWatch(literals, first, second)
+            if (stopped) break
+            if (replacement >= 0) {
+                if (!visit()) break
+                if (replaceFirst) firstWatch[index] = replacement else secondWatch[index] = replacement
+                watchers[literals[replacement]].add(index)
+                watching.removeAt(position)
+            } else {
+                if (otherTruth == false) conflict = true else implyLiteral(literals[other])
+                position++
+            }
+        }
+        return visits
+    }
+
+    private fun replacementWatch(literals: IntArray, first: Int, second: Int): Int {
+        for (candidate in literals.indices) {
+            if (!visit()) return -1
+            if (candidate != first && candidate != second && literalTruth(literals[candidate]) != false) {
+                return candidate
+            }
+        }
+        return -1
     }
 
     private inline fun forEachIncidence(action: (col: Int, row: Int) -> Unit): Boolean {
@@ -291,6 +413,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
 
     private fun addRow(coeffs: LongArray, cols: IntArray, relation: LinearOp, bound: Long, guard: Int) {
         fun half(rhs: Long, sign: Long, guardValue: Long) {
+            rootRows.add(rowCols.size)
             rowCoeffs.add(coeffs)
             rowCols.add(cols)
             rowBound.add(rhs)
@@ -402,10 +525,12 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     // there, or on a spent budget, leaves the bounds derived so far, every one of them implied.
     private fun propagate(): Boolean {
         var visits = 0L
-        val cap = PROBE_SOURCE_VISITS_PER_ROW * (1L + rowCols.size)
+        val cap = PROBE_SOURCE_VISITS_PER_ROW * (1L + rowCols.size + clauses.size)
         while (!crossed && !stopped && queue.isNotEmpty()) {
             val col = queue.removeFirst()
             queued[col] = false
+            visits = propagateClauses(col, visits, cap)
+            if (crossed || stopped) break
             for (k in incidenceStart[col] until incidenceStart[col + 1]) {
                 if (!visit()) break
                 visits++
@@ -422,9 +547,10 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     }
 
     fun propagateRoot(): Boolean {
-        for (h in rowCols.indices) {
+        for (k in 0 until rootRows.size) {
             if (stopped) break
-            process(h)
+            val h = rootRows[k]
+            if (h < 0) initializeClause(-h - 1) else process(h)
             if (crossed) return false
         }
         return propagate()
@@ -448,7 +574,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         while (b < problem.numBoolVars && probed < maxCandidates && !stopped) {
             if (!visit()) break
             val col = numInts + b++
-            if (fixed(col) || incidenceStart[col] == incidenceStart[col + 1]) continue
+            if (fixed(col) || (incidenceStart[col] == incidenceStart[col + 1] && !clauseColumns[col])) continue
             probed++
             if (!probe(col)) return false
             if (!stopped && cancellation()) stopped = true

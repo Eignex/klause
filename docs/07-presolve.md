@@ -284,6 +284,12 @@ models. With real columns they may run in the source lane even when integer
 columns are closed or absent; generator lex and value-precedence chains remain
 finite-owned.
 
+Source probing propagates Boolean clauses through watched literals and arithmetic
+rows through declared intervals on one bound trail. Clause watches survive undo
+because retraction widens assignments; hypothetical bounds are fully retracted
+before deductions are published. Clause-only columns retain their candidate order,
+and the propagation visit ceiling counts both clauses and arithmetic half-rows.
+
 ### Pre-bake LP bounds
 
 The finite pipeline runs pre-bake LP bound tightening when a factor couples two

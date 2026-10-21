@@ -218,6 +218,108 @@ class ProbingTest {
 
         assertTrue(Presolve.probeSource(problem, cap, Cancellation.Never).isEmpty)
     }
+
+    @Test
+    fun `source root propagation should alternate clause and interval deductions`() {
+        val problem = Problem(
+            4, 1, arrayOf(IntDomain(0, 0)),
+            listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 5),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ReifiedLinear(3, intArrayOf(1), intArrayOf(0), LinearOp.LE, -1),
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true))),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val delta = Presolve.probeSource(problem, 0, Cancellation.Never)
+
+        assertEquals(setOf(Lit.make(1, false), Lit.make(2, true), Lit.make(3, false)), sourceUnits(delta))
+        assertEquals(0L, delta.bounds!!.lower(0))
+        assertEquals(2L, delta.bounds.upper(0))
+    }
+
+    @Test
+    fun `source probing should refute incompatible Boolean alternatives without arithmetic rows`() {
+        val problem = Problem(
+            3, 0, emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+            ),
+        )
+
+        val delta = Presolve.probeSource(problem, 1, Cancellation.Never)
+
+        assertTrue(delta.infeasible)
+    }
+
+    @Test
+    fun `source propagation should refute opposite root units without probing`() {
+        for (polarity in listOf(false, true)) {
+            val problem = Problem(
+                1, 0, emptyArray(),
+                listOf(Clause(intArrayOf(Lit.make(0, polarity))), Clause(intArrayOf(Lit.make(0, !polarity)))),
+            )
+
+            val delta = Presolve.probeSource(problem, 0, Cancellation.Never)
+
+            assertTrue(delta.infeasible)
+        }
+    }
+
+    @Test
+    fun `later source probes should retain only deductions common to earlier alternatives`() {
+        val problem = Problem(
+            5, 0, emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(4, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(4, false))),
+            ),
+        )
+
+        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+        val reduced = Problem(5, 0, emptyArray(), problem.factors.toList() + delta.addedFactors)
+
+        assertEquals(setOf(Lit.make(2, false)), sourceUnits(delta))
+        assertEquals(feasibleAssignments(problem), feasibleAssignments(reduced))
+    }
+
+    @Test
+    fun `source clause occurrences should retain Boolean candidate order and cap`() {
+        val problem = Problem(
+            4, 0, emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
+            ),
+        )
+        for (limit in listOf(1, 2, 3)) {
+            val delta = Presolve.probeSource(problem, limit, Cancellation.Never)
+
+            assertEquals(if (limit < 3) emptySet() else setOf(Lit.make(2, true)), sourceUnits(delta))
+        }
+    }
+
+    @Test
+    fun `a tautological source clause should not constrain either polarity`() {
+        val problem = Problem(
+            2, 0, emptyArray(),
+            listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true)))),
+        )
+
+        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+
+        assertTrue(delta.isEmpty)
+    }
     @Test
     fun `root fixed columns should not consume the candidate cap or emit redundant units`() {
         val problem = Problem(
@@ -307,15 +409,21 @@ class ProbingTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true))),
             ),
         )
-        for (allowance in listOf(451L, 491L, 531L, 581L, 631L, 681L)) {
+        var interrupted = false
+        var completed = false
+        for (allowance in 1L..901L step 13L) {
             val budget = PresolveBudget(allowance)
 
             val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
 
             assertTrue(delta.isEmpty, "allowance=$allowance")
             assertFalse(delta.infeasible)
-            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+            assertTrue(budget.spent() <= allowance + 9, "spent=${budget.spent()}")
+            interrupted = interrupted || budget.spent() >= allowance
+            completed = completed || budget.spent() < allowance
         }
+        assertTrue(interrupted)
+        assertTrue(completed)
     }
 
     @Test
@@ -357,14 +465,17 @@ class ProbingTest {
             129, 0, emptyArray(),
             List(128) { Clause(intArrayOf(Lit.make(0, false), Lit.make(it + 1, true))) },
         )
-        for (allowance in listOf(21801L, 22441L, 23081L)) {
+        var interrupted = false
+        for (allowance in listOf(19001L, 21801L, 22441L, 23081L)) {
             val budget = PresolveBudget(allowance)
 
             val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
 
             assertTrue(delta.isEmpty)
             assertFalse(delta.infeasible)
-            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+            assertTrue(budget.spent() <= allowance + 9, "spent=${budget.spent()}")
+            interrupted = interrupted || budget.spent() >= allowance
         }
+        assertTrue(interrupted)
     }
 }
