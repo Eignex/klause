@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
@@ -12,6 +12,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 
 /** Reject an unsupported construct with a clean [UnsupportedSmtException]. */
@@ -337,7 +338,8 @@ internal object Compiler {
             return sourceProblem(objective, factors.toTypedArray())
         }
 
-        internal fun refutedSource(): SmtLibProblem = sourceProblem(null, arrayOf(Clause(intArrayOf())))
+        internal fun refutedSource(): SmtLibProblem = sourceProblem(null,
+            arrayOf(ExactLinear.of(intArrayOf(), emptyList(), LinearOp.EQ, BigFraction.ONE)))
 
         private fun sourceProblem(objective: LinearObjectiveSpec?, sourceFactors: Array<Factor>): SmtLibProblem {
             val model = Problem(

@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.simplex.exact.BigFraction
@@ -107,21 +108,19 @@ internal class SmtLibRefutedPremises : RuntimeException()
 internal fun Compiler.Builder.closeProductBounds() {
     if (productBoundsClosed || intDomains.none { it is PresolveDomain.Open }) return
     productBoundsClosed = true
-    if (sourceCancellation()) throw PolynomialSourceInterrupted()
+    sourceCancellation.polynomialSourceCheckpoint()
     val premises = Problem(settings = settings, numBoolVars = 0, intBounds = modelIntBounds(),
         factors = Array(boundPremises.size) { index ->
             val row = boundPremises[index]
             ExactLinear.of(IntArray(row.vars.size) { Term.ofIntVar(row.vars[it]) },
                 row.coeffs.map { BigFraction.ofLong(it) }, row.op, BigFraction.ofLong(row.bound))
         })
-    val closed = when (val outcome = premises.closeOpenBounds(sourceCancellation)) {
-        OpenPresolveResult.Refuted -> {
-            if (sourceCancellation()) throw PolynomialSourceInterrupted()
-            throw SmtLibRefutedPremises()
-        }
+    val outcome = premises.closeOpenBounds(sourceCancellation)
+    sourceCancellation.polynomialSourceCheckpoint()
+    val closed = when (outcome) {
+        OpenPresolveResult.Refuted -> throw SmtLibRefutedPremises()
         is OpenPresolveResult.Tightened -> outcome.spec
     }
-    if (sourceCancellation()) throw PolynomialSourceInterrupted()
     for (id in intDomains.indices) {
         if (intDomains[id] !is PresolveDomain.Open) continue
         intDomains[id] = openOrFinite(
