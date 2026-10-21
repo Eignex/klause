@@ -256,6 +256,9 @@ These checks share the traversal's work and stop controls, attempt at most 64
 queries per search, and follow four initial visits with a cadence of 32 visits.
 Native analysis captures a prefix conflict before retraction; the resolver retains
 that analysis until the traversal can apply its learned consequence.
+Unconditioned exact runs can also offer their admitted source clauses through the
+portfolio's global feasibility channel. Integer-bound atoms travel as typed source
+predicates, and sharing keeps the native conflict resolution and pool limits.
 Successful fixpoints deliver new deductions to propagation-aware selectors. Phase
 saving captures values before
 retraction, so propagated as well as decided polarities survive backjumps and

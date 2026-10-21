@@ -15,6 +15,7 @@ import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.ProductionLpCertificationPolicy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpBranching
@@ -810,12 +811,16 @@ private class ResidualRealComponent(
     solveContext: LpSolveContext,
 ) : SearchConflictResolver,
     LpSearchResource {
+    private val solveContext = solveContext
     private val toleranceCheck = params.toleranceCheck
+    private val sourceClauseExchange = params.clauseExchange?.takeIf {
+        params.assumptions.isEmpty && !problem.semantics.isApproximate && toleranceCheck == null &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+    }
     private val absCompletion = if (problem.factors.any {
             it is RealAbs || it is RealFiniteDomain ||
                 (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
         }) AbsRealCompletion(problem) else null
-    private val solveContext = solveContext
     private var absWork = 0L
     private val engine = LpEngine(
         problem,
@@ -910,7 +915,7 @@ private class ResidualRealComponent(
             return ComponentResult.Consistent
         }
         val clause = engine.pinnedLeafClause ?: return ComponentResult.Consistent
-        prefixResolution = cp.resolveClause(clause, context)
+        prefixResolution = resolveSourceClause(clause, context, "PREFIX")
         completed = null
         return ComponentResult.Conflict()
     }
@@ -985,7 +990,7 @@ private class ResidualRealComponent(
             sink?.lp?.observePrimalPhase(phase, "NO_CLAUSE", 0L)
             return SearchConflictResolution.Chronological
         }
-        val result = prefix ?: cp.resolveClause(checkNotNull(clause), context)
+        val result = prefix ?: resolveSourceClause(checkNotNull(clause), context, "LEAF")
         val outcome = when (result) {
             is SearchConflictResolution.Backjump -> "BACKJUMP"
             SearchConflictResolution.Exhausted -> "EXHAUSTED"
@@ -993,6 +998,19 @@ private class ResidualRealComponent(
         }
         sink?.lp?.observePrimalPhase(phase, outcome, 0L)
         return result
+    }
+
+    private fun resolveSourceClause(clause: IntArray, context: SearchContext, phase: String): SearchConflictResolution {
+        val resolution = cp.resolveClause(clause, context)
+        val exchange = sourceClauseExchange ?: return resolution
+        if (clause.size !in 1..4096) return resolution
+        val stop = context.executionControls.cancellation
+        stop.charge(8L * clause.size + 1L)
+        if (stop() || clause.any { it < 0 || cp.session.litTruth(it) != false }) return resolution
+        // Native atom ids belong to one session; the source clause travels as typed bound predicates.
+        exchange.publishGlobal(cp.session.asSharedClause(clause, clause.size))
+        sink?.lp?.observePrimalPhase("REAL_SOURCE_CLAUSE_SHARE", "${phase}_OFFERED", 0L)
+        return resolution
     }
 
     override fun onRestart(context: SearchContext) {
