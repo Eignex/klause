@@ -110,7 +110,9 @@ It creates no numerical row or query. Private conditioned
 openings keep their own policy, and a partial point supplies no implication proof.
 Completed coverage is reused while matrix, bounds, row activity and pop revisions
 stay unchanged. Retraction and newly available Boolean coefficient inputs reopen
-coverage; that cache only controls optional visits and supplies no logical fact.
+coverage while preserving the rotating row cursor, so repeated prefix changes
+still give later guards a visit. Coverage only controls optional visits and
+supplies no logical fact.
 
 #### Disjunctions and disequalities
 

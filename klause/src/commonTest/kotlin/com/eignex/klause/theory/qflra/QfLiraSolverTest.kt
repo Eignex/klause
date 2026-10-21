@@ -26,6 +26,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModelKey
+import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -50,6 +51,46 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `changing prefixes should let bounded guard sweeps reach later implications`() {
+        for (earlyGuards in listOf(64, 128)) {
+            val source = Problem(
+                numBoolVars = earlyGuards + 1,
+                intBounds = openBounds(0),
+                numRealVars = 4,
+                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, 0.0,
+                    Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, 1.0,
+                    Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+                factors = Array<Factor>(earlyGuards + 2) { index ->
+                    when (index) {
+                        earlyGuards -> ReifiedRealLinear(index, intArrayOf(), doubleArrayOf(),
+                            intArrayOf(1), doubleArrayOf(1.0), LinearOp.LE, 1.0)
+                        earlyGuards + 1 -> Linear(intArrayOf(), doubleArrayOf(),
+                            intArrayOf(0, 2, 3), doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 10.0)
+                        else -> ReifiedRealLinear(index, intArrayOf(), doubleArrayOf(),
+                            intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0)
+                    }
+                },
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                component.useSourceGuardPropagation()
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(earlyGuards + 1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertNull(session.boolValue(earlyGuards))
+
+                repeat(earlyGuards / 64) { round ->
+                    val split = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                        listOf(SourceBoundTerm(SearchRealValue(2), BigFraction.ONE)),
+                        BigFraction.ofLong(-round.toLong())))
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.positive)))
+                }
+
+                assertEquals(true, session.boolValue(earlyGuards))
+            }
+        }
+    }
+
     @Test
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")

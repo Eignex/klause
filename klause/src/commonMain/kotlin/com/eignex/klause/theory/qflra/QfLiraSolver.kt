@@ -1397,7 +1397,6 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun resetSourceGuardCoverage() {
-        sourceGuardCursor = 0
         sourceGuardCovered = 0
         sourceGuardPendingBodies = false
     }
