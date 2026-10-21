@@ -171,7 +171,7 @@ object Presolver {
                     { current.presolveSize() },
                     { pass.namespaceEligible(current) },
                 ) { invocation ->
-                    val units = entrySize.units(current)
+                    val units = entrySize.units(current, token)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
                     val delta = pass.applySource(current, slice?.let(ctx::withCancellation) ?: ctx)
@@ -248,7 +248,7 @@ object Presolver {
                 { problem.presolveSize() }, { true },
             ) {
                 cancellation.charge(PresolvePass.STRENGTHEN_COEFFICIENTS.baseWorkWeight *
-                    PresolveEntrySize(context.presolveBudget).units(problem))
+                    PresolveEntrySize(context.presolveBudget).units(problem, cancellation))
                 if (Presolve.strengthenCoefficients(problem, cancellation).infeasible) {
                     PassOutcome.INFEASIBLE
                 } else PassOutcome.UNCHANGED
@@ -292,7 +292,7 @@ object Presolver {
                     { current.presolveSize() },
                     { pass.namespaceEligible(current) },
                 ) { invocation ->
-                    val units = entrySize.units(current)
+                    val units = entrySize.units(current, token)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
                     val delta = pass.applyFinite(current, slice?.let(ctx::withCancellation) ?: ctx)
@@ -379,7 +379,7 @@ object Presolver {
                 ) { invocation ->
                     // Before the context: [passOccurrence] is keyed against the factor list [passInput] fixes.
                     val input = session.passInput()
-                    val units = session.entryUnits()
+                    val units = session.entryUnits(token)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
                     val base = passContext(pass)

@@ -124,10 +124,11 @@ internal class PresolveSession(
     private var inputDirty: Boolean = true
     private var aggregateEntryUnits: Long? = null
 
-    internal fun entryUnits(): Long {
+    internal fun entryUnits(token: Cancellation): Long {
+        if (token.workMeter() == null) return 0L
         aggregateEntryUnits?.let { return it }
         val input = if (addedLog.isEmpty() && droppedFactorLog.isEmpty() && reseedEpoch == 0) base else passInput()
-        return (cancellation.presolveBudget()?.entryUnits(input.factors) ?: passBaseUnits(input.factors)).also {
+        return (token.presolveBudget()?.entryUnits(input.factors) ?: passBaseUnits(input.factors)).also {
             aggregateEntryUnits = it
         }
     }

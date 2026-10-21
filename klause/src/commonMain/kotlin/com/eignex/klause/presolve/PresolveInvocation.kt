@@ -14,7 +14,8 @@ internal class PresolveEntrySize(private val budget: PresolveBudget?) {
     private var factors: Array<Factor>? = null
     private var entries = 0L
 
-    fun units(problem: Problem): Long {
+    fun units(problem: Problem, token: Cancellation): Long {
+        if (budget == null && token.workMeter() == null) return 0L
         if (factors !== problem.factors) {
             entries = budget?.entryUnits(problem.factors) ?: passBaseUnits(problem.factors)
             factors = problem.factors
@@ -125,7 +126,7 @@ internal fun <T> PresolveBudget?.observeTransform(
                 unchanged()
             }
             else -> {
-                val units = PresolveEntrySize(this).units(input)
+                val units = PresolveEntrySize(this).units(input, cancellation)
                 invocation.recordEntries(units)
                 cancellation.charge(pass.baseWorkWeight * units)
                 action()
