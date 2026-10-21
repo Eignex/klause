@@ -96,6 +96,8 @@ internal class LpScopedSolver(
 
     fun push(token: Cancellation = cancellation): Boolean = edit(token) { it.push(token) }
 
+    fun pushTo(depth: Int, token: Cancellation = cancellation): Boolean = edit(token) { it.pushTo(depth, token) }
+
     fun assertBound(
         column: Int,
         upper: Boolean,

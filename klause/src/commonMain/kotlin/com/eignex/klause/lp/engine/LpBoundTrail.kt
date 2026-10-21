@@ -27,6 +27,19 @@ internal class LpBoundTrail(initial: LpExactState) {
         return commit(next, token)
     }
 
+    fun pushTo(depth: Int, token: Cancellation = Cancellation.Never): Boolean {
+        if (token() || depth < state.depth) return false
+        if (depth == state.depth) return true
+        if (depth - state.depth == 1) return push(token)
+        val marks = state.scopes.toMutableList()
+        val end = state.assertions.size
+        while (marks.size < depth) {
+            if (token()) return false
+            marks.add(end)
+        }
+        return commit(snapshot(scopes = marks), token)
+    }
+
     fun assertBound(
         column: Int,
         upper: Boolean,

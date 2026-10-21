@@ -65,6 +65,9 @@ A check proceeds in four steps:
    Deferred rows stay tied to that point; retirement clears their proof stamps,
    and ordinary solving first asserts every active deferred row. Failed or
    unavailable checks discard the point and leave certification to the LP.
+   Proved Boolean updates can also defer numerical scope synchronization. Source
+   bounds synchronize before assertion, and ordinary solving creates the pending
+   empty scopes together before it assembles rows.
 3. **Explain.** An infeasible system produces a conflict from the certified
    infeasibility support: each cited row or bound contributes its premise literals.
    If a cited row or bound has changed in the live LP state, no conflict is

@@ -254,6 +254,7 @@ class ExactLiraSearchComponent private constructor(
     private val lpDelegate: Lazy<LpPropagator> = lazy {
         LpPropagator(
             object : LpSearchPolicy {
+                override val eagerAssertionScopes: Boolean get() = false
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                     accept(decision, context)
                 override fun propagate(context: SearchContext): ComponentResult = relax(context)
@@ -1147,7 +1148,10 @@ class ExactLiraSearchComponent private constructor(
         pointHintPoint = null
         val wasDirty = dirty
         dirty = true
-        if (decision !is SearchDecision.Bool) checkPointReuse(decision)
+        if (decision !is SearchDecision.Bool) {
+            if (!lp.atLevel(context.decisionLevel, operationStop)) return ComponentResult.Indeterminate
+            checkPointReuse(decision)
+        }
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
@@ -1243,7 +1247,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun assertSource(context: SearchContext, deferPoint: Boolean = false): Boolean {
-        if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
+        if (!installSource() || (!deferPoint && !lp.atLevel(context.decisionLevel, operationStop))) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.

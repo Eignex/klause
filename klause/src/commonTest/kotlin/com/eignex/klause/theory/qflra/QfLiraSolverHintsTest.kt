@@ -50,6 +50,45 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `registered bounds should expire after delayed Boolean scopes retract`() {
+        val model = Problem(
+            numBoolVars = 5,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = doubleArrayOf(1.0, 0.0, 0.0),
+            factors = Array<Factor>(5) { head ->
+                when {
+                    head < 3 -> ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), IntArray(3) { it },
+                        DoubleArray(3) { 1.0 }, LinearOp.GE, 0.0)
+                    head == 3 -> ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.GE, 0.5)
+                    else -> Linear(intArrayOf(), doubleArrayOf(), IntArray(3) { it }, DoubleArray(3) { 1.0 },
+                        LinearOp.GE, 0.0)
+                }
+            },
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(5))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(false, hints.preferredBool(3))
+            repeat(3) { head ->
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(head, true))))
+            }
+            val atom = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(atom.positive)))
+            session.popTo(0)
+
+            val result = session.push(SearchDecision.Bool(Lit.make(3, true)))
+
+            assertIs<ComponentResult.Consistent>(result)
+        }
+    }
+
+    @Test
     fun `unchanged real points should preserve eager guard preferences without recapturing them`() {
         val model = Problem(
             numBoolVars = 5,

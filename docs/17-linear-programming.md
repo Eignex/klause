@@ -178,6 +178,9 @@ sides, and pop restores bounds and deactivates scoped rows.
 Assertion validation walks sorted scope marks together with assertion positions;
 repeated marks preserve the depth of empty scopes. Shared assertion prefixes keep
 their checked authority while appended assertions validate their row and witness.
+Empty scopes can publish as one batch with the same assertion marks. Cancellation
+leaves the predecessor intact, and a backjump through the batch restores the bounds
+at its selected depth.
 
 A nonbasic bound change updates the basic values by `-B^-1 A(j) delta(x(j))`; pop
 reseats nonbasics and recomputes `x(B) = B^-1 (b - N x(N))`. Compatible edits and
