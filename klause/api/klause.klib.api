@@ -802,6 +802,31 @@ final enum class com.eignex.klause.solver.pipeline/VarSelectorKind : kotlin/Enum
     }
 }
 
+final enum class com.eignex.klause.solver.result/PresolveInvocationOutcome : kotlin/Enum<com.eignex.klause.solver.result/PresolveInvocationOutcome> { // com.eignex.klause.solver.result/PresolveInvocationOutcome|null[0]
+    enum entry CHANGED // com.eignex.klause.solver.result/PresolveInvocationOutcome.CHANGED|null[0]
+    enum entry COMPLETE_MISS // com.eignex.klause.solver.result/PresolveInvocationOutcome.COMPLETE_MISS|null[0]
+    enum entry ELIGIBILITY_SKIP // com.eignex.klause.solver.result/PresolveInvocationOutcome.ELIGIBILITY_SKIP|null[0]
+    enum entry INTERRUPTED // com.eignex.klause.solver.result/PresolveInvocationOutcome.INTERRUPTED|null[0]
+    enum entry REFUTED // com.eignex.klause.solver.result/PresolveInvocationOutcome.REFUTED|null[0]
+
+    final val entries // com.eignex.klause.solver.result/PresolveInvocationOutcome.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.result/PresolveInvocationOutcome> // com.eignex.klause.solver.result/PresolveInvocationOutcome.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.result/PresolveInvocationOutcome // com.eignex.klause.solver.result/PresolveInvocationOutcome.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.result/PresolveInvocationOutcome> // com.eignex.klause.solver.result/PresolveInvocationOutcome.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.solver.result/PresolveLane : kotlin/Enum<com.eignex.klause.solver.result/PresolveLane> { // com.eignex.klause.solver.result/PresolveLane|null[0]
+    enum entry FINITE // com.eignex.klause.solver.result/PresolveLane.FINITE|null[0]
+    enum entry SOURCE // com.eignex.klause.solver.result/PresolveLane.SOURCE|null[0]
+
+    final val entries // com.eignex.klause.solver.result/PresolveLane.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.result/PresolveLane> // com.eignex.klause.solver.result/PresolveLane.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.result/PresolveLane // com.eignex.klause.solver.result/PresolveLane.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.result/PresolveLane> // com.eignex.klause.solver.result/PresolveLane.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.solver.result/QuadraticClaim : kotlin/Enum<com.eignex.klause.solver.result/QuadraticClaim> { // com.eignex.klause.solver.result/QuadraticClaim|null[0]
     enum entry Bound // com.eignex.klause.solver.result/QuadraticClaim.Bound|null[0]
     enum entry Infeasible // com.eignex.klause.solver.result/QuadraticClaim.Infeasible|null[0]
@@ -12460,9 +12485,13 @@ final class com.eignex.klause.presolve/PresolveBudget : com.eignex.klause.util/W
 
     final val allowance // com.eignex.klause.presolve/PresolveBudget.allowance|{}allowance[0]
         final fun <get-allowance>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.allowance.<get-allowance>|<get-allowance>(){}[0]
+    final val invocations // com.eignex.klause.presolve/PresolveBudget.invocations|{}invocations[0]
+        final fun <get-invocations>(): kotlin.collections/List<com.eignex.klause.solver.result/PresolveInvocationStats> // com.eignex.klause.presolve/PresolveBudget.invocations.<get-invocations>|<get-invocations>(){}[0]
     final val passCalls // com.eignex.klause.presolve/PresolveBudget.passCalls|{}passCalls[0]
         final fun <get-passCalls>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.presolve/PresolveBudget.passCalls.<get-passCalls>|<get-passCalls>(){}[0]
 
+    final var entrySizeVisits // com.eignex.klause.presolve/PresolveBudget.entrySizeVisits|{}entrySizeVisits[0]
+        final fun <get-entrySizeVisits>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.entrySizeVisits.<get-entrySizeVisits>|<get-entrySizeVisits>(){}[0]
     final var probeCalls // com.eignex.klause.presolve/PresolveBudget.probeCalls|{}probeCalls[0]
         final fun <get-probeCalls>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.probeCalls.<get-probeCalls>|<get-probeCalls>(){}[0]
     final var rootConstructionEntries // com.eignex.klause.presolve/PresolveBudget.rootConstructionEntries|{}rootConstructionEntries[0]
@@ -15640,7 +15669,7 @@ final class com.eignex.klause.solver.result/PortfolioStats { // com.eignex.klaus
 }
 
 final class com.eignex.klause.solver.result/PresolveEffortStats { // com.eignex.klause.solver.result/PresolveEffortStats|null[0]
-    constructor <init>(kotlin/String, kotlin/Double, kotlin/Int, kotlin/Int, kotlin/Int, kotlin.time/Duration, kotlin/Long?, kotlin/Long?, kotlin/Int?, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin/Long?, kotlin/Long? = ..., kotlin/Long? = ...) // com.eignex.klause.solver.result/PresolveEffortStats.<init>|<init>(kotlin.String;kotlin.Double;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.time.Duration;kotlin.Long?;kotlin.Long?;kotlin.Int?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.Long?;kotlin.Long?;kotlin.Long?){}[0]
+    constructor <init>(kotlin/String, kotlin/Double, kotlin/Int, kotlin/Int, kotlin/Int, kotlin.time/Duration, kotlin/Long?, kotlin/Long?, kotlin/Int?, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin/Long?, kotlin/Long? = ..., kotlin/Long? = ..., kotlin.collections/List<com.eignex.klause.solver.result/PresolveInvocationStats> = ..., kotlin/Long? = ...) // com.eignex.klause.solver.result/PresolveEffortStats.<init>|<init>(kotlin.String;kotlin.Double;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.time.Duration;kotlin.Long?;kotlin.Long?;kotlin.Int?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.collections.List<com.eignex.klause.solver.result.PresolveInvocationStats>;kotlin.Long?){}[0]
 
     final val abortFraction // com.eignex.klause.solver.result/PresolveEffortStats.abortFraction|{}abortFraction[0]
         final fun <get-abortFraction>(): kotlin/Double // com.eignex.klause.solver.result/PresolveEffortStats.abortFraction.<get-abortFraction>|<get-abortFraction>(){}[0]
@@ -15650,6 +15679,10 @@ final class com.eignex.klause.solver.result/PresolveEffortStats { // com.eignex.
         final fun <get-elapsed>(): kotlin.time/Duration // com.eignex.klause.solver.result/PresolveEffortStats.elapsed.<get-elapsed>|<get-elapsed>(){}[0]
     final val emphasis // com.eignex.klause.solver.result/PresolveEffortStats.emphasis|{}emphasis[0]
         final fun <get-emphasis>(): kotlin/String // com.eignex.klause.solver.result/PresolveEffortStats.emphasis.<get-emphasis>|<get-emphasis>(){}[0]
+    final val entrySizeVisits // com.eignex.klause.solver.result/PresolveEffortStats.entrySizeVisits|{}entrySizeVisits[0]
+        final fun <get-entrySizeVisits>(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.entrySizeVisits.<get-entrySizeVisits>|<get-entrySizeVisits>(){}[0]
+    final val invocations // com.eignex.klause.solver.result/PresolveEffortStats.invocations|{}invocations[0]
+        final fun <get-invocations>(): kotlin.collections/List<com.eignex.klause.solver.result/PresolveInvocationStats> // com.eignex.klause.solver.result/PresolveEffortStats.invocations.<get-invocations>|<get-invocations>(){}[0]
     final val maxRounds // com.eignex.klause.solver.result/PresolveEffortStats.maxRounds|{}maxRounds[0]
         final fun <get-maxRounds>(): kotlin/Int // com.eignex.klause.solver.result/PresolveEffortStats.maxRounds.<get-maxRounds>|<get-maxRounds>(){}[0]
     final val passCalls // com.eignex.klause.solver.result/PresolveEffortStats.passCalls|{}passCalls[0]
@@ -15666,6 +15699,8 @@ final class com.eignex.klause.solver.result/PresolveEffortStats { // com.eignex.
         final fun <get-rootPropagationWork>(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.rootPropagationWork.<get-rootPropagationWork>|<get-rootPropagationWork>(){}[0]
     final val rounds // com.eignex.klause.solver.result/PresolveEffortStats.rounds|{}rounds[0]
         final fun <get-rounds>(): kotlin/Int? // com.eignex.klause.solver.result/PresolveEffortStats.rounds.<get-rounds>|<get-rounds>(){}[0]
+    final val unattributedWork // com.eignex.klause.solver.result/PresolveEffortStats.unattributedWork|{}unattributedWork[0]
+        final fun <get-unattributedWork>(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.unattributedWork.<get-unattributedWork>|<get-unattributedWork>(){}[0]
     final val work // com.eignex.klause.solver.result/PresolveEffortStats.work|{}work[0]
         final fun <get-work>(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.work.<get-work>|<get-work>(){}[0]
 
@@ -15674,6 +15709,8 @@ final class com.eignex.klause.solver.result/PresolveEffortStats { // com.eignex.
     final fun component11(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.component11|component11(){}[0]
     final fun component12(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.component12|component12(){}[0]
     final fun component13(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.component13|component13(){}[0]
+    final fun component14(): kotlin.collections/List<com.eignex.klause.solver.result/PresolveInvocationStats> // com.eignex.klause.solver.result/PresolveEffortStats.component14|component14(){}[0]
+    final fun component15(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.component15|component15(){}[0]
     final fun component2(): kotlin/Double // com.eignex.klause.solver.result/PresolveEffortStats.component2|component2(){}[0]
     final fun component3(): kotlin/Int // com.eignex.klause.solver.result/PresolveEffortStats.component3|component3(){}[0]
     final fun component4(): kotlin/Int // com.eignex.klause.solver.result/PresolveEffortStats.component4|component4(){}[0]
@@ -15682,10 +15719,44 @@ final class com.eignex.klause.solver.result/PresolveEffortStats { // com.eignex.
     final fun component7(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.component7|component7(){}[0]
     final fun component8(): kotlin/Long? // com.eignex.klause.solver.result/PresolveEffortStats.component8|component8(){}[0]
     final fun component9(): kotlin/Int? // com.eignex.klause.solver.result/PresolveEffortStats.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin.time/Duration = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ...): com.eignex.klause.solver.result/PresolveEffortStats // com.eignex.klause.solver.result/PresolveEffortStats.copy|copy(kotlin.String;kotlin.Double;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.time.Duration;kotlin.Long?;kotlin.Long?;kotlin.Int?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.Long?;kotlin.Long?;kotlin.Long?){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin.time/Duration = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin.collections/List<com.eignex.klause.solver.result/PresolveInvocationStats> = ..., kotlin/Long? = ...): com.eignex.klause.solver.result/PresolveEffortStats // com.eignex.klause.solver.result/PresolveEffortStats.copy|copy(kotlin.String;kotlin.Double;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.time.Duration;kotlin.Long?;kotlin.Long?;kotlin.Int?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.collections.List<com.eignex.klause.solver.result.PresolveInvocationStats>;kotlin.Long?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/PresolveEffortStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/PresolveEffortStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/PresolveEffortStats.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.result/PresolveInvocationStats { // com.eignex.klause.solver.result/PresolveInvocationStats|null[0]
+    final val elapsed // com.eignex.klause.solver.result/PresolveInvocationStats.elapsed|{}elapsed[0]
+        final fun <get-elapsed>(): kotlin.time/Duration // com.eignex.klause.solver.result/PresolveInvocationStats.elapsed.<get-elapsed>|<get-elapsed>(){}[0]
+    final val fixedColumns // com.eignex.klause.solver.result/PresolveInvocationStats.fixedColumns|{}fixedColumns[0]
+        final fun <get-fixedColumns>(): kotlin/Int // com.eignex.klause.solver.result/PresolveInvocationStats.fixedColumns.<get-fixedColumns>|<get-fixedColumns>(){}[0]
+    final val input // com.eignex.klause.solver.result/PresolveInvocationStats.input|{}input[0]
+        final fun <get-input>(): com.eignex.klause.solver.result/PresolveSizeStats // com.eignex.klause.solver.result/PresolveInvocationStats.input.<get-input>|<get-input>(){}[0]
+    final val lane // com.eignex.klause.solver.result/PresolveInvocationStats.lane|{}lane[0]
+        final fun <get-lane>(): com.eignex.klause.solver.result/PresolveLane // com.eignex.klause.solver.result/PresolveInvocationStats.lane.<get-lane>|<get-lane>(){}[0]
+    final val narrowedColumns // com.eignex.klause.solver.result/PresolveInvocationStats.narrowedColumns|{}narrowedColumns[0]
+        final fun <get-narrowedColumns>(): kotlin/Int // com.eignex.klause.solver.result/PresolveInvocationStats.narrowedColumns.<get-narrowedColumns>|<get-narrowedColumns>(){}[0]
+    final val outcome // com.eignex.klause.solver.result/PresolveInvocationStats.outcome|{}outcome[0]
+        final fun <get-outcome>(): com.eignex.klause.solver.result/PresolveInvocationOutcome // com.eignex.klause.solver.result/PresolveInvocationStats.outcome.<get-outcome>|<get-outcome>(){}[0]
+    final val output // com.eignex.klause.solver.result/PresolveInvocationStats.output|{}output[0]
+        final fun <get-output>(): com.eignex.klause.solver.result/PresolveSizeStats // com.eignex.klause.solver.result/PresolveInvocationStats.output.<get-output>|<get-output>(){}[0]
+    final val pass // com.eignex.klause.solver.result/PresolveInvocationStats.pass|{}pass[0]
+        final fun <get-pass>(): kotlin/String // com.eignex.klause.solver.result/PresolveInvocationStats.pass.<get-pass>|<get-pass>(){}[0]
+    final val rebuildWork // com.eignex.klause.solver.result/PresolveInvocationStats.rebuildWork|{}rebuildWork[0]
+        final fun <get-rebuildWork>(): kotlin/Long // com.eignex.klause.solver.result/PresolveInvocationStats.rebuildWork.<get-rebuildWork>|<get-rebuildWork>(){}[0]
+    final val work // com.eignex.klause.solver.result/PresolveInvocationStats.work|{}work[0]
+        final fun <get-work>(): kotlin/Long // com.eignex.klause.solver.result/PresolveInvocationStats.work.<get-work>|<get-work>(){}[0]
+}
+
+final class com.eignex.klause.solver.result/PresolveSizeStats { // com.eignex.klause.solver.result/PresolveSizeStats|null[0]
+    final val booleans // com.eignex.klause.solver.result/PresolveSizeStats.booleans|{}booleans[0]
+        final fun <get-booleans>(): kotlin/Int // com.eignex.klause.solver.result/PresolveSizeStats.booleans.<get-booleans>|<get-booleans>(){}[0]
+    final val factors // com.eignex.klause.solver.result/PresolveSizeStats.factors|{}factors[0]
+        final fun <get-factors>(): kotlin/Int // com.eignex.klause.solver.result/PresolveSizeStats.factors.<get-factors>|<get-factors>(){}[0]
+    final val integers // com.eignex.klause.solver.result/PresolveSizeStats.integers|{}integers[0]
+        final fun <get-integers>(): kotlin/Int // com.eignex.klause.solver.result/PresolveSizeStats.integers.<get-integers>|<get-integers>(){}[0]
+    final val occurrences // com.eignex.klause.solver.result/PresolveSizeStats.occurrences|{}occurrences[0]
+        final fun <get-occurrences>(): kotlin/Long? // com.eignex.klause.solver.result/PresolveSizeStats.occurrences.<get-occurrences>|<get-occurrences>(){}[0]
 }
 
 final class com.eignex.klause.solver.result/PresolveStats { // com.eignex.klause.solver.result/PresolveStats|null[0]
