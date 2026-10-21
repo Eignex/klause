@@ -21,6 +21,39 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `partial even powers retain zero boundary completions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        for (predicate in listOf(
+            "(= (+ (* x1 x1) (* x2 x2)) 0)",
+            "(not (> (+ (* x1 x1) (* x2 x2)) 0))",
+            "(>= (- (+ (* x1 x1) (* x2 x2))) 0)",
+        )) {
+            val source = SmtLibPolynomial.parse(
+                "$declarations (assert (= (* x0 x0) 1)) (assert $predicate)",
+            )
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+            val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+            assertEquals(0, algebraic.sign(point.realValue(1)))
+            assertEquals(0, algebraic.sign(point.realValue(2)))
+        }
+    }
+
+    @Test
+    fun `partial odd powers retain sign changing completions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* x0 x0) 1)) (assert (= (+ (* x1 x1 x1) (* x0 x0)) 0))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertEquals(0, algebraic.compare(point.realValue(1), algebraic.rational(BigFraction.MINUS_ONE)))
+    }
+
+    @Test
     fun `independent missing boundaries avoid Cartesian sample products`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val constraints = (0 until 8).joinToString(" ") {

@@ -15,6 +15,11 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.requireVariableCounts
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.theory.qfnra.PolynomialSigns.ALL_SIGNS
+import com.eignex.klause.theory.qfnra.PolynomialSigns.NEGATIVE_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.POSITIVE_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.ZERO_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
@@ -1674,11 +1679,70 @@ private fun rejectedRegionAtom(
         arithmetic.step()
         val atom = formula.atoms[index]
         val variable = atom.polynomial.mainVariable
-        if (variable != null && (atomLevels?.getValue(index) ?: variable) >= coordinates.size) continue
+        if (variable != null && (atomLevels?.getValue(index) ?: variable) >= coordinates.size) {
+            if (atomLevels != null) {
+                val signs = try {
+                    partialRegionSigns(atom.polynomial, coordinates, arithmetic, algebraic)
+                } catch (_: PolynomialResourceLimit) {
+                    ALL_SIGNS
+                }
+                val allowed = relationSigns(atom.relation)
+                if (signs and (if (required) allowed else ALL_SIGNS xor allowed) == 0) return index
+            }
+            continue
+        }
         val sign = algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))
         if (atom.holds(sign) != required) return index
     }
     return null
+}
+
+private fun partialRegionSigns(
+    polynomial: Polynomial,
+    coordinates: Map<Int, AlgebraicReal>,
+    arithmetic: PolynomialArithmetic,
+    algebraic: AlgebraicArithmetic,
+): Int {
+    var constant = algebraic.rational(BigFraction.ZERO)
+    var positiveTerms = false
+    var negativeTerms = false
+    for ((monomial, coefficient) in polynomial.terms) {
+        arithmetic.step()
+        var value = algebraic.rational(coefficient)
+        var pending = false
+        var odd = false
+        for (variable in monomial.variables) {
+            arithmetic.step()
+            val exponent = monomial.exponent(variable)
+            val coordinate = coordinates[variable]
+            if (coordinate == null) {
+                pending = true
+                if (exponent and 1 != 0) odd = true
+            } else {
+                value = algebraic.multiply(value, algebraic.power(coordinate, exponent))
+            }
+        }
+        val sign = algebraic.sign(value)
+        if (sign == 0) continue
+        if (!pending) {
+            constant = algebraic.add(constant, value)
+        } else {
+            if (odd) return ALL_SIGNS
+            if (sign > 0) positiveTerms = true else negativeTerms = true
+        }
+    }
+    return evenCompletionSigns(algebraic.sign(constant), positiveTerms, negativeTerms)
+}
+
+private fun evenCompletionSigns(constant: Int, positiveTerms: Boolean, negativeTerms: Boolean): Int = when {
+    !positiveTerms && !negativeTerms -> when {
+        constant < 0 -> NEGATIVE_SIGN
+        constant > 0 -> POSITIVE_SIGN
+        else -> ZERO_SIGN
+    }
+    !negativeTerms && constant >= 0 -> if (constant > 0) POSITIVE_SIGN else ZERO_SIGN or POSITIVE_SIGN
+    !positiveTerms && constant <= 0 -> if (constant < 0) NEGATIVE_SIGN else ZERO_SIGN or NEGATIVE_SIGN
+    else -> ALL_SIGNS
 }
 
 private fun checkRegionSample(

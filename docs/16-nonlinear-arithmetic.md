@@ -290,7 +290,13 @@ depending on a varying projected coordinate retain cell traversal.
 polynomial is specialized at the earlier coordinates, the
 [kernel](18-exact-arithmetic.md#algebraic-arithmetic-and-lifting) isolates its real
 roots, and roots become section samples with rational samples in the sectors
-between them. A violated region literal prunes the cell. At a complete sample,
+between them. Partial substitution uses exact assigned coordinates to bound a
+predicate's sign when every remaining monomial has even powers and coefficients
+of one sign. A strict constant sign remains strict after adding terms of that
+sign; zero coefficients and boundary completions remain possible. An odd power,
+mixed signs or a representation refusal leaves the prefix open. A predicate
+whose required truth is impossible for every completion prunes the prefix.
+At a complete sample,
 eliminated coordinates are reconstructed and the full assignment passes the
 original formula before capture. Exhausting every cell of the complete projection
 refutes the region.
