@@ -16,6 +16,44 @@ import kotlin.time.TimeSource
 
 class CancellationTest {
     @Test
+    fun `or compositions should poll predicates in order until cancellation`() {
+        for (arity in 0..6) {
+            for (cancelAt in -1 until arity) {
+                for (direct in listOf(false, true)) {
+                    val visited = ArrayList<Int>()
+                    var token = Cancellation.Never or Cancellation.Never
+                    repeat(arity) { index ->
+                        token = token or Cancellation {
+                            visited += index
+                            index == cancelAt
+                        }
+                    }
+
+                    val cancelled = if (direct) token.isCancelled() else token()
+
+                    assertEquals(cancelAt >= 0, cancelled)
+                    val count = if (cancelAt >= 0) cancelAt + 1 else arity
+                    assertEquals((0 until count).toList(), visited)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `or compositions should poll repeated stateful predicates separately`() {
+        for (direct in listOf(false, true)) {
+            var polls = 0
+            val predicate = Cancellation { ++polls == 2 }
+            val token = (predicate or predicate) or Cancellation { error("polled after cancellation") }
+
+            val cancelled = if (direct) token.isCancelled() else token()
+
+            assertTrue(cancelled)
+            assertEquals(2, polls)
+        }
+    }
+
+    @Test
     fun `adjacent monotonic deadlines should stop before following predicates`() {
         for (reverse in listOf(false, true)) {
             val now = TimeSource.Monotonic.markNow()

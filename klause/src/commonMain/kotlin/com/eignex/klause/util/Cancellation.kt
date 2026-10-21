@@ -147,6 +147,11 @@ private class OrCancellation(
     }.toTypedArray()
 
     override fun isCancelled(): Boolean {
+        when (tokens.size) {
+            0 -> return false
+            1 -> return tokens[0].isCancelled()
+            2 -> return tokens[0].isCancelled() || tokens[1].isCancelled()
+        }
         for (token in tokens) if (token.isCancelled()) return true
         return false
     }
