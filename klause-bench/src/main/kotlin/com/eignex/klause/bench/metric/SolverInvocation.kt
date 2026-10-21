@@ -2,7 +2,6 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
-import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.klause.bench.runner.MiniZincRunner
@@ -241,13 +240,7 @@ internal object SolverInvocation {
         }
         val mzn = CorpusFetcher.resolve(ref.source)
         val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
-        val src = ref.source
-        val includeDirs = if (src is ProblemSource.External) {
-            val root = CorpusFetcher.ensure(src.collection)
-            src.collection.includeDirs.map { File(root, it) }.filter { it.isDirectory }
-        } else {
-            emptyList()
-        }
+        val includeDirs = CorpusFetcher.includeDirs(ref.source)
         return buildList {
             add("minizinc")
             add("--solver")

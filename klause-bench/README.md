@@ -44,7 +44,7 @@ forwarded to the bench JVM. Keep the CLI distribution and runtime fixed during a
 |---|---|
 | `list [suite]` | List suites or problems |
 | `preview [filters]` | Inspect selection without solving |
-| `select [filters]` | Emit instance identities as JSON lines; `features=true` adds structural features |
+| `select [filters]` | Emit instance identities as JSON lines; `features=true` adds structural features, `files=true` the resolved model, data and include paths |
 | `solve [filters]` | Run one configuration over the selection |
 | `solve-one suite=<id> problem=<name> [filters] [out=<dir>]` | Run one selected identity and save a case record |
 | `validate-solution suite=<id> problem=<name> output=<path>` | Check saved MiniZinc, XCSP3 or SMT output without solving again |
