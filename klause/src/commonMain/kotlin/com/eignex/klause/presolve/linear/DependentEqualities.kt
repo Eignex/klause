@@ -15,6 +15,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.isZero
 
 /**
  * Drop redundant single-equality factors using declared integer equalities, and refute a system of
@@ -25,10 +26,12 @@ import com.eignex.klause.util.bigIntOf
  * more others, as an assignment's last row-sum is of the column sums and the remaining row sums. Exact
  * fraction-free elimination over the equality block finds those as the rows that reduce to `0 = 0`.
  * Each is a rational combination of rows that stay, so every solution of the kept rows satisfies it and
- * dropping the lot leaves the solution set as it was.
+ * dropping the lot leaves the solution set as it was. Binary partition equations remain as finite
+ * propagation and branching structure, even when the other equations imply them.
  *
- * Reads only the rows, never a domain, so it runs before any finite projection exists. A row whose
- * constants leave 64 bits is not read: it stays, which can only leave a dependent row in place.
+ * Reads declared bounds rather than finite search domains, so it runs before any finite projection
+ * exists. A row whose constants leave 64 bits is not read: it stays, which can only leave a dependent row
+ * in place.
  */
 internal object DependentEqualities {
 
@@ -45,9 +48,11 @@ internal object DependentEqualities {
                 if (row.relation != LinearOp.EQ || !row.isLongUnconditional || !row.isIntegerOnly) continue
                 val constants = row.constants as IntegerConstants
                 val sparse = sparseRow(row, constants::coeff) ?: continue
-                droppableFactorOf.add(if (droppable) i else -1)
+                val bound = bigIntOf(constants.bound)
+                val removeFactor = droppable && !isBinaryPartition(sparse, bound, problem)
+                droppableFactorOf.add(if (removeFactor) i else -1)
                 rows.add(sparse)
-                rhs.add(bigIntOf(constants.bound))
+                rhs.add(bound)
             }
         }
         // One equality cannot be implied by the others, and an empty system has nothing to imply.
@@ -57,6 +62,19 @@ internal object DependentEqualities {
         val dependent = echelon.dependentRows
         if (dependent.isEmpty()) return SourceDelta()
         return SourceDelta(droppedIndices = dependent.map { droppableFactorOf[it] }.filter { it >= 0 }.toIntArray())
+    }
+
+    private fun isBinaryPartition(row: SparseIntRow, bound: BigInt, problem: Problem): Boolean {
+        if (bound.isZero()) return false
+        val bounds = problem.intBounds
+        for (k in row.index.indices) {
+            if (row.value[k] != bound) return false
+            val v = row.index[k]
+            if (!bounds.hasLower(v) || !bounds.hasUpper(v) || bounds.lower(v) < 0L || bounds.upper(v) > 1L) {
+                return false
+            }
+        }
+        return true
     }
 
     /**

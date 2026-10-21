@@ -50,6 +50,50 @@ class DependentEqualitiesTest {
     }
 
     @Test
+    fun `dependent binary partition equations should retain their finite search structure`() {
+        for (scale in listOf(-1, 1, 2)) {
+            val rows = listOf(
+                eq(intArrayOf(scale, scale), intArrayOf(0, 1), scale),
+                eq(intArrayOf(scale, scale), intArrayOf(2, 3), scale),
+                eq(intArrayOf(scale, scale), intArrayOf(0, 2), scale),
+                eq(intArrayOf(scale, scale), intArrayOf(1, 3), scale),
+            )
+            val p = Problem(0, 4, Array(4) { IntDomain(0, 1) }, rows)
+
+            val delta = dropped(p)
+
+            assertTrue(delta.isEmpty)
+        }
+    }
+
+    @Test
+    fun `binary partition equations should supply premises for other redundant equalities`() {
+        val rows = listOf(
+            eq(intArrayOf(1, 1), intArrayOf(0, 1), 1),
+            eq(intArrayOf(1, 1), intArrayOf(2, 3), 1),
+            eq(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), 2),
+        )
+        val p = Problem(0, 4, Array(4) { IntDomain(0, 1) }, rows)
+
+        val delta = dropped(p)
+
+        assertEquals(listOf(2), delta.droppedIndices.toList())
+    }
+
+    @Test
+    fun `inconsistent binary partition equations should refute the model`() {
+        val rows = listOf(
+            eq(intArrayOf(1, 1), intArrayOf(0, 1), 1),
+            eq(intArrayOf(1, 1), intArrayOf(0, 1), 0),
+        )
+        val p = Problem(0, 2, Array(2) { IntDomain(0, 1) }, rows)
+
+        val delta = dropped(p)
+
+        assertTrue(delta.infeasible)
+    }
+
+    @Test
     fun `an inequality the equalities imply should not be read`() {
         val p = problem(
             eq(intArrayOf(1, 1), intArrayOf(0, 1), 3),
