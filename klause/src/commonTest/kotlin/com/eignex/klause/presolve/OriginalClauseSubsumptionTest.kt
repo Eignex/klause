@@ -133,7 +133,7 @@ class OriginalClauseSubsumptionTest {
 
     @Test
     fun `source scheduling should preserve objective columns and mixed theory participation when counting`() {
-        val channel = ReifiedLinear(0, Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1))
+        val channel = ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
         val realRow = Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(),
             realVars = intArrayOf(0), realCoeffs = doubleArrayOf(1.0), op = LinearOp.GE, bound = 0.0)
         val problem = Problem(3, 1, arrayOf(IntDomain(0, 2)),

@@ -1016,6 +1016,7 @@ open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex
     enum entry REMOVE_REDUNDANT // com.eignex.klause.presolve/PresolvePass.REMOVE_REDUNDANT|null[0]
     enum entry STRENGTHEN_COEFFICIENTS // com.eignex.klause.presolve/PresolvePass.STRENGTHEN_COEFFICIENTS|null[0]
     enum entry SUBSTITUTE_BINARY_COLUMNS // com.eignex.klause.presolve/PresolvePass.SUBSTITUTE_BINARY_COLUMNS|null[0]
+    enum entry SUBSUME_CLAUSES // com.eignex.klause.presolve/PresolvePass.SUBSUME_CLAUSES|null[0]
     enum entry VALUE_PRECEDENCE // com.eignex.klause.presolve/PresolvePass.VALUE_PRECEDENCE|null[0]
 
     final val autoEligible // com.eignex.klause.presolve/PresolvePass.autoEligible|{}autoEligible[0]
