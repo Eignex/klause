@@ -30,6 +30,76 @@ import kotlin.test.assertTrue
 
 class SearchTest {
     @Test
+    fun `point integer proposals should preserve both interval branches until fixed`() {
+        val native = PropagationSession(Problem(2, 1, arrayOf(IntDomain(0, 5)), emptyArray()))
+        val cp = CpSearchComponent(native, branching = CpBranching.None)
+        val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(2))
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            phaseSaving = true, randomSeed = 0L)
+        val brancher = BacktrackBrancher(native, params, sink = null, restart = NoRestartSchedule)
+        val hints = RealPointHints(2, 1, 0, Cancellation.Never)
+        hints.replace(intArrayOf(-1, 1), longArrayOf(3))
+        brancher.realPointPreference = { variable -> when (variable) {
+            is VarRef.Bool -> hints.booleanValue(variable.varId)
+            is VarRef.IntVar -> hints.integerValue(variable.varId)
+        } }
+        brancher.realPointVariablePreference = hints::preferredBooleanVariable
+        brancher.realPointIntegerVariablePreference = hints::preferredIntegerVariable
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        val first = assertNotNull(brancher.nextBranch(session))
+
+        assertEquals(listOf(SearchDecision.IntAtMost(0, 3), SearchDecision.IntAtLeast(0, 4)), first)
+        assertIs<ComponentResult.Consistent>(session.push(first.first()))
+        val second = assertNotNull(brancher.nextBranch(session))
+        assertEquals(listOf(SearchDecision.IntAtLeast(0, 3), SearchDecision.IntAtMost(0, 2)), second)
+        assertIs<ComponentResult.Consistent>(session.push(second.first()))
+        assertEquals(listOf(SearchDecision.Bool(Lit.make(1, true)), SearchDecision.Bool(Lit.make(1, false))),
+            brancher.nextBranch(session))
+    }
+
+    @Test
+    fun `point integer proposals should defer to disabled or saved phases`() {
+        for (saved in listOf(false, true)) {
+            val native = PropagationSession(problemOf(IntDomain(0, 3), IntDomain(0, 3)))
+            val cp = CpSearchComponent(native, branching = CpBranching.None)
+            val session = SearchSession(listOf(cp))
+            val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+                phaseSaving = saved, randomSeed = 0L)
+            val brancher = BacktrackBrancher(native, params, sink = null, restart = NoRestartSchedule)
+            brancher.realPointPreference = { variable -> if (variable == VarRef.IntVar(1)) 2L else null }
+            brancher.realPointIntegerVariablePreference = { accept -> 1.takeIf(accept) }
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            if (saved) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntEqual(1, 0)))
+                session.popTo(0)
+            }
+
+            assertEquals(listOf(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtLeast(0, 1)),
+                brancher.nextBranch(session))
+        }
+    }
+
+    @Test
+    fun `explicit branching should precede point integer variable proposals`() {
+        val native = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 3)), emptyArray()))
+        val cp = CpSearchComponent(native, branching = CpBranching.None)
+        val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            phaseSaving = true, randomSeed = 0L)
+        val brancher = BacktrackBrancher(native, params, sink = null, restart = NoRestartSchedule,
+            branching = object : BacktrackBranching {
+                override fun pick(session: PropagationSession): VarRef = VarRef.Bool(0)
+            })
+        brancher.realPointPreference = { variable -> if (variable is VarRef.IntVar) 2L else null }
+        brancher.realPointIntegerVariablePreference = { accept -> 0.takeIf(accept) }
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertEquals(listOf(SearchDecision.Bool(Lit.make(0, false)), SearchDecision.Bool(Lit.make(0, true))),
+            brancher.nextBranch(session))
+    }
+
+    @Test
     fun `point variable proposals should preserve both branches for unobserved phases`() {
         for (enabled in listOf(false, true)) {
             val native = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))

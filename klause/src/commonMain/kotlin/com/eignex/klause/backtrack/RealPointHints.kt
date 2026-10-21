@@ -21,6 +21,7 @@ internal class RealPointHints(
     private var booleans: IntArray? = null
     private var integers: LongArray? = null
     private var cursor = 0
+    private var integerCursor = 0
     private var refreshPending = false
 
     val available: Boolean get() = booleans != null
@@ -33,6 +34,7 @@ internal class RealPointHints(
         booleans = booleanValues
         integers = integerValues
         cursor = 0
+        integerCursor = 0
         refreshPending = false
     }
 
@@ -43,6 +45,18 @@ internal class RealPointHints(
     }
 
     fun integerValue(variable: Int): Long? = integers?.getOrNull(variable)
+
+    fun preferredIntegerVariable(accept: (Int) -> Boolean): Int? {
+        val values = integers ?: return null
+        while (integerCursor < values.size) {
+            stop.charge(1L)
+            if (stop()) return null
+            // An interval split can leave the proposed value inside an unfixed domain.
+            if (accept(integerCursor)) return integerCursor
+            integerCursor++
+        }
+        return null
+    }
 
     fun preferredBooleanVariable(accept: (Int) -> Boolean): Int? {
         val values = booleans ?: return null
@@ -57,6 +71,7 @@ internal class RealPointHints(
 
     fun retract(): Boolean {
         integers = null
+        integerCursor = 0
         if (booleans == null) return false
         // Refresh must admit the retained guesses alongside the replacement workspace.
         if (2L * numBooleans + numReals + 2L * numIntegers > 65536L) {
@@ -71,6 +86,7 @@ internal class RealPointHints(
         booleans = null
         integers = null
         cursor = 0
+        integerCursor = 0
         refreshPending = false
     }
 }

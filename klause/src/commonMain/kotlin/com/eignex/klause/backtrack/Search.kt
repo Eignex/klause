@@ -213,6 +213,7 @@ internal class CpSatisfactionTraversal(
                 resources.own(it)
                 lpResources.add(it)
                 traversal.brancher.realPointVariablePreference = completion::preferredBooleanVariable
+                traversal.brancher.realPointIntegerVariablePreference = completion::preferredIntegerVariable
             }
             val lp = if (params.lpConfig != null || params.lpPlan != LpPlan()) {
                 LpFeasibilityComponent(problem, cp, params, sink, solveContext).also {
@@ -489,8 +490,12 @@ internal class BacktrackBrancher(
     private var preferImportedSolution = false
     var realPointPreference: ((VarRef) -> Long?)? = null
     var realPointVariablePreference: (((Int) -> Boolean) -> Int?)? = null
+    var realPointIntegerVariablePreference: (((Int) -> Boolean) -> Int?)? = null
     private val acceptsPointVariable: (Int) -> Boolean = { variable ->
         phase.acceptsBooleanCandidate(variable) && session.boolValue(variable) == null
+    }
+    private val acceptsPointInteger: (Int) -> Boolean = { variable ->
+        phase.acceptsIntegerCandidate(variable) && !session.intDomain(variable).isFixed
     }
 
     init {
@@ -549,7 +554,13 @@ internal class BacktrackBrancher(
         return alternatives
     }
 
-    private fun pointVariable(): VarRef.Bool? {
+    private fun pointVariable(): VarRef? {
+        val integer = realPointIntegerVariablePreference?.invoke(acceptsPointInteger)
+            ?.takeIf(acceptsPointInteger)
+        if (integer != null) {
+            sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "SELECTED_INTEGER_VARIABLE", 0L)
+            return VarRef.IntVar(integer)
+        }
         val variable = realPointVariablePreference?.invoke(acceptsPointVariable)
             ?.takeIf(acceptsPointVariable) ?: return null
         sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "SELECTED_GUARD_VARIABLE", 0L)
@@ -669,6 +680,7 @@ private sealed interface BacktrackCompletion {
     val lpResource: LpSearchResource? get() = null
     fun preferredValue(variable: VarRef): Long? = null
     fun preferredBooleanVariable(accept: (Int) -> Boolean): Int? = null
+    fun preferredIntegerVariable(accept: (Int) -> Boolean): Int? = null
 
     fun addTo(components: MutableList<SearchComponent>)
 
@@ -688,6 +700,8 @@ private sealed interface BacktrackCompletion {
         override fun preferredValue(variable: VarRef): Long? = component.preferredValue(variable)
         override fun preferredBooleanVariable(accept: (Int) -> Boolean): Int? =
             component.preferredBooleanVariable(accept)
+        override fun preferredIntegerVariable(accept: (Int) -> Boolean): Int? =
+            component.preferredIntegerVariable(accept)
 
         override fun addTo(components: MutableList<SearchComponent>) {
             components += component
@@ -844,6 +858,7 @@ private class ResidualRealComponent(
     )
 
     fun preferredBooleanVariable(accept: (Int) -> Boolean): Int? = pointHints.preferredBooleanVariable(accept)
+    fun preferredIntegerVariable(accept: (Int) -> Boolean): Int? = pointHints.preferredIntegerVariable(accept)
 
     fun preferredValue(variable: VarRef): Long? {
         if (!pointHints.available) return null

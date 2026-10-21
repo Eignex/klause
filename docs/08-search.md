@@ -123,12 +123,15 @@ entry limit. A declined refresh leaves only the old Boolean ordering available.
 Restart, solver retirement, leaf checking and close discard all active hints.
 Both Boolean alternatives and the complete source checks remain required.
 
-An available finite prefix table can also propose an unassigned comparison head
-before the configured variable selector. The proposal must have no retained phase
-and must be eligible for candidate fallback under the current phase regime;
-explicit search branching keeps precedence. An amortized cursor visits each table
-entry once, sharing the containing work and cancellation. Choosing a head installs
-both Boolean alternatives through the normal brancher and supplies no source fact.
+An available finite prefix table can also propose an unfixed integer or an unassigned
+comparison head before the configured variable selector, with integers first. The
+proposal must have no retained phase and must be eligible for candidate fallback
+under the current phase regime; explicit search branching keeps precedence.
+Amortized cursors skip ineligible entries, sharing the containing work and cancellation.
+An eligible integer remains selected until fixed or ineligible, since its first interval
+split need not pin the proposed value. Integer proposals expire with their point table
+on retraction. Choosing a variable installs both normal alternatives and supplies no
+source fact.
 
 ### Source bound atoms
 

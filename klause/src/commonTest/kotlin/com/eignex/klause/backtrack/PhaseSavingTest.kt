@@ -24,6 +24,34 @@ import kotlin.test.assertIs
 
 class PhaseSavingTest {
     @Test
+    fun `candidate integer eligibility should follow integer phase fallback`() {
+        for (kind in listOf("unobserved", "saved", "stable", "solution", "focused", "forced", "disabled")) {
+            val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()))
+            session.pinInt(0, 0)
+            val phase = PhaseSaving(0, 1, BacktrackParams(phaseSaving = kind != "disabled",
+                targetPhasing = true, solutionPhasing = true, rephaseInterval = 1))
+            when (kind) {
+                "saved" -> phase.capture(VarRef.IntVar(0), session)
+                "stable", "solution", "focused" -> {
+                    phase.onSolution(Sample(booleanArrayOf(), longArrayOf(0)))
+                    when (kind) {
+                        "stable" -> phase.setManagedMode(PhaseMode.STABLE)
+                        "focused" -> phase.setManagedMode(PhaseMode.FOCUSED)
+                        else -> phase.onConflictTick()
+                    }
+                }
+                "forced" -> repeat(3) { phase.onConflictTick() }
+            }
+
+            val eligible = phase.acceptsIntegerCandidate(0)
+            phase.applyPhase(VarRef.IntVar(0), sequenceOf(0L, 1L), integerCandidate = 1L).toList()
+
+            assertEquals(kind in listOf("unobserved", "focused", "forced"), eligible, kind)
+            assertEquals(eligible, phase.candidateUses > 0L, kind)
+        }
+    }
+
+    @Test
     fun `candidate variable eligibility should follow Boolean phase fallback`() {
         for (kind in listOf("unobserved", "saved", "target", "solution", "forced", "disabled")) {
             val session = boolSession(1)

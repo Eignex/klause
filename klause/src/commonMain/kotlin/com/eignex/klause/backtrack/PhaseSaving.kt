@@ -61,6 +61,14 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
         }
     }
 
+    fun acceptsIntegerCandidate(variable: Int): Boolean {
+        if (intPhaseSet?.getOrNull(variable) != false) return false
+        return !(useIntegerSolution && solutionInts != null && hasSolution && variable < solutionInts.size)
+    }
+
+    private val useIntegerSolution: Boolean get() = managedMode == PhaseMode.STABLE ||
+        (managedMode == PhaseMode.UNMANAGED && rephaseMode == RephaseMode.SOLUTION)
+
     private fun booleanSource(solution: Boolean): RephaseMode = when (managedMode) {
         PhaseMode.STABLE -> if (solution) RephaseMode.SOLUTION else RephaseMode.TARGET
         PhaseMode.FOCUSED -> RephaseMode.SAVED
@@ -125,10 +133,8 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
             val sols = solutionInts
             // Stable / SOLUTION mode dives on the incumbent's value (objective-good); otherwise the plain
             // saved value. Out-of-domain values are harmless — [splitIntAlternatives] clamps the split into the domain.
-            val useSolution = managedMode == PhaseMode.STABLE ||
-                (managedMode == PhaseMode.UNMANAGED && rephaseMode == RephaseMode.SOLUTION)
             val preferred: Long? = when {
-                useSolution && sols != null && hasSolution && vi < sols.size -> sols[vi]
+                useIntegerSolution && sols != null && hasSolution && vi < sols.size -> sols[vi]
                 intPhase != null && intPhaseSet != null && intPhaseSet[vi] -> intPhase[vi]
                 intPhase != null && integerCandidate != null -> {
                     candidateUses++

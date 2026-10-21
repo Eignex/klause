@@ -21,6 +21,44 @@ import kotlin.test.assertTrue
 
 class RealPointHintsTest {
     @Test
+    fun `integer variable proposals should remain available until ineligible`() {
+        val hints = RealPointHints(1, 3, 1, Cancellation.Never)
+        hints.replace(intArrayOf(1), longArrayOf(2, 3, 4))
+        var firstFixed = false
+        val accept: (Int) -> Boolean = { it != 1 && (!firstFixed || it != 0) }
+
+        assertEquals(0, hints.preferredIntegerVariable(accept))
+        assertEquals(0, hints.preferredIntegerVariable(accept))
+        firstFixed = true
+        assertEquals(2, hints.preferredIntegerVariable(accept))
+        assertEquals(2, hints.preferredIntegerVariable(accept))
+        assertNull(hints.preferredIntegerVariable { false })
+    }
+
+    @Test
+    fun `integer variable proposals should expire on retraction and restart on replacement`() {
+        val hints = RealPointHints(1, 2, 1, Cancellation.Never)
+        hints.replace(intArrayOf(1), longArrayOf(2, 3))
+        assertEquals(1, hints.preferredIntegerVariable { it == 1 })
+
+        hints.retract()
+
+        assertNull(hints.preferredIntegerVariable { true })
+        hints.replace(intArrayOf(0), longArrayOf(4, 5))
+        assertEquals(0, hints.preferredIntegerVariable { true })
+    }
+
+    @Test
+    fun `integer variable proposals should respect containing cancellation`() {
+        var stopped = false
+        val hints = RealPointHints(1, 1, 1, Cancellation { stopped })
+        hints.replace(intArrayOf(1), longArrayOf(2))
+        stopped = true
+
+        assertNull(hints.preferredIntegerVariable { true })
+    }
+
+    @Test
     fun `retraction should retain Boolean guesses and discard integer guesses`() {
         val hints = RealPointHints(3, 1, 1, Cancellation.Never)
         hints.replace(intArrayOf(1, -1, 0), longArrayOf(4))
