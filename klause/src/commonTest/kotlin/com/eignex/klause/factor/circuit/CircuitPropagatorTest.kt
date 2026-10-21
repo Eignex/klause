@@ -68,6 +68,27 @@ class CircuitPropagatorTest {
     }
 
     @Test
+    fun `an interior premature closure should cite every edge in its fixed chain`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = Array(5) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(Circuit(IntArray(5) { it })),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.undoLogging = true
+        state.currentLevel = 1
+        assertTrue(state.setInt(1, 3) && state.setInt(3, 2))
+
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertFalse(1L in state.intDomains[2])
+        val premises = setOf(Lit.make(state.atomVarEq(1, 3), false), Lit.make(state.atomVarEq(3, 2), false))
+        assertEquals(premises, state.reasonOf(state.holeReasonFor(2, 1))?.toSet())
+    }
+
+    @Test
     fun `strong connectivity should reject a candidate graph with an inescapable component`() {
         // No edge is fixed, so only strong connectivity sees that {3, 4, 5} never leads back.
         val problem = Problem(
