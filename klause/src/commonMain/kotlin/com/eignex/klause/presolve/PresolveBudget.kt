@@ -134,6 +134,8 @@ class PresolveBudget(
     )
 
     internal fun observeStops(token: Cancellation): Cancellation = object : Cancellation by token {
+        override fun invoke(): Boolean = isCancelled()
+
         override fun isCancelled(): Boolean = token().also { stopped ->
             if (stopped) activeInvocation?.interrupted = true
         }
