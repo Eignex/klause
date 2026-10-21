@@ -3,7 +3,6 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.RationalBasisBuild
 import com.eignex.klause.simplex.basis.RationalBasisFactors
 import com.eignex.klause.simplex.basis.RationalBasisLimits
-import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.util.BIG_ONE
@@ -931,7 +930,7 @@ private class RefinementRun(
         // The basis check returns no raw BTRAN vector, so the exact duals are solved from the cached factors.
         exactVectors(a, basis, cache, allowBuild = false) { authority, factors, budget ->
             budget.phase = ExactBasisPhase.DUAL
-            output.dual = exactSolve(factors, authority.costs, true, budget)
+            output.dual = solveExactBasis(factors, authority.costs, true, budget)
             output.dualUsesBasis = true
         }
     }
@@ -961,7 +960,7 @@ private class RefinementRun(
         basis: Basis,
         cache: ExactBasisCache,
         allowBuild: Boolean = true,
-        block: (ExactBasisAuthority, RationalBasisFactors, ExactBasisMeter) -> Unit,
+        block: (ExactBasisAuthority, ExactBasisFactorization, ExactBasisMeter) -> Unit,
     ) {
         val budget = ExactBasisMeter(meter.basisLimits(), meter.token)
         var reason: ExactBasisDecline? = null
@@ -980,7 +979,10 @@ private class RefinementRun(
                 val build = RationalBasisFactors.factor(matrix, order, budget.factorLimits(), budget.token)
                 budget.record(build.stats)
                 when (build) {
-                    is RationalBasisBuild.Ready -> build.factors.also { cache.install(authority, it) }
+                    is RationalBasisBuild.Ready -> {
+                        budget.charge(bytes = 32L)
+                        DenseExactBasisFactorization(build.factors).also { cache.install(authority, it) }
+                    }
                     is RationalBasisBuild.Singular -> budget.stop(ExactBasisDecline.SINGULAR)
                     is RationalBasisBuild.Declined -> budget.stop(ExactBasisDecline.valueOf(build.reason.name))
                 }
@@ -1044,7 +1046,7 @@ private class RefinementRun(
                     for ((row, coefficient) in authority.matrix[j]) {
                         rhs[row] = budget.subtractProduct(rhs[row], coefficient, sign)
                     }
-                    val basics = exactSolve(factors, rhs, false, budget)
+                    val basics = solveExactBasis(factors, rhs, false, budget)
                     val ray = MutableList(a.source.numVars) { BigFraction.ZERO }
                     ray[j] = sign
                     for (i in authority.headings.indices) ray[authority.headings[i]] = basics[i]
@@ -1202,21 +1204,6 @@ private fun floatFactorCount(metrics: LpSolveMetrics): Int = metrics.initialRefa
     metrics.warmStartRefactorizations + metrics.singularRecoveryRefactorizations + metrics.updateLimitRefactorizations +
     metrics.backendRequestedRefactorizations + metrics.reconcileRecoveryRefactorizations +
     metrics.numericalRecoveryRefactorizations + metrics.primalRefactorizations
-
-private fun exactSolve(
-    factors: RationalBasisFactors,
-    rhs: List<BigFraction>,
-    transpose: Boolean,
-    meter: ExactBasisMeter,
-): List<BigFraction> {
-    meter.solves++
-    val solved = factors.solve(rhs, transpose, meter.factorLimits(), meter.token)
-    meter.record(solved.stats)
-    return when (solved) {
-        is RationalBasisSolve.Solved -> solved.values
-        is RationalBasisSolve.Declined -> meter.stop(ExactBasisDecline.valueOf(solved.reason.name))
-    }
-}
 
 private fun auxiliaryModel(
     a: RefinementAuthority,
