@@ -42,7 +42,8 @@ harvest rerunning only when it tightened something.
 the cheap tier once, `default` iterates cheap and moderate tiers to a fixpoint and
 `aggressive` adds exhaustive probing, all within 16 rounds. Passes can be enabled or
 disabled by name, but a pass that would break the query's required guarantee stays
-disabled.
+disabled. Explicitly enabling a problem pass under `off` gives both schedules the
+default round cap; an explicit zero round cap still suppresses those schedules.
 
 ## Guarantees and source mappings
 
@@ -97,6 +98,9 @@ fresh `BakedProblem`, so deadlines, meters and the pre-bake span gate keep their
 scope across rebuilds and reseeds. A fired token skips root-probe phases and stops
 propagation at its polling boundaries; partial propagation is sound but can forgo
 deductions. Cancellation is cooperative, and probe caps do not bound wall time.
+Finite probing and implication harvesting retain the pass token, including its
+native-work meter. Value precedence uses that token throughout value-orbit
+discovery and stops posting chains when it fires.
 
 ## Phase allowance and telemetry
 
@@ -190,6 +194,10 @@ breaks value symmetry. Both are off for solution-set-sensitive queries. Probing 
 each free Boolean both ways: a conflicting polarity yields a unit, and a bound implied
 by both holds unconditionally. Integer and open-range probing apply singleton arc
 consistency to bounds and holes. Only units and unconditional bounds persist.
+Source probing and symmetry defer to finite preparation for models containing only
+closed discrete columns. With real columns present, their supported Boolean and
+integer reductions run in the source phase even when every integer column is
+closed or absent; generator lex and value-precedence chains stay finite-owned.
 
 ### Clausal objectives
 

@@ -4,7 +4,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.Cancellation
 
 private const val PROBE_PASS_MAX_CANDIDATES = 2_048
 private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
@@ -282,8 +281,8 @@ enum class PresolvePass(
 
     /** Interchangeable-variable / block / value symmetry breaking.
      *
-     *  On a source model only the breaks a theory can own are posted, and only while some column is still
-     *  open; see [SymmetryBreaking.breakSourceSymmetries]. */
+     *  On a source model only the breaks a theory can own are posted; see
+     *  [SymmetryBreaking.breakSourceSymmetries]. */
     BREAK_SYMMETRIES(
         "symmetry",
         Stage.PROBLEM,
@@ -324,7 +323,7 @@ enum class PresolvePass(
         autoEligible = false,
     ) {
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
-            Presolve.breakValuePrecedence(problem, ctx.objectiveIntVars)
+            Presolve.breakValuePrecedence(problem, ctx.objectiveIntVars, ctx.cancellation)
     },
 
     /** Dual fixing / dominated-variable reductions — pins a variable to a bound when the
@@ -396,7 +395,9 @@ enum class PresolvePass(
     ) {
         override fun applySource(problem: Problem, ctx: PresolveContext): SourceDelta {
             val bounds = problem.intBounds
-            if ((0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }) return SourceDelta()
+            if (problem.numRealVars == 0 &&
+                (0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }
+            ) return SourceDelta()
             return Presolve.probeSource(problem, PROBE_PASS_MAX_CANDIDATES, ctx.cancellation)
         }
     },
@@ -411,7 +412,7 @@ enum class PresolvePass(
         // The finite lane probes with the engine's own propagators over root domains, which see every
         // factor and the holes a range cannot state.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
-            Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never)
+            Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, ctx.cancellation)
     },
 
     /** Binary implication graph: harvest `lit -> lit` implications by probing-style pinning (from the
@@ -436,7 +437,7 @@ enum class PresolvePass(
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.reduceImplicationGraph(
             problem,
             IMPLICATION_GRAPH_MAX_CANDIDATES,
-            Cancellation.Never,
+            ctx.cancellation,
             ctx.objectiveBoolVars,
         )
     },

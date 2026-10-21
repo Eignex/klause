@@ -56,7 +56,7 @@ internal object SymmetryBreaking {
     }
 
     /**
-     * [breakSymmetries] over a source model that still has an open integer column.
+     * [breakSymmetries] over a source model with real or open integer columns.
      *
      * Two columns are interchangeable only when their declarations match: the same value set for closed
      * columns, and for a column with an open side the same open sides and the same finite endpoints, which
@@ -67,8 +67,8 @@ internal object SymmetryBreaking {
      * Only breaks some theory can own are posted, since a CP-only factor over an open column leaves that
      * column with no lane: the scalar total orders, the Boolean orders, and the single-column value pin.
      * The generator lex and the value-precedence chain are CP propagators and wait for the finite lane.
-     * A model with every column closed is left to the finite form outright, which reads root-propagated
-     * domains and posts both.
+     * A model with only closed discrete columns is left to the finite form, which reads
+     * root-propagated domains and posts both.
      *
      * A total order needs only transpositions, so the source form never runs the generator search: it
      * tests the pairs inside each colour class directly, against the factors the two columns read.
@@ -80,7 +80,9 @@ internal object SymmetryBreaking {
         cancellation: Cancellation = Cancellation.Never,
     ): SourceDelta {
         val bounds = problem.intBounds
-        if ((0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }) return SourceDelta()
+        if (problem.numRealVars == 0 &&
+            (0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }
+        ) return SourceDelta()
         if (problem.factors.any { it is SymmetryHandling }) return SourceDelta()
         if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return SourceDelta()
         // A column no factor reads is decided by no lane, so ordering it buys nothing and only adds a row the
@@ -376,12 +378,17 @@ internal object SymmetryBreaking {
      * Variables in [objectiveIntVars] are excluded (ordering them would change the optimum). Returns an
      * empty delta when nothing is eligible.
      */
-    fun breakValuePrecedence(problem: BakedProblem, objectiveIntVars: Set<Int> = emptySet()): PassDelta {
+    fun breakValuePrecedence(
+        problem: BakedProblem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): PassDelta {
         val n = problem.numIntVars
         val columns = FiniteColumns(problem)
-        val orbits = verifiedValueOrbits(problem, columns) ?: return PassDelta()
+        val orbits = verifiedValueOrbits(problem, columns, cancellation) ?: return PassDelta()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
+            if (cancellation()) break
             val orbitSet = LongHashSet()
             orbit.forEach { orbitSet.add(it) }
             val seq = IntArrayList()
