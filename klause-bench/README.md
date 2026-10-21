@@ -354,6 +354,15 @@ complementary names under the unchanged registry limit. This is isolated naming
 demand: it neither captures the actual rebound fragment nor reproduces earlier
 component registrations, initializes a solver, or proves the opening's refusal cause.
 
+With `inspect=lp-equalities`, the same profile advances its traversal within the
+original ten-second deadline, then captures the retained immutable exact LP state
+before closing it. A separate five-second metadata allowance records coefficients,
+origins, bounds, strictness, costs, premises and stable row identities. Capture is
+limited to 16,384 coordinates, 262,144 metadata entries, 4,096-bit rationals and
+16 MiB; an incomplete or absent state is explicitly declined. The capture neither
+removes rows or coordinates nor solves a transformed system or admits a source
+verdict. Its direct-library traversal supplies no ordinary CLI timing equivalence.
+
 `bench.profile.ExecutionOptionsProfile` compares legacy request parsing, captured frontend
 options and directly typed options while repeatedly resolving the same portfolio settings.
 `rounds` (default seven) alternates mode order after one warmup round; `plans` (default
