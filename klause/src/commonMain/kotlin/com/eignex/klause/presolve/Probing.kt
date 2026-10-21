@@ -480,6 +480,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
 
     private fun applyPending() {
         for (k in 0 until pending.size) {
+            if (!visit()) return
             val entry = pending[k]
             if ((entry and 1) == 0) setLo(entry ushr 1, pendingValue[k]) else setHi(entry ushr 1, pendingValue[k])
         }

@@ -117,7 +117,8 @@ class ProbingTest {
         )
         assertTrue(Lit.make(1, false) in units(probed(problem)))
         val delta = Presolve.probe(problem.bake(), 1, Cancellation.Never)
-        assertEquals(listOf(Lit.make(1, false)), delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() })
+        val forced = delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() }
+        assertEquals(listOf(Lit.make(1, false)), forced)
     }
 
     @Test
@@ -231,7 +232,8 @@ class ProbingTest {
 
         val delta = Presolve.probe(problem, 1, Cancellation.Never)
 
-        assertEquals(listOf(Lit.make(2, true)), delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() })
+        val forced = delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() }
+        assertEquals(listOf(Lit.make(2, true)), forced)
     }
 
     @Test
