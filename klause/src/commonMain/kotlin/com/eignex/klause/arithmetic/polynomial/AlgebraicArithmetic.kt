@@ -278,16 +278,22 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         arithmetic.step()
         val a = left.image?.base ?: left
         val b = right.image?.base ?: right
-        if (a.rootIndex != b.rootIndex) return null
-        arithmetic.denseSize(a.definingPolynomial.degree)
-        arithmetic.denseSize(b.definingPolynomial.degree)
-        if (a.definingPolynomial.degree != b.definingPolynomial.degree) return null
-        for (index in 0..a.definingPolynomial.degree) {
-            arithmetic.step()
-            if (a.definingPolynomial[index] != b.definingPolynomial[index]) return null
-        }
+        if (!sameIndexedRoot(a, b)) return null
         return CommonImages(a, left.image?.polynomial ?: RationalPolynomial.X,
             right.image?.polynomial ?: RationalPolynomial.X)
+    }
+
+    private fun sameIndexedRoot(a: AlgebraicReal, b: AlgebraicReal): Boolean {
+        arithmetic.step()
+        if (a.rootIndex != b.rootIndex) return false
+        arithmetic.denseSize(a.definingPolynomial.degree)
+        arithmetic.denseSize(b.definingPolynomial.degree)
+        if (a.definingPolynomial.degree != b.definingPolynomial.degree) return false
+        for (index in 0..a.definingPolynomial.degree) {
+            arithmetic.step()
+            if (a.definingPolynomial[index] != b.definingPolynomial[index]) return false
+        }
+        return true
     }
 
     private fun sharedImage(
@@ -452,7 +458,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         for (coefficient in coefficients) for (id in coefficient.variables) {
             arithmetic.step()
             if (requireNotNull(coordinates[id]).rational != null) continue
-            if (baseId != null && baseId != id) return null
+            if (baseId != null && baseId != id) return captureSharedSpecialization(coefficients, coordinates)
             baseId = id
         }
         val id = baseId ?: return null
@@ -470,6 +476,49 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             extract(remaining, id)
         }
         return AlgebraicSpecialization(base, captured)
+    }
+
+    private fun captureSharedSpecialization(
+        coefficients: List<Polynomial>,
+        coordinates: Map<Int, AlgebraicReal>,
+    ): AlgebraicSpecialization? {
+        return try {
+            var base: AlgebraicReal? = null
+            for (coefficient in coefficients) for (id in coefficient.variables) {
+                arithmetic.step()
+                val value = coordinates.getValue(id)
+                if (value.rational != null) continue
+                val origin = value.image?.base ?: value
+                if (base != null && !sameIndexedRoot(base, origin)) return null
+                base = origin
+            }
+            val root = base ?: return null
+            arithmetic.denseSize(root.definingPolynomial.degree)
+            val captured = coefficients.map { coefficient ->
+                var result = RationalPolynomial.ZERO
+                for (term in coefficient.terms) {
+                    arithmetic.step()
+                    var product = RationalPolynomial(listOf(term.coefficient))
+                    for (id in term.monomial.variables) {
+                        arithmetic.step()
+                        val value = coordinates.getValue(id)
+                        val expression = value.rational?.let { RationalPolynomial(listOf(it)) }
+                            ?: value.image?.polynomial ?: RationalPolynomial.X
+                        repeat(term.monomial.exponent(id)) {
+                            arithmetic.step()
+                            product = univariate.divide(univariate.multiply(product, expression),
+                                root.definingPolynomial).second
+                        }
+                    }
+                    result = univariate.add(result, product)
+                }
+                result
+            }
+            AlgebraicSpecialization(root, captured)
+        } catch (_: PolynomialResourceLimit) {
+            // Optional shared images cannot exclude an admitted scalar coefficient representation.
+            null
+        }
     }
 
     fun polynomial(coefficients: List<AlgebraicReal>): AlgebraicPolynomial {
