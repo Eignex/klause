@@ -21,13 +21,20 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
-internal fun BakedProblem.withRealDifferenceSystem(stop: Cancellation): BakedProblem {
+internal fun BakedProblem.withRealDifferenceSystem(
+    stop: Cancellation,
+    onInterrupted: () -> Unit = {},
+): BakedProblem {
     if (numRealVars !in 1..10000 || semantics.isApproximate) return this
-    val system = RealDifferenceFragment(this, stop).prepare() ?: return this
+    val system = RealDifferenceFragment(this, stop, onInterrupted).prepare() ?: return this
     return withAppendedFactor(system)
 }
 
-private class RealDifferenceFragment(private val model: Problem, private val stop: Cancellation) {
+private class RealDifferenceFragment(
+    private val model: Problem,
+    private val stop: Cancellation,
+    private val onInterrupted: () -> Unit,
+) {
     private class Edge(
         val source: Int,
         val target: Int,
@@ -44,7 +51,11 @@ private class RealDifferenceFragment(private val model: Problem, private val sto
     private fun visit(count: Int = 1): Boolean {
         stop.charge(count.toLong())
         visits += count
-        return visits <= 65536 && !stop()
+        if (visits > 65536) {
+            onInterrupted()
+            return false
+        }
+        return !stop()
     }
 
     fun prepare(): DifferenceSystem? {

@@ -9,11 +9,19 @@ import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.presolve.effortStats
+import com.eignex.klause.presolve.observePreparation
+import com.eignex.klause.presolve.preparationInterrupted
+import com.eignex.klause.presolve.preparationRefuted
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
+import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.withRealDifferenceSystem
 import com.eignex.klause.util.Cancellation
@@ -128,14 +136,21 @@ object FinitePipeline {
         // A source rewrite moves factor ownership with the factors, so the routing plan does not index the
         // model the engine is built from; an untouched model keeps the plan routing already built.
         val sourcePlan = if (prepared.changed) {
-            prepared.problem.prepareExecutionPlan(
-                original = requireNotNull(request.preparedPlan.sourceModel),
-                objective = request.preparedPlan.workingLinearObjective,
-                maximize = request.preparedPlan.maximize,
-                preferFinite = true,
-                providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default,
-                cancellation = request.solveCancellation,
-            ).retainingLinearSource(request.preparedPlan)
+            request.presolveBudget.observePreparation(
+                PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.FINITE, prepared.problem,
+                request.solveCancellation,
+            ) { token, observation ->
+                prepared.problem.prepareExecutionPlan(
+                    original = requireNotNull(request.preparedPlan.sourceModel),
+                    objective = request.preparedPlan.workingLinearObjective,
+                    maximize = request.preparedPlan.maximize,
+                    preferFinite = true,
+                    providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default,
+                    cancellation = token,
+                ).retainingLinearSource(request.preparedPlan).also {
+                    if (it.decline == PreparedPlanDecline.RESOURCE) observation.preparationInterrupted()
+                }
+            }
         } else {
             request.preparedPlan
         }
@@ -172,10 +187,26 @@ object FinitePipeline {
             val projections = (model as? BakedProblem)?.factorProjections
                 ?.takeIf { it.providers === plan.factorProjections.providers }
                 ?: plan.factorProjections.forEngineView(model)
-            model.bake(projections, request.solveCancellation)
+            request.presolveBudget.observePreparation(
+                PresolvePreparationStage.ENGINE_BAKE, PresolveLane.FINITE, model, request.solveCancellation,
+                output = { it },
+            ) { token, observation ->
+                model.bake(projections, token).also {
+                    if (it.baked is PropagationResult.Unsat) observation.preparationRefuted()
+                }
+            }
         }
         val finiteModel = if (!outcome.stats.infeasible && bakedModel is BakedProblem) {
-            bakedModel.withRealDifferenceSystem(request.solveCancellation)
+            request.presolveBudget.observePreparation(
+                PresolvePreparationStage.REAL_DIFFERENCE, PresolveLane.FINITE, bakedModel,
+                request.solveCancellation, output = { it },
+            ) { token, observation ->
+                bakedModel.withRealDifferenceSystem(token) { observation.preparationInterrupted() }.also {
+                    if (it === bakedModel) observation?.outcome = if (
+                        bakedModel.numRealVars !in 1..10000 || bakedModel.semantics.isApproximate
+                    ) PresolveInvocationOutcome.ELIGIBILITY_SKIP else PresolveInvocationOutcome.COMPLETE_MISS
+                }
+            }
         } else bakedModel
         val mapping = if (finiteModel === bakedModel) outcome.mapping else outcome.mapping.then(
             SourceMapping(outcome.mapping.target, finiteModel, TransformationGuarantees.IDENTITY),
@@ -191,15 +222,21 @@ object FinitePipeline {
             val model = requireNotNull(finiteModel as? BakedProblem)
             val providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default
             val projections = model.factorProjections?.takeIf { it.providers === providers } ?: providers.prepare(model)
-            model.prepareExecutionPlan(
-                original = requireNotNull(request.preparedPlan.sourceModel),
-                objective = request.preparedPlan.workingLinearObjective,
-                maximize = request.preparedPlan.maximize,
-                preferFinite = true,
-                providers = providers,
-                projections = projections,
-                cancellation = request.solveCancellation,
-            ).retainingLinearSource(request.preparedPlan)
+            request.presolveBudget.observePreparation(
+                PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.FINITE, model, request.solveCancellation,
+            ) { token, observation ->
+                model.prepareExecutionPlan(
+                    original = requireNotNull(request.preparedPlan.sourceModel),
+                    objective = request.preparedPlan.workingLinearObjective,
+                    maximize = request.preparedPlan.maximize,
+                    preferFinite = true,
+                    providers = providers,
+                    projections = projections,
+                    cancellation = token,
+                ).retainingLinearSource(request.preparedPlan).also {
+                    if (it.decline == PreparedPlanDecline.RESOURCE) observation.preparationInterrupted()
+                }
+            }
         }
         return FinitePipelinePreparation(
             problem = finiteModel,

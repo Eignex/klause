@@ -1,24 +1,52 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.prepareOpenSource
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
-import kotlin.test.assertNotNull
 import kotlin.test.assertFalse
-import kotlin.time.Duration
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 class PreparedSourceTest {
+    @Test
+    fun `required source encoders should report cost under a spent elective allowance`() {
+        val budget = PresolveBudget(0L)
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ONE)),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+
+        problem.prepareOpenSource(config = PresolveConfig.NONE, budget = budget)
+
+        val stage = budget.preparationStages.single()
+        assertEquals(PresolvePreparationStage.SOURCE_ENCODER, stage.stage)
+        assertEquals(PresolveInvocationOutcome.COMPLETE, stage.outcome)
+        assertTrue(stage.nativeWork > 0L)
+        assertEquals(0L, budget.spent())
+        assertTrue(budget.invocations.isEmpty())
+    }
+
     @Test
     fun `unchanged source preparation should retain attempted pass effort`() {
         val problem = Problem(0, 0, emptyArray(), emptyArray())

@@ -12,6 +12,7 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationProblem
@@ -24,6 +25,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
@@ -36,6 +38,36 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RealDifferenceFragmentsTest {
+    @Test
+    fun `finite real graph assembly should retain cost independently of elective passes`() {
+        val budget = PresolveBudget(0L)
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.EQ, BigFraction.ONE),
+                RealElement(0, 0, doubleArrayOf(0.0, 1.0), indexOffset = 0),
+            ),
+            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                problem, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
+                presolveBudget = budget,
+            ),
+        )
+
+        val effort = assertNotNull(assertNotNull(preparation.presolve).effort)
+        val graph = effort.preparationStages.single { it.stage == PresolvePreparationStage.REAL_DIFFERENCE }
+        assertTrue(graph.nativeWork > 0L)
+        assertEquals(0L, graph.work)
+        assertEquals(1, graph.input.reals)
+        assertEquals(graph.input.factors + 1, graph.output.factors)
+        assertTrue(effort.invocations.isEmpty())
+    }
+
     @Test
     fun `a strict real cycle should refute an open source guard`() {
         val problem = Problem(1, 0, emptyArray(), arrayOf(

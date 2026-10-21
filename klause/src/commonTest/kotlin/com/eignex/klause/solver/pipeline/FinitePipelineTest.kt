@@ -26,6 +26,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.hasActivity
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -38,6 +39,29 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
+    @Test
+    fun `the engine bake should report containing work after the elective allowance is spent`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 5) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
+        )
+        val budget = PresolveBudget(0L)
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                problem, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
+                cancellation = budget.orSpent(Cancellation.Never), solveCancellation = Cancellation.Never,
+                presolveBudget = budget,
+            ),
+        )
+
+        val effort = assertNotNull(assertNotNull(preparation.presolve).effort)
+        val bake = effort.preparationStages.single { it.stage == PresolvePreparationStage.ENGINE_BAKE }
+        assertEquals(PresolveInvocationOutcome.COMPLETE, bake.outcome)
+        assertEquals(0L, bake.work)
+        assertTrue(bake.nativeWork > 0L)
+        assertTrue(effort.invocations.isEmpty())
+    }
 
     @Test
     fun `unchanged finite preparation should retain completed empty analysis effort`() {

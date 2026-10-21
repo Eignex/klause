@@ -4,10 +4,15 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.closeOpenBounds
+import com.eignex.klause.presolve.observePreparation
+import com.eignex.klause.presolve.preparationInterrupted
+import com.eignex.klause.presolve.presolveBudget
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.hasFiniteIntegerRanges
-import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
+import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 
@@ -32,12 +37,16 @@ internal fun prepareFactorQuadratic(
             is OpenPresolveResult.Tightened -> result.spec
         }
     }
-    val plan = bounded.preparePolynomialExecutionPlan(
-        original = source,
-        providers = request.providers,
-        projections = projections.forEngineView(bounded),
-        cancellation = polynomialStop,
-    ).let { prepared ->
+    val plan = request.boundCancellation.presolveBudget().observePreparation(
+        PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, bounded, polynomialStop,
+    ) { token, observation ->
+        bounded.preparePolynomialExecutionPlan(
+            original = source,
+            providers = request.providers,
+            projections = projections.forEngineView(bounded),
+            cancellation = token,
+        ).also { if (it.decline == PreparedPlanDecline.RESOURCE) observation.preparationInterrupted() }
+    }.let { prepared ->
         request.quadraticObjective?.let {
             prepared.withObjective(it, if (request.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE)
         } ?: prepared.withObjective(requireNotNull(request.objective), request.maximize)

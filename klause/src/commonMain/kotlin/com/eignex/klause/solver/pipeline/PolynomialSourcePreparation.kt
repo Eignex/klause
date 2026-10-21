@@ -5,13 +5,17 @@ import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
+import com.eignex.klause.presolve.observePreparation
+import com.eignex.klause.presolve.preparationInterrupted
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
@@ -35,10 +39,14 @@ internal fun PolynomialTheoryRequest.afterSourcePreparation(
     require(prepared.source === resolvedModel().source)
     val mark = TimeSource.Monotonic.markNow()
     val selected = if (prepared.changed) {
-        val plan = prepared.problem.preparePolynomialExecutionPlan(
-            projections = requireNotNull(preparedPlan.factorProjections).forEngineView(prepared.problem),
-            cancellation = cancellation,
-        )
+        val plan = prepared.budget.observePreparation(
+            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, prepared.problem, cancellation,
+        ) { token, observation ->
+            prepared.problem.preparePolynomialExecutionPlan(
+                projections = requireNotNull(preparedPlan.factorProjections).forEngineView(prepared.problem),
+                cancellation = token,
+            ).also { if (it.decline == PreparedPlanDecline.RESOURCE) observation.preparationInterrupted() }
+        }
         if (plan.execution !is PreparedExecution.Polynomial) {
             prepared.elapsed += mark.elapsedNow()
             return null

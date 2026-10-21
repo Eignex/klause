@@ -16,6 +16,7 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
 
@@ -334,7 +335,13 @@ object Presolver {
         cancellation: Cancellation,
         abortFraction: Double,
     ): Presolved {
-        val session = PresolveSession(problem, ctx.bakeConfig, cancellation)
+        val session = ctx.presolveBudget.observePreparation(
+            PresolvePreparationStage.FINITE_SESSION, PresolveLane.FINITE, problem, cancellation,
+        ) { token, observation ->
+            PresolveSession(problem, ctx.bakeConfig, token).also {
+                if (it.infeasible) observation.preparationRefuted()
+            }
+        }
         // Persistent subsume indices + the change-mark at subsume's last firing, so each re-run reprocesses
         // only the factors other passes changed in between instead of rescanning the whole live set.
         val subsumeMemo = SubsumeMemo()
@@ -361,7 +368,9 @@ object Presolver {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
                     pass, PresolveLane.FINITE, token,
-                    { PresolveSizeStats(session.liveFactorCount, problem.numBoolVars, problem.numIntVars) },
+                    { PresolveSizeStats(
+                        session.liveFactorCount, problem.numBoolVars, problem.numIntVars, reals = problem.numRealVars,
+                    ) },
                     { pass.namespaceEligible(problem) && incrementalEligible(pass, token) },
                 ) { invocation ->
                     // Before the context: [passOccurrence] is keyed against the factor list [passInput] fixes.
@@ -443,7 +452,12 @@ object Presolver {
             }
         }
 
-        val transformed = session.materialize()
+        val transformed = ctx.presolveBudget.observePreparation(
+            PresolvePreparationStage.FINITE_MATERIALIZATION, PresolveLane.FINITE, problem, cancellation,
+            output = { it },
+        ) { _, observation ->
+            session.materialize().also { if (session.infeasible) observation.preparationRefuted() }
+        }
         val mapping = SourceMapping(
             problem, transformed, rounds.fired.transformationGuarantees(),
             SourceRebuilds.compose(host.rebuilds),
