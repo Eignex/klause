@@ -1,12 +1,12 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.result.PresolveInvocationStats
 import com.eignex.klause.util.Cancellation
 
 /**
  * Share of the model, in [PresolveRoundEngine.RoundHost.modelSize] units, that other passes must change
- * before a pass above [PresolveTiming.FAST] runs again. Below it the cheap passes absorb the change and
- * the expensive one would mostly re-derive what it found last time.
+ * before a pass above [PresolveTiming.FAST] runs again, in addition to its observed cost/yield threshold.
  */
 private const val RERUN_CHANGE_FRACTION = 0.01
 
@@ -64,8 +64,8 @@ internal object PresolveRoundEngine {
      * Drive [passes] to their bounded fixpoint through [host].
      *
      * Any change re-enables every [PresolveTiming.FAST] pass. A costlier pass runs again only once the
-     * other passes have changed `RERUN_CHANGE_FRACTION` of the model it last ran over, so a small fold
-     * elsewhere does not buy a second symmetry search or probe.
+     * other passes have changed at least `RERUN_CHANGE_FRACTION` of the model it last ran over and met
+     * its observed work per useful reduction. These are spending heuristics, not search-cost bounds.
      */
     fun run(
         passes: List<PresolvePass>,
@@ -81,6 +81,7 @@ internal object PresolveRoundEngine {
         // toward re-running it, and the model size it ran over.
         val unitsAfterRun = HashMap<PresolvePass, Long>()
         val sizeAtRun = HashMap<PresolvePass, Long>()
+        val changeForCost = HashMap<PresolvePass, Long>()
         val fired = LinkedHashSet<PresolvePass>()
         val exhausted = HashSet<PresolvePass>()
         var infeasible = false
@@ -91,7 +92,8 @@ internal object PresolveRoundEngine {
             if (pass in exhausted || ranAtVersion[pass] == version) return false
             val after = unitsAfterRun[pass] ?: return true
             val changedSince = host.changedUnits() - after
-            return changedSince > 0 && changedSince >= RERUN_CHANGE_FRACTION * sizeAtRun.getValue(pass)
+            return changedSince > 0 && changedSince >= RERUN_CHANGE_FRACTION * sizeAtRun.getValue(pass) &&
+                changedSince >= changeForCost.getValue(pass)
         }
 
         while (round < maxRounds && !cancellation()) {
@@ -107,6 +109,7 @@ internal object PresolveRoundEngine {
                 eligible--
                 val size = host.modelSize()
                 budget?.recordPass(pass)
+                val before = budget?.lastInvocation
                 when (host.runPass(pass, slice)) {
                     PassOutcome.INFEASIBLE -> {
                         fired.add(pass)
@@ -125,6 +128,8 @@ internal object PresolveRoundEngine {
                 if (pass.timing != PresolveTiming.FAST) {
                     unitsAfterRun[pass] = host.changedUnits()
                     sizeAtRun[pass] = size
+                    val observation = budget?.lastInvocation?.takeIf { it !== before && it.pass == pass.id }
+                    changeForCost[pass] = observation?.changeForCost(pass) ?: 0L
                 }
                 host.afterPass(pass)
             }
@@ -152,3 +157,19 @@ internal object PresolveRoundEngine {
         return budget.slice(share) or cancellation
     }
 }
+
+private fun PresolveInvocationStats.changeForCost(pass: PresolvePass): Long {
+    val removedOccurrences = input.occurrences?.let { before -> output.occurrences?.let { before - it } } ?: 0L
+    // Added factors and replaced rows alone do not establish useful yield. Tightening and net
+    // representation reductions are proxies; neither promises better propagation or learning.
+    val yield = maxOf(
+        1L, removedOccurrences, (input.factors - output.factors).toLong(),
+        narrowedColumns.toLong(), fixedColumns.toLong(),
+    )
+    // Normalize charged analysis and rebuild work into entry visits before dividing by retained yield.
+    // Ceiling divisions avoid overflow and make a costly empty or interrupted call require more change.
+    val entries = work.ceilDiv(pass.baseWorkWeight)
+    return entries.ceilDiv(yield)
+}
+
+private fun Long.ceilDiv(divisor: Long): Long = this / divisor + if (this % divisor == 0L) 0L else 1L

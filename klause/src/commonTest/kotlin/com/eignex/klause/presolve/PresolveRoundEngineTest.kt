@@ -1,5 +1,7 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,16 +11,32 @@ class PresolveRoundEngineTest {
         private val size: Long,
         private val changes: Map<PresolvePass, List<Long>>,
         private val decreasingComplexity: Boolean = false,
+        val budget: PresolveBudget? = null,
+        private val work: Map<PresolvePass, Long> = emptyMap(),
+        private val interrupted: Set<PresolvePass> = emptySet(),
+        private val narrowed: Boolean = false,
     ) : PresolveRoundEngine.RoundHost {
         val runs = ArrayList<PresolvePass>()
         private var units = 0L
 
-        override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+        override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome = budget.observe(
+            pass, PresolveLane.SOURCE, { PresolveSizeStats(size.toInt(), 0, 0, size) },
+        ) { invocation ->
             val change = changes[pass]?.getOrNull(runs.count { it == pass }) ?: 0L
             runs.add(pass)
-            if (change == 0L) return PassOutcome.UNCHANGED
+            budget?.charge(work[pass] ?: 0L)
+            invocation?.let {
+                if (narrowed) it.narrowedColumns = change.toInt() else it.outputOccurrences = size - change
+                it.interrupted = pass in interrupted
+            }
             units += change
-            return PassOutcome.CHANGED
+            val outcome = when {
+                change > 0L -> PassOutcome.CHANGED
+                pass in interrupted -> PassOutcome.INTERRUPTED
+                else -> PassOutcome.UNCHANGED
+            }
+            invocation.record(outcome)
+            outcome
         }
 
         override fun complexity(): Long = if (decreasingComplexity) size - units else size
@@ -29,7 +47,7 @@ class PresolveRoundEngineTest {
     }
 
     private fun runs(passes: List<PresolvePass>, host: ScriptedHost): List<PresolvePass> {
-        PresolveRoundEngine.run(passes, MAX_PRESOLVE_ROUNDS, Cancellation.Never, null, host)
+        PresolveRoundEngine.run(passes, MAX_PRESOLVE_ROUNDS, Cancellation.Never, host.budget, host)
         return host.runs
     }
 
@@ -72,5 +90,53 @@ class PresolveRoundEngineTest {
         val runs = runs(listOf(PresolvePass.AGGREGATE_SUB_SUMS, PresolvePass.STRENGTHEN_COEFFICIENTS), host)
 
         assertEquals(2, runs.count { it == PresolvePass.AGGREGATE_SUB_SUMS })
+    }
+
+    @Test
+    fun `an expensive empty analysis should require more change as its measured work rises`() {
+        val expensive = PresolvePass.AGGREGATE_SUB_SUMS
+        val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
+        for ((work, expected) in listOf(11L to 2, 1_100L to 1)) {
+            val host = ScriptedHost(
+                1_000, mapOf(cheap to listOf(10L)), budget = PresolveBudget(Long.MAX_VALUE),
+                work = mapOf(expensive to work),
+            )
+
+            val runs = runs(listOf(expensive, cheap), host)
+
+            assertEquals(expected, runs.count { it == expensive })
+        }
+    }
+
+    @Test
+    fun `retained row reductions and narrowed columns should both credit an expensive rerun`() {
+        val expensive = PresolvePass.AGGREGATE_SUB_SUMS
+        val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
+        for (narrowed in listOf(false, true)) {
+            for ((yield, expected) in listOf(1L to 1, 50L to 2)) {
+                val host = ScriptedHost(
+                    1_000, mapOf(expensive to listOf(yield), cheap to listOf(10L)),
+                    budget = PresolveBudget(Long.MAX_VALUE), work = mapOf(expensive to 1_100L), narrowed = narrowed,
+                )
+
+                val runs = runs(listOf(expensive, cheap), host)
+
+                assertEquals(expected, runs.count { it == expensive })
+            }
+        }
+    }
+
+    @Test
+    fun `an expensive interrupted analysis should retry after sufficient accumulated change`() {
+        val expensive = PresolvePass.BREAK_SYMMETRIES
+        val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
+        val host = ScriptedHost(
+            1_000, mapOf(cheap to listOf(50L, 50L)), budget = PresolveBudget(Long.MAX_VALUE),
+            work = mapOf(expensive to 1_600L), interrupted = setOf(expensive),
+        )
+
+        val runs = runs(listOf(expensive, cheap), host)
+
+        assertEquals(listOf(expensive, cheap, cheap, expensive, cheap), runs)
     }
 }
