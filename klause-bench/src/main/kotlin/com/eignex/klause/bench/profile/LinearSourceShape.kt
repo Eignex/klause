@@ -122,7 +122,8 @@ internal object LinearSourceShape {
                     .forEach { (fanout, count) -> put(fanout.toString(), count) }
             })
             put("selectionEquivalence",
-                "Prepared binary RealElement indexes in 0..1 with one unit reified EQ/NE definition at 1; same signed guard only")
+                "Prepared binary RealElement indexes in 0..1 with one unit reified EQ/NE definition at 1; " +
+                    "same signed guard only")
             put("factorKinds", buildJsonObject {
                 model.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
                     .forEach { (kind, count) -> put(kind, count) }
