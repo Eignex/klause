@@ -23,6 +23,60 @@ class Xcsp3SourceCheckerArithmeticTest {
     }
 
     @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "0|1 2 3 0|valid",
+        "0|1 0 2 3|valid",
+        "0|1 0 3 2|invalid",
+        "0|1 0 0 3|invalid",
+        "0|1 0 2 4|unknown",
+        "1|2 3 4 1|unknown",
+    ])
+    fun `circuit witnesses should use the audited reference traversal`(start: String, values: String, status: String) {
+        val model = File.createTempFile("xcsp-circuit-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables><array id="s" size="[4]">0..4</array></variables>
+                  <constraints><circuit><list startIndex="$start">s[]</list></circuit></constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>s[0] s[1] s[2] s[3]</list><values>$values</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals(status, checked.status, checked.reason)
+            if (status == "valid") assertNotNull(checked.checkedWitness) else assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("2,valid", "k,valid", "4,invalid")
+    fun `circuit size should be checked by the reference traversal`(size: String, status: String) {
+        val model = File.createTempFile("xcsp-circuit-size-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables><array id="s" size="[4]">0..3</array><var id="k">2</var></variables>
+                  <constraints><circuit><list>s[]</list><size>$size</size></circuit></constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>s[0] s[1] s[2] s[3] k</list><values>1 0 2 3 2</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals(status, checked.status, checked.reason)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource(
         "1500000000 1500000000 0,le,unknown",
         "-1073741824 -1073741824 0,le,valid",

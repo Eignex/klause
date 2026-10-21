@@ -176,6 +176,7 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
             "noOverlap" -> checkEndpoints(c.childs[0].value, c.childs[1].value)
             "cumulative" -> checkCumulative(c)
             "binPacking" -> checkPacking(c)
+            "circuit" -> checkCircuit(c)
             "knapsack" -> {
                 checkWeighted(c.childs[0].value, c.childs[1].value)
                 checkWeighted(c.childs[0].value, c.childs[3].value)
@@ -294,6 +295,18 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
         integer(index, "element index offset")
         if (index < BigInteger.ZERO || index >= BigInteger.valueOf(list.size.toLong())) decline("element index range")
         integers(list).forEach { integer(it, "element entry") }
+    }
+
+    private fun checkCircuit(c: XCtr) {
+        val list = c.childs[0].value as? Array<*> ?: decline("circuit list")
+        if (list.any { it !is XVarInteger }) decline("circuit list")
+        val start = c.childs[0].attributes.entries.singleOrNull { it.key.name == "startIndex" }?.value
+        if (start != null && start != "0") decline("circuit start index")
+        // The pinned checker follows successors as array indexes and counts distinct visited nodes.
+        if (integers(list).any { it < BigInteger.ZERO || it >= BigInteger.valueOf(list.size.toLong()) }) {
+            decline("circuit successor range")
+        }
+        c.childs.drop(1).forEach { child -> integers(child.value).forEach { integer(it, "circuit size") } }
     }
 
     private fun checkMatrixElement(c: XCtr) {

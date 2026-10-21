@@ -933,6 +933,9 @@ forms are outside this checking surface. Reified/soft constraints, multiple
 objectives, unsupported checker callbacks, oversized integer coordinates and the
 ten-second/512 MiB checker subprocess limit leave checking `unknown`. An arithmetic guard admits only audited callbacks before
 the pinned checker runs.
+Zero-offset circuits audit successor indexes before the reference checker's
+distinctness and cycle traversal; nonzero offsets and out-of-range successors
+remain unknown.
 It checks signed integer task endpoints, cumulative loads at task boundaries,
 bin-packing loads, ordered offsets and knapsack products/totals with exact integers.
 Direct sums require every assigned product and running total to fit a signed
