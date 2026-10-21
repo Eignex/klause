@@ -31,8 +31,8 @@ class QfNraSolverTest {
         val result = solveQfNra(source.formula, source.boolCount, source.realCount, params)
 
         val point = assertIs<QfNraResult.Satisfiable>(result).assignment
-        assertEquals(BigFraction.MINUS_ONE, point.realValue(0).rational)
-        assertEquals(BigFraction.ZERO, point.realValue(1).rational)
+        assertEquals(0, algebraic.compare(point.realValue(0), algebraic.rational(BigFraction.MINUS_ONE)))
+        assertEquals(0, algebraic.compare(point.realValue(1), algebraic.rational(BigFraction.ZERO)))
     }
 
     @Test
