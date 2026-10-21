@@ -121,6 +121,25 @@ internal class PolynomialAffineReduction private constructor(
                 yield(null)
             }
             if (!inconsistent) {
+                val deriving = preparePolynomialAffineConsequences(current, arithmetic)
+                var consequences: List<PolynomialAtom>? = null
+                while (consequences == null) {
+                    consequences = deriving.next()
+                    if (consequences == null) yield(null)
+                }
+                if (consequences.isNotEmpty()) {
+                    val preparation = preparePolynomialConjunction(consequences + current, arithmetic)
+                    var conjunction: PolynomialConjunction? = null
+                    while (conjunction == null) {
+                        conjunction = preparation.next()
+                        if (conjunction == null) yield(null)
+                    }
+                    current = conjunction.atoms
+                    inconsistent = conjunction.inconsistent
+                    predicatesChanged = true
+                }
+            }
+            if (!inconsistent) {
                 val consequenceChecking = preparePolynomialConsequenceRefutation(current, arithmetic)
                 var consequenceConflict: Boolean? = null
                 while (consequenceConflict == null) {
