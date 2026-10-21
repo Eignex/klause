@@ -38,7 +38,7 @@ class SatClauseDbTest {
         val d = db(2, listOf(Clause(intArrayOf(pos(0), neg(0))), Clause(intArrayOf(pos(1)))))
         assertEquals(1, d.slotCount)
         assertEquals(1, d.origin(0))
-        assertContentEquals(intArrayOf(0), d.toDelta(null).droppedIndices)
+        assertContentEquals(intArrayOf(0), d.toDelta(SourceRebuilds.NONE).droppedIndices)
     }
 
     @Test
@@ -49,7 +49,7 @@ class SatClauseDbTest {
         assertNull(d.clause(0))
         assertEquals(-1, d.origin(derived))
 
-        val delta = d.toDelta(null)
+        val delta = d.toDelta(SourceRebuilds.NONE)
         assertContentEquals(intArrayOf(0), delta.droppedIndices)
         assertContentEquals(
             listOf(listOf(pos(1), pos(2))),
@@ -61,6 +61,6 @@ class SatClauseDbTest {
     fun `a derived clause removed before the delta should contribute nothing`() {
         val d = db(2, listOf(Clause(intArrayOf(pos(0), pos(1)))))
         d.remove(d.add(intArrayOf(neg(0))))
-        assertTrue(d.toDelta(null).isEmpty)
+        assertTrue(d.toDelta(SourceRebuilds.NONE).isEmpty)
     }
 }

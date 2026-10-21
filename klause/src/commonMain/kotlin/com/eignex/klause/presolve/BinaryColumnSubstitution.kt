@@ -59,10 +59,11 @@ import com.eignex.klause.util.LongArrayList
  */
 internal object BinaryColumnSubstitution {
 
-    /** The result of a firing substitution: the transformed [problem] (its Boolean namespace extended for
-     *  columns without an existing indicator), the [reconstruct] that lifts its solutions back to the input's
-     *  variable space, and the number of [columns] substituted. */
-    class Substitution(val problem: BakedProblem, val reconstruct: (Sample) -> Sample, val columns: Int)
+    /** The transformed [problem], its typed [rebuild] into the input's variable space, and the number of
+     *  [columns] substituted. [reconstruct] adapts the rebuild to finite samples. */
+    class Substitution(val problem: BakedProblem, val rebuild: SourceRebuilds, val columns: Int) {
+        val reconstruct: (Sample) -> Sample = checkNotNull(rebuild.asSampleLift())
+    }
 
     /**
      * Substitute every eligible `{0, 1}` column of [problem] for a Boolean literal, or return `null`
@@ -139,11 +140,11 @@ internal object BinaryColumnSubstitution {
         for (k in 0 until columns.size) domains[columns[k]] = IntDomain(0, 0)
         val rebuilt = PresolveShared.rebuildProblem(problem, out, domains, bakeConfig, numBoolVars = nextBool)
         val substituted = columns.toIntArray()
-        val substitutedLiterals = IntArray(substituted.size) { valueLiterals[substituted[it]] }
-        val firstBool = problem.numBoolVars
-        return Substitution(rebuilt, { sample ->
-            restore(sample, substituted, substitutedLiterals, firstBool)
-        }, substituted.size)
+        val rebuild = SourceRebuilds(
+            substituted.map { RebuildStep.IntegerFromLiteral(it, valueLiterals[it]) },
+            sourceBoolVars = problem.numBoolVars,
+        )
+        return Substitution(rebuilt, rebuild, substituted.size)
     }
 
     private fun Factor.binaryChannelLiteral(): Int {
@@ -159,19 +160,6 @@ internal object BinaryColumnSubstitution {
         val atZero = holds(0L)
         val atOne = holds(row.coeff(0))
         return if (atZero == atOne) Lit.NONE else Lit.make(channel.auxBoolVar, atOne)
-    }
-
-    /** Recover the substituted columns' integer values from their literals and drop the added Booleans, so
-     *  the sample lands in the pre-substitution variable space. */
-    private fun restore(sample: Sample, substituted: IntArray, literals: IntArray, firstBool: Int): Sample {
-        val ints = sample.ints
-        for (k in substituted.indices) {
-            val literal = literals[k]
-            val value = Lit.variable(literal).let { it < sample.numBoolVars && sample.boolValue(it) }
-            ints[substituted[k]] = if (Lit.evaluate(literal, value)) 1L else 0L
-        }
-        val bools = if (sample.numBoolVars > firstBool) sample.bools.copyOf(firstBool) else sample.bools
-        return sample.copy(bools = bools, ints = ints)
     }
 
     /** Clear [substitutable] for every column a factor this cannot rewrite mentions, and — to a fixpoint —

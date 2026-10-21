@@ -4,7 +4,6 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
@@ -63,10 +62,11 @@ internal class SatClauseDb private constructor(
      * An input clause that survives unchanged is kept (absent from the delta); a derived clause that was
      * itself later removed contributes nothing.
      */
-    fun toDelta(reconstruct: ((Sample) -> Sample)?): PassDelta {
+    fun toDelta(rebuild: SourceRebuilds): PassDelta {
         val (dropped, added) = rewrite()
         if (dropped.isEmpty() && added.isEmpty()) return PassDelta()
-        return PassDelta(droppedIndices = dropped, addedFactors = added, reconstruct = reconstruct)
+        return PassDelta(droppedIndices = dropped, addedFactors = added, reconstruct = rebuild.asSampleLift())
+            .also { it.rebuild = rebuild }
     }
 
     /** The same rewrite as the source lane's delta, stating [rebuild] as data rather than as a lift. */

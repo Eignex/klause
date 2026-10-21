@@ -48,11 +48,12 @@ internal object ImplicationGraph {
         if (problem.numBoolVars == 0 || cancellation()) return PassDelta()
         val implications = harvestImplications(problem, maxCandidates, cancellation)
         val reduction = reduceOver(problem, implications, objectiveBoolVars, cancellation) ?: return PassDelta()
+        val rebuild = reduction.merges.asRebuilds()
         return PresolveShared.identityDelta(
             problem.factors,
             reduction.factors,
-            reconstruct = reduction.merges.asRebuilds().asSampleLift(),
-        )
+            reconstruct = rebuild.asSampleLift(),
+        ).also { it.rebuild = rebuild }
     }
 
     /**
