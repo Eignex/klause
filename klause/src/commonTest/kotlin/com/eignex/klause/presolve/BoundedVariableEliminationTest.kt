@@ -187,7 +187,10 @@ class BoundedVariableEliminationTest {
         for (extra in listOf(10L, 50L, 100L)) {
             val budget = PresolveBudget(setup.spent() + extra)
 
-            val delta = BoundedVariableElimination.eliminateSource(problem, cancellation = budget.orSpent(Cancellation.Never))
+            val delta = BoundedVariableElimination.eliminateSource(
+                problem,
+                cancellation = budget.orSpent(Cancellation.Never),
+            )
 
             assertTrue(delta.isEmpty)
             assertEquals(setup.spent() + extra, budget.spent())
