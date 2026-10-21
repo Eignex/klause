@@ -478,8 +478,8 @@ class ExactLiraSearchComponent private constructor(
 
     internal fun partialPointHintAvailable(): Boolean {
         val current = context ?: return false
-        return (pointHintValues != null || pointHintPoint != null) && !dirty && current.decisionLevel == pointHintLevel &&
-            !current.cancelled() && !pointHintStop() && !parentStop()
+        return (pointHintValues != null || pointHintPoint != null) && !dirty &&
+            current.decisionLevel == pointHintLevel && !current.cancelled() && !pointHintStop() && !parentStop()
     }
 
     internal fun partialPointHintBool(variable: Int): Boolean? =
