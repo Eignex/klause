@@ -23,7 +23,6 @@ import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchBranchKind
@@ -38,6 +37,7 @@ import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchStopCause
+import com.eignex.klause.solver.search.SourceOrderBooleanBranching
 import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.solver.search.followedBy
 import com.eignex.klause.theory.EncoderDecline
@@ -464,7 +464,7 @@ class OpenTheoryEngine internal constructor(
             }
             val branching = when (selectedBranching) {
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
-                OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
+                OpenBranching.SourceOrder, OpenBranching.Automatic -> SourceOrderBooleanBranching(model.numBoolVars)
             }
             if (planned.theory is ExactLiraSearchComponent) {
                 state.smt.observeCompleteSearchStage("BRANCHING_BOOLEANS_${model.numBoolVars}")

@@ -84,6 +84,12 @@ refutation. A conditioned run keeps the decision level at which it opens; restar
 return there, backjumps below it fall back to chronological traversal, and
 exhaustion is conditional (see [sessions](06-sessions.md)).
 
+Open-theory source-order traversal retains the lowest unassigned Boolean cursor
+between choices. Shared retraction notifications lower the cursor to each freed
+source variable, preserving source order across backjumps and restarts without
+rescanning an assigned prefix on every decision. Candidate hints still only order
+the selected variable's two polarities.
+
 For an entirely theory-owned integer difference graph, source-proved relative
 interval proposals precede Boolean choices through arithmetic category priority,
 registering exact complementary difference predicates; see
