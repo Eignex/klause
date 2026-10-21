@@ -7,6 +7,21 @@ import kotlin.test.assertIs
 
 class SearchRunTest {
     @Test
+    fun `an indeterminate alternative should leave its sibling available`() {
+        val component = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                if (context.boolValue(0) == false) ComponentResult.Indeterminate else ComponentResult.Consistent
+        }
+        val session = SearchSession(listOf(component))
+        session.initialize()
+        val run = session.openRun(numBoolVars = 1)
+
+        val result = assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(true, result.model.valueOf(SearchBoolValue(0)))
+    }
+
+    @Test
     fun `a learned backjump should preserve nested conditions`() {
         for (selection in listOf(
             SearchBranchSelection.Default,

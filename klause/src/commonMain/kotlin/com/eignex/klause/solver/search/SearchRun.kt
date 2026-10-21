@@ -277,48 +277,54 @@ class SearchRun internal constructor(
             val level = session.decisionLevel
             val decision = frame.decisions[frame.next++]
             if (!decision.tightens(session)) continue
-            if (!session.executionControls.canCommitDecision()) return Advance.Budget
-            when (val result = session.push(decision)) {
-                ComponentResult.Consistent -> {
-                    if (!session.lastPushCreatedLevel()) continue
-                    if (!session.executionControls.recordDecision(decision)) return Advance.Budget
-                    decisions++
-                    decisionsSinceRestart++
-                    observer.onCommit(decision, session.decisionLevel)
-                    if (!decisionBudget.consume()) {
-                        session.markDecisionBudgetExhausted()
-                        return Advance.Budget
-                    }
-                    return Advance.Expanded
-                }
-
-                ComponentResult.Indeterminate -> {
-                    session.popTo(level)
-                    rememberIndeterminate()
-                }
-
-                is ComponentResult.Conflict -> {
-                    observer.onConflict(decision)
-                    val outcome = if (session.hasNativeConflictResolver) {
-                        LearnedOutcome.UNAPPLIED
-                    } else {
-                        resolveExplainedConflict(result.explanation)
-                    }
-                    if (outcome == LearnedOutcome.RESUMED) return Advance.Expanded
-                    if (session.decisionLevel < level) return Advance.Exhausted
-                    // An abandoned learned conflict has already run its course; only an unapplied one leaves the
-                    // original conflict for the chronological resolvers.
-                    val unapplied = outcome == LearnedOutcome.UNAPPLIED
-                    if (unapplied) retainExplanation(result.explanation)
-                    session.popTo(level)
-                    if (unapplied && resolveConflict()) return Advance.Expanded
-                    if (frames.isEmpty()) return Advance.Exhausted
-                    if (frames.last() !== frame) return Advance.Exhausted
-                }
-            }
+            val advance = attemptFrameDecision(frame, level, decision)
+            if (advance != null) return advance
         }
         frames.removeLast()
         return Advance.Exhausted
+    }
+
+    private fun attemptFrameDecision(frame: Frame, level: Int, decision: SearchDecision): Advance? {
+        if (!session.executionControls.canCommitDecision()) return Advance.Budget
+        when (val result = session.push(decision)) {
+            ComponentResult.Consistent -> {
+                if (!session.lastPushCreatedLevel()) return null
+                if (!session.executionControls.recordDecision(decision)) return Advance.Budget
+                decisions++
+                decisionsSinceRestart++
+                observer.onCommit(decision, session.decisionLevel)
+                if (!decisionBudget.consume()) {
+                    session.markDecisionBudgetExhausted()
+                    return Advance.Budget
+                }
+                return Advance.Expanded
+            }
+
+            ComponentResult.Indeterminate -> {
+                session.popTo(level)
+                rememberIndeterminate()
+            }
+
+            is ComponentResult.Conflict -> {
+                observer.onConflict(decision)
+                val outcome = if (session.hasNativeConflictResolver) {
+                    LearnedOutcome.UNAPPLIED
+                } else {
+                    resolveExplainedConflict(result.explanation)
+                }
+                if (outcome == LearnedOutcome.RESUMED) return Advance.Expanded
+                if (session.decisionLevel < level) return Advance.Exhausted
+                // An abandoned learned conflict has already run its course; only an unapplied one leaves the
+                // original conflict for the chronological resolvers.
+                val unapplied = outcome == LearnedOutcome.UNAPPLIED
+                if (unapplied) retainExplanation(result.explanation)
+                session.popTo(level)
+                if (unapplied && resolveConflict()) return Advance.Expanded
+                if (frames.isEmpty()) return Advance.Exhausted
+                if (frames.last() !== frame) return Advance.Exhausted
+            }
+        }
+        return null
     }
 
     private fun SearchDecision.tightens(context: SearchContext): Boolean = when (this) {
