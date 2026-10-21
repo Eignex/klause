@@ -903,7 +903,7 @@ infeasibility certificate is performed. Only an accepted supplied point receives
 feasibility and objective credit. Native proof claims remain uncredited; original
 claims remain in the `reported*` fields.
 
-The build downloads the official `miplib2017-testscript-v1.0.4.zip`, pinned to
+MPS checker packaging downloads the official `miplib2017-testscript-v1.0.4.zip`, pinned to
 SHA-256 `37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9`.
 `KLAUSE_MIPLIB_ARCHIVE` can supply a local copy of that exact archive; the build
 checks the same checksum before extraction. CI's `scripts/cache-miplib-solchecker.sh`
@@ -911,7 +911,10 @@ tries upstream first, then an unpublished repository cache asset using `GH_TOKEN
 The helper verifies the checksum independently and leaves the checker sources unchanged.
 It extracts only the checker C++ sources, README, Makefile and MIT license, compiles
 the unchanged upstream main with GMP and zlib, and packages those files and the
-binary in the non-published bench artifact. The optional converter is not extracted.
+binary in the non-published bench artifact when built with `-Pbench.mpsSolchecker`.
+Ordinary bench installations omit these optional MPS resources. The JVM test
+classpath includes the resources separately and retains every checker test.
+The optional converter is not extracted.
 Building requires a C++ compiler and GMP/zlib development packages. Invocation
 supports Linux with GNU `timeout`/`prlimit` and macOS with the system shell limits.
 Other hosts remain unverified. The packaged executable targets the build host;

@@ -204,6 +204,10 @@ The Gradle build includes `:klause` (model, DSL, compilation, formats and solvin
 `:klause-bench`, a JVM module that is not published. The default build targets JVM
 and Linux x64; releases opt into Linux arm64 and macOS arm64 with `-Ptargets.full`.
 
+The bench distribution includes the external MIPLIB checker only with
+`-Pbench.mpsSolchecker`. Its JVM tests use the checker resources on their test
+classpath separately from the distribution's resources.
+
 ```sh
 ./gradlew :klause-cli:installJvmDist
 klause-cli/build/install/klause-cli-jvm/bin/klause-cli --help
