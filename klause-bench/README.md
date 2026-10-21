@@ -538,6 +538,10 @@ vendor BLAS, external libraries or MiniZinc compiler. Capture those separately.
 
 ## Saved results
 
+CLI presolve summaries remain in each solve and `solve-one` record's `stats` map,
+including cache and JSON round trips. Their [field contract](../docs/20-cli.md#statistics)
+keeps phase work separate from native work and preserves empty and interrupted calls.
+
 Ordinary subprocess records retain `stderr` as a prefix of at most 16 Ki characters,
 with line endings normalized to newlines. `stderrComplete=true` means the drain
 finished and the whole stream fits in that prefix. Null text or a false flag leaves

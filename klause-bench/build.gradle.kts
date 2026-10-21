@@ -22,6 +22,7 @@ dependencies {
     implementation(project(":klause"))
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.10")
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation(project(":klause-cli"))
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
     implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")

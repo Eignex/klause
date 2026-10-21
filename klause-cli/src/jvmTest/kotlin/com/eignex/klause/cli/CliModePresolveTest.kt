@@ -90,6 +90,8 @@ class CliModePresolveTest {
 
         val summary = Regex("source preparation: factors (\\d+), ints (\\d+), reals (\\d+)").find(text)
         assertTrue(summary != null, text)
+        assertTrue("presolveWork=" in text, text)
+        assertTrue("presolveStage_" in text, text)
         val counts = Regex("source preparation factor ([^:]+): total=(\\d+), implied=(\\d+)").findAll(text).toList()
         assertTrue(counts.isNotEmpty(), text)
         assertEquals(summary.groupValues[1].toInt(), counts.sumOf { it.groupValues[2].toInt() })
@@ -129,6 +131,8 @@ class CliModePresolveTest {
 
         assertTrue("presolve dry-run:" in err, err)
         assertTrue("open columns: 2 of 2" in err, err)
+        assertTrue("presolveInvocation_SOURCE_" in err, err)
+        assertTrue("presolveUnattributedWork=" in err, err)
         assertTrue("sat" !in out, out)
     }
 
@@ -141,6 +145,8 @@ class CliModePresolveTest {
         val out = captureErr { main(arrayOf("--param", "dry-run-presolve=on", fzn.absolutePath)) }
         assertTrue("presolve dry-run:" in out, out)
         assertTrue("factors:" in out, out)
+        assertTrue("presolveStage_FINITE_ROOT_BAKE_COMPLETE_Calls=" in out, out)
+        assertTrue("presolveInvocation_FINITE_" in out, out)
         assertTrue("elapsed:" in out, out)
     }
 

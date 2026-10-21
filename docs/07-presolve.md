@@ -171,7 +171,8 @@ Operations under containing controls preserve their cancellation token and forwa
 native charges unchanged, recording `nativeWork` separately from phase units.
 Observation neither reprices that work against the elective allowance nor renews
 it; the temporary recorder restores the containing meter on exit. The
-[CLI statistics](20-cli.md#statistics) expose aggregate effort fields.
+[CLI statistics](20-cli.md#statistics) expose bounded lane/pass/outcome and
+preparation-stage summaries of this ledger, including preparation-only requests.
 
 ## Selected reductions
 
