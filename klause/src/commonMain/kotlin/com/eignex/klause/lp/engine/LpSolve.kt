@@ -727,7 +727,7 @@ private fun certifyLpResultWithin(
     val legacyBasis = refined == null || refined.metrics.decline == LpRefinementDecline.DISABLED ||
         refined.metrics.decline == LpRefinementDecline.AUTHORITY
     if (result != null && legacyBasis &&
-        (witness == null || bound?.value != witness.objective) && !stopped()
+        (witness == null || bound?.value != requireNotNull(witness).objective) && !stopped()
     ) {
         val checked = verifyExactBasis(
             model,
