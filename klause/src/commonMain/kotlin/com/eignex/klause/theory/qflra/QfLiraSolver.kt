@@ -320,6 +320,13 @@ class ExactLiraSearchComponent private constructor(
 
     internal val lpMetrics get() = lp.metrics
 
+    internal fun arithmeticBooleanVariables(stop: Cancellation): IntArray? {
+        stop.charge(arithmeticVariables.size.toLong() * (Int.SIZE_BITS + 2L))
+        if (stop()) return null
+        val variables = arithmeticVariables.toIntArray().apply { sort() }
+        return variables.takeUnless { stop() }
+    }
+
     internal fun observeWith(stats: SmtStatsSink) {
         smtStats = stats
     }

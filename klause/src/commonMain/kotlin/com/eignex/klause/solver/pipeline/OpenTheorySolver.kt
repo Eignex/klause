@@ -456,7 +456,15 @@ class OpenTheoryEngine internal constructor(
                 ) OpenBranching.Activity else OpenBranching.SourceOrder
                 else -> params.openBranching
             }
-            val branching = when (selectedBranching) {
+            val arithmeticBooleans = if (params.openBranching == OpenBranching.Automatic &&
+                plan.theoryPipeline == ProblemPipeline.EXACT_LRA
+            ) (planned.theory as? ExactLiraSearchComponent)?.arithmeticBooleanVariables(cancellation) else null
+            if (arithmeticBooleans != null) {
+                state.smt.observeCompleteSearchStage("ARITHMETIC_BOOLEAN_PRIORITY_${arithmeticBooleans.size}")
+            }
+            val branching = if (arithmeticBooleans != null) {
+                ArithmeticBooleanBranching(arithmeticBooleans, model.numBoolVars)
+            } else when (selectedBranching) {
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
                 OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
             }
