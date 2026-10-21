@@ -245,7 +245,14 @@ implements the decision procedure. The pipeline uses
 
 `solveQfNra` decides a neutral `PolynomialRealFormula`. Normalization expands exact
 rational polynomial expressions and keeps each atom's sign, relation and Boolean
-structure. Before probing or Boolean search, mandatory numeric predicates are
+structure. Scalar-equivalent numeric predicates share Boolean truth; complementary
+relations use opposite truth values. Exact rational scaling accounts for order
+reversal under a negative coefficient. Strict and weak comparisons retain their
+different zero boundaries, and variable factors retain singular fibres. The
+Boolean DAG retains original Boolean identities and the first numeric
+representative, including after graph substitution.
+
+Before probing or Boolean search, mandatory numeric predicates are
 extracted with Boolean propagation. Their exact total graph equalities are
 substituted into every atom, including optional branches. Opposite weak bounds may
 supply such an equality; an unforced guarded equation or an equation with a
