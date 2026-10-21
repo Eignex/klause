@@ -413,6 +413,8 @@ internal class RevisedSimplex(
     override val lastRefactorizations: Int get() = observations.refactorizations
     override val lastWarmStarted: Boolean get() = observations.warmStarted
     override val lastWorkOps: Long get() = work.ops
+    override var lastIterations: Long = 0L
+        private set
     override val lastSingularRefactorizations: Int get() = observations.singularRefactorizations
     override val lastSmallPivotBails: Int get() = observations.smallPivotBails
     override val lastMetrics: LpSolveMetrics get() = observations.snapshot(work.ops)
@@ -1043,6 +1045,16 @@ internal class RevisedSimplex(
         }
     }
 
+    override fun resolvePrimalBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+        val previous = floatAllowance
+        floatAllowance = allowance
+        return try {
+            solvePrimal(retainedBasis())
+        } finally {
+            floatAllowance = previous
+        }
+    }
+
     private fun clearNumericalPublication() {
         solvedExactState = null
         optimalBasis = null
@@ -1095,6 +1107,7 @@ internal class RevisedSimplex(
         try {
             runChargedSolve(progress, block)
         } finally {
+            lastIterations = progress.iterations
             chargeWork()
         }
 

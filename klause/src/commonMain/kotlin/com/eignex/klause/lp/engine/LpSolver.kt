@@ -245,6 +245,8 @@ internal interface LpSolver : AutoCloseable {
         smallPivotBails = lastSmallPivotBails,
     )
 
+    val lastIterations: Long get() = lastPivots.toLong()
+
     /** Nonbasic columns with zero reduced cost at the last termination — dual degeneracy. 0 on an engine
      *  that does not measure it. */
     val lastDegenerateColumns: Int get() = 0
@@ -312,10 +314,9 @@ internal interface RetainedComponentLpSolverCapability :
     RetainedLpSolver
 
 /**
- * An [LpSolver] retaining its basis and factorization across exact bound and objective adoption.
- * Monolithic ownership is required: a component solve has no single basis to retain.
+ * An [LpSolver] preparing and retaining a full-model basis across exact state adoption.
  */
-internal interface PersistentLpSolver : RetainedLpSolver {
+internal interface PreparedLpSolver : RetainedLpSolver {
     // Builds an all-logical basis without claiming feasibility; null means unsupported or declined.
     fun prepareLogicals(token: Cancellation = Cancellation.Never): Basis? = null
 
@@ -324,6 +325,14 @@ internal interface PersistentLpSolver : RetainedLpSolver {
     fun retainedBasis(): Basis? = null
 
     val basisLifecycleWork: BasisOperationWork? get() = null
+
+    val ownershipWork: Long get() = 0L
+
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult?
+}
+
+internal interface PersistentLpSolver : PreparedLpSolver {
+    fun resolvePrimalBounds(allowance: LpFloatAllowance?): FloatLpResult? = null
 
     /**
      * Re-solve with retained factors. Null [allowance] uses construction limits; explicit zero work

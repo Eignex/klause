@@ -140,6 +140,20 @@ objective edits invalidate dependent proofs.
 and [CpLpAdapter](../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/CpLpAdapter.kt)
 hold bound trails, active-row identity and verification caches.
 
+Scoped numerical ownership uses `PreparedLpSolver`: a monolithic persistent engine
+or independent prepared component engines. Components follow the union of every
+retained exact row, including free logical definitions and fixed-coordinate edges.
+Empty structural rows keep a row-only numerical owner; isolated structural columns
+retain their full bounds and objective contribution. Child bases map to the original
+global heading order, including imported warm headings, and child results pass
+exact certification before global source witness checking.
+
+Partitioning, projection, preparation and adoption retain their work charges across
+declines. Numerical children share one containing work and iteration allowance;
+an exhausted remainder cannot enter a child as an unbounded allowance. A declined
+adoption discards its numerical owner while retaining the prior exact trail state,
+so partial child adoption cannot become a published scope.
+
 Rows have stable identities. Deactivation removes slack bounds, strictness and
 integrality, and is rejected while surviving assertions need the row; global
 source-valid cuts can survive pop. Appends and compaction prepare a fresh

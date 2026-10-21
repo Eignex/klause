@@ -42,6 +42,15 @@ internal class ComponentLpSolver(
 
     override val lastMetrics: LpSolveMetrics get() = metrics
 
+    internal val workingModel: LpModel get() = model
+    internal val neighborhoods: List<LpNeighborhood> get() = parts
+    internal var basisSlots: List<IntArray>? = null
+
+    internal fun decline(termination: LpFloatTermination) {
+        clearEvidence()
+        lastTermination = termination
+    }
+
     override fun deferUnscaledSourceDiagnostics() {
         for (solver in solvers) solver.deferUnscaledSourceDiagnostics()
     }
@@ -56,25 +65,32 @@ internal class ComponentLpSolver(
         closeComponentSolvers(solvers)
     }
 
-    override fun solve(warm: Basis?): FloatLpResult? = invoke { s -> s.solve(null) }
+    override fun solve(warm: Basis?): FloatLpResult? = invokeComponents { _, s -> s.solve(null) }
 
-    override fun solvePrimal(warm: Basis?): FloatLpResult? = invoke { s -> s.solvePrimal(null) }
+    override fun solvePrimal(warm: Basis?): FloatLpResult? = invokeComponents { _, s -> s.solvePrimal(null) }
 
-    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = invoke { solver ->
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = invokeComponents { _, solver ->
         check(solver is RetainedLpSolver)
         solver.resolveBounds(allowance)
     }
 
     @Suppress("TooGenericExceptionCaught") // Retire every child when adoption fails, including native failures.
-    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+    override fun adopt(state: LpExactState, token: Cancellation): Boolean = try {
+        adoptWithMeter(state, token, LpProjectionMeter(cancellation = token))
+    } catch (_: LpProjectionStop) {
+        false
+    }
+
+    internal fun adoptWithMeter(state: LpExactState, token: Cancellation, meter: LpProjectionMeter): Boolean {
         val previous = model.exactState ?: return false
         if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
-        val nextModel = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
+        val nextModel = state.ownerWorkingModel(meter) ?: return false
         val nextParts = ArrayList<LpNeighborhood>(parts.size)
-        for (part in parts) nextParts += part.rebindExact(state, token) ?: return false
+        for (part in parts) nextParts += part.rebindExact(state, token, meter) ?: return false
         if (token()) return false
         try {
             for (index in solvers.indices) {
+                meter.reserve(LpScalingView.constructionWorkBound(nextParts[index].model), 0L, matrix = true)
                 if (!(solvers[index] as RetainedLpSolver).adopt(
                     checkNotNull(nextParts[index].model.exactState),
                     token,
@@ -111,8 +127,11 @@ internal class ComponentLpSolver(
     }
 
     @Suppress("TooGenericExceptionCaught") // Clear the invocation reason for any child failure.
-    private inline fun invoke(op: (LpSolver) -> FloatLpResult?): FloatLpResult? = try {
-        stitch(op)
+    internal fun invokeComponents(
+        admit: (Int) -> Boolean = { true },
+        op: (Int, LpSolver) -> FloatLpResult?,
+    ): FloatLpResult? = try {
+        stitch(admit, op)
     } catch (primary: Throwable) {
         lastTermination = null
         blockResults = null
@@ -122,7 +141,7 @@ internal class ComponentLpSolver(
         throw primary
     }
 
-    private inline fun stitch(op: (LpSolver) -> FloatLpResult?): FloatLpResult? {
+    private fun stitch(admit: (Int) -> Boolean, op: (Int, LpSolver) -> FloatLpResult?): FloatLpResult? {
         check(!closed)
         lastTermination = null
         infeasibleRay = null
@@ -172,8 +191,9 @@ internal class ComponentLpSolver(
             objective += c * shifted
         }
         for (k in parts.indices) {
+            if (!admit(k)) return null
             val part = parts[k]
-            val r = op(solvers[k]) ?: run {
+            val r = op(k, solvers[k]) ?: run {
                 metrics += solvers[k].lastMetrics
                 lastTermination = solvers[k].lastTermination
                 // A dual-unbounded block is a candidate infeasibility of the whole model: its float
@@ -210,8 +230,9 @@ internal class ComponentLpSolver(
                 duals[part.rows[i]] = r.duals[i]
                 status[model.slackCol(part.rows[i])] = r.basis.status[sub.n + i]
             }
-            for (b in r.basis.basicVars) {
-                basicVars[basicAt++] = if (b < sub.n) part.cols[b] else model.slackCol(part.rows[b - sub.n])
+            for ((local, b) in r.basis.basicVars.withIndex()) {
+                val slot = basisSlots?.get(k)?.get(local) ?: basicAt++
+                basicVars[slot] = if (b < sub.n) part.cols[b] else model.slackCol(part.rows[b - sub.n])
             }
             pivots += r.pivots
             if (r.luMaxFill > maxFill) maxFill = r.luMaxFill
@@ -382,8 +403,9 @@ internal class ComponentLpSolver(
                 val parent = if (column < sub.n) part.cols[column] else model.slackCol(part.rows[column - sub.n])
                 status[parent] = basis.status[column]
             }
-            for (column in basis.basicVars) {
-                basic[at++] = if (column < sub.n) part.cols[column] else model.slackCol(part.rows[column - sub.n])
+            for ((local, column) in basis.basicVars.withIndex()) {
+                val slot = basisSlots?.get(index)?.get(local) ?: at++
+                basic[slot] = if (column < sub.n) part.cols[column] else model.slackCol(part.rows[column - sub.n])
             }
         }
         return Basis(basic, status, captureEligible = false)

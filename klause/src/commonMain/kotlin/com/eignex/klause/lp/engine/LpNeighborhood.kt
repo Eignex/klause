@@ -159,6 +159,7 @@ internal fun LpModel.restrictTo(
      *  many small components dwarfs the restriction itself. Cleared for the rows it touches on the way
      *  out, so the buffer comes back all `-1` and the next call cannot see this one's rows. */
     rowMapScratch: IntArray? = null,
+    meter: LpProjectionMeter? = null,
 ): LpNeighborhood {
     val subN = takenCols.size
     val subM = takenRows.size
@@ -166,7 +167,7 @@ internal fun LpModel.restrictTo(
     for (r in 0 until subM) rowMap[takenRows[r]] = r
     exactState?.let { state ->
         try {
-            return state.restrictTo(takenCols, takenRows, colMap, copyCosts, rowMap)
+            return state.restrictTo(takenCols, takenRows, colMap, copyCosts, rowMap, meter)
         } finally {
             if (rowMapScratch != null) for (r in 0 until subM) rowMap[takenRows[r]] = -1
         }
@@ -309,13 +310,16 @@ private fun LpExactState.restrictTo(
     colMap: IntArray?,
     copyCosts: Boolean,
     rowMap: IntArray,
+    meter: LpProjectionMeter?,
 ): LpNeighborhood {
     val source = model
     val indices = columns.toIntArray() + IntArray(rows.size) { source.n + rows[it] }
     val zero = ExactLpNumber.of(0L)
     val restricted = ExactLpModel(
         matrix = List(columns.size) { column ->
+            meter?.poll()
             source.columnEntries(columns[column]).mapNotNull { entry ->
+                meter?.poll()
                 rowMap[entry.row].takeIf { it >= 0 }?.let { ExactLpEntry(it, entry.number) }
             }.sortedBy { it.row }
         },
@@ -335,9 +339,14 @@ private fun LpExactState.restrictTo(
     return LpNeighborhood(working, colMap, rows.toIntArray(), columns.toIntArray())
 }
 
-internal fun LpNeighborhood.rebindExact(state: LpExactState, token: Cancellation): LpNeighborhood? {
+internal fun LpNeighborhood.rebindExact(
+    state: LpExactState,
+    token: Cancellation,
+    meter: LpProjectionMeter = LpProjectionMeter(cancellation = token),
+): LpNeighborhood? {
     val previous = model.exactState ?: return null
     val source = state.model
+    meter.reserve((cols.size.toLong() + rows.size) * 4L + 1L, 0L, matrix = false)
     val indices = cols + IntArray(rows.size) { source.n + rows[it] }
     val columns = ArrayList<ExactLpColumn>(indices.size)
     for ((local, original) in indices.withIndex()) {
@@ -365,7 +374,7 @@ internal fun LpNeighborhood.rebindExact(state: LpExactState, token: Cancellation
     if (!previous.sameMatrix(next)) return null
     next.inheritProjection(previous)
     next.inheritScalars(previous)
-    val working = next.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return null
+    val working = next.ownerWorkingModel(meter) ?: return null
     return LpNeighborhood(working, colMap, rows, cols)
 }
 
