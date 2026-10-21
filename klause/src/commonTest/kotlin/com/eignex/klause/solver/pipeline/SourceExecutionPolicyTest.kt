@@ -45,7 +45,8 @@ class SourceExecutionPolicyTest {
         ))
 
         val failure = assertFailsWith<PipelineConfigException> {
-            SourceExecutionRequest(invocation, ExecutionOptions(), presolveConfig = PresolveConfig.parse("off,+probe-open"))
+            SourceExecutionRequest(invocation, ExecutionOptions(),
+                presolveConfig = PresolveConfig.parse("off,+probe-open"))
         }
 
         assertTrue("canonical factor model" in assertNotNull(failure.message))

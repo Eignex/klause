@@ -89,8 +89,8 @@ internal fun PolynomialTheoryRequest.reconstructSource(sample: Sample, params: P
 
 internal fun PolynomialTheoryRequest.preparationStats(stats: SolveStats): SolveStats {
     val preparation = sourcePreparation?.stats ?: return stats
-    return stats.copy(presolve = preparation,
-        run = stats.run.copy(wallMs = stats.run.wallMs + requireNotNull(preparation.effort).elapsed.inWholeMilliseconds))
+    val elapsedMs = requireNotNull(preparation.effort).elapsed.inWholeMilliseconds
+    return stats.copy(presolve = preparation, run = stats.run.copy(wallMs = stats.run.wallMs + elapsedMs))
 }
 
 internal fun SolveResult.withStats(stats: SolveStats): SolveResult = when (this) {
