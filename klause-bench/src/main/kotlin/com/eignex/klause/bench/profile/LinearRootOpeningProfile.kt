@@ -71,11 +71,11 @@ internal object LinearRootOpeningProfile {
         }
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            compiled.source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            cancellation = stop,
-        )
+                compiled.source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                cancellation = stop,
+            ),
         )
         val model = requireNotNull(invocation.preparedPlan?.model) { "source has no factor inspection view" }
         val request = (invocation.route as? SourceProblemRoute.OpenTheory)?.request
@@ -140,8 +140,8 @@ internal object LinearRootOpeningProfile {
                 put(
                     "runtimeOptions",
                     buildJsonArray {
-                    ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-                }
+                        ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
+                    },
                 )
             }
             out.resolve("root-opening.json").writeText(result.toString() + "\n")
@@ -175,8 +175,8 @@ internal object LinearRootOpeningProfile {
         command += args
         out.resolve("launcher.json").writeText(
             buildJsonObject {
-            put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
-        }.toString() + "\n"
+                put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
+            }.toString() + "\n",
         )
         val builder = ProcessBuilder(command)
             .redirectOutput(out.resolve("measured.stdout"))
@@ -195,10 +195,10 @@ internal object LinearRootOpeningProfile {
             out.resolve("measured.exit").writeText("${process.exitValue()}\n")
             out.resolve("transport-status.json").writeText(
                 buildJsonObject {
-                put("timeout", transportTimeout)
-                put("forcedTermination", forced)
-                put("exit", process.exitValue())
-            }.toString() + "\n"
+                    put("timeout", transportTimeout)
+                    put("forcedTermination", forced)
+                    put("exit", process.exitValue())
+                }.toString() + "\n",
             )
         }
         check(!transportTimeout) { "measured root JVM transport timed out" }

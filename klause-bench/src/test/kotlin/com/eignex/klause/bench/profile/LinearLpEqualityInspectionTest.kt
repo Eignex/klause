@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -102,7 +103,7 @@ class LinearLpEqualityInspectionTest {
         assertEquals(
             "7",
             columns[2].jsonObject.getValue("lower").jsonObject.getValue("value")
-            .jsonObject.getValue("rational").jsonPrimitive.content
+                .jsonObject.getValue("rational").jsonPrimitive.content,
         )
         val coefficient = captured.getValue("matrix").jsonArray[1].jsonObject.getValue("entries")
             .jsonArray.single().jsonObject.getValue("coefficient").jsonObject
@@ -122,7 +123,7 @@ class LinearLpEqualityInspectionTest {
 
     @Test
     fun `a theory without an LP delegate should retain an explicit unavailable state`() {
-        val out = java.nio.file.Files.createTempDirectory("lp-equality-inspection").toFile()
+        val out = Files.createTempDirectory("lp-equality-inspection").toFile()
         try {
             LinearLpEqualityInspection.inspect(Any(), null, false, out)
 

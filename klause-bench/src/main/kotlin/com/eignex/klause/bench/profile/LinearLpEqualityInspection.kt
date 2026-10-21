@@ -55,22 +55,22 @@ internal object LinearLpEqualityInspection {
             put(
                 "rowIdentities",
                 buildJsonArray {
-                repeat(member(model, "getM") as Int) { index ->
-                    budget.poll()
-                    val identity = requireNotNull(row.invoke(identities, index))
-                    add(
-                        budget.keep(
-                            buildJsonObject {
-                        put("index", index)
-                        put("id", member(identity, "getId").toString())
-                        put("depth", scalar(member(identity, "getDepth")))
-                        put("active", member(identity, "getActive") as Boolean)
-                        put("suspendedAt", scalar(member(identity, "getSuspendedAt")))
-                    }
+                    repeat(member(model, "getM") as Int) { index ->
+                        budget.poll()
+                        val identity = requireNotNull(row.invoke(identities, index))
+                        add(
+                            budget.keep(
+                                buildJsonObject {
+                                    put("index", index)
+                                    put("id", member(identity, "getId").toString())
+                                    put("depth", scalar(member(identity, "getDepth")))
+                                    put("active", member(identity, "getActive") as Boolean)
+                                    put("suspendedAt", scalar(member(identity, "getSuspendedAt")))
+                                },
+                            ),
                         )
-                    )
-                }
-            }
+                    }
+                },
             )
             put("rowRemovalAuthorized", false)
             put("coordinateEliminationAuthorized", false)
@@ -101,12 +101,12 @@ internal object LinearLpEqualityInspection {
                 "objective",
                 budget.keep(
                     buildJsonObject {
-                put("sense", member(objective, "getSense").toString())
-                put("constant", number(member(objective, "getConstant"), budget))
-                put("scale", number(member(objective, "getScale"), budget))
-                put("externalConstant", number(member(objective, "getExternalConstant"), budget))
-            }
-                )
+                        put("sense", member(objective, "getSense").toString())
+                        put("constant", number(member(objective, "getConstant"), budget))
+                        put("scale", number(member(objective, "getScale"), budget))
+                        put("externalConstant", number(member(objective, "getExternalConstant"), budget))
+                    },
+                ),
             )
             put("sourceVerdictClaim", false)
         }
@@ -122,17 +122,17 @@ internal object LinearLpEqualityInspection {
             add(
                 budget.keep(
                     buildJsonObject {
-                put("index", index)
-                put("logical", index >= structural)
-                put("origin", number(member(value, "getOrigin"), budget))
-                put("integral", member(value, "getIntegral") as Boolean)
-                put("tag", member(value, "getTag") as Int)
-                put("cost", number(cost.invoke(objective, index), budget))
-                val bounds = requireNotNull(member(value, "getBounds"))
-                put("lower", side(member(bounds, "getLower"), budget))
-                put("upper", side(member(bounds, "getUpper"), budget))
-            }
-                )
+                        put("index", index)
+                        put("logical", index >= structural)
+                        put("origin", number(member(value, "getOrigin"), budget))
+                        put("integral", member(value, "getIntegral") as Boolean)
+                        put("tag", member(value, "getTag") as Int)
+                        put("cost", number(cost.invoke(objective, index), budget))
+                        val bounds = requireNotNull(member(value, "getBounds"))
+                        put("lower", side(member(bounds, "getLower"), budget))
+                        put("upper", side(member(bounds, "getUpper"), budget))
+                    },
+                ),
             )
         }
     }
@@ -144,26 +144,26 @@ internal object LinearLpEqualityInspection {
             add(
                 budget.keep(
                     buildJsonObject {
-                put("column", index)
-                put(
-                    "entries",
-                    buildJsonArray {
-                    for (entry in entries.invoke(owner, index) as List<*>) {
-                        budget.poll()
-                        val value = requireNotNull(entry)
-                        add(
-                            budget.keep(
-                                buildJsonObject {
-                            put("row", member(value, "getRow") as Int)
-                            put("coefficient", number(member(value, "getNumber"), budget))
-                        }
-                            )
+                        put("column", index)
+                        put(
+                            "entries",
+                            buildJsonArray {
+                                for (entry in entries.invoke(owner, index) as List<*>) {
+                                    budget.poll()
+                                    val value = requireNotNull(entry)
+                                    add(
+                                        budget.keep(
+                                            buildJsonObject {
+                                                put("row", member(value, "getRow") as Int)
+                                                put("coefficient", number(member(value, "getNumber"), budget))
+                                            },
+                                        ),
+                                    )
+                                }
+                            },
                         )
-                    }
-                }
-                )
-            }
-                )
+                    },
+                ),
             )
         }
     }
@@ -177,13 +177,13 @@ internal object LinearLpEqualityInspection {
             add(
                 budget.keep(
                     buildJsonObject {
-                put("index", index)
-                put("rhs", number(rhs.invoke(owner, index), budget))
-                put("global", member(value, "getGlobal") as Boolean)
-                put("strict", member(value, "getStrict") as Boolean)
-                put("premises", premises(member(value, "getPremises"), budget))
-            }
-                )
+                        put("index", index)
+                        put("rhs", number(rhs.invoke(owner, index), budget))
+                        put("global", member(value, "getGlobal") as Boolean)
+                        put("strict", member(value, "getStrict") as Boolean)
+                        put("premises", premises(member(value, "getPremises"), budget))
+                    },
+                ),
             )
         }
     }
@@ -193,10 +193,10 @@ internal object LinearLpEqualityInspection {
     } else {
         budget.keep(
             buildJsonObject {
-            put("value", number(member(value, "getNumber"), budget))
-            put("strict", member(value, "getStrict") as Boolean)
-            put("premises", premises(member(value, "getPremises"), budget))
-        }
+                put("value", number(member(value, "getNumber"), budget))
+                put("strict", member(value, "getStrict") as Boolean)
+                put("premises", premises(member(value, "getPremises"), budget))
+            },
         )
     }
 
@@ -205,31 +205,31 @@ internal object LinearLpEqualityInspection {
     } else {
         budget.keep(
             buildJsonObject {
-            put(
-                "bounds",
-                buildJsonArray {
-                for (entry in member(value, "boundEntries") as List<*>) {
-                    budget.poll()
-                    val bound = requireNotNull(entry)
-                    add(
-                        budget.keep(
-                            buildJsonObject {
-                        put("variable", member(bound, "getVariable") as Int)
-                        put("upper", member(bound, "getUpper") as Boolean)
-                        put("threshold", number(member(bound, "getThreshold"), budget))
-                    }
-                        )
-                    )
-                }
-            }
-            )
-            put(
-                "literals",
-                buildJsonArray {
-                for (literal in member(value, "literalEntries") as List<*>) add(budget.keep(scalar(literal)))
-            }
-            )
-        }
+                put(
+                    "bounds",
+                    buildJsonArray {
+                        for (entry in member(value, "boundEntries") as List<*>) {
+                            budget.poll()
+                            val bound = requireNotNull(entry)
+                            add(
+                                budget.keep(
+                                    buildJsonObject {
+                                        put("variable", member(bound, "getVariable") as Int)
+                                        put("upper", member(bound, "getUpper") as Boolean)
+                                        put("threshold", number(member(bound, "getThreshold"), budget))
+                                    },
+                                ),
+                            )
+                        }
+                    },
+                )
+                put(
+                    "literals",
+                    buildJsonArray {
+                        for (literal in member(value, "literalEntries") as List<*>) add(budget.keep(scalar(literal)))
+                    },
+                )
+            },
         )
     }
 
@@ -242,9 +242,9 @@ internal object LinearLpEqualityInspection {
         }
         return budget.keep(
             buildJsonObject {
-            put("rational", fraction.toString())
-            put("ieeeBits", scalar(member(owner, "getIeeeBits")))
-        }
+                put("rational", fraction.toString())
+                put("ieeeBits", scalar(member(owner, "getIeeeBits")))
+            },
         )
     }
 
