@@ -333,8 +333,45 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         return result
     }
 
-    fun specialize(polynomial: Polynomial, variable: Int, coordinates: Map<Int, AlgebraicReal>): AlgebraicPolynomial =
-        this.polynomial(arithmetic.coefficients(polynomial, variable).map { evaluate(it, coordinates) })
+    fun specialize(polynomial: Polynomial, variable: Int, coordinates: Map<Int, AlgebraicReal>): AlgebraicPolynomial {
+        val coefficients = arithmetic.coefficients(polynomial, variable)
+        val captured = captureSpecialization(coefficients, coordinates)
+            ?: return this.polynomial(coefficients.map { evaluate(it, coordinates) })
+        val specialized = this.polynomial(captured.coefficients.map { evaluate(it, captured.base) })
+        if (specialized.coefficients.all { arithmetic.step(); it.rational != null }) return specialized
+        return AlgebraicPolynomial(
+            specialized.coefficients,
+            AlgebraicSpecialization(captured.base, captured.coefficients.take(specialized.degree + 1)),
+        )
+    }
+
+    private fun captureSpecialization(
+        coefficients: List<Polynomial>,
+        coordinates: Map<Int, AlgebraicReal>,
+    ): AlgebraicSpecialization? {
+        var baseId: Int? = null
+        for (coefficient in coefficients) for (id in coefficient.variables) {
+            arithmetic.step()
+            if (requireNotNull(coordinates[id]).rational != null) continue
+            if (baseId != null && baseId != id) return null
+            baseId = id
+        }
+        val id = baseId ?: return null
+        val base = coordinates.getValue(id)
+        val captured = coefficients.map { coefficient ->
+            arithmetic.step()
+            var remaining = coefficient
+            for (other in coefficient.variables) {
+                arithmetic.step()
+                if (other == id) continue
+                remaining = arithmetic.substitute(
+                    remaining, other, Polynomial.constant(requireNotNull(coordinates.getValue(other).rational)),
+                )
+            }
+            extract(remaining, id)
+        }
+        return AlgebraicSpecialization(base, captured)
+    }
 
     fun polynomial(coefficients: List<AlgebraicReal>): AlgebraicPolynomial {
         arithmetic.step()
@@ -366,6 +403,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             arithmetic.denseSize(polynomial.degree)
             return roots(RationalPolynomial(rational))
         }
+        polynomial.specialization?.let { return CorrelatedAlgebraicRoots(this).roots(it) }
         val variable = coefficients.size
         var relation = Polynomial.ZERO
         for ((index, coefficient) in coefficients.withIndex()) {
