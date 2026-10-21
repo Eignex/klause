@@ -30,6 +30,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 
 /*
@@ -45,7 +46,7 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun CommonOptions.routingCancellation(): Cancellation {
     routingToken?.let { return it }
     if (!takeOpenBoundProof()) return Cancellation { true }.also { routingToken = it }
-    val solveStop = Cancellation { deadlineAtMs?.let { nowMillis() >= it } == true }
+    val solveStop = Cancellation { deadlineExpired() }
     val budget = sharedPresolveBudget()
     val phaseStop = presolveTimeCancellation or solveStop
     val token = budget?.let { routingSlice(it, phaseStop) } ?: phaseStop
@@ -55,7 +56,7 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
 
 // Required admission observes the containing stop while retaining the shared routing work ledger.
 internal fun CommonOptions.routingPreparationCancellation(): RoutingPreparationScope = RoutingPreparationScope(
-    { deadlineAtMs?.let { nowMillis() >= it } == true },
+    this::deadlineExpired,
     routingCancellation().workMeter(),
 )
 
@@ -160,12 +161,20 @@ internal class CommonOptions {
 
     var engine: String? = null
     var timeLimitMs: Long? = null
+    private var deadlineMark: ComparableTimeMark? = null
 
     /** Absolute wall-clock instant (in [nowMillis] units) at which the `-t` budget expires,
      *  anchored once before the input is loaded. A single deadline shared by the construction-time bake
      *  ([CliMode.load]) and the solve phase ([SolveCore]) so the two phases don't each spend a
      *  fresh full budget (which would let `-t` overshoot ~2×). Null when no `-t` is given. */
     var deadlineAtMs: Long? = null
+        set(value) {
+            field = value
+            deadlineMark = value?.let(::deadlineMarkAtMillis)
+        }
+
+    internal fun deadlineExpired(): Boolean = deadlineMark?.hasPassedNow()
+        ?: (deadlineAtMs?.let { nowMillis() >= it } == true)
 
     /** Null also represents an explicitly disabled cap, so initialization is tracked separately. */
     internal var presolveAllowanceInitialized = false

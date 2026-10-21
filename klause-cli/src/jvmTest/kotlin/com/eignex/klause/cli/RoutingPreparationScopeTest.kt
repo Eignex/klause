@@ -39,9 +39,19 @@ class RoutingPreparationScopeTest {
         stop.close()
         assertFalse(stop())
 
-        common.deadlineAtMs = nowMillis() - 1L
+        for ((deadline, expired) in listOf(
+            (nowMillis() + 60_000L) to false,
+            (nowMillis() - 1L) to true,
+            null to false,
+            Long.MIN_VALUE to true,
+            Long.MAX_VALUE to false,
+            (nowMillis() - 1L) to true,
+            (nowMillis() + 60_000L) to false,
+        )) {
+            common.deadlineAtMs = deadline
 
-        assertTrue(stop())
+            assertEquals(expired, stop())
+        }
     }
 
     @Test
