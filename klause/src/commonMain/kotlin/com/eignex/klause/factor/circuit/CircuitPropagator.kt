@@ -155,6 +155,8 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
                 if (!state.tightenIntMax(v, d.max - 1, ant)) return fail(Reason(state).addAll(ant).lower(v))
             } else if (d.min == d.max && d.min == i.toLong()) {
                 return fail(Reason(state).fixed(i))
+            } else if (i.toLong() in d && !state.excludeIntValue(v, i.toLong(), Reason(state).build())) {
+                return fail(Reason(state).fixed(i))
             }
         }
         val pred = IntArray(n) { -1 }
@@ -167,7 +169,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
                 pred[target] = i
             }
         }
-        if (!shaveClaimed(state, pred)) return false
+        if (!excludeClaimed(state, pred)) return false
         val visited = BooleanArray(n)
         val posOnPath = IntArray(n) { -1 }
         val path = IntArrayList()
@@ -232,6 +234,8 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
                     if (!state.tightenIntMax(v, d.max - 1, own)) return fail(Reason(state).addAll(own).lower(v))
                 } else if (d.min == d.max && d.min == start.toLong()) {
                     return fail(Reason(state).addAll(ant).fixed(i))
+                } else if (!state.excludeIntValue(v, start.toLong(), ant)) {
+                    return fail(Reason(state).addAll(ant).fixed(i))
                 }
             }
         }
@@ -240,31 +244,18 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         return true
     }
 
-    // Shave the values other successors have claimed off each open successor's endpoints, citing those claims.
-    private fun shaveClaimed(state: PropagationState, claimed: IntArray): Boolean {
+    // A fixed incoming edge excludes every competing incoming edge, including interior domain values.
+    private fun excludeClaimed(state: PropagationState, claimed: IntArray): Boolean {
         for (i in succ.indices) {
             val v = succ[i]
-            val d = state.intDomains[v]
-            if (d.min == d.max) continue
-            var newMin = d.min
-            val lowReason = Reason(state)
-            while (newMin < d.max && claimed[newMin.toInt()] != -1 && claimed[newMin.toInt()] != i) {
-                lowReason.fixed(claimed[newMin.toInt()])
-                newMin++
-            }
-            var newMax = d.max
-            val highReason = Reason(state)
-            while (newMax > newMin && claimed[newMax.toInt()] != -1 && claimed[newMax.toInt()] != i) {
-                highReason.fixed(claimed[newMax.toInt()])
-                newMax--
-            }
-            if (newMin != d.min) {
-                val ant = lowReason.lower(v).build()
-                if (!state.tightenIntMin(v, newMin, ant)) return fail(Reason(state).addAll(ant).upper(v))
-            }
-            if (newMax != d.max) {
-                val ant = highReason.upper(v).build()
-                if (!state.tightenIntMax(v, newMax, ant)) return fail(Reason(state).addAll(ant).lower(v))
+            if (state.intDomains[v].min == state.intDomains[v].max) continue
+            for (target in claimed.indices) {
+                val owner = claimed[target]
+                if (owner < 0 || owner == i || target.toLong() !in state.intDomains[v]) continue
+                val reason = Reason(state).fixed(owner)
+                if (!state.excludeIntValue(v, target.toLong(), reason.build())) {
+                    return fail(reason.fixed(i))
+                }
             }
         }
         return true

@@ -13,15 +13,59 @@ import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.boundEstablishment
 import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.holeReasonFor
+import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.propagation.undoTo
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CircuitPropagatorTest {
+
+    @Test
+    fun `a full circuit should exclude interior self loops`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, 3) },
+            factors = arrayOf<Factor>(Circuit(IntArray(4) { it })),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+
+        assertNull(state.runToFixpoint(allFactors = true))
+
+        assertFalse(1L in state.intDomains[1])
+        assertFalse(2L in state.intDomains[2])
+    }
+
+    @Test
+    fun `a fixed incoming edge should exclude an interior competing edge with its premise`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = Array(5) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(Circuit(IntArray(5) { it })),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.undoLogging = true
+        val mark = state.mark()
+        state.currentLevel = 1
+        assertTrue(state.setInt(4, 2))
+
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertFalse(2L in state.intDomains[1])
+        val premise = Lit.make(state.atomVarEq(4, 2), false)
+        assertEquals(listOf(premise), state.reasonOf(state.holeReasonFor(1, 2)!!)?.toList())
+        state.undoTo(mark)
+        assertTrue(2L in state.intDomains[1])
+    }
 
     @Test
     fun `strong connectivity should reject a candidate graph with an inescapable component`() {
