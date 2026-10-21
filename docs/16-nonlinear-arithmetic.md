@@ -270,6 +270,19 @@ occurring only linearly in inequalities are eliminated by affine pairing, and si
 propagation can refute the region outright.
 The reduced conjunction supplies projection predicates; the original regional
 predicates supply the witness check for both rewrites and coordinate elimination.
+
+Disjoint equal-dimensional vector blocks can share an orthogonal symmetry. Pure
+isotropic norm predicates identify candidate blocks; an exact coefficient scan
+then requires every regional polynomial to be a linear combination of their norms
+and mutual inner products, with polynomial coefficients in unrotated coordinates.
+Fixed coordinates are excluded, and at least one inner product must couple the
+blocks. A common orthogonal basis makes the first vectors lower trapezoidal with
+nonnegative diagonal entries. These constraints select an orbit representative;
+zero pivots preserve rank-deficient configurations. Every regional model has such
+a representative, so exhaustive refutation retains its authority. This reduction
+is local to the conditioned region, and witnesses still pass its original
+predicates after coordinate reconstruction.
+
 [PolynomialProjection](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
 then builds one polynomial family per level using Collins projection, which
 preserves delineability including repeated roots and vanishing leading

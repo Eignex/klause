@@ -21,6 +21,115 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `orthogonal representatives retain zero vectors in complemented regions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (not (distinct (+ (* x0 x0) (* x1 x1)) 0))) " +
+                "(assert (not (distinct (+ (* x2 x2) (* x3 x3)) 1))) " +
+                "(assert (not (< (+ (* x0 x2) (* x1 x3)) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 500_000))
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertEquals(33, point.realCount)
+        assertEquals(0, algebraic.sign(point.realValue(0)))
+        assertEquals(0, algebraic.sign(point.realValue(1)))
+        val norm = algebraic.add(algebraic.power(point.realValue(2), 2), algebraic.power(point.realValue(3), 2))
+        assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+    }
+
+    @Test
+    fun `orthogonal reduction preserves conditioned original coordinates`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1)) " +
+                "(assert (= (+ (* x2 x2) (* x3 x3)) 1)) " +
+                "(assert (<= (+ (* x0 x2) (* x1 x3)) 0))",
+        )
+        for (value in listOf(BigFraction.MINUS_ONE, BigFraction.ONE)) {
+            val fixed = mapOf(0 to value, 1 to BigFraction.ZERO)
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+                QfNraParams(maximumWork = 500_000), PolynomialCondition(lower = fixed, upper = fixed))
+
+            val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+            assertEquals(33, point.realCount)
+            assertEquals(0, algebraic.compare(point.realValue(0), algebraic.rational(value)))
+            assertEquals(0, algebraic.sign(point.realValue(1)))
+            val norm = algebraic.add(algebraic.power(point.realValue(2), 2), algebraic.power(point.realValue(3), 2))
+            assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+            assertTrue(algebraic.sign(algebraic.multiply(point.realValue(0), point.realValue(2))) <= 0)
+        }
+    }
+
+    @Test
+    fun `rotationally sensitive predicates retain their original orientation`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1)) " +
+                "(assert (= (+ (* x2 x2) (* x3 x3)) 1)) " +
+                "(assert (<= (+ (* x0 x2) (* x1 x3)) 0)) (assert (< x0 0))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 500_000))
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertEquals(33, point.realCount)
+        assertTrue(algebraic.sign(point.realValue(0)) < 0)
+        for (offset in listOf(0, 2)) {
+            val norm = algebraic.add(algebraic.power(point.realValue(offset), 2),
+                algebraic.power(point.realValue(offset + 1), 2))
+            assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+        }
+        val dot = algebraic.add(algebraic.multiply(point.realValue(0), point.realValue(2)),
+            algebraic.multiply(point.realValue(1), point.realValue(3)))
+        assertTrue(algebraic.sign(dot) <= 0)
+    }
+
+    @Test
+    fun `zero fibres retain eight separated unit vectors`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val norms = (0 until 8).joinToString(" ") { point ->
+            val terms = (0 until 4).joinToString(" ") { axis ->
+                "(* x${4 * point + axis} x${4 * point + axis})"
+            }
+            "(assert (= (+ $terms) 1))"
+        }
+        val separation = (0 until 8).flatMap { left ->
+            (left + 1 until 8).map { right ->
+                val terms = (0 until 4).joinToString(" ") { axis ->
+                    val difference = "(- x${4 * left + axis} x${4 * right + axis})"
+                    "(* $difference $difference)"
+                }
+                "(assert (>= (+ $terms) 1))"
+            }
+        }.joinToString(" ")
+        val source = SmtLibPolynomial.parse("$declarations $norms $separation")
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 5_000_000))
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        for (left in 0 until 8) {
+            val norm = (0 until 4).fold(algebraic.rational(BigFraction.ZERO)) { sum, axis ->
+                algebraic.add(sum, algebraic.power(point.realValue(4 * left + axis), 2))
+            }
+            assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+            for (right in left + 1 until 8) {
+                val distance = (0 until 4).fold(algebraic.rational(BigFraction.ZERO)) { sum, axis ->
+                    val difference = algebraic.subtract(point.realValue(4 * left + axis),
+                        point.realValue(4 * right + axis))
+                    algebraic.add(sum, algebraic.power(difference, 2))
+                }
+                assertTrue(algebraic.compare(distance, algebraic.rational(BigFraction.ONE)) >= 0)
+            }
+        }
+    }
+
+    @Test
     fun `retained equalities reduce projection predicates without removing coordinates`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val expression = "(+ (* x0 x0) (* x1 x1) x0)"

@@ -50,6 +50,7 @@ internal class PolynomialAffineReduction private constructor(
             region: PolynomialBooleanRegion,
             realCount: Int,
             arithmetic: PolynomialArithmetic,
+            fixed: Set<Int> = emptySet(),
             onGraph: (() -> Unit)? = null,
         ): Iterator<PolynomialAffineReduction?> = sequence {
             var current = region.atoms.map { (index, truth) ->
@@ -68,11 +69,18 @@ internal class PolynomialAffineReduction private constructor(
                 yield(PolynomialAffineReduction(current, emptyList(), true, false))
                 return@sequence
             }
+            val gauging = preparePolynomialOrthogonalGauge(current, fixed, arithmetic)
+            var gauge: List<PolynomialAtom>? = null
+            while (gauge == null) {
+                gauge = gauging.next()
+                if (gauge == null) yield(null)
+            }
+            current = current + gauge
             val fibres = ArrayList<AffineFibre>()
             var inconsistent = false
             var normalizeConjunction = true
             var graphChanges = false
-            var predicatesChanged = false
+            var predicatesChanged = gauge.isNotEmpty()
             while (true) {
                 if (normalizeConjunction) {
                     val preparation = preparePolynomialConjunction(current, arithmetic)
