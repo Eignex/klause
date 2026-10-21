@@ -110,9 +110,13 @@ class CoverColumnDominanceTest {
                 ReifiedPseudoBoolean(2, longArrayOf(1), intArrayOf(literal), PbOp.GE, 1),
             )
             for (reader in readers) {
-                val problem = Problem(3, 0, emptyArray(), listOf(
-                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))), reader,
-                ))
+                val problem = Problem(
+                    3, 0, emptyArray(),
+                    listOf(
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                    reader,
+                )
+                )
 
                 assertTrue(CoverColumnDominance.pins(problem, mapOf(0 to 2L, 1 to 1L), Cancellation.Never).isEmpty())
             }
@@ -159,15 +163,21 @@ class CoverColumnDominanceTest {
 
     @Test
     fun `an interrupted index should not overlook a late unsupported reader`() {
-        val problem = Problem(2, 0, emptyArray(), listOf(
+        val problem = Problem(
+            2, 0, emptyArray(),
+            listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-        ))
+        )
+        )
         for (limit in 0L..40L) {
             val budget = PresolveBudget(limit)
 
-            val pins = CoverColumnDominance.pins(problem, mapOf(0 to 2L, 1 to 1L),
-                budget.orSpent(Cancellation.Never))
+            val pins = CoverColumnDominance.pins(
+                problem,
+                mapOf(0 to 2L, 1 to 1L),
+                budget.orSpent(Cancellation.Never),
+            )
 
             assertTrue(pins.isEmpty())
         }
@@ -175,11 +185,16 @@ class CoverColumnDominanceTest {
 
     @Test
     fun `both scheduled lanes should retain the supplied cancellation`() {
-        val problem = Problem(2, 0, emptyArray(), listOf(
+        val problem = Problem(
+            2, 0, emptyArray(),
+            listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-        ))
-        val context = PresolveContext(objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L),
-            cancellation = Cancellation { true })
+        )
+        )
+        val context = PresolveContext(
+            objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L),
+            cancellation = Cancellation { true },
+        )
 
         assertTrue(PresolvePass.DUAL_FIX.applySource(problem, context).isEmpty)
         assertTrue(PresolvePass.DUAL_FIX.applyFinite(problem.bake(), context).isEmpty)
@@ -210,8 +225,10 @@ class CoverColumnDominanceTest {
         val objective = assertNotNull(source.objective).toLinearObjective()
 
         val prepared = PresolvePipeline.run(source.problem, objective, PresolveConfig.DEFAULT, false)
-        val result = BacktrackSolver(prepared.problem.bake()).minimize(prepared.objective ?: objective,
-            BacktrackParams(randomSeed = 0L))
+        val result = BacktrackSolver(prepared.problem.bake()).minimize(
+            prepared.objective ?: objective,
+            BacktrackParams(randomSeed = 0L),
+        )
         val witness = prepared.reconstruct(assertNotNull(result.assignment))
 
         assertTrue(prepared.changed)
@@ -221,8 +238,11 @@ class CoverColumnDominanceTest {
         assertEquals(1L, objective.evaluateLong(witness))
         val mask = (if (witness.boolValue(0)) 1 else 0) or (if (witness.boolValue(1)) 2 else 0)
         assertTrue(document.hardClauses.all { holds(Clause(it), mask) })
-        assertEquals(objective.evaluateLong(witness), document.fixedCost + document.softClauses
-            .filter { !holds(Clause(it.literals), mask) }.sumOf { it.weight })
+        assertEquals(
+            objective.evaluateLong(witness),
+            document.fixedCost + document.softClauses
+            .filter { !holds(Clause(it.literals), mask) }.sumOf { it.weight }
+        )
         val assumptions = Assumptions.None.withBool(0, witness.boolValue(0)).withBool(1, witness.boolValue(1))
         assertFalse(source.problem.propagate(assumptions) is PropagationResult.Unsat)
     }
@@ -233,8 +253,11 @@ class CoverColumnDominanceTest {
         val problem = Problem(2, 0, emptyArray(), listOf(clause))
         val objective = LinearObjective(boolWeights = longArrayOf(2, 1))
         val context = PresolveContext.of(objective, solutionSetSensitive = true)
-        for (config in listOf(PresolveConfig.DEFAULT, PresolveConfig.parse("off,+dual-fix"),
-            PresolveConfig.parse("all"))) {
+        for (config in listOf(
+            PresolveConfig.DEFAULT,
+            PresolveConfig.parse("off,+dual-fix"),
+            PresolveConfig.parse("all"),
+        )) {
             assertFalse(config.resolved(PresolvePass.DUAL_FIX, context))
         }
         val config = PresolveConfig.parse("off,+dual-fix")
@@ -244,9 +267,12 @@ class CoverColumnDominanceTest {
 
         assertTrue(source.passesFired.isEmpty())
         assertFalse(finite.changed)
-        assertEquals(listOf(1, 2, 3), (0 until 4).filter { mask ->
+        assertEquals(
+            listOf(1, 2, 3),
+            (0 until 4).filter { mask ->
             finite.problem.factors.all { holds(it as Clause, mask) }
-        })
+        }
+        )
     }
 
     private fun holds(clause: Clause, mask: Int): Boolean = clause.literals.any {
