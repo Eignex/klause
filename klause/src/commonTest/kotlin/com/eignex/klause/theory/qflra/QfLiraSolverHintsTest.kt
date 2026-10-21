@@ -50,6 +50,75 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `deferred compatible guards should be asserted before solving an incompatible guard`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = doubleArrayOf(1.0, 0.0, 0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), IntArray(3) { it },
+                    DoubleArray(3) { 1.0 }, LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 0.5),
+                Linear(intArrayOf(), doubleArrayOf(), IntArray(3) { it }, DoubleArray(3) { 1.0 },
+                    LinearOp.GE, 0.0),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED"))
+
+            val result = session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
+    fun `deferred source checks should expire when backtracking replaces the retained point`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = doubleArrayOf(1.0, 0.0, 0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), IntArray(3) { it },
+                    DoubleArray(3) { 1.0 }, LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 0.5),
+                Linear(intArrayOf(), doubleArrayOf(), IntArray(3) { it }, DoubleArray(3) { 1.0 },
+                    LinearOp.GE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertEquals(false, hints.preferredBool(0))
+
+            val result = session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
     fun `registered real bounds should check a retained point before partial reuse`() {
         for (incompatible in listOf(false, true)) {
             val model = Problem(
@@ -274,8 +343,9 @@ class QfLiraSolverHintsTest {
 
             assertEquals(ComponentCheck.Feasible, component.check(session))
             assertEquals(300L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED"))
-            assertEquals(1L, stats.snapshot().completeSearchLinearChecks)
-            assertEquals(1L, stats.snapshot().completeSearchLinearPoints)
+            assertEquals(0L, stats.snapshot().completeSearchLinearChecks)
+            assertEquals(0L, stats.snapshot().completeSearchLinearPoints)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_COMPLETE_ACCEPTED"))
         }
     }
 

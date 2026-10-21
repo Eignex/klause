@@ -59,9 +59,11 @@ A check proceeds in four steps:
    states are checked once at least one arithmetic row is determined.
    Default pure-real checks can retain a feasible point across source updates.
    Each newly resolved comparison, including shared heads and resolved Boolean
-   coefficients, checks that point before assertion. Registered source bounds
+   coefficients, checks that point before LP assembly. Registered source bounds
    also require current source ownership and exact evaluation. If every update
-   holds, the partial check can skip a redundant numerical solve. Failed or
+   holds, the partial check can defer the LP row and skip a numerical solve.
+   Deferred rows stay tied to that point; retirement clears their proof stamps,
+   and ordinary solving first asserts every active deferred row. Failed or
    unavailable checks discard the point and leave certification to the LP.
 3. **Explain.** An infeasible system produces a conflict from the certified
    infeasibility support: each cited row or bound contributes its premise literals.
@@ -119,7 +121,9 @@ and deadline allowance. Retraction, restart and unchecked arithmetic changes
 discard the point, while a completed private numerical query does not end its lifetime.
 The private index, returned heads and point share the 65,536-entry admission limit.
 Both storage forms can retain the same admitted point for checked partial reuse.
-Complete Boolean states take the ordinary source witness path.
+Complete Boolean states can submit the retained point to the full source witness
+check. A missing disjunct or disequality direction leaves completion to ordinary
+solving and branching.
 
 ### Results and proof authority
 

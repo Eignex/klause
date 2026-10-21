@@ -210,6 +210,7 @@ class ExactLiraSearchComponent private constructor(
     private val hasSourceDisjunctions = model.factors.any { it.linearForm is LinearForm.Disjunction }
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
+    // Deferred rows are proved by the retained point and must be reasserted when it retires.
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
@@ -523,7 +524,7 @@ class ExactLiraSearchComponent private constructor(
         graph: Boolean = false,
         reused: Boolean = false,
     ) {
-        retirePointReuse()
+        if (!reused) retirePointReuse()
         pointHintValues = null
         pointHintPoint = null
         val rows = pointHintRows
@@ -596,6 +597,11 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun retirePointReuse() {
+        if (pointReusePoint != null) {
+            for (index in sourceAssertionLevels.indices) {
+                if (sourceAssertionLevels[index] == DEFERRED_SOURCE_ROW) sourceAssertionLevels[index] = -1
+            }
+        }
         pointReusePoint = null
     }
 
@@ -632,13 +638,21 @@ class ExactLiraSearchComponent private constructor(
         if (pointReusePoint != null) observeCompleteStage("POINT_REUSE_THEORY_BOUND")
     }
 
+    private fun canReusePoint(): Boolean = pointReusePoint != null && pointReuseEnabled && !graphFirst &&
+        solveContext.certificationPolicy === ProductionLpCertificationPolicy && !operationStop() && !pointHintStop()
+
     private fun reuseCompatiblePoint(context: SearchContext): Boolean {
+        if (!canReusePoint()) return false
         val point = pointReusePoint ?: return false
-        if (!pointReuseEnabled || graphFirst ||
-            solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
-            bools.none { it == UNASSIGNED } || operationStop() || pointHintStop()
-        ) return false
         candidate = point
+        if (bools.none { it == UNASSIGNED }) {
+            observeCompleteStage("POINT_REUSE_COMPLETE_CHECKED")
+            captureCompleteWitness(point)
+            if (operationStop() || outcome != ComponentCheck.Feasible) return false
+            dirty = false
+            observeCompleteStage("POINT_REUSE_COMPLETE_ACCEPTED")
+            return true
+        }
         dirty = false
         if (pointHintIndex != null) {
             pointHintPoint = point
@@ -1209,13 +1223,16 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
-    private fun assertSource(context: SearchContext): Boolean {
+    private fun assertSource(context: SearchContext, deferPoint: Boolean = false): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
-            if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
+            val assertedLevel = sourceAssertionLevels[index]
+            if ((deferPoint && assertedLevel != -1) ||
+                (context.decisionLevel > 0 && assertedLevel >= 0)
+            ) continue
             val address = prepared.address
             val asserted = node.rowAssertions[address]
             if (prepared.disjunction && asserted == null) continue
@@ -1224,6 +1241,11 @@ class ExactLiraSearchComponent private constructor(
             // A retained point must satisfy every newly resolved source input before it can replace a solve.
             checkPointReuse(comparison)
             if (operationStop()) return false
+            if (deferPoint) {
+                if (pointReusePoint == null) return false
+                sourceAssertionLevels[index] = DEFERRED_SOURCE_ROW
+                continue
+            }
             val leaves = prepared.booleans.map { variable ->
                 SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
             }.toMutableList<SearchAtomPremise>()
@@ -1236,6 +1258,7 @@ class ExactLiraSearchComponent private constructor(
                 sourceAssertionLevels[index] = context.decisionLevel
             }
         }
+        if (deferPoint) return true
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
             if (!system.assertAtom(atom, premise)) return false
@@ -1415,13 +1438,21 @@ class ExactLiraSearchComponent private constructor(
                 else -> Unit
             }
         }
+        if (canReusePoint()) {
+            if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
+            checked = true
+            val deferred = assertSource(context, deferPoint = true)
+            if (operationStop()) return ComponentResult.Indeterminate
+            if (deferred && reuseCompatiblePoint(context)) return ComponentResult.Consistent
+            if (!deferred && pointReusePoint != null) return ComponentResult.Indeterminate
+        }
+        // Ordinary solving must include every active row whose LP assertion was deferred.
+        retirePointReuse()
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
-        if (reuseCompatiblePoint(context)) return ComponentResult.Consistent
-        retirePointReuse()
         if (operationStop()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
@@ -1888,6 +1919,7 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
 
 private const val UNASSIGNED = -1
 private const val DECLINED_HINT = -2
+private const val DEFERRED_SOURCE_ROW = -2
 private const val MAX_POINT_HINT_ENTRIES = 65_536
 private const val MAX_POINT_HINT_BITS = 4096
 private const val FALSE = 0
