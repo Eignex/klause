@@ -234,6 +234,14 @@ Like dual fixing, this rule is excluded from complete-coverage queries.
 
 ### Boolean reductions
 
+Source Boolean equivalence normalization reads clean mandatory binary clauses and
+substitutes same-polarity equivalent variables through compatible factor readers.
+Explicit equivalence clauses keep each alias constrained under its original ID,
+preserving every assignment and objective without reconstruction. The source
+MEDIUM tier runs this normalization; the finite lane retains its separate
+implication probing. A completed contradictory literal component refutes the
+source. Interrupted SCC analysis or rewriting publishes no partial change.
+
 Opt-in `+clause-subsume` removes a clause implied by a retained subset and shortens
 clauses by self-subsuming resolution. It indexes clean Boolean clauses of width at
 most eight, with separate candidate and literal visit caps. Completed edits remain

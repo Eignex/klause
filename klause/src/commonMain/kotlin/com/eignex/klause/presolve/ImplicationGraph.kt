@@ -76,6 +76,76 @@ internal object ImplicationGraph {
         return PresolveShared.sourceIdentityDelta(problem.factors, reduction.factors, reduction.merges.asRebuilds())
     }
 
+    fun normalizeSourceEquivalences(problem: Problem, cancellation: Cancellation): SourceDelta {
+        if (problem.numBoolVars == 0 || problem.numBoolVars > Int.MAX_VALUE / 2) return SourceDelta()
+        val work = GraphWork(cancellation)
+        // Literal adjacency, SCC scratch, remapping arrays and publication buffers share the phase allowance.
+        if (!work.reserve(problem.numBoolVars * 32L + problem.numIntVars + problem.numRealVars)) {
+            return SourceDelta()
+        }
+        val graph = binaryClauseImplications(problem, problem.factors.asList(), work) ?: return SourceDelta()
+        val components = stronglyConnectedComponents(graph, work) ?: return SourceDelta()
+        for (variable in 0 until problem.numBoolVars) {
+            if (!work.visit()) return SourceDelta()
+            if (components[Lit.make(variable, true)] == components[Lit.make(variable, false)]) {
+                return if (work.check()) SourceDelta(infeasible = true) else SourceDelta()
+            }
+        }
+        val candidates = equivalentVariableMerges(problem.numBoolVars, graph, emptySet(), work, components)
+            ?: return SourceDelta()
+        val merges = compatibleMerges(problem, candidates, work) ?: return SourceDelta()
+        if (merges.isEmpty()) return SourceDelta()
+        val boolMap = IntArray(problem.numBoolVars) { it }
+        val links = MutableLongIntMap()
+        for (merge in merges) {
+            if (!work.reserve(8L)) return SourceDelta()
+            boolMap[merge.from] = merge.into
+            links.put(binaryKey(Lit.make(merge.from, false), Lit.make(merge.into, true)), 0)
+            links.put(binaryKey(Lit.make(merge.into, false), Lit.make(merge.from, true)), 0)
+        }
+        val mapping = VarRemap(boolMap, IntArray(problem.numIntVars) { it })
+        val dropped = IntArrayList()
+        val added = ArrayList<Factor>()
+        for ((index, factor) in problem.factors.withIndex()) {
+            val variables = factor.variables
+            if (!work.reserve(1L + variables.boolVars.size + variables.ints.size + variables.reals.size)) {
+                return SourceDelta()
+            }
+            var changed = false
+            for (variable in variables.boolVars) {
+                if (!work.visit() || variable !in boolMap.indices) return SourceDelta()
+                if (boolMap[variable] != variable) changed = true
+            }
+            if (isCleanBinary(factor, problem.numBoolVars)) {
+                val clause = factor as Clause
+                val key = binaryKey(clause.literals[0], clause.literals[1])
+                if (links.containsKey(key)) {
+                    links.put(key, 1)
+                    continue
+                }
+            }
+            if (!changed) continue
+            val remapped = factor.remap(mapping)
+            dropped.add(index)
+            if (remapped !is Clause || !isTautology(remapped, work)) added.add(remapped)
+        }
+        for (merge in merges) {
+            for (from in listOf(true, false)) {
+                if (!work.reserve(4L)) return SourceDelta()
+                val left = Lit.make(merge.from, from)
+                val right = Lit.make(merge.into, !from)
+                if (links.getOrDefault(binaryKey(left, right), 0) == 0) {
+                    added.add(Clause(intArrayOf(left, right)))
+                }
+            }
+        }
+        if (!work.reserve(dropped.size.toLong() + added.size)) return SourceDelta()
+        return SourceDelta(dropped.toIntArray(), added)
+    }
+
+    private fun binaryKey(left: Int, right: Int): Long =
+        (minOf(left, right).toLong() shl Int.SIZE_BITS) or maxOf(left, right).toLong()
+
     /** The factors after collapsing the cycles of [implications] and dropping entailed binaries, or `null`
      *  when neither changed anything. */
     private fun reduceOver(
@@ -189,8 +259,9 @@ internal object ImplicationGraph {
         adj: Adjacency,
         objectiveBoolVars: Set<Int>,
         work: GraphWork,
+        components: IntArray? = null,
     ): List<BoolMerge>? {
-        val componentOf = stronglyConnectedComponents(adj, work) ?: return null
+        val componentOf = components ?: stronglyConnectedComponents(adj, work) ?: return null
         // Representative variable per literal-SCC: the smallest variable id whose positive literal sits
         // in that component. A component is mergeable only through positive literals (same polarity).
         val repVarOfComponent = MutableIntIntMap()
@@ -487,6 +558,13 @@ internal object ImplicationGraph {
             if (stopped) return false
             cancellation.charge(IMPLICATION_GRAPH_WORK_WEIGHT)
             return if (cancellation.workMeter() != null || poll.due()) check() else true
+        }
+
+        fun reserve(units: Long): Boolean {
+            if (stopped) return false
+            val charged = minOf(units, Long.MAX_VALUE / IMPLICATION_GRAPH_WORK_WEIGHT)
+            cancellation.charge(charged * IMPLICATION_GRAPH_WORK_WEIGHT)
+            return check()
         }
     }
 

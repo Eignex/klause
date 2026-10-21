@@ -433,6 +433,22 @@ enum class PresolvePass(
             Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, ctx.cancellation)
     },
 
+    /** Normalize source readers of same-polarity binary-clause equivalences while retaining the
+     *  aliases as explicit equivalence clauses. Every original assignment and objective survives. */
+    NORMALIZE_BOOLEAN_EQUIVALENCES(
+        "bool-equivalences",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = true,
+        autoEligible = true,
+    ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            ImplicationGraph.normalizeSourceEquivalences(problem, ctx.cancellation)
+
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = PassDelta()
+    },
+
     /** Binary implication graph: harvest `lit -> lit` implications by probing-style pinning (from the
      *  binary clauses alone before a finite projection exists), collapse
      *  same-polarity equivalent literals (mutual-implication cycles) to one representative, and drop
@@ -570,13 +586,15 @@ enum class PresolvePass(
     internal fun namespaceEligible(problem: Problem): Boolean = when (this) {
         SUBSUME_CLAUSES -> OriginalClauseSubsumption.eligible(problem)
         AGGREGATE_SUB_SUMS -> problem.numIntVars >= 3
-        ELIMINATE_BOOL_VARS, ELIMINATE_BLOCKED_CLAUSES, IMPLICATION_GRAPH,
+        ELIMINATE_BOOL_VARS, ELIMINATE_BLOCKED_CLAUSES, IMPLICATION_GRAPH, NORMALIZE_BOOLEAN_EQUIVALENCES,
         FOLD_COMPARISON_CLAUSES, PROBE_FAILED_LITERALS -> problem.numBoolVars > 0
         ELIMINATE_AFFINE_SINGLETONS, REDUCE_DIOPHANTINE, PROJECT_SINGLETON_INEQUALITIES,
         VALUE_PRECEDENCE, PROBE_INT_BOUNDS, PROBE_INT_HOLES, SUBSTITUTE_BINARY_COLUMNS -> problem.numIntVars > 0
         MERGE_DUPLICATE_COLUMNS -> problem.numIntVars >= 2
         else -> true
     }
+
+    internal val sourcePreparationOnly: Boolean get() = this == NORMALIZE_BOOLEAN_EQUIVALENCES
 
     /** Independent semantic and multiplicity guarantees under the pass's protected objective. */
     val guarantees: TransformationGuarantees
