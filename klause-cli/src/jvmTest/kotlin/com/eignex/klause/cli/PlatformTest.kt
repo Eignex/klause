@@ -5,8 +5,20 @@ import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.milliseconds
 
 class PlatformTest {
+
+    @Test
+    fun `deadline marks share the millisecond clock origin`() {
+        val origin = deadlineMarkAtMillis(0L)
+
+        for (deadline in listOf(-1L, 0L, 1L, 60_000L)) {
+            val mark = deadlineMarkAtMillis(deadline)
+
+            assertEquals(deadline.milliseconds, mark - origin)
+        }
+    }
 
     @Test
     fun `the format extension should be taken after any compression suffix`() {

@@ -14,9 +14,38 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RoutingPreparationScopeTest {
+    @Test
+    fun `retained admission observes removing and replacing its invocation deadline`() {
+        val common = CommonOptions()
+        val stop = common.routingPreparationCancellation()
+        stop.close()
+        common.deadlineAtMs = Long.MIN_VALUE
+        assertTrue(stop())
+
+        common.deadlineAtMs = null
+        assertFalse(stop())
+        common.deadlineAtMs = Long.MAX_VALUE
+        assertFalse(stop())
+        common.deadlineAtMs = 0L
+        assertTrue(stop())
+    }
+
+    @Test
+    fun `admission deadline polling retains an opaque containing token`() {
+        val common = CommonOptions().apply { deadlineAtMs = Long.MAX_VALUE }
+        val stop = common.routingPreparationCancellation()
+
+        val shortened = stop.shorten(0.25)
+
+        assertNull(stop.deadline())
+        assertSame(stop, shortened)
+        assertFalse(stop())
+    }
+
     @Test
     fun `closing required admission should stop charging its completed routing ledger`() {
         val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }

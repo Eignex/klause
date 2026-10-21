@@ -119,6 +119,12 @@ Solver-control flags are common to every mode; `--help` lists every parameter.
 - `--ozn FILE` (MiniZinc mode): render output with the native `.ozn` applier
   instead of `solns2out`.
 
+The invocation's millisecond deadline is anchored before loading. Assigning it
+captures a mark relative to the same monotonic clock origin, which admission and
+routing poll directly. Retained admission scopes observe deadline replacements
+and removal without exposing a phase-relative deadline or retaining a completed
+routing work ledger.
+
 ### Arithmetic routes
 
 Native arithmetic routes compose the selected engine with exact completion: complete

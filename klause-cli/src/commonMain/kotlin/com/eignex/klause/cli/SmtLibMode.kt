@@ -42,7 +42,7 @@ internal object SmtLibMode : CliMode {
             val overrides = common.sourceOverrides(smtLibSemantics)
             latestSourceObjective = null
             val admissionStart = TimeSource.Monotonic.markNow()
-            val stop = Cancellation { common.deadlineAtMs?.let { nowMillis() >= it } == true }
+            val stop = Cancellation { common.deadlineHasPassed() }
             val parsed = try {
                 SmtLib.parse(
                     { openFileSource(path) },
