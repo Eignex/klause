@@ -2,6 +2,7 @@ import java.io.FileOutputStream
 import java.net.URI
 import java.security.MessageDigest
 import java.util.zip.ZipFile
+import org.gradle.api.tasks.Optional
 import org.gradle.process.ExecOperations
 
 plugins {
@@ -205,15 +206,20 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
     @get:Input abstract val version: Property<String>
     @get:Input abstract val archiveSha256: Property<String>
     @get:OutputDirectory abstract val upstream: DirectoryProperty
+    @get:InputFile @get:Optional @get:PathSensitive(PathSensitivity.NONE)
+    abstract val cachedArchive: RegularFileProperty
 
     @TaskAction
     fun download() {
         val root = upstream.get().asFile
         root.mkdirs()
-        val archive = File(temporaryDir, "miplib.zip")
-        URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
-            .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
-            .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        val downloaded = !cachedArchive.isPresent
+        val archive = if (downloaded) File(temporaryDir, "miplib.zip") else cachedArchive.get().asFile
+        if (downloaded) {
+            URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
+                .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
+                .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        }
         val hash = MessageDigest.getInstance("SHA-256").digest(archive.readBytes())
             .joinToString("") { "%02x".format(it) }
         check(hash == archiveSha256.get()) { "MIPLIB distribution hash differs" }
@@ -228,7 +234,7 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
                 }
             }
         }
-        check(archive.delete())
+        if (downloaded) check(archive.delete())
     }
 }
 val prepareMpsSolchecker = tasks.register<DownloadMpsSolcheckerTask>("prepareMpsSolchecker") {
@@ -236,6 +242,7 @@ val prepareMpsSolchecker = tasks.register<DownloadMpsSolcheckerTask>("prepareMps
     description = "Fetch the pinned upstream MIPLIB checker (MIT)."
     version.set(miplibVersion)
     archiveSha256.set(miplibArchiveSha256)
+    cachedArchive.set(layout.file(providers.environmentVariable("KLAUSE_MIPLIB_ARCHIVE").map { File(it) }))
     upstream.set(miplibDirectory.map { it.dir("upstream") })
 }
 val miplibBinary = miplibDirectory.map { it.file("solchecker") }

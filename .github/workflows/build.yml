@@ -46,6 +46,14 @@ jobs:
       # (linuxArm64, macosArm64) are opt-in via -Ptargets.full and build on release.
 
       # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
+      - name: Fetch pinned MIPLIB checker archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive="$RUNNER_TEMP/miplib2017-testscript-v1.0.4.zip"
+          bash klause-bench/scripts/cache-miplib-solchecker.sh "$archive"
+          printf '%s\n' "KLAUSE_MIPLIB_ARCHIVE=$archive" >> "$GITHUB_ENV"
+
       - name: Run JVM tests with coverage
         run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist
 
@@ -148,6 +156,14 @@ jobs:
           path: ~/.konan
           key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle.kts') }}
           restore-keys: ${{ runner.os }}-konan-
+
+      - name: Fetch pinned MIPLIB checker archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive="$RUNNER_TEMP/miplib2017-testscript-v1.0.4.zip"
+          bash klause-bench/scripts/cache-miplib-solchecker.sh "$archive"
+          printf '%s\n' "KLAUSE_MIPLIB_ARCHIVE=$archive" >> "$GITHUB_ENV"
 
       - name: Run linter
         run: ./gradlew --refresh-dependencies lintDocs
