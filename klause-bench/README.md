@@ -902,6 +902,9 @@ claims remain in the `reported*` fields.
 
 The build downloads the official `miplib2017-testscript-v1.0.4.zip`, pinned to
 SHA-256 `37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9`.
+An I/O failure uses the same archive from the
+[pinned source mirror](https://github.com/Eignex/klause-lab/releases/tag/upstream-miplib2017-testscript-v1.0.4),
+with the hash checked before extraction.
 It extracts only the checker C++ sources, README, Makefile and MIT license, compiles
 the unchanged upstream main with GMP and zlib, and packages those files and the
 binary in the non-published bench artifact. The optional converter is not extracted.

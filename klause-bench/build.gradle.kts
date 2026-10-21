@@ -1,4 +1,5 @@
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.URI
 import java.security.MessageDigest
 import java.util.zip.ZipFile
@@ -211,9 +212,26 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
         val root = upstream.get().asFile
         root.mkdirs()
         val archive = File(temporaryDir, "miplib.zip")
-        URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
-            .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
-            .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        val sources = listOf(
+            URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip"),
+            URI(
+                "https://github.com/Eignex/klause-lab/releases/download/" +
+                    "upstream-miplib2017-testscript-v${version.get()}/" +
+                    "miplib2017-testscript-v${version.get()}.zip",
+            ),
+        )
+        var downloadFailure: IOException? = null
+        for (source in sources) {
+            try {
+                source.toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
+                    .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+                downloadFailure = null
+                break
+            } catch (failure: IOException) {
+                if (downloadFailure == null) downloadFailure = failure else downloadFailure.addSuppressed(failure)
+            }
+        }
+        downloadFailure?.let { throw it }
         val hash = MessageDigest.getInstance("SHA-256").digest(archive.readBytes())
             .joinToString("") { "%02x".format(it) }
         check(hash == archiveSha256.get()) { "MIPLIB distribution hash differs" }
