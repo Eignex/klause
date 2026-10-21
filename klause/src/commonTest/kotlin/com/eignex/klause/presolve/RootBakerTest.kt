@@ -29,6 +29,24 @@ import kotlin.test.assertTrue
 
 class RootBakerTest {
     @Test
+    fun `SAC observations should count tightened columns without requiring fixings`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 3) },
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            ),
+        ).bake(budget.orSpent(Cancellation.Never))
+
+        RootBaker.bake(problem, BakeConfig(probeIntBounds = true))
+
+        val invocation = budget.invocations.single()
+        assertEquals(2, invocation.narrowedColumns)
+        assertEquals(0, invocation.fixedColumns)
+    }
+
+    @Test
     fun `a certified refutation should survive spent construction allowance`() {
         val budget = PresolveBudget(0L)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyList())
