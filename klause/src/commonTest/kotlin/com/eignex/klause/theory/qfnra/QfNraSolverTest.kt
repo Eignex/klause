@@ -21,6 +21,58 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `affine bound consequences retain a full damped fifth order transition counterexample`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val energy = "(+ (* x2 x2) (* (/ 1 25) x2 x3) (* (/ 1 10) x3 x3) " +
+            "(* (- (/ 3 20)) x2) (* (- (/ 1 50)) x3))"
+        val invariant = "(and (<= (- 1) x2) (<= x2 (/ 6 5)) (<= (- (/ 16 5)) x3) " +
+            "(<= x3 (/ 33 10)) (<= $energy (/ 111 100)))"
+        val postcondition = invariant.replace("x2", "x0").replace("x3", "x1")
+        val fifthOrder = "(+ x2 (- (/ (* x2 x2 x2) 6)) (/ (* x2 x2 x2 x2 x2) 120))"
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and $invariant (= x0 (+ x2 (/ x3 100))) " +
+                "(= x1 (+ x3 (/ (- (* (- (/ 1 2)) x3) (* (/ 981 100) $fifthOrder)) 100))) " +
+                "(not $postcondition)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 5_000_000))
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertEquals(33, point.realCount)
+        val hundredth = algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(100)))
+        val u = point.realValue(2)
+        val v = point.realValue(3)
+        val step = algebraic.add(u, algebraic.multiply(hundredth, v))
+        assertEquals(0, algebraic.compare(point.realValue(0), step))
+        val sine = algebraic.evaluate(RationalPolynomial(listOf(BigFraction.ZERO, BigFraction.ONE,
+            BigFraction.ZERO, BigFraction.of(bigIntOf(-1), bigIntOf(6)), BigFraction.ZERO,
+            BigFraction.of(bigIntOf(1), bigIntOf(120)))), u)
+        val acceleration = algebraic.subtract(
+            algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-1), bigIntOf(2))), v),
+            algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(981), bigIntOf(100))), sine))
+        assertEquals(0, algebraic.compare(point.realValue(1),
+            algebraic.add(v, algebraic.multiply(hundredth, acceleration))))
+        val inside = ArrayList<Boolean>()
+        for ((a, b) in listOf(u to v, point.realValue(0) to point.realValue(1))) {
+            val value = listOf(algebraic.power(a, 2),
+                algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(25))),
+                    algebraic.multiply(a, b)),
+                algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(10))),
+                    algebraic.power(b, 2)),
+                algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-3), bigIntOf(20))), a),
+                algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-1), bigIntOf(50))), b))
+                .fold(algebraic.rational(BigFraction.ZERO), algebraic::add)
+            inside.add(algebraic.compare(a, algebraic.rational(BigFraction.MINUS_ONE)) >= 0 &&
+                algebraic.compare(a, algebraic.rational(BigFraction.of(bigIntOf(6), bigIntOf(5)))) <= 0 &&
+                algebraic.compare(b, algebraic.rational(BigFraction.of(bigIntOf(-16), bigIntOf(5)))) >= 0 &&
+                algebraic.compare(b, algebraic.rational(BigFraction.of(bigIntOf(33), bigIntOf(10)))) <= 0 &&
+                algebraic.compare(value, algebraic.rational(BigFraction.of(bigIntOf(111), bigIntOf(100)))) <= 0)
+        }
+        assertEquals(listOf(true, false), inside)
+    }
+
+    @Test
     fun `retained equalities reduce projection predicates without removing coordinates`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val expression = "(+ (* x0 x0) (* x1 x1) x0)"
