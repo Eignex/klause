@@ -253,7 +253,7 @@ Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3, with 0 disabling it. Restart-configured
 backtrack arms count equivalent base work segments, so short fragments cannot
 destroy retained traversal; accepted improvements clear the count, and reseeding
-waits while bounded preparation owns pending work.
+waits while bounded preparation or interrupted root rounding owns pending work.
 
 Complete-search arms without a restart schedule retain their traversal, because
 closing a proof gap need not produce a better incumbent. Reseeding preserves

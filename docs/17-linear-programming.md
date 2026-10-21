@@ -114,7 +114,9 @@ Finite satisfaction and optimization share root hull pruning and cut harvesting;
 objective shaving and incumbent-relative fixings are optimization work. Root
 preparation runs once, under a common time and work allowance, before shared
 initialization publishes its bounds; a cancelled phase contributes only completed
-deductions. Root rounding and pumping propose discrete assignments for mixed
+deductions. Interrupted root rounding retains its relaxation layout and basis for
+later slices, charging every retry to the remaining root and LP work allowances.
+Root rounding and pumping propose discrete assignments for mixed
 models, but a relaxation point supplies a target, never witness authority.
 
 ### Leaf completion

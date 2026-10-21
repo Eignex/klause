@@ -36,6 +36,61 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
+    fun `interrupted rounding should resume only its original LP objective`() {
+        for (sameObjective in listOf(true, false)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            ))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+            var stopped = false
+            var solves = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newTableauSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): TableauCutSolver {
+                    val first = solves++ == 0
+                    val delegate = ProductionLpEngineFactory.newTableauSolver(
+                        model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    )
+                    return object : TableauCutSolver by delegate {
+                        override val lastTermination get() =
+                            if (first) LpFloatTermination.CANCELLED else delegate.lastTermination
+                        override fun solve(warm: Basis?): FloatLpResult? {
+                            if (!first) return if (warm == null) null else delegate.solve(warm)
+                            val result = delegate.solve(warm) ?: return null
+                            stopped = true
+                            return FloatLpResult(result.basis, result.objective, result.duals, result.primal,
+                                optimal = false)
+                        }
+                    }
+                }
+            }
+            val sink = SolveStatsSink(backend = "resumed-rounding")
+            val token = Cancellation { stopped }
+
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+                LpSolveContext(factory)).use { engine ->
+                assertNull(engine.lpRoundingProbe(objective, token))
+                stopped = false
+                val next = if (sameObjective) objective else LinearObjective(intCoefficients = longArrayOf(2, 1))
+
+                val proposal = engine.lpRoundingProbe(next, token)
+
+                if (sameObjective) {
+                    assertEquals(listOf(1L, 0L), assertNotNull(proposal).ints.toList())
+                } else {
+                    assertNull(proposal)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `the pump should change an integral rounding the consumer declines`() {
         for (coefficient in listOf(1L, -1L)) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())

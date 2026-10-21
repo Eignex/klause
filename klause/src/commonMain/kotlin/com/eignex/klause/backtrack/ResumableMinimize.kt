@@ -133,7 +133,8 @@ internal class ResumableMinimize(
     private val deferredInstallation: Boolean = false,
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
-    override val canReseed: Boolean get() = !preparationPending && clausePrimal?.isDone != false
+    override val canReseed: Boolean
+        get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending
     override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
     private var replaced = false
@@ -287,6 +288,8 @@ internal class ResumableMinimize(
     private var rootExhausted: UnsatCore? = null
     private var rootIsExhausted = false
     private var firstRun = true
+    private var rootRoundingPending = false
+    private var rootRoundingAttempted = false
     private var treeBudgetExhausted = false
     private val inprocessing = Inprocessing.from(params, sink.search)
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
@@ -484,6 +487,7 @@ internal class ResumableMinimize(
         globalToken = baseCancellation.lifetimeCancellation() or global
         publishClausePrimalCandidate()?.let { onIncumbent(it.withSourceSemantics(problem.semantics)) }
         if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
+        rootRoundingAttempted = false
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
         // different node on a faster machine and every counter downstream would follow.
@@ -595,6 +599,9 @@ internal class ResumableMinimize(
         run.reset()
         inprocessing?.reset()
         firstRun = true
+        rootRoundingPending = false
+        lpEngine.rootRoundingWarmStart = null
+        lpEngine.rootRoundingInterrupted = false
         treeBudgetExhausted = false
         incumbents = minimizingSampleExchange(problem, params.toleranceCheck)
         objVarBest = null
@@ -652,6 +659,14 @@ internal class ResumableMinimize(
                 firstRunWork()?.let {
                     return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
                 }
+            } else if (rootRoundingPending && !rootRoundingAttempted) {
+                rootPrimalWork(rootLpBudget())?.let {
+                    return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
+                }
+            }
+            if (rootRoundingPending) {
+                slice.charge()
+                if (sliceExpired()) return StepEvent.Paused
             }
             unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
             if (treeBudgetExhausted) return terminal(terminalBudget())
@@ -908,11 +923,12 @@ internal class ResumableMinimize(
     }
 
     /**
-     * One-shot pre-search root work (harvest the global cut pool, capture the root relaxation bound for
+     * Initial pre-search root work (harvest the global cut pool, capture the root relaxation bound for
      * the integrality-gap metric, root shaving, bound exchange, and the primal probes). Run on the first
      * engine step so the live cancellation gates the LP solves. Returns the first incumbent if a probe
      * seeds one (in which case the tree-search probe is skipped this call), else null. The root-LP work
-     * is time-boxed by [rootLpBudget].
+     * is time-boxed by [rootLpBudget]. Interrupted rounding retains its basis for later slices under
+     * the remaining root and LP work allowances.
      */
     private fun firstRunWork(): MinimizeResult.WithSample? {
         if (!hasPreparation) sink.start()
@@ -991,38 +1007,8 @@ internal class ResumableMinimize(
         // arm's (root propagation + shaving), before any incumbent-relative fixing runs.
         boundExchange.importGlobalVarBounds()
         boundExchange.publishGlobalVarBounds()
-        if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
-            fun accept(proposal: Sample): Sample? {
-                val started = TimeSource.Monotonic.markNow()
-                var outcome = "FAILED"
-                try {
-                    val accepted = verifiedLpProposal(proposal, rootToken) { outcome = it } ?: return null
-                    val cutoff = minOf(bestObj, externalCutoff())
-                    if (cutoff.isNaN()) {
-                        outcome = "INVALID_CUTOFF"
-                        return null
-                    }
-                    val exact = exactSourceObjective(objective, accepted.assignment, params.toleranceCheck)
-                    val improving = exact?.let { beatsCutoff(it, cutoff) } ?: (accepted.objective < cutoff)
-                    outcome = when {
-                        !improving -> "NON_IMPROVING"
-                        rootToken() -> "CANCELLED"
-                        else -> "IMPROVING"
-                    }
-                    return accepted.assignment.takeIf { outcome == "IMPROVING" }
-                } finally {
-                    sink.lp.observePrimalPhase("PRIMAL_PROPOSAL", outcome, started.elapsedNow().inWholeNanoseconds)
-                }
-            }
-            val seed = lpEngine.lpRoundingProbe(objective, rootToken,
-                initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
-                toleranceReals = params.toleranceCheck != null,
-                accept = ::accept)
-                ?: lpEngine.lpFeasibilityPump(objective, rootToken,
-                    initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
-                    accept = ::accept)
-            if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
-        }
+        rootPrimalWork(rootToken)?.let { return it }
+        if (rootRoundingPending) return null
         if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null && params.componentFactory == null) {
             val before = lpEngine.primalSearchWork
             val seed = lpEngine.lbTreeSearch(objective, rootToken, params.assumptions, params.toleranceCheck,
@@ -1035,6 +1021,57 @@ internal class ResumableMinimize(
             }
         }
         return null
+    }
+
+    private fun rootPrimalWork(rootToken: Cancellation): MinimizeResult.WithSample? {
+        rootRoundingAttempted = true
+        if (!lpEngine.params.lpPlan.probe || lpEngine.lpRelaxer == null) {
+            rootRoundingPending = false
+            lpEngine.rootRoundingWarmStart = null
+            return null
+        }
+        fun accept(proposal: Sample): Sample? {
+            val started = TimeSource.Monotonic.markNow()
+            var outcome = "FAILED"
+            try {
+                val accepted = verifiedLpProposal(proposal, rootToken) { outcome = it } ?: return null
+                val cutoff = minOf(bestObj, externalCutoff())
+                if (cutoff.isNaN()) {
+                    outcome = "INVALID_CUTOFF"
+                    return null
+                }
+                val exact = exactSourceObjective(objective, accepted.assignment, params.toleranceCheck)
+                val improving = exact?.let { beatsCutoff(it, cutoff) } ?: (accepted.objective < cutoff)
+                outcome = when {
+                    !improving -> "NON_IMPROVING"
+                    rootToken() -> "CANCELLED"
+                    else -> "IMPROVING"
+                }
+                return accepted.assignment.takeIf { outcome == "IMPROVING" }
+            } finally {
+                sink.lp.observePrimalPhase("PRIMAL_PROPOSAL", outcome, started.elapsedNow().inWholeNanoseconds)
+            }
+        }
+        val rounded = lpEngine.lpRoundingProbe(objective, rootToken,
+            initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
+            toleranceReals = params.toleranceCheck != null,
+            accept = ::accept)
+        rootRoundingPending = rounded == null && canResumeRootRounding()
+        if (rootRoundingPending) return null
+        lpEngine.rootRoundingWarmStart = null
+        val seed = rounded ?: lpEngine.lpFeasibilityPump(objective, rootToken,
+            initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
+            accept = ::accept)
+        if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+        return null
+    }
+
+    private fun canResumeRootRounding(): Boolean {
+        val plan = lpEngine.params.lpPlan
+        return pausable && lpEngine.rootRoundingInterrupted && !solveCancelled() &&
+            (plan.rootBudgetFraction <= 0.0 ||
+                !lpEngine.workSpentExceeds(plan.rootMaxWork, sink.lp.standaloneWork)) &&
+            !lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork)
     }
 
     /**
