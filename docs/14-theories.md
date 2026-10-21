@@ -197,10 +197,6 @@ tries first. The default integer pipeline installs no such provider. A numerical
 seed keeps the last completed potential for the next sweep. Neither supplies a
 fact, explanation or verdict.
 
-Potential queries seed every vertex, then revisit outgoing edges only from vertices
-whose potential changed. Their structural edge index is invalidated when an edge
-is added; active-edge masks and predecessor explanations remain local to each query.
-
 #### Real graph admission and checks
 
 The real component inside the linear theory uses the graph when every arithmetic

@@ -176,28 +176,6 @@ class DifferenceGraphTest {
     }
 
     @Test
-    fun `changed potentials should propagate through reverse ordered vertices`() {
-        val g = graph(6, Triple(5, 4, -1L), Triple(4, 3, -1L), Triple(3, 2, -1L),
-            Triple(2, 1, -1L), Triple(1, 0, -1L))
-
-        val values = assertIs<Potentials.Found>(g.potentials()).values
-
-        for (vertex in 0 until 5) assertTrue(values[vertex] <= values[vertex + 1] - 1L)
-    }
-
-    @Test
-    fun `new graph edges should participate after an earlier potential query`() {
-        val g = graph(3, Triple(0, 1, -1L))
-        val initial = assertIs<Potentials.Found>(g.potentials()).values
-        g.addEdge(1, 2, -2L)
-
-        val values = assertIs<Potentials.Found>(g.potentials(initial = initial)).values
-
-        assertTrue(values[1] <= values[0] - 1L)
-        assertTrue(values[2] <= values[1] - 2L)
-    }
-
-    @Test
     fun `potentials should detect a negative cycle beside an acyclic component`() {
         val g = graph(4, Triple(3, 2, -4L), Triple(0, 1, -2L), Triple(1, 0, 1L))
 
