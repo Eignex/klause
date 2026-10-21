@@ -1693,7 +1693,7 @@ private fun rejectedRegionAtom(
             }
             continue
         }
-        val sign = algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))
+        val sign = algebraic.signAt(atom.polynomial, coordinates)
         if (atom.holds(sign) != required) return index
     }
     return null
@@ -1758,7 +1758,7 @@ private fun checkRegionSample(
     val atoms = IntArray(formula.atoms.size) { index ->
         arithmetic.step()
         val atom = formula.atoms[index]
-        val sign = algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))
+        val sign = algebraic.signAt(atom.polynomial, coordinates)
         if (atom.holds(sign)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
     }
     val bools = BooleanArray(boolCount) {
@@ -1794,8 +1794,7 @@ private fun checkSample(
     val atomValues = IntArray(formula.atoms.size) { index ->
         arithmetic.step()
         val atom = formula.atoms[index]
-        val value = evaluation?.evaluate(atom.polynomial) ?: algebraic.evaluate(atom.polynomial, coordinates)
-        val sign = algebraic.sign(value)
+        val sign = evaluation?.signAt(atom.polynomial) ?: algebraic.signAt(atom.polynomial, coordinates)
         if (signs != null) {
             arithmetic.step()
             signs[index] = sign
