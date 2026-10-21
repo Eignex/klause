@@ -19,6 +19,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
@@ -84,6 +85,9 @@ class QfLiraSolverLpTest {
         )
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, success ->
+                success && certifier == LpCertifier.INTEGER
+            }))
             component.observeWith(stats)
             component.observeCompleteTraversal()
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
@@ -117,6 +121,9 @@ class QfLiraSolverLpTest {
             ),
         )
         ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, success ->
+                success && certifier == LpCertifier.INTEGER
+            }))
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
             session.initialize()
             session.push(SearchDecision.Bool(Lit.make(0, true)))
@@ -155,6 +162,9 @@ class QfLiraSolverLpTest {
                 ),
             )
             ExactLiraSearchComponent(source).use { component ->
+                component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, success ->
+                    success && certifier == LpCertifier.INTEGER
+                }))
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
                 assertIs<ComponentResult.Consistent>(session.initialize())
 
@@ -190,6 +200,9 @@ class QfLiraSolverLpTest {
                 ),
             )
             ExactLiraSearchComponent(source).use { component ->
+                component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, success ->
+                    success && certifier == LpCertifier.INTEGER
+                }))
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
 
                 assertIs<ComponentResult.Consistent>(session.initialize())
@@ -216,6 +229,9 @@ class QfLiraSolverLpTest {
             ),
         )
         ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, success ->
+                success && certifier == LpCertifier.INTEGER
+            }))
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
 
             assertIs<ComponentResult.Consistent>(session.initialize())
@@ -241,6 +257,9 @@ class QfLiraSolverLpTest {
         )
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, success ->
+                success && certifier == LpCertifier.INTEGER
+            }))
             component.observeWith(stats)
             component.observeCompleteTraversal()
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
@@ -273,6 +292,9 @@ class QfLiraSolverLpTest {
         )
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, success ->
+                success && certifier == LpCertifier.INTEGER
+            }))
             component.observeWith(stats)
             component.observeCompleteTraversal()
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
