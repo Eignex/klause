@@ -195,8 +195,10 @@ narrowing bounds and, in finite state, carving off-class values.
 Dependent-equality removal uses fraction-free elimination over unconditional integer
 equalities and refutes rationally inconsistent blocks. It drops only factors whose
 whole meaning is one redundant equality; conjunctions and relaxations can supply
-premises but remain intact. Guarded or
-disjunctive rows are excluded, and interrupted elimination publishes no deduction.
+premises but remain intact. Binary partition equations retain their propagation and
+branching structure, including scaled equations equivalent to `sum(x_i) = 1` over
+declared integer bounds within zero and one. They still supply elimination premises.
+Guarded or disjunctive rows are excluded, and interrupted elimination publishes no deduction.
 
 Sub-sum aggregation contracts a defining equality's partner terms to its output
 variable, retaining the equality. A unit pivot and two distinct integer partners

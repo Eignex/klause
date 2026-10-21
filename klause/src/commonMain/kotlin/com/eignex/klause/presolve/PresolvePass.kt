@@ -197,6 +197,7 @@ enum class PresolvePass(
     /** Drop the integer equalities the other equalities imply, by exact elimination over the equality
      *  block, and refute a block with no rational solution. Catches a row dependent through three or more
      *  others, which pairwise fusion and subsumption cannot; runs after them so duplicates are gone.
+     *  Binary partition equations retain their finite search structure while supplying premises.
      *  Solution-set exact. One elimination per input, so it stops re-running once it finds nothing. */
     DROP_DEPENDENT_EQUALITIES(
         "dependent-rows",
