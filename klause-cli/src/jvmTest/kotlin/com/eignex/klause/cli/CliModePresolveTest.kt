@@ -22,6 +22,37 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModePresolveTest {
+    @Test
+    fun `comparison folding should publish a complete FlatZinc assignment satisfying both reifications`() {
+        val fzn = File.createTempFile("comparison-indicators", ".fzn").apply {
+            writeText("""
+                var 0..1: x :: output_var;
+                var 0..1: y :: output_var;
+                var bool: b :: output_var;
+                var bool: c :: output_var;
+                constraint int_eq_reif(x, 1, b);
+                constraint int_eq_reif(y, 1, c);
+                constraint bool_clause([b, c], []);
+                solve satisfy;
+            """.trimIndent())
+        }
+
+        val output = try {
+            capture {
+                assertEquals(0, runCli(arrayOf("--presolve", "conservative", "-r", "3", "-p", "1", fzn.absolutePath)))
+            }
+        } finally {
+            fzn.delete()
+        }
+
+        val values = Regex("(?m)^(x|y|b|c) = (0|1|false|true);$").findAll(output)
+            .associate { it.groupValues[1] to it.groupValues[2] }
+        assertEquals(setOf("x", "y", "b", "c"), values.keys, output)
+        assertEquals(values["x"] == "1", values["b"] == "true", output)
+        assertEquals(values["y"] == "1", values["c"] == "true", output)
+        assertTrue(values["b"] == "true" || values["c"] == "true", output)
+        assertEquals(1, output.lines().count { it == "----------" }, output)
+    }
 
     @Test
     fun `finite linear preparation summaries should partition implied factors by class`() {

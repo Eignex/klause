@@ -33,6 +33,25 @@ import kotlin.test.assertTrue
 
 class SourceMappingTest {
     @Test
+    fun `comparison indicators should be reconstructed without direct hint correspondence`() {
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), emptyArray())
+        val target = source.withFactors(emptyArray())
+        val mapping = SourceMapping(source, target, PresolvePass.FOLD_COMPARISON_CLAUSES.guarantees,
+            SourceRebuilds(listOf(RebuildStep.ComparisonValue(0, 0, LinearOp.EQ, 1))))
+        val reduced = Sample(booleanArrayOf(false), longArrayOf(1))
+
+        val point = mapping.reconstructFrom(target, reduced)
+        val coordinates = assertNotNull(mapping.retainedCoordinates())
+
+        assertTrue(point.boolValue(0))
+        assertNull(DefinitionHint.BooleanReference(0).remap(coordinates))
+        assertEquals(0, assertNotNull(DefinitionHint.IntegerReference(0).remap(coordinates)).output)
+        assertTrue(mapping.guarantees.reconstructability)
+        assertTrue(mapping.guarantees.projectedSolutions)
+        assertFalse(mapping.guarantees.bijection)
+    }
+
+    @Test
     fun `source hints should exclude every coordinate reconstructed by a mapping chain`() {
         val source = Problem(1, 3, Array(3) { IntDomain(0, 9) }, emptyArray())
         val middle = source.withFactors(emptyArray())
@@ -204,7 +223,6 @@ class SourceMappingTest {
         assertTrue(chain.satisfiability)
         assertTrue(chain.reconstructability)
         assertFalse(chain.projectedSolutions)
-        assertFalse(PresolvePass.FOLD_COMPARISON_CLAUSES.guarantees.reconstructability)
     }
 
     @Test

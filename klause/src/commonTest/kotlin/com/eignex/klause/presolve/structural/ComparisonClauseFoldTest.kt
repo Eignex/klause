@@ -3,6 +3,7 @@ package com.eignex.klause.presolve.structural
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -13,16 +14,106 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
+import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ComparisonClauseFoldTest {
+    @Test
+    fun `source and finite folding should restore every original comparison independently of clause polarity`() {
+        for (op in LinearOp.entries) for (positive in listOf(false, true)) {
+            val model = problemOf(
+                2,
+                Array(2) { IntDomain(0, 2) },
+                listOf(
+                    reif(0, 0, op, 1),
+                    reif(1, 1, LinearOp.EQ, 1),
+                    Clause(intArrayOf(Lit.make(0, positive), Lit.make(1, true))),
+                ),
+            )
+            val source = ComparisonClauseFold.foldSource(model)
+            val finite = ComparisonClauseFold.fold(model.bake())
+            for (x in 0L..2L) {
+                val expected = when (op) {
+                    LinearOp.LE -> x <= 1L
+                    LinearOp.EQ -> x == 1L
+                    LinearOp.GE -> x >= 1L
+                    LinearOp.NE -> x != 1L
+                }
+                val sample = Sample(booleanArrayOf(!expected, false), longArrayOf(x, 1))
+                val restored = listOf(
+                    assertNotNull(source.rebuild.asSampleLift())(sample),
+                    assertNotNull(finite.reconstruct)(sample),
+                )
+
+                for (point in restored) {
+                    assertContentEquals(booleanArrayOf(expected, true), point.bools, "$op $positive $x")
+                    assertContentEquals(sample.ints, point.ints)
+                }
+                assertContentEquals(booleanArrayOf(!expected, false), sample.bools)
+            }
+        }
+    }
+
+    @Test
+    fun `folding should reconstruct indicators from every consumed clause with signed coefficients and constants`() {
+        val model = problemOf(
+            4,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(1, 1)),
+            listOf(
+                ReifiedLinear(0, intArrayOf(-1, 1), intArrayOf(0, 2), LinearOp.LE, 0),
+                reif(1, 1, LinearOp.EQ, 1),
+                reif(2, 0, LinearOp.NE, 1),
+                reif(3, 1, LinearOp.GE, 2),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
+            ),
+        )
+        val sample = Sample(booleanArrayOf(true, false, false, true), longArrayOf(0, 1, 1))
+        val source = ComparisonClauseFold.foldSource(model)
+        val finite = ComparisonClauseFold.fold(model.bake())
+
+        val restored = listOf(
+            assertNotNull(source.rebuild.asSampleLift())(sample),
+            assertNotNull(finite.reconstruct)(sample),
+        )
+
+        for (point in restored) {
+            assertContentEquals(booleanArrayOf(false, true, true, false), point.bools)
+            assertContentEquals(sample.ints, point.ints)
+        }
+    }
+
+    @Test
+    fun `finite folding should reconstruct comparisons simplified by root fixings`() {
+        val model = constantShifted(openConstants = false)
+        val unfixed = Problem(
+            2,
+            4,
+            Array(4) { IntDomain(0, 3) },
+            model.factors + arrayOf(
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 1),
+                Linear(intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
+            ),
+        )
+        val sample = Sample(booleanArrayOf(false, true), longArrayOf(0, 2, 1, 1))
+        assertTrue(ComparisonClauseFold.foldSource(unfixed).isEmpty)
+
+        val delta = ComparisonClauseFold.fold(unfixed.bake())
+        val restored = assertNotNull(delta.reconstruct)(sample)
+
+        assertContentEquals(booleanArrayOf(true, false), restored.bools)
+        assertContentEquals(sample.ints, restored.ints)
+    }
+
     @Test
     fun `declared reified comparisons should fold without changing integer solutions`() {
         val first = reif(0, 0, LinearOp.LE, 1)

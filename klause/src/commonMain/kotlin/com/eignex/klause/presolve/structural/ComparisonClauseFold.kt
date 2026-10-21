@@ -12,7 +12,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceDelta
+import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.util.Cancellation
@@ -28,8 +30,9 @@ import com.eignex.klause.util.subExact
  * `Clause` over indicator literals, where each indicator is the sole-use aux of a single-variable
  * reified comparison (`b ⇔ (c·x ⟨op⟩ k)`, `|c| = 1`, `b` used only by that reified factor and
  * this clause), is exactly the disjunction of those comparisons — so it becomes one factor and the
- * indicator auxiliaries drop out. The front-ends that build such a clause directly (XCSP3 intension)
- * already emit [ComparisonClause]; this pass catches the reified form any front-end (FlatZinc, SMT-LIB)
+ * indicator definitions drop out. Reconstruction restores each indicator from its defining comparison,
+ * independently of the polarity used in the clause. Front-ends that build the disjunction directly
+ * (XCSP3 intension) already emit [ComparisonClause]; this pass catches the reified form (FlatZinc, SMT-LIB)
  * produces after Tseitin lowering.
  *
  * Not solution-set preserving: the dropped indicators are left unconstrained (like affine elimination /
@@ -47,8 +50,8 @@ internal object ComparisonClauseFold {
         val occ = PropagationProblem(problem).boolOccurrences
         val uses = IntArray(problem.numBoolVars) { occ[it].size }
         val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
-        val folded = foldAll(problem.factors, ranges, uses, objectiveBoolVars, cancellation) ?: return PassDelta()
-        return PassDelta(droppedIndices = folded.first, addedFactors = folded.second)
+        return foldAll(problem.factors, ranges, uses, objectiveBoolVars, cancellation)
+            .asPassDelta(problem.rootIntDomainsInPlace)
     }
 
     /**
@@ -64,8 +67,7 @@ internal object ComparisonClauseFold {
         val uses = IntArray(problem.numBoolVars)
         for (f in problem.factors) for (b in f.boolVars) uses[b]++
         val ranges = ColumnRanges.of(problem.intBounds)
-        val folded = foldAll(problem.factors, ranges, uses, objectiveBoolVars, cancellation) ?: return SourceDelta()
-        return SourceDelta(folded.first, folded.second)
+        return foldAll(problem.factors, ranges, uses, objectiveBoolVars, cancellation)
     }
 
     private fun foldAll(
@@ -74,7 +76,7 @@ internal object ComparisonClauseFold {
         uses: IntArray,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
-    ): Pair<IntArray, List<Factor>>? {
+    ): SourceDelta {
         // A consumed definition must be equivalent to its single reified row.
         val defByAux = MutableIntObjectMap<Pair<Int, LinearRow>>()
         for (i in factors.indices) {
@@ -82,22 +84,23 @@ internal object ComparisonClauseFold {
             val row = (factors[i].linearForm as? LinearForm.Conjunction)?.rows?.singleOrNull() ?: continue
             if (row.activator != LinearRow.ALWAYS) defByAux.put(row.activator, i to row)
         }
-        if (defByAux.isEmpty()) return null
+        if (defByAux.isEmpty()) return SourceDelta()
 
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
+        val rebuilds = ArrayList<RebuildStep>()
         for (i in factors.indices) {
             val f = factors[i]
             if (f !is Clause || f.literals.size < 2) continue
             cancellation.charge(FOLD_WORK_WEIGHT * (1L + f.literals.size))
-            foldClause(f, defByAux, uses, objectiveBoolVars, ranges)?.let { (clause, consumed) ->
+            foldClause(f, defByAux, uses, objectiveBoolVars, ranges)?.let { (clause, consumed, steps) ->
                 dropped.add(i)
                 for (c in consumed) dropped.add(c)
                 added.add(clause)
+                rebuilds.addAll(steps)
             }
         }
-        if (dropped.isEmpty()) return null
-        return dropped.toIntArray() to added
+        return SourceDelta(dropped.toIntArray(), added, rebuild = SourceRebuilds(rebuilds))
     }
 
     /** The [ComparisonClause] equivalent of [clause] and the reified-factor indices it consumes, or
@@ -108,11 +111,12 @@ internal object ComparisonClauseFold {
         uses: IntArray,
         objectiveBoolVars: Set<Int>,
         ranges: ColumnRanges,
-    ): Pair<ComparisonClause, IntArray>? {
+    ): Triple<ComparisonClause, IntArray, List<RebuildStep>>? {
         val vars = IntArrayList()
         val ops = ArrayList<LinearOp>()
         val consts = ArrayList<Long>()
         val consumed = IntArrayList()
+        val rebuilds = ArrayList<RebuildStep>()
         val seen = IntHashSet()
         for (lit in clause.literals) {
             val v = Lit.variable(lit)
@@ -123,13 +127,18 @@ internal object ComparisonClauseFold {
             if (v in objectiveBoolVars) return null
             val def = defByAux[v] ?: return null
             val comp = singleVarComparison(def.second, ranges) ?: return null
+            rebuilds.add(RebuildStep.ComparisonValue(v, comp.first, comp.second, comp.third))
             val lifted = if (Lit.isPositive(lit)) comp else negate(comp) ?: return null
             vars.add(lifted.first)
             ops.add(lifted.second)
             consts.add(lifted.third)
             consumed.add(def.first)
         }
-        return ComparisonClause(vars.toIntArray(), ops.toTypedArray(), consts.toLongArray()) to consumed.toIntArray()
+        return Triple(
+            ComparisonClause(vars.toIntArray(), ops.toTypedArray(), consts.toLongArray()),
+            consumed.toIntArray(),
+            rebuilds,
+        )
     }
 
     /**

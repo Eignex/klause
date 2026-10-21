@@ -217,8 +217,9 @@ enum class PresolvePass(
 
     /** Fold a reified comparison disjunction — a clause over sole-use single-variable reified-comparison
      *  indicators — into one [com.eignex.klause.factor.arithmetic.ComparisonClause], dropping the
-     *  indicator auxiliaries. The XCSP3 front-end emits the clause directly; this catches the reified
-     *  form other front-ends produce. Not solution-set preserving (the dropped indicators are left
+     *  indicator definitions and rebuilding their truth from the comparisons. The XCSP3 front-end emits
+     *  the clause directly; this catches the reified form other front-ends produce.
+     *  Not solution-set preserving (the dropped indicators are left
      *  unconstrained, like affine elimination), so it is gated off under `-a` / `-n N>1`. */
     FOLD_COMPARISON_CLAUSES(
         "comparison-clause",
@@ -538,9 +539,8 @@ enum class PresolvePass(
     val guarantees: TransformationGuarantees
         get() = when {
             preservesSolutionSet -> TransformationGuarantees.IDENTITY
-            this == ELIMINATE_AFFINE_SINGLETONS || this == IMPLICATION_GRAPH ->
+            this == ELIMINATE_AFFINE_SINGLETONS || this == IMPLICATION_GRAPH || this == FOLD_COMPARISON_CLAUSES ->
                 TransformationGuarantees(true, true, true, false, true)
-            this == FOLD_COMPARISON_CLAUSES -> TransformationGuarantees(true, true, false, false, false)
             else -> TransformationGuarantees(true, true, true, false, false)
         }
 

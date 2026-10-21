@@ -150,8 +150,11 @@ domains, so a pinned global becomes a simpler factor; on source models it reache
 only factors over closed integer columns. Redundancy and subsumption remove
 duplicate and dominated rows using indices maintained across rounds.
 Comparison-clause folding replaces a clause over sole-use reified comparison
-indicators with one comparison disjunction. Duplicate-column merging replaces two
-columns with identical linear occurrences by their sum and splits the value back on
+indicators with one comparison disjunction. Source and finite reconstruction restore
+every consumed indicator from its defining comparison, before clause polarity, after
+later integer reconstructions and before original-source checking or output. These
+Boolean columns are excluded from direct definition and search hints. Duplicate-column
+merging replaces two columns with identical linear occurrences by their sum and splits the value back on
 reconstruction. Dual fixing pins a variable to a bound when no occurrence or the
 objective prefers the other direction. Folding, merging and dual fixing change the
 solution set.
