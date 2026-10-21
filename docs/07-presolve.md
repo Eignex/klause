@@ -205,8 +205,14 @@ records forced literals; mutual-implication cycles collapse to one representativ
 and transitively implied binary clauses drop. Graph construction, node and edge traversal, and SCC
 discovery charge and poll in bounded chunks. Interrupted reachability restores the
 candidate clause's edges, and incomplete SCC discovery publishes no merges. Bounded
-variable elimination resolves out a Boolean in clean clauses and no objective when resolvents do not outnumber the clauses they
-replace. Blocked clause elimination removes clauses whose resolvents on some literal
+variable elimination resolves out a Boolean in clean clauses and no objective when
+distinct resolvents neither outnumber the removed clauses nor exceed their literal
+volume, counting each literal once per clause. Each pivot permits at most 4,096
+clause pairs, width 64 resolvents and 65,536 candidate, occurrence, literal and pair visits.
+Visits charge and poll the phase token; a declined or interrupted pivot publishes
+nothing, retaining completed eliminations and their reconstruction. These local
+representation bounds do not guarantee a search-time improvement.
+Blocked clause elimination removes clauses whose resolvents on some literal
 are tautologies, repairing them on reconstruction. These are satisfiability
 preserving only. At-most-one clique merging replaces pairwise exclusions with one
 constraint when at least two drop. XOR unit derivation runs bounded GF(2)

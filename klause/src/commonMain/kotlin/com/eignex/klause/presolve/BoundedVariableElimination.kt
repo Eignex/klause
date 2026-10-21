@@ -10,7 +10,7 @@ import com.eignex.klause.util.IntHashSet
  * Bounded variable elimination (BVE) over the pure-SAT part of the model. A Boolean
  * variable `v` is eliminated by resolving every clause containing `v` against every clause containing
  * `¬v` and replacing all of them with the (non-tautological) resolvents — the projection of `v` out of
- * the clause set — but only when that does not increase the clause count (the *bounded* rule). A
+ * the clause set — but only when neither clause count nor distinct literal volume increases. A
  * monotone `v` (appearing in only one polarity) is a degenerate case: its clauses are satisfiable by the
  * pure value and simply drop, adding no resolvents.
  *
@@ -28,7 +28,8 @@ internal object BoundedVariableElimination {
      *  so a high-degree variable cannot make the pairwise resolution quadratic-blow-up. */
     private const val RESOLVENT_PRODUCT_CAP = 4_096
 
-    /** Poll the cancellation once per this many variables considered. */
+    private const val RESOLVENT_WIDTH_CAP = 64
+    private const val PIVOT_WORK_CAP = 65_536
     private const val CANCEL_POLL_MASK = 0xFF
 
     fun eliminate(
@@ -70,23 +71,23 @@ internal object BoundedVariableElimination {
         val order = (0 until nb)
             .filter { db.eligible[it] }
             .sortedBy { db.occ(Lit.make(it, true)).size + db.occ(Lit.make(it, false)).size }
-        for ((idx, v) in order.withIndex()) {
-            if ((idx and CANCEL_POLL_MASK) == 0 && cancellation()) break
-            val occurrences = db.occ(Lit.make(v, true)).size + db.occ(Lit.make(v, false)).size
-            cancellation.charge(BVE_WORK_WEIGHT * (1L + occurrences))
-            eliminateVar(v, db, eliminations)
+        for (v in order) {
+            if (cancellation()) break
+            eliminateVar(v, db, eliminations, cancellation)
         }
 
         return delta(db, eliminations.asRebuilds())
     }
 
-    private fun eliminateVar(v: Int, db: SatClauseDb, eliminations: ArrayList<VarElim>) {
+    private fun eliminateVar(v: Int, db: SatClauseDb, eliminations: ArrayList<VarElim>, cancellation: Cancellation) {
+        val work = PivotWork(cancellation)
+        if (!work.visit()) return
         val posSlots = IntArrayList()
         val negSlots = IntArrayList()
         val posLits = ArrayList<IntArray>()
         val negLits = ArrayList<IntArray>()
-        gather(db, Lit.make(v, true), posSlots, posLits)
-        gather(db, Lit.make(v, false), negSlots, negLits)
+        if (!gather(db, Lit.make(v, true), posSlots, posLits, work)) return
+        if (!gather(db, Lit.make(v, false), negSlots, negLits, work)) return
         if (posLits.isEmpty() && negLits.isEmpty()) return
 
         val clauses = ArrayList<IntArray>(posLits.size + negLits.size)
@@ -100,19 +101,30 @@ internal object BoundedVariableElimination {
             resolvents = emptyList()
         } else {
             if (posLits.size.toLong() * negLits.size > RESOLVENT_PRODUCT_CAP) return
+            val removedVolume = clauses.sumOf { it.size.toLong() }
+            var addedVolume = 0L
             val out = ArrayList<IntArray>()
             val seen = HashSet<List<Int>>() // exact literal-set identity — a lossy hash could drop a needed resolvent
             for (a in posLits.indices) {
                 for (b in negLits.indices) {
-                    val r = resolve(posLits[a], negLits[b], v) ?: continue // tautology
-                    if (seen.add(r.sorted())) out.add(r)
+                    if (!work.visit()) return
+                    val r = resolve(posLits[a], negLits[b], v, work)
+                    if (work.stopped) return
+                    if (r == null) continue // tautology
+                    if (r.size > RESOLVENT_WIDTH_CAP) return
+                    if (seen.add(r.sorted())) {
+                        addedVolume += r.size
+                        if (addedVolume > removedVolume) return
+                        out.add(r)
+                    }
                     if (out.size > clauses.size) return // unbounded: give up before committing
                 }
             }
             resolvents = out
         }
 
-        // Commit: remove v's clauses, add the resolvents, and record the removed clauses for reconstruction.
+        if (cancellation()) return
+        // Commit only a complete pivot, retaining earlier eliminations if this pivot is declined.
         for (k in 0 until posSlots.size) db.remove(posSlots[k])
         for (k in 0 until negSlots.size) db.remove(negSlots[k])
         for (r in resolvents) db.add(r)
@@ -120,28 +132,57 @@ internal object BoundedVariableElimination {
     }
 
     /** Collect the live slots (and their literals) that contain [lit] into the parallel lists. */
-    private fun gather(db: SatClauseDb, lit: Int, slots: IntArrayList, lits: ArrayList<IntArray>) {
+    private fun gather(
+        db: SatClauseDb,
+        lit: Int,
+        slots: IntArrayList,
+        lits: ArrayList<IntArray>,
+        work: PivotWork,
+    ): Boolean {
         val col = db.occ(lit)
         for (k in 0 until col.size) {
+            if (!work.visit()) return false
             val s = col[k]
             val c = db.clause(s) ?: continue
             slots.add(s)
             lits.add(c)
         }
+        return true
     }
 
     /** Resolve [c1] (contains `+v`) and [c2] (contains `¬v`) on [v]: their literals minus the `v`
      *  literals, deduplicated; `null` when the result is a tautology (contains a literal and its
      *  negation). */
-    private fun resolve(c1: IntArray, c2: IntArray, v: Int): IntArray? {
-        val lits = IntHashSet(c1.size + c2.size)
-        for (l in c1) if (Lit.variable(l) != v) lits.add(l)
+    private fun resolve(c1: IntArray, c2: IntArray, v: Int, work: PivotWork): IntArray? {
+        val lits = IntHashSet()
+        for (l in c1) {
+            if (!work.visit()) return null
+            if (Lit.variable(l) != v) lits.add(l)
+        }
         for (l in c2) {
+            if (!work.visit()) return null
             if (Lit.variable(l) == v) continue
             if (Lit.negate(l) in lits) return null
             lits.add(l)
         }
         return lits.toIntArray()
+    }
+
+    private class PivotWork(private val cancellation: Cancellation) {
+        private var visits = 0
+        var stopped = false
+            private set
+
+        fun visit(): Boolean {
+            if (visits >= PIVOT_WORK_CAP) {
+                stopped = true
+                return false
+            }
+            visits++
+            cancellation.charge(BVE_WORK_WEIGHT)
+            if ((visits and CANCEL_POLL_MASK) == 0 && cancellation()) stopped = true
+            return !stopped
+        }
     }
 
     /** One eliminated variable and the clauses that mentioned it, for solution reconstruction. */
@@ -159,5 +200,5 @@ internal object BoundedVariableElimination {
         SourceRebuilds(asReversed().map { RebuildStep.SatisfyClauses(it.v, it.clauses) })
 }
 
-// Work units per occurrence visited, relative to one simplex operation.
+// Work units per candidate, occurrence, literal or clause pair visited, relative to one simplex operation.
 private const val BVE_WORK_WEIGHT = 10L
