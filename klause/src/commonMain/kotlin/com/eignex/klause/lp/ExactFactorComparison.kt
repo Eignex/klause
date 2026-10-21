@@ -11,6 +11,10 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.subExact
+import com.eignex.klause.util.toLong
 
 /** Exact values of the mixed columns an [ExactComparison] states its terms over. */
 internal interface ExactColumnValues {
@@ -147,6 +151,25 @@ internal class ExactRowForm(
     private val hasReals: Boolean,
 ) {
     private val ordered = ExactOrderedTerms(terms)
+    private val integralBound = integralBooleanBound()
+
+    private fun integralBooleanBound(): Long? {
+        if (booleanLiterals.isEmpty() || rhs.den != BIG_ONE || !rhs.num.fitsLong()) return null
+        val initial = rhs.num.toLong()
+        var lower = initial
+        var upper = initial
+        // These endpoints enclose every subset, including each prefix of the Boolean fold.
+        for (coefficient in booleanCoefficients) {
+            if (coefficient.den != BIG_ONE || !coefficient.num.fitsLong()) return null
+            val value = coefficient.num.toLong()
+            try {
+                if (value > 0L) lower = subExact(lower, value) else upper = subExact(upper, value)
+            } catch (_: CheckedLongOverflowException) {
+                return null
+            }
+        }
+        return initial
+    }
 
     fun hintComparison(
         booleanValue: (Int) -> Boolean?,
@@ -171,10 +194,23 @@ internal class ExactRowForm(
 
     /** The comparison the row states when its activator holds [truth] under [booleanValue]. */
     fun comparison(truth: Boolean, booleanValue: (Int) -> Boolean): ExactComparison {
-        var bound = rhs
-        for (k in booleanLiterals.indices) {
-            val literal = booleanLiterals[k]
-            if (booleanValue(Lit.variable(literal)) == Lit.isPositive(literal)) bound -= booleanCoefficients[k]
+        val narrow = integralBound
+        val bound = if (narrow != null) {
+            var value = narrow
+            for (k in booleanLiterals.indices) {
+                val literal = booleanLiterals[k]
+                if (booleanValue(Lit.variable(literal)) == Lit.isPositive(literal)) {
+                    value -= booleanCoefficients[k].num.toLong()
+                }
+            }
+            BigFraction.ofLong(value)
+        } else {
+            var value = rhs
+            for (k in booleanLiterals.indices) {
+                val literal = booleanLiterals[k]
+                if (booleanValue(Lit.variable(literal)) == Lit.isPositive(literal)) value -= booleanCoefficients[k]
+            }
+            value
         }
         return ExactComparison(
             terms,

@@ -53,6 +53,12 @@ indicator records both bound premises and retires when the pin retracts. Bounds
 retract with the search scope while definitions stay available to siblings. These
 definitions supply no witness authority: publication checks the original rows.
 
+Boolean contributions move a row's right-hand side without changing its numeric
+terms. A template folds integral contributions in `Long` only when every input and
+both extreme endpoint sums fit; every partial assignment then fits as well. Other
+rows keep rational arithmetic. Literal polarity, operator complements and strictness
+retain their source meaning in both paths.
+
 ## Numerical authority
 
 The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
