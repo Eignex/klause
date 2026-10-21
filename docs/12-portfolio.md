@@ -218,6 +218,9 @@ normalization, witness probing and projection keep completed phases across slice
 and subresultant preparation checkpoints in small batches. Every continuation keeps
 the same native allowance, and unfinished initialization publishes neither a point
 nor a refutation.
+Disposing the search releases its unfinished polynomial query while retaining the
+spent allowance in the worker's theory invocation, which remains available for
+later completion checks.
 
 #### Auxiliary incumbent evaluation
 

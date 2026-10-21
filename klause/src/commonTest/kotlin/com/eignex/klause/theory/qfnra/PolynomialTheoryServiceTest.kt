@@ -16,6 +16,67 @@ import kotlin.test.assertTrue
 
 class PolynomialTheoryServiceTest {
     @Test
+    fun `closing an unfinished query releases the invocation without refunding work`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val required = service.invocation().use { it.check().stats.workSpent }
+        service.invocation(QfNraParams(maximumWork = required)).use { invocation ->
+            val pending = invocation.prepareCheck()
+            assertNull(pending.next())
+            val charged = invocation.stats.workSpent
+
+            pending.close()
+            pending.close()
+
+            assertTrue(charged > 0)
+            assertEquals(charged, invocation.stats.workSpent)
+            assertFalse(pending.hasNext())
+            assertFailsWith<NoSuchElementException> { pending.next() }
+            assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(invocation.check()).reason)
+            assertEquals(required, invocation.stats.workSpent)
+        }
+    }
+
+    @Test
+    fun `a released query permits a different Boolean condition`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const b Bool) (declare-const x Real) (assert (or b (= x 1)))",
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        service.invocation().use { invocation ->
+            val pending = invocation.prepareCheck(PolynomialCondition(mapOf(0 to true)))
+            assertNull(pending.next())
+            pending.close()
+
+            val result = invocation.check(PolynomialCondition(mapOf(0 to false)))
+
+            val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+            assertFalse(point.boolValue(0))
+            assertEquals(BigFraction.ONE, point.realValue(0).rational)
+            assertEquals(2L, invocation.queries)
+        }
+    }
+
+    @Test
+    fun `closing a completed query leaves a later query active`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        service.invocation().use { invocation ->
+            val first = invocation.prepareCheck()
+            assertIs<QfNraResult.Satisfiable>(first.asSequence().filterNotNull().single())
+            val second = invocation.prepareCheck(PolynomialCondition(lower = mapOf(0 to BigFraction.ONE)))
+            assertNull(second.next())
+            val charged = invocation.stats.workSpent
+
+            first.close()
+
+            assertEquals(charged, invocation.stats.workSpent)
+            assertTrue(second.hasNext())
+            assertIs<QfNraResult.Satisfiable>(second.asSequence().filterNotNull().single())
+        }
+    }
+
+    @Test
     fun `completed query should have no further elements`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)

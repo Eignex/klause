@@ -230,6 +230,10 @@ A conditioned invocation keeps its allowance across queries. A completed witness
 can be reused for a later Boolean-only condition after a charged scan confirms
 every pin; no refutation is reused across conditions. Published algebraic scalars
 outlive the invocation.
+Prepared queries have a separate closeable lifetime. Closing an unfinished query
+retains its spent work and releases the invocation for another condition without
+publishing a result. Search components close their pending query when their search
+owner is disposed; the containing theory invocation remains available to its worker.
 
 ### Implementation
 

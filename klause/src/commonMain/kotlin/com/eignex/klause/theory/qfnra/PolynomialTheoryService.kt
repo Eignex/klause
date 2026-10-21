@@ -69,6 +69,8 @@ internal class PolynomialTheoryService(
         PolynomialTheoryInvocation(formula, boolCount, realCount, params, fixedReals)
 }
 
+internal interface PolynomialTheoryQuery : Iterator<QfNraResult?>, AutoCloseable
+
 internal class PolynomialTheoryInvocation(
     private val formula: PolynomialRealFormula,
     private val boolCount: Int,
@@ -99,7 +101,7 @@ internal class PolynomialTheoryInvocation(
     fun prepareCheck(
         condition: PolynomialCondition = PolynomialCondition(),
         cancellation: Cancellation = Cancellation.Never,
-    ): Iterator<QfNraResult?> {
+    ): PolynomialTheoryQuery {
         check(!closed) { "polynomial invocation is closed" }
         check(!active) { "polynomial invocation has an active query" }
         active = true
@@ -110,9 +112,18 @@ internal class PolynomialTheoryInvocation(
             witness.takeIf { condition.lower.isEmpty() && condition.upper.isEmpty() })
         pending = query
         queries = sum(queries, 1)
-        return object : Iterator<QfNraResult?> {
+        return object : PolynomialTheoryQuery {
             private var finished = false
             override fun hasNext(): Boolean = !closed && !finished
+
+            override fun close() {
+                if (closed || finished) return
+                completedStats = combine(completedStats, query.stats)
+                pending = null
+                active = false
+                finished = true
+            }
+
             @Suppress("TooGenericExceptionCaught") // query failures retain their spent native allowance
             override fun next(): QfNraResult? {
                 check(!closed) { "polynomial query is closed" }

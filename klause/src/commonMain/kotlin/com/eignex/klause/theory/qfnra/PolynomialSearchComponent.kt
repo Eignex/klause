@@ -21,11 +21,13 @@ internal class PolynomialSearchComponent(
     private val invocation: PolynomialTheoryInvocation,
     integerColumns: Map<Int, Int> = emptyMap(),
     private val capture: ((QfNraAssignment, SearchContext) -> Sample)? = null,
-) : SearchComponent, PreparingSearchComponent, FiniteFactorEnforcer {
+) : SearchComponent, PreparingSearchComponent, FiniteFactorEnforcer, AutoCloseable {
     private val integerColumns = integerColumns.toMap()
     val witnessKey = SearchModelKey(QfNraAssignment::class)
     private var signature: PolynomialSignature? = null
     private var outcome: QfNraResult? = null
+    private var preparation: PolynomialTheoryQuery? = null
+    private var closed = false
 
     private var attached = false
     private var finiteEnforcement: FiniteFactorEnforcer? = null
@@ -51,6 +53,7 @@ internal class PolynomialSearchComponent(
     }
 
     override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+        check(!closed) { "polynomial search component is closed" }
         attached = true
         if (context.cancelled() || !context.consumeCheck()) {
             yield(ComponentResult.Indeterminate)
@@ -58,11 +61,14 @@ internal class PolynomialSearchComponent(
         }
         val current = signatureOf(context)
         val pending = invocation.prepareCheck(conditionOf(current), Cancellation { context.cancelled() })
+        preparation = pending
         var result: QfNraResult? = null
         while (result == null) {
+            check(!closed) { "polynomial search component is closed" }
             result = pending.next()
             if (result == null) yield(null)
         }
+        preparation = null
         retain(current, result)
         yield(when (result) {
             is QfNraResult.Satisfiable -> ComponentResult.Consistent
@@ -99,6 +105,7 @@ internal class PolynomialSearchComponent(
     }
 
     private fun evaluate(context: SearchContext): QfNraResult? {
+        check(!closed) { "polynomial search component is closed" }
         if (context.cancelled()) return null
         val current = signatureOf(context)
         if (signature == current) return outcome
@@ -127,6 +134,14 @@ internal class PolynomialSearchComponent(
     private fun invalidate() {
         signature = null
         outcome = null
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        preparation?.close()
+        preparation = null
+        invalidate()
     }
 }
 
