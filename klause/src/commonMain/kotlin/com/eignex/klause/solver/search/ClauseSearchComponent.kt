@@ -22,6 +22,11 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
     private var active: SearchContext? = null
     private var unitsPending = false
 
+    internal fun booleanBranching(numBoolVars: Int, onAllSatisfied: (() -> Unit)? = null): BooleanBranching? =
+        sourceClauses.takeIf { it.isNotEmpty() }?.let {
+            SourceClauseBooleanBranching(numBoolVars, it, onAllSatisfied)
+        }
+
     override fun initialize(context: SearchContext): ComponentResult = withContext(context) {
         if (sourceClauses.any { clause -> clause.any { context.atomLiteral(SearchDecision.Bool(it)) == null } }) {
             return@withContext ComponentResult.Indeterminate
