@@ -47,7 +47,9 @@ class MpsSolutionTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["digits", "positive-exponent", "negative-exponent", "expanded-integer", "expanded-fraction"])
+    @ValueSource(
+        strings = ["digits", "positive-exponent", "negative-exponent", "expanded-integer", "expanded-fraction"],
+    )
     fun `solution numbers exceeding the upstream buffer profile should be declined`(variant: String) {
         val value = when (variant) {
             "digits" -> "1".repeat(160)
