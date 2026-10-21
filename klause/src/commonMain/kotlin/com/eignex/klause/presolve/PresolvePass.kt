@@ -158,7 +158,8 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.aggregateSourceSubSums(problem)
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.aggregateSourceSubSums(problem, ctx.cancellation)
     },
 
     /** Constraint subsumption / redundant-constraint removal — drops duplicate factors and

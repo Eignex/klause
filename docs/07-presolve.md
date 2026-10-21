@@ -142,7 +142,11 @@ and relaxations can supply premises but remain intact; disjunctive and reified r
 are excluded. Elimination polls between row combinations and during support merges,
 charges visited entries and discards every partial deduction on interruption. Sub-sum
 aggregation replaces a row's copy of a defining equality's right-hand side by its
-variable. Linear bound fusion merges matching upper and lower bounds into an equality
+variable. Its candidate and term visits charge and poll the phase token. Rarest-partner
+incidence counts and row widths estimate each scan before entry against a work cap
+proportional to indexed terms, with an absolute ceiling. Unaffordable scans are
+skipped; interruption retains only completed rewrites and their unchanged defining
+equalities. Linear bound fusion merges matching upper and lower bounds into an equality
 or refutes crossing ones. These preserve the solution set. Affine singleton
 elimination and singleton inequality projection need reconstruction, and the
 projection is off for solution-set-sensitive queries.

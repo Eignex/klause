@@ -130,8 +130,8 @@ object Presolve {
     fun aggregateSubSums(problem: Problem): PassDelta = LinearSubSumAggregation.aggregateSubSums(problem)
 
     /** [aggregateSubSums] in the source lane's change form. */
-    internal fun aggregateSourceSubSums(problem: Problem): SourceDelta =
-        LinearSubSumAggregation.aggregateSubSums(problem).asSourceDelta()
+    internal fun aggregateSourceSubSums(problem: Problem, cancellation: Cancellation): SourceDelta =
+        LinearSubSumAggregation.aggregateSubSums(problem, cancellation).asSourceDelta()
 
     /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the
      *  objective). See [SingletonInequalityProjection]. */
