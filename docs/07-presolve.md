@@ -32,9 +32,8 @@ before another analysis. Yield is the largest of net occurrences removed, factor
 removed, columns narrowed or columns fixed, with a floor of one. Empty and
 interrupted calls retain their cost; only completed misses can park a pass. These
 signals are deterministic spending heuristics, not predictions or proofs of search
-savings. Direct round schedules without a caller allowance collect observations
-under an unlimited local allowance. Cancellation and phase allowances still bound
-optional work. Presolve and
+savings. Unmetered calls use the 1% change threshold without adding accounting
+scans. Cancellation and phase allowances still bound optional work. Presolve and
 an LP-relaxation harvest iterate to a joint fixpoint for at most four rounds, the
 harvest rerunning only when it tightened something. Automatically selected elective
 harvest skips pure clausal satisfaction sources before LP construction unless
