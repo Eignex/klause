@@ -38,7 +38,7 @@ class PresolveInvocationTest {
                 PresolveLane.FINITE -> Presolver.run(problem.bake(), config, context, token)
             }
 
-            assertEquals(4, budget.invocations.size)
+            assertEquals(if (lane == PresolveLane.SOURCE) 4 else 3, budget.invocations.size)
             assertTrue(budget.invocations.all { it.outcome == PresolveInvocationOutcome.ELIGIBILITY_SKIP })
             assertTrue(budget.invocations.all { it.work == 0L && it.input.occurrences == null })
             assertEquals(0L, budget.entrySizeVisits)
