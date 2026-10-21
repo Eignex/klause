@@ -271,6 +271,17 @@ restarts the operation from authority, and every attempt is charged. Owner-local
 exact factors require the same matrix and ordered basis. An off-status feasible
 point cannot furnish a claimed warm basis.
 
+A current model outside continuation dimensions can use a private affine frame.
+Fixed nonstrict logical sides allow unit substitution through free structural
+pivots; all remaining rows, sides, strictness, origins and objective terms stay
+represented. The frame retains original authority and lifts points and row
+multipliers back for complete original-state verification, including scoped
+premises and bound witnesses. Reduced dimensions and original verification each
+keep their existing guards. Frame construction, continuation, lifting and
+verification share metered resources and cancellation. Its logical basis and
+continuation belong to one exact-state identity; edits and pop invalidate reuse.
+The floating owner and original source coordinates remain authoritative.
+
 ### Farkas and recession checks
 
 For `M = [A | I]`, a Farkas contradiction requires

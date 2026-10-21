@@ -16,6 +16,7 @@ import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TimeSource
 
 internal class LpExactContinuationCache {
+    internal var affine: LpAffineContinuation? = null
     internal var state: LpExactState? = null
     internal var key: ByteArray? = null
     internal var headings: List<Int>? = null
@@ -24,10 +25,10 @@ internal class LpExactContinuationCache {
     private var inputWork = 0L
     private var inputAllocation = 0L
     private var inputTimeNs = 0L
-    val usedWork get() = continuation?.usedWork ?: inputWork
-    val usedAllocation get() = continuation?.usedAllocation ?: inputAllocation
-    val usedTimeNs get() = continuation?.usedTimeNs ?: inputTimeNs
-    val scalarPeak get() = continuation?.normalizedScalarPeak ?: 0
+    val usedWork get() = affine?.cache?.usedWork ?: continuation?.usedWork ?: inputWork
+    val usedAllocation get() = affine?.cache?.usedAllocation ?: continuation?.usedAllocation ?: inputAllocation
+    val usedTimeNs get() = affine?.cache?.usedTimeNs ?: continuation?.usedTimeNs ?: inputTimeNs
+    val scalarPeak get() = affine?.cache?.scalarPeak ?: continuation?.normalizedScalarPeak ?: 0
 
     fun accountInput(work: Long, allocation: Long, timeNs: Long) {
         require(work >= 0L && allocation >= 0L && timeNs >= 0L)
@@ -46,6 +47,7 @@ internal class LpExactContinuationCache {
     }
 
     fun clear() {
+        affine = null
         inputWork = 0L
         inputAllocation = 0L
         inputTimeNs = 0L
@@ -127,9 +129,17 @@ internal fun continueExactLp(
     targetMetrics: ExactContinuationMetrics = ExactContinuationMetrics(),
 ): LpContinuationVerification {
     require(shortPivots >= 0)
-    if (targetMetrics.decline != null) return LpContinuationVerification(null, null, null, targetMetrics)
+    if (targetMetrics.decline != null) {
+        if (targetMetrics.decline == ContinuationDecline.DIMENSION && model.exactState != null) {
+            return continueAffineLp(model, cache, cancellation, limits, shortPivots, fullEffort, targetMetrics)
+        }
+        return LpContinuationVerification(null, null, null, targetMetrics)
+    }
     val selection = selectContinuation(model, basis, cache, limits, cancellation, targetMetrics)
     if (selection.metrics.decline != null) {
+        if (selection.metrics.decline == ContinuationDecline.DIMENSION && model.exactState != null) {
+            return continueAffineLp(model, cache, cancellation, limits, shortPivots, fullEffort, selection.metrics)
+        }
         return LpContinuationVerification(null, null, null, selection.metrics)
     }
     val invalidated = selection.metrics.invalidated
@@ -472,7 +482,7 @@ private fun engineStatus(status: ContinuationStatus): VarStatus = when (status) 
     ContinuationStatus.FREE -> VarStatus.FREE
 }
 
-private fun combineContinuationMetrics(a: ExactContinuationMetrics, b: ExactContinuationMetrics) = b.copy(
+internal fun combineContinuationMetrics(a: ExactContinuationMetrics, b: ExactContinuationMetrics) = b.copy(
     builds = a.builds + b.builds, imports = a.imports + b.imports, pivots = a.pivots + b.pivots,
     repairs = a.repairs + b.repairs, restarts = a.restarts + b.restarts,
     work = a.work + b.work, allocation = a.allocation + b.allocation, elapsedNs = a.elapsedNs + b.elapsedNs,
