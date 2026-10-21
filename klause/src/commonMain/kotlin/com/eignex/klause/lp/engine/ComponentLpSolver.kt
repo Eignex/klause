@@ -293,6 +293,13 @@ internal class ComponentLpSolver(
         observer: LpCertificationObserver?,
         policy: LpCertificationPolicy,
         cancellation: Cancellation,
+    ): ExactLpWitness? = exactWitness(observer, policy, cancellation, null)
+
+    override fun exactWitness(
+        observer: LpCertificationObserver?,
+        policy: LpCertificationPolicy,
+        cancellation: Cancellation,
+        recovery: ((LpModel, FloatLpResult) -> ExactLpWitness?)?,
     ): ExactLpWitness? {
         if (!currentAuthority() || cancellation()) return null
         val results = blockResults ?: return null
@@ -314,7 +321,7 @@ internal class ComponentLpSolver(
             ) ?: policy.acceptNullable(
                 LpCertifier.EXACT_POINT,
                 exactPointWitness(part.model, results[index].primal, observer),
-            ) ?: return null
+            ) ?: recovery?.invoke(part.model, results[index]) ?: return null
             for (column in part.cols.indices) point[part.cols[column]] = witness.primal[column]
         }
         for (column in isolated) {

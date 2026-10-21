@@ -531,6 +531,7 @@ private fun certifyLpResultWithin(
     // Both refinement calls a node can make, so the reported work is what certification spent.
     var refinementMetrics: LpRefinementMetrics? = null
     var pointRecovery: ExactPointRecovery? = null
+    var componentRecoveryElapsed = Duration.ZERO
     var numericalWitness = earlyContinuation?.witness ?: witness
     var numericalBound = bound
     var numericalConflict: BigRationalConflict? = null
@@ -543,7 +544,8 @@ private fun certifyLpResultWithin(
     var chargedAllocation = 0L
     var chargedElapsed = Duration.ZERO
     fun directElapsed(): Duration =
-        (certificationStarted?.elapsedNow() ?: Duration.ZERO) - (pointRecovery?.elapsed ?: Duration.ZERO)
+        (certificationStarted?.elapsedNow() ?: Duration.ZERO) - (pointRecovery?.elapsed ?: Duration.ZERO) -
+            componentRecoveryElapsed
     fun refine() {
         if (refinement == null || state == null || stopped()) return
         if (result == null) {
@@ -639,7 +641,49 @@ private fun certifyLpResultWithin(
         if (stronger != null && (bound == null || stronger.value > requireNotNull(bound).value)) bound = stronger
     }
     if (result != null && witness == null && !stopped()) {
-        witness = component?.exactWitness(observer, policy, cancellation)
+        var meter: RefinementMeter? = null
+        var decline: LpRefinementDecline? = null
+        val recovery: ((LpModel, FloatLpResult) -> ExactLpWitness?)? = if (refinement != null && sparsePointRecovery) {
+            { part, floated ->
+                try {
+                    val limits = refinement.effectiveLimits()
+                    val priorElapsed = (directElapsed() - chargedElapsed).coerceAtLeast(Duration.ZERO)
+                    val token = if (limits.time.isInfinite()) cancellation else cancellation or Cancellation.until(
+                        TimeSource.Monotonic.markNow() +
+                            (limits.time - refinement.cache.elapsed - priorElapsed).coerceAtLeast(Duration.ZERO),
+                    )
+                    val active = meter ?: RefinementMeter(
+                        limits, refinement.cache, token,
+                    ).also {
+                        meter = it
+                        val work = (reconstruction?.metrics?.work ?: 0L) + (exactBasis?.metrics?.work ?: 0L) +
+                            (capturedTarget?.metrics?.work ?: 0L)
+                        val allocation = (reconstruction?.metrics?.allocation ?: 0L) +
+                            (exactBasis?.metrics?.allocation ?: 0L) + (capturedTarget?.metrics?.allocation ?: 0L)
+                        val elapsed = directElapsed()
+                        it.prior(
+                            (work - chargedWork).coerceAtLeast(0L),
+                            (allocation - chargedAllocation).coerceAtLeast(0L),
+                            (elapsed - chargedElapsed).coerceAtLeast(Duration.ZERO),
+                        )
+                        chargedWork = work
+                        chargedAllocation = allocation
+                        chargedElapsed = elapsed
+                    }
+                    continueComponentWitness(part, floated, active, observer, policy, fullContinuation)
+                } catch (stop: RefinementStop) {
+                    decline = stop.reason
+                    null
+                }
+            }
+        } else {
+            null
+        }
+        try {
+            witness = component?.exactWitness(observer, policy, cancellation, recovery)
+        } finally {
+            meter?.let { componentRecoveryElapsed += it.finish(decline).elapsed }
+        }
         numericalWitness = witness ?: numericalWitness
     }
     if (result != null && numericalWitness == null && refinement != null &&
@@ -1425,6 +1469,37 @@ internal fun exactLpStateKey(model: ExactLpModel): ByteArray? {
     val state = LpExactState(model)
     if (state.toWorkingModel() == null) return null
     return LpExactCapture.stateKey(state)
+}
+
+private fun continueComponentWitness(
+    model: LpModel,
+    result: FloatLpResult,
+    meter: RefinementMeter,
+    observer: LpCertificationObserver?,
+    policy: LpCertificationPolicy,
+    fullEffort: Boolean,
+): ExactLpWitness? {
+    meter.poll()
+    if (meter.remainingWork == 0L) meter.stop(LpRefinementDecline.WORK)
+    if (meter.remainingAllocation == 0L) meter.stop(LpRefinementDecline.ALLOCATION)
+    val defaults = ExactContinuationLimits()
+    val continued = continueExactLp(
+        model, result.basis, cancellation = meter.token,
+        limits = defaults.copy(
+            maxColumns = minOf(defaults.maxColumns, meter.limits.maxCoordinates),
+            maxCells = minOf(defaults.maxCells, meter.limits.maxEntries),
+            maxBits = minOf(defaults.maxBits, meter.limits.maxBits),
+            maxWork = meter.remainingWork,
+            maxAllocation = meter.remainingAllocation,
+        ),
+        fullEffort = fullEffort,
+    )
+    meter.completed(continued.metrics.work, continued.metrics.allocation)
+    observer?.observeContinuation(continued.metrics)
+    observer?.observe(LpCertifier.RATIONAL, continued.metrics.success, LpCertifierCost.Reported)
+    return policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })?.witness?.let {
+        policy.acceptNullable(LpCertifier.EXACT_BASIS, it)
+    }
 }
 
 private const val MAX_COUNTER_KEY_VALUES = 4096L

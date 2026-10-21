@@ -150,6 +150,8 @@ leaf completion still waits for all finite pins and checks the original source.
 Required large-leaf completion requests bounded witness recovery above the
 rational-basis dimension limit. A separate owner of the same exact model performs
 sparse point repair and strict-margin refinement for component numerical solves.
+Independent components can first recover strict points through exact continuation,
+sharing the same recovery work, storage and time allowance before global refinement.
 The existing refinement work, storage, scalar and auxiliary limits bound this
 recovery, and every recovered point passes exact source verification.
 

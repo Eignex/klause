@@ -278,6 +278,13 @@ internal interface ComponentLpSolverCapability : LpSolver {
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
         cancellation: Cancellation = Cancellation.Never,
     ): ExactLpWitness?
+
+    fun exactWitness(
+        observer: LpCertificationObserver?,
+        policy: LpCertificationPolicy,
+        cancellation: Cancellation,
+        recovery: ((LpModel, FloatLpResult) -> ExactLpWitness?)?,
+    ): ExactLpWitness? = exactWitness(observer, policy, cancellation)
 }
 
 /**
