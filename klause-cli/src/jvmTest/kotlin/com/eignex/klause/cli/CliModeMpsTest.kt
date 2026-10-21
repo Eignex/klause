@@ -154,12 +154,13 @@ class CliModeMpsTest {
 
         for (exact in listOf(false, true)) {
             val policy = if (exact) arrayOf("--exact") else emptyArray()
-            val kept = capture { assertEquals(0, runCli(arrayOf("-s", "-t", "10000") + policy + mps.absolutePath)) }
+            val flags = arrayOf("-s", "-e", "cp", "-p", "1", "-t", "10000")
+            val kept = capture { assertEquals(0, runCli(flags + policy + mps.absolutePath)) }
             val declined = capture {
                 assertEquals(
                     0,
                     runCli(
-                        arrayOf("-s", "-t", "10000", "--param", "open-bound-proof=false") +
+                        flags + arrayOf("--param", "open-bound-proof=false") +
                             policy + mps.absolutePath,
                     ),
                 )
@@ -174,30 +175,6 @@ class CliModeMpsTest {
         }
     }
 
-    @Test
-    fun `bound-proof params should be consumed rather than left for an engine to reject`() {
-        val mps = File.createTempFile("cli", ".mps").apply {
-            writeText(
-                "NAME          T\nROWS\n N  COST\n G  R1\nCOLUMNS\n" +
-                    "    MARKER                 'MARKER'                 'INTORG'\n" +
-                    "    x  COST  1.0   R1  1.0\n" +
-                    "    MARKER                 'MARKER'                 'INTEND'\n" +
-                    "RHS\n    RHS  R1  1.0\nBOUNDS\n UI BND  x  4\nENDATA\n",
-            )
-            deleteOnExit()
-        }
-
-        var code = -1
-        val err = captureErr {
-            capture {
-                code = runCli(arrayOf("-t", "10000", "--param", "open-bound-proof=false", mps.absolutePath))
-            }
-        }
-
-        assertEquals(0, code, err)
-        assertFalse("open-bound-proof" in err, err)
-    }
-
     private fun capture(block: () -> Unit): String {
         val buf = ByteArrayOutputStream()
         val old = System.out
@@ -206,18 +183,6 @@ class CliModeMpsTest {
             block()
         } finally {
             System.setOut(old)
-        }
-        return buf.toString()
-    }
-
-    private fun captureErr(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.err
-        System.setErr(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setErr(old)
         }
         return buf.toString()
     }

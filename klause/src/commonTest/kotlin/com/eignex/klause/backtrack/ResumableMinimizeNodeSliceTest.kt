@@ -37,15 +37,17 @@ class ResumableMinimizeNodeSliceTest {
     private fun handle() = BacktrackSolver(problem().bake()).resumable(objective(), BacktrackParams(randomSeed = 0L))
 
     private fun fullSearchNodes(): Double {
-        val search = handle()
-        search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
-        return search.stats.search.nodes.sum
+        return handle().use { search ->
+            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+            search.stats.search.nodes.sum
+        }
     }
 
     private fun nodesAfterOneSlice(budget: Long): Double {
-        val search = handle()
-        search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
-        return search.stats.search.nodes.sum
+        return handle().use { search ->
+            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
+            search.stats.search.nodes.sum
+        }
     }
 
     @Test
@@ -60,25 +62,27 @@ class ResumableMinimizeNodeSliceTest {
 
     @Test
     fun `node budgeted slice should be reproducible`() {
-        val budget = (fullSearchNodes() / 4).toLong()
+        val budget = 8L
 
         val first = nodesAfterOneSlice(budget)
         val second = nodesAfterOneSlice(budget)
 
+        assertTrue(first > 0.0)
         assertEquals(first, second)
     }
 
     @Test
     fun `successive node budgeted slices should resume instead of restart`() {
-        val budget = (fullSearchNodes() / 4).toLong()
-        val search = handle()
+        val budget = 8L
+        handle().use { search ->
+            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
+            val afterFirst = search.stats.search.nodes.sum
+            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
+            val afterSecond = search.stats.search.nodes.sum
 
-        search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
-        val afterFirst = search.stats.search.nodes.sum
-        search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
-        val afterSecond = search.stats.search.nodes.sum
-
-        assertTrue(afterSecond > afterFirst)
+            assertTrue(afterFirst > 0.0)
+            assertTrue(afterSecond > afterFirst)
+        }
     }
 
     @Test
@@ -132,17 +136,17 @@ class ResumableMinimizeNodeSliceTest {
 
     @Test
     fun `LP arm slice should spend its LP work as nodes`() {
-        val lp = { knapsackLp() }
-        val whole = lp().also { it.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { } }
-        val budget = (whole.stats.search.nodes.sum / 2).toLong()
-        val search = lp()
+        knapsackLp().use { search ->
+            val budget = 32L
 
-        val terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
+            val terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
 
-        assertTrue(
-            terminal == null && search.stats.search.nodes.sum < budget,
-            "slice ${search.stats.search.nodes.sum} of $budget, terminal $terminal",
-        )
+            assertTrue(search.stats.lp.workOps.sum > 0.0)
+            assertTrue(
+                terminal == null && search.stats.search.nodes.sum < budget,
+                "slice ${search.stats.search.nodes.sum} of $budget, terminal $terminal",
+            )
+        }
     }
 
     @Test
