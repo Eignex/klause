@@ -318,7 +318,7 @@ class LinearSubSumAggregationTest {
             val delta = LinearSubSumAggregation.sparsifyRows(problem)
 
             val replacement = delta.addedFactors.single() as Linear
-            assertTrue(replacement.vars.isEmpty())
+            assertTrue(checkNotNull(replacement.integerConstants).coeffs.all { it == 0L })
             assertEquals(
                 feasible(problem.factors, LongArray(3) { -2 }, LongArray(3) { 2 }),
                 feasible(arrayOf(equality, replacement), LongArray(3) { -2 }, LongArray(3) { 2 }),
