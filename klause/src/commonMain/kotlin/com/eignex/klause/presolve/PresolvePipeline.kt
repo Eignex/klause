@@ -242,7 +242,7 @@ object PresolvePipeline {
         }
         var current = substitution?.problem ?: seeded
         substitution?.let {
-            mappings.add(SourceMapping(seeded, it.problem, TransformationGuarantees.IDENTITY, lift = it.reconstruct))
+            mappings.add(SourceMapping(seeded, it.problem, TransformationGuarantees.IDENTITY, it.rebuild))
             firedPasses.add(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.id)
         }
         var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
