@@ -158,12 +158,16 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
 
     // A fixed incoming edge excludes every competing incoming edge, including optional self-loops.
     private fun excludeClaimed(state: PropagationState, claimed: IntArray): Boolean {
+        val targets = IntArrayList()
+        for (target in claimed.indices) if (claimed[target] >= 0) targets.add(target)
+        if (targets.isEmpty()) return true
         for (i in succ.indices) {
             val v = succ[i]
             if (state.intDomains[v].min == state.intDomains[v].max) continue
-            for (target in claimed.indices) {
+            for (k in 0 until targets.size) {
+                val target = targets[k]
                 val owner = claimed[target]
-                if (owner < 0 || owner == i || target.toLong() !in state.intDomains[v]) continue
+                if (owner == i || target.toLong() !in state.intDomains[v]) continue
                 val reason = Reason(state).fixed(owner)
                 if (!state.excludeIntValue(v, target.toLong(), reason.build())) {
                     return fail(reason.fixed(i))
