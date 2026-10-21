@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -23,6 +24,9 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
+import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.hasActivity
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,6 +38,54 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
+
+    @Test
+    fun `unchanged finite preparation should retain completed empty analysis effort`() {
+        val problem = Problem(3, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2, 4))))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                problem, FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.parse("off,+strengthen"),
+                presolveBudget = budget,
+            ),
+        )
+
+        val stats = assertNotNull(preparation.presolve)
+        val effort = assertNotNull(stats.effort)
+        assertTrue(stats.passes.isEmpty())
+        assertFalse(stats.lpStats.hasActivity())
+        assertTrue(effort.invocations.isNotEmpty())
+        assertTrue(effort.invocations.all { it.outcome == PresolveInvocationOutcome.COMPLETE_MISS })
+        assertEquals(
+            setOf(PresolveLane.SOURCE, PresolveLane.FINITE), effort.invocations.map { it.lane }.toSet(),
+        )
+        assertEquals(budget.spent(), effort.work)
+    }
+
+    @Test
+    fun `unchanged finite preparation should retain interrupted empty analysis effort`() {
+        val problem = Problem(3, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2, 4))))
+        val budget = PresolveBudget(1L)
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                problem, FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.parse("off,+strengthen"),
+                cancellation = budget.orSpent(Cancellation.Never),
+                solveCancellation = Cancellation.Never,
+                presolveBudget = budget,
+            ),
+        )
+
+        val stats = assertNotNull(preparation.presolve)
+        val effort = assertNotNull(stats.effort)
+        assertTrue(stats.passes.isEmpty())
+        assertFalse(stats.lpStats.hasActivity())
+        assertEquals(PresolveInvocationOutcome.INTERRUPTED, effort.invocations.single().outcome)
+        assertEquals(budget.spent(), effort.work)
+    }
 
     @Test
     fun `prebake LP reasoning should use the selected relaxation rows`() {
