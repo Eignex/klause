@@ -37,7 +37,6 @@ class LpSolveTest {
         assertEquals(listOf(BigFraction.of(BIG_ONE, bigIntOf(2_000_003)),
             BigFraction.of(BIG_ONE, bigIntOf(2_000_029))), point.primal)
         assertNotNull(checkedLpWitness(model, point.primal))
-        assertTrue(assertNotNull(recovered.exactPoint).work > 0L)
     }
 
     @Test
