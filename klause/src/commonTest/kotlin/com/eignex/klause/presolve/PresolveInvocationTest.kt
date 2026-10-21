@@ -120,7 +120,8 @@ class PresolveInvocationTest {
     @Test
     fun `finite clause subsumption should read clauses retained by earlier reductions`() {
         val shorter = Clause(intArrayOf(0, 2))
-        val problem = Problem(3, 0, emptyArray(), listOf(shorter, Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 2, 4))))
+        val problem = Problem(3, 0, emptyArray(),
+            listOf(shorter, Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 2, 4))))
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val result = Presolver.run(problem.bake(), PresolveConfig.parse("off,+subsume,+clause-subsume"),
