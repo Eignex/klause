@@ -705,10 +705,19 @@ from the record.
 
 | Format | `finalWitness` |
 |---|---|
-| MiniZinc | The last complete DZN solution from its first assignment, then its `% klause-exact:`, `% klause-coordinate:` and `% klause-float-` lines |
+| MiniZinc | The last complete DZN solution from its first assignment, then its `% klause-exact:`, `% klause-coordinate:` and `% klause-float-` lines; a Klause solution at model level (below) |
 | XCSP3 | The last complete `<instantiation>`, prefixed once with `v ` |
 | SMT-LIB | The last complete model, from its `(` line to its `)` line, with newline line endings |
 | MPS, OPB, DIMACS, WCNF | The last `v ` line |
+
+Klause solves a MiniZinc model's compiled FlatZinc, so its own output names FlatZinc
+variables (`X_INTRODUCED_*`) and prints enums as integers. The bench passes the final
+solution through the model's compiled output mapping (`minizinc --ozn-file`, the
+`.ozn` compiled beside the FlatZinc), so `finalWitness` assigns the model's output
+variables, enum values by name, and can be read as extra data for the model.
+`stats.finalWitnessLevel` is `model`; a solution the mapping cannot read keeps its
+FlatZinc-level text with `finalWitnessLevel=flatzinc` and the reason under
+`stats.finalWitnessMappingError`. Reference solvers print model-level output already.
 
 Authoritative rational coordinates travel as `% klause-exact: name = value;`
 comments beside decimal assignments. Mixed exact/grid witnesses use

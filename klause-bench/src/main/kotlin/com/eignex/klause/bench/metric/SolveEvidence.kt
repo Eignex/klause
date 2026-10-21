@@ -23,9 +23,12 @@ internal object SolveEvidence {
         }
     }
 
-    fun finalWitness(format: Format, raw: String): String? {
+    /** [raw]'s final candidate as [SolveRecord.finalWitness], or null when it holds none or it exceeds 8 MiB.
+     *  [modelOutput], when given, maps a MiniZinc solution's FlatZinc-level DZN to the model's own output
+     *  (see [com.eignex.klause.bench.runner.MiniZincRunner.modelOutput]) before its comment lines are appended. */
+    fun finalWitness(format: Format, raw: String, modelOutput: ((String) -> String)? = null): String? {
         val witness = when (format) {
-            Format.MINIZINC -> miniZincWitness(raw)
+            Format.MINIZINC -> miniZincWitness(raw, modelOutput)
 
             Format.SMTLIB -> finalSmtModel(raw)
 
@@ -39,10 +42,22 @@ internal object SolveEvidence {
         return witness?.takeIf { it.length <= MAX_WITNESS_CHARS }
     }
 
-    /** The last complete DZN solution, with the `% klause-exact:`, `% klause-coordinate:` and `% klause-float-`
-     *  lines of that solution appended; an exact-coordinate-only solution keeps those lines alone. */
-    private fun miniZincWitness(raw: String): String? = (
-        miniZincSolution(raw)
+    /** The assignments of the last complete DZN solution in [raw], from its first assignment line on. */
+    fun miniZincSolution(raw: String): String? {
+        val complete = raw.split("----------").dropLast(1).lastOrNull() ?: return null
+        val lines = complete.lineSequence().filter { line ->
+            val trimmed = line.trim()
+            trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====")
+        }.toList()
+        val start = lines.indexOfFirst { ASSIGNMENT.containsMatchIn(it) }
+        return if (start < 0) null else lines.drop(start).joinToString("\n")
+    }
+
+    /** The last complete DZN solution, mapped by [modelOutput] when given, with the `% klause-exact:`,
+     *  `% klause-coordinate:` and `% klause-float-` lines of that solution appended; an exact-coordinate-only
+     *  solution keeps those lines alone. */
+    private fun miniZincWitness(raw: String, modelOutput: ((String) -> String)?): String? = (
+        miniZincSolution(raw)?.let { modelOutput?.invoke(it) ?: it }
             ?: if (exactCoordinates(raw) != null) "" else null
         )?.let { candidate ->
         val comments = raw.split("----------").dropLast(1).lastOrNull()
@@ -56,17 +71,6 @@ internal object SolveEvidence {
     private fun exactCoordinates(raw: String): String? = raw.split("----------").dropLast(1).lastOrNull()
         ?.lineSequence()?.filter { it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") }
         ?.map { it.substringAfter(": ") }?.toList()?.takeIf { it.isNotEmpty() }?.joinToString("\n")
-
-    /** The assignments of the last complete DZN solution, from its first assignment line on. */
-    private fun miniZincSolution(raw: String): String? {
-        val complete = raw.split("----------").dropLast(1).lastOrNull() ?: return null
-        val lines = complete.lineSequence().filter { line ->
-            val trimmed = line.trim()
-            trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====")
-        }.toList()
-        val start = lines.indexOfFirst { ASSIGNMENT.containsMatchIn(it) }
-        return if (start < 0) null else lines.drop(start).joinToString("\n")
-    }
 
     /** The last complete XCSP3 `<instantiation>` of the `v ` lines, without their prefix. */
     private fun xcspInstantiation(raw: String): String? {

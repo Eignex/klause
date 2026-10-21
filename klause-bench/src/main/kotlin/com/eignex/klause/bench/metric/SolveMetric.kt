@@ -9,6 +9,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.runner.MiniZincCompileFailure
 import com.eignex.klause.bench.runner.MiniZincCompilerIdentity
+import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.ProblemKind
@@ -275,6 +276,7 @@ internal object SolveMetric {
         },
         invoke: (ResolvedProblem, String, SolverInvocation.Settings, Budget, Boolean) -> SolverInvocation.Result =
             SolverInvocation::run,
+        modelOutput: (ProblemRef, String) -> String = MiniZincRunner()::modelOutput,
     ): Pair<SolveRecord, String?> {
         val optimize = entry.objective != null
         val kind = if (optimize) "optimize" else "satisfy"
@@ -295,13 +297,17 @@ internal object SolveMetric {
             } else {
                 emptyMap()
             }
+            val (witness, witnessStats) = if (r.feasible == true) {
+                witness(entry.ref, solverId, r.rawOutput, modelOutput)
+            } else {
+                null to emptyMap()
+            }
             record(entry, solverId, settings, budget, kind, timestamp, sha, r).let { reported ->
                 reported.copy(
-                    stats = reported.stats + approximation,
+                    stats = reported.stats + approximation + witnessStats,
                     compilerIdentity = compiler,
                     sourceHashes = sourceHashes,
-                    finalWitness = SolveEvidence.finalWitness(entry.ref.format, r.rawOutput)
-                        .takeIf { r.feasible == true },
+                    finalWitness = witness,
                 )
             } to r.rawOutput
         }.getOrElse { failure ->
@@ -315,6 +321,29 @@ internal object SolveMetric {
                 )
             println("?? [${entry.name}] $kind ERROR: ${record.stats["errorMessage"] ?: record.stats["errorClass"]}")
             record to null
+        }
+    }
+
+    /** [raw]'s final witness, with how it was mapped. Klause solves a MiniZinc model's compiled FlatZinc, so its
+     *  solution names FlatZinc variables and gives enums as integers; it goes through the model's output mapping
+     *  to the model's own output variables (`stats.finalWitnessLevel=model`). One that cannot be mapped keeps its
+     *  FlatZinc-level text (`flatzinc`), with why under `stats.finalWitnessMappingError`. */
+    private fun witness(
+        ref: ProblemRef,
+        solverId: String,
+        raw: String,
+        modelOutput: (ProblemRef, String) -> String,
+    ): Pair<String?, Map<String, String>> {
+        if (ref.format != Format.MINIZINC || solverId != SolverInvocation.KLAUSE) {
+            return SolveEvidence.finalWitness(ref.format, raw) to emptyMap()
+        }
+        return runCatching {
+            val witness = SolveEvidence.finalWitness(ref.format, raw) { modelOutput(ref, it) }
+            witness to mapOf("finalWitnessLevel" to "model")
+        }.getOrElse { failure ->
+            val reason = (failure.message ?: failure::class.simpleName.orEmpty()).take(REASON_CAP)
+            SolveEvidence.finalWitness(ref.format, raw) to
+                mapOf("finalWitnessLevel" to "flatzinc", "finalWitnessMappingError" to reason)
         }
     }
 

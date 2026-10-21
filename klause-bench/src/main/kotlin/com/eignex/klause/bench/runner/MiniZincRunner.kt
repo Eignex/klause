@@ -3,6 +3,7 @@ package com.eignex.klause.bench.runner
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.linearObjective
@@ -80,6 +81,40 @@ internal class MiniZincRunner(
     }
 
     fun compileOutput(ref: ProblemRef): File = outputFile(compileFzn(ref))
+
+    /**
+     * [ref]'s model-level DZN for [flatSolution], one solution of a FlatZinc solver's DZN output for [ref]'s compiled
+     * FlatZinc: `minizinc --ozn-file` (solns2out) evaluates the compiled output mapping on it, so the result assigns
+     * the model's output variables, enum values by name and no FlatZinc-introduced variables, plus `_objective` for an
+     * optimisation model. Throws, saying why, when the mapping fails.
+     */
+    fun modelOutput(ref: ProblemRef, flatSolution: String): String {
+        val ozn = compileOutput(ref)
+        val dir = Files.createTempDirectory("klause-ozn-").toFile()
+        try {
+            val input = File(dir, "flat.dzn").apply { writeText("$flatSolution\n----------\n") }
+            val output = File(dir, "model.dzn")
+            val log = File(dir, "solns2out.log")
+            val proc = ProcessBuilder(MiniZincCompatibility.compiler.executable, "--ozn-file", ozn.absolutePath)
+                .redirectInput(input).redirectOutput(output).redirectError(log).start()
+            try {
+                check(proc.waitFor(OUTPUT_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    "minizinc --ozn-file timed out after ${OUTPUT_TIMEOUT_SECONDS}s"
+                }
+                val text = output.readText()
+                check(proc.exitValue() == 0) {
+                    "minizinc --ozn-file failed (exit ${proc.exitValue()}): ${(log.readText() + text).trim().take(500)}"
+                }
+                return checkNotNull(SolveEvidence.miniZincSolution(text)) {
+                    "minizinc --ozn-file printed no complete solution: ${text.trim().take(500)}"
+                }
+            } finally {
+                if (proc.isAlive) proc.destroyForcibly().waitFor()
+            }
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 
     private fun outputFile(fzn: File): File = File(fzn.parentFile, "${fzn.nameWithoutExtension}.ozn")
 
@@ -169,3 +204,5 @@ internal class MiniZincRunner(
  * would otherwise solve different instances.
  */
 internal const val MZN_RANDOM_SEED = 1
+
+private const val OUTPUT_TIMEOUT_SECONDS = 30L
