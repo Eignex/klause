@@ -57,7 +57,7 @@ class ReferenceStoreTest {
         val corrected = proof.copy(
             objective = -4.86034407505895E10,
             proven = false,
-            version = "highs|${MpsWitness.VERSION}",
+            version = "highs|mps-validate-3",
         )
         val weaker = corrected.copy(objective = null, feasible = null)
 

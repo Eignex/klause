@@ -73,40 +73,15 @@ internal object SolverInvocation {
         val rawOutput: String,
         val command: String,
         val buildProvenance: BuildProvenance? = null,
-        /** The solution a reference returned, as `name value` lines: kept beside its record so the verdict can be
-         *  checked again. Null when it returned none, or for a solver that does not report one. */
-        val assignment: String? = null,
         /** Subprocess wall-clock duration, including launch and output consumption; null when unavailable. */
         val elapsedMs: Long? = null,
         val exactObjective: String? = null,
         val stderr: String? = null,
         val stderrComplete: Boolean = false,
-    ) {
-        fun referenceElapsedMs(budgetMs: Long): Long = when {
-            proven -> solveTimeMs(stats) ?: elapsedMs ?: budgetMs
-            feasible == true -> timeToFirstFeasibleMs ?: solveTimeMs(stats) ?: elapsedMs ?: budgetMs
-            else -> budgetMs
-        }
-    }
-
-    /** Registered MiniZinc solver ids, parsed once from `minizinc --solvers` (the parenthesised tag
-     *  lists). Lets a reference report "not available" instead of failing obscurely. */
-    private val registered: Set<String> by lazy {
-        runCatching {
-            val proc = ProcessBuilder("minizinc", "--solvers").redirectErrorStream(true).start()
-            val out = proc.inputStream.bufferedReader().readText()
-            proc.waitFor(REGISTRY_WAIT_MILLIS, TimeUnit.MILLISECONDS)
-            Regex("""\(([^)]*)\)""").findAll(out)
-                .flatMap { it.groupValues[1].split(',') }
-                .map { it.trim().lowercase() }
-                .toSet()
-        }.getOrElse { emptySet() }
-    }
-
-    fun referenceAvailable(solverId: String): Boolean = solverId.lowercase() in registered
+    )
 
     /** Run [solverId] over [entry] under [budget]. `solverId == "klause"` runs the cli; any other id
-     *  is a registered MiniZinc reference. [optimize] selects intermediate-solution mode (`-a`). */
+     *  is a MiniZinc solver. [optimize] selects intermediate-solution mode (`-a`). */
     fun run(entry: ResolvedProblem, solverId: String, settings: Settings, budget: Budget, optimize: Boolean): Result {
         val cmd = if (solverId == KLAUSE) {
             klauseCommand(entry, settings, budget, optimize)
@@ -120,16 +95,6 @@ internal object SolverInvocation {
         return invoke(cmd, dialectFor(solverId, entry.ref.format), hardTimeoutMs = budget.timeoutMillis * 2 + 20_000)
             .copy(buildProvenance = provenance)
     }
-
-    /** Run a registered MiniZinc [solverId] reference directly on [ref] — no klause `Problem` is
-     *  built (the reference oracle solves the `.mzn`/`.fzn` itself), so a whole-corpus reference
-     *  sweep stays flat in memory. [optimize] selects intermediate-solution mode (`-a`). */
-    fun runReference(ref: ProblemRef, solverId: String, settings: Settings, budget: Budget, optimize: Boolean): Result =
-        invoke(
-            minizincCommand(ref, solverId, settings, budget, optimize),
-            Dialect.MINIZINC,
-            hardTimeoutMs = budget.timeoutMillis * 2 + 20_000,
-        )
 
     /** The provisioned klause-cli launcher. */
     fun klauseCliBin(): File = File(CorpusFetcher.workspaceRoot(), KLAUSE_CLI_BIN)
@@ -584,7 +549,6 @@ internal object SolverInvocation {
 
     /** Ceiling on the dist's answer to `--version`, so a child that never answers cannot hang a run. */
     private const val PREFLIGHT_TIMEOUT_MS = 30_000L
-    private const val REGISTRY_WAIT_MILLIS = 10_000L
 }
 
 /**

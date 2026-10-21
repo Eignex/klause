@@ -16,10 +16,10 @@ Kotlin Multiplatform constraint solver.
 - Bash for glue scripts that chain standard tools (`curl`, `tar`, `jq`, `bc`, `sha256sum`), under
   `klause-bench/output/` or a module's `scripts/`. Prefer a short script to a new `klause-bench`
   subcommand, and delete an unused tool instead of porting it.
-- MiniZinc for the `klause-mzn-lib` library and test models; Dockerfiles only to wrap external
-  reference solvers.
-- No Python anywhere: not in sources, tests, resources, Gradle tasks or CI. Reference images that
-  need another language live in klause-lab.
+- MiniZinc for the `klause-mzn-lib` library and test models.
+- No Dockerfiles and no reference-solver code: klause-lab runs the reference solvers and owns their
+  images. klause-bench only selects problems and resolves their files (`select files=true`).
+- No Python anywhere: not in sources, tests, resources, Gradle tasks or CI.
 
 ## PR validation
 

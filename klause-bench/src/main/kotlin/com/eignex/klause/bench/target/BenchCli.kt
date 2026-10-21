@@ -6,26 +6,19 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSets
 import com.eignex.klause.bench.metric.ArmMining
-import com.eignex.klause.bench.metric.BenchCache
-import com.eignex.klause.bench.metric.ClaspReference
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.InstanceClassifier
 import com.eignex.klause.bench.metric.InstanceFeatures
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.MiniZincSourceValidation
-import com.eignex.klause.bench.metric.ReferenceEntry
-import com.eignex.klause.bench.metric.ReferenceSolve
 import com.eignex.klause.bench.metric.ReferenceStore
 import com.eignex.klause.bench.metric.ResultCredit
-import com.eignex.klause.bench.metric.ScipReference
 import com.eignex.klause.bench.metric.SmtSourceValidation
 import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
-import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.metric.Xcsp3SourceValidation
-import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MZN_COMPATIBILITY_POLICY
@@ -41,9 +34,6 @@ import com.eignex.klause.bench.tools.ProfileScope
 import java.io.File
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.Callable
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -52,15 +42,11 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
 /**
- * Benchmark command dispatcher for solving, references, selection, result credit and corpus
+ * Benchmark command dispatcher for solving, selection, result credit and corpus
  * maintenance. Solves write per-problem [SolveMetric] outputs and a per-run result CSV;
  * comparison and scoring operate on those saved records.
  */
 object BenchCli {
-    /** Default reference-sweep concurrency: enough to keep cores busy, low enough that a handful of
-     *  large-instance cp-sat solves can't exhaust memory. Override with `jobs=N`. */
-    private const val DEFAULT_REFERENCE_JOBS = 6
-
     private const val MIB = 1024L * 1024
 
     private const val MIB_COLUMN_WIDTH = 14
@@ -87,7 +73,6 @@ object BenchCli {
                 InstalledBuild.writeManifest(File(output))
             }
 
-            "reference" -> reference(args.drop(1))
 
             "classify" -> classify(args.drop(1))
 
@@ -100,7 +85,7 @@ object BenchCli {
             else ->
                 error(
                     "unknown command '$cmd' " +
-                        "(commands: solve, solve-one, validate-solution, select, preview, reference, " +
+                        "(commands: solve, solve-one, validate-solution, select, preview, " +
                         "classify, credit, mine, corpus, provenance, list)",
                 )
         }
@@ -225,7 +210,7 @@ object BenchCli {
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         // `backend=` is the solver id: a registered MiniZinc solver (choco/gecode/yuck/…) run via
         // `minizinc --solver`; unset (or `klause`) runs klause via klause-cli.
-        val backend = (f["backend"] ?: f["reference"])?.lowercase()?.takeIf { it != "klause" }
+        val backend = f["backend"]?.lowercase()?.takeIf { it != "klause" }
         val profile = parseProfile(f)
         // `param=` is repeatable (`param=var-selector=vsids param=luby=256`), so collect it from the
         // raw args rather than the dedup'd filter map; each value is a klause-cli `key=value` knob.
@@ -342,171 +327,13 @@ object BenchCli {
         val record = SolveMetric.solveOne(
             ref,
             f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget(),
-            (f["backend"] ?: f["reference"])?.lowercase()?.takeIf { it != "klause" } ?: SolverInvocation.KLAUSE,
+            f["backend"]?.lowercase()?.takeIf { it != "klause" } ?: SolverInvocation.KLAUSE,
             parseKlauseSearch(f, params) ?: KlauseSearch(),
             label = f["label"],
             outDir = f["out"]?.let(::File),
-            referenceSolver = f["solver"],
         )
         println("${record.problem}: feasible=${record.feasible} objective=${record.objective} proven=${record.proven}")
     }
-
-    /** Harvest per-instance reference optima/bounds into the committed table (see [ReferenceStore]),
-     *  used for gap-to-optimum scoring and as a soundness oracle. Runs the reference solver (`backend=`, default
-     *  `cp-sat`) over the selection — cache-replayed if already solved — then merges each instance's
-     *  `{objective, proven}` into its solver's `klause-bench/reference/<solver>.csv` (virtual-best).
-     *  For optima pass `kind=cop`; match the cached run's `timeout=` to replay it. */
-    private fun reference(filterArgs: List<String>) {
-        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
-        // Best strong solver per format: cp-sat for MiniZinc (`minizinc --solver`) and XCSP3 (the CPMpy
-        // container — OR-Tools has no XCSP3 frontend), clasp for DIMACS/OPB/WCNF (the Boolean formats cp-sat
-        // can't read), z3 for SMT-LIB, SCIP for MPS (MIP). Other formats have no path.
-        val refs = select(f).filter {
-            it.format == Format.MINIZINC || it.format == Format.XCSP3 ||
-                it.format == Format.DIMACS || it.format == Format.OPB || it.format == Format.WCNF ||
-                it.format == Format.SMTLIB || it.format == Format.MPS
-        }
-        if (refs.isEmpty()) {
-            println("(no MiniZinc/XCSP3/DIMACS/OPB/WCNF/SMT-LIB/MPS problems matched the selection)")
-            return
-        }
-        val backend = (f["backend"] ?: f["reference"] ?: "cp-sat").lowercase()
-        refs.forEach { ReferenceSolve.solverIdFor(it, backend) }
-        require(refs.none { it.format == Format.MINIZINC } || SolverInvocation.referenceAvailable(backend)) {
-            "reference solver '$backend' is not registered with minizinc (`minizinc --solvers`)"
-        }
-        require(refs.none { it.format == Format.XCSP3 } || Xcsp3CpSatReference.imageAvailable()) {
-            "XCSP3 reference needs the ${Xcsp3CpSatReference.IMAGE} image " +
-                "(build it from klause-lab: docker build -t ${Xcsp3CpSatReference.IMAGE} images/xcsp3-cpsat)"
-        }
-        val clasp = refs.any { it.format == Format.DIMACS || it.format == Format.OPB || it.format == Format.WCNF }
-        require(!clasp || ClaspReference.imageAvailable()) {
-            "DIMACS/OPB reference needs the ${ClaspReference.IMAGE} image " +
-                "(build it: docker build -t ${ClaspReference.IMAGE} klause-bench/clasp)"
-        }
-        require(refs.none { it.format == Format.SMTLIB } || Z3Reference.available()) {
-            "SMT-LIB reference needs a z3 binary on PATH (`z3 --version`)"
-        }
-        require(refs.none { it.format == Format.MPS } || ScipReference.imageAvailable()) {
-            "MPS reference needs the ${ScipReference.IMAGE} image " +
-                "(build it: docker build -t ${ScipReference.IMAGE} klause-bench/scip)"
-        }
-        // Reap containers left by an earlier interrupted run, and again on a graceful stop (each is
-        // memory-capped, so a hard kill only ever leaves bounded, short-lived ones).
-        if (refs.any { it.format == Format.XCSP3 }) {
-            Xcsp3CpSatReference.reapStragglers()
-            Runtime.getRuntime().addShutdownHook(Thread { Xcsp3CpSatReference.reapStragglers() })
-        }
-        if (clasp) {
-            ClaspReference.reapStragglers()
-            Runtime.getRuntime().addShutdownHook(Thread { ClaspReference.reapStragglers() })
-        }
-        if (refs.any { it.format == Format.MPS }) {
-            ScipReference.reapStragglers()
-            Runtime.getRuntime().addShutdownHook(Thread { ScipReference.reapStragglers() })
-        }
-        val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
-        // `workers=` pins each cp-sat/choco job to that many search workers (default 1): without it the
-        // reference fans out to every core, so `jobs` concurrent solves would oversubscribe the machine.
-        // Total core pressure is `jobs × workers`; keep it within the box.
-        val workers = (f["workers"] ?: f["processors"])?.toIntOrNull()?.coerceAtLeast(1) ?: 1
-        val settings = SolverInvocation.Settings(processors = workers, free = f["fixed"]?.toBoolean() != true)
-        val jobs = (f["jobs"]?.toIntOrNull() ?: DEFAULT_REFERENCE_JOBS).coerceIn(1, refs.size)
-        println(
-            "=== reference ($backend, ${budget.timeoutMillis}ms budget, jobs=$jobs × workers=$workers): " +
-                "${refs.size} instance(s) ===",
-        )
-        val pool = Executors.newFixedThreadPool(jobs)
-        val done = AtomicInteger()
-        val harvested = try {
-            refs.map { ref ->
-                pool.submit(
-                    Callable { solveReference(ref, backend, settings, budget, done, refs.size) },
-                )
-            }
-                .map { it.get() }
-        } finally {
-            pool.shutdown()
-        }
-        val (added, tightened, unchanged) = ReferenceStore.mergeAndSave(harvested)
-        // Name the solvers that produced the rows; each format may use a different reference.
-        val solvers = harvested.map { it.solver }.distinct().sorted().joinToString("+").ifEmpty { backend }
-        val decisive = harvested.count { it.feasible == true || it.proven }
-        println(
-            "\nreference table: +$added new, $tightened tightened, $unchanged unchanged " +
-                "($decisive decisive, ${harvested.size} rows of ${refs.size} from $solvers)",
-        )
-    }
-
-    /** Solve one instance with the reference [backend] and turn the result into a [ReferenceEntry]: a
-     *  feasible witness or a proof when decisive, else an "unknown" row (an undecided timeout or an
-     *  error) so every instance is covered. Reuses [BenchCache], so re-runs and resumes replay instantly
-     *  and a killed sweep loses no completed work. */
-    private fun solveReference(
-        ref: ProblemRef,
-        backend: String,
-        settings: SolverInvocation.Settings,
-        budget: Budget,
-        counter: AtomicInteger,
-        total: Int,
-    ): ReferenceEntry = runCatching {
-        val run = ReferenceSolve.run(ref, backend, settings, budget)
-        val solverId = run.solver
-        val r = run.result
-        val maximize = run.maximize
-        r.stats["error"]?.let { println("?? ${ref.name} ERROR: $it") }
-        val elapsedMs = r.referenceElapsedMs(budget.timeoutMillis)
-        val verdict = when {
-            r.proven && r.feasible == false -> "UNSAT"
-            r.proven -> "opt=${r.objective ?: "sat"}"
-            r.feasible == true -> "best=${r.objective ?: "sat"}"
-            else -> "??"
-        }
-        println("[${counter.incrementAndGet()}/$total] ${ref.name} = $verdict")
-        // Unknown rows preserve coverage without replacing decisive rows of the same validation version.
-        if (r.feasible == true || r.proven) {
-            ReferenceEntry(
-                ReferenceStore.suiteOf(ref),
-                ref.name,
-                maximize,
-                r.objective,
-                r.feasible,
-                r.proven,
-                elapsedMs,
-                solverId,
-                budget.timeoutMillis,
-                version = r.stats["referenceVersion"].orEmpty(),
-            )
-        } else {
-            unknownRow(ref, maximize, solverId, budget, r.stats["referenceVersion"].orEmpty())
-        }
-    }.getOrElse {
-        // An instance the reference couldn't even run (parse/solver error) is also uncovered — record an
-        // unknown row so coverage stays complete; the error is logged for visibility.
-        println("?? ${ref.name} ERROR: ${it.message ?: it::class.simpleName}")
-        unknownRow(ref, maximize = false, solver = ReferenceSolve.solverIdFor(ref, backend), budget = budget)
-    }
-
-    /** An "unknown" reference row for an instance the solver left undecided (timeout) or couldn't run:
-     *  no objective, feasibility unknown, unproven, crediting the full budget as elapsed. */
-    private fun unknownRow(
-        ref: ProblemRef,
-        maximize: Boolean,
-        solver: String,
-        budget: Budget,
-        version: String = "",
-    ): ReferenceEntry = ReferenceEntry(
-        suite = ReferenceStore.suiteOf(ref),
-        problem = ref.name,
-        maximize = maximize,
-        objective = null,
-        feasible = null,
-        proven = false,
-        elapsedMs = budget.timeoutMillis,
-        solver = solver,
-        budgetMs = budget.timeoutMillis,
-        version = version,
-    )
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
      *  Returns null when none are set. Defaults: `engine` unset ⇒ no `-e`, so klause follows the cli's

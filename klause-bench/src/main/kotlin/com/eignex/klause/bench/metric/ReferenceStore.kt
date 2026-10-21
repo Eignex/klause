@@ -48,7 +48,7 @@ internal data class ReferenceEntry(
      *  [structure] (MiniZinc/XCSP3/OPB/DIMACS), or when unclassified. */
     val logic: String = "",
     /**
-     * Solver build, options and validation version ([MpsWitness.VERSION]) affecting row validity.
+     * Solver build, options and the validation version that judged the row, which decide whether it still holds.
      * Blank when provenance is unavailable or the solver does not record it.
      */
     val version: String = "",
