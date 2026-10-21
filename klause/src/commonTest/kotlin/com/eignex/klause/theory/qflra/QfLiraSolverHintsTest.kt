@@ -50,6 +50,72 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `conditioned eager hints should reuse compatible real source updates`() {
+        val model = Problem(
+            numBoolVars = 4,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = Array<Factor>(4) { head ->
+                if (head < 3) ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), IntArray(3) { it },
+                    DoubleArray(3) { 1.0 }, LinearOp.LE, 0.0)
+                else Linear(intArrayOf(), doubleArrayOf(), IntArray(3) { it }, DoubleArray(3) { 1.0 },
+                    LinearOp.GE, 0.0)
+            },
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val captures = stats.snapshot().lpPointHintCaptures
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(true, hints.preferredBool(2))
+            assertEquals(captures, stats.snapshot().lpPointHintCaptures)
+            assertEquals(2L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED"))
+        }
+    }
+
+    @Test
+    fun `conditioned eager point reuse should discard points between source branches`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = doubleArrayOf(1.0, 0.0, 0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), IntArray(3) { it },
+                    DoubleArray(3) { 1.0 }, LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 0.5),
+                Linear(intArrayOf(), doubleArrayOf(), IntArray(3) { it }, DoubleArray(3) { 1.0 },
+                    LinearOp.GE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertEquals(false, hints.preferredBool(0))
+
+            val result = session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
     fun `registered bounds should expire after delayed Boolean scopes retract`() {
         val model = Problem(
             numBoolVars = 5,

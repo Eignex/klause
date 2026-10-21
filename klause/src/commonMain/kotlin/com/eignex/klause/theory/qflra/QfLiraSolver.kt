@@ -376,7 +376,7 @@ class ExactLiraSearchComponent private constructor(
         var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
         val rows = ArrayList<PreparedSourceRow>()
         val variables = LinkedHashSet<Int>()
-        var stable = defaultOpening && model.numIntVars == 0
+        var stable = model.numIntVars == 0
         for (prepared in preparedRows) {
             stop.charge(1)
             if (stop()) return declined(HintIndexOutcome.STOPPED)
@@ -399,7 +399,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintIndex = null
         pointHintPoint = null
         pointHintStop = stop
-        pointReuseEnabled = defaultOpening && model.numIntVars == 0
+        pointReuseEnabled = model.numIntVars == 0
         return variables.toIntArray() to pointHintProvider(defaultOpening, defaultGraphSelections)
     }
 

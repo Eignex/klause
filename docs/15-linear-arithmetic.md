@@ -57,7 +57,8 @@ A check proceeds in four steps:
 2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
    the LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
-   Default pure-real checks can retain a feasible point across source updates.
+   Pure-real checks with admitted point guidance can retain a feasible point
+   across source updates, including conditioned query openings.
    Each newly resolved comparison, including shared heads and resolved Boolean
    coefficients, checks that point before LP assembly. Registered source bounds
    also require current source ownership and exact evaluation. If every update
@@ -126,6 +127,8 @@ The private index, returned heads and point share the 65,536-entry admission lim
 Both storage forms can retain the same admitted point for checked partial reuse.
 An eager table without Boolean coefficients stays valid with that immutable point;
 Boolean-dependent tables are evaluated against the current assignments on reuse.
+Conditioned eager openings use the same point checks and containing cancellation;
+condition markers and retraction discard their retained point and deferred rows.
 Complete Boolean states can submit the retained point to the full source witness
 check. A missing disjunct or disequality direction leaves completion to ordinary
 solving and branching.
