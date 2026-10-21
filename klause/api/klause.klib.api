@@ -17302,6 +17302,9 @@ sealed class com.eignex.klause.solver.pipeline/SourceExecutionResult : com.eigne
     open val semantics // com.eignex.klause.solver.pipeline/SourceExecutionResult.semantics|{}semantics[0]
         open fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.solver.pipeline/SourceExecutionResult.semantics.<get-semantics>|<get-semantics>(){}[0]
 
+    final var preparationStats // com.eignex.klause.solver.pipeline/SourceExecutionResult.preparationStats|{}preparationStats[0]
+        final fun <get-preparationStats>(): com.eignex.klause.solver.result/PresolveStats? // com.eignex.klause.solver.pipeline/SourceExecutionResult.preparationStats.<get-preparationStats>|<get-preparationStats>(){}[0]
+
     final class Declined : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Declined|null[0]
         final val reason // com.eignex.klause.solver.pipeline/SourceExecutionResult.Declined.reason|{}reason[0]
             final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.pipeline/SourceExecutionResult.Declined.reason.<get-reason>|<get-reason>(){}[0]
@@ -17886,6 +17889,7 @@ final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/intersect(c
 final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/ne(com.eignex.klause.model/SetTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/ne|ne@com.eignex.klause.model.SetTerm(com.eignex.klause.model.SetTerm){}[0]
 final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/subsetOf(com.eignex.klause.model/SetTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/subsetOf|subsetOf@com.eignex.klause.model.SetTerm(com.eignex.klause.model.SetTerm){}[0]
 final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/union(com.eignex.klause.model/SetTerm): com.eignex.klause.model/SetExpr // com.eignex.klause.schema/union|union@com.eignex.klause.model.SetTerm(com.eignex.klause.model.SetTerm){}[0]
+final fun (com.eignex.klause.presolve/PresolveConfig).com.eignex.klause.presolve/effortStats(com.eignex.klause.presolve/PresolveBudget?, kotlin.time/Duration): com.eignex.klause.solver.result/PresolveEffortStats // com.eignex.klause.presolve/effortStats|effortStats@com.eignex.klause.presolve.PresolveConfig(com.eignex.klause.presolve.PresolveBudget?;kotlin.time.Duration){}[0]
 final fun (com.eignex.klause.propagation/Assumptions).com.eignex.klause.solver.evidence/sourceCondition(): com.eignex.klause.solver.evidence/SourceCondition // com.eignex.klause.solver.evidence/sourceCondition|sourceCondition@com.eignex.klause.propagation.Assumptions(){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/eq(com.eignex.klause.model/ContinuousRealExpr): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.schema.FloatTerm(com.eignex.klause.model.ContinuousRealExpr){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/eq(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.schema.FloatTerm(com.eignex.klause.schema.FloatTerm){}[0]

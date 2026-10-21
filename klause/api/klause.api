@@ -9113,6 +9113,10 @@ public final class com/eignex/klause/presolve/PresolveContext$Companion {
 	public static synthetic fun of$default (Lcom/eignex/klause/presolve/PresolveContext$Companion;Lcom/eignex/klause/solver/objective/LinearObjective;ZZILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveContext;
 }
 
+public final class com/eignex/klause/presolve/PresolveEffortKt {
+	public static final fun effortStats-SxA4cEA (Lcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/presolve/PresolveBudget;J)Lcom/eignex/klause/solver/result/PresolveEffortStats;
+}
+
 public final class com/eignex/klause/presolve/PresolveEmphasis : java/lang/Enum {
 	public static final field AGGRESSIVE Lcom/eignex/klause/presolve/PresolveEmphasis;
 	public static final field CONSERVATIVE Lcom/eignex/klause/presolve/PresolveEmphasis;
@@ -12608,6 +12612,7 @@ public abstract class com/eignex/klause/solver/pipeline/SourceExecutionResult : 
 	public final fun getCompleteSearchAdmitted ()Ljava/lang/Boolean;
 	public final fun getInvocation ()Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
 	public final fun getLinearSource ()Lcom/eignex/klause/solver/pipeline/LinearSourceOutcome;
+	public final fun getPreparationStats ()Lcom/eignex/klause/solver/result/PresolveStats;
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 }
 
