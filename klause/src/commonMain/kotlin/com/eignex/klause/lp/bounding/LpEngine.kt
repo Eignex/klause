@@ -62,6 +62,7 @@ import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
@@ -864,6 +865,10 @@ internal class LpEngine(
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
             .also { leafSolver = it }
+        val recoverWitness = residualOversized && model.m > RationalBasisLimits().dimension &&
+            !problem.semantics.isApproximate && toleranceCheck == null &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+        if (recoverWitness) sink.lp.observePrimalPhase("PINNED_REAL_LEAF_RECOVERY", "REQUESTED", 0L)
         val certified = solver.solve(
             model,
             cancellation = params.cancellation,
@@ -874,7 +879,9 @@ internal class LpEngine(
                 { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) }
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
+            recoverWitness = recoverWitness,
         )
+        if (recoverWitness) sink.lp.observePrimalPhase("PINNED_REAL_LEAF_RECOVERY", certified.verdict.name, 0L)
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         return when (certified.verdict) {
             LpVerdict.TOLERANCE_OPTIMUM -> LeafRealResult(

@@ -147,6 +147,12 @@ owner's lifetime, including failed transformations. Solver retirement and search
 undo do not replenish them. It supplies no source witness or deduction. Required
 leaf completion still waits for all finite pins and checks the original source.
 
+Required large-leaf completion requests bounded witness recovery above the
+rational-basis dimension limit. A separate owner of the same exact model performs
+sparse point repair and strict-margin refinement for component numerical solves.
+The existing refinement work, storage, scalar and auxiliary limits bound this
+recovery, and every recovered point passes exact source verification.
+
 A compacted refutation maps each supported interval to the original rows that
 establish its strongest lower and upper endpoints, retaining a strict parent at
 equal endpoints. It cites those rows' validity premises and both bounds of touched

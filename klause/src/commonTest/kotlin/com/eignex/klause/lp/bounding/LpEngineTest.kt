@@ -44,6 +44,25 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `large pinned strict components should complete with an exact source witness`() {
+        val reals = 129
+        val source = Problem(0, 0, emptyArray(), Array(1032) { row ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(row % reals)), listOf(BigFraction.ONE),
+                LinearOp.GE, BigFraction.ZERO, strict = true)
+        }, numRealVars = reals, realLower = DoubleArray(reals), realUpper = DoubleArray(reals) { 1.0 })
+        val engine = LpEngine(source, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+            SolveStatsSink(backend = "required-component-witness"))
+
+        val leaf = engine.use { it.leafCertify(PropagationSession(source)) }
+
+        assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+        val point = Sample(booleanArrayOf(), longArrayOf(), leaf.reals,
+            exactReals = assertNotNull(leaf.exactReals))
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point))
+    }
+
+    @Test
     fun `prefix point attempts should remain bounded across solver retirement`() {
         val source = Problem(1, 0, emptyArray(), Array(1001) {
             ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },

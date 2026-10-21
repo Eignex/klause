@@ -314,6 +314,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
         floatAccept: ((FloatLpResult) -> Boolean)? = null,
         floatOffset: Double = 0.0,
+        recoverWitness: Boolean = false,
     ): CertifiedLpResult {
         // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
         if (floatAccept != null && result != null && result.optimal && !cancellation()) {
@@ -326,7 +327,9 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         }
         val ladderTimer = LpPhaseTimer(observer, LpSolvePhase.EXACT_LADDER)
         val state = model.exactState
-        val refinement = if (state != null && solver !is ComponentLpSolverCapability && !cancellation()) {
+        val refinement = if (state != null &&
+            (recoverWitness || solver !is ComponentLpSolverCapability) && !cancellation()
+        ) {
             val previous = anchor
             val current = if (previous != null && previous.adopt(state, cancellation)) {
                 previous
@@ -342,7 +345,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         val certified = certifyLpResult(
             model, solver, result, cancellation, observer, context.certificationPolicy,
             counterResults, continuationCache = continuation, refinement = refinement,
-            sparsePointRecovery = context.sparsePointRecovery,
+            sparsePointRecovery = context.sparsePointRecovery || recoverWitness,
         )
         ladderTimer.finish(certified.verdict.name)
         return certified

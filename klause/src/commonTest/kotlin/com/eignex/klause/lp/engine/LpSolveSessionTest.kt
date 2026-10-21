@@ -6,10 +6,65 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
+    @Test
+    fun `requested component recovery should produce a strict witness beyond the basis ceiling`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 1.0)
+        val y = builder.addRealVar(2.0, 2.0)
+        repeat(129) {
+            builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)
+        }
+        builder.addRealRow(intArrayOf(y), doubleArrayOf(1.0), Relation.EQ, 2.0)
+        val model = assertNotNull(
+            LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel(),
+        )
+
+        LpSolveSession().use { owner ->
+            val ordinary = owner.solve(model)
+            val recovered = owner.solve(model, recoverWitness = true)
+
+            assertNull(ordinary.witness)
+            val point = assertNotNull(recovered.witness)
+            assertTrue(point.primal[x] > BigFraction.ZERO && point.primal[x] <= BigFraction.ONE)
+            assertEquals(BigFraction.ofLong(2L), point.primal[y])
+            assertNotNull(checkedLpWitness(model, point.primal))
+        }
+    }
+
+    @Test
+    fun `requested component recovery should follow bounds across strict siblings`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 1.0)
+        val y = builder.addRealVar(2.0, 2.0)
+        repeat(129) {
+            builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)
+        }
+        builder.addRealRow(intArrayOf(y), doubleArrayOf(1.0), Relation.EQ, 2.0)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+
+        LpSolveSession().use { owner ->
+            assertNotNull(owner.solve(assertNotNull(trail.state.ownerWorkingModel()), recoverWitness = true).witness)
+            assertTrue(trail.push())
+            assertTrue(trail.assertBound(x, true, ExactLpSide(ExactLpNumber.of(0L)), 7L))
+
+            val conflict = owner.solve(assertNotNull(trail.state.ownerWorkingModel()), recoverWitness = true)
+            assertTrue(trail.pop(0))
+            val model = assertNotNull(trail.state.ownerWorkingModel())
+            val restored = owner.solve(model, recoverWitness = true)
+
+            assertEquals(LpVerdict.INFEASIBLE, conflict.verdict)
+            assertNull(conflict.witness)
+            val point = assertNotNull(restored.witness)
+            assertTrue(point.primal[x] > BigFraction.ZERO && point.primal[x] <= BigFraction.ONE)
+            assertNotNull(checkedLpWitness(model, point.primal))
+        }
+    }
+
     @Test
     fun `retained fractional equalities should reject a rounded product`() {
         val builder = LpBuilder()
