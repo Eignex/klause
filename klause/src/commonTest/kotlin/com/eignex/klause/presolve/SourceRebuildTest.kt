@@ -29,7 +29,7 @@ class SourceRebuildTest {
         )
         val rebuild = SourceRebuilds.compose(passes)
         val sample = Sample(booleanArrayOf(false, true), longArrayOf(0, 1),
-            doubleArrayOf(0.5), listOf(BigFraction.ofLong(1) / BigFraction.ofLong(2)))
+            doubleArrayOf(0.5), listOf(BigFraction.of(bigIntOf(1), bigIntOf(2))))
 
         val finite = assertNotNull(rebuild.asSampleLift())(sample)
         val open = rebuild.lift(OpenTheoryAssignment.Sampled(sample), 2, 2)
