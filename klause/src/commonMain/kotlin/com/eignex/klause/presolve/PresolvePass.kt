@@ -34,6 +34,7 @@ private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
  *  expensive search that overwhelmingly finds nothing to add (symmetry detection, xor unit
  *  derivation) repeating it after each reduction is wasted work, so it runs at most until its first
  *  empty result. Cheap reductions leave it `false` — they must re-run as the problem shrinks.
+ * @property canonicalOnly whether the pass runs only before a canonical source model is baked.
  */
 enum class PresolvePass(
     val id: String,
@@ -43,6 +44,7 @@ enum class PresolvePass(
     val preservesSolutionSet: Boolean,
     val autoEligible: Boolean,
     val skipAfterEmpty: Boolean = false,
+    internal val canonicalOnly: Boolean = false,
 ) {
     /** GCD + bounded-integer coefficient strengthening. */
     STRENGTHEN_COEFFICIENTS(
@@ -469,6 +471,22 @@ enum class PresolvePass(
     ) {
         override fun applySource(problem: Problem, ctx: PresolveContext) =
             Presolve.eliminateSourceBlockedClauses(problem, ctx.objectiveBoolVars, ctx.cancellation)
+    },
+
+    /** Existentially project clause-only Booleans and reconstruct them from fixed transformed slots. */
+    PROJECT_SOURCE_BOOLEANS(
+        "project-booleans",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = false,
+        autoEligible = true,
+        canonicalOnly = true,
+    ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            BooleanProjection.projectSource(problem, ctx.objectiveBoolVars, ctx.cancellation)
+
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = PassDelta()
     },
 
     /** At-most-one clique merging: grow the pairwise exclusion constraints into maximal cliques and

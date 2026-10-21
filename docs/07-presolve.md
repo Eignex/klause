@@ -33,7 +33,7 @@ harvest rerunning only when it tightened something.
 |---|---|
 | Linear | Coefficient strengthening, Diophantine bound tightening, linear bound fusion, affine singleton elimination, sub-sum aggregation, dependent-equality removal, singleton inequality projection |
 | Structural | Redundancy and subsumption, structural reduction, comparison-clause folding, duplicate-column merging, dual fixing |
-| Boolean | Implication graph, bounded variable elimination, blocked clause elimination, at-most-one clique merging, XOR unit derivation |
+| Boolean | Canonical Boolean projection, implication graph, bounded variable elimination, blocked clause elimination, at-most-one clique merging, XOR unit derivation |
 | Symmetry | Symmetry breaking and value precedence |
 | Probing | Failed literals, integer bounds and holes, open ranges |
 | Around the rounds | Binary column substitution, LP harvest, difference-system posting |
@@ -157,6 +157,22 @@ objective prefers the other direction. Folding, merging and dual fixing change t
 solution set.
 
 ### Boolean reductions
+
+Canonical Boolean projection resolves out an objective-free Boolean read only by
+clean mandatory clauses. It keeps the original slot fixed false in the transformed
+model and reconstructs its source value from the removed clauses in reverse order.
+The fixing selects a representative; it is not an original-source consequence.
+Resolvents plus that unit may not outnumber the removed clauses. Every non-clause
+Boolean reader protects its variables. The moderate pass runs only before baking;
+finite rounds skip it. It preserves satisfiability and objectives, and is disabled
+for solution-set-sensitive queries. Original value checking follows reconstruction.
+
+Eligibility, occurrence visits, exact resolution and duplicate checks share the
+phase token. Each variable's complete replacement and reconstruction are prepared
+before a single commit, with final output and immutable rebuild copies charged in
+advance. Cancellation retains completed transactions and discards the unfinished
+one. Presolve telemetry counts committed projected variables, and attaching effort
+telemetry retains that count. Variable IDs and array lengths remain unchanged.
 
 The implication graph pins each free Boolean, propagates and records forced
 literals; mutual-implication cycles collapse to one representative and transitively

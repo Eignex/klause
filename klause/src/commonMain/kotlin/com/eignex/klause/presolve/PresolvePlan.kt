@@ -136,6 +136,7 @@ class PresolveConfig(
         val passes = PresolvePass.entries.filter {
             it.stage == PresolvePass.Stage.PROBLEM &&
                 capability.supports(it.capability) &&
+                (capability == PresolvePass.Capability.SOURCE || !it.canonicalOnly) &&
                 resolved(it, context)
         }
         // The finite lane probes with [PresolvePass.PROBE] over root domains, and where that pass runs the

@@ -9025,6 +9025,7 @@ public final class com/eignex/klause/presolve/PresolveBudget : com/eignex/klause
 	public final fun getRootConstructionEntries ()J
 	public final fun getRootPropagationWork ()J
 	public final fun getRounds ()I
+	public final fun getSourceBooleansProjected ()J
 	public final fun orSpent (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
 	public final fun remaining ()J
 	public final fun slice (J)Lcom/eignex/klause/util/Cancellation;
@@ -9167,6 +9168,7 @@ public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field PROBE_INT_HOLES Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field PROBE_OPEN_RANGES Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field PROJECT_SINGLETON_INEQUALITIES Lcom/eignex/klause/presolve/PresolvePass;
+	public static final field PROJECT_SOURCE_BOOLEANS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REDUCE_DIOPHANTINE Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REDUCE_STRUCTURAL Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REMOVE_REDUNDANT Lcom/eignex/klause/presolve/PresolvePass;
@@ -13988,8 +13990,10 @@ public final class com/eignex/klause/solver/result/PresolveStats {
 	public final fun getLpHarvest ()Lcom/eignex/klause/solver/result/LpHarvestReport;
 	public final fun getLpStats ()Lcom/eignex/klause/solver/result/LpStats;
 	public final fun getPasses ()Ljava/util/List;
+	public final fun getSourceBooleansProjected ()Ljava/lang/Long;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+	public final fun withEffort (Lcom/eignex/klause/solver/result/PresolveEffortStats;)Lcom/eignex/klause/solver/result/PresolveStats;
 }
 
 public final class com/eignex/klause/solver/result/QuadraticCertificate {

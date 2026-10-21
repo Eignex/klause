@@ -30,9 +30,9 @@ import com.eignex.klause.util.toLongExact
  * is stated once for the whole reconstruction instead of being implied between two carriers.
  *
  * A step names columns of the model before the elimination, and the reduced model has to keep every one
- * of them: a pass leaves an eliminated column in place and unconstrained rather than renumbering the
- * Boolean space. Both lanes evaluate over an array indexed by those ids, so a pass that renumbered
- * instead would have its steps read and write the wrong columns.
+ * of them: an eliminated column keeps its slot, either unconstrained or fixed to a transformed
+ * representative, rather than renumbering the Boolean space. Both lanes evaluate over those ids, so
+ * a pass that renumbered instead would have its steps read and write the wrong columns.
  */
 internal sealed interface RebuildStep {
 

@@ -538,7 +538,9 @@ private fun round4(x: Double): String {
  *  presolve was off or a no-op. */
 internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val p = stats.presolve ?: return emptyList()
-    if (p.passes.isEmpty() && p.constraintsRemoved == 0 && !p.infeasible && p.effort == null) return emptyList()
+    if (p.passes.isEmpty() && p.constraintsRemoved == 0 && !p.infeasible && p.effort == null &&
+        p.sourceBooleansProjected == null
+    ) return emptyList()
     val out = ArrayList<Pair<String, String>>()
     p.effort?.let { e ->
         out += "presolveEmphasis" to e.emphasis
@@ -555,6 +557,7 @@ internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
         e.rootPropagationWork?.let { out += "presolveRootPropagationWork" to "$it" }
         for ((id, calls) in e.passCalls.entries.sortedBy { it.key }) out += "presolveCalls_$id" to "$calls"
     }
+    p.sourceBooleansProjected?.let { out += "presolveSourceBooleansProjected" to "$it" }
     if (p.passes.isNotEmpty()) out += "presolvePasses" to p.passes.joinToString(",")
     if (p.constraintsRemoved != 0) out += "presolveConstraintsRemoved" to "${p.constraintsRemoved}"
     if (p.infeasible) out += "presolveInfeasible" to "true"

@@ -56,6 +56,10 @@ class PresolveBudget(
     val passCalls: Map<String, Int> get() = calls.toMap()
     private val calls = HashMap<String, Int>()
 
+    /** Boolean projections committed with a fixed transformed representative and reverse reconstruction. */
+    var sourceBooleansProjected: Long = 0
+        internal set
+
     /** Root-bake propagation probes across reseeds and tiers, including repair calls. */
     var probeCalls: Long = 0
         private set
@@ -112,6 +116,10 @@ private class PresolveRootWorkMeter(val budget: PresolveBudget) : RootWorkMeter 
 
 internal fun Cancellation.recordPresolveProbe() {
     (workMeter() as? PresolveRootWorkMeter)?.budget?.recordProbe()
+}
+
+internal fun Cancellation.recordSourceBooleanProjection() {
+    (workMeter() as? PresolveRootWorkMeter)?.budget?.let { it.sourceBooleansProjected++ }
 }
 
 private fun saturatedSum(total: Long, units: Long): Long =

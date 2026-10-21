@@ -986,6 +986,7 @@ open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex
     enum entry PROBE_INT_HOLES // com.eignex.klause.presolve/PresolvePass.PROBE_INT_HOLES|null[0]
     enum entry PROBE_OPEN_RANGES // com.eignex.klause.presolve/PresolvePass.PROBE_OPEN_RANGES|null[0]
     enum entry PROJECT_SINGLETON_INEQUALITIES // com.eignex.klause.presolve/PresolvePass.PROJECT_SINGLETON_INEQUALITIES|null[0]
+    enum entry PROJECT_SOURCE_BOOLEANS // com.eignex.klause.presolve/PresolvePass.PROJECT_SOURCE_BOOLEANS|null[0]
     enum entry REDUCE_DIOPHANTINE // com.eignex.klause.presolve/PresolvePass.REDUCE_DIOPHANTINE|null[0]
     enum entry REDUCE_STRUCTURAL // com.eignex.klause.presolve/PresolvePass.REDUCE_STRUCTURAL|null[0]
     enum entry REMOVE_REDUNDANT // com.eignex.klause.presolve/PresolvePass.REMOVE_REDUNDANT|null[0]
@@ -12471,6 +12472,8 @@ final class com.eignex.klause.presolve/PresolveBudget : com.eignex.klause.util/W
         final fun <get-rootPropagationWork>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.rootPropagationWork.<get-rootPropagationWork>|<get-rootPropagationWork>(){}[0]
     final var rounds // com.eignex.klause.presolve/PresolveBudget.rounds|{}rounds[0]
         final fun <get-rounds>(): kotlin/Int // com.eignex.klause.presolve/PresolveBudget.rounds.<get-rounds>|<get-rounds>(){}[0]
+    final var sourceBooleansProjected // com.eignex.klause.presolve/PresolveBudget.sourceBooleansProjected|{}sourceBooleansProjected[0]
+        final fun <get-sourceBooleansProjected>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.sourceBooleansProjected.<get-sourceBooleansProjected>|<get-sourceBooleansProjected>(){}[0]
 
     final fun charge(kotlin/Long) // com.eignex.klause.presolve/PresolveBudget.charge|charge(kotlin.Long){}[0]
     final fun orSpent(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.presolve/PresolveBudget.orSpent|orSpent(com.eignex.klause.util.Cancellation){}[0]
@@ -15706,6 +15709,9 @@ final class com.eignex.klause.solver.result/PresolveStats { // com.eignex.klause
     final val passes // com.eignex.klause.solver.result/PresolveStats.passes|{}passes[0]
         final fun <get-passes>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.result/PresolveStats.passes.<get-passes>|<get-passes>(){}[0]
 
+    final var sourceBooleansProjected // com.eignex.klause.solver.result/PresolveStats.sourceBooleansProjected|{}sourceBooleansProjected[0]
+        final fun <get-sourceBooleansProjected>(): kotlin/Long? // com.eignex.klause.solver.result/PresolveStats.sourceBooleansProjected.<get-sourceBooleansProjected>|<get-sourceBooleansProjected>(){}[0]
+
     final fun component1(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.result/PresolveStats.component1|component1(){}[0]
     final fun component2(): kotlin/Int // com.eignex.klause.solver.result/PresolveStats.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.eignex.klause.solver.result/PresolveStats.component3|component3(){}[0]
@@ -15717,6 +15723,7 @@ final class com.eignex.klause.solver.result/PresolveStats { // com.eignex.klause
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/PresolveStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/PresolveStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/PresolveStats.toString|toString(){}[0]
+    final fun withEffort(com.eignex.klause.solver.result/PresolveEffortStats): com.eignex.klause.solver.result/PresolveStats // com.eignex.klause.solver.result/PresolveStats.withEffort|withEffort(com.eignex.klause.solver.result.PresolveEffortStats){}[0]
 }
 
 final class com.eignex.klause.solver.result/QuadraticCertificate { // com.eignex.klause.solver.result/QuadraticCertificate|null[0]

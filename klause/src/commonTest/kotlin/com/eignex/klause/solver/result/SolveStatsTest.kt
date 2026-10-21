@@ -25,6 +25,30 @@ import kotlin.test.assertTrue
 
 class SolveStatsTest {
 
+    @Test
+    fun `attaching effort should retain committed Boolean projection observations`() {
+        val stats = PresolveStats().also { it.sourceBooleansProjected = 3L }
+        val effort = PresolveEffortStats(
+            emphasis = "default",
+            abortFraction = 0.001,
+            maxRounds = 16,
+            probeBudgetPerVar = 0,
+            probeTotalBudget = 0,
+            elapsed = kotlin.time.Duration.ZERO,
+            work = 1L,
+            allowance = 2L,
+            rounds = 1,
+            passCalls = emptyMap(),
+            probeCalls = 0L,
+        )
+
+        val attached = stats.withEffort(effort)
+
+        assertEquals(3L, attached.sourceBooleansProjected)
+        assertEquals(effort, attached.effort)
+        assertEquals(null, stats.effort)
+    }
+
     private class Queens6 : VariableSchema() {
         val q0 by intVar(0, 5)
         val q1 by intVar(0, 5)
