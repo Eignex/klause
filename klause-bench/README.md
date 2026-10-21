@@ -942,6 +942,8 @@ SHA-256 `37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9`.
 checks the same checksum before extraction. CI's `scripts/cache-miplib-solchecker.sh`
 tries upstream first, then an unpublished repository cache asset using `GH_TOKEN`.
 The helper verifies the checksum independently and leaves the checker sources unchanged.
+A direct build whose upstream request fails can use the same private cache through
+an installed, authenticated `gh` CLI. The downloaded bytes must pass the pinned checksum.
 It extracts only the checker C++ sources, README, Makefile and MIT license, compiles
 the unchanged upstream main with GMP and zlib, and packages those files and the
 binary in the non-published bench artifact when built with `-Pbench.mpsSolchecker`.

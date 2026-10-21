@@ -1,4 +1,5 @@
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.URI
 import java.security.MessageDigest
 import java.util.zip.ZipFile
@@ -208,6 +209,7 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
     @get:OutputDirectory abstract val upstream: DirectoryProperty
     @get:InputFile @get:Optional @get:PathSensitive(PathSensitivity.NONE)
     abstract val cachedArchive: RegularFileProperty
+    @get:Inject abstract val exec: ExecOperations
 
     @TaskAction
     fun download() {
@@ -216,9 +218,20 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
         val downloaded = !cachedArchive.isPresent
         val archive = if (downloaded) File(temporaryDir, "miplib.zip") else cachedArchive.get().asFile
         if (downloaded) {
-            URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
-                .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
-                .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+            try {
+                URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
+                    .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
+                    .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+            } catch (_: IOException) {
+                archive.outputStream().use { output ->
+                    exec.exec {
+                        commandLine("gh", "api", "--hostname", "github.com",
+                            "repos/Eignex/klause/releases/assets/662279198",
+                            "--header", "Accept: application/octet-stream")
+                        standardOutput = output
+                    }
+                }
+            }
         }
         val hash = MessageDigest.getInstance("SHA-256").digest(archive.readBytes())
             .joinToString("") { "%02x".format(it) }
