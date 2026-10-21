@@ -261,6 +261,9 @@ enumerates source implicants: assignments of Boolean leaves and signed numeric
 predicates that make the formula true. Propagation treats numeric predicates as
 opaque leaves, a proof scan keeps only supporting literals, and private exclusion
 clauses prevent revisiting a region without entering shared learning.
+Branching follows an unwitnessed root proof to a required leaf and tries that
+truth first; backtracking retains its opposite value. A missing demanded leaf
+leaves the ordinary complete leaf choice available.
 
 **3. Regional reduction and projection.** Each region's signed predicates form a
 conjunction. Linear required equalities are solved and substituted, coordinates
