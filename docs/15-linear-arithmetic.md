@@ -55,6 +55,9 @@ Completed assertion stamps also survive subsequent root publications: a row whos
 Boolean inputs are fixed keeps the same meaning, and tighter root bounds preserve
 its earlier assertion. Newly resolved rows still follow source order and use the
 fixed-column substitutions available when they are first asserted.
+A pure Boolean clause with a live true source literal needs no numerical assertion.
+Its satisfaction stamp expires with the containing Boolean scope; unresolved or
+false clauses retain ordinary exact checking.
 
 #### A check
 

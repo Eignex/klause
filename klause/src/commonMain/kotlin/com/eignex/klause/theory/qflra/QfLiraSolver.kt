@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
@@ -1268,12 +1269,25 @@ class ExactLiraSearchComponent private constructor(
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         val batch = ArrayList<ResolvedSourceAssertion>()
         for ((index, prepared) in preparedRows.withIndex()) {
-            // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
+            // Resolved source inputs stay fixed until their containing Boolean scope is popped.
             val assertedLevel = sourceAssertionLevels[index]
             if ((deferPoint && assertedLevel != -1) || assertedLevel >= 0) continue
             val address = prepared.address
             val asserted = node.rowAssertions[address]
             if (prepared.disjunction && asserted == null) continue
+            val clause = prepared.row as? Clause
+            if (!prepared.disjunction && clause != null) {
+                lpStop.charge(clause.literals.size.toLong() + 1L)
+                if (lpStop()) return false
+                if (clause.allLiteralsBool(bools.size) && clause.literals.any { literal ->
+                        bools[Lit.variable(literal)] == if (literal and 1 == 0) TRUE else FALSE
+                    }
+                ) {
+                    // One live true literal proves the row without a numerical assertion.
+                    sourceAssertionLevels[index] = context.decisionLevel
+                    continue
+                }
+            }
             val truth = node.rowTruth(address, prepared.row, bools) ?: continue
             val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
             // A retained point must satisfy every newly resolved source input before it can replace a solve.

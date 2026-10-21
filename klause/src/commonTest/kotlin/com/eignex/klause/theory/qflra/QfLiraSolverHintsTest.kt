@@ -50,6 +50,38 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `a satisfied source clause should retract before an all false sibling`() {
+        for (positive in listOf(false, true)) for (guided in listOf(false, true)) {
+            val model = Problem(numBoolVars = 3, intBounds = openBounds(0), numRealVars = 3,
+                realLower = DoubleArray(3) { -1.0 }, realUpper = DoubleArray(3) { 1.0 },
+                factors = arrayOf(
+                    Clause(intArrayOf(Lit.make(0, positive), Lit.make(1, true))),
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.EQ, 0.0),
+                    ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
+                ))
+            ExactLiraSearchComponent(model).use { component ->
+                if (guided) assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, positive))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+                assertNull(session.boolValue(1))
+                assertEquals(ComponentCheck.Indeterminate, session.check())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+                assertEquals(ComponentCheck.Feasible, session.check())
+
+                session.popTo(0)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, !positive))))
+
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            }
+        }
+    }
+
+    @Test
     fun `interval guard implications should retract before a feasible sibling`() {
         val model = Problem(numBoolVars = 4, intBounds = openBounds(0), numRealVars = 2,
             realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
