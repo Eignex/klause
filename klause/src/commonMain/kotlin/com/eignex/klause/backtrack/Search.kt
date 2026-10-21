@@ -257,7 +257,7 @@ internal class CpSatisfactionTraversal(
                         is ComponentResult.Conflict -> SearchOutcome.Exhausted()
                         ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
                     }
-                    if (rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
+                    if (rootOutcome == null) run = startRun(session)
                 }
             }
         } catch (failure: Throwable) {
@@ -317,9 +317,7 @@ internal class CpSatisfactionTraversal(
                     ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
                 }
                 if (rootOutcome == null) {
-                    run = session.openRun(problem.numBoolVars, traversal).also {
-                        it.fixedCancellationCadence = fixedCancellationCadence
-                    }
+                    run = startRun(session)
                 }
             }
             sharedSession = null
@@ -364,6 +362,13 @@ internal class CpSatisfactionTraversal(
                 close()
                 SearchOutcome.BudgetCapped
             }
+        }
+    }
+
+    private fun startRun(session: SearchSession): SearchRun {
+        params.clauseExchange?.onSearchStart(cp.session)
+        return session.openRun(problem.numBoolVars, traversal).also {
+            it.fixedCancellationCadence = fixedCancellationCadence
         }
     }
 

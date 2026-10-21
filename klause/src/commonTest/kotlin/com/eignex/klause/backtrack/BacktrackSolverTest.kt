@@ -24,6 +24,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
@@ -56,6 +57,30 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BacktrackSolverTest {
+    @Test
+    fun `satisfaction should expose its post seed root to clause exchange`() {
+        for (nativeSat in listOf(false, true)) {
+            var starts = 0
+            val exchange = object : ClauseExchange {
+                override fun onRestart(session: PropagationSession) = Unit
+                override fun onSearchStart(session: PropagationSession) {
+                    starts++
+                    assertEquals(true, session.boolValue(1))
+                    assertEquals(null, session.boolValue(0))
+                    assertEquals(1, session.decisionLevel)
+                }
+            }
+            val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
+
+            val result = solver.solve(BacktrackParams(nativeSat = nativeSat, clauseExchange = exchange,
+                assumptions = Assumptions.None.withBool(1, true)))
+
+            assertIs<SolveResult.Sat>(result)
+            assertEquals(1, starts)
+            assertTrue(result.sample.boolValue(1))
+        }
+    }
+
     @Test
     fun `a completed satisfaction call should release its additional peers`() {
         var closes = 0

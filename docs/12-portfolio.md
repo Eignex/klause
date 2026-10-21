@@ -145,6 +145,9 @@ The incumbent exchange runs the source witness checker before installing a cutof
 including for direct engine publications. The low-level portfolio API also
 supports caller-trusted unbound workers with an explicit witness checker. Learned
 clauses are exchanged only when at least two backtrack workers exist.
+Satisfaction and minimization import the pool once after successful root
+initialization, then incrementally at restarts. Resuming a retained slice keeps its
+exchange cursor and native learned database.
 Complete source feasibility clauses can use the global clause channel to bypass
 the glue filter. Residual real prefix and leaf checks offer these clauses only
 from unconditioned exact runs; repair exchanges retain their policy for global sharing.
