@@ -915,6 +915,11 @@ claims remain in the `reported*` fields.
 
 The build downloads the official `miplib2017-testscript-v1.0.4.zip`, pinned to
 SHA-256 `37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9`.
+If the upstream connection fails,
+it reads the byte-identical archive from the unpublished `Eignex/klause` CI tool
+cache through authenticated `gh api`. CI supplies its existing token through
+`GH_TOKEN`; local builds can use an authenticated GitHub CLI session. Both paths
+apply the same archive checksum and preserve the original licence and attribution.
 It extracts only the checker C++ sources, README, Makefile and MIT license, compiles
 the unchanged upstream main with GMP and zlib, and packages those files and the
 binary in the non-published bench artifact. The optional converter is not extracted.

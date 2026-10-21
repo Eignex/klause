@@ -1,6 +1,7 @@
 import java.io.FileOutputStream
 import java.net.URI
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 import org.gradle.process.ExecOperations
 
@@ -204,6 +205,7 @@ val miplibDirectory = layout.buildDirectory.dir("miplib-solchecker")
 abstract class DownloadMpsSolcheckerTask : DefaultTask() {
     @get:Input abstract val version: Property<String>
     @get:Input abstract val archiveSha256: Property<String>
+    @get:Input abstract val cacheAssetId: Property<Long>
     @get:OutputDirectory abstract val upstream: DirectoryProperty
 
     @TaskAction
@@ -211,9 +213,14 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
         val root = upstream.get().asFile
         root.mkdirs()
         val archive = File(temporaryDir, "miplib.zip")
-        URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
-            .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
-            .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        try {
+            URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
+                .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
+                .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        } catch (failure: java.io.IOException) {
+            if (Thread.currentThread().isInterrupted) throw failure
+            cachedArchive(archive)
+        }
         val hash = MessageDigest.getInstance("SHA-256").digest(archive.readBytes())
             .joinToString("") { "%02x".format(it) }
         check(hash == archiveSha256.get()) { "MIPLIB distribution hash differs" }
@@ -230,12 +237,37 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
         }
         check(archive.delete())
     }
+
+    private fun cachedArchive(archive: File) {
+        val errors = File(temporaryDir, "miplib-cache.stderr")
+        logger.lifecycle("Reading the pinned MIPLIB archive from the authenticated CI tool cache")
+        val process = ProcessBuilder(
+            "gh", "api", "--header", "Accept: application/octet-stream",
+            "repos/Eignex/klause/releases/assets/${cacheAssetId.get()}",
+        ).redirectOutput(archive).redirectError(errors).start()
+        try {
+            val finished = process.waitFor(60, TimeUnit.SECONDS)
+            check(finished && process.exitValue() == 0) {
+                val status = if (finished) "exit ${process.exitValue()}" else "timeout"
+                "Authenticated MIPLIB cache read failed ($status); see $errors"
+            }
+        } finally {
+            if (process.isAlive) {
+                process.descendants().use { descendants ->
+                    descendants.toList().asReversed().forEach { it.destroyForcibly() }
+                }
+                process.destroyForcibly()
+                process.waitFor()
+            }
+        }
+    }
 }
 val prepareMpsSolchecker = tasks.register<DownloadMpsSolcheckerTask>("prepareMpsSolchecker") {
     group = "build"
     description = "Fetch the pinned upstream MIPLIB checker (MIT)."
     version.set(miplibVersion)
     archiveSha256.set(miplibArchiveSha256)
+    cacheAssetId.set(662279198L)
     upstream.set(miplibDirectory.map { it.dir("upstream") })
 }
 val miplibBinary = miplibDirectory.map { it.file("solchecker") }
