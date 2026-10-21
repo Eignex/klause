@@ -268,6 +268,8 @@ region's required zero equalities, which remain as premises. Linear required
 equalities are solved and substituted, coordinates
 occurring only linearly in inequalities are eliminated by affine pairing, and sign
 propagation can refute the region outright.
+The reduced conjunction supplies projection predicates; the original regional
+predicates supply the witness check for both rewrites and coordinate elimination.
 [PolynomialProjection](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
 then builds one polynomial family per level using Collins projection, which
 preserves delineability including repeated roots and vanishing leading
