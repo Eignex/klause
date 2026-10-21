@@ -227,7 +227,7 @@ class QfLiraSolverLpTest {
 
     @Test
     fun `guard bounds should exclude unresolved Boolean arithmetic terms`() {
-        val guarded = object : Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {
+        val guarded = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {
             override val variables = MixedVars(boundInts = intArrayOf(0), boolVars = intArrayOf(0, 1))
             override val linearForm = LinearForm.Conjunction(
                 listOf(TaggedLinearRow(intArrayOf(Term.ofIntVar(0), Term.ofLit(Lit.make(1, true))),
@@ -255,7 +255,7 @@ class QfLiraSolverLpTest {
 
     @Test
     fun `guard bounds should exclude comparisons inside an unresolved disjunction`() {
-        val disjunction = object : Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {
+        val disjunction = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {
             override val variables = MixedVars(boundInts = intArrayOf(0), boolVars = intArrayOf(0))
             override val linearForm = LinearForm.Disjunction(
                 listOf(
