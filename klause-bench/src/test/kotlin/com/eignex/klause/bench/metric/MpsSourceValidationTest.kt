@@ -148,6 +148,8 @@ class MpsSourceValidationTest {
             "indicator|v I=1 X=2|2|valid",
             "marker|v I=1|1|valid",
             "marker|v I=2|2|invalid",
+            "marker-unit-bounds|v I=1|1|valid",
+            "marker-unit-bounds|v I=2|2|invalid",
         ],
     )
     fun `qualified source features should be checked by upstream MIPLIB`(
@@ -223,29 +225,45 @@ class MpsSourceValidationTest {
         assertNull(result.validation.checkedWitness)
     }
 
-    @Test
-    fun `unavailable checker should withhold feasibility and retain original inputs`() {
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = '|',
+        value = [
+            "klause-bench/smoke-corpus/mps/blend-tiny.mps|v X1=3 X2=1|9",
+            "klause-bench/src/test/resources/mps-solchecker/marker-unit-bounds.mps|v I=1|1",
+        ],
+    )
+    fun `unavailable checker should withhold feasibility and retain original inputs`(
+        path: String,
+        point: String,
+        objective: String,
+    ) {
         val ref = ProblemRef(
             "fixture", Format.MPS,
-            ProblemSource.Vendored("klause-bench/smoke-corpus/mps/blend-tiny.mps"),
+            ProblemSource.Vendored(path),
             Category.OPTIMIZATION, Expected.Unknown,
         )
-        val raw = "o 9\nv X1=3 X2=1\n"
+        val raw = "o $objective\n$point\n"
         val record = SolveRecord(
             ref.name, "klause", null, 1, "free", 1, 10_000, "optimize", false,
-            true, 9.0, 1, proven = true, gitSha = "test", timestamp = "test", command = "cli --exact",
+            true, objective.toDouble(), 1, proven = true, gitSha = "test", timestamp = "test", command = "cli --exact",
             validationPolicy = MPS_SOURCE_POLICY, sourceHashes = SolveEvidence.sourceHashes(ref),
-            sourceOutputSha256 = sha256(raw.toByteArray()), finalWitness = "v X1=3 X2=1", exactObjective = "9",
+            sourceOutputSha256 = sha256(raw.toByteArray()), finalWitness = point, exactObjective = objective,
         )
 
         val result = MpsSourceValidation.validate(ref, record, raw, true, directory)
+        val admitted = record.sourceChecked(result.validation, approximation = false, witnessOnly = true)
 
         assertEquals("unknown", result.validation.status)
         assertNull(result.validation.checkedWitness)
+        assertNull(admitted.feasible)
+        assertFalse(admitted.proven)
         assertTrue(result.validation.reason.contains("missing packaged MIPLIB solchecker"))
         val retained = File(assertNotNull(result.stats["sourceValidationDirectory"]))
         assertEquals(raw, File(retained, "stdout.txt").readText())
         assertEquals(record.sourceHashes.getValue("model"), sha256(File(retained, "source.mps").readBytes()))
+        val source = File(retained, "source.mps").readText()
+        assertEquals(MpsSolcheckerInput.qualify(source).text, File(retained, "checker.mps").readText())
     }
 
     @Test

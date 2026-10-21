@@ -1,11 +1,18 @@
 package com.eignex.klause.bench.metric
 
+import java.math.BigDecimal
+
 internal object MpsSolcheckerInput {
     private val decimal = Regex("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
     private val sections =
         setOf("NAME", "OBJSENSE", "ROWS", "COLUMNS", "RHS", "RANGES", "BOUNDS", "INDICATORS", "ENDATA")
 
-    data class Profile(val maximize: Boolean, val text: String, val insertedHeaders: List<String>)
+    data class Profile(
+        val maximize: Boolean,
+        val text: String,
+        val insertedHeaders: List<String>,
+        val reorderedBoundPairs: Int,
+    )
 
     // The upstream reader needs a restricted input profile to preserve source obligations.
     fun qualify(source: String, cancelled: () -> Boolean = { false }): Profile {
@@ -23,7 +30,11 @@ internal object MpsSolcheckerInput {
         val vectors = mutableMapOf<String, String>()
         val vectorRows = mutableMapOf<String, MutableSet<String>>()
         val boundKinds = mutableMapOf<String, MutableSet<String>>()
-        for (line in source.lineSequence()) {
+        val reorderableUpper = mutableMapOf<String, Int>()
+        val lines = Regex("(?<=\\n)|(?<=\\r)(?!\\n)").split(source).toMutableList()
+        var reorderedBoundPairs = 0
+        for ((lineIndex, record) in lines.withIndex()) {
+            val line = record.trimEnd('\r', '\n')
             check(!cancelled()) { "MPS admission allowance exhausted" }
             require(line.length < 1023 && line.all { it == '\t' || it.code in 32..126 }) { "unsupported MPS line" }
             if (line.isBlank() || line.startsWith('*')) continue
@@ -92,13 +103,29 @@ internal object MpsSolcheckerInput {
                 "BOUNDS" -> {
                     require(fields.size in 3..4 && first in setOf("LO", "UP", "FX", "LI", "UI", "FR", "MI", "PL", "BV"))
                     require(vectors.getOrPut(section) { fields[1] } == fields[1]) { "multiple bound vectors" }
+                    if (fields.size == 4) requireNumber(fields[3])
                     val kinds = boundKinds.getOrPut(fields[2]) { mutableSetOf() }
+                    val upperIndex = reorderableUpper.remove(fields[2])
                     require((first != "BV" || kinds.isEmpty()) && "BV" !in kinds) { "mixed binary bounds" }
-                    require(first !in setOf("LO", "LI", "MI") || "UP" !in kinds) {
-                        "lower bounds following upper bounds are unsupported"
+                    if (first in setOf("LO", "LI", "MI") && "UP" in kinds) {
+                        require(
+                            first == "LO" && upperIndex != null && fields.size == 4 &&
+                                BigDecimal(fields[3]).compareTo(BigDecimal.ZERO) == 0,
+                        ) {
+                            "lower bounds following upper bounds are unsupported"
+                        }
+                        // MIPLIB resets a marker-binary upper side on LO; LO 0 then UP 1 preserves both sides.
+                        lines[lineIndex] = lines[upperIndex]
+                        lines[upperIndex] = record
+                        reorderedBoundPairs++
+                    }
+                    if (
+                        first == "UP" && kinds.isEmpty() && fields.size == 4 &&
+                        BigDecimal(fields[3]).compareTo(BigDecimal.ONE) == 0
+                    ) {
+                        reorderableUpper[fields[2]] = lineIndex
                     }
                     kinds += first
-                    if (fields.size == 4) requireNumber(fields[3])
                 }
 
                 "INDICATORS" -> require(
@@ -111,7 +138,7 @@ internal object MpsSolcheckerInput {
         }
         require(ended && objective != null) { "incomplete MPS source" }
         val headers = mutableListOf<String>()
-        var text = source
+        var text = lines.joinToString("")
         if (!named) {
             text = "NAME KLAUSE_SOURCE_CHECK\n$text"
             headers += "NAME"
@@ -123,7 +150,7 @@ internal object MpsSolcheckerInput {
             headers += "RHS"
         }
         check(!cancelled()) { "MPS admission allowance exhausted" }
-        return Profile(maximize, text, headers)
+        return Profile(maximize, text, headers, reorderedBoundPairs)
     }
 
     fun requireNumber(text: String) {
