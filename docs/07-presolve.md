@@ -255,7 +255,10 @@ clean clauses when neither distinct clause count nor literal volume grows. Each
 pivot is bounded to 4,096 pairs, width 64 and 65,536 visits; an unfinished pivot
 publishes nothing. Blocked-clause elimination removes clauses whose resolvents on
 one literal are all tautologies. Both need witness reconstruction and can change
-source multiplicity.
+source multiplicity. Their shared database construction charges and polls column,
+factor, literal and occurrence-index visits; interrupted construction publishes no
+database or rewrite. BVE also meters its stable initial degree ordering before
+attempting a pivot. Source and finite calls use the same pass token and work units.
 
 At-most-one merging replaces pairwise exclusions with a cardinality when at least
 two factors drop. Default clausal optimization retains exclusions for native SAT

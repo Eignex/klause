@@ -112,6 +112,43 @@ class PresolvePassTest {
     }
 
     @Test
+    fun `SAT passes should retain typed reconstruction under the same source and finite currency`() {
+        val source = Problem(
+            2, 0, emptyArray(),
+            listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 3))),
+        )
+        val finite = source.bake()
+        for (pass in listOf(PresolvePass.ELIMINATE_BOOL_VARS, PresolvePass.ELIMINATE_BLOCKED_CLAUSES)) {
+            val sourceBudget = PresolveBudget(10_000L)
+            val finiteBudget = PresolveBudget(10_000L)
+
+            val sourceDelta = pass.applySource(
+                source, PresolveContext(cancellation = sourceBudget.orSpent(Cancellation.Never)),
+            )
+            val finiteDelta = pass.applyFinite(
+                finite, PresolveContext(cancellation = finiteBudget.orSpent(Cancellation.Never)),
+            )
+
+            assertFalse(sourceDelta.isEmpty)
+            assertFalse(sourceDelta.rebuild.isEmpty)
+            assertFalse(finiteDelta.isEmpty)
+            assertFalse(finiteDelta.rebuild.isEmpty)
+            assertEquals(sourceBudget.spent(), finiteBudget.spent())
+            assertTrue(sourceBudget.spent() in 1L..999L)
+            for (mask in 0 until 4) {
+                val point = BooleanArray(2) { mask and (1 shl it) != 0 }
+                for (rebuild in listOf(sourceDelta.rebuild, finiteDelta.rebuild)) {
+                    val lifted = point.copyOf()
+                    rebuild.rebuildInto(lifted)
+                    assertTrue(source.factors.filterIsInstance<Clause>().all { clause ->
+                        clause.literals.any { Lit.evaluate(it, lifted[Lit.variable(it)]) }
+                    })
+                }
+            }
+        }
+    }
+
+    @Test
     fun `source probing should derive Boolean units beside real rows with no open integer`() {
         for (integers in 0..1) {
             val problem = Problem(
