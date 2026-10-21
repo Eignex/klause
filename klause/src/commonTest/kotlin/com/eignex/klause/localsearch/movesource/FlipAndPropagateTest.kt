@@ -9,11 +9,11 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class FlipAndPropagateTest {
 
-    // The fork keeps the unit seed the sole violated factor after one forced variable is pre-satisfied.
     private fun forkProblem(): Problem = Problem(
         numBoolVars = 3,
         numIntVars = 0,
@@ -21,7 +21,6 @@ class FlipAndPropagateTest {
         factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, true))),
         ),
     )
 
@@ -32,18 +31,11 @@ class FlipAndPropagateTest {
         factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, true))),
         ),
     )
 
-    private fun emittedParts(state: LocalSearchState, maxDepth: Int = 16): Set<Move> {
-        val sink = MoveSink(state.assumptions)
-        sink.setInvariants(state.invariants)
-        FlipAndPropagate(cap = 4, maxDepth = maxDepth).generate(state, sink)
-        val compounds = sink.list.filterIsInstance<Move.Compound>()
-        assertEquals(1, compounds.size, "exactly one implication-flip compound expected")
-        return compounds.single().parts.toSet()
-    }
+    private fun emittedParts(state: LocalSearchState, maxDepth: Int = 16): Set<Move> =
+        assertNotNull(state.buildImplicationFlip(state.seeding.implicationGraph, 0, maxDepth)).toSet()
 
     @Test
     fun `a transitive chain should bundle every forced flip`() {
@@ -58,8 +50,6 @@ class FlipAndPropagateTest {
     @Test
     fun `a variable already satisfying a forced value should add no redundant part`() {
         val state = freshState(forkProblem(), seed = 1L)
-        // Pre-set x1 to the value x0=true forces (true). The forced literal x1=true is then a no-op
-        // and must not appear as a part; the other forced flip x2 still flips.
         state.assignment.setBool(1, true)
         state.recompute()
         val parts = emittedParts(state)
@@ -68,5 +58,18 @@ class FlipAndPropagateTest {
             Move.BoolFlip(0) in parts && Move.BoolFlip(2) in parts,
             "the seed and the unsatisfied forced flip remain",
         )
+    }
+
+    @Test
+    fun `a root fixed seed should produce no implication flip compound`() {
+        val source = chainProblem()
+        val problem = source.withFactors(source.factors + Clause(intArrayOf(Lit.make(0, true))))
+        val state = freshState(problem, seed = 1L)
+        val sink = MoveSink(state.assumptions)
+        sink.setInvariants(state.invariants)
+
+        FlipAndPropagate(cap = 4, maxDepth = 16).generate(state, sink)
+
+        assertTrue(sink.list.filterIsInstance<Move.Compound>().isEmpty())
     }
 }

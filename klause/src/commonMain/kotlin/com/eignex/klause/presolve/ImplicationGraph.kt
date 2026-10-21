@@ -45,7 +45,7 @@ internal object ImplicationGraph {
         cancellation: Cancellation,
         objectiveBoolVars: Set<Int> = emptySet(),
     ): PassDelta {
-        if (problem.numBoolVars == 0) return PassDelta()
+        if (problem.numBoolVars == 0 || cancellation()) return PassDelta()
         val implications = harvestImplications(problem, maxCandidates, cancellation)
         val reduction = reduceOver(problem, implications, objectiveBoolVars, cancellation) ?: return PassDelta()
         return PresolveShared.identityDelta(
