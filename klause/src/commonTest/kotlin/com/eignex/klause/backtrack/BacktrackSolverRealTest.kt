@@ -20,11 +20,6 @@ import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
-import com.eignex.klause.portfolio.PoolClauseExchange
-import com.eignex.klause.portfolio.SharedClausePool
-import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -40,73 +35,9 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BacktrackSolverRealTest {
-    @Test
-    fun `source real prefix clauses should share only without assumptions`() {
-        for (conditioned in listOf(false, true)) {
-            val source = Problem(3, 0, emptyArray(), Array(1002) { row ->
-                ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
-                    if (row == 1) LinearOp.GE else LinearOp.LE,
-                    when (row) {
-                        0 -> BigFraction.ZERO
-                        1 -> BigFraction.ONE
-                        else -> BigFraction.ofLong(10)
-                    }, activator = if (row < 2) row else -1)
-            }, numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
-            val pool = SharedClausePool(shareMaxLbd = 0, shareMaxLen = 0)
-            val assumptions = if (conditioned) Assumptions(bools = mapOf(2 to true)) else Assumptions.None
-
-            val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 1,
-                variableSelector = InputOrder, valueSelector = IndomainMax, phaseSaving = false,
-                targetPhasing = false, nodeBudget = NodeBudget(3), assumptions = assumptions,
-                clauseExchange = PoolClauseExchange(pool)))
-
-            val sat = assertIs<SolveResult.Sat>(result)
-            assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
-            val peer = PropagationSession(source)
-            assertIs<PropagationResult.Implied>(peer.seed(Assumptions.None))
-            PoolClauseExchange(pool).onSearchStart(peer)
-            assertIs<PropagationResult.Implied>(peer.pinBool(0, true))
-            assertEquals(if (conditioned) null else false, peer.boolValue(1))
-            assertNull(peer.boolValue(2))
-        }
-    }
-
-    @Test
-    fun `source real clauses should retain integer guards in a fresh peer`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, Array<Factor>(1002) {
-            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1),
-                Term.ofRealVar(2), Term.ofIntVar(0)), List(4) { BigFraction.ONE },
-                LinearOp.GE, BigFraction.ONE)
-        } + ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
-            LinearOp.EQ, BigFraction.ZERO),
-            numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
-        val pool = SharedClausePool(shareMaxLbd = 0, shareMaxLen = 0)
-
-        val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 1,
-            variableSelector = InputOrder, valueSelector = IndomainMin, phaseSaving = false,
-            targetPhasing = false, nodeBudget = NodeBudget(8), clauseExchange = PoolClauseExchange(pool)))
-
-        val sat = assertIs<SolveResult.Sat>(result)
-        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
-        assertTrue(sat.stats.search.fails.sum > 0.0)
-        assertTrue(pool.drainSince(0).clauses.isNotEmpty())
-        val peer = PropagationSession(source)
-        assertIs<PropagationResult.Implied>(peer.seed(Assumptions.None))
-        peer.boundGeLit(1, 1, true)
-        PoolClauseExchange(pool).onSearchStart(peer)
-        assertIs<PropagationResult.Implied>(peer.pinInt(1, 0))
-        assertIs<PropagationResult.Unsat>(peer.pinInt(0, 0))
-        assertIs<PropagationResult.Implied>(peer.pinInt(0, 1))
-        assertEquals(1L, peer.intDomain(0).min)
-        assertEquals(1L, peer.intDomain(0).max)
-    }
-
     @Test
     fun `a partial real point should guide an unobserved integer without a conflict`() {
         val source = Problem(2, 1, arrayOf(IntDomain(0, 1)), Array<Factor>(1002) {

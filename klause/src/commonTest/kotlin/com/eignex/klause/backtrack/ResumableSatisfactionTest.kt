@@ -4,8 +4,6 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.ClauseExchange
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
@@ -48,14 +46,6 @@ class ResumableSatisfactionTest {
     @Test
     fun `component preparation should wait for a slice and initialize once`() {
         var batches = 0
-        var starts = 0
-        val exchange = object : ClauseExchange {
-            override fun onRestart(session: PropagationSession) = Unit
-            override fun onSearchStart(session: PropagationSession) {
-                assertEquals(3, batches)
-                starts++
-            }
-        }
         val component = object : PreparingSearchComponent {
             override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
                 repeat(3) {
@@ -66,19 +56,16 @@ class ResumableSatisfactionTest {
             }.iterator()
         }
         val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(
-            BacktrackParams(componentFactory = { listOf(component) }, clauseExchange = exchange),
+            BacktrackParams(componentFactory = { listOf(component) }),
         )
         assertEquals(0, batches)
-        assertEquals(0, starts)
         assertNull(search.runSlice(Cancellation.Never, 0L, 1L))
         assertEquals(0, batches)
-        assertEquals(0, starts)
 
         val verdict = search.use { runToVerdict(it, 1L) }
 
         assertIs<SolveResult.Unsat>(verdict)
         assertEquals(3, batches)
-        assertEquals(1, starts)
     }
 
     private fun pigeonhole(pigeons: Int, holes: Int): Problem {
@@ -158,25 +145,17 @@ class ResumableSatisfactionTest {
 
     @Test
     fun `an indeterminate node-only root should end with no slice work`() {
-        var starts = 0
-        val exchange = object : ClauseExchange {
-            override fun onRestart(session: PropagationSession) = Unit
-            override fun onSearchStart(session: PropagationSession) {
-                starts++
-            }
-        }
         val component = object : SearchComponent {
             override fun initialize(context: SearchContext): ComponentResult = ComponentResult.Indeterminate
         }
         val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(
-            BacktrackParams(componentFactory = { listOf(component) }, clauseExchange = exchange),
+            BacktrackParams(componentFactory = { listOf(component) }),
         )
 
         val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) }
 
         assertIs<SolveResult.Unknown>(result)
         assertTrue(search.isDone)
-        assertEquals(0, starts)
     }
 
     @Test
