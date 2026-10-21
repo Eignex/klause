@@ -5,8 +5,8 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -48,7 +48,8 @@ class PreparedComponentLpSolverTest {
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(state.ownerWorkingModel())
         val warm = Basis(
-            intArrayOf(3, 2), arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC),
+            intArrayOf(3, 2),
+            arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC),
         )
 
         assertIs<PreparedComponentLpSolver>(newPreparedLpSolver(model)).use { owner ->
@@ -108,7 +109,9 @@ class PreparedComponentLpSolverTest {
         }
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val row = LpScopedRow(
-            2L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-4L),
+            2L,
+            listOf(0 to ExactLpNumber.of(-1L)),
+            ExactLpNumber.of(-4L),
             ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
         )
 
@@ -141,12 +144,23 @@ class PreparedComponentLpSolverTest {
         var reject = false
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val declines = acquired++ == 1
                 val child = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by child {
                     override fun adopt(state: LpExactState, token: Cancellation): Boolean =
@@ -182,11 +196,22 @@ class PreparedComponentLpSolverTest {
         var calls = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val child = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 var charged: Long? = null
                 return object : PersistentLpSolver by child {
@@ -225,11 +250,22 @@ class PreparedComponentLpSolverTest {
         var calls = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val child = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 var used = 0L
                 return object : PersistentLpSolver by child {
@@ -286,12 +322,23 @@ class PreparedComponentLpSolverTest {
         var closed = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 check(acquired++ == 0) { "construction failure" }
                 val child = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by child {
                     override fun close() {
@@ -321,7 +368,8 @@ class PreparedComponentLpSolverTest {
         LpScopedSolver(state).use { owner ->
             assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.solve()).lowerBound)
             val working = LpWorkingModel.overrides(
-                owner.state, ExactLpObjective(listOf(negative, negative, zero, zero)),
+                owner.state,
+                ExactLpObjective(listOf(negative, negative, zero, zero)),
             )
             owner.withWorkingModel(working) { scope ->
                 assertEquals(BigFraction.ofLong(-10L), assertNotNull(scope.solve()).lowerBound)

@@ -164,7 +164,10 @@ internal fun LpModel.restrictTo(
     val subN = takenCols.size
     val subM = takenRows.size
     val rowMap = rowMapScratch ?: IntArray(m) { -1 }
-    for (r in 0 until subM) rowMap[takenRows[r]] = r
+    for (r in 0 until subM) {
+        meter?.poll()
+        rowMap[takenRows[r]] = r
+    }
     exactState?.let { state ->
         try {
             return state.restrictTo(takenCols, takenRows, colMap, copyCosts, rowMap, meter)
@@ -323,14 +326,26 @@ private fun LpExactState.restrictTo(
                 rowMap[entry.row].takeIf { it >= 0 }?.let { ExactLpEntry(it, entry.number) }
             }.sortedBy { it.row }
         },
-        rhs = List(rows.size) { source.rhs(rows[it]) },
-        columns = indices.map { source.column(it) },
-        rows = List(rows.size) { source.row(rows[it]) },
+        rhs = List(rows.size) {
+            meter?.poll()
+            source.rhs(rows[it])
+        },
+        columns = indices.map {
+            meter?.poll()
+            source.column(it)
+        },
+        rows = List(rows.size) {
+            meter?.poll()
+            source.row(rows[it])
+        },
         // Parts certify contributions in raw minimized units; the parent applies its affine objective once.
         objective = ExactLpObjective(indices.map { if (copyCosts) source.objective.cost(it) else zero }),
     )
     val identities = LpScopedRows(
-        List(rows.size) { LpRowIdentity(it.toLong(), null, active = this.rows.row(rows[it]).active) },
+        List(rows.size) {
+            meter?.poll()
+            LpRowIdentity(it.toLong(), null, active = this.rows.row(rows[it]).active)
+        },
         rows.size - 1L,
     )
     val working = requireNotNull(LpExactState(restricted, rows = identities).ownerWorkingModel()) {
@@ -361,7 +376,9 @@ internal fun LpNeighborhood.rebindExact(
     )
     val next = LpExactState(
         previous.baseModel.copy(
-            rhs = rows.map { source.rhs(it) }, columns = columns, rows = rows.map { source.row(it) },
+            rhs = rows.map { source.rhs(it) },
+            columns = columns,
+            rows = rows.map { source.row(it) },
             objective = ExactLpObjective(indices.map { source.objective.cost(it) }),
         ),
         matrixRevision = previous.matrixRevision,

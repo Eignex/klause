@@ -2427,8 +2427,10 @@ internal class RevisedSimplex(
         }
         observations.sourceBasicDualResidual = dualResidual
         if (numerical.applied &&
-            (!observations.sourcePrimalResidual.isFinite() ||
-                !observations.sourceBoundViolation.isFinite() || !dualResidual.isFinite())
+            (
+                !observations.sourcePrimalResidual.isFinite() ||
+                !observations.sourceBoundViolation.isFinite() || !dualResidual.isFinite()
+            )
         ) {
             throw LpScalingArithmeticException()
         }

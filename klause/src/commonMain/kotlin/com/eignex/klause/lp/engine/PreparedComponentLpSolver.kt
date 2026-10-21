@@ -15,7 +15,10 @@ internal fun newPreparedLpSolver(
     trackDegeneracy: Boolean = false,
     factory: LpEngineFactory = ProductionLpEngineFactory,
     pricing: LpPricingOptions = LpPricingOptions(),
-    preparation: LpProjectionMeter = LpProjectionMeter(cancellation = cancellation),
+    preparation: LpProjectionMeter = LpProjectionMeter(
+        workLimit = if (workLimit > 0L) workLimit else Long.MAX_VALUE,
+        cancellation = cancellation,
+    ),
 ): PreparedLpSolver? {
     val before = preparation.work
     val layout = preparedComponentLayout(model, preparation)
@@ -24,12 +27,24 @@ internal fun newPreparedLpSolver(
     val remaining = if (workLimit > 0L) workLimit - spent else 0L
     if (layout == null) {
         return factory.newPersistentSolver(
-            model, cancellation, refactorUpdateLimit, iterationLimit, remaining, trackDegeneracy, pricing,
+            model,
+            cancellation,
+            refactorUpdateLimit,
+            iterationLimit,
+            remaining,
+            trackDegeneracy,
+            pricing,
         )
     }
     return preparedComponentLpSolver(model, layout, cancellation, remaining, iterationLimit) { child ->
         factory.newPersistentSolver(
-            child, cancellation, refactorUpdateLimit, iterationLimit, remaining, trackDegeneracy, pricing,
+            child,
+            cancellation,
+            refactorUpdateLimit,
+            iterationLimit,
+            remaining,
+            trackDegeneracy,
+            pricing,
         )
     }
 }
@@ -54,8 +69,9 @@ internal fun preparedComponentLayout(model: LpModel, meter: LpProjectionMeter): 
         model.forEachColumnRow(column) { row ->
             meter.reserve(1L, 0L, matrix = true)
             used[column] = true
-            if (first[row] < 0) first[row] = column
-            else {
+            if (first[row] < 0) {
+                first[row] = column
+            } else {
                 val left = root(first[row])
                 val right = root(column)
                 if (left != right) parents[right] = left
@@ -83,7 +99,9 @@ internal fun preparedComponentLayout(model: LpModel, meter: LpProjectionMeter): 
     var empty = -1
     for (row in 0 until model.m) {
         meter.poll()
-        val owner = if (first[row] >= 0) block[root(first[row])] else {
+        val owner = if (first[row] >= 0) {
+            block[root(first[row])]
+        } else {
             if (empty < 0) {
                 empty = columns.size
                 columns.add(IntArrayList())
@@ -125,7 +143,10 @@ internal fun preparedComponentLpSolver(
         }
         return PreparedComponentLpSolver(
             ComponentLpSolver(model, layout.parts, children, layout.isolated),
-            children, cancellation, workLimit, iterationLimit,
+            children,
+            cancellation,
+            workLimit,
+            iterationLimit,
         )
     } catch (primary: Throwable) {
         for (child in children) {
@@ -145,7 +166,8 @@ internal class PreparedComponentLpSolver(
     private val cancellation: Cancellation,
     private val workLimit: Long,
     private val iterationLimit: Int,
-) : PreparedLpSolver, ComponentLpSolverCapability by component {
+) : PreparedLpSolver,
+    ComponentLpSolverCapability by component {
     private var preparationMetrics: LpSolveMetrics? = null
     private var closed = false
     private var pendingAdoptionWork = 0L
@@ -197,7 +219,9 @@ internal class PreparedComponentLpSolver(
                 }
                 component.decline(LpFloatTermination.OTHER)
                 true
-            } else component.adoptWithMeter(state, token, meter)
+            } else {
+                component.adoptWithMeter(state, token, meter)
+            }
         } catch (_: LpProjectionStop) {
             close()
             false
@@ -228,9 +252,9 @@ internal class PreparedComponentLpSolver(
         val mappingWork = model.numVars * 4L + model.m * 2L + 1L
         preparationMetrics = LpSolveMetrics()
         component.decline(LpFloatTermination.OTHER)
-        if (token() || (limit > 0L && mappingWork >= limit) ||
-            (warm != null && !warm.validFor(requireNotNull(model.exactState).model))) return null
+        if (token() || (limit > 0L && mappingWork >= limit)) return null
         preparationMetrics = LpSolveMetrics(workOps = mappingWork)
+        if (warm != null && !warm.validFor(requireNotNull(model.exactState).model)) return null
         val parts = component.neighborhoods
         val localBases = ArrayList<Basis?>(parts.size)
         val slots = parts.map { IntArrayList() }
@@ -240,8 +264,11 @@ internal class PreparedComponentLpSolver(
             val locals = IntArray(model.numVars) { -1 }
             for ((index, part) in parts.withIndex()) {
                 for (column in 0 until part.model.numVars) {
-                    val parent = if (column < part.model.n) part.cols[column] else
+                    val parent = if (column < part.model.n) {
+                        part.cols[column]
+                    } else {
                         model.slackCol(part.rows[column - part.model.n])
+                    }
                     owners[parent] = index
                     locals[parent] = column
                 }
@@ -266,8 +293,11 @@ internal class PreparedComponentLpSolver(
             } else {
                 if (localBasic[index].size != part.model.m) return null
                 val statuses = Array(part.model.numVars) { column ->
-                    val parent = if (column < part.model.n) part.cols[column] else
+                    val parent = if (column < part.model.n) {
+                        part.cols[column]
+                    } else {
                         model.slackCol(part.rows[column - part.model.n])
+                    }
                     warm.status[parent]
                 }
                 localBases.add(Basis(localBasic[index].toIntArray(), statuses))
@@ -307,13 +337,19 @@ internal class PreparedComponentLpSolver(
         for ((index, part) in component.neighborhoods.withIndex()) {
             val basis = children[index].retainedBasis() ?: return null
             for (column in basis.status.indices) {
-                val parent = if (column < part.model.n) part.cols[column] else
+                val parent = if (column < part.model.n) {
+                    part.cols[column]
+                } else {
                     model.slackCol(part.rows[column - part.model.n])
+                }
                 status[parent] = basis.status[column]
             }
             for ((local, column) in basis.basicVars.withIndex()) {
-                basic[slots[index][local]] = if (column < part.model.n) part.cols[column] else
+                basic[slots[index][local]] = if (column < part.model.n) {
+                    part.cols[column]
+                } else {
                     model.slackCol(part.rows[column - part.model.n])
+                }
             }
         }
         return Basis(basic, status, captureEligible = false)
@@ -329,7 +365,9 @@ internal class PreparedComponentLpSolver(
         val preparation = if (warm != null) {
             if (prepareBasis(warm, cancellation) == null) return null
             lastMetrics
-        } else LpSolveMetrics()
+        } else {
+            LpSolveMetrics()
+        }
         if (workLimit > 0L && (adoption >= workLimit || preparation.workOps >= workLimit - adoption)) {
             component.decline(LpFloatTermination.WORK)
             return null
@@ -356,8 +394,11 @@ internal class PreparedComponentLpSolver(
         }
         val remainingWork = if (work > 0L) work - adoption else 0L
         val requestedIterations = allowance?.iterations ?: iterationLimit
-        val iterations = if (requestedIterations > 0) requestedIterations.toLong() else
+        val iterations = if (requestedIterations > 0) {
+            requestedIterations.toLong()
+        } else {
             minOf(Int.MAX_VALUE.toLong(), 50L * (model.m.toLong() + model.numVars) + 200L)
+        }
         var spent = 0L
         var stop: LpFloatTermination? = null
         val result = component.invokeComponents(admit = {
@@ -368,19 +409,21 @@ internal class PreparedComponentLpSolver(
                     else -> LpFloatTermination.PIVOTS
                 }
                 false
-            } else true
+            } else {
+                true
+            }
         }) { index, _ ->
-                val child = children[index]
-                val remaining = LpFloatAllowance(
-                    if (remainingWork > 0L) remainingWork - spent else 0L,
-                    (iterations - lastIterations).toInt(),
-                )
-                try {
-                    if (primal) child.resolvePrimalBounds(remaining) else child.resolveBounds(remaining)
-                } finally {
-                    spent += minOf(child.lastWorkOps, Long.MAX_VALUE - spent)
-                    lastIterations += minOf(child.lastIterations, Long.MAX_VALUE - lastIterations)
-                }
+            val child = children[index]
+            val remaining = LpFloatAllowance(
+                if (remainingWork > 0L) remainingWork - spent else 0L,
+                (iterations - lastIterations).toInt(),
+            )
+            try {
+                if (primal) child.resolvePrimalBounds(remaining) else child.resolveBounds(remaining)
+            } finally {
+                spent += minOf(child.lastWorkOps, Long.MAX_VALUE - spent)
+                lastIterations += minOf(child.lastIterations, Long.MAX_VALUE - lastIterations)
+            }
         }
         stop?.let(component::decline)
         return result

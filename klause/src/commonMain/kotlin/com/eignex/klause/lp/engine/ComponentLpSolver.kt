@@ -81,6 +81,7 @@ internal class ComponentLpSolver(
         false
     }
 
+    @Suppress("TooGenericExceptionCaught") // Partial child adoption owns every child even when cleanup fails.
     internal fun adoptWithMeter(state: LpExactState, token: Cancellation, meter: LpProjectionMeter): Boolean {
         val previous = model.exactState ?: return false
         if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
@@ -92,9 +93,10 @@ internal class ComponentLpSolver(
             for (index in solvers.indices) {
                 meter.reserve(LpScalingView.constructionWorkBound(nextParts[index].model), 0L, matrix = true)
                 if (!(solvers[index] as RetainedLpSolver).adopt(
-                    checkNotNull(nextParts[index].model.exactState),
-                    token,
-                )) {
+                        checkNotNull(nextParts[index].model.exactState),
+                        token,
+                    )
+                ) {
                     close()
                     return false
                 }
@@ -174,11 +176,13 @@ internal class ComponentLpSolver(
                     0.0
                 }
             } else {
-                (isolatedValue(j) ?: run {
+                (
+                    isolatedValue(j) ?: run {
                     val direction = recessionDirection ?: DoubleArray(model.n).also { recessionDirection = it }
                     direction[j] = if (c < 0.0) 1.0 else -1.0
                     feasibleIsolatedValue(j)
-                }).toDouble()
+                }
+                ).toDouble()
             }
             status[j] = when {
                 model.fixed(j) -> VarStatus.FIXED
@@ -208,7 +212,7 @@ internal class ComponentLpSolver(
                     for (column in direction.indices) full[part.cols[column]] = direction[column]
                     recessionDirection = full
                 }
-                if (recessionDirection != null) continuationTarget = componentBasis()
+                continuationTarget = componentBasis()
                 return null
             }
             if (part.model.exactState != null &&
@@ -281,8 +285,11 @@ internal class ComponentLpSolver(
                 val support = bound.support ?: return null
                 for ((row, _) in support.rows) citedRows.add(part.rows[row])
                 for (side in support.sides) {
-                    val column = if (side.column < part.model.n) part.cols[side.column] else
+                    val column = if (side.column < part.model.n) {
+                        part.cols[side.column]
+                    } else {
                         model.slackCol(part.rows[side.column - part.model.n])
+                    }
                     citedSides += side.copy(
                         column = column,
                         witness = state.activeSide(column, side.upper)?.takeIf { it.side == side.side }?.witness,

@@ -114,7 +114,8 @@ internal class LpScopedSolver(
         if (result is LpBoundBatchResult.Declined || next.state === state) return result
         try {
             val current = solver
-            if (current != null && !adoptOwner(current, next.state, token)) return LpBoundBatchResult.Declined(result.count)
+            val accepted = current == null || adoptOwner(current, next.state, token)
+            if (!accepted) return LpBoundBatchResult.Declined(result.count)
             if (current == null && token()) return LpBoundBatchResult.Declined(result.count)
         } catch (primary: Throwable) {
             try {
@@ -311,7 +312,6 @@ internal class LpScopedSolver(
         }
         if (!accepted && solver === current) {
             solver = null
-            lastResult = null
             try {
                 recordPendingAppendSolve(current)
             } finally {
@@ -570,12 +570,12 @@ internal class LpScopedSolver(
         try {
             if (token() || next.model.m > maxRetainedRows) return null
             val working = next.ownerWorkingModel(projection)?.also {
-                    // The numerical owner refreshes its scaled vectors while adopting this state.
-                    projection.reserveVectors(next.model)
-                    // Building it scales the matrix. Preparation caps take precedence, so the bound is reserved from
-                    // this preparation's allowance and charged as spent; the ledger records the reported work.
-                    constructionBound = LpScalingView.constructionWorkBound(it)
-                    projection.reserve(constructionBound, 0L, matrix = true)
+                // The numerical owner refreshes its scaled vectors while adopting this state.
+                projection.reserveVectors(next.model)
+                // Building it scales the matrix. Preparation caps take precedence, so the bound is reserved from
+                // this preparation's allowance and charged as spent; the ledger records the reported work.
+                constructionBound = LpScalingView.constructionWorkBound(it)
+                projection.reserve(constructionBound, 0L, matrix = true)
             } ?: return null
             val remainingWork = if (workLimit > 0L) workLimit - projection.work else 0L
             if (workLimit > 0L && remainingWork <= 0L) return null
@@ -600,9 +600,13 @@ internal class LpScopedSolver(
                 constructionWork = saturated(constructionWork, candidate.lastMetrics.preparationOps)
                 preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
-            if (!basis.validFor(next.model) || (warm == null &&
-                    (basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
-                        basis.status.indices.any { (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n) })) ||
+            if (!basis.validFor(next.model) || (
+                warm == null &&
+                    (
+                        basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
+                        basis.status.indices.any { (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n) }
+                    )
+            ) ||
                 token()
             ) {
                 return null
