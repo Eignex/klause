@@ -85,6 +85,12 @@ internal class GatedResidual(
     var lastFeasible: Boolean = false
 }
 
+internal class RootRoundingWarmStart(
+    val objective: LinearObjective,
+    val relaxation: LpRelaxation,
+    val basis: Basis,
+)
+
 /**
  * Per-node relaxation-bounding runtime for branch-and-bound. Owns the whole LP-relaxation family
  * state — the [CpToLpRelaxation] relaxer, structural cut separators and the harvested global-cut
@@ -114,6 +120,8 @@ internal class LpEngine(
     private var closed = false
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
+    internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
+    internal var rootRoundingInterrupted: Boolean = false
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
         if (projections?.builtInRelaxation == false) {
             CpToLpRelaxation(problem, objective, realResidual = true, projections = null)
@@ -152,6 +160,8 @@ internal class LpEngine(
     override fun close() {
         if (closed) return
         closed = true
+        rootRoundingWarmStart = null
+        rootRoundingInterrupted = false
         try {
             releasePersistentSolvers()
         } finally {

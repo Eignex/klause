@@ -2,7 +2,10 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.RootRoundingWarmStart
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
@@ -33,19 +36,38 @@ internal fun LpEngine.lpRoundingProbe(
 ): Sample? {
     val started = TimeSource.Monotonic.markNow()
     var outcome = "RELAXATION_DECLINED"
+    rootRoundingInterrupted = false
     val session = PropagationSession(problem, cancellation)
     try {
+        if (cancellation()) {
+            rootRoundingInterrupted = true
+            return null
+        }
+        val retained = rootRoundingWarmStart?.takeIf { it.objective === objective }
+        rootRoundingWarmStart = null
         if (session.isUnsatAtRoot) {
             outcome = "DISCRETE_ROOT_REJECTED"
             return null
         }
-        val relaxation = CpToLpRelaxation(problem, objective).build(session)
+        val relaxation = retained?.relaxation ?: CpToLpRelaxation(problem, objective).build(session)
         if (relaxation.model.n == 0) {
             outcome = "EMPTY_RELAXATION"
             return null
         }
         val result = try {
-            solvePrimalRelaxation(relaxation.model, cancellation, primal = false)
+            solvePrimalRelaxation(
+                relaxation.model,
+                cancellation,
+                primal = false,
+                warm = retained?.basis,
+            ) { iterate, termination ->
+                if (iterate?.optimal != true && termination == LpFloatTermination.CANCELLED) {
+                    rootRoundingInterrupted = true
+                }
+                if (iterate != null && (iterate.optimal || termination == LpFloatTermination.CANCELLED)) {
+                    rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis)
+                }
+            }
         } catch (_: CheckedLongOverflowException) {
             return null
         } ?: return null
@@ -56,7 +78,10 @@ internal fun LpEngine.lpRoundingProbe(
         }
         val seen = HashSet<String>()
         fun propose(rounding: LpRounding, seed: Sample? = null, reals: DoubleArray? = null): Sample? {
-            if (cancellation()) return null
+            if (cancellation()) {
+                rootRoundingInterrupted = true
+                return null
+            }
             val attempt = if (rounding == LpRounding.NEAREST && seed == null) session else {
                 PropagationSession(problem, cancellation)
             }
@@ -75,6 +100,7 @@ internal fun LpEngine.lpRoundingProbe(
                     }
                 }
                 if (attempt.fixpointCancelled || cancellation()) {
+                    rootRoundingInterrupted = true
                     outcome = "CANCELLED"
                     return null
                 }
@@ -105,6 +131,8 @@ internal fun LpEngine.lpRoundingProbe(
         return roundings(null)
     } finally {
         primalPropagationWork += session.work
+        if (outcome == "PROPOSED" && cancellation()) rootRoundingInterrupted = true
+        if (!rootRoundingInterrupted) rootRoundingWarmStart = null
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)
     }
 }
@@ -333,6 +361,8 @@ private fun LpEngine.solvePrimalRelaxation(
     model: LpModel,
     cancellation: Cancellation,
     primal: Boolean,
+    warm: Basis? = null,
+    observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)? = null,
 ): FloatLpResult? {
     requireOpen()
     if (cancellation()) return null
@@ -341,11 +371,12 @@ private fun LpEngine.solvePrimalRelaxation(
         workLimit = rootPrimalWorkBudget(), factory = solveContext.engineFactory, pricing = pricingOptions)
     var outcome = "FAILED"
     try {
-        val result = if (primal) simplex.solvePrimal() else simplex.solve()
+        val result = if (primal) simplex.solvePrimal(warm) else simplex.solve(warm)
         outcome = if (result?.optimal == true) "OPTIMAL" else {
             val reason = simplex.lastTermination?.name ?: "OTHER"
             if (result == null) "NO_POINT_$reason" else "NON_OPTIMAL_$reason"
         }
+        observeResult?.invoke(result, simplex.lastTermination)
         return result?.takeIf { it.optimal }
     } finally {
         try {

@@ -19,12 +19,15 @@ import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
@@ -177,6 +180,63 @@ internal object FiniteCutoffKnapsackFixture {
 }
 
 class ResumableMinimizeTest {
+    @Test
+    fun `sliced root rounding should resume only while its LP allowance remains`() {
+        val charged = 5_000L * LP_WORK_PER_NODE
+        for (allowance in listOf(charged, 2L * charged)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            )).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+            var primalSolves = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newTableauSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): TableauCutSolver {
+                    val delegate = ProductionLpEngineFactory.newTableauSolver(
+                        model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    )
+                    if (workLimit == 0L) return delegate
+                    val first = primalSolves++ == 0
+                    return object : TableauCutSolver by delegate {
+                        override val lastTermination get() =
+                            if (first) LpFloatTermination.CANCELLED else delegate.lastTermination
+                        override val lastMetrics get() =
+                            if (first) LpSolveMetrics(workOps = charged) else delegate.lastMetrics
+                        override fun solve(warm: Basis?): FloatLpResult? {
+                            if (!first) return if (warm == null) null else delegate.solve(warm)
+                            val result = delegate.solve(warm) ?: return null
+                            return FloatLpResult(result.basis, result.objective, result.duals, result.primal,
+                                optimal = false)
+                        }
+                    }
+                }
+            }
+            val params = BacktrackParams(
+                maxDecisions = 0L,
+                lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false,
+                    boundAdaptiveWork = false, rootMaxWork = allowance),
+            )
+            val offered = ArrayList<Sample>()
+
+            BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+                search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+                search.runSlice(Cancellation.Never, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+            }
+
+            if (allowance > charged) {
+                assertEquals(listOf(1L, 0L), offered.single().ints.toList())
+            } else {
+                assertTrue(offered.isEmpty())
+            }
+        }
+    }
+
     @Test
     fun `closing an abandoned improvement stream should release additional peers`() {
         val closed = ArrayList<Int>()
