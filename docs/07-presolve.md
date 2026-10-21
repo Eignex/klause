@@ -194,7 +194,14 @@ variable. Its candidate and term visits charge and poll the phase token. Rarest-
 incidence counts and row widths estimate each scan before entry against a work cap
 proportional to indexed terms, with an absolute ceiling. Unaffordable scans are
 skipped; interruption retains only completed rewrites and their unchanged defining
-equalities. Linear bound fusion merges matching upper and lower bounds into an equality
+equalities. The opt-in `sparsify` pass subtracts retained unconditional integer
+equalities from equivalent complete single-row factors. It scales the target by a
+positive integer when needed, preserves its comparison, and accepts only a strict
+decrease in nonzero terms. Overlap incidence bounds candidate scans; width, ratio,
+coefficient-growth and checked-arithmetic guards bound each attempted combination.
+It reads no domains or objective and eliminates no variables. Interrupted attempts
+are discarded while completed replacements keep their unchanged equality premises.
+Linear bound fusion merges matching upper and lower bounds into an equality
 or refutes crossing ones. These preserve the solution set. Affine singleton
 elimination and singleton inequality projection need reconstruction, and the
 projection is off for solution-set-sensitive queries.
