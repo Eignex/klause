@@ -116,6 +116,27 @@ class SourceExecutionTest {
     }
 
     @Test
+    fun `open source execution should retain an exhausted preparation allowance`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val budget = PresolveBudget(3).apply { charge(3) }
+
+        val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(
+            invocation, presolveBudget = budget,
+        )))
+
+        val outcome = assertIs<OpenTheoryExecution.Satisfy>(result.result).result
+        assertIs<OpenTheoryResult.Sat>(outcome)
+        val effort = assertNotNull(assertNotNull(outcome.stats.presolve).effort)
+        assertEquals(3L, effort.work)
+        assertEquals(3L, effort.allowance)
+        assertEquals(0, effort.rounds)
+        assertTrue(effort.passCalls.isEmpty())
+    }
+
+    @Test
     fun `fixed source execution should reject parallel cores across source families`() {
         val sources = listOf(
             SourceExecutionKind.FINITE to "(declare-const b Bool) (assert b)",
