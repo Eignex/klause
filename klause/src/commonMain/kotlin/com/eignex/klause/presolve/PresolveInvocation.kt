@@ -34,6 +34,7 @@ internal class PresolveInvocation(
     var rebuildWork = 0L
     var childrenElapsed = Duration.ZERO
     var outcome = PresolveInvocationOutcome.COMPLETE_MISS
+    var interrupted = false
     var narrowedColumns = 0
     var fixedColumns = 0
     var outputOccurrences: Long? = null
@@ -50,6 +51,7 @@ internal fun <T> PresolveBudget?.observe(
 ): T {
     if (this == null) return action(null)
     val invocation = PresolveInvocation(pass.id, lane, size())
+    if (cancellation()) invocation.interrupted = true
     val parent = activeInvocation
     activeInvocation = invocation
     var completed = false
@@ -59,7 +61,7 @@ internal fun <T> PresolveBudget?.observe(
         val elapsed = invocation.start.elapsedNow()
         activeInvocation = parent
         parent?.let { it.childrenElapsed += elapsed }
-        val outcome = if ((!completed || cancellation()) && invocation.outcome != PresolveInvocationOutcome.REFUTED) {
+        val outcome = if ((!completed || invocation.interrupted) && invocation.outcome != PresolveInvocationOutcome.REFUTED) {
             PresolveInvocationOutcome.INTERRUPTED
         } else invocation.outcome
         recordInvocation(PresolveInvocationStats(
@@ -102,7 +104,9 @@ internal fun PresolveBudget?.observeRoundPass(
         !eligible() -> PassOutcome.SKIPPED
         else -> action(invocation)
     }
-    val result = if (outcome == PassOutcome.UNCHANGED && cancellation()) PassOutcome.INTERRUPTED else outcome
+    val result = if (outcome == PassOutcome.UNCHANGED && invocation?.interrupted == true) {
+        PassOutcome.INTERRUPTED
+    } else outcome
     invocation.record(result)
     result
 }
