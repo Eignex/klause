@@ -18,14 +18,19 @@ import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.observedCandidateHints
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.HintIndexOutcome
+import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.HintedBooleanBranching
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchLearnedDbParams
@@ -35,6 +40,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
+import com.eignex.klause.solver.search.followedBy
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -49,6 +55,79 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
+    @Test
+    fun `retracted Boolean phases should retain both alternatives ahead of point guesses`() {
+        for (truth in listOf(false, true)) {
+            val model = Problem(numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+                realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+                factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0)))
+            ExactLiraSearchComponent(model).use { component ->
+                val phases = assertNotNull(component.retainBooleanPhases(Cancellation.Never))
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, truth))))
+                session.popTo(0)
+                val branching = HintedBooleanBranching(BooleanBranching.SourceOrder(1),
+                    phases.followedBy(SearchCandidateHints { !truth }))
+
+                val choices = branching.alternatives(session)
+
+                assertEquals(listOf(SearchDecision.Bool(Lit.make(0, truth)),
+                    SearchDecision.Bool(Lit.make(0, !truth))), choices)
+                assertNull(session.boolValue(0))
+                assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+            }
+        }
+    }
+
+    @Test
+    fun `caller preferences should precede retained Boolean phases`() {
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            val phases = assertNotNull(component.retainBooleanPhases(Cancellation.Never))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            session.popTo(1)
+            val hints = observedCandidateHints(SearchCandidateHints { false }, phases, OpenHintUsageSink())
+            val branching = HintedBooleanBranching(BooleanBranching.SourceOrder(2), hints)
+
+            val choices = branching.alternatives(session)
+
+            assertEquals(listOf(SearchDecision.Bool(Lit.make(1, false)),
+                SearchDecision.Bool(Lit.make(1, true))), choices)
+            assertNull(session.boolValue(1))
+        }
+    }
+
+    @Test
+    fun `retained phases and point hints should share the existing workspace limit`() {
+        val model = Problem(
+            numBoolVars = 30000,
+            intBounds = openBounds(0),
+            numRealVars = 256,
+            realLower = DoubleArray(256),
+            realUpper = DoubleArray(256),
+            factors = Array<Factor>(300) { head -> ReifiedRealLinear(
+                head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                LinearOp.LE, 0.0,
+            ) },
+        )
+        for (phaseFirst in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                val first = if (phaseFirst) component.retainBooleanPhases(Cancellation.Never)
+                    else component.partialPointHints(Cancellation.Never, defaultOpening = true)
+
+                val second = if (phaseFirst) component.partialPointHints(Cancellation.Never, defaultOpening = true)
+                    else component.retainBooleanPhases(Cancellation.Never)
+
+                assertNotNull(first)
+                assertNull(second)
+            }
+        }
+    }
+
     @Test
     fun `interval guard implications should retract before a feasible sibling`() {
         val model = Problem(numBoolVars = 4, intBounds = openBounds(0), numRealVars = 2,

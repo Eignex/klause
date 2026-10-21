@@ -155,6 +155,13 @@ guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
 
+With automatic linear-real branching and candidate steering enabled, observed
+Boolean assignment polarities can survive retraction as saved phases. Caller
+preferences precede them, and they precede an available point's polarity.
+Retained phases and point guidance share
+the 65,536-entry workspace; insufficient space leaves the point provider alone.
+These Boolean guesses outlive no component and carry no numerical point or proof.
+
 Default pure-real guidance can index unique activators into the immutable prepared
 rows when retaining eager guard terms exceeds its workspace. It retains only that
 index and a copy of the existing exact point; shared or disjunctive heads receive

@@ -98,6 +98,12 @@ preference only reorders the two sides of an already selected split, preserving 
 complementary alternative. Propagation and complete component checks keep their
 authority, and a hypothetical value supplies no arithmetic fact or feasibility claim.
 
+Automatic linear-real traversal with candidate steering enabled can retain Boolean
+assignment polarities across retraction and restart. Caller hints take precedence,
+followed by saved phases and then current point guidance. The phase table shares the existing
+65,536-entry private hint workspace and is discarded when its component closes.
+It preserves both alternatives and supplies no assignment or proof.
+
 Built-in providers derive preferences from a completed arithmetic point: a single
 linear completion owner reuses the point of its last numerical check, and the opt-in
 `openHintFlips` provider indexes source clauses and prefers the polarity that breaks

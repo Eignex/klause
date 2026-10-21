@@ -39,6 +39,7 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.Vsids
+import com.eignex.klause.solver.search.followedBy
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
@@ -420,11 +421,15 @@ class OpenTheoryEngine internal constructor(
         var handedOff = false
         var failure: Throwable? = null
         try {
+            var savedPhases: SearchCandidateHints = SearchCandidateHints.None
             (planned.theory as? ExactLiraSearchComponent)?.let {
                 it.observePrimaryLpWith(stats.lp.certificationObserver(LpRoute.STANDALONE))
                 it.observeCompleteTraversal()
                 it.useMixedPointCompletion()
                 it.useSourceGuardPropagation()
+                if (params.openBranching == OpenBranching.Automatic &&
+                    plan.theoryPipeline == ProblemPipeline.EXACT_LRA && params.openHintFlips != 0L
+                ) savedPhases = it.retainBooleanPhases(cancellation) ?: SearchCandidateHints.None
             }
             planned.session.bindOpenTheoryWork(work)
             when (planned.session.initialize()) {
@@ -471,7 +476,8 @@ class OpenTheoryEngine internal constructor(
                 booleanBranching = branching,
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = nodePolicy,
-                candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
+                candidateHints = observedCandidateHints(hints, savedPhases.followedBy(planned.candidateHints),
+                    state.smt.hintUsage),
                 branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
                     SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
                         SearchBranchKind.Finite))

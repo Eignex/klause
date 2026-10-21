@@ -234,6 +234,7 @@ class ExactLiraSearchComponent private constructor(
     private var floatCandidate: DoubleArray? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
+    private var savedBooleanPhases: IntArray? = null
     private var pointHintIndex: IntArray? = null
     private var pointHintPoint: List<BigFraction>? = null
     private var pointReuseEnabled = false
@@ -354,6 +355,44 @@ class ExactLiraSearchComponent private constructor(
         observeCompleteStage("OPENING")
     }
 
+    internal fun retainBooleanPhases(stop: Cancellation): SearchCandidateHints? {
+        check(context == null && savedBooleanPhases == null)
+        val count = model.numBoolVars
+        if (count == 0 || count > MAX_POINT_HINT_ENTRIES) return null
+        var entries = when {
+            pointHintIndex != null -> 2L * count + model.numRealVars
+            pointHintRows != null -> count.toLong() + model.numIntVars + model.numRealVars
+            else -> 0L
+        }
+        for (prepared in pointHintRows.orEmpty()) {
+            stop.charge(1L)
+            if (stop()) return null
+            entries += prepared.row.size.toLong() + 1L
+            if (entries + count > MAX_POINT_HINT_ENTRIES) break
+        }
+        if (entries + count > MAX_POINT_HINT_ENTRIES) {
+            observeCompleteStage("SAVED_PHASE_STORAGE_DECLINED")
+            return null
+        }
+        stop.charge(count.toLong() + 1L)
+        if (stop()) return null
+        savedBooleanPhases = IntArray(count) { UNASSIGNED }
+        observeCompleteStage("SAVED_PHASE_ADMITTED")
+        return SearchCandidateHints { variable ->
+            val phases = savedBooleanPhases ?: return@SearchCandidateHints null
+            stop.charge(1L)
+            if (stop()) null else {
+                val preferred = when (phases.getOrNull(variable)) {
+                    TRUE -> true
+                    FALSE -> false
+                    else -> null
+                }
+                observeCompleteStage(if (preferred == null) "SAVED_PHASE_MISS" else "SAVED_PHASE_PREFERRED")
+                preferred
+            }
+        }
+    }
+
     internal fun partialPointHints(
         stop: Cancellation,
         defaultOpening: Boolean = false,
@@ -375,7 +414,7 @@ class ExactLiraSearchComponent private constructor(
         }
         if (stop()) return declined(HintIndexOutcome.STOPPED)
         if (defaultOpening && model.numIntVars == 0) {
-            var retained = model.numRealVars.toLong() + model.numBoolVars
+            var retained = model.numRealVars.toLong() + model.numBoolVars + (savedBooleanPhases?.size ?: 0)
             for (prepared in preparedRows) {
                 stop.charge(1L)
                 if (stop()) return declined(HintIndexOutcome.STOPPED)
@@ -387,7 +426,8 @@ class ExactLiraSearchComponent private constructor(
                 }
             }
         }
-        var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
+        var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars +
+            (savedBooleanPhases?.size ?: 0)
         val rows = ArrayList<PreparedSourceRow>()
         val variables = LinkedHashSet<Int>()
         var stable = model.numIntVars == 0
@@ -427,7 +467,7 @@ class ExactLiraSearchComponent private constructor(
             return null
         }
         // Prepared terms are immutable source storage; the private index and point have their own envelope.
-        if (2L * model.numBoolVars + model.numRealVars > MAX_POINT_HINT_ENTRIES) {
+        if (2L * model.numBoolVars + model.numRealVars + (savedBooleanPhases?.size ?: 0) > MAX_POINT_HINT_ENTRIES) {
             return declined(HintIndexOutcome.STORAGE)
         }
         stop.charge(model.numBoolVars.toLong())
@@ -908,6 +948,7 @@ class ExactLiraSearchComponent private constructor(
         lp.onRestart(context)
     }
     override fun close() {
+        savedBooleanPhases = null
         floatCandidate = null
         releasePartialPointHints()
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
@@ -1186,6 +1227,7 @@ class ExactLiraSearchComponent private constructor(
                     }
                 }
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
+                savedBooleanPhases?.set(variable, bools[variable])
                 boolLevels[variable] = context.decisionLevel
                 node = node.copy(
                     retainedReduction = null,
