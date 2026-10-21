@@ -17,6 +17,7 @@ import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.propagation.setIntAsDecision
 import com.eignex.klause.propagation.undoTo
 import kotlin.random.Random
 import kotlin.test.Test
@@ -55,8 +56,7 @@ class CircuitPropagatorTest {
         assertNull(state.runToFixpoint(allFactors = true))
         state.undoLogging = true
         val mark = state.mark()
-        state.currentLevel = 1
-        assertTrue(state.setInt(4, 2))
+        assertTrue(state.setIntAsDecision(4, 2))
 
         assertNull(state.runToFixpoint(allFactors = false))
 
@@ -78,8 +78,7 @@ class CircuitPropagatorTest {
         val state = PropagationState(problem, Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))
         state.undoLogging = true
-        state.currentLevel = 1
-        assertTrue(state.setInt(1, 3) && state.setInt(3, 2))
+        assertTrue(state.setIntAsDecision(1, 3) && state.setIntAsDecision(3, 2))
 
         assertNull(state.runToFixpoint(allFactors = false))
 
@@ -152,7 +151,7 @@ class CircuitPropagatorTest {
     }
 
     @Test
-    fun `a chain should block its own closing citing only its fixed edges`() {
+    fun `a chain closing bound should cite its fixed edges and crossed holes`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 5,
@@ -173,7 +172,13 @@ class CircuitPropagatorTest {
             val atom = Lit.variable(lit) - problem.numBoolVars
             Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
         }
-        assertEquals(setOf(Triple(0, AtomKind.EQ, 1L), Triple(1, AtomKind.EQ, 2L)), cited.toSet())
+        assertEquals(
+            setOf(
+                Triple(0, AtomKind.EQ, 1L), Triple(1, AtomKind.EQ, 2L),
+                Triple(2, AtomKind.EQ, 1L), Triple(2, AtomKind.EQ, 2L),
+            ),
+            cited.toSet(),
+        )
     }
 
     private fun fourNodeSubcircuitProblem(): Problem {
