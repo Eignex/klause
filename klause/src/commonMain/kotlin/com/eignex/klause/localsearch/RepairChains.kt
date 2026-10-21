@@ -210,6 +210,25 @@ private fun LocalSearchState.runRepairChain(
     }
     val keep = bestPrefixLen >= 2
 
+    restoreRepairChain(
+        inverses, savedSlots, savedTouched, savedCounts, oldStep, oldBest,
+        oldBoolConf, oldIntConf,
+    )
+
+    return if (keep) parts.subList(0, bestPrefixLen) else null
+}
+
+@Suppress("LongParameterList")
+private fun LocalSearchState.restoreRepairChain(
+    inverses: ArrayList<Move>,
+    savedSlots: IntArrayList,
+    savedTouched: LongArrayList,
+    savedCounts: IntArrayList,
+    oldStep: Long,
+    oldBest: Long,
+    oldBoolConf: BooleanArray,
+    oldIntConf: BooleanArray,
+) {
     for (i in inverses.indices.reversed()) apply(inverses[i])
     tabu.step = oldStep
     for (i in 0 until savedSlots.size) {
@@ -219,8 +238,6 @@ private fun LocalSearchState.runRepairChain(
     for (i in oldBoolConf.indices) boolConfChange[i] = oldBoolConf[i]
     for (i in oldIntConf.indices) intConfChange[i] = oldIntConf[i]
     bestCostSeen = oldBest
-
-    return if (keep) parts.subList(0, bestPrefixLen) else null
 }
 
 /** Record into [base] the current degree of every factor [p] could affect — factors over

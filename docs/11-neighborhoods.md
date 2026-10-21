@@ -24,6 +24,12 @@ objective from the same probe, rejecting a hard violation before valuing the
 objective. Probes record no activity or best-cost observations, and weighted probes
 rescan only factors whose degrees change, in the order a full scan would use.
 
+Directed repair chains apply successive proposals against one chain-start degree
+baseline and retain the best prefix with at least two primitive parts. A rollback
+phase applies inverse moves in reverse order, then restores the tabu clock, touched
+slots, activity counts, configuration flags and best-cost watermark. Candidate
+sampling and chain growth share the state's random stream.
+
 `ArgminJump` builds coordinated integer targets and maintained-Boolean inverse
 repairs through the generic move sink before comparing their complete weighted
 deltas. Each sampled coordinate contributes at most one strict improvement over
