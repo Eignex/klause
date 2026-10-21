@@ -13,6 +13,60 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `shared specialization should not require coefficient image elimination`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val relation = polynomial.subtract(Polynomial.variable(1), polynomial.power(Polynomial.variable(0), 2))
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val specialized = limited.specialize(relation, 1, mapOf(0 to base))
+
+        assertEquals(1, specialized.degree)
+    }
+
+    @Test
+    fun `captured coefficient images should use the evaluating caller`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val value = arithmetic.roots(RationalPolynomial.of(-4, 0, 0, 1)).single()
+        val relation = polynomial.subtract(Polynomial.variable(1), polynomial.power(Polynomial.variable(0), 2))
+        var cancelled = false
+        val producer = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled },
+            limits = PolynomialLimits(maxMatrixCells = 0)))
+        val specialized = producer.specialize(relation, 1, mapOf(0 to base))
+        cancelled = true
+
+        val result = arithmetic.evaluate(specialized, value)
+
+        assertEquals(0, arithmetic.sign(result))
+    }
+
+    @Test
+    fun `captured coefficient widths should obey the lifting caller dense limit`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val relation = polynomial.subtract(Polynomial.variable(1), polynomial.power(Polynomial.variable(0), 3))
+        val specialized = arithmetic.specialize(relation, 1, mapOf(0 to base))
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 3)))
+
+        val failure = assertFailsWith<PolynomialResourceLimit> { limited.roots(specialized) }
+
+        assertEquals(PolynomialResource.DENSE_COEFFICIENTS, failure.resource)
+    }
+
+    @Test
+    fun `rational shared coefficients should lift without elimination matrices`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val relation = polynomial.subtract(polynomial.power(Polynomial.variable(1), 2),
+            polynomial.power(Polynomial.variable(0), 2))
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+        val specialized = limited.specialize(relation, 1, mapOf(0 to base))
+
+        val roots = limited.roots(specialized)
+
+        assertEquals(2, roots.size)
+        assertEquals(0, arithmetic.compare(roots[0], arithmetic.negate(base)))
+        assertEquals(0, arithmetic.compare(roots[1], base))
+    }
+
+    @Test
     fun `shared coefficient conjugates should retain only the selected quadratic roots`() {
         val bases = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
         val x = Polynomial.variable(0)

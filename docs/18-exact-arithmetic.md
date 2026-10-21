@@ -105,11 +105,13 @@ equality or order. Rational sector samples lie strictly between ordered algebrai
 boundaries. Evaluation owners cache root counts, coordinate powers and line images
 for one caller, charging lookups to the same token; published values keep no cache.
 
-Specialization evaluates coefficients at earlier exact coordinates and trims
+Specialization captures coefficients at earlier exact coordinates and trims
 vanished leading coefficients by exact sign. With rational coefficients, lifting
 isolates the polynomial directly. When the coefficients depend on one irrational
-coordinate, specialization captures their rational polynomial expressions in that
-coordinate. A joint resultant supplies a rational annihilator. Sturm variations
+coordinate, specialization keeps their rational polynomial expressions in that
+coordinate. Scalar coefficient images are materialized only for scalar polynomial
+evaluation, under the requesting caller's resource context. A joint resultant
+supplies a rational annihilator for lifting. Sturm variations
 over the ordered field of the captured root select its specialized roots from that
 annihilator's isolating intervals; one-sided endpoint signs exclude boundary roots
 and retain distinct repeated roots. Reducible defining polynomials are restricted
