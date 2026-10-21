@@ -35,16 +35,20 @@ class QfNraSolverTest {
                 "(not $postcondition)))",
         )
 
+        println("full transition: solve entered")
         val result = solveQfNra(source.formula, source.boolCount, source.realCount,
             QfNraParams(maximumWork = 5_000_000))
+        println("full transition: solve returned")
 
         val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
         assertEquals(33, point.realCount)
+        println("full transition: assignment checked")
         val hundredth = algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(100)))
         val u = point.realValue(2)
         val v = point.realValue(3)
         val step = algebraic.add(u, algebraic.multiply(hundredth, v))
         assertEquals(0, algebraic.compare(point.realValue(0), step))
+        println("full transition: position equation checked")
         val sine = algebraic.evaluate(RationalPolynomial(listOf(BigFraction.ZERO, BigFraction.ONE,
             BigFraction.ZERO, BigFraction.of(bigIntOf(-1), bigIntOf(6)), BigFraction.ZERO,
             BigFraction.of(bigIntOf(1), bigIntOf(120)))), u)
@@ -53,8 +57,10 @@ class QfNraSolverTest {
             algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(981), bigIntOf(100))), sine))
         assertEquals(0, algebraic.compare(point.realValue(1),
             algebraic.add(v, algebraic.multiply(hundredth, acceleration))))
+        println("full transition: velocity equation checked")
         val inside = ArrayList<Boolean>()
         for ((a, b) in listOf(u to v, point.realValue(0) to point.realValue(1))) {
+            println("full transition: checking invariant")
             val value = listOf(algebraic.power(a, 2),
                 algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(25))),
                     algebraic.multiply(a, b)),
@@ -63,13 +69,16 @@ class QfNraSolverTest {
                 algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-3), bigIntOf(20))), a),
                 algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-1), bigIntOf(50))), b))
                 .fold(algebraic.rational(BigFraction.ZERO), algebraic::add)
+            println("full transition: energy evaluated")
             inside.add(algebraic.compare(a, algebraic.rational(BigFraction.MINUS_ONE)) >= 0 &&
                 algebraic.compare(a, algebraic.rational(BigFraction.of(bigIntOf(6), bigIntOf(5)))) <= 0 &&
                 algebraic.compare(b, algebraic.rational(BigFraction.of(bigIntOf(-16), bigIntOf(5)))) >= 0 &&
                 algebraic.compare(b, algebraic.rational(BigFraction.of(bigIntOf(33), bigIntOf(10)))) <= 0 &&
                 algebraic.compare(value, algebraic.rational(BigFraction.of(bigIntOf(111), bigIntOf(100)))) <= 0)
+            println("full transition: invariant evaluated")
         }
         assertEquals(listOf(true, false), inside)
+        println("full transition: counterexample checked")
     }
 
     @Test
