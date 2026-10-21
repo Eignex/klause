@@ -52,12 +52,16 @@ internal fun PolynomialTheoryRequest.afterSourcePreparation(
 internal fun PolynomialTheoryRequest.reconstructSource(
     incumbent: QuadraticIncumbent,
     params: PolynomialTheoryParams,
-): QuadraticIncumbent? = reconstructSource(incumbent.sample, params)?.let { incumbent.copy(sample = it) }
+): QuadraticIncumbent? {
+    if (sourcePreparation?.changed != true) return incumbent
+    return reconstructSource(incumbent.sample, params)?.let { incumbent.copy(sample = it) }
+}
 
 internal fun PolynomialTheoryRequest.publishSource(
     result: QuadraticOptimizationResult,
     params: PolynomialTheoryParams,
 ): QuadraticOptimizationResult {
+    if (sourcePreparation == null) return result
     val stats = preparationStats(result.stats)
     val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.let {
         reconstructSource(it.incumbent, params)
