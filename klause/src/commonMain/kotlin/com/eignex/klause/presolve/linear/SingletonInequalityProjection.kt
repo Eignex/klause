@@ -8,9 +8,9 @@ import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SourceRebuilds
+import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 
@@ -77,12 +77,11 @@ internal object SingletonInequalityProjection {
             pinned[x] = xBest
         }
         if (dropped.isEmpty()) return PassDelta()
-        val reconstruct: (Sample) -> Sample = { s ->
-            val ints = s.ints
-            for ((x, v) in pinned) if (x in ints.indices) ints[x] = v
-            s.copy(ints = ints)
-        }
-        return PassDelta(dropped.toIntArray(), added, reconstruct = reconstruct)
+        val rebuild = SourceRebuilds(pinned.map { (x, value) ->
+            RebuildStep.AffineValue(x, value, IntArray(0), LongArray(0), 1L)
+        })
+        return PassDelta(dropped.toIntArray(), added, reconstruct = rebuild.asSampleLift())
+            .also { it.rebuild = rebuild }
     }
 
     /**

@@ -1,11 +1,21 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SearchGroup
+import com.eignex.klause.ir.SearchHints
+import com.eignex.klause.ir.ValueSelection
+import com.eignex.klause.ir.VariableSelection
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.linear.SingletonInequalityProjection
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -14,6 +24,7 @@ import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.solver.pipeline.remapped
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
@@ -32,6 +43,94 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceMappingTest {
+    @Test
+    fun `binary substitution composed with Boolean elimination should retain unrelated hints and source values`() {
+        val source = Problem(2, 4,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(-2, 2), IntDomain(0, 2)),
+            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1), Abs(2, 3))).bake()
+        val substitution = assertNotNull(BinaryColumnSubstitution.substitute(source, emptySet(), BakeConfig.NONE))
+        val middle = substitution.problem
+        val delta = BoundedVariableElimination.eliminate(middle)
+        val target = middle.withPassDelta(delta, BakeConfig.NONE)
+        val mapping = SourceMapping(source, middle, TransformationGuarantees.IDENTITY, substitution.rebuild)
+            .then(SourceMapping(middle, target, PresolvePass.ELIMINATE_BOOL_VARS.guarantees, delta.rebuild))
+        val reduced = Sample(booleanArrayOf(true, false, false, false), longArrayOf(0, 0, -2, 2))
+
+        val coordinates = assertNotNull(mapping.retainedCoordinates())
+        val search = assertNotNull(SearchHints(listOf(SearchGroup(intArrayOf(1, 0), intArrayOf(0, 3, 1, 2))))
+            .remapped(coordinates, Cancellation.Never))
+        val point = mapping.reconstructFrom(target, reduced)
+
+        assertEquals(4, target.numBoolVars)
+        assertEquals(2, point.numBoolVars)
+        assertEquals(4, point.numIntVars)
+        assertEquals(listOf(true, false), point.bools.toList())
+        assertEquals(listOf(1L, 0L, -2L, 2L), point.ints.toList())
+        assertEquals(listOf(1, 0), search.tiers.single().boolVars.toList())
+        assertEquals(listOf(3, 2), search.tiers.single().intVars.toList())
+        assertNull(DefinitionHint.IntegerReference(0).remap(coordinates))
+        assertNull(DefinitionHint.IntegerReference(1).remap(coordinates))
+        assertNotNull(DefinitionHint.Abs(3, DefinitionHint.Operand.Variable(2)).remap(coordinates))
+        assertEquals(listOf(false, false), reduced.bools.drop(2))
+        assertEquals(listOf(0L, 0L, -2L, 2L), reduced.ints.toList())
+    }
+
+    @Test
+    fun `finite Boolean reductions should retain hints only for unchanged coordinates`() {
+        for (pass in listOf(PresolvePass.ELIMINATE_BOOL_VARS, PresolvePass.ELIMINATE_BLOCKED_CLAUSES,
+            PresolvePass.IMPLICATION_GRAPH)) {
+            val clauses = if (pass == PresolvePass.IMPLICATION_GRAPH) listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true))),
+            ) else listOf(Clause(intArrayOf(Lit.make(1, true), Lit.make(0, true))))
+            val source = Problem(3, 1, arrayOf(IntDomain(0, 3)), clauses).bake()
+            val delta = when (pass) {
+                PresolvePass.ELIMINATE_BOOL_VARS -> BoundedVariableElimination.eliminate(source, setOf(0, 2))
+                PresolvePass.ELIMINATE_BLOCKED_CLAUSES -> BlockedClauseElimination.eliminate(source, setOf(0, 2))
+                else -> ImplicationGraph.reduce(source, 3, Cancellation.Never)
+            }
+            val target = source.withPassDelta(delta, BakeConfig.NONE)
+            val mapping = SourceMapping(source, target, pass.guarantees, delta.rebuild)
+
+            val coordinates = assertNotNull(mapping.retainedCoordinates(), pass.id)
+            val search = assertNotNull(SearchHints(listOf(SearchGroup(intArrayOf(1, 2, 0), intArrayOf(0),
+                VariableSelection.InputOrder, ValueSelection.Maximum))).remapped(coordinates, Cancellation.Never))
+            val point = mapping.reconstructFrom(target, Sample(
+                booleanArrayOf(pass == PresolvePass.IMPLICATION_GRAPH, false, false), longArrayOf(2),
+            ))
+
+            assertEquals(listOf(2, 0), search.tiers.single().boolVars.toList(), pass.id)
+            assertEquals(ValueSelection.Maximum, search.tiers.single().valueSelector)
+            assertEquals(VariableSelection.InputOrder, search.tiers.single().varSelector)
+            assertNull(DefinitionHint.BooleanReference(1).remap(coordinates), pass.id)
+            assertEquals(2, assertNotNull(DefinitionHint.BooleanReference(2).remap(coordinates)).output)
+            assertEquals(0, assertNotNull(DefinitionHint.IntegerReference(0).remap(coordinates)).output)
+            assertTrue(point.boolValue(1), pass.id)
+            assertEquals(3, point.numBoolVars)
+            assertEquals(2L, point.intValue(0))
+        }
+    }
+
+    @Test
+    fun `finite singleton projection should retain hints for its surviving columns`() {
+        val source = Problem(1, 3, arrayOf(IntDomain(2, 5), IntDomain(0, 8), IntDomain(0, 8)),
+            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10))).bake()
+        val delta = SingletonInequalityProjection.project(source, setOf(1))
+        val target = source.withPassDelta(delta, BakeConfig.NONE)
+        val mapping = SourceMapping(source, target, PresolvePass.PROJECT_SINGLETON_INEQUALITIES.guarantees,
+            delta.rebuild)
+
+        val coordinates = assertNotNull(mapping.retainedCoordinates())
+        val search = assertNotNull(SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0, 2, 1))))
+            .remapped(coordinates, Cancellation.Never))
+        val point = mapping.reconstructFrom(target, Sample(booleanArrayOf(true), longArrayOf(5, 8, 4)))
+
+        assertEquals(listOf(2, 1), search.tiers.single().intVars.toList())
+        assertNull(DefinitionHint.IntegerReference(0).remap(coordinates))
+        assertEquals(2, assertNotNull(DefinitionHint.IntegerReference(2).remap(coordinates)).output)
+        assertEquals(listOf(2L, 8L, 4L), point.ints.toList())
+    }
+
     @Test
     fun `comparison indicators should be reconstructed without direct hint correspondence`() {
         val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), emptyArray())
@@ -117,6 +216,24 @@ class SourceMappingTest {
 
         assertNull(coordinates)
         assertEquals(2L, charged)
+    }
+
+    @Test
+    fun `literal reconstruction hint projection should stop at its rebuild work boundary`() {
+        val source = Problem(1, 2, Array(2) { IntDomain(0, 1) }, emptyArray())
+        val target = Problem(3, 2, Array(2) { IntDomain(0, 1) }, emptyArray())
+        val mapping = SourceMapping(source, target, TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.IntegerFromLiteral(0, Lit.make(1, true))), sourceBoolVars = 1))
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 5
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val coordinates = mapping.retainedCoordinates(stop)
+
+        assertNull(coordinates)
+        assertEquals(5L, charged)
     }
 
     @Test

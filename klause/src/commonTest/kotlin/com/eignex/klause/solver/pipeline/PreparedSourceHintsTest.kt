@@ -2,9 +2,12 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.DivMod
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.presolve.PresolveConfig
@@ -19,6 +22,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PreparedSourceHintsTest {
+    @Test
+    fun `binary substitution should preserve an unrelated source definition and its objective gradient`() {
+        val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(-2, 2), IntDomain(0, 2))
+        val source = Problem(0, 4, domains, listOf(
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1), Abs(2, 3),
+        ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, listOf(DefinitionHint.Abs(3, DefinitionHint.Operand.Variable(2)))),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, objective,
+        ))
+        val shape = invocation.finiteShape()
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
+            shape.problem, FiniteEngine.LOCAL_SEARCH, shape.linearObjective,
+            PresolveConfig.parse("binary-columns"), explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
+        ))
+
+        val view = assertNotNull(invocation.heuristicHints(preparation.problem, preparation.objective,
+            preparation.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+            assertNotNull(preparation.executionPlan).capabilities))
+        val assignment = Assignment(preparation.problem.numBoolVars, preparation.problem.numIntVars)
+        assignment.setInt(2, -2)
+        assertNotNull(view.sweep).sweep(assignment, domains)
+
+        assertEquals(2, preparation.problem.numBoolVars)
+        assertEquals(2L, assignment.intValue(3))
+        assertEquals(-1.0, assertNotNull(view.objective).deltaIfApplied(assignment, Move.IntSet(2, 1)))
+    }
+
     @Test
     fun `empty source hints should retain unhinted arithmetic maintenance and objective gradients`() {
         for (maximize in listOf(false, true)) {

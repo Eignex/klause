@@ -36,7 +36,7 @@ internal object BoundedVariableElimination {
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild ->
-        db.toDelta(rebuild.asSampleLift())
+        db.toDelta(rebuild)
     } ?: PassDelta()
 
     /**

@@ -21,6 +21,41 @@ import kotlin.test.assertTrue
 
 class SourceRebuildTest {
     @Test
+    fun `integer literal reconstruction should read restored literals before truncating their namespace`() {
+        for (positive in listOf(false, true)) {
+            val rebuild = SourceRebuilds.compose(listOf(
+                SourceRebuilds(listOf(RebuildStep.AffineValue(1, 2, intArrayOf(0), longArrayOf(3), 1))),
+                SourceRebuilds(listOf(RebuildStep.IntegerFromLiteral(0, Lit.make(2, positive))), sourceBoolVars = 1),
+                SourceRebuilds(listOf(RebuildStep.CopyLiteral(2, Lit.make(3, true))), sourceBoolVars = 3),
+            ))
+            val sample = Sample(booleanArrayOf(true, false, false, true), longArrayOf(0, 0))
+            val expected = if (positive) longArrayOf(1, 5) else longArrayOf(0, 2)
+
+            val restored = assertNotNull(rebuild.asSampleLift())(sample)
+
+            assertContentEquals(booleanArrayOf(true), restored.bools)
+            assertContentEquals(expected, restored.ints)
+            assertContentEquals(booleanArrayOf(true, false, false, true), sample.bools)
+            assertContentEquals(longArrayOf(0, 0), sample.ints)
+        }
+    }
+
+    @Test
+    fun `integer literal reconstruction should preserve unrelated arbitrary precision values`() {
+        val huge = bigIntOf(Long.MAX_VALUE) + BIG_ONE
+        val sample = Sample(booleanArrayOf(true), longArrayOf(), exactInts = listOf(BIG_ZERO, huge))
+        val rebuild = SourceRebuilds(
+            listOf(RebuildStep.IntegerFromLiteral(0, Lit.make(0, true))), sourceBoolVars = 0,
+        )
+
+        val restored = assertNotNull(rebuild.asSampleLift())(sample)
+
+        assertEquals(listOf(BIG_ONE, huge), restored.exactInts)
+        assertEquals(0, restored.numBoolVars)
+        assertEquals(listOf(BIG_ZERO, huge), sample.exactInts)
+    }
+
+    @Test
     fun `comparison reconstruction should read later recovered integers before earlier Boolean aliases`() {
         val passes = listOf(
             SourceRebuilds(listOf(RebuildStep.CopyLiteral(1, Lit.make(0, false)))),

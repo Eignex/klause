@@ -30,10 +30,9 @@ import com.eignex.klause.util.toLongExact
  * already recovered. Boolean and integer steps share one list rather than sitting in two, so that order
  * is stated once for the whole reconstruction instead of being implied between two carriers.
  *
- * A step names columns of the model before the elimination, and the reduced model has to keep every one
- * of them: a pass leaves an eliminated column in place and unconstrained rather than renumbering the
- * Boolean space. Both lanes evaluate over an array indexed by those ids, so a pass that renumbered
- * instead would have its steps read and write the wrong columns.
+ * A step names columns of the model before the elimination, and the reduced model keeps their slots.
+ * Binary substitution can append Boolean columns; the evaluator reads those literals before the witness
+ * adapter truncates the Boolean namespace. Neither namespace is renumbered.
  */
 internal sealed interface RebuildStep {
 
@@ -43,6 +42,8 @@ internal sealed interface RebuildStep {
      * The equivalent-literal form: a merged variable takes its representative's value.
      */
     class CopyLiteral(val variable: Int, val source: Int) : RebuildStep
+
+    class IntegerFromLiteral(val variable: Int, val literal: Int) : RebuildStep
 
     /** Give Boolean [variable] the truth of its defining integer comparison, before clause polarity. */
     class ComparisonValue(val variable: Int, val intVar: Int, val op: LinearOp, val bound: Long) : RebuildStep
@@ -106,13 +107,18 @@ internal sealed interface RebuildStep {
 /**
  * The columns a pass eliminated, in the order they are recovered.
  *
- * Immutable and lane-neutral: [rebuildInto] is the whole evaluator, and a lane adapts its witness to a
- * `BooleanArray` rather than this knowing about the witness.
+ * Immutable and lane-neutral: [rebuildInto] evaluates values in the reduced namespace, and the witness
+ * adapter truncates appended Boolean coordinates to [sourceBoolVars] after all steps have read them.
  */
-internal class SourceRebuilds(steps: List<RebuildStep>) {
+internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int? = null) {
+    init {
+        require(sourceBoolVars == null || sourceBoolVars >= 0)
+    }
+
     internal val steps: List<RebuildStep> = steps.map { step ->
         when (step) {
             is RebuildStep.CopyLiteral -> RebuildStep.CopyLiteral(step.variable, step.source)
+            is RebuildStep.IntegerFromLiteral -> RebuildStep.IntegerFromLiteral(step.variable, step.literal)
             is RebuildStep.ComparisonValue ->
                 RebuildStep.ComparisonValue(step.variable, step.intVar, step.op, step.bound)
             is RebuildStep.SatisfyClauses -> RebuildStep.SatisfyClauses(step.variable, step.clauses.map { it.copyOf() })
@@ -134,11 +140,12 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
     }
 
     /** Whether this recovers nothing, so a lane can skip adapting its witness at all. */
-    val isEmpty: Boolean get() = steps.isEmpty()
+    val isEmpty: Boolean get() = steps.isEmpty() && sourceBoolVars == null
 
     /** Whether any step reads or recovers an integer column, so a lane knows if it must carry values. */
     val touchesInts: Boolean get() = steps.any {
-        it is RebuildStep.AffineValue || it is RebuildStep.QuotientValue || it is RebuildStep.ComparisonValue
+        it is RebuildStep.AffineValue || it is RebuildStep.QuotientValue || it is RebuildStep.ComparisonValue ||
+            it is RebuildStep.IntegerFromLiteral
     }
 
     /**
@@ -149,6 +156,10 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
      */
     fun rebuildInto(bools: BooleanArray, ints: LongArray) {
         for (step in steps) {
+            if (step is RebuildStep.IntegerFromLiteral) {
+                ints[step.variable] = if (Lit.evaluate(step.literal, bools[Lit.variable(step.literal)])) 1L else 0L
+                continue
+            }
             if (step is RebuildStep.ComparisonValue) {
                 bools[step.variable] = comparisonHolds(step.op, ints[step.intVar].compareTo(step.bound))
                 continue
@@ -182,6 +193,12 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
      */
     fun rebuildInto(bools: BooleanArray, ints: Array<BigInt>) {
         for (step in steps) {
+            if (step is RebuildStep.IntegerFromLiteral) {
+                ints[step.variable] = bigIntOf(
+                    if (Lit.evaluate(step.literal, bools[Lit.variable(step.literal)])) 1L else 0L,
+                )
+                continue
+            }
             if (step is RebuildStep.ComparisonValue) {
                 bools[step.variable] = comparisonHolds(step.op, ints[step.intVar].compareTo(bigIntOf(step.bound)))
                 continue
@@ -262,7 +279,8 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
                 // Recovered by the value evaluators, which alone know the width to compute it at.
                 is RebuildStep.AffineValue, is RebuildStep.QuotientValue -> Unit
 
-                is RebuildStep.ComparisonValue -> error("comparison reconstruction requires integer coordinates")
+                is RebuildStep.ComparisonValue, is RebuildStep.IntegerFromLiteral ->
+                    error("literal and comparison reconstruction requires integer coordinates")
             }
         }
     }
@@ -304,7 +322,8 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
          */
         fun compose(passes: List<SourceRebuilds>): SourceRebuilds {
             val steps = passes.asReversed().flatMap { it.steps }
-            return if (steps.isEmpty()) NONE else SourceRebuilds(steps)
+            val sourceBoolVars = passes.firstNotNullOfOrNull { it.sourceBoolVars }
+            return if (steps.isEmpty() && sourceBoolVars == null) NONE else SourceRebuilds(steps, sourceBoolVars)
         }
     }
 }
@@ -320,11 +339,13 @@ internal fun SourceRebuilds.asSampleLift(): ((Sample) -> Sample)? = if (isEmpty)
 } else {
     { sample ->
         val bools = sample.bools
+        val sourceBools = sourceBoolVars ?: bools.size
+        require(sourceBools <= bools.size) { "reconstruction cannot extend the reduced Boolean namespace" }
         val exact = sample.exactInts
         if (exact == null) {
             val ints = sample.ints
             rebuildInto(bools, ints)
-            sample.copy(bools = bools, ints = ints)
+            sample.copy(bools = if (sourceBools == bools.size) bools else bools.copyOf(sourceBools), ints = ints)
         } else {
             val ints = exact.toTypedArray()
             rebuildInto(bools, ints)
@@ -333,7 +354,8 @@ internal fun SourceRebuilds.asSampleLift(): ((Sample) -> Sample)? = if (isEmpty)
             } else {
                 EmptyLongArray
             }
-            sample.copy(bools = bools, ints = finite, exactInts = ints.toList())
+            sample.copy(bools = if (sourceBools == bools.size) bools else bools.copyOf(sourceBools),
+                ints = finite, exactInts = ints.toList())
         }
     }
 }
