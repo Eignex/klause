@@ -44,7 +44,7 @@ internal fun LpEngine.lpRoundingProbe(
             return null
         }
         val retained = rootRoundingWarmStart?.takeIf { it.objective === objective }
-        rootRoundingWarmStart = null
+        rootRoundingWarmStart = retained
         if (session.isUnsatAtRoot) {
             outcome = "DISCRETE_ROOT_REJECTED"
             return null
@@ -131,7 +131,7 @@ internal fun LpEngine.lpRoundingProbe(
         return roundings(null)
     } finally {
         primalPropagationWork += session.work
-        if (outcome == "PROPOSED" && cancellation()) rootRoundingInterrupted = true
+        if (cancellation()) rootRoundingInterrupted = true
         if (!rootRoundingInterrupted) rootRoundingWarmStart = null
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)
     }
