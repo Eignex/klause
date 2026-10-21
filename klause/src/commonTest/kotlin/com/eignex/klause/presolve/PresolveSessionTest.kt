@@ -25,8 +25,9 @@ class PresolveSessionTest {
         val session = PresolveSession(Problem(2, 0, emptyArray(), listOf(clause, clause)).bake())
         val originalIds = session.passFactorIds()
         val mark = session.changeMark()
-        assertTrue(session.apply(PresolveDelta(droppedIds = intArrayOf(1), addedFactors = listOf(clause))))
-        assertTrue(session.apply(PresolveDelta(droppedIds = intArrayOf(2))))
+        assertTrue(session.applyDelta(PassDelta(droppedIndices = intArrayOf(1), addedFactors = listOf(clause))))
+        session.passInput()
+        assertTrue(session.applyDelta(PassDelta(droppedIndices = intArrayOf(1))))
 
         assertEquals(listOf(0, 1), originalIds.toList())
         assertEquals(listOf(0), session.passFactorIds().toList())
