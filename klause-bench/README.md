@@ -670,6 +670,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_EXACT_REFINEMENT_<route>`, `lpPhase_STRICT_REFINEMENT_<route>` | Refinement decline, inclusive time, charged work and numerical pivots; strict-margin work and time are subsets of exact refinement |
 | `lpPhase_COMPONENT_POINT_RECOVERY_<route>` | Failed direct component-point recovery followed by exact continuation, with structural column count, row count and terminal decline in the outcome |
 | `openHintIndexSourceLimit`, `openHintIndexStorageLimit`, `openHintIndexInvalidPrimitive`, `openHintIndexStopped` | Opening guidance admission declines, including the primitive provider before any clause index is available |
+| `smtCompleteSearchStage_POINT_HINT_INDEXED_CAPTURE`, `smtCompleteSearchStage_POINT_HINT_INDEXED_CONSULTED` | Captured existing exact points and selected guard evaluations through the bounded unique-head index; these are guidance events, not feasibility or source-witness claims |
 | `lpPhase_PREFIX_REAL_ADMISSION_ROOT`, `lpPhase_PREFIX_REAL_COMPACTION_ROOT` | Optional selected-prefix assembly and actual row admission with open finite coordinates |
 | `lpPhase_PREFIX_REAL_CHECK_ROOT`, `lpPhase_PREFIX_REAL_EXPLANATION_ROOT` | Exact prefix query verdict and emitted source clause length; positive points carry no source witness authority |
 | `lpPhase_PREFIX_REAL_HANDOFF_ROOT` | Native conflict handling for a checked selected-prefix source clause |

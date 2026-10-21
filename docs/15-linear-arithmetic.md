@@ -105,6 +105,14 @@ guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
 
+Default pure-real guidance can index unique activators into the immutable prepared
+rows when retaining eager guard terms exceeds its workspace. It retains only that
+index and a copy of the existing exact point; shared or disjunctive heads receive
+no preference. Selected guard evaluation spends the containing invocation's work
+and deadline allowance. Retraction, restart and changed arithmetic state discard
+the point, while a completed private numerical query does not end its lifetime.
+The private index, returned heads and point share the 65,536-entry admission limit.
+
 ### Results and proof authority
 
 `ExactLraAssignment` captures Boolean values and rational real coordinates.

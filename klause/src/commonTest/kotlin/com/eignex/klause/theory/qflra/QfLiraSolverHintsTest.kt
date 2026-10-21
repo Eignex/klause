@@ -19,6 +19,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
+import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
@@ -46,6 +47,157 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
+    @Test
+    fun `indexed point hints should preserve strict comparison polarity beyond eager storage`() {
+        val model = Problem(
+            numBoolVars = 301,
+            intBounds = openBounds(0),
+            numRealVars = 256,
+            realLower = DoubleArray(256),
+            realUpper = DoubleArray(256),
+            factors = Array<Factor>(301) { head ->
+                if (head < 300) ReifiedRealLinear(
+                    head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    if (head % 2 == 0) LinearOp.LE else LinearOp.GE, 0.0, strict = head % 4 >= 2,
+                ) else Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    LinearOp.EQ, 0.0)
+            },
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            assertNull(component.partialPointHints(Cancellation.Never))
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            for (head in 0..3) assertEquals(head < 2, hints.preferredBool(head))
+        }
+    }
+
+    @Test
+    fun `indexed point hints should use the containing stop after a private query expires`() {
+        var privateStopped = false
+        var containingStopped = false
+        val stop = Cancellation { containingStopped }
+        val model = Problem(
+            numBoolVars = 301,
+            intBounds = openBounds(0),
+            numRealVars = 256,
+            realLower = DoubleArray(256),
+            realUpper = DoubleArray(256),
+            factors = Array<Factor>(301) { head ->
+                if (head < 300) ReifiedRealLinear(
+                    head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    LinearOp.LE, 0.0,
+                ) else Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    LinearOp.EQ, 0.0)
+            },
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.useOperationAllowance { parent -> parent or Cancellation { privateStopped } }
+            val hints = assertNotNull(component.partialPointHints(stop, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            privateStopped = true
+
+            assertEquals(true, hints.preferredBool(0))
+            containingStopped = true
+            assertNull(hints.preferredBool(0))
+        }
+    }
+
+    @Test
+    fun `indexed point hints should omit shared activators`() {
+        val model = Problem(
+            numBoolVars = 301,
+            intBounds = openBounds(0),
+            numRealVars = 256,
+            realLower = DoubleArray(256),
+            realUpper = DoubleArray(256),
+            factors = Array<Factor>(302) { head ->
+                when {
+                    head < 300 -> ReifiedRealLinear(
+                        head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                        LinearOp.LE, 0.0,
+                    )
+                    head == 300 -> Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it },
+                        DoubleArray(256) { 1.0 }, LinearOp.EQ, 0.0)
+                    else -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.GE, 0.0)
+                }
+            },
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(hints.preferredBool(0))
+            assertEquals(true, hints.preferredBool(1))
+        }
+    }
+
+    @Test
+    fun `indexed point hints should discard points across retraction and restart`() {
+        for (restart in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 301,
+                intBounds = openBounds(0),
+                numRealVars = 256,
+                realLower = DoubleArray(256),
+                realUpper = DoubleArray(256),
+                factors = Array<Factor>(301) { head ->
+                    if (head < 300) ReifiedRealLinear(
+                        head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                        LinearOp.LE, 0.0,
+                    ) else Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                        LinearOp.EQ, 0.0)
+                },
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                    defaultGraphSelections = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(true, hints.preferredBool(0))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(300, true))))
+                assertEquals(true, hints.preferredBool(0))
+
+                if (restart) component.onRestart(session) else session.popTo(0)
+
+                assertNull(hints.preferredBool(0))
+            }
+        }
+    }
+
+    @Test
+    fun `indexed point hints should decline an oversized private index`() {
+        var decline: HintIndexOutcome? = null
+        val model = Problem(
+            numBoolVars = 32768,
+            intBounds = openBounds(0),
+            numRealVars = 256,
+            realLower = DoubleArray(256),
+            realUpper = DoubleArray(256),
+            factors = Array<Factor>(300) { head -> ReifiedRealLinear(
+                head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                LinearOp.LE, 0.0,
+            ) },
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                onDecline = { decline = it })
+
+            assertNull(hints)
+            assertEquals(HintIndexOutcome.STORAGE, decline)
+        }
+    }
+
     @Test
     fun `explicit integer point preparation should decline without charging its caller`() {
         var charged = 0L
