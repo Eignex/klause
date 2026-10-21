@@ -10,9 +10,8 @@ refute the model.
 Execution has three parts: prepare retained workers, give them bounded slices of
 the [resource allowance](06-sessions.md#resource-allowances), and verify their
 publications with [source validation](07-presolve.md#source-witness-validation)
-before sharing or returning them. The [solver vision](01-introduction.md#shared-model-breadth)
-requires a complete-search/local-search pair for every supported model; current
-admission gaps are implementation limits.
+before sharing or returning them. Prepared admission determines which complete
+and heuristic arms can execute the source; a declined arm keeps its explicit cause.
 
 The chapter starts with how an invocation is assembled and which strategies it
 admits, then follows a worker's output: which [witnesses](#witnesses-and-proof-scope)

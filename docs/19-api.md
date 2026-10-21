@@ -221,9 +221,11 @@ and `SourceStrategy.withProjectionProviders(providers)`. Descriptors hold no mut
 workspace; factories return private state for each live search or worker.
 
 Encoders install a factor into a theory. `encoder.select(factor, target)` returns an
-`Encoder` whose support is direct, conditioned, relaxation-only or unsupported; only
-the first two may install. `TheoryEncoding` stages the relation and its private
-auxiliaries and commits only on success; a decline discards everything staged.
+`Encoder` whose support is direct, equivalent, conditioned, relaxation-only or
+unsupported. Direct and equivalent support enforce the unconditioned relation;
+conditioned support also requires its captured source pins. `TheoryEncoding` stages
+the relation and its private auxiliaries and commits only on success; a decline
+discards everything staged.
 Extensions must preserve every source solution, guard, strictness and reconstruction;
 installing an encoding supplies no proof certificate by itself.
 

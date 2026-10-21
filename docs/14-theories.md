@@ -81,7 +81,7 @@ indeterminate required leaf cannot justify source exhaustion.
 
 ## Shared composition contract
 
-The [factor and ownership contract](01-introduction.md#high-level-factors-and-composed-reasoning)
+The [factor and ownership contract](02-model.md#factor-projection-selection)
 allows finite propagation and theory encoding for the same source factor. Schema
 compilation, library preparations and format frontends select the same factor
 encoders; native nonlinear snapshots already contain theory formulas.
@@ -114,9 +114,8 @@ omitted integrality or finite factors.
 Feasibility support does not imply support for an objective, an attained optimum or
 unboundedness; each theory chapter states those limits.
 [LP certification](17-linear-programming.md#lp-certification) owns linear numerical evidence. Current
-certificates are in-memory;
-[independent proof export](01-introduction.md#independently-checkable-proof-files)
-is a target capability.
+certificates are in-memory; there is no
+[independent proof export](01-introduction.md#independently-checkable-proof-files).
 
 ## State and resources
 

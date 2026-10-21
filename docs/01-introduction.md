@@ -7,29 +7,22 @@ local search and arithmetic reasoning fits the model. Choosing a strategy change
 how the problem is searched; the meaning of the model and the guarantees attached
 to every published result stay the same.
 
-This chapter sets out what Klause is meant to be: one model surface for every
-search style, results whose strength matches their evidence, and a clear boundary
-between finite propagation and arithmetic. It then records where the
-implementation stands against those targets and closes with the system
-architecture that keeps the guarantees. Later chapters describe the implemented
-system; remaining gaps are listed in
-[current coverage](03-input-semantics.md#solving-coverage).
+This chapter introduces the shared model, result guarantees and boundary between
+finite propagation and arithmetic, then maps them onto modules and packages.
+[Solving coverage](03-input-semantics.md#solving-coverage) records the supported
+fragments and strategy limits.
 
 ## Shared model breadth
 
-Every supported problem must have both a runnable complete-search arm and a
-runnable local-search arm, and callers must always be able to compose the two
-into a portfolio. Both arms retain the same source constraints, variable meanings
-and objective. This applies to finite, open, continuous and mixed models,
-including pure theory problems. Single-arm execution remains an explicit caller
-choice.
+Complete search, local search and portfolios consume the same source constraints,
+variable meanings and objective. Preparation selects engine projections and any
+required arithmetic completion; changing strategy cannot drop a source relation.
+The mechanisms differ in filtering, scoring, completeness and proof authority.
 
-Each arm must execute meaningful search over the admitted model: dropping
-constraints, rejecting the model or immediately returning UNKNOWN is a coverage
-gap, not engine parity. Shared breadth does not require equal filtering, scoring,
-performance or proof authority. The gaps in
-[current coverage](03-input-semantics.md#solving-coverage) are work to close, not
-permanent exclusions.
+Not every route admits every strategy. Prepared capabilities report explicit
+declines, including heuristic execution over open numerical MPS models. The
+[coverage table](03-input-semantics.md#solving-coverage) and individual format
+chapters describe these limits.
 
 ## Results and completeness
 
@@ -65,17 +58,11 @@ support never places real domains in CP. See
 
 ## High-level factors and composed reasoning
 
-These target requirements are tracked by [#2850](https://github.com/Eignex/klause/issues/2850)
-and [#2841](https://github.com/Eignex/klause/issues/2841) and are not fully implemented.
-[Engine projections](02-model.md#engine-projections-and-factor-capabilities)
-and [theory composition](14-theories.md#shared-composition-contract) describe
-current execution.
-
-Frontends retain the strongest source factor available, and preparation selects
-its propagation, scoring, relaxation and theory mechanisms. An `Encoder` installs
-the factor's relation into a selected theory by direct support or a
-source-equivalent encoding; generic encodings belong in `lowering`, and private
-auxiliaries retain source mappings.
+Source factors retain relations that preparation projects into propagation,
+scoring, relaxation and theory mechanisms. Frontends also use shared encodings in
+`lowering` where source syntax needs decomposition. An `Encoder` installs a whole
+factor relation into a selected theory, retaining source mappings for private
+auxiliaries. Native arithmetic snapshots carry formulas directly.
 
 Variable ownership is separate from factor participation. A factor can use a
 `Propagator`, an `Encoder`, an `Invariant` and relaxation views together: joint
@@ -108,42 +95,27 @@ selects how to solve it. Three layers determine the effective setup, in order:
    qualification, so an approximating override cannot publish an exact claim.
 3. **Automatic setup.** One library entry receives the model, its semantics, the
    operation and the caller's strategy and resource settings, and selects the
-   route, theory composition, engines and portfolio: the strongest complete
-   mechanism paired with local search. An explicit engine request narrows that
-   selection without bypassing admission.
+   route, theory composition, engines and portfolio from prepared capabilities.
+   An explicit engine request narrows that selection without bypassing admission.
 
-Frontends parse, lower to the [strongest factors](#high-level-factors-and-composed-reasoning),
-attach semantics and render results. They do not prove bounds, choose lowerings
-by solver capability or interpret engine names, so the CLI and library reach the
-same route for the same model.
+Frontends parse, lower source syntax, attach semantics and render results.
+[Source setup](19-api.md#source-setup) owns execution selection for all file formats,
+including MPS's numerical route. SMT-LIB admission selects a lossless factor or
+native formula representation before that setup.
 
 ## Independently checkable proof files
 
-The target includes optional proof files that let a separate checker verify
-published claims without trusting the search: feasible assignments, refutations,
-objective bounds, attained optima and unboundedness under the declared source
-semantics. A timed-out run can still retain a checked incumbent and a certified
-bound.
-
-Proofs must connect back to the original source and invocation assumptions.
-Lowering, presolve, propagation, learned clauses and imported bounds need
-checkable justifications wherever they contribute to a claim; checking an exported
-encoding alone leaves its translation trusted, and that boundary must be explicit.
-Local search supplies checkable solutions without logging its moves, while the
-proof-producing arm supplies justified deductions. Different fragments may need
-different formats: pseudo-Boolean deduction proofs for finite models, exact
-numerical certificates for linear arithmetic, algebraic evidence for polynomial
-arithmetic.
-
-This is not implemented. [Portfolio certificates](12-portfolio.md#witnesses-and-proof-scope),
+Klause checks supported claims in memory through
+[portfolio certificates](12-portfolio.md#witnesses-and-proof-scope),
 [LP certification](17-linear-programming.md#lp-certification) and
-[source derivations](13-evidence.md) check supported claims in memory, but no
-proof of an entire source solve is exported.
+[source derivations](13-evidence.md). It does not export a proof of an entire
+source solve for a separate checker. In-memory engine attestations and checked
+original-source derivations have distinct authority; neither a reduced-model
+label nor a checked witness supplies a missing refutation or bound derivation.
 
 ## Current execution contracts
 
-The requirements above are partly implemented. Each row links to the chapter that
-owns the contract.
+Each row links to the chapter that owns the contract.
 
 | Area | Implemented contract |
 |---|---|
@@ -152,14 +124,6 @@ owns the contract.
 | Conditioned completion | [Linear query owners](06-sessions.md#theory-invocation-scopes) retain prepared decomposition and search across repairs under [cumulative allowances](06-sessions.md#native-arithmetic-allowances). |
 | Strategy admission | [Prepared capabilities](12-portfolio.md#prepared-strategy-admission) expose arms, operations, completeness, claim authority and explicit declines. |
 | Source evidence | [Typed source-scoped evidence](13-evidence.md) checks supported derivations against original premises, separately from native admission. |
-
-## Active work toward the vision
-
-| Area | Current implementation | Remaining work |
-|---|---|---|
-| Factor retention and composed reasoning | Frontends can decompose relations before mechanism selection; theory assembly has specialized admission paths. | [#2850](https://github.com/Eignex/klause/issues/2850) and [#2841](https://github.com/Eignex/klause/issues/2841) implement the [factor requirements](#high-level-factors-and-composed-reasoning). |
-| Independent proof export | Exact numerical checks and supported source derivations run in memory. | [Proof files](#independently-checkable-proof-files) and a separate checker remain targets. |
-| Format semantics and automatic setup | Formats declare [typed source semantics](02-model.md#typed-source-semantics); [source setup](19-api.md#source-setup) dispatches DIMACS, WCNF, OPB, XCSP3, FlatZinc, SMT-LIB and source strategies. | MPS and legacy entries keep their own execution surfaces, and SMT-LIB admission still chooses its representation. [#3043](https://github.com/Eignex/klause/issues/3043) tracks [one automatic setup](#format-semantics-caller-settings-and-automatic-setup). |
 
 ## System architecture
 
@@ -206,6 +170,7 @@ numerical mechanisms beneath them.
 |---|---|
 | `klause` | Kotlin Multiplatform model, DSL, compilation, formats and solving |
 | `klause-cli` | Shared command-line driver, format dispatch, output protocols and platform seams |
+| `klause-bench` | Non-published JVM tooling; workflow and evidence live in its [README](../klause-bench/README.md) |
 
 The CLI depends on the library and adds no solving behavior of its own: every
 route it runs is reachable through the [library API](19-api.md).

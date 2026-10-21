@@ -13,8 +13,9 @@ that the consumer supplies independently of the producer. The context holds the
 declared coordinate namespaces, stable premise identifiers, the exact affine
 objective and a source semantics checker. A claimed revision or a producer's row
 snapshot cannot substitute for it, and an omitted affine objective has no bound
-authority. Capture does not export proof files; those remain a
-[vision requirement](01-introduction.md#independently-checkable-proof-files).
+authority. Capture retains evidence in memory; the
+[proof-file boundary](01-introduction.md#independently-checkable-proof-files)
+applies here too.
 
 ## Source contexts and scopes
 

@@ -8,8 +8,8 @@ driver; each frontend owns parsing and output semantics.
 
 The chapter starts with building and running the CLI, then covers format dispatch,
 how arithmetic results are published, and the flags and statistics it reports. It
-ends with working on the code itself: module layout, building, the Kotlin DSL and
-the conventions for tests and source.
+ends with the build targets, validation tasks and library entry points used during
+development.
 
 ## Build and run
 
@@ -127,16 +127,19 @@ engines run the theory's traversal, `-e ls` and `-e alns` search exact-coordinat
 neighborhoods with witness-only authority, and `-e mixed` combines them. Each route
 has its own work currency, separate from `node-limit`:
 
-| Route | Parameters | Chapter |
+| Route | Parameters | Contract |
 |---|---|---|
-| Open linear | `open-work-limit`, `open-branching`, `open-hint-flips`, `open-hint-min-splits` | [20](15-linear-arithmetic.md)–[22](15-linear-arithmetic.md#linear-mixed-arithmetic) |
-| Polynomial real | `nra-work-limit`, `nra-dense-coefficients`, `nra-matrix-cells` | [24](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) |
-| Nonlinear integer | `nia-candidates`, `nia-moves`, plus the polynomial limits | [23](16-nonlinear-arithmetic.md) |
-| Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [28](18-exact-arithmetic.md#exact-quadratic-certificates) |
-| Transcendental | shared exact-satisfaction controls | [25](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
+| Open linear | `open-work-limit`, `open-branching`, `open-hint-flips`, `open-hint-min-splits` | [Linear arithmetic](15-linear-arithmetic.md) |
+| Polynomial real | `nra-work-limit`, `nra-dense-coefficients`, `nra-matrix-cells` | [Polynomial completion](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) |
+| Nonlinear integer | `nia-candidates`, `nia-moves`, plus the polynomial limits | [Integer candidates](16-nonlinear-arithmetic.md#nonlinear-integer-arithmetic) |
+| Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [Quadratic execution](16-nonlinear-arithmetic.md#quadratic-strategy-execution) |
+| Transcendental | `nra-*` limits and shared exact-satisfaction controls | [Function checks](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
 
-Omitted work limits are unlimited. Exhausted candidates or work yield UNKNOWN; LS and
-ALNS keep checked incumbents, and neighborhood exhaustion supplies no global claim.
+Omitted limits use each route's defaults: linear and polynomial work are unlimited,
+nonlinear integer search caps candidates at 1,024 and heuristic moves at 256, and
+transcendental work defaults to 100,000 units. Polynomial representation caps still
+apply. Exhausted candidates or work yield UNKNOWN; LS and ALNS keep checked incumbents,
+and neighborhood exhaustion supplies no global claim.
 
 ### Statistics
 
@@ -158,8 +161,12 @@ sibling's accepted result can still be the verdict. See
 
 Source routes use the same `presolvePreparationMs`, work, allowance, round-entry and
 pass-call fields as finite execution. Empty and stopped preparations retain these
-observations even when no reduction fired. Frontend routing and theory search remain
-separate from the preparation duration.
+observations even when no reduction fired. `presolveWork` uses phase units;
+construction entries and root propagation work are native counters whose converted
+cost is already included. Detailed pass and preparation-stage observations belong
+to the [effort snapshot](07-presolve.md#observations), including native work under
+containing controls. They are not additional CLI totals. The preparation duration
+excludes theory search.
 
 ### Source interpretation controls
 
@@ -222,71 +229,24 @@ test tasks report and fail individually through
 to `klause`; native tests run in CI alongside a smoke start of the release CLI
 executable.
 
-### Kotlin DSL
+### Library entry points
 
-Declare a schema, compile it and decode solutions:
-
-```kotlin
-class Order : VariableSchema() {
-    val a by intVar(min = 1, max = 3)
-    val b by intVar(min = 1, max = 3)
-    val c by intVar(min = 1, max = 3)
-    val unique by constraint { allDifferent(a, b, c) }
-}
-
-val schema = Order()
-val compiled = schema.compile()
-for (sample in BacktrackSolver(compiled).enumerate().take(5)) {
-    println(compiled.decode(schema.a, sample))
-}
-```
-
-The [schema DSL](../klause/src/commonMain/kotlin/com/eignex/klause/schema) and
-[solver APIs](../klause/src/commonMain/kotlin/com/eignex/klause/solver) provide
-schema construction, compilation, decoding and solving. Variables can be optional;
-constraints lower to reified or aggregation-aware forms. Sets and non-linear float
-wrappers compile to supported finite encodings.
-
-The [library API](19-api.md) describes supported extension surfaces, experimental
-composition, typed identities and compatible migration.
-
-### Result requirements
-
-Enumeration and sampling operate over compiled finite problems; counting and
-near-uniform sampling mechanisms live under
-[count](../klause/src/commonMain/kotlin/com/eignex/klause/count).
-Select the API and engine for the required result. A local-search witness does
-not establish exhaustive search or optimality; an interrupted complete search
-can remain undecided. LP result strength and source reconstruction follow the
-[certification contract](17-linear-programming.md#proof-packages).
+The [schema DSL](03-input-semantics.md#schema-lowering) owns the declaration,
+compilation and decoding example. [Library APIs](19-api.md) define source-aware
+strategies, finite sessions, extension surfaces and coordinate ownership.
+Enumeration, counting and near-uniform sampling use compiled finite models;
+[source result guarantees](01-introduction.md#results-and-completeness) and
+[LP certification](17-linear-programming.md#proof-packages) define the authority of
+their results.
 
 ### Tests
 
-Unit tests define focused behavior and subsystem contracts: parsing and lowering,
-state ownership, rollback, explanations, exact arithmetic, result publication and
-resource limits. Keep a small set of representative examples for each contract
-rather than a separate toy solve for every DSL operator, search policy or frontend
-feature. Add a unit test when it clarifies a distinct contract; extend an existing
-case for a variant of the same behavior.
-
-Use the surrounding framework, layout and assertions. Name classes after the
-file under test and name tests in backticks with plain ASCII describing behavior.
-Keep one observable behavior per test, using arrange, act, assert. Parameterize
-variants of one behavior and separate semantically different behaviors.
-Reuse existing fixtures/helpers. JVM tests must stay below 300 ms.
-
-Unit tests and their resource/setup tasks use local deterministic fixtures or fakes.
-They do not make network requests or provision external tools. Ordinary Gradle
-dependency resolution is separate from test execution. External-reference integration
-runs belong in klause-lab and remain outside `check` and `lintDocs`.
-
-### Source style and boundaries
-
-Prefer clear names and types. Comments explain soundness, performance or lifecycle
-reasons rather than narrating code or changes. Public APIs receive KDoc; use
-`[Symbol]` links and functional math notation such as `succ(i)`.
-Follow the [package boundaries](01-introduction.md#package-boundaries), especially
-the closed numerical-engine dependency list.
+Unit tests cover parsing, lowering, ownership, rollback, explanations, exact
+arithmetic, publication and resource limits with local deterministic fixtures or
+fakes. Test execution and setup tasks make no network requests and provision no
+external tools; ordinary Gradle dependency resolution is separate.
+External-reference integration belongs in klause-lab. Full PR validation runs in
+GitHub CI; local targeted tests are optional.
 
 ---
 

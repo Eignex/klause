@@ -44,7 +44,7 @@ powers, transcendental functions and multiple-query sessions have separate ident
 The fetched QF_NRA archive preserves its per-family attribution/licenses and is
 not certified as polynomial by its logic tag. See the benchmark README for
 [named selection](../README.md#selection-and-named-sets) and
-[reference authority](../README.md#smt-reference-records).
+[reference solving in klause-lab](../README.md#klause-lab).
 
 [Canonical source variants](qfnra-source-canonical-v1/manifest.json)
 retain degree-drop and equal-degree common-root cases with canonical `(- 1)`

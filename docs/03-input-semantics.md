@@ -27,7 +27,8 @@ cover the file formats.
 Formats declare their defaults as
 [typed source semantics](02-model.md#typed-source-semantics) that caller overrides
 replace before lowering; [source setup](19-api.md#source-setup) consumes them.
-MPS retains its own execution surface.
+MPS attaches its original linear snapshot to the same setup and selects numerical
+execution under its captured certification policy.
 
 | Source | Numeric authority |
 |---|---|
@@ -57,17 +58,17 @@ MPS, SMT-LIB and exact FlatZinc.
 
 `-e` selects complete traversal, local search, ALNS or a mixed portfolio over the
 selected route. Supported linear and polynomial sources keep the same constraints
-and objective across those strategies. SMT-LIB and MPS can fall back to open local
-search for an unsupported fragment, supplying witnesses without a completeness
-claim; exact FlatZinc declines unsupported open fragments. MPS mixed models keep
-CP ownership of bounded integer choices (see [MPS semantics](05-arithmetic-formats.md)).
+and objective across those strategies. SMT-LIB can fall back to open local search
+for an unsupported fragment, supplying witnesses without a completeness claim;
+exact FlatZinc declines unsupported open fragments. MPS keeps finite search for
+bounded integer choices and numerical branch-and-bound for surviving open
+integers. That open numerical route declines LS and ALNS (see
+[MPS semantics](05-arithmetic-formats.md#routing-and-result-strength)).
 
 ## Solving coverage
 
 This is current execution coverage, separate from what a frontend can parse.
-[The introduction](01-introduction.md) requires common model breadth; remaining
-work is listed under
-[active work toward the vision](01-introduction.md#active-work-toward-the-vision).
+The format chapters define source-specific admission and strategy limits.
 
 | Model family | Mechanisms | Boundary |
 |---|---|---|

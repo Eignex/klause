@@ -27,33 +27,31 @@ so the engine never depends on presolve. Finite rounds follow under one
 bounded-fixpoint scheduler shared with the source lane: a pass above the cheapest
 tier reruns only after other passes changed at least 1% of the model. Presolve and
 an LP-relaxation harvest iterate to a joint fixpoint for at most four rounds, the
-harvest rerunning only when it tightened something. Automatically selected elective
-harvest skips pure clausal satisfaction sources before LP construction unless
-clause rewrites expose cardinality constraints that can strengthen the relaxation.
-Propagator-only symmetry handling supplies no LP rows and retains the skip. An
-explicit `+lp-harvest` enables it; nonclausal sources and optimization retain their
-harvest eligibility. The separate wide-integer pre-bake
-LP safety checks do not depend on this gate.
+harvest rerunning only when it tightened something. Automatic harvest skips clausal
+satisfaction unless rewrites expose cardinalities with stronger LP rows;
+propagator-only symmetry does not change that eligibility. Explicit `+lp-harvest`,
+nonclausal sources and optimization keep harvest eligibility.
+[Wide-integer pre-bake bounds](#pre-bake-lp-bounds) use a separate safety gate.
 
-The round-boundary diminishing-return check uses a model-size heuristic: finite
-hosts count live factors plus integer-domain endpoint spans, with both individual
-spans and the total saturating at `Long.MAX_VALUE`. Incremental and fresh-rebuild
-hosts use the same nonnegative calculation. This size measure does not estimate
-measured runtime utility; saturation can hide a reduction until the total fits.
+The round-boundary diminishing-return check counts live factors plus integer-domain
+endpoint spans. Incremental and rebuilt hosts use the same nonnegative measure,
+saturating spans and totals at `Long.MAX_VALUE`; saturation can hide reductions.
+The default abort fraction is 0.001. This structural heuristic supplies no runtime
+guarantee.
 
 | Family | Passes |
 |---|---|
-| Linear | Coefficient strengthening, Diophantine bound tightening, linear bound fusion, affine singleton elimination, sub-sum aggregation, dependent-equality removal, singleton inequality projection |
+| Linear | Coefficient strengthening, Diophantine tightening, bound fusion, affine elimination, sub-sum aggregation, row sparsification, dependent equalities, singleton projection |
 | Structural | Redundancy and subsumption, structural reduction, comparison-clause folding, duplicate-column merging, dual fixing |
-| Boolean | Implication graph, bounded variable elimination, blocked clause elimination, at-most-one clique merging, XOR unit derivation |
+| Boolean | Original-clause subsumption, implication graph, bounded variable elimination, blocked clause elimination, at-most-one clique merging, XOR unit derivation |
 | Symmetry | Symmetry breaking and value precedence |
 | Probing | Failed literals, integer bounds and holes, open ranges |
 | Around the rounds | Binary column substitution, LP harvest, difference-system posting |
 
-`PresolveEmphasis` selects the cost tiers: `off` runs nothing, `conservative` applies
-the cheap tier once, `default` iterates cheap and moderate tiers to a fixpoint and
-`aggressive` adds exhaustive probing, all within 16 rounds. Passes can be enabled or
-disabled by name, but a pass that would break the query's required guarantee stays
+`PresolveEmphasis` selects elective cost tiers: `off` disables them, `conservative`
+applies the cheap tier once, `default` iterates cheap and moderate tiers to a
+fixpoint and `aggressive` adds exhaustive probing, all within 16 rounds. Passes can
+be enabled or disabled by name, but a pass that would break the query's required guarantee stays
 disabled. Explicitly enabling a problem pass under `off` gives both schedules the
 default round cap; an explicit zero round cap still suppresses those schedules.
 
@@ -124,190 +122,148 @@ discovery and stops posting chains when it fires.
 ## Phase allowance and telemetry
 
 [PresolveBudget](../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveBudget.kt)
-owns the phase's deterministic work allowance. Rebuilding a problem neither creates
-another allowance nor resets consumed work.
+owns one deterministic phase allowance across routing, passes, probes and rebuilds.
+The CLI also bounds optional work by an elapsed ceiling; `presolve-work-limit=unlimited`
+removes only the work cap. Host speed can therefore affect which reductions finish.
+[Resource configuration](06-sessions.md#configuration-and-lifetime) owns these controls.
 
-Root propagation reports native work through a propagation-owned meter, and presolve
-converts each construction entry and unit of propagation work to 53 phase units.
-Construction entries are a structural size proxy over columns, factors and
-structural keys; propagation work counts factor fires, literal reads and wakeups,
-including native SAT BCP. Each fresh root, probe and repair reports construction once
-and flushes deltas before each poll, so nothing is billed twice.
+Root construction reports a size proxy over columns, factors and structural keys;
+propagation reports factor fires, literal reads and wakeups, including SAT BCP.
+Each entry or propagation unit costs 53 phase units, charged once through native
+meters and flushed before polling. Mandatory construction remains charged under a
+zero allowance. Optional probes and tiers stop at the next polling boundary; a
+completed failed probe keeps its deduction, while an interrupted hypothetical
+branch contributes none. Atomic work can overrun the allowance.
 
-A spent allowance prevents entry into another probe, repair or tier. A completed
-failed probe keeps its proven forcing, exclusion or hole, but an interrupted
-hypothetical probe publishes nothing. Construction is mandatory and charged even
-under a zero allowance. Propagation polls every 256 fires or SAT trail entries, so
-a single operation can overrun; the weights are not a time bound.
+### Observations
 
-The CLI pairs the work allowance with an elapsed-time ceiling of the same derived
-duration, kept through routing and preparation. Either limit can stop optional
-passes, so elapsed cancellation can make deductions and route selection depend on
-host speed. `presolve-work-limit=unlimited` removes only the work cap. Effort
-telemetry reports construction, propagation work, converted `presolveWork` and probe
-calls separately.
+The effort snapshot retains work, allowance, rounds, pass calls and root work even
+when preparation changes nothing or stops. Source preparation excludes theory search;
+polynomial encoder rebuilding is preparation, and routes without factor preparation
+retain their counters with zero phase time.
 
-Unchanged and allowance-stopped source and finite phases retain the same effort
-ledger as successful reductions. Source preparation time excludes theory search; polynomial
-encoder rebuilding belongs to preparation. Routes without a factor preparation
-report the retained allowance and counters with zero time for that phase.
+`PresolveInvocationStats` records each pass's lane, exclusive elapsed time and
+phase work, including its construction/propagation share. Outcomes distinguish an
+eligibility skip, completed empty analysis, retained reductions, refutation and
+observed interruption. Namespace and candidate-shape checks precede entry scans;
+entry size is cached per immutable factor revision and maintained from finite-session
+deltas. Dimensions, available occurrence counts and explicit column narrowings
+describe yield without another whole-model scan.
 
-The shared budget retains invocation observations for source and finite round passes,
-construction SAC tiers, binary-column substitution, LP harvest and difference posting.
-Each records its pass and lane, exclusive elapsed time and work, the construction and
-propagation share of that work, and whether eligibility rejected it, analysis completed
-empty, reductions survived, a refutation completed or analysis stopped. Nested SAC work
-belongs to its own observation. Separate preparation observations attribute wide-domain
-pre-bake LPs, root and engine bakes, finite-session construction and materialization,
-source encoder rebuilding, and finite exact-real difference assembly. These operations
-retain observations even when the elective pass catalogue is disabled. Pass work plus
-preparation work and any unattributed remainder equals the phase total; neither a rebuild
-nor an interrupted call loses its charge.
-Factor and column dimensions, available variable-occurrence counts and explicit column
-narrowings describe reduction yield without another whole-model scan. Yield alone does
-not establish an improvement in solve cost.
+`PresolvePreparationStats` separately attributes pre-bake LPs, root and engine
+bakes, finite-session construction/materialization, source encoder rebuilding and
+finite exact-real difference assembly, including with elective passes disabled.
+Nested observations own their time and work exclusively. Pass work, preparation
+phase work and any unattributed remainder account for the phase total.
 
-Preparation observations preserve each operation's cancellation and work meter.
-Operations under containing controls report native visits separately from phase units,
-with existing containing charges forwarded unchanged. Observation does not reprice
-those visits against the elective allowance or renew it. Nested observations own
-their elapsed time and charges exclusively, and the temporary native recorder restores
-the containing meter when preparation ends.
-
-Namespace and incremental candidate-shape checks precede full-model pass entry work.
-Entry size is cached for an immutable factor revision; the finite session updates its
-aggregate and live factor count from deltas. Unchanged calls retain their analysis
-charges while reusing that aggregate. Eligibility skips consume only work their cheap
-checks actually perform, and remain distinct from completed empty analysis.
+Operations under containing controls preserve their cancellation token and forward
+native charges unchanged, recording `nativeWork` separately from phase units.
+Observation neither reprices that work against the elective allowance nor renews
+it; the temporary recorder restores the containing meter on exit. The
+[CLI statistics](20-cli.md#statistics) expose aggregate effort fields.
 
 ## Selected reductions
 
-The passes listed under [Pipeline](#pipeline) share the guarantees above. This
-section describes what each family deduces and which guarantee it needs.
+The passes listed under [Pipeline](#pipeline) share the guarantees above. Candidate
+and term visits charge and poll the pass token under bounded scans. Interruption
+retains completed sound reductions and discards unfinished analysis. The following
+families describe the premises and preservation guarantees of those reductions.
 
 ### Linear reductions
 
-Coefficient strengthening divides an integer or pseudo-Boolean row by the gcd of its
-coefficients and rounds the bound inward; an indivisible equality is infeasible.
-Diophantine tightening confines each `x_i` in `sum(a_i * x_i) = b` to one residue
-class modulo `gcd(a_j : j != i)` and moves its bounds to the nearest member.
-Residue extraction and source-bound narrowing poll the phase token. Finite carving
-charges each live value visited and polls in chunks of at most 64 values; interruption
-discards the unfinished carve and retains completed narrowings.
-Dependent-equality removal runs fraction-free elimination over declared unconditional
-integer equality rows, dropping a redundant factor only when its complete meaning is
-one equality, and refuting a block with no rational solution. Multi-row conjunctions
-and relaxations can supply premises but remain intact; disjunctive and reified rows
-are excluded. Elimination polls between row combinations and during support merges,
-charges visited entries and discards every partial deduction on interruption. Sub-sum
-aggregation replaces a row's copy of a defining equality's right-hand side by its
-variable. Its candidate and term visits charge and poll the phase token. Rarest-partner
-incidence counts and row widths estimate each scan before entry against a work cap
-proportional to indexed terms, with an absolute ceiling. Unaffordable scans are
-skipped; interruption retains only completed rewrites and their unchanged defining
-equalities. The opt-in `sparsify` pass subtracts retained unconditional integer
-equalities from equivalent complete single-row factors. It scales the target by a
-positive integer when needed, preserves its comparison, and accepts only a strict
-decrease in nonzero terms. Overlap incidence bounds candidate scans; width, ratio,
-coefficient-growth and checked-arithmetic guards bound each attempted combination.
-It reads no domains or objective and eliminates no variables. Interrupted attempts
-are discarded while completed replacements keep their unchanged equality premises.
-Linear bound fusion merges matching upper and lower bounds into an equality
-or refutes crossing ones. These preserve the solution set. Affine singleton
-elimination and singleton inequality projection need reconstruction, and the
-projection is off for solution-set-sensitive queries.
+Coefficient strengthening divides an integral row by its coefficient gcd and rounds
+the bound inward; an indivisible equality refutes the source. Diophantine tightening
+restricts each coordinate of `sum(a_i * x_i) = b` to its implied residue class,
+narrowing bounds and, in finite state, carving off-class values.
+
+Dependent-equality removal uses fraction-free elimination over unconditional integer
+equalities and refutes rationally inconsistent blocks. It drops only factors whose
+whole meaning is one redundant equality; conjunctions and relaxations can supply
+premises but remain intact. Guarded or
+disjunctive rows are excluded, and interrupted elimination publishes no deduction.
+
+Sub-sum aggregation contracts a defining equality's partner terms to its output
+variable, retaining the equality. Rarest-partner incidence and row widths bound
+candidate scans by indexed size and an absolute work cap.
+
+Opt-in `+sparsify` subtracts retained unconditional integer equalities from complete
+single-row factors, accepting only fewer nonzero terms. Positive target scaling
+preserves the comparison; no domain, objective or variable elimination is involved.
+Overlap incidence, width, ratio and checked coefficient-growth limits bound attempts.
+If every term cancels, a zero term represents the constant comparison.
+Both row-rewrite passes discard unfinished attempts and keep completed replacements
+with their unchanged equality premises.
+
+Bound fusion combines matching sides into an equality or refutes crossing bounds.
+These reductions preserve the solution set. Affine singleton elimination and
+singleton inequality projection require reconstruction; projection stays off for
+solution-set-sensitive queries.
 
 ### Structural reductions
 
-Structural reduction offers each factor its `structuralReduce` hook under current
-domains, so a pinned global becomes a simpler factor; on source models it reaches
-only factors over closed integer columns. Redundancy and subsumption remove
-duplicate and dominated rows using indices maintained across rounds.
-Clique-implied subsumption builds and extends the conflict graph only when a
-surviving factor is an unconditional single-row Boolean `<=` knapsack with positive
-weights. Its activity bound uses cliques backed by retained clauses and
-cardinalities, so dropping a knapsack cannot remove its own justification.
-Comparison-clause folding replaces a clause over sole-use reified comparison
-indicators with one comparison disjunction. Source and finite reconstruction restore
-every consumed indicator from its defining comparison, before clause polarity, after
-later integer reconstructions and before original-source checking or output. These
-Boolean columns are excluded from direct definition and search hints. Duplicate-column
-merging replaces two columns with identical linear occurrences by their sum and splits the value back on
-reconstruction. Dual fixing pins a variable to a bound when no occurrence or the
-objective prefers the other direction. Folding, merging and dual fixing change the
-solution set.
+Structural reduction calls each factor's `structuralReduce` hook under current
+domains; source execution restricts this to closed integer columns. Redundancy and
+subsumption use indexes maintained across rounds. Clique-implied subsumption admits
+only unconditional positive Boolean knapsacks and derives activity bounds from
+retained clauses/cardinalities, so a dropped row cannot justify its own removal.
 
-Boolean cover-column dominance extends dual fixing: an unfixed Boolean read only
-positively by unconditional cover clauses can be pinned false when a strictly
-cheaper, nonnegative-cost Boolean occurs in every one of its clauses. Costs use
-minimize sense; other readers, unit pins and finite root fixings exclude a column.
-Incidence signatures filter candidates from the smallest containing clause before
-exact subset checks. Indexing and comparison visits charge and poll the phase token;
-indexing has an absolute cap and comparisons have both a linear and absolute cap.
-Incomplete indexing publishes nothing; interrupted comparisons retain only completed
-pins. Strictly decreasing replacement costs make batched chains acyclic and preserve
-an optimum through their final covering column. This rule shares dual fixing's
-exclusion from counting, enumeration, sampling and other complete-coverage queries.
+Comparison-clause folding combines sole-use reified indicators into one comparison
+disjunction. Reconstruction restores their truth after integer reconstruction and
+before source checking, and excludes them from direct search/definition hints.
+Duplicate-column merging replaces matching linear columns by their sum and splits
+the value on reconstruction. Dual fixing selects a bound when neither occurrences
+nor the objective prefer the opposite direction. These change the solution set.
+
+Boolean cover dominance extends dual fixing: a positive-cost unfixed Boolean read
+only by positive unconditional cover clauses can be pinned false if a strictly
+cheaper nonnegative-cost column covers every one of its clauses. Other readers,
+unit pins and finite root fixings exclude either column. Bounded incidence indexing
+and exact subset checks select replacements; incomplete indexing publishes nothing.
+Strictly decreasing costs make replacement chains acyclic, preserving an optimum.
+Like dual fixing, this rule is excluded from complete-coverage queries.
 
 ### Boolean reductions
 
-Original-clause subsumption (`+clause-subsume`, opt-in) deletes a clause implied by
-a retained subset and removes a target literal when one opposite premise literal
-and the remaining subset justify self-subsuming resolution. It indexes clean
-Boolean clauses of width at most eight, using occurrences, variable signatures and
-a queue of shortened clauses. Candidate and literal visits have separate caps and
-charge the phase token. Each completed edit is equivalent against the live clause
-database, so a rewritten premise remains implied across the final batch and
-cancellation retains only completed reductions. Every assignment and objective
-column survives, including columns shared with arithmetic factors; counting needs
-no reconstruction.
+Opt-in `+clause-subsume` removes a clause implied by a retained subset and shortens
+clauses by self-subsuming resolution. It indexes clean Boolean clauses of width at
+most eight, with separate candidate and literal visit caps. Completed edits remain
+equivalent against the live database, preserving every assignment and objective,
+including arithmetic-shared columns; counting needs no reconstruction.
 
-Finite probing and implication harvesting count only Booleans with live factor
-occurrences and no root deduction toward their candidate caps. An empty candidate
-set needs no probe root. The implication graph pins each candidate, propagates and
-records forced literals; mutual-implication cycles collapse to one representative
-and transitively implied binary clauses drop. Graph construction, node and edge traversal, and SCC
-discovery charge and poll in bounded chunks. Interrupted reachability restores the
-candidate clause's edges, and incomplete SCC discovery publishes no merges. Bounded
-variable elimination resolves out a Boolean in clean clauses and no objective when
-distinct resolvents neither outnumber the removed clauses nor exceed their literal
-volume, counting each literal once per clause. Each pivot permits at most 4,096
-clause pairs, width 64 resolvents and 65,536 candidate, occurrence, literal and pair visits.
-Visits charge and poll the phase token; a declined or interrupted pivot publishes
-nothing, retaining completed eliminations and their reconstruction. These local
-representation bounds do not guarantee a search-time improvement.
-Blocked clause elimination removes clauses whose resolvents on some literal
-are tautologies, repairing them on reconstruction. These are satisfiability
-preserving only. At-most-one clique merging replaces pairwise exclusions with one
-constraint when at least two drop. XOR unit derivation runs bounded GF(2)
-elimination over parity rows, including parities implied over 0/1 integers, and
-emits only forced values and refutations.
+Implication harvesting probes live, unfixed Boolean candidates; an empty set builds
+no probe root. Mutual-implication cycles merge representatives and transitive binary
+clauses drop. Interrupted reachability restores candidate edges, and unfinished SCC
+discovery publishes no merges.
+
+Bounded variable elimination resolves an objective-free Boolean occurring only in
+clean clauses when neither distinct clause count nor literal volume grows. Each
+pivot is bounded to 4,096 pairs, width 64 and 65,536 visits; an unfinished pivot
+publishes nothing. Blocked-clause elimination removes clauses whose resolvents on
+one literal are all tautologies. Both need witness reconstruction and can change
+source multiplicity.
+
+At-most-one merging replaces pairwise exclusions with a cardinality when at least
+two factors drop. Default clausal optimization retains exclusions for native SAT
+propagation and learning; `+amo-clique` or aggressive emphasis permits conversion.
+XOR unit derivation uses bounded GF(2) elimination and emits only forced values and
+refutations.
 
 ### Symmetry and probing
 
-Symmetry breaking finds candidate interchangeable variables by colour refinement,
-verifies each transposition by remapping every factor, and orders each verified orbit
-to keep one representative; objective variables are excluded, and value precedence
-breaks value symmetry. Both are off for solution-set-sensitive queries. Probing pins
-each free Boolean both ways: a conflicting polarity yields a unit, and a bound implied
-by both holds unconditionally. Integer and open-range probing apply singleton arc
-consistency to bounds and holes. Open-range compilation, incidence construction,
-root-row visits and queued incidence scans charge and poll throughout, including
-individual row terms. Interruption keeps proved root bounds and rolls back the
-active hypothetical branch before publication. Only units and unconditional bounds
-persist.
-Source probing and symmetry defer to finite preparation for models containing only
-closed discrete columns. With real columns present, their supported Boolean and
-integer reductions run in the source phase even when every integer column is
-closed or absent; generator lex and value-precedence chains stay finite-owned.
+Symmetry breaking verifies candidate transpositions by remapping every factor, then
+orders verified orbits while protecting objective columns. Value precedence breaks
+value symmetry. Both stay off for solution-set-sensitive queries.
 
-### Clausal objectives
+Boolean probing retains failed-literal units and bounds implied by both polarities;
+integer and open-range probing extend this to bounds and holes. Compilation, incidence,
+row and graph visits charge and poll the pass token. An interruption retains completed
+unconditional deductions and retracts the active hypothetical branch. Candidate,
+entry and representation limits bound optional analysis, not solve time.
 
-Default clausal optimization keeps binary exclusion clauses rather than merging
-at-most-one cliques into cardinalities, which preserves native SAT propagation and
-learning. `+amo-clique` or aggressive emphasis permits conversion. A clique
-replacement is published only after analysis completes within its cancellation
-scope.
+Source probing and symmetry defer to finite preparation for closed discrete-only
+models. With real columns they may run in the source lane even when integer
+columns are closed or absent; generator lex and value-precedence chains remain
+finite-owned.
 
 ### Pre-bake LP bounds
 
