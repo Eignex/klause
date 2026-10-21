@@ -69,18 +69,24 @@ class SatClauseDbTest {
     @Test
     fun `interrupted construction should discard every partial index and retain its work`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             listOf(Clause(intArrayOf(pos(0), neg(0))), Clause(intArrayOf(pos(0), pos(1)))),
         )
         for (short in listOf(false, true)) {
             val full = PresolveBudget(Long.MAX_VALUE)
             val token = full.orSpent(Cancellation.Never)
-            val complete = assertNotNull(if (short) {
-                SatClauseDb.buildShortClauses(problem, 8) {
-                    token.charge(10L)
-                    !token()
-                }
-            } else SatClauseDb.build(problem, emptySet(), token))
+            val complete = assertNotNull(
+                if (short) {
+                    SatClauseDb.buildShortClauses(problem, 8) {
+                        token.charge(10L)
+                        !token()
+                    }
+                } else {
+                    SatClauseDb.build(problem, emptySet(), token)
+                },
+            )
             assertEquals(1, complete.slotCount)
             assertEquals(1, complete.occ(pos(0)).size)
             assertEquals(1, complete.occ(pos(1)).size)
@@ -94,7 +100,9 @@ class SatClauseDbTest {
                         stop.charge(10L)
                         !stop()
                     }
-                } else SatClauseDb.build(problem, emptySet(), stop)
+                } else {
+                    SatClauseDb.build(problem, emptySet(), stop)
+                }
 
                 assertNull(partial, "short=$short allowance=$allowance")
                 assertTrue(budget.spent() in allowance..allowance + 9L)

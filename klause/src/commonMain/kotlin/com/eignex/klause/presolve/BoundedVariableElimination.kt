@@ -104,7 +104,9 @@ internal object BoundedVariableElimination {
                     if (cancellation()) return null
                     scratch[out] = if (left < mid && (right >= hi || degrees[order[left]] <= degrees[order[right]])) {
                         order[left++]
-                    } else order[right++]
+                    } else {
+                        order[right++]
+                    }
                 }
                 lo = hi
             }
