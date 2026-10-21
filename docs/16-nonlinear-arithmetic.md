@@ -277,7 +277,9 @@ polynomial is specialized at the earlier coordinates, the
 [kernel](18-exact-arithmetic.md#algebraic-arithmetic-and-lifting) isolates its real
 roots. A merge of the increasing per-polynomial root lists supplies distinct
 boundaries as traversal requests them, retaining the first polynomial's scalar
-when roots coincide. Roots become section samples with rational samples in the
+when roots coincide. The merge owns tighter certified intervals for comparison,
+while emitted boundaries retain their original scalars and isolating bounds.
+Overlapping intervals require exact common-root comparison. Roots become section samples with rational samples in the
 sectors between them; later boundaries need ordering only when their cells are
 visited. A violated region literal prunes the cell. At a complete sample,
 eliminated coordinates are reconstructed and the full assignment passes the

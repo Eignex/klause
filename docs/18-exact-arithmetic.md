@@ -89,7 +89,9 @@ list, a one-based index among the distinct real roots, and exact isolating bound
 Defining polynomials need not be minimal. Comparison uses exact gcd and
 common-root tests and interval separation, and sign evaluation refines intervals
 until a nonzero sign is certified. Equal values with different defining
-polynomials compare equal; object identity is not numerical equality.
+polynomials compare equal; object identity is not numerical equality. Comparison
+can report completed operand refinements to a caller that owns their reuse; the
+input scalars remain immutable.
 
 ### Algebraic arithmetic and lifting
 
@@ -110,7 +112,9 @@ roots.
 ### Invocation resources
 
 Every operation polls the caller's `Cancellation` and charges deterministic work;
-`PolynomialInterrupted` publishes no partial result. `PolynomialLimits` defaults to
+`PolynomialInterrupted` withholds the requested result. Completed refinement
+observations can survive an interrupted comparison, but supply no comparison
+verdict. `PolynomialLimits` defaults to
 65,536 dense coefficients and 262,144 elimination matrix cells, and dimensions are
 checked before allocation. No cap truncates a polynomial or supplies a refutation;
 callers translate declines into an unknown resource outcome.

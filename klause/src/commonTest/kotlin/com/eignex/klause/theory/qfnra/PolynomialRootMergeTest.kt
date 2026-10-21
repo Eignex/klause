@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.RationalInterval
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
@@ -15,6 +16,81 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class PolynomialRootMergeTest {
+    @Test
+    fun `close irrational boundaries retain their original scalars and bounds`() {
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+        val roots = listOf(-200L, -201L, -202L).map { AlgebraicReal(RationalPolynomial.of(it, 0, 100), 2, interval) }
+        val merge = PolynomialRootMerge(roots.map { listOf(it) }, AlgebraicArithmetic())
+
+        val boundaries = generateSequence { merge.next() }.toList()
+
+        assertEquals(roots.size, boundaries.size)
+        for (index in roots.indices) {
+            assertSame(roots[index], boundaries[index])
+            assertEquals(interval, boundaries[index].interval)
+        }
+    }
+
+    @Test
+    fun `rational equality discovered by ordering preserves the original nonpoint boundary`() {
+        val algebraic = AlgebraicArithmetic()
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+        val root = AlgebraicReal(RationalPolynomial.of(-9, 0, 4), 2, interval)
+        val equal = algebraic.rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal())
+        val upper = algebraic.rational(BigFraction.ofLong(2))
+        val merge = PolynomialRootMerge(listOf(listOf(root), listOf(equal), listOf(upper)), algebraic)
+
+        val first = merge.next()
+
+        assertSame(root, first)
+        assertNull(root.rational)
+        assertEquals(interval, root.interval)
+        assertSame(upper, merge.next())
+        assertNull(merge.next())
+    }
+
+    @Test
+    fun `completed comparisons fund the next boundary within remaining caller work`() {
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+        val roots = listOf(-201L, -200L, -202L).map { AlgebraicReal(RationalPolynomial.of(it, 0, 100), 2, interval) }
+        var spent = 0L
+        var limit = Long.MAX_VALUE
+        val meter = WorkMeter { spent += it }
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= limit
+            override fun workMeter(): WorkMeter = meter
+        }
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
+        val merge = PolynomialRootMerge(roots.map { listOf(it) }, algebraic)
+        assertSame(roots[1], merge.next())
+        limit = spent + 64
+
+        val next = merge.next()
+
+        assertSame(roots[0], next)
+        assertEquals(interval, roots[0].interval)
+    }
+
+    @Test
+    fun `cancellation after an irrational boundary leaves a fresh merge independent`() {
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+        val roots = listOf(-200L, -201L, -202L).map { AlgebraicReal(RationalPolynomial.of(it, 0, 100), 2, interval) }
+        var stopped = false
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { stopped }))
+        val merge = PolynomialRootMerge(roots.map { listOf(it) }, counted)
+        assertSame(roots[0], merge.next())
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { merge.next() }
+
+        val fresh = PolynomialRootMerge(roots.map { listOf(it) }, AlgebraicArithmetic())
+        for (root in roots) {
+            assertSame(root, fresh.next())
+            assertEquals(interval, root.interval)
+        }
+        assertNull(fresh.next())
+    }
+
     @Test
     fun `empty root families retain an exhausted boundary sequence`() {
         for (families in listOf<List<List<AlgebraicReal>>>(emptyList(), listOf(emptyList()))) {

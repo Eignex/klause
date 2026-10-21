@@ -67,12 +67,30 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         value.definingPolynomial, value.rootIndex, univariate.refine(value.definingPolynomial, value.interval),
     )
 
-    fun compare(left: AlgebraicReal, right: AlgebraicReal): Int {
+    fun compare(left: AlgebraicReal, right: AlgebraicReal): Int = compareRoots(left, right, null, null)
+
+    fun compareWithRefinements(
+        left: AlgebraicReal,
+        right: AlgebraicReal,
+        onLeftRefinement: (AlgebraicReal) -> Unit,
+        onRightRefinement: (AlgebraicReal) -> Unit,
+    ): Int {
+        val result = compareRoots(left, right, onLeftRefinement, onRightRefinement)
+        arithmetic.step()
+        return result
+    }
+
+    private fun compareRoots(
+        left: AlgebraicReal,
+        right: AlgebraicReal,
+        onLeftRefinement: ((AlgebraicReal) -> Unit)?,
+        onRightRefinement: ((AlgebraicReal) -> Unit)?,
+    ): Int {
         arithmetic.step()
         if (left === right) return 0
         if (left.definingPolynomial == right.definingPolynomial && left.rootIndex == right.rootIndex) return 0
-        left.rational?.let { return -compareRational(right, it) }
-        right.rational?.let { return compareRational(left, it) }
+        left.rational?.let { return -compareRational(right, it, onRightRefinement) }
+        right.rational?.let { return compareRational(left, it, onLeftRefinement) }
         val common = univariate.gcd(left.definingPolynomial, right.definingPolynomial)
         val sequence = if (common.degree > 0) univariate.sturm(common) else emptyList()
         var a = left
@@ -87,21 +105,32 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             )
             if (sequence.isNotEmpty() && univariate.countOpen(sequence, overlap) > 0) return 0
             a = refine(a)
+            onLeftRefinement?.invoke(a)
             b = refine(b)
-            a.rational?.let { return -compareRational(b, it) }
-            b.rational?.let { return compareRational(a, it) }
+            onRightRefinement?.invoke(b)
+            a.rational?.let { return -compareRational(b, it, onRightRefinement) }
+            b.rational?.let { return compareRational(a, it, onLeftRefinement) }
         }
     }
 
-    private fun compareRational(value: AlgebraicReal, other: BigFraction): Int {
+    private fun compareRational(
+        value: AlgebraicReal,
+        other: BigFraction,
+        onRefinement: ((AlgebraicReal) -> Unit)? = null,
+    ): Int {
         var current = value
         while (true) {
             arithmetic.step()
             current.rational?.let { return it.compareTo(other) }
             if (current.interval.upper <= other) return -1
             if (current.interval.lower >= other) return 1
-            if (univariate.evaluate(current.definingPolynomial, other).isZero) return 0
+            if (univariate.evaluate(current.definingPolynomial, other).isZero) {
+                onRefinement?.invoke(AlgebraicReal(current.definingPolynomial, current.rootIndex,
+                    RationalInterval(other, other)))
+                return 0
+            }
             current = refine(current)
+            onRefinement?.invoke(current)
         }
     }
 
