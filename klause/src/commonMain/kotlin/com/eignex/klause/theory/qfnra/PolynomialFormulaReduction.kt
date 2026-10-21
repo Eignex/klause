@@ -113,11 +113,12 @@ internal class PolynomialFormulaReduction private constructor(
                         rewritten.add(PolynomialAtom(polynomial, atom.relation))
                         yield(null)
                     }
+                    val rewrittenFormula = current.withAtoms(rewritten, arithmetic)
                     for ((variable, replacement) in replacements) {
                         arithmetic.step()
                         fibres.add(FormulaFibre(variable, replacement))
                     }
-                    current = current.withAtoms(rewritten)
+                    current = rewrittenFormula
                     repeat(replacements.size) { arithmetic.step(); onGraph?.invoke() }
                     yield(null)
                 }

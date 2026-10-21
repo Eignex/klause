@@ -18,8 +18,126 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PolynomialFormulaTest {
+    @Test
+    fun `rational scalar equivalent comparisons preserve shared Boolean truth`() {
+        val relations = listOf("=" to "=", "distinct" to "distinct", "<" to ">", "<=" to ">=",
+            ">" to "<", ">=" to "<=")
+        for ((left, reversed) in relations) for ((right, scalar) in listOf(left to "3", reversed to "(- 3)")) {
+            val source = SmtLibPolynomial.parse(
+                "(declare-const x Real) (declare-const y Real) (declare-const b Bool) (declare-const c Bool) " +
+                    "(assert (and (= b ($left (- x y) 0)) (= c ($right (* $scalar (- x y)) 0)) " +
+                    "(not (= b c))))",
+            )
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+            val refuted = formula.refuteBooleans(arithmetic, 128, 2048, 4096)
+
+            assertTrue(refuted)
+        }
+    }
+
+    @Test
+    fun `complementary scalar comparisons cannot have equal Boolean truth`() {
+        for ((left, right) in listOf("=" to "distinct", "<" to ">=", "<=" to ">")) {
+            val source = SmtLibPolynomial.parse(
+                "(declare-const x Real) (declare-const y Real) (declare-const b Bool) (declare-const c Bool) " +
+                    "(assert (and (= b ($left (- x y) 0)) (= c ($right (* 3 (- x y)) 0)) (= b c)))",
+            )
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+            val refuted = formula.refuteBooleans(arithmetic, 128, 2048, 4096)
+
+            assertTrue(refuted)
+        }
+    }
+
+    @Test
+    fun `weak and strict comparisons retain different truth at zero`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const b Bool) (declare-const c Bool) " +
+                "(assert (and (= x 0) (= b (<= x 0)) (= c (< x 0)) b (not c)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.ZERO, point.realValue(0).rational)
+        assertEquals(true, point.boolValue(0))
+        assertEquals(false, point.boolValue(1))
+    }
+
+    @Test
+    fun `a variable factor retains its singular Boolean truth`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const b Bool) (declare-const c Bool) " +
+                "(assert (and (= x 0) (= y 1) (= b (= (* x y) 0)) (= c (= y 0)) b (not c)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.ZERO, point.realValue(0).rational)
+        assertEquals(BigFraction.ONE, point.realValue(1).rational)
+        assertEquals(true, point.boolValue(0))
+        assertEquals(false, point.boolValue(1))
+    }
+
+    @Test
+    fun `total graph substitution preserves equivalent predicate truth across alternatives`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const z Real) (declare-const b Bool) (declare-const c Bool) " +
+                "(assert (and (= z (+ (* 2 x) 1)) (= b (< z 1)) (= c (< x 0)) (not (= b c))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val reduction = PolynomialFormulaReduction.prepare(formula, source.realCount, arithmetic)
+            .asSequence().filterNotNull().single()
+
+        val regions = reduction.formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+        assertTrue(regions.isEmpty())
+    }
+
+    @Test
+    fun `shared scalar predicates retract conditioned Boolean pins`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const b Bool) (declare-const c Bool) " +
+                "(assert (and (= b (> x 0)) (= c (< (* (- 3) x) 0))))",
+        )
+        val invocation = PolynomialTheoryService(source.formula, source.boolCount, source.realCount).invocation()
+        val fixed = mapOf(0 to BigFraction.ONE)
+
+        try {
+            for (other in listOf(true, false, true)) {
+                val result = invocation.check(PolynomialCondition(bools = mapOf(0 to true, 1 to other),
+                    lower = fixed, upper = fixed))
+
+                if (other) {
+                    val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+                    assertEquals(BigFraction.ONE, point.realValue(0).rational)
+                    assertTrue(point.boolValue(0))
+                    assertTrue(point.boolValue(1))
+                } else assertIs<QfNraResult.Unsatisfiable>(result)
+            }
+        } finally {
+            invocation.close()
+        }
+    }
+
+    @Test
+    fun `cancelled predicate sharing exposes no replacement formula`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (> x 0))")
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        val arithmetic = PolynomialArithmetic(Cancellation { true })
+
+        assertFailsWith<PolynomialInterrupted> { formula.withAtoms(formula.atoms, arithmetic) }
+    }
+
     @Test
     fun `witness guidance retains only unconditional signed atoms`() {
         val source = SmtLibPolynomial.parse(
