@@ -55,10 +55,12 @@ internal object Probing {
      * ORSA J. Computing 6(4), 1994, https://doi.org/10.1287/ijoc.6.4.445
      */
     fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: Cancellation): PassDelta {
+        val candidates = problem.freeBooleanProbeCandidates(maxCandidates, cancellation)
+        if (candidates.isEmpty()) return PassDelta()
         val units = ArrayList<Factor>()
         val domains = problem.rootIntDomains()
         var domainsChanged = false
-        for (v in problem.freeBooleanProbeCandidates(maxCandidates, cancellation)) {
+        for (v in candidates) {
             if (cancellation()) break
             val tryTrue = problem.propagate(Assumptions.None.withBool(v, true), cancellation)
             if (tryTrue is PropagationResult.Unsat) {
@@ -161,7 +163,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val numInts = problem.numIntVars
     private val numCols = numInts + problem.numBoolVars
     private val lo = LongArray(numCols)
-    private val hi = LongArray(numCols) { if (it >= numInts) 1L else 0L }
+    private val hi = LongArray(numCols)
     private val loOpen = BooleanArray(numCols)
     private val hiOpen = BooleanArray(numCols)
 
@@ -208,6 +210,10 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
             hiOpen[v] = bounds.isOpenUpper(v)
             if (!loOpen[v]) lo[v] = bounds.lower(v)
             if (!hiOpen[v]) hi[v] = bounds.upper(v)
+        }
+        for (v in numInts until numCols) {
+            if (!visit()) return
+            hi[v] = 1L
         }
         for (factor in problem.factors) {
             if (!visit()) return

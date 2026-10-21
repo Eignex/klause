@@ -183,11 +183,11 @@ solution set.
 Finite probing and implication harvesting count only Booleans with live factor
 occurrences and no root deduction toward their candidate caps. An empty candidate
 set needs no probe root. The implication graph pins each candidate, propagates and
-records forced literals; mutual-implication cycles collapse to one representative and transitively
-implied binary clauses drop. Graph construction, node and edge traversal, and SCC
+records forced literals; mutual-implication cycles collapse to one representative
+and transitively implied binary clauses drop. Graph construction, node and edge traversal, and SCC
 discovery charge and poll in bounded chunks. Interrupted reachability restores the
-candidate clause's edges, and incomplete SCC discovery publishes no merges. Bounded variable elimination resolves out a Boolean in
-clean clauses and no objective when resolvents do not outnumber the clauses they
+candidate clause's edges, and incomplete SCC discovery publishes no merges. Bounded
+variable elimination resolves out a Boolean in clean clauses and no objective when resolvents do not outnumber the clauses they
 replace. Blocked clause elimination removes clauses whose resolvents on some literal
 are tautologies, repairing them on reconstruction. These are satisfiability
 preserving only. At-most-one clique merging replaces pairwise exclusions with one

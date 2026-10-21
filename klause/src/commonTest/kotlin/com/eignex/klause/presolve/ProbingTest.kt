@@ -331,4 +331,38 @@ class ProbingTest {
         assertTrue(delta.isEmpty)
         assertFalse(delta.infeasible)
     }
+
+    @Test
+    fun `wide row compilation and propagation should poll individual terms`() {
+        val problem = Problem(
+            0, 16, Array(16) { IntDomain(0, 1) },
+            listOf(Linear(IntArray(16) { 1 }, IntArray(16) { it }, LinearOp.LE, 16)),
+        )
+        for (allowance in listOf(181L, 851L, 1011L)) {
+            val budget = PresolveBudget(allowance)
+
+            val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+
+            assertTrue(delta.isEmpty)
+            assertFalse(delta.infeasible)
+            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+        }
+    }
+
+    @Test
+    fun `high degree incidence should stop inside a hypothetical column scan`() {
+        val problem = Problem(
+            129, 0, emptyArray(),
+            List(128) { Clause(intArrayOf(Lit.make(0, false), Lit.make(it + 1, true))) },
+        )
+        for (allowance in listOf(21801L, 22441L, 23081L)) {
+            val budget = PresolveBudget(allowance)
+
+            val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
+
+            assertTrue(delta.isEmpty)
+            assertFalse(delta.infeasible)
+            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+        }
+    }
 }
