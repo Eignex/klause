@@ -328,11 +328,13 @@ internal object Compiler {
             } else null
             lowerOpenIteChains() // an objective term can open chains of its own
             conditionalEqualities.expandPending(this)
+            factors.addAll(affineRealTables.infer())
             val removed = conditionalEqualities.retainNeededDefinitions(
                 factors, intNames.values, boolNames.values, compiledObjective,
             )
-            val objective = compactConditionalColumns(removed, compiledObjective)
-            factors.addAll(affineRealTables.infer())
+            val objective = compactConditionalColumns(
+                substituteBinaryHelpers(compiledObjective, removed), compiledObjective,
+            )
             val sourceBounds = modelIntBounds()
 
             val model = Problem(

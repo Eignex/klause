@@ -104,6 +104,7 @@ internal fun wideEnforceRow(
     op: LinearOp,
     bound: BigInt,
     auxLit: Int?,
+    booleanPremises: IntArray = intArrayOf(),
 ): Boolean {
     val n = vars.size
     val termLo = Array(n) { BIG_ZERO }
@@ -126,13 +127,20 @@ internal fun wideEnforceRow(
     val rootFact = state.currentLevel == 0
     val includeAux = auxLit != null
 
+    fun withBooleans(reason: IntArray?): IntArray? = when {
+        booleanPremises.isEmpty() -> reason
+        reason == null -> booleanPremises
+        else -> reason + booleanPremises
+    }
+
     // An NE deduction reads every other term pinned, so both bounds.
     fun ant(i: Int): IntArray? =
-        if (rootFact && !includeAux) null else collectLinearTightenAntecedents(state, vars, i, auxLit ?: 0, includeAux)
+        withBooleans(if (rootFact && !includeAux) null else
+            collectLinearTightenAntecedents(state, vars, i, auxLit ?: 0, includeAux))
 
     // A bound from the `≤` side reads the other terms' least contributions, from the `≥` side their greatest.
     fun sideAnt(i: Int, useLo: Boolean): IntArray? =
-        if (rootFact && !includeAux) null else wideSideReason(state, vars, coeffs, useLo, i, auxLit)
+        withBooleans(if (rootFact && !includeAux) null else wideSideReason(state, vars, coeffs, useLo, i, auxLit))
     if (op == LinearOp.NE) {
         for (i in 0 until n) {
             val c = coeffs[i]

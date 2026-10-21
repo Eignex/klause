@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
@@ -27,7 +28,7 @@ import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 
-/** An exact rational comparison over tagged integer and real source coordinates. */
+/** An exact rational comparison over tagged integer, Boolean and real source coordinates. */
 class ExactLinear private constructor(
     private val references: IntArray,
     private val coefficients: Array<BigInt>,
@@ -44,15 +45,19 @@ class ExactLinear private constructor(
     override val linearForm: LinearForm = LinearForm.Conjunction(listOf(this))
     override val variables: MixedVars = MixedVars(
         boundInts = references.filter(Term::isInt).map(Term::intVar).toIntArray(),
-        boolVars = if (activator == LinearRow.ALWAYS) intArrayOf() else intArrayOf(activator),
+        boolVars = (references.filter(Term::isBool).map { Lit.variable(Term.lit(it)) } +
+            if (activator == LinearRow.ALWAYS) emptyList() else listOf(activator)).distinct().toIntArray(),
         reals = references.filter(Term::isReal).map(Term::realVar).toIntArray(),
     )
 
     override fun remap(mapping: VarRemap): ExactLinear = of(
         IntArray(size) { k ->
             val reference = ref(k)
-            if (Term.isInt(reference)) Term.ofIntVar(mapping.int(Term.intVar(reference)))
-            else Term.ofRealVar(mapping.real(Term.realVar(reference)))
+            when {
+                Term.isInt(reference) -> Term.ofIntVar(mapping.int(Term.intVar(reference)))
+                Term.isBool(reference) -> Term.ofLit(mapping.lit(Term.lit(reference)))
+                else -> Term.ofRealVar(mapping.real(Term.realVar(reference)))
+            }
         },
         coefficients.map { BigFraction.of(it, BIG_ONE) }, relation, BigFraction.of(rhs, BIG_ONE), strict,
         if (activator == LinearRow.ALWAYS) activator else mapping.bool(activator).also {
@@ -65,6 +70,7 @@ class ExactLinear private constructor(
     override fun remapStructuralHash(mapping: VarRemap): Int = key(mapping).hashCode()
 
     internal fun key(mapping: VarRemap? = null): StructuralKey {
+        if (references.any(Term::isBool)) return booleanKey(mapping)
         val terms = LinkedHashMap<Pair<Boolean, Int>, BigInt>()
         for (index in references.indices) {
             val reference = references[index]
@@ -84,6 +90,40 @@ class ExactLinear private constructor(
             int(kept.size)
             for ((coordinate, coefficient) in kept) {
                 bool(coordinate.first)
+                int(coordinate.second)
+                ints(coefficient.toString().map { it.code }.toIntArray())
+            }
+        }
+    }
+
+    private fun booleanKey(mapping: VarRemap?): StructuralKey {
+        val terms = HashMap<Pair<Int, Int>, BigInt>()
+        for (index in references.indices) {
+            val reference = references[index]
+            val coordinate = when {
+                Term.isInt(reference) -> 0 to (mapping?.int(Term.intVar(reference)) ?: Term.intVar(reference))
+                Term.isBool(reference) -> {
+                    val variable = Lit.variable(Term.lit(reference))
+                    1 to (mapping?.bool(variable) ?: variable)
+                }
+                else -> 2 to (mapping?.real(Term.realVar(reference)) ?: Term.realVar(reference))
+            }
+            terms[coordinate] = (terms[coordinate] ?: BIG_ZERO) + coefficients[index]
+        }
+        val kept = terms.filterValues { it != BIG_ZERO }.entries.sortedWith(
+            compareBy({ it.key.first }, { it.key.second }),
+        )
+        val hasBooleans = kept.any { it.key.first == 1 }
+        return StructuralKey.of(FactorKind.EXACT_LINEAR) {
+            // Numeric-only keys start with a relation ordinal; symmetry colors stay typed here.
+            if (hasBooleans) int(-1)
+            enum(relation)
+            bool(strict)
+            int(if (activator == LinearRow.ALWAYS) activator else mapping?.bool(activator) ?: activator)
+            ints(rhs.toString().map { it.code }.toIntArray())
+            int(kept.size)
+            for ((coordinate, coefficient) in kept) {
+                if (hasBooleans) int(coordinate.first) else bool(coordinate.first == 2)
                 int(coordinate.second)
                 ints(coefficient.toString().map { it.code }.toIntArray())
             }
@@ -111,16 +151,24 @@ class ExactLinear private constructor(
             require(activator >= LinearRow.ALWAYS) { "invalid row activator" }
 
             require(refs.size == coefficients.size)
-            require(refs.all { it >= 0 && (Term.isInt(it) || Term.isReal(it)) })
+            require(refs.all { it >= 0 && (Term.isInt(it) || Term.isBool(it) || Term.isReal(it)) })
             val terms = LinkedHashMap<Int, BigFraction>()
+            var threshold = rhs
             for (index in refs.indices) {
-                terms[refs[index]] = (terms[refs[index]] ?: BigFraction.ZERO) + coefficients[index]
+                val reference = refs[index]
+                val complemented = Term.isBool(reference) && !Lit.isPositive(Term.lit(reference))
+                val normalized = if (complemented) Term.ofLit(Lit.make(Lit.variable(Term.lit(reference)), true))
+                    else reference
+                val coefficient = coefficients[index]
+                if (complemented) threshold -= coefficient
+                terms[normalized] = (terms[normalized] ?: BigFraction.ZERO) +
+                    if (complemented) coefficient.negated() else coefficient
             }
             val kept = terms.filterValues { !it.isZero }
-            val denominator = kept.values.fold(rhs.den) { scale, value -> scale / scale.gcd(value.den) * value.den }
+            val denominator = kept.values.fold(threshold.den) { scale, value -> scale / scale.gcd(value.den) * value.den }
             val multiplier = BigFraction.of(if (relation == LinearOp.GE) -denominator else denominator, BIG_ONE)
             val integerStrict = strict && kept.keys.none(Term::isReal)
-            val bound = (rhs * multiplier).num - if (integerStrict) BIG_ONE else BIG_ZERO
+            val bound = (threshold * multiplier).num - if (integerStrict) BIG_ONE else BIG_ZERO
             return ExactLinear(kept.keys.toIntArray(), kept.values.map { (it * multiplier).num }.toTypedArray(),
                 bound, if (relation == LinearOp.GE) LinearOp.LE else relation, strict && !integerStrict, activator)
         }

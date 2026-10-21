@@ -207,6 +207,11 @@ A result with an open bound instead keeps guarded exact equalities to its branch
 Affine real conditionals retain `RealElement`. Comparisons against a conditional
 can lower to Boolean tests of its branches when the branch images are small, and
 definitions no surviving constraint needs are dropped after a dependency fixpoint.
+Before publishing the model, private exact zero/one integer helpers with an existing
+Boolean channel substitute that literal's numeric truth value in every supported
+arithmetic reader. Binary selections with fixed arms admit the same affine rewrite.
+Declared integers, objective readers and helpers with unsupported readers retain
+their numeric coordinates. Compaction remaps all retained factors and names together.
 For up to eight Boolean inputs, a scalar defined by consistent, complete cases also
 supplies a verified affine row beside the source factors.
 

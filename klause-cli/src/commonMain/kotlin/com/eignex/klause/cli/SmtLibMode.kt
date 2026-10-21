@@ -1,8 +1,11 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -59,6 +62,7 @@ internal object SmtLibMode : CliMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
+            if (common.statistics) (parsed.source.originalSource as? Problem)?.let(::reportSmtArithmeticStatistics)
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${bools.size} int=${ints.size} real=${reals.size}"
             }
@@ -80,6 +84,24 @@ internal object SmtLibMode : CliMode {
 
         override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput { latestSourceObjective }
     }
+}
+
+private fun reportSmtArithmeticStatistics(model: Problem) {
+    var booleanRows = 0
+    var mixedRows = 0
+    var booleanTerms = 0
+    for (factor in model.factors) {
+        val row = factor as? ExactLinear ?: continue
+        val terms = (0 until row.size).count { Term.isBool(row.ref(it)) }
+        if (terms == 0) continue
+        booleanRows++
+        booleanTerms += terms
+        if ((0 until row.size).any { Term.isInt(row.ref(it)) || Term.isReal(row.ref(it)) }) mixedRows++
+    }
+    println("; smtCompiledIntegers=${model.numIntVars}")
+    println("; smtBooleanArithmeticRows=$booleanRows")
+    println("; smtMixedBooleanArithmeticRows=$mixedRows")
+    println("; smtBooleanArithmeticTerms=$booleanTerms")
 }
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per

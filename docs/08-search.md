@@ -206,7 +206,15 @@ mechanisms, not full consistency at every size.
 
 Exact integer rows select compact signed-word propagation when their constants fit
 and the sum of coefficient magnitudes is at most `Long.MAX_VALUE`, keeping residual
-checks within 128 bits; wider rows keep arbitrary-precision propagation. Packed SAT
+checks within 128 bits; wider rows keep arbitrary-precision propagation.
+Rows mixing integer and Boolean terms use exact activity intervals, retaining every
+assigned Boolean premise in numeric deductions. Unassigned Boolean terms contribute
+their zero/one interval; equality enforces both necessary numeric sides, while
+disequality filters numeric values once its Boolean offset is fixed. Reification
+selects the row or its exact integral complement, and complete pins enforce the
+whole relation.
+
+Packed SAT
 propagation requires built-in clause descriptors, so a clause assigned to a custom
 projection uses the general CP lane. AllDifferent tries its cached incremental path
 before full matching. Assignment-dependent payloads such as live tuples and diagram

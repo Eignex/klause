@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
@@ -27,6 +28,7 @@ import kotlin.math.ceil
 
 internal fun ExactLinear.propagationView(): Propagator {
     if (variables.reals.isNotEmpty()) return NoPropagator
+    if ((0 until size).any { Term.isBool(ref(it)) }) return BooleanLinearPropagator(this)
     val vars = IntArray(size) { Term.intVar(ref(it)) }
     val integer = (constants as? IntegerConstants)?.takeIf {
         it.permitsCompactPropagation(activator != LinearRow.ALWAYS)
@@ -67,18 +69,23 @@ internal fun LinearIndicator.propagationView(): Propagator = if (variables.reals
             val trigger = if (whenOne) 1L else 0L
             val domain = state.intDomains[indicator]
             if (domain.min != domain.max || domain.min != trigger ||
-                row.intVars.any { state.intDomains[it].min != state.intDomains[it].max }
+                row.intVars.any { state.intDomains[it].min != state.intDomains[it].max } ||
+                row.variables.boolVars.any { state.boolValues[it] == null }
             ) return true
             var activity = BIG_ZERO
             for (k in 0 until row.size) {
-                activity += row.constants.exactCoeff(k) * bigIntOf(state.intDomains[Term.intVar(row.ref(k))].min)
+                val reference = row.ref(k)
+                val value = if (Term.isBool(reference)) {
+                    if (state.boolValues[Lit.variable(Term.lit(reference))] == true) 1L else 0L
+                } else state.intDomains[Term.intVar(reference)].min
+                activity += row.constants.exactCoeff(k) * bigIntOf(value)
             }
             return exactLinearResidual(activity - row.constants.exactBound, row.relation) == BIG_ZERO
         }
     }
 
 internal fun ExactLinear.scoringView(domains: Array<IntDomain>? = null): Invariant {
-    if (variables.reals.isNotEmpty()) return ExactLinearScore(this)
+    if (variables.reals.isNotEmpty() || (0 until size).any { Term.isBool(ref(it)) }) return ExactLinearScore(this)
     val vars = IntArray(size) { Term.intVar(ref(it)) }
     val integer = constants as? IntegerConstants
     return if (integer != null && domains != null && !needsExactSum(integer, vars, domains)) {
@@ -116,22 +123,33 @@ private class ExactLinearScore(
         flippedBool: Int = -1,
     ): Int {
         fun intValue(id: Int): Long = if (id == changedInt) integer else state.assignment.intValue(id)
+        fun boolValue(id: Int): Boolean = state.assignment.boolValue(id).let { if (id == flippedBool) !it else it }
         if (indicator >= 0 && intValue(indicator) != (if (whenOne) 1L else 0L)) return 0
         if (row.variables.reals.isEmpty()) {
             var activity = BIG_ZERO
             for (k in 0 until row.size) {
-                activity += row.constants.exactCoeff(k) * bigIntOf(intValue(Term.intVar(row.ref(k))))
+                val reference = row.ref(k)
+                val value = if (Term.isBool(reference)) {
+                    if (boolValue(Lit.variable(Term.lit(reference)))) 1L else 0L
+                } else intValue(Term.intVar(reference))
+                activity += row.constants.exactCoeff(k) * bigIntOf(value)
             }
             val residual = exactLinearResidual(activity - row.constants.exactBound, row.relation)
             val largest = bigIntOf(Long.MAX_VALUE)
             val capped = if (residual > largest) Long.MAX_VALUE else residual.toLongExact()
-            return compressViolation(capped, state.violationSoftCap)
+            val degree = compressViolation(capped, state.violationSoftCap)
+            return if (row.activator == LinearRow.ALWAYS) degree else
+                reifiedDegree(boolValue(row.activator), residual == BIG_ZERO) { degree }
         }
         var activity = 0.0
         for (k in 0 until row.size) {
             val ref = row.ref(k)
-            val value = if (Term.isInt(ref)) intValue(Term.intVar(ref)).toDouble()
-                else if (Term.realVar(ref) == changedReal) real else state.assignment.realValue(Term.realVar(ref))
+            val value = when {
+                Term.isInt(ref) -> intValue(Term.intVar(ref)).toDouble()
+                Term.isBool(ref) -> if (boolValue(Lit.variable(Term.lit(ref)))) 1.0 else 0.0
+                Term.realVar(ref) == changedReal -> real
+                else -> state.assignment.realValue(Term.realVar(ref))
+            }
             activity += coefficients[k] * value
         }
         val difference = activity - bound

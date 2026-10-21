@@ -191,12 +191,18 @@ private fun ExactLinear.keeps(point: Sample, direction: List<BigFraction>): Bool
     for (index in 0 until size) {
         val coefficient = BigFraction.of(constants.exactCoeff(index), BIG_ONE)
         val reference = ref(index)
-        if (Term.isInt(reference)) {
-            activity += coefficient * BigFraction.of(point.exactIntValue(Term.intVar(reference)), BIG_ONE)
-        } else {
-            val id = Term.realVar(reference)
-            activity += coefficient * reals[id]
-            movement += coefficient * direction[id]
+        when {
+            Term.isInt(reference) -> {
+                activity += coefficient * BigFraction.of(point.exactIntValue(Term.intVar(reference)), BIG_ONE)
+            }
+            Term.isBool(reference) -> {
+                if (point.boolValue(Lit.variable(Term.lit(reference)))) activity += coefficient
+            }
+            else -> {
+                val id = Term.realVar(reference)
+                activity += coefficient * reals[id]
+                movement += coefficient * direction[id]
+            }
         }
     }
     val bound = BigFraction.of(constants.exactBound, BIG_ONE)

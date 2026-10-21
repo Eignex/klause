@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
@@ -31,19 +32,27 @@ internal fun ExactLinear.emitExactLpRelaxation(builder: RelaxationBuilder, indic
             val row = numericalRow() ?: return
             val columns = IntArray(size) { index ->
                 val reference = ref(index)
-                if (Term.isInt(reference)) builder.intColumn(Term.intVar(reference))
-                else builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
+                when {
+                    Term.isInt(reference) -> builder.intColumn(Term.intVar(reference))
+                    Term.isBool(reference) -> builder.boolColumn(Lit.variable(Term.lit(reference)))
+                    else -> builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
+                }
             }
             builder.exactRow(columns, row, relation, indicator, value)
             return
         }
-        if (indicator < 0 && variables.reals.isEmpty()) emitWideLpRelaxation(builder)
+        if (indicator < 0 && variables.reals.isEmpty() && (0 until size).none { Term.isBool(ref(it)) }) {
+            emitWideLpRelaxation(builder)
+        }
         return
     }
     val columns = IntArray(size) { index ->
         val reference = ref(index)
-        if (Term.isInt(reference)) builder.intColumn(Term.intVar(reference))
-        else builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
+        when {
+            Term.isInt(reference) -> builder.intColumn(Term.intVar(reference))
+            Term.isBool(reference) -> builder.boolColumn(Lit.variable(Term.lit(reference)))
+            else -> builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
+        }
     }
     val coefficients = LongArray(size) { constants.exactCoeff(it).toLongExact() }
     if (indicator < 0) builder.row(columns, coefficients, relation, constants.exactBound.toLongExact())

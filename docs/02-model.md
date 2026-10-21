@@ -192,8 +192,10 @@ nothing outside the declared grid policy.
 
 ### Exact linear source relations
 
-`factor.arithmetic.ExactLinear` captures rational comparisons over integer and real
-coordinates, coalescing aliases before exact denominator clearing. Strict real
+`factor.arithmetic.ExactLinear` captures rational comparisons over integer, Boolean
+and real coordinates. Boolean terms contribute their literal's zero/one truth value;
+complemented literals contribute an exact constant offset before aliases coalesce
+and denominators clear. Strict real
 comparisons keep their open boundary; integer-only strict comparisons use the
 equivalent integral threshold. An optional Boolean activator reifies the whole
 comparison in both directions. The numerical projection emits representable scaled

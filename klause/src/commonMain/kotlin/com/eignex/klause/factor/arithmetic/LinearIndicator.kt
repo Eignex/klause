@@ -24,6 +24,7 @@ class LinearIndicator(
 
     override val variables: MixedVars = MixedVars(
         boundInts = (row.intVars.toList() + indicator).distinct().toIntArray(),
+        boolVars = row.variables.boolVars,
         reals = row.variables.reals,
     )
 

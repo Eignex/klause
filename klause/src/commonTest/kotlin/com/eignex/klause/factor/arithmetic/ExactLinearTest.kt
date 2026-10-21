@@ -12,6 +12,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealSolver
@@ -31,12 +32,142 @@ import com.eignex.klause.util.parseBigInt
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class ExactLinearTest {
+    @Test
+    fun `finite enumeration should retain the exact mixed arithmetic solution set`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofIntVar(0)),
+            listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE)
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), arrayOf(row))
+
+        val points = BacktrackSolver(source.bake()).enumerate().map { it.intValue(0) to it.boolValue(0) }.toSet()
+
+        assertEquals(setOf(0L to true, 1L to false), points)
+    }
+
+    @Test
+    fun `numerical completion should pin Boolean terms in compact and wide exact rows`() {
+        for (coefficient in listOf("2", "18446744073709551617")) for (boolean in listOf(false, true)) {
+            val exact = BigFraction.of(parseBigInt(coefficient), BIG_ONE)
+            val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofRealVar(0)),
+                listOf(exact, exact), LinearOp.EQ, exact)
+            val source = Problem(1, 0, emptyArray(), arrayOf(row), numRealVars = 1,
+                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+
+            val result = LeafRealSolver(source, null).use { it.solve(Sample(booleanArrayOf(boolean), longArrayOf())) }
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict, "$coefficient $boolean")
+            assertEquals(listOf(if (boolean) BigFraction.ZERO else BigFraction.ONE), result.exactReals)
+        }
+    }
+
+    @Test
+    fun `complemented Boolean terms should retain their numeric offset and typed identity`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, false)), Term.ofIntVar(0)),
+            listOf(BigFraction.ofLong(3), BigFraction.ofLong(2)), LinearOp.LE, BigFraction.ofLong(7))
+        val expected = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofIntVar(0)),
+            listOf(BigFraction.ofLong(-3), BigFraction.ofLong(2)), LinearOp.LE, BigFraction.ofLong(4))
+        val integer = ExactLinear.of(intArrayOf(Term.ofIntVar(1), Term.ofIntVar(0)),
+            listOf(BigFraction.ofLong(-3), BigFraction.ofLong(2)), LinearOp.LE, BigFraction.ofLong(4))
+
+        assertEquals(expected.structuralKey(), row.structuralKey())
+        assertNotEquals(integer.structuralKey(), row.structuralKey())
+        assertEquals(listOf(0), row.variables.boolVars.toList())
+        assertFailsWith<IllegalArgumentException> { row.remap(VarRemap(intArrayOf(-1), intArrayOf(0))) }
+    }
+
+    @Test
+    fun `Boolean alias cancellation should preserve remapped structural hashes`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofLit(Lit.make(1, true)),
+            Term.ofIntVar(0)), listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.ONE),
+            LinearOp.EQ, BigFraction.ONE)
+        val mapping = VarRemap(intArrayOf(0, 0), intArrayOf(0))
+
+        val image = row.remap(mapping)
+
+        assertEquals(image.structuralKey().hashCode(), row.remapStructuralHash(mapping))
+    }
+
+    @Test
+    fun `mixed row deductions should retain Boolean and integer premises`() {
+        for (relation in LinearOp.entries) for (truth in listOf(false, true)) {
+            val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofIntVar(0)),
+                listOf(BigFraction.ofLong(2), BigFraction.ONE), relation, BigFraction.ofLong(3), activator = 1)
+            val source = Problem(2, 1, arrayOf(IntDomain(0, 4)), arrayOf(row))
+
+            PropagationReasonOracle.assertReasonsImply(source, "$relation $truth") { state ->
+                state.pinBool(0, true) && state.pinBool(1, truth) && state.tightenIntMin(0, 1)
+            }
+        }
+    }
+
+    @Test
+    fun `a fixed numeric term should force an unassigned Boolean arithmetic term`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofIntVar(0)),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), LinearOp.LE, BigFraction.ofLong(3))
+        val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(2, 2)), arrayOf(row)), Assumptions.None)
+
+        assertTrue(state.factorAt(0).propagate(state, 0))
+
+        assertEquals(false, state.boolValues[0])
+    }
+
+    @Test
+    fun `wide mixed equality should force the exact Boolean value`() {
+        val wide = BigFraction.of(parseBigInt("18446744073709551617"), BIG_ONE)
+        val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofIntVar(0)),
+            listOf(wide, wide), LinearOp.EQ, wide)
+        val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 0)), arrayOf(row)), Assumptions.None)
+
+        assertTrue(state.factorAt(0).propagate(state, 0))
+
+        assertEquals(true, state.boolValues[0])
+    }
+
+    @Test
+    fun `mixed Boolean and integer move deltas should match fresh reified grading`() {
+        for (relation in LinearOp.entries) for (truth in listOf(false, true)) {
+            for (move in listOf(BoolFlip(0), BoolFlip(1), IntSet(0, 2L))) {
+                val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, false)), Term.ofIntVar(0)),
+                    listOf(BigFraction.ofLong(2), BigFraction.ONE), relation, BigFraction.ofLong(3), activator = 1)
+                val source = Problem(2, 1, arrayOf(IntDomain(0, 4)), arrayOf(row))
+                val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
+                state.assignment.setBool(0, true)
+                state.assignment.setBool(1, truth)
+                state.assignment.setInt(0, 3)
+                state.recompute()
+                val before = state.cost
+
+                val delta = state.netDelta(move)
+                state.apply(move)
+                val after = state.cost
+                state.recompute()
+
+                assertEquals(after - before, delta, "$relation $truth $move")
+                assertEquals(after, state.cost, "$relation $truth $move")
+            }
+        }
+    }
+
+    @Test
+    fun `strict real rows should evaluate Boolean numeric terms before source publication`() {
+        for (boolean in listOf(false, true)) {
+            val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE, strict = true)
+            val source = Problem(1, 0, emptyArray(), arrayOf(row, Clause(intArrayOf(Lit.make(0, boolean)))),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+
+            val result = BacktrackSolver.source(source).solve()
+
+            if (boolean) assertIs<OpenTheoryResult.Unsat>(result) else assertIs<OpenTheoryResult.Sat>(result)
+        }
+    }
+
     @Test
     fun `empty integer source rows should grade exact truth at signed word bounds`() {
         for (relation in LinearOp.entries) {
