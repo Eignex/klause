@@ -1,7 +1,6 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.SmtSourceTools
-import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
@@ -256,8 +255,9 @@ object CompletionInitializationProfile {
         }
         val input = out.resolve("source-checks.smt2").apply { writeText(checks) }
         val output = out.resolve("source-checks.out")
-        val identity = Z3Reference.identity()
-        val process = ProcessBuilder(System.getProperty("klause.bench.z3", "z3"), "-smt2", "-T:20", "-memory:512",
+        val z3 = File(System.getProperty("klause.bench.z3", "z3"))
+        val identity = if (z3.isFile) "sha256=${hash(z3.readBytes())}" else z3.path
+        val process = ProcessBuilder(z3.path, "-smt2", "-T:20", "-memory:512",
             input.absolutePath).redirectOutput(output).redirectError(out.resolve("source-checks.err")).start()
         try {
             check(process.waitFor(30, TimeUnit.SECONDS)) { "source checking timed out" }

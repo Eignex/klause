@@ -217,7 +217,6 @@ class SolverInvocationTest {
         assertNull(r.timeToBestMs)
         assertNull(r.timeToFirstFeasibleMs)
         assertNull(r.stats["solveTime"])
-        assertEquals(r.elapsedMs, r.referenceElapsedMs(60_000))
     }
 
     @Test
@@ -229,39 +228,6 @@ class SolverInvocationTest {
 
         assertTrue(assertNotNull(r.elapsedMs) > assertNotNull(r.timeToBestMs))
         assertEquals(r.timeToBestMs, r.timeToFirstFeasibleMs)
-    }
-
-    @Test
-    fun `reference proofs should use solve time then wall clock then budget`() {
-        val r = SolverInvocation.Result(
-            false,
-            null,
-            null,
-            proven = true,
-            stats = emptyMap(),
-            rawOutput = "",
-            command = "",
-        )
-        val cases = listOf(
-            r to 60_000L,
-            r.copy(elapsedMs = 140) to 140L,
-            r.copy(elapsedMs = 140, stats = mapOf("solveTime" to "0.02")) to 20L,
-            r.copy(elapsedMs = 140, stats = mapOf("solveTime" to "NaN")) to 140L,
-            r.copy(elapsedMs = 140, stats = mapOf("solveTime" to "-1")) to 140L,
-        )
-
-        cases.forEach { (result, expected) -> assertEquals(expected, result.referenceElapsedMs(60_000)) }
-    }
-
-    @Test
-    fun `reference witnesses should use incumbent time and undecided runs the budget`() {
-        val r = SolverInvocation.Result(
-            true, null, 12, timeToFirstFeasibleMs = 10, elapsedMs = 140,
-            proven = false, stats = emptyMap(), rawOutput = "", command = "",
-        )
-
-        assertEquals(10, r.referenceElapsedMs(60_000))
-        assertEquals(60_000, r.copy(feasible = null).referenceElapsedMs(60_000))
     }
 
     @Test

@@ -177,9 +177,10 @@ optimization over a continuous coordinate runs in the lab suite; the focused JVM
 matrix optimizes the finite global argument alongside exact polynomial completion.
 
 [Klause-lab](https://github.com/Eignex/klause-lab) owns remote experiment execution,
-regression schedules and reference-result storage. It builds the Klause revisions
+regression schedules, reference solving and reference-result storage. It builds the Klause revisions
 named by an experiment, selects problems through `klause-bench select`, and runs
-each problem/configuration/seed/repetition with `solve-one`. The lab's queue,
+each problem/configuration/seed/repetition with `solve-one`. Reference solvers run in
+the lab itself, on the files `select files=true` resolves. The lab's queue,
 live output, comparisons and regression trends are served over HTTP.
 Deployment, client connection settings, AWS execution, reference filtering and
 scheduling are documented in its maintained
@@ -380,32 +381,6 @@ before checking the final CI gate.
 
 Cases disable result caching, alternate configurations across seeds/repetitions,
 and retain installed-build provenance when supported by the selected revision.
-XCSP3 references accept only `cp-sat`; `solve-one backend=reference solver=cp-sat`
-uses the CPMpy importer and OR-Tools engine. Unsupported solver names are rejected
-before invocation and cannot supply a reference verdict under another engine's label.
-The `xcsp3-source-preserving-v2` policy uses the pinned packages of the
-`klause-xcsp3-cpsat:source-preserving-v2` image, built from
-[klause-lab](https://github.com/Eignex/klause-lab/tree/main/images/xcsp3-cpsat).
-Negative extension tables encode each forbidden tuple as a disjunction of
-coordinate disequalities; wildcard coordinates contribute no comparison. This
-preserves every permitted source pair after unary exclusions and avoids the
-native negated-table conversion. Positive extension tables keep their native
-encoding. Implicit objective coefficients remain integer ones. Native model
-presolve and search remain enabled.
-The image digest, importer policy, worker count and solver seed distinguish cache
-entries. Records retain effective `referenceSeed`, `referenceWorkers` and
-`cpModelPresolve` settings, complete original-variable `finalWitness`, raw output
-identity, installed harness/runtime provenance, container exit/watchdog diagnostics
-and `exactObjective`. Failed or interrupted container processes remain undecided.
-Emitted `o` and `v` lines precede the final JSON
-verdict. Feasible claims without a complete witness and proofs with incompatible
-native settings are undecided. Native optimum/refutation statuses remain reference
-claims; a source-checked witness certifies feasibility and its objective only.
-
-klause-lab builds the image on the host providing Docker and runs its importer regressions,
-which cover matrix axes, weighted expression sums, contradictions, unconstrained source
-variables and objectives beyond binary64 precision.
-
 Check failed, unsupported and missing cases before interpreting comparisons.
 Lab agreement and regression confirmation remain recorded-result evidence;
 [independent source validation](#source-validation) defines stronger checks.
@@ -540,16 +515,6 @@ the domain bounds. A branch with that hole conflicts with the opposite indicator
 After rollback and learning, a source-checked assignment using the restored target
 must remain feasible.
 
-### XCSP3 reference importer
-
-The cp-sat reference image and its self-authored importer regression fixtures live in
-[klause-lab](https://github.com/Eignex/klause-lab/tree/main/images/xcsp3-cpsat), which builds and runs
-the reference images. Full fetched XCSP sources and saved witness records remain external; their source
-hashes and independent checker receipts bind remote regression controls to original bytes.
-Source-preserving reference records retain the installed image/importer identity, complete source
-assignment and exact integer objective. See the [benchmark reference workflow](#klause-lab) for the
-distinction between source witnesses and native proof claims.
-
 ### FlatZinc witness
 
 [voltage_divider.fzn](src/test/resources/flatzinc/voltage_divider.fzn)
@@ -645,8 +610,7 @@ ERROR records preserve original source hashes, installed-build provenance/finger
 and MiniZinc compiler identity captured before the failing operation. `gitSha`
 identifies the harness checkout, separately from installed bytes. A failed identity
 capture leaves that identity unavailable and retains the capture exception; the catch
-path does not recapture changed inputs or installations. Reference failures retain
-the build identity only when the reference runner supplied it before failure.
+path does not recapture changed inputs or installations.
 An undecided returned result keeps its ordinary command and statistics, without
 caught-exception fields. Legacy ERROR records with empty statistics remain readable;
 their missing exception text and installed-build/source identities cannot be recovered
@@ -740,38 +704,7 @@ hashes, runtime/options, child process exit, measurements and every incumbent in
 terminal result recorded in `measurements.json`; no native proof is captured.
 
 
-### SMT reference records
-
-`solve-one backend=reference solver=z3` sends original SMT-LIB directly to Z3,
-including QF_NRA; Klause frontend support does not control reference selection.
-The executable resolved from `PATH` (or `-Dklause.bench.z3`) is hashed once per
-bench process. Its version/SHA-256, memory ceiling, single-thread options and
-`smt-reference-v3` policy form `referenceVersion` and the reference cache key.
-Input paths use the explicit `-file:` option, preserving literal filenames containing `=`.
-`-model pp.decimal=false` requests exact rational and algebraic `root-obj` models.
-Input options may override printing; a decimal approximation is not algebraic
-witness evidence. Records retain original `sourceHashes`, stdout SHA-256,
-`finalWitness`, command, exit code, stderr, watchdog outcome and
-`referenceStatus=sat|unsat|unknown|timeout|error`. Parse errors or failed exits
-cannot earn a decided verdict. The default memory ceiling is 2048 MiB; override
-with `-Dklause.bench.z3.memoryMb`. The solver timeout uses whole seconds, rounded
-down with a one-second minimum; a watchdog kills after twice the requested budget
-plus twenty seconds. Keep integer-second budgets for matched reference runs.
-
-Z3 case `buildProvenance` also binds the installed bench launcher/libraries in
-`harness`, the JVM runtime and options, host OS/architecture, and the installed
-CLI tree from setup. The CLI is rebuilt by lab setup but is not invoked by a
-reference case; Z3's own executable remains identified by `referenceVersion`.
-Capture hashes before solving, outside subprocess timing. Reference runs therefore
-require the installed bench and CLI distributions, using the same provenance
-manifest mechanism as Klause cases.
-
-These are solver-reported reference verdicts (`referenceValidation`), separate
-from independently checked source witnesses or refutation certificates. The lab
-persists the solver/version rows through its ordinary reference backend; raw models
-and diagnostics remain in case artifacts. Frozen baseline runs use `reference=any`,
-a ten-second budget, one processor, no result-cache replay and explicit repetition.
-Preserve every planned identity and unsuccessful outcome in external evidence.
+### Subprocess exit records
 
 Each returned subprocess record retains the actual child exit in `stats.exit`,
 including a nonzero exit after a verdict. Lab command exits belong to the containing

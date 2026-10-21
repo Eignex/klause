@@ -116,12 +116,6 @@ internal data class SolveRecord(
 internal object SolveMetric {
     private const val SOLVE_SEED = 3L
 
-    /** The `backend=` that runs each format's reference solver instead of one fixed solver. */
-    const val REFERENCE = "reference"
-
-    /** The MiniZinc solver `backend=reference` uses, as `bench reference` defaults to. */
-    private const val REFERENCE_MINIZINC_BACKEND = "cp-sat"
-
     /** Characters of a load failure's message kept in its record. */
     private const val REASON_CAP = 400
     private const val MAX_LOAD_CAUSE_DEPTH = 64
@@ -188,12 +182,7 @@ internal object SolveMetric {
         search: KlauseSearch = KlauseSearch(),
         label: String? = null,
         outDir: File? = null,
-        /** For a reference solve, which of the format's reference solvers runs; null for its default. */
-        referenceSolver: String? = null,
     ): SolveRecord {
-        if (solverId == REFERENCE) {
-            ReferenceSolve.solverIdFor(ref, REFERENCE_MINIZINC_BACKEND, referenceSolver)
-        }
         val settings = settings(solverId, search)
         if (solverId == SolverInvocation.KLAUSE) {
             SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
@@ -203,96 +192,13 @@ internal object SolveMetric {
         val timestamp = Instant.now().toString()
         val sha = Reports.readGitSha()
         val name = ref.name.replace('/', '_')
-        val (rec, raw) = if (solverId == REFERENCE) {
-            referenceRecord(ref, settings, budget, timestamp, sha, referenceSolver, File(dir, "$name.sol"))
-        } else {
-            runCatching { Runners.resolve(ref, settings.exact) }.fold(
-                { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha, evidenceRoot = dir) },
-                { failure -> loadFailureRecord(ref, solverId, settings, budget, timestamp, sha, failure) to null },
-            )
-        }
+        val (rec, raw) = runCatching { Runners.resolve(ref, settings.exact) }.fold(
+            { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha, evidenceRoot = dir) },
+            { failure -> loadFailureRecord(ref, solverId, settings, budget, timestamp, sha, failure) to null },
+        )
         raw?.let { File(dir, "$name.out").writeText(it) }
         File(dir, "$name.json").writeText(Reports.json.encodeToString(rec))
         return rec
-    }
-
-    /**
-     * The format's reference solver on [ref] (see [ReferenceSolve]), as a record whose `solver` names the solver that
-     * ran. The instance goes to that solver as it is, without klause's front end, so a model klause declines still
-     * gets a reference verdict. A run that fails is an error record. A solution the reference returned is written to
-     * [solution], as `name value` lines, so its verdict can be checked again.
-     */
-    private fun referenceRecord(
-        ref: ProblemRef,
-        s: SolverInvocation.Settings,
-        budget: Budget,
-        timestamp: String,
-        sha: String?,
-        solver: String?,
-        solution: File,
-    ): Pair<SolveRecord, String?> {
-        var hashes: Map<String, String> = emptyMap()
-        var provenance: BuildProvenance? = null
-        return runCatching {
-            hashes = SolveEvidence.sourceHashes(ref)
-            provenance = if (ReferenceSolve.solverIdFor(ref, REFERENCE_MINIZINC_BACKEND, solver) == "z3") {
-                InstalledBuild.reference
-            } else {
-                null
-            }
-            val run = ReferenceSolve.run(ref, REFERENCE_MINIZINC_BACKEND, s, budget, solver)
-            val r = run.result
-            provenance = provenance ?: r.buildProvenance
-            check(hashes == SolveEvidence.sourceHashes(ref)) { "reference source changed during solve" }
-            r.assignment?.let { solution.writeText(it) }
-            SolveRecord(
-                problem = ref.name,
-                solver = run.solver,
-                engine = null,
-                processors = s.processors ?: 1,
-                search = if (s.free) "free" else "fixed",
-                seed = s.seed,
-                budgetMs = budget.timeoutMillis,
-                kind = if (run.optimize) "optimize" else "satisfy",
-                maximize = run.maximize,
-                feasible = r.feasible,
-                objective = r.objective,
-                exactObjective = r.exactObjective,
-                timeToBestMs = r.timeToBestMs,
-                timeToFirstFeasibleMs = r.timeToFirstFeasibleMs,
-                elapsedMs = r.elapsedMs,
-                proven = r.proven,
-                stats = r.stats,
-                gitSha = sha,
-                timestamp = timestamp,
-                command = r.command,
-                buildProvenance = provenance,
-                buildFingerprint = provenance?.fingerprint,
-                sourceHashes = hashes,
-                sourceOutputSha256 = sha256(r.rawOutput.toByteArray()),
-                finalWitness = if (r.feasible == true) SolveEvidence.finalWitness(ref.format, r.rawOutput) else null,
-            ) to r.rawOutput
-        }.getOrElse { failure ->
-            val loaded = loadFailureRecord(
-                ref,
-                solver ?: ReferenceSolve.solverIdFor(ref, REFERENCE_MINIZINC_BACKEND),
-                s,
-                budget,
-                timestamp,
-                sha,
-                failure,
-                sourceHashes = hashes,
-            )
-            val record = loaded.copy(
-                command = "ERROR",
-                stats = loaded.stats + SolveFailure.stats(failure),
-                sourceHashes = hashes,
-                buildProvenance = provenance,
-                buildFingerprint = provenance?.fingerprint,
-            )
-            println("?? [${ref.name}] reference ERROR: ${record.stats["errorMessage"] ?: record.stats["errorClass"]}")
-            record to null
-        }
     }
 
     /** The record of a problem that never reached the solver: undecided, with why under `stats`. */
