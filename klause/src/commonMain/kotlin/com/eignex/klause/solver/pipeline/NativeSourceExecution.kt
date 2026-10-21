@@ -2,10 +2,12 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.presolve.OpenPresolveResult
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.hasFiniteIntegerRanges
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 
@@ -110,11 +112,33 @@ internal fun executeNativeSource(
 
         is NativeSourceExecution.Polynomial -> {
             val params = request.polynomial.nativeBoundTo(invocation)
-            when {
+            val source = if (invocation.canonicalPolynomial) {
+                val model = native.request.resolvedModel().source
+                val protection = if (quadratic == null) {
+                    affine?.let { if (invocation.maximizeSourceObjective) it.negated() else it }
+                } else {
+                    // A nonlinear objective has no coefficient sign for dual fixing.
+                    LinearObjective(boolWeights = LongArray(model.numBoolVars) { 1L },
+                        intCoefficients = LongArray(model.numIntVars) { 1L })
+                }
+                native.request.prepareSource(request.presolveConfig ?: PresolveConfig.DEFAULT, protection,
+                    request.presolveCancellation, params.cancellation or params.timeout, request.presolveBudget,
+                    solutionSetSensitive = quadratic != null)
+            } else null
+            if (source?.infeasible == true) return SourceExecutionResult.Refuted(invocation).also {
+                it.preparationStats = source.stats
+            }
+            val prepared = if (source == null) native.request else {
+                native.request.afterSourcePreparation(source, params.cancellation or params.timeout)
+                    ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
+                        it.preparationStats = source.stats
+                    }
+            }
+            val result = when {
                 quadratic != null -> SourceExecutionResult.Quadratic(
                     invocation,
                     OpenTheoryPipeline.minimize(
-                        native.request,
+                        prepared,
                         quadratic,
                         params,
                         engine,
@@ -127,7 +151,7 @@ internal fun executeNativeSource(
                 affine != null -> SourceExecutionResult.Quadratic(
                     invocation,
                     OpenTheoryPipeline.optimize(
-                        native.request,
+                        prepared,
                         affine,
                         params,
                         engine,
@@ -139,9 +163,10 @@ internal fun executeNativeSource(
 
                 else -> SourceExecutionResult.Polynomial(
                     invocation,
-                    OpenTheoryPipeline.execute(native.request, params, engine, request.cores),
+                    OpenTheoryPipeline.execute(prepared, params, engine, request.cores),
                 )
             }
+            result.also { it.preparationStats = source?.stats }
         }
 
         is NativeSourceExecution.IntegerPolynomial -> {

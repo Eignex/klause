@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.Cancellation
@@ -81,6 +82,8 @@ class SourceExecutionPolicy(
         engine: FiniteEngine,
         presolveTuning: Boolean = false,
         prepareOnly: Boolean = false,
+        presolveConfig: PresolveConfig? = null,
+        canonicalPolynomial: Boolean = false,
     ) {
         if (prepareOnly && kind !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.LINEAR)) {
             pipelineConfigError(
@@ -99,9 +102,14 @@ class SourceExecutionPolicy(
                 pipelineConfigError("portfolio arm defaults do not apply to source ${kind.name.lowercase()}")
             }
         }
-        if ((explicitPresolve || presolveTuning) && !finite && kind != SourceExecutionKind.LINEAR) {
+        val disabled = presolveConfig?.let {
+            it.emphasis == PresolveEmphasis.OFF && it.overrides.values.none { enabled -> enabled }
+        } == true
+        if ((explicitPresolve || presolveTuning) && !finite && kind != SourceExecutionKind.LINEAR &&
+            !canonicalPolynomial && !disabled
+        ) {
             pipelineConfigError(
-                "--presolve requires finite or linear source execution; selected ${kind.name.lowercase()}",
+                "individual presolve reductions require a canonical factor model; selected ${kind.name.lowercase()}",
             )
         }
         if (finite) lpConfig(engine)

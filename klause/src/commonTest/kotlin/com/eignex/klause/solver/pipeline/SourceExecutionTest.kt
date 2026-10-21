@@ -19,6 +19,8 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
@@ -43,6 +45,76 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class SourceExecutionTest {
+    @Test
+    fun `polynomial source probing should reduce Booleans beside a nonlinear real factor`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            ContinuousProduct(0, 0, 1),
+        ), numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val budget = PresolveBudget(1_000_000)
+
+        val result = assertIs<SourceExecutionResult.Polynomial>(SourceSetup.execute(SourceExecutionRequest(
+            invocation, presolveConfig = PresolveConfig.parse("off,+probe-open"), presolveBudget = budget,
+        )))
+
+        assertTrue(assertIs<OpenTheoryResult.Sat>(result.result.result).assignment.boolValue(0))
+        val stats = assertNotNull(result.result.result.stats.presolve)
+        assertTrue(PresolvePass.PROBE_OPEN_RANGES.id in stats.passes)
+        val effort = assertNotNull(stats.effort)
+        assertEquals(budget.spent(), effort.work)
+        assertEquals(budget.passCalls, effort.passCalls)
+        assertTrue(assertNotNull(effort.rounds) > 0)
+    }
+
+    @Test
+    fun `polynomial source rewrites should reconstruct the original Boolean assignment`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            ContinuousProduct(0, 0, 1),
+        ), numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+
+        val result = assertIs<SourceExecutionResult.Polynomial>(SourceSetup.execute(SourceExecutionRequest(
+            invocation, presolveConfig = PresolveConfig.parse("off,+bve"),
+        )))
+
+        val point = assertIs<OpenTheoryResult.Sat>(result.result.result).assignment
+        assertTrue(point.boolValue(0))
+        assertEquals(BigFraction.ONE, assertNotNull(point.algebraicRealValue(0)).rational)
+        assertTrue(assertNotNull(result.preparationStats).constraintsRemoved > 0)
+    }
+
+    @Test
+    fun `polynomial optimization should publish reconstructed source incumbents`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            ContinuousProduct(0, 0, 1),
+        ), numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
+            objective = LinearObjective(boolWeights = longArrayOf(0, 1)), maximize = true,
+        ))
+        val points = mutableListOf<Sample>()
+
+        val result = assertIs<SourceExecutionResult.Quadratic>(SourceSetup.execute(SourceExecutionRequest(
+            invocation, presolveConfig = PresolveConfig.parse("off,+bve"),
+        ), SourceExecutionCallbacks(onQuadraticIncumbent = { points += it.incumbent.sample })))
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result.result.result)
+        assertTrue(optimum.incumbent.sample.boolValue(0))
+        assertTrue(optimum.incumbent.sample.boolValue(1))
+        assertTrue(points.isNotEmpty())
+        assertTrue(points.all { it.boolValue(0) })
+    }
+
     @Test
     fun `fixed source execution should reject parallel cores across source families`() {
         val sources = listOf(

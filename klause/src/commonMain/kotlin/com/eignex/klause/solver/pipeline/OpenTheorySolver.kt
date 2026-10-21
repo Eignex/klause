@@ -369,8 +369,8 @@ class OpenTheoryEngine internal constructor(
         // Preparation runs before the route exists, so its refutation is the model's verdict.
         val source = prepare(cancellation)
         val prepared = source.prepared
+        stats.presolve = prepared.stats
         if (cancellation()) return OpenTheoryStart.Decided(unknown(params.timeout(), stats = stats, state = state))
-        stats.presolve = prepared.stats.takeIf { prepared.changed || it.infeasible }
         val routed = when (source) {
             is OpenSourcePreparation.Refuted -> return OpenTheoryStart.Decided(
                 OpenTheoryResult.Unsat(stats.finish(state)),

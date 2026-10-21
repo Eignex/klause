@@ -19,8 +19,60 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class SourceExecutionOutputTest {
+    @Test
+    fun `unchanged open preparation should render effort fields`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val solvable = preparedSourceSolvable(invocation, { error("open source is not finite") }, { "point" })
+        val common = CommonOptions().apply {
+            engine = "cp"
+            statistics = true
+            presolve = "off,+strengthen"
+        }
+        var stats: SolveStats? = null
+        val output = object : OutputProtocol by SmtLibOutput() {
+            override fun onStatistics(value: SolveStats, solveTimeMs: Long, solutions: Long) { stats = value }
+        }
+
+        SolveCore.solve(solvable, common, output)
+
+        val pairs = presolveStatPairs(assertNotNull(stats)).toMap()
+        assertEquals("off", pairs["presolveEmphasis"])
+        assertEquals("1", pairs["presolveCalls_strengthen"])
+        assertTrue(assertNotNull(pairs["presolveWork"]).toLong() > 0)
+        assertNotNull(pairs["presolvePreparationMs"])
+        assertNotNull(pairs["presolveWorkAllowance"])
+        assertNotNull(pairs["presolveRoundEntries"])
+    }
+
+    @Test
+    fun `linear source output should retain a disabled preparation ledger`() {
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+        )
+        val common = CommonOptions().apply { engine = "cp"; statistics = true; presolve = "off" }
+        val solvable = linearSourceSolvable(source, common, { "point" })
+        var stats: SolveStats? = null
+        val output = object : OutputProtocol by SmtLibOutput() {
+            override fun onStatistics(value: SolveStats, solveTimeMs: Long, solutions: Long) { stats = value }
+        }
+
+        SolveCore.solve(solvable, common, output)
+
+        val pairs = presolveStatPairs(assertNotNull(stats)).toMap()
+        assertEquals("off", pairs["presolveEmphasis"])
+        assertNotNull(pairs["presolvePreparationMs"])
+        assertNotNull(pairs["presolveWork"])
+        assertNotNull(pairs["presolveWorkAllowance"])
+        assertEquals("0", pairs["presolveRoundEntries"])
+    }
+
     @Test
     fun `native source refutations should retain their verdict without a complete pool`() {
         val source = SmtLib.parse(

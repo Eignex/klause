@@ -339,7 +339,7 @@ class OpenTheoryMinimizer internal constructor(
             // a descent whose every side closed would select the finite route, which no round of it can run.
             val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning(), projections, stop).plan
             if (stop() || boundedPlan.encodingDecline == EncoderDecline.RESOURCE) {
-                sink.presolve = prepared.stats.takeIf { prepared.changed || it.infeasible }
+                sink.presolve = prepared.stats
                 sink.stop()
                 val reason = when {
                     params.timeout() -> TerminationReason.Timeout

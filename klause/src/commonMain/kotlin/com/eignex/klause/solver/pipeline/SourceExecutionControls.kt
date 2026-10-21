@@ -42,7 +42,8 @@ internal fun bindSourceExecutionControls(
     val kind = SourceSetup.executionKind(invocation)
     val preparation = reader.presolve(presolveConfig ?: PresolveConfig.DEFAULT)
     val prepareOnly = reader[ExecutionOption.dryRunPresolve] == true
-    policy.validate(kind, invocation.request.engine, preparation.requested, prepareOnly)
+    policy.validate(kind, invocation.request.engine, preparation.requested, prepareOnly, preparation.config,
+        invocation.canonicalPolynomial)
     val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }
     val stop = cancellation or timeout or invocation.cancellation
     val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve")

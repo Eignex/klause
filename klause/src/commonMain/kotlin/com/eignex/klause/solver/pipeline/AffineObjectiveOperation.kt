@@ -8,4 +8,5 @@ internal fun PolynomialTheoryRequest.affineOperation(
     sense: ObjectiveSense,
 ): PolynomialTheoryRequest = PolynomialTheoryRequest(
     problem, preparedPlan.withObjective(objective, sense == ObjectiveSense.MAXIMIZE),
+    sourcePreparation, originalPlan.withObjective(objective, sense == ObjectiveSense.MAXIMIZE),
 )

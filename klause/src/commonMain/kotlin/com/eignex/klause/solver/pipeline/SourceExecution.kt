@@ -9,8 +9,10 @@ import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.effortStats
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LinearOptimizationResult
+import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
@@ -70,7 +72,7 @@ class SourceExecutionRequest private constructor(
     val polynomial: PolynomialTheoryParams,
     /** Requested arithmetic portfolio lanes. */
     val cores: Int,
-    /** Optional override of linear source preparation. */
+    /** Optional override of canonical source preparation. */
     val presolveConfig: PresolveConfig?,
     /** Containing token for the optional source preparation phase. */
     val presolveCancellation: Cancellation,
@@ -189,7 +191,9 @@ class SourceExecutionRequest private constructor(
         if (invocation.request.engine == FiniteEngine.FIXED && cores > 1) {
             throw PipelineConfigException("engine 'fixed' is single-core; use 'backtrack' for a parallel pool")
         }
-        policy.validate(SourceSetup.executionKind(invocation), invocation.request.engine, prepareOnly = prepareOnly)
+        policy.validate(SourceSetup.executionKind(invocation), invocation.request.engine, prepareOnly = prepareOnly,
+            presolveConfig = presolveConfig,
+            canonicalPolynomial = invocation.canonicalPolynomial)
     }
 }
 
@@ -229,6 +233,10 @@ sealed class SourceExecutionResult protected constructor(
     /** Bind an invocation without an additional original-unit linear qualification. */
     protected constructor(invocation: PreparedSourceInvocation) : this(invocation, null)
     override val semantics: EffectiveSourceSemantics = invocation.source.semantics
+
+    /** Source preparation observation, including unchanged and allowance-stopped phases. */
+    var preparationStats: PresolveStats? = null
+        internal set
 
     /** Source preparation diagnostics, without a solved witness, bound or terminal. */
     class Prepared internal constructor(
@@ -360,8 +368,22 @@ fun SourceSetup.execute(
 ): SourceExecutionResult {
     val kind = validateSourceExecution(request)
     if (request.prepareOnly && kind == SourceExecutionKind.LINEAR) return prepareSourceExecution(request)
-    if (request.invocation.linearSource != null) return executeLinearSource(request, callbacks, ::executeCapturedSource)
-    return executeCapturedSource(request, callbacks)
+    val result = if (request.invocation.linearSource != null) {
+        executeLinearSource(request, callbacks, ::executeCapturedSource)
+    } else executeCapturedSource(request, callbacks)
+    if (result.preparationStats == null && kind != SourceExecutionKind.FINITE) {
+        val observed = when (result) {
+            is SourceExecutionResult.Linear -> when (val execution = result.result) {
+                is OpenTheoryExecution.Satisfy -> execution.result.stats.presolve
+                is OpenTheoryExecution.Optimize -> execution.result.stats.presolve
+            }
+            else -> null
+        }
+        result.preparationStats = observed ?: PresolveStats(
+            effort = (request.presolveConfig ?: PresolveConfig.DEFAULT).effortStats(request.presolveBudget, Duration.ZERO),
+        )
+    }
+    return result
 }
 
 private fun validateSourceExecution(request: SourceExecutionRequest): SourceExecutionKind {
@@ -419,20 +441,19 @@ private fun executeCapturedSource(
             val result = if (kind == SourceExecutionKind.HEURISTIC) {
                 executeSourceHeuristic(invocation, route.preparedPlan, params, request.cores, callbacks)
             } else {
-                val prepared = request.presolveConfig?.let { config ->
-                    route.request.withPresolve(
-                        config,
-                        cancellation = request.presolveCancellation or invocation.cancellation,
-                        budget = request.presolveBudget,
-                    )
-                } ?: route.request
+                val prepared = route.request.withPresolve(
+                    request.presolveConfig ?: route.request.presolveConfig,
+                    cancellation = route.request.presolveCancellation or request.presolveCancellation or
+                        invocation.cancellation,
+                    budget = request.presolveBudget ?: route.request.presolveBudget,
+                )
                 OpenTheoryPipeline.execute(prepared, params, engine, request.cores, callbacks.onLinearIncumbent)
             }
             SourceExecutionResult.Linear(invocation, result)
         }
 
         is SourceProblemRoute.PolynomialTheory -> {
-            val prepared = if (invocation.linearSource == null) {
+            val original = if (invocation.linearSource == null) {
                 route.request
             } else {
                 PolynomialTheoryRequest(
@@ -442,7 +463,21 @@ private fun executeCapturedSource(
             }
             val params = request.polynomial.boundTo(invocation)
             val objective = invocation.workingLinearObjective
-            if (objective == null) {
+            val source = original.prepareSource(
+                request.presolveConfig ?: PresolveConfig.DEFAULT,
+                objective?.let { if (invocation.maximizeSourceObjective) it.negated() else it },
+                request.presolveCancellation or params.cancellation or params.timeout,
+                invocation.cancellation or params.cancellation or params.timeout,
+                request.presolveBudget,
+            )
+            if (source.infeasible) return SourceExecutionResult.Refuted(invocation).also {
+                it.preparationStats = source.stats
+            }
+            val prepared = original.afterSourcePreparation(source, params.cancellation or params.timeout)
+                ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
+                    it.preparationStats = source.stats
+                }
+            val result = if (objective == null) {
                 SourceExecutionResult.Polynomial(
                     invocation,
                     OpenTheoryPipeline.execute(prepared, params, engine, request.cores),
@@ -462,6 +497,7 @@ private fun executeCapturedSource(
                     ),
                 )
             }
+            result.also { it.preparationStats = source.stats }
         }
 
         is SourceProblemRoute.UnsupportedOpen -> SourceExecutionResult.Linear(

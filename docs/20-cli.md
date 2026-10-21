@@ -104,7 +104,8 @@ Solver-control flags are common to every mode; `--help` lists every parameter.
     recipe axes `sources`, `scoring` and `acceptance` edit the pool.
   - `alns` (aliases `lns`, `hybrid-lns`): adaptive large-neighbourhood search.
 - `--presolve <strength>`: `off`, `conservative`, `default` or `aggressive`, with
-  `+/-<pass>` deltas; applies to finite or linear preparation.
+  `+/-<pass>` deltas; applies to canonical factor preparation, including polynomial
+  routes. `off` is accepted for native formulas without a factor view.
 - `--lp <ceiling>`: relaxation ceiling with the same levels and `+/-<technique>`
   deltas. Arms choose intensity below it. `--lp-pricing` selects zero-objective
   entering policy. Native arithmetic routes reject explicit LP flags.
@@ -154,6 +155,11 @@ nested `frontendRoutingMs` must not be added to it. An omitted native work block
 not a zero. `armFailure.<label>` reports a caught arm exception as one-line JSON; a
 sibling's accepted result can still be the verdict. See
 [portfolio failures](12-portfolio.md#reseeding-and-arm-failures).
+
+Source routes use the same `presolvePreparationMs`, work, allowance, round-entry and
+pass-call fields as finite execution. Empty and stopped preparations retain these
+observations even when no reduction fired. Frontend routing and theory search remain
+separate from the preparation duration.
 
 ### Source interpretation controls
 

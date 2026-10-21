@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
+import kotlin.time.Duration
 
 /**
  * What the one source-safe preparation phase produced, before any route or component plan is selected.
@@ -36,6 +37,8 @@ internal class PreparedSource(
     val rebuild: SourceRebuilds,
     /** What remains of the presolve phase's allowance. */
     val budget: PresolveBudget?,
+    private val config: PresolveConfig = PresolveConfig.NONE,
+    internal var elapsed: Duration = Duration.ZERO,
 ) {
     val mapping: SourceMapping = SourceMapping(source, problem, passesFired.transformationGuarantees(), rebuild)
 
@@ -47,6 +50,7 @@ internal class PreparedSource(
         passes = passesFired.map { it.id },
         constraintsRemoved = source.factors.size - problem.factors.size,
         infeasible = infeasible,
+        effort = config.effortStats(budget, elapsed),
     )
 
     /** Preparations that did not run a pass. */

@@ -37,6 +37,10 @@ class PreparedSourceInvocation internal constructor(
 
     internal val enginePlan: PreparedSourcePlan? get() = floatGrid?.route?.preparedPlan ?: preparedPlan
 
+    internal val canonicalPolynomial: Boolean get() = engineRoute is SourceProblemRoute.PolynomialTheory ||
+        (enginePlan?.originalSource is com.eignex.klause.ir.Problem &&
+            enginePlan?.execution is PreparedExecution.Polynomial)
+
     /** Captured private grid geometry, when an explicit finite consumer selected it. */
     val floatProjection: SourceFloatProjection? get() = floatGrid?.metadata
 
