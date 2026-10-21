@@ -54,7 +54,7 @@ class SourceOrderBooleanBranchingTest {
                     event = run.next()
                 }
                 assertEquals(SearchRunEvent.Exhausted, event)
-                assertEquals(8, models.size)
+                assertEquals(8, models.distinct().size)
                 observations += models
             }
 
