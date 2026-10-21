@@ -15,6 +15,28 @@ import kotlin.test.assertTrue
 
 class PolynomialAffineReductionTest {
     @Test
+    fun `affine bound consequences remain visible without coordinate elimination`() {
+        val arithmetic = PolynomialArithmetic()
+        val x = Polynomial.variable(0)
+        val y = Polynomial.variable(1)
+        val cube = arithmetic.power(x, 3)
+        val atoms = listOf(PolynomialAtom(y, PolynomialRelation.GE),
+            PolynomialAtom(arithmetic.subtract(cube, y), PolynomialRelation.GT),
+            PolynomialAtom(arithmetic.subtract(arithmetic.power(y, 2), Polynomial.ONE), PolynomialRelation.GE))
+        val formula = PolynomialFormula.conjunction(atoms, arithmetic)
+        val region = PolynomialBooleanRegion(formula.atoms.indices.associateWith { true }, emptyMap())
+
+        val reduction = PolynomialAffineReduction.prepare(formula, region, 2, arithmetic)
+            .asSequence().filterNotNull().single()
+
+        assertFalse(reduction.inconsistent)
+        assertTrue(reduction.changed)
+        assertEquals(0, reduction.eliminatedCount)
+        assertEquals(PolynomialAtom(cube, PolynomialRelation.GT), reduction.atoms.first())
+        assertTrue(atoms.all { it in reduction.atoms })
+    }
+
+    @Test
     fun `predicate remainders retain changes without eliminating coordinates`() {
         val arithmetic = PolynomialArithmetic()
         val x = Polynomial.variable(0)
