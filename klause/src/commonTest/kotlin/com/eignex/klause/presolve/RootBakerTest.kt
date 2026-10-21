@@ -29,6 +29,17 @@ import kotlin.test.assertTrue
 
 class RootBakerTest {
     @Test
+    fun `a certified refutation should survive spent construction allowance`() {
+        val budget = PresolveBudget(0L)
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyList())
+            .bake(budget.orSpent(Cancellation.Never))
+
+        val result = RootBaker.provenInfeasible(problem, BakeConfig.NONE)
+
+        assertIs<PropagationResult.Unsat>(result.baked)
+    }
+
+    @Test
     fun `a materialized contradiction should remain infeasible with inert deduction`() {
         val providers = FactorProjectionProviders(
             propagation = PropagationProjectionProvider {

@@ -417,10 +417,8 @@ object RootBaker {
                 intDomains = problem.rootIntDomains(),
                 factors = factors,
                 cancellation = problem.cancellation,
-                // The explicit contradiction is independent of the selected filtering strength.
-                seedDeductions = if (problem.factorProjections?.nativePropagation == false) {
-                    PropagationResult.Unsat()
-                } else PropagationResult.Implied.EMPTY,
+                // The certified refutation survives cancellation of mandatory construction.
+                seedDeductions = PropagationResult.Unsat(),
                 impliedFactorMask = problem.impliedFactorMask?.let { mask ->
                     BooleanArray(factors.size) { it < mask.size && mask[it] }
                 },
