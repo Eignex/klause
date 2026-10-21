@@ -20,6 +20,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
+import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
@@ -29,6 +30,25 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class LinearSubSumAggregationTest {
+    @Test
+    fun `a three column definition should contract its target in both schedules`() {
+        for (lane in PresolveLane.entries) {
+            val problem = Problem(
+                0, 3, Array(3) { IntDomain(0, 10) },
+                listOf(sumDef(), Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 7)),
+            )
+            val config = PresolveConfig.parse("off,+aggregate")
+
+            val reduced = when (lane) {
+                PresolveLane.SOURCE -> Presolver.runSource(problem, config).problem
+                PresolveLane.FINITE -> Presolver.run(problem.bake(), config).problem
+            }
+
+            val target = reduced.factors.filterIsInstance<Linear>().single { it.vars.contentEquals(intArrayOf(0)) }
+            assertEquals(7L, target.integerConstants?.bound)
+        }
+    }
+
     @Test
     fun `the scheduled pass should honor an already cancelled phase without charging work`() {
         val problem = Problem(
