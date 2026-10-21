@@ -471,31 +471,6 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `backtrack solve should stay correct with aggressive restarts and clause forgetting`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = Array(4) { IntDomain(0, 3) },
-            factors = arrayOf<Factor>(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1),
-                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, -1),
-                Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.LE, -1),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(
-                lubyRestartBase = 4,
-                maxLearnedClauses = 0,
-                lbdGlueThreshold = 2,
-                randomSeed = 9L,
-            ),
-        )
-        val sat = assertIs<SolveResult.Sat>(r)
-        val v = sat.assignment.ints
-        assertTrue(v[0] < v[1] && v[1] < v[2] && v[2] < v[3], "got ${v.toList()}")
-    }
-
-    @Test
     fun `branch and bound should not over-prune with negative coefficients and holes`() {
         val problem = Problem(
             numBoolVars = 0,

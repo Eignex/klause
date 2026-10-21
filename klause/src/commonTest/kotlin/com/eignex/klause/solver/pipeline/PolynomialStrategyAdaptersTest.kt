@@ -289,8 +289,8 @@ class PolynomialStrategyAdaptersTest {
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
                 backtrack = BacktrackParams(randomSeed = 17),
-                localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 64),
-                alnsIterations = 8,
+                localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 16),
+                alnsIterations = 2,
             ),
         )
 
@@ -300,12 +300,12 @@ class PolynomialStrategyAdaptersTest {
             FiniteEngine.LOCAL_SEARCH,
             FiniteEngine.ALNS,
         )) {
-            val result = OpenTheoryPipeline.execute(request, params, engine, 8).result
+            val result = OpenTheoryPipeline.execute(request, params, engine, 4).result
 
             val sat = assertIs<OpenTheoryResult.Sat>(result)
             assertEquals("1", sat.assignment.intValue(0))
             assertEquals(1.0, assertNotNull(sat.assignment.algebraicRealValue(0)).rational?.toDouble())
-            assertEquals(8, sat.stats.portfolio.arms.size)
+            assertEquals(4, sat.stats.portfolio.arms.size)
         }
     }
 

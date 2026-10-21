@@ -2,8 +2,6 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -11,26 +9,21 @@ import kotlin.test.assertTrue
 class LocalSearchSolverCancellationTest {
 
     @Test
-    fun `local search samples should stop promptly after cancellation`() {
+    fun `local search samples should stop before exhausting their allowance after cancellation`() {
         val problem = unconstrainedBools(numVars = 20)
-        val cancel = AtomicBoolean(false)
+        var cancelled = false
         val params = LocalSearchParams(
-            maxFlips = Long.MAX_VALUE,
+            maxFlips = 10_000L,
             randomSeed = 1L,
-            cancellation = { cancel.get() },
+            cancellation = { cancelled },
         )
         val solver = LocalSearchSolver(problem.bake())
 
-        val flagger = thread(start = true) {
-            Thread.sleep(50)
-            cancel.set(true)
-        }
-        val started = System.currentTimeMillis()
-        val samples = solver.samples(params).toList()
-        val elapsed = System.currentTimeMillis() - started
-        flagger.join()
+        val samples = solver.samples(params).onEach {
+            cancelled = true
+        }.toList()
 
-        assertTrue(elapsed < 10_000, "took ${elapsed}ms")
+        assertTrue(samples.size.toLong() in 1 until params.maxFlips)
         samples.forEach { assertEquals(problem.numBoolVars, it.bools.size) }
     }
 
