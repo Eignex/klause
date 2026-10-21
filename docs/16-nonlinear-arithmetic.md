@@ -258,6 +258,10 @@ complete original-formula check. The probe is limited to small formulas and one
 
 **2. Required graph reduction.** Boolean unit propagation and constant numeric
 truths identify necessary signed predicates without choosing a Boolean branch.
+One private owner retains the fixed Boolean graph's unit closure through completed
+total substitutions. Newly constant predicates extend that closure; captured
+constants remain unchanged, and unrelated Boolean captures cannot share the owner.
+An interrupted capture discards its mutable state before another capture can run.
 Sign propagation can refute their conjunction. A required equality with a nonzero
 rational coordinate coefficient defines a total polynomial graph; substitution
 rewrites every atom while retaining the Boolean structure. Opposing proportional

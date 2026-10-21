@@ -52,9 +52,10 @@ internal class PolynomialFormulaReduction private constructor(
                 bitLimit = saturatedSum(bitLimit, scalarFootprint(atom.polynomial, arithmetic))
             }
             try {
+                val required = formula.requiredAtoms(arithmetic)
                 while (true) {
                     arithmetic.step()
-                    val forced = current.forcedAtoms(arithmetic)
+                    val forced = current.forcedAtoms(required)
                     if (forced == null) {
                         inconsistent = true
                         break
