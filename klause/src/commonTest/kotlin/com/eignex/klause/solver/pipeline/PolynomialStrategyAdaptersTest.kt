@@ -35,6 +35,7 @@ import kotlin.test.assertTrue
 class PolynomialStrategyAdaptersTest {
     @Test
     fun `ordinary frontend products retain the full damped transition counterexample`() {
+        println("full frontend transition: parse entered")
         val source = SmtLib.parse(
             """
             (set-info :smt-lib-version 2.6)
@@ -96,12 +97,17 @@ class PolynomialStrategyAdaptersTest {
             (exit)
             """.trimIndent(),
         )
+        println("full frontend transition: parse returned")
         val request = source.model.prepareExecutionPlan().polynomialRequest()
+        println("full frontend transition: request prepared")
         val params = PolynomialTheoryParams(maximumWork = 5_000_000)
 
+        println("full frontend transition: solve entered")
         val result = OpenTheoryPipeline.execute(request, params, FiniteEngine.BACKTRACK).result
+        println("full frontend transition: solve returned")
 
         assertIs<OpenTheoryResult.Sat>(result, result.toString())
+        println("full frontend transition: assertion passed")
     }
 
     @Test
