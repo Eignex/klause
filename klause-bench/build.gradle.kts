@@ -258,11 +258,22 @@ val compileMpsSolchecker = tasks.register<Exec>("compileMpsSolchecker") {
             miplibDirectory.get().file("upstream/checker/src/$it").asFile.absolutePath
         }.toTypedArray(), "-lgmp", "-lz")
 }
-tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
+val mpsSolcheckerResources = tasks.register<Sync>("mpsSolcheckerResources") {
+    group = "bench"
+    description = "Prepare upstream MIPLIB resources for explicit MPS validation."
     dependsOn(compileMpsSolchecker)
+    into(layout.buildDirectory.dir("mps-solchecker-resources"))
     from(miplibBinary) { into("miplib-solchecker") }
     from(miplibDirectory.map { it.dir("upstream") }) {
         include("LICENSE", "checker/README", "checker/Makefile", "checker/src/**")
         into("miplib-solchecker")
+    }
+}
+tasks.named<Test>("test") {
+    classpath += files(mpsSolcheckerResources)
+}
+if (providers.gradleProperty("bench.mpsSolchecker").isPresent) {
+    tasks.named<Jar>("jar") {
+        from(mpsSolcheckerResources)
     }
 }
