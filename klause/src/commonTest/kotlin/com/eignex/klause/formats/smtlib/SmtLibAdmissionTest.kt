@@ -43,9 +43,21 @@ class SmtLibAdmissionTest {
     @Test
     fun `inconsistent integer scalar equations should retain a linear source`() {
         val source = SmtLib.parse(
-            "(set-logic QF_LIA) (declare-const x1 Int) (declare-const x2 Int) " +
-                "(declare-const x3 Int) (declare-const x4 Int) " +
-                "(assert (= (+ x1 x2) 8)) (assert (= x1 (* 3 x3))) (assert (= x2 (* 6 x4))) (check-sat)",
+            """
+            (set-info :smt-lib-version 2.6)
+            (set-logic QF_LIA)
+            (set-info :source | Leonardo de Moura |)
+            (set-info :category "check")
+            (set-info :status unsat)
+            (set-info :notes |This benchmark is designed to check if the integer DP is complete.|)
+            (declare-fun x1 () Int)
+            (declare-fun x2 () Int)
+            (declare-fun x3 () Int)
+            (declare-fun x4 () Int)
+            (assert (and (= (+ x1 x2) 8) (= x1 (* 3 x3)) (= x2 (* 6 x4))))
+            (check-sat)
+            (exit)
+            """.trimIndent(),
         )
 
         assertIs<Problem>(source.source.originalSource)
