@@ -644,6 +644,9 @@ internal object Suites {
         format = Format.OPB
         license = "internal"
         vendored("setcover-tiny", Category.PACKING, Expected.Sat)
+        vendored("cover-dominated", Category.OPTIMIZATION, Expected.Opt(1L))
+        vendored("cover-tied", Category.OPTIMIZATION, Expected.Opt(1L))
+        vendored("cover-other-reader", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("pb-cardinality", Category.SAT, Expected.Sat)
         vendored(
             "sporttournament06",

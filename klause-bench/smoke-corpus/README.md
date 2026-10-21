@@ -87,6 +87,12 @@ separate Boolean, integer and real declaration-zero identities. Their exact cost
 are `31/2` and `27/2` in both directions. Schema and condition hashes accompany
 the immutable original source hashes; generated execution records stay external.
 
+The self-authored Apache-2.0 `opb-core/cover-*` fixtures share four positive
+covering rows with optimum 1. `cover-dominated` has strictly cheaper covering
+replacements; `cover-tied` retains tied costs and `cover-other-reader` excludes the
+common covering column through an equality. They support focused dual-fixing
+comparisons.
+
 ## Other controls
 
 The self-authored [weighted penalty complement fixture](dimacs/weighted-penalty-complements.wcnf)
