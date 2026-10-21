@@ -320,9 +320,12 @@ class CliModeSmtTest {
         assertEquals("sat", ordinary.lineSequence().first())
         assertTrue("; solvePipeline=finite-cp" in measured, measured)
         assertTrue("; frontendRoutingOutcome=finite" in measured, measured)
+        assertTrue("; smtCompiledIntegers=0" in measured, measured)
+        assertTrue("; smtBooleanArithmeticRows=0" in measured, measured)
         assertFalse("declaredTheoryRoute=" in measured, measured)
         assertFalse("solvePipeline=" in ordinary, ordinary)
         assertFalse("frontendLoadMs=" in ordinary, ordinary)
+        assertFalse("smtCompiledIntegers=" in ordinary, ordinary)
     }
 
     @Test

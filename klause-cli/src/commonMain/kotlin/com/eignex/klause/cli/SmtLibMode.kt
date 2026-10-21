@@ -16,6 +16,7 @@ import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.symbolicRealValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.compareTo
@@ -37,6 +38,7 @@ internal object SmtLibMode : CliMode {
 
     private class Session : ModeSession {
         private var latestSourceObjective: BigFraction? = null
+        private var arithmeticStatistics: List<Pair<String, String>> = emptyList()
 
         override fun flags(): List<FlagSpec> = emptyList()
 
@@ -44,6 +46,7 @@ internal object SmtLibMode : CliMode {
             val config = common.config
             val overrides = common.sourceOverrides(smtLibSemantics)
             latestSourceObjective = null
+            arithmeticStatistics = emptyList()
             val admissionStart = TimeSource.Monotonic.markNow()
             val stop = Cancellation { common.deadlineAtMs?.let { nowMillis() >= it } == true }
             val parsed = try {
@@ -62,7 +65,10 @@ internal object SmtLibMode : CliMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
-            if (common.statistics) (parsed.source.originalSource as? Problem)?.let(::reportSmtArithmeticStatistics)
+            if (common.statistics) {
+                val model = parsed.source.originalSource as? Problem
+                arithmeticStatistics = model?.let(::smtArithmeticStatistics).orEmpty()
+            }
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${bools.size} int=${ints.size} real=${reals.size}"
             }
@@ -82,11 +88,19 @@ internal object SmtLibMode : CliMode {
             )
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput { latestSourceObjective }
+        override fun output(common: CommonOptions): OutputProtocol {
+            val delegate = SmtLibOutput { latestSourceObjective }
+            return object : OutputProtocol by delegate {
+                override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                    delegate.onStatistics(stats, solveTimeMs, solutions)
+                    delegate.onAllowanceStatistics(arithmeticStatistics)
+                }
+            }
+        }
     }
 }
 
-private fun reportSmtArithmeticStatistics(model: Problem) {
+private fun smtArithmeticStatistics(model: Problem): List<Pair<String, String>> {
     var booleanRows = 0
     var mixedRows = 0
     var booleanTerms = 0
@@ -98,10 +112,12 @@ private fun reportSmtArithmeticStatistics(model: Problem) {
         booleanTerms += terms
         if ((0 until row.size).any { Term.isInt(row.ref(it)) || Term.isReal(row.ref(it)) }) mixedRows++
     }
-    println("; smtCompiledIntegers=${model.numIntVars}")
-    println("; smtBooleanArithmeticRows=$booleanRows")
-    println("; smtMixedBooleanArithmeticRows=$mixedRows")
-    println("; smtBooleanArithmeticTerms=$booleanTerms")
+    return listOf(
+        "smtCompiledIntegers" to model.numIntVars.toString(),
+        "smtBooleanArithmeticRows" to booleanRows.toString(),
+        "smtMixedBooleanArithmeticRows" to mixedRows.toString(),
+        "smtBooleanArithmeticTerms" to booleanTerms.toString(),
+    )
 }
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per
