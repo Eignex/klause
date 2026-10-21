@@ -52,22 +52,25 @@ internal fun PolynomialTheoryRequest.afterSourcePreparation(
 internal fun PolynomialTheoryRequest.reconstructSource(
     incumbent: QuadraticIncumbent,
     params: PolynomialTheoryParams,
+    verification: Cancellation,
 ): QuadraticIncumbent? {
     if (sourcePreparation?.changed != true) return incumbent
-    return reconstructSource(incumbent.sample, params)?.let { incumbent.copy(sample = it) }
+    return reconstructSource(incumbent.sample, params, verification)?.let { incumbent.copy(sample = it) }
 }
 
 internal fun PolynomialTheoryRequest.publishSource(
     result: QuadraticOptimizationResult,
     params: PolynomialTheoryParams,
+    verification: Cancellation,
 ): QuadraticOptimizationResult {
     if (sourcePreparation == null) return result
     val stats = preparationStats(result.stats)
     val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.let {
-        reconstructSource(it.incumbent, params)
+        reconstructSource(it.incumbent, params, verification)
     }
     if (result is QuadraticOptimizationResult.WithIncumbent && point == null) {
-        return QuadraticOptimizationResult.Unknown(null, TerminationReason.Unsupported, result.sense, stats)
+        val reason = params.sourceVerificationReason(verification)
+        return QuadraticOptimizationResult.Unknown(null, reason, result.sense, stats)
     }
     return when (result) {
         is QuadraticOptimizationResult.Optimal -> result.copy(incumbent = requireNotNull(point), stats = stats)
@@ -79,12 +82,23 @@ internal fun PolynomialTheoryRequest.publishSource(
     }
 }
 
-internal fun PolynomialTheoryRequest.reconstructSource(sample: Sample, params: PolynomialTheoryParams): Sample? {
+internal fun PolynomialTheoryRequest.reconstructSource(
+    sample: Sample,
+    params: PolynomialTheoryParams,
+    verification: Cancellation,
+): Sample? {
     val preparation = sourcePreparation?.takeIf { it.changed } ?: return sample
     val lifted = preparation.mapping.reconstructFrom(preparation.problem, sample)
-    val checked = checkQuadraticSourceWitness(originalPlan, lifted, params.cancellation or params.timeout,
+    val checked = checkQuadraticSourceWitness(originalPlan, lifted, verification,
         PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells))
     return lifted.takeIf { checked == SourceEvidenceCheck.Checked }
+}
+
+internal fun PolynomialTheoryParams.sourceVerificationReason(verification: Cancellation): TerminationReason = when {
+    timeout() -> TerminationReason.Timeout
+    cancellation() -> TerminationReason.Cancelled
+    verification() -> TerminationReason.BudgetExhausted
+    else -> TerminationReason.Unsupported
 }
 
 internal fun PolynomialTheoryRequest.preparationStats(stats: SolveStats): SolveStats {

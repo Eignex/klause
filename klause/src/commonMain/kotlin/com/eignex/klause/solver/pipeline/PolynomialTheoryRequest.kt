@@ -317,7 +317,7 @@ private fun executePolynomial(
     val solved = PolynomialStrategyAdapters(request.preparedPlan, shared, scope, params.strategy, stop, cores)
         .solve(engine)
     val result = solved.withStats(request.preparationStats(solved.stats))
-    val stats = scope.stats
+    var stats = scope.stats
     if (stop()) {
         return incomplete(
             if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
@@ -327,8 +327,10 @@ private fun executePolynomial(
     }
     return when (result) {
         is SolveResult.Sat -> {
-            val sample = request.reconstructSource(result.assignment, params) ?: return incomplete(
-                TerminationReason.Unsupported, stats, result.stats,
+            val sample = request.reconstructSource(result.assignment, params, scope.cancellation)
+            stats = scope.stats
+            if (sample == null) return incomplete(
+                params.sourceVerificationReason(scope.cancellation), stats, result.stats,
             )
             val assignment = ExactNraAssignment(
                 BooleanArray(source.sourceBoolCount) { sample.boolValue(it) },
@@ -346,7 +348,7 @@ private fun executePolynomial(
             }
             if (stop()) {
                 incomplete(
-                    if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
+                    params.sourceVerificationReason(scope.cancellation),
                     stats,
                     result.stats,
                 )

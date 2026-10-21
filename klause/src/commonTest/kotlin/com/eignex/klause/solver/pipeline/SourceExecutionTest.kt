@@ -40,6 +40,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration
@@ -113,6 +114,31 @@ class SourceExecutionTest {
         assertTrue(optimum.incumbent.sample.boolValue(1))
         assertTrue(points.isNotEmpty())
         assertTrue(points.all { it.boolValue(0) })
+    }
+
+    @Test
+    fun `reconstructed polynomial witness checking should spend the containing native allowance`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            ContinuousProduct(0, 0, 1),
+        ), numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val original = source.pipelineRequest()
+        val preparation = original.prepareSource(PresolveConfig.parse("off,+bve"), null,
+            Cancellation.Never, Cancellation.Never, null)
+        val prepared = assertNotNull(original.afterSourcePreparation(preparation, Cancellation.Never))
+        val sample = Sample(booleanArrayOf(false, false), LongArray(0), doubleArrayOf(1.0, 1.0),
+            exactReals = listOf(BigFraction.ONE, BigFraction.ONE))
+        val params = PolynomialTheoryParams(maximumWork = 1)
+        val native = QuadraticNativeScope(params)
+
+        val reconstructed = prepared.reconstructSource(sample, params, native.polynomial)
+
+        assertTrue(preparation.changed)
+        assertNull(reconstructed)
+        assertTrue(native.work > 0)
+        assertTrue(native.exhausted)
+        assertEquals(TerminationReason.BudgetExhausted, params.sourceVerificationReason(native.polynomial))
     }
 
     @Test

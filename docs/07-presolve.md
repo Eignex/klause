@@ -266,6 +266,8 @@ Boolean and integer coordinates before original-source checking and publication,
 including streamed optimization incumbents. Native formulas without a canonical
 factor view keep their native preparation; disabling presolve is accepted on every
 route, while individual reductions require their input representation.
+Original-source checking after reconstruction spends the containing arithmetic
+allowance and retains an already checked publication if later work stops.
 
 ## Source witness validation
 
