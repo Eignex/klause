@@ -44,7 +44,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         val claimed = IntArray(n) { -1 }
         val pred = IntArray(n) { -1 }
         if (!claimFixed(state, claimed, pred)) return false
-        if (!shaveClaimed(state, claimed)) return false
+        if (!excludeClaimed(state, claimed)) return false
         val mandatory = BooleanArray(n)
         val includedCount = markMandatory(state, mandatory)
         if (!noShortFixedCycle(state, mandatory, includedCount)) return false
@@ -66,13 +66,13 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         return true
     }
 
-    // Mark the nodes whose own index has left their successor's bounds, so they must lie on the cycle; returns
+    // Mark the nodes whose own index has left their successor's domain, so they must lie on the cycle; returns
     // how many there are.
     private fun markMandatory(state: PropagationState, mandatory: BooleanArray): Int {
         var includedCount = 0
         for (i in succ.indices) {
             val d = state.intDomains[succ[i]]
-            if (i < d.min || i > d.max) {
+            if (i.toLong() !in d) {
                 mandatory[i] = true
                 includedCount++
             }
@@ -116,7 +116,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         return true
     }
 
-    // Shave the endpoint that would close a fixed chain into a cycle too short for the nodes that must be on it.
+    // Exclude closing a fixed chain into a cycle too short for the nodes that must be on it.
     private fun shaveChainClosures(
         state: PropagationState,
         pred: IntArray,
@@ -131,7 +131,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             val start = c.head
             if (start == i || includedCount <= c.length) continue
             val atMin = start.toLong() == d.min
-            if (!atMin && start.toLong() != d.max) continue
+            if (start.toLong() !in d) continue
             // Closing the chain start → … → i now would leave a node that must be on the cycle off it.
             val onChain = BooleanArray(n)
             val reason = Reason(state)
@@ -146,39 +146,28 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             if (atMin) {
                 val ant = reason.lower(v).build()
                 if (!state.tightenIntMin(v, d.min + 1, ant)) return fail(Reason(state).add(ant).upper(v))
-            } else {
+            } else if (start.toLong() == d.max) {
                 val ant = reason.upper(v).build()
                 if (!state.tightenIntMax(v, d.max - 1, ant)) return fail(Reason(state).add(ant).lower(v))
+            } else if (!state.excludeIntValue(v, start.toLong(), reason.build())) {
+                return fail(reason.fixed(i))
             }
         }
         return true
     }
 
-    // Shave the values other successors have claimed off each open successor's endpoints, citing those claims.
-    private fun shaveClaimed(state: PropagationState, claimed: IntArray): Boolean {
+    // A fixed incoming edge excludes every competing incoming edge, including optional self-loops.
+    private fun excludeClaimed(state: PropagationState, claimed: IntArray): Boolean {
         for (i in succ.indices) {
             val v = succ[i]
-            val d = state.intDomains[v]
-            if (d.min == d.max) continue
-            var newMin = d.min
-            val lowReason = Reason(state)
-            while (newMin < d.max && claimed[newMin.toInt()] != -1 && claimed[newMin.toInt()] != i) {
-                lowReason.fixed(claimed[newMin.toInt()])
-                newMin++
-            }
-            var newMax = d.max
-            val highReason = Reason(state)
-            while (newMax > newMin && claimed[newMax.toInt()] != -1 && claimed[newMax.toInt()] != i) {
-                highReason.fixed(claimed[newMax.toInt()])
-                newMax--
-            }
-            if (newMin != d.min) {
-                val ant = lowReason.lower(v).build()
-                if (!state.tightenIntMin(v, newMin, ant)) return fail(Reason(state).add(ant).upper(v))
-            }
-            if (newMax != d.max) {
-                val ant = highReason.upper(v).build()
-                if (!state.tightenIntMax(v, newMax, ant)) return fail(Reason(state).add(ant).lower(v))
+            if (state.intDomains[v].min == state.intDomains[v].max) continue
+            for (target in claimed.indices) {
+                val owner = claimed[target]
+                if (owner < 0 || owner == i || target.toLong() !in state.intDomains[v]) continue
+                val reason = Reason(state).fixed(owner)
+                if (!state.excludeIntValue(v, target.toLong(), reason.build())) {
+                    return fail(reason.fixed(i))
+                }
             }
         }
         return true
@@ -244,7 +233,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             return this
         }
 
-        /** The bound that keeps one node outside [excluded] from opting out, which the cycle must then visit. */
+        /** One node outside [excluded] cannot opt out, so the cycle must visit it. */
         fun mandatoryOutside(mandatory: BooleanArray, excluded: BooleanArray): Reason {
             var chosen = -1
             for (k in 0 until n) {
@@ -252,16 +241,12 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
                 if (chosen == -1 || cost(k) < cost(chosen)) chosen = k
             }
             check(chosen >= 0) { "no mandatory node outside the cycle" }
-            val d = state.intDomains[succ[chosen]]
-            return if (chosen < d.min) lower(succ[chosen]) else upper(succ[chosen])
+            return lacks(chosen, chosen)
         }
 
-        // A node opted in by a root bound costs no literal.
+        // A node opted in by its root domain costs no literal.
         private fun cost(k: Int): Int {
-            val v = succ[k]
-            val d = state.intDomains[v]
-            val root = state.rootDomains[v]
-            return if (k < d.min) (if (d.min > root.min) 1 else 0) else (if (d.max < root.max) 1 else 0)
+            return if (k.toLong() in state.rootDomains[succ[k]]) 1 else 0
         }
 
         private fun addLiteral(literal: Int) {

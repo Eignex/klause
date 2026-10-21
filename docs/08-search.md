@@ -229,11 +229,12 @@ retraction, so propagated as well as decided polarities survive backjumps and
 restarts. Dom/wdeg failure weights belong to the solve and survive restarts; fresh
 selectors isolate solves that share a projection.
 
-Full-circuit propagation removes self-loops, targets claimed by fixed incoming
-edges and premature chain closures throughout successor domains, including interior
-values. Conditional removals cite the fixed edges that justify them and retract
-with those premises. Reachability and dominator filtering then inspect the remaining
-candidate arcs.
+Circuit propagation removes targets claimed by fixed incoming edges and premature
+chain closures throughout successor domains, including interior values. Full
+circuits also exclude self-loops; optional cycles treat an absent self-loop as
+mandatory participation even when it is an interior hole. Conditional removals cite
+their fixed edges and required participation premises and retract with them.
+Reachability and full-circuit dominator filtering inspect the remaining arcs.
 
 General CP optimization builds its private state in retained batches before
 traversal, and assumption installation commits each fixpoint before the next;

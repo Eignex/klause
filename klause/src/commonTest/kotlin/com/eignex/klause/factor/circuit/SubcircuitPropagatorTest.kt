@@ -11,9 +11,12 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
 import kotlin.random.Random
 import kotlin.test.Test
@@ -25,6 +28,42 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SubcircuitPropagatorTest {
+
+    @Test
+    fun `a fixed incoming edge should exclude interior alternatives and retract with its premise`() {
+        val state = PropagationState(problem(5), Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.undoLogging = true
+        val mark = state.mark()
+        state.currentLevel = 1
+        assertTrue(state.setInt(4, 2))
+
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertFalse(2L in state.intDomains[1])
+        assertFalse(2L in state.intDomains[2])
+        val premises = setOf(Lit.make(state.atomVarGe(4, 2), false), Lit.make(state.atomVarLe(4, 2), false))
+        assertEquals(premises, state.reasonOf(state.holeReasonFor(1, 2))?.toSet())
+        state.undoTo(mark)
+        assertTrue(2L in state.intDomains[1])
+        assertTrue(2L in state.intDomains[2])
+    }
+
+    @Test
+    fun `a premature cycle should cite a mandatory node whose self loop is an interior hole`() {
+        val source = problem(5)
+        val state = PropagationState(source, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        assertTrue(state.setInt(0, 1) && state.setInt(1, 0) && state.excludeIntValue(3, 3))
+        state.currentFactor = 0
+
+        assertFalse(state.factorAt(0).propagate(state, 0))
+
+        val premise = state.exclusionLiteral(3, 3, state.undo.size)
+        assertTrue(premise in state.factorAt(0).conflictReason(state, 0)!!)
+        ConflictReasonOracle.assertEntailed(source, state, 0)
+    }
 
     @Test
     fun `subcircuit deductions should be implied by their reasons under carved holes`() {
