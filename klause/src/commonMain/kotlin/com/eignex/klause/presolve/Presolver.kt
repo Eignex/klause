@@ -246,9 +246,10 @@ object Presolver {
             context.presolveBudget.observeRoundPass(
                 PresolvePass.STRENGTHEN_COEFFICIENTS, PresolveLane.FINITE, cancellation,
                 { problem.presolveSize() }, { true },
-            ) {
-                cancellation.charge(PresolvePass.STRENGTHEN_COEFFICIENTS.baseWorkWeight *
-                    PresolveEntrySize(context.presolveBudget).units(problem, cancellation))
+            ) { invocation ->
+                val units = PresolveEntrySize(context.presolveBudget).units(problem, cancellation)
+                invocation.recordEntries(units)
+                cancellation.charge(PresolvePass.STRENGTHEN_COEFFICIENTS.baseWorkWeight * units)
                 if (Presolve.strengthenCoefficients(problem, cancellation).infeasible) {
                     PassOutcome.INFEASIBLE
                 } else PassOutcome.UNCHANGED

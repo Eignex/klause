@@ -12,7 +12,7 @@ enum class PresolveLane {
 
 /** Whether analysis was inapplicable, completed, productive or stopped. */
 enum class PresolveInvocationOutcome {
-    /** A sound namespace or candidate-shape exclusion avoided analysis. */
+    /** An applicability gate declined the reduction analysis. */
     ELIGIBILITY_SKIP,
     /** Analysis completed without a reduction. */
     COMPLETE_MISS,

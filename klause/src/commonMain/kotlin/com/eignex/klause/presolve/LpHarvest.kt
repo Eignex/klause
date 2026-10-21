@@ -291,6 +291,7 @@ fun lpHarvestReporting(
             numIntVars = problem.numIntVars,
             intDomains = domains,
             factors = factors,
+            cancellation = cancellation,
             // The LP-only continuous columns are a namespace the harvest never touches; carrying them
             // through is what keeps the leaf's exact verdict on them after a shave.
             numRealVars = problem.numRealVars,

@@ -407,6 +407,7 @@ object RootBaker {
                 numIntVars = problem.numIntVars,
                 intDomains = problem.rootIntDomains(),
                 factors = factors,
+                cancellation = problem.cancellation,
                 // The explicit contradiction is independent of the selected filtering strength.
                 seedDeductions = if (problem.factorProjections?.nativePropagation == false) {
                     PropagationResult.Unsat()
