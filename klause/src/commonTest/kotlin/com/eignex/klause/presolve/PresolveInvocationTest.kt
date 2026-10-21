@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -11,16 +12,126 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolveInvocationTest {
+    @Test
+    fun `unsupported clause analyses should skip before entry accounting in either lane`() {
+        val problem = Problem(3, 0, emptyArray(), List(8) { Clause(intArrayOf(0, 2, 4)) })
+        for (lane in PresolveLane.entries) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val token = budget.orSpent(Cancellation.Never)
+            val config = PresolveConfig.parse("off,+probe-open,+fuse-bounds,+dependent-rows,+sparsify")
+            val context = PresolveContext(presolveBudget = budget)
+
+            when (lane) {
+                PresolveLane.SOURCE -> Presolver.runSource(problem, config, context, token)
+                PresolveLane.FINITE -> Presolver.run(problem.bake(), config, context, token)
+            }
+
+            assertEquals(4, budget.invocations.size)
+            assertTrue(budget.invocations.all { it.outcome == PresolveInvocationOutcome.ELIGIBILITY_SKIP })
+            assertTrue(budget.invocations.all { it.work == 0L && it.input.occurrences == null })
+            assertEquals(0L, budget.entrySizeVisits)
+        }
+    }
+
+    @Test
+    fun `closed integer source probing should skip before entry accounting`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        Presolver.runSource(problem, PresolveConfig.parse("off,+probe-open"),
+            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+
+        assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, budget.invocations.single().outcome)
+        assertEquals(0L, budget.spent())
+        assertEquals(0L, budget.entrySizeVisits)
+    }
+
+    @Test
+    fun `integer row analyses should retain productive calls in either lane`() {
+        val equality = Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 3)
+        val cases = listOf(
+            "fuse-bounds" to listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+            ),
+            "dependent-rows" to listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.EQ, 4),
+                Linear(intArrayOf(1, 2, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 7),
+            ),
+            "sparsify" to listOf(equality,
+                Linear(intArrayOf(2, 2, 3), intArrayOf(0, 1, 2), LinearOp.LE, 7)),
+        )
+        for ((pass, factors) in cases) {
+            for (lane in PresolveLane.entries) {
+                val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, factors)
+                val budget = PresolveBudget(Long.MAX_VALUE)
+                val context = PresolveContext(presolveBudget = budget)
+                val token = budget.orSpent(Cancellation.Never)
+                val config = PresolveConfig.parse("off,+$pass")
+
+                when (lane) {
+                    PresolveLane.SOURCE -> Presolver.runSource(problem, config, context, token)
+                    PresolveLane.FINITE -> Presolver.run(problem.bake(), config, context, token)
+                }
+
+                assertEquals(PresolveInvocationOutcome.CHANGED, budget.invocations.first().outcome, "$pass $lane")
+                assertTrue(budget.invocations.first().work > 0L)
+            }
+        }
+    }
+
+    @Test
+    fun `probing without integer columns should retain constant row refutation`() {
+        val problem = Problem(0, 0, emptyArray(), listOf(
+            ExactLinear.of(intArrayOf(), emptyList(), LinearOp.LE, BigFraction.ONE.negated()),
+        ))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val result = Presolver.runSource(problem, PresolveConfig.parse("off,+probe"),
+            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+
+        assertTrue(result.infeasible)
+        assertEquals(PresolveInvocationOutcome.REFUTED, budget.invocations.single().outcome)
+    }
+
+    @Test
+    fun `clause subsumption eligibility should follow the supplied live factor count at its cap`() {
+        val problem = Problem(3, 0, emptyArray(), listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 2, 4))))
+        val pass = PresolvePass.SUBSUME_CLAUSES
+
+        assertFalse(pass.namespaceEligible(problem, 200_001))
+        assertTrue(pass.namespaceEligible(problem, 200_000))
+    }
+
+    @Test
+    fun `finite clause subsumption should read clauses retained by earlier reductions`() {
+        val shorter = Clause(intArrayOf(0, 2))
+        val problem = Problem(3, 0, emptyArray(), listOf(shorter, Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 2, 4))))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val result = Presolver.run(problem.bake(), PresolveConfig.parse("off,+subsume,+clause-subsume"),
+            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+
+        assertEquals(1, result.problem.factors.size)
+        val call = budget.invocations.first { it.pass == "clause-subsume" }
+        assertEquals(2, call.input.factors)
+        assertEquals(PresolveInvocationOutcome.CHANGED, call.outcome)
+    }
+
     @Test
     fun `aggregation without a pivot and two integer partners should skip entry analysis`() {
         for (numInts in 0..2) {

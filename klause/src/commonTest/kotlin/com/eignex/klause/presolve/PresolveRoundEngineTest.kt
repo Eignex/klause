@@ -1,5 +1,7 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
@@ -7,6 +9,43 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class PresolveRoundEngineTest {
+    @Test
+    fun `a skipped clause pass should become eligible when live dimensions cross its cap`() {
+        val problem = Problem(3, 0, emptyArray(), listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 2, 4))))
+        val outcomes = ArrayList<PassOutcome>()
+        val host = object : PresolveRoundEngine.RoundHost {
+            var liveFactors = 200_001
+            var changed = 0L
+
+            override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+                if (pass == PresolvePass.REMOVE_REDUNDANT) {
+                    if (liveFactors <= 2) return PassOutcome.UNCHANGED
+                    changed += liveFactors - 2
+                    liveFactors = 2
+                    return PassOutcome.CHANGED
+                }
+                val outcome = if (pass.namespaceEligible(problem, liveFactors)) {
+                    val delta = pass.applySource(problem, PresolveContext.EMPTY)
+                    changed += delta.droppedIndices.size
+                    liveFactors -= delta.droppedIndices.size
+                    PassOutcome.CHANGED
+                } else PassOutcome.SKIPPED
+                outcomes.add(outcome)
+                return outcome
+            }
+
+            override fun complexity(): Long = liveFactors.toLong()
+            override fun modelSize(): Long = liveFactors.toLong() + 3
+            override fun changedUnits(): Long = changed
+        }
+
+        PresolveRoundEngine.run(listOf(PresolvePass.SUBSUME_CLAUSES, PresolvePass.REMOVE_REDUNDANT),
+            2, Cancellation.Never, null, host)
+
+        assertEquals(listOf(PassOutcome.SKIPPED, PassOutcome.CHANGED), outcomes)
+        assertEquals(1, host.liveFactors)
+    }
+
     private class ScriptedHost(
         private val size: Long,
         private val changes: Map<PresolvePass, List<Long>>,

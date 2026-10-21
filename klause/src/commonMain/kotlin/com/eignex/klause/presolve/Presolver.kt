@@ -372,7 +372,7 @@ object Presolver {
                     { PresolveSizeStats(
                         session.liveFactorCount, problem.numBoolVars, problem.numIntVars, reals = problem.numRealVars,
                     ) },
-                    { pass.namespaceEligible(problem) && incrementalEligible(pass, token) },
+                    { pass.namespaceEligible(problem, session.liveFactorCount) && incrementalEligible(pass, token) },
                 ) { invocation ->
                     // Before the context: [passOccurrence] is keyed against the factor list [passInput] fixes.
                     val input = session.passInput()
