@@ -71,7 +71,7 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
     }
 
     @Test
-    fun `native presolve tuning should require linear source preparation`() {
+    fun `native presolve tuning should require canonical source preparation`() {
         val source = sourceText?.let { SmtLib.parse(it).source } ?: SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
             ProblemSettings(),
@@ -81,7 +81,7 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
         )
         val options = ExecutionOptions(ExecutionOption.presolveMaxRounds(2))
 
-        if (SourceSetup.executionKind(invocation) == SourceExecutionKind.LINEAR) {
+        if (SourceSetup.executionKind(invocation) == SourceExecutionKind.LINEAR || invocation.canonicalPolynomial) {
             assertEquals(2, SourceExecutionRequest(invocation, options).presolveConfig?.maxRounds)
         } else {
             assertFailsWith<PipelineConfigException> { SourceExecutionRequest(invocation, options) }

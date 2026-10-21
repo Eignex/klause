@@ -35,14 +35,14 @@ class SourceExecutionOutputTest {
             statistics = true
             presolve = "off,+strengthen"
         }
-        var stats: SolveStats? = null
+        var observed: SolveStats? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onStatistics(value: SolveStats, solveTimeMs: Long, solutions: Long) { stats = value }
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) { observed = stats }
         }
 
         SolveCore.solve(solvable, common, output)
 
-        val pairs = presolveStatPairs(assertNotNull(stats)).toMap()
+        val pairs = presolveStatPairs(assertNotNull(observed)).toMap()
         assertEquals("off", pairs["presolveEmphasis"])
         assertEquals("1", pairs["presolveCalls_strengthen"])
         assertTrue(assertNotNull(pairs["presolveWork"]).toLong() > 0)
@@ -58,14 +58,14 @@ class SourceExecutionOutputTest {
         )
         val common = CommonOptions().apply { engine = "cp"; statistics = true; presolve = "off" }
         val solvable = linearSourceSolvable(source, common, { "point" })
-        var stats: SolveStats? = null
+        var observed: SolveStats? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onStatistics(value: SolveStats, solveTimeMs: Long, solutions: Long) { stats = value }
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) { observed = stats }
         }
 
         SolveCore.solve(solvable, common, output)
 
-        val pairs = presolveStatPairs(assertNotNull(stats)).toMap()
+        val pairs = presolveStatPairs(assertNotNull(observed)).toMap()
         assertEquals("off", pairs["presolveEmphasis"])
         assertNotNull(pairs["presolvePreparationMs"])
         assertNotNull(pairs["presolveWork"])
