@@ -9,6 +9,7 @@ import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioScenario
@@ -43,7 +44,16 @@ class SourceSearchAdmissionTest {
         val points = ArrayList<Sample>()
 
         val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(
-            SourceExecutionRequest(invocation, presolveConfig = PresolveConfig.parse("affine")),
+            SourceExecutionRequest(invocation, finiteRequest = { shape ->
+                FiniteSolveRequest(
+                    shape, FiniteEngine.MIXED, PresolveConfig.parse("affine"), true, false, Cancellation.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
+                    randomSeed = 1, defaultArms = PortfolioScenario.DEFAULT_ARMS, lpConfig = LpConfig.OFF,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null, deadlineExceeded = { false },
+                    onEvent = null, onPortfolioEvent = null,
+                )
+            }),
             SourceExecutionCallbacks(FiniteSolveCallbacks(points::add, { points += it.sample })),
         ))
 
