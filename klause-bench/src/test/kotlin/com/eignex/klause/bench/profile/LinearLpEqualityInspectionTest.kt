@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.solver.search.SearchNodeDisposition
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.Json
@@ -11,6 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
@@ -31,13 +33,15 @@ class LinearLpEqualityInspectionTest {
         val first = current
         val checkpoint = LinearLpEqualityCheckpoint { current }
         val session = SearchSession(emptyList())
+        val run = session.openRun(numBoolVars = 0, nodePolicy = checkpoint)
+        session.initialize()
 
-        val paused = checkpoint.beforeBranch(session)
+        val paused = run.next()
         current = LinearLpEqualitySnapshot(Any(), 257)
-        val checkedAgain = checkpoint.beforeBranch(session)
+        val checkedAgain = run.next()
 
-        assertSame(SearchNodeDisposition.Pause, paused)
-        assertSame(SearchNodeDisposition.Pause, checkedAgain)
+        assertIs<SearchRunEvent.Paused>(paused)
+        assertIs<SearchRunEvent.Paused>(checkedAgain)
         assertSame(first, checkpoint.captured)
         assertEquals(0, checkpoint.decisionLevel)
     }
