@@ -13,6 +13,105 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `shared images should add within a single image elimination matrix`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val square = arithmetic.evaluate(RationalPolynomial.of(0, 0, 1), base)
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
+
+        val sum = limited.add(arithmetic.refine(base), square)
+
+        assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-6, -6, 0, 1), sum))
+        assertEquals(1, arithmetic.sign(sum))
+    }
+
+    @Test
+    fun `shared affine images should multiply within a single image elimination matrix`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val left = arithmetic.evaluate(RationalPolynomial.of(1, 1), base)
+        val right = arithmetic.evaluate(RationalPolynomial.of(-1, 0, 1), base)
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
+
+        val product = limited.multiply(left, right)
+
+        assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-9, 9, -3, 1), product))
+    }
+
+    @Test
+    fun `refined nested images should retain their common primitive root`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val square = arithmetic.evaluate(RationalPolynomial.of(0, 0, 1), base)
+        val fourth = arithmetic.power(arithmetic.refine(square), 2)
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
+
+        val sum = limited.add(fourth, square)
+
+        assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-20, -12, 0, 1), sum))
+    }
+
+    @Test
+    fun `images of distinct conjugates should preserve their separate root choices`() {
+        val bases = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 0, 1))
+        val left = arithmetic.evaluate(RationalPolynomial.of(1, 1), bases.last())
+        val right = arithmetic.evaluate(RationalPolynomial.of(-1, 1), bases.first())
+
+        val sum = arithmetic.add(left, right)
+
+        assertEquals(0, arithmetic.sign(sum))
+    }
+
+    @Test
+    fun `shared images should use the requesting caller after producer cancellation`() {
+        var cancelled = false
+        val producer = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        val base = producer.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val square = producer.evaluate(RationalPolynomial.of(0, 0, 1), base)
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
+        cancelled = true
+
+        val sum = caller.add(base, square)
+
+        assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-6, -6, 0, 1), sum))
+    }
+
+    @Test
+    fun `interrupted image arithmetic should leave owned values usable by another caller`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val square = arithmetic.evaluate(RationalPolynomial.of(0, 0, 1), base)
+        val interrupted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
+
+        assertFailsWith<PolynomialInterrupted> { interrupted.add(base, square) }
+        val sum = caller.add(base, square)
+
+        assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-6, -6, 0, 1), sum))
+    }
+
+    @Test
+    fun `wide captured bases should leave admitted scalar arithmetic available`() {
+        val defining = RationalPolynomial(List(13) { index ->
+            when (index) {
+                0 -> BigFraction.ofLong(-2)
+                12 -> BigFraction.ONE
+                else -> BigFraction.ZERO
+            }
+        })
+        val base = arithmetic.roots(defining).last()
+        val first = arithmetic.evaluate(RationalPolynomial(List(5) { index ->
+            if (index == 4) BigFraction.ONE else BigFraction.ZERO
+        }), base)
+        val second = arithmetic.evaluate(RationalPolynomial(List(9) { index ->
+            if (index == 8) BigFraction.ONE else BigFraction.ZERO
+        }), base)
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(
+            maxDenseCoefficients = 10, maxMatrixCells = 36,
+        )))
+
+        val sum = caller.add(first, second)
+
+        assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-6, -6, 0, 1), sum))
+    }
+
+    @Test
     fun `shared specialization should not require coefficient image elimination`() {
         val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
         val relation = polynomial.subtract(Polynomial.variable(1), polynomial.power(Polynomial.variable(0), 2))
