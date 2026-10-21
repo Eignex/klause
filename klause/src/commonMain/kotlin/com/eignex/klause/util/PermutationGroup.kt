@@ -95,6 +95,22 @@ object PermutationGroup {
      *  transversal `u` of the orbit of [point], `u(s·γ)⁻¹ ∘ s ∘ u(γ)` over every generator `s` and
      *  orbit point `γ`. Each fixes [point] and lies in `<gens>`. */
     private fun schreierGenerators(gens: List<IntArray>, point: Int, n: Int): List<IntArray> {
+        val transversal = schreierTransversal(gens, point, n)
+        val result = ArrayList<IntArray>()
+        val orbit = ArrayList<Int>(transversal.size)
+        transversal.forEach { gamma, _ -> orbit.add(gamma) }
+        for (gamma in orbit) {
+            val ug = transversal.getValue(gamma)
+            for (s in gens) {
+                val sug = compose(s, ug)
+                val usg = transversal.getValue(s[gamma])
+                result.add(compose(inverse(usg), sug))
+            }
+        }
+        return result
+    }
+
+    private fun schreierTransversal(gens: List<IntArray>, point: Int, n: Int): MutableIntObjectMap<IntArray> {
         val transversal = MutableIntObjectMap<IntArray>()
         transversal.put(point, IntArray(n) { it })
         val frontier = ArrayDeque<Int>()
@@ -110,18 +126,7 @@ object PermutationGroup {
                 }
             }
         }
-        val result = ArrayList<IntArray>()
-        val orbit = ArrayList<Int>(transversal.size)
-        transversal.forEach { gamma, _ -> orbit.add(gamma) }
-        for (gamma in orbit) {
-            val ug = transversal.getValue(gamma)
-            for (s in gens) {
-                val sug = compose(s, ug)
-                val usg = transversal.getValue(s[gamma])
-                result.add(compose(inverse(usg), sug))
-            }
-        }
-        return result
+        return transversal
     }
 
     private fun dedup(list: List<IntArray>): ArrayList<IntArray> {
