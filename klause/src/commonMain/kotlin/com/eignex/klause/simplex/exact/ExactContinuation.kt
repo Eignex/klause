@@ -474,9 +474,18 @@ private class RationalContinuationLane<F>(
         while (true) {
             val values = values(budget)
             val epsilon = epsilonValues(budget)
-            val row = headings.indices.filter { violation(it, values, epsilon, budget) != 0 }
-                .minByOrNull { headings[it] }
-            if (row == null) {
+            var row = -1
+            var direction = 0
+            for (candidate in headings.indices) {
+                budget.step()
+                if (row >= 0 && headings[candidate] >= headings[row]) continue
+                val violated = violation(candidate, values, epsilon, budget)
+                if (violated != 0) {
+                    row = candidate
+                    direction = violated
+                }
+            }
+            if (row < 0) {
                 return LaneResult(
                     materialize(values, epsilon, budget),
                     // Finite strict points need not sit at the original nonbasic endpoints.
@@ -484,7 +493,6 @@ private class RationalContinuationLane<F>(
                     statuses = if (epsilon == null) statuses.toList() else null,
                 )
             }
-            val direction = violation(row, values, epsilon, budget)
             val enter = entering(row, direction, budget)
             if (enter == null) return conflict(row, direction, budget)
             beforePivot()
@@ -551,13 +559,13 @@ private class RationalContinuationLane<F>(
     private fun values(budget: ContinuationBudget): List<F> {
         budget.step(bytes = input.total * 8L)
         val result = seats.toMutableList()
+        val active = activeSeats(seats, budget)
         for (row in headings.indices) {
+            budget.step()
             var value = table[row][width - 1]
-            for (j in 0 until input.total) {
+            for (j in active) {
                 budget.step()
-                if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(seats[j]) &&
-                    !ops.isZero(table[row][j])
-                ) {
+                if (!ops.isZero(table[row][j])) {
                     value = subtract(value, multiply(table[row][j], seats[j], budget), budget)
                 }
             }
@@ -570,19 +578,31 @@ private class RationalContinuationLane<F>(
         val epsilon = seatEpsilon ?: return null
         budget.step(bytes = input.total * 8L)
         val result = epsilon.toMutableList()
+        val active = activeSeats(epsilon, budget)
         for (row in headings.indices) {
+            budget.step()
             var value = ops.zero
-            for (j in 0 until input.total) {
+            for (j in active) {
                 budget.step()
-                if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(epsilon[j]) &&
-                    !ops.isZero(table[row][j])
-                ) {
+                if (!ops.isZero(table[row][j])) {
                     value = subtract(value, multiply(table[row][j], epsilon[j], budget), budget)
                 }
             }
             result[headings[row]] = value
         }
         return result
+    }
+
+    private fun activeSeats(values: List<F>, budget: ContinuationBudget): IntArray {
+        budget.step(bytes = input.total * 4L)
+        val active = IntArray(input.total)
+        var count = 0
+        for (j in values.indices) {
+            budget.step()
+            if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(values[j])) active[count++] = j
+        }
+        budget.step(count.toLong(), count * 4L)
+        return active.copyOf(count)
     }
 
     private fun materialize(values: List<F>, epsilon: List<F>?, budget: ContinuationBudget): List<BigFraction> {

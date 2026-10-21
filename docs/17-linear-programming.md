@@ -309,6 +309,9 @@ pivot updates. Pivots copy the normalized row and each row with a nonzero enteri
 coefficient, sharing unchanged rows until a later pivot edits them. Row selection,
 copies and coefficient traversal remain charged; nonzero arithmetic retains scalar
 admission and pivots publish atomically.
+Value sweeps select nonzero nonbasic seats once before visiting rows. Bland
+selection compares a row's bounds only when its heading can precede the current
+violated candidate.
 
 Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
 restarts the operation from authority, and every attempt is charged. Owner-local

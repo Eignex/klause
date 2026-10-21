@@ -11,6 +11,81 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `wide zero seated systems should preserve strict and fixed contributors within their work allowance`() {
+        val rows = 64
+        val columns = 512
+        val total = columns + rows
+        val last = columns - 1
+        val limits = ExactContinuationLimits(maxWork = 400_000)
+        for (strict in listOf(false, true)) {
+            val input = ExactContinuationInput(
+                List(columns) { column ->
+                    when {
+                        column < rows -> listOf(column to BigFraction.ONE)
+                        column == last -> listOf(0 to BigFraction.ONE)
+                        else -> emptyList()
+                    }
+                },
+                List(rows) { if (it == 0 && !strict) BigFraction.ofLong(2L) else BigFraction.ONE },
+                List(total) { if (it == last && !strict) BigFraction.ONE else BigFraction.ZERO },
+                List(total) {
+                    when {
+                        it < rows -> null
+                        it == last -> BigFraction.ONE
+                        else -> BigFraction.ZERO
+                    }
+                },
+                List(rows) { columns + it },
+                List(total) {
+                    when {
+                        it < rows || (it == last && strict) -> ContinuationStatus.LOWER
+                        it < columns -> ContinuationStatus.FIXED
+                        else -> ContinuationStatus.BASIC
+                    }
+                },
+                lowerStrict = List(total) { it == last && strict },
+            )
+
+            val result = ExactContinuation(input).resume(limits)
+
+            val point = assertNotNull(result.values, result.metrics.toString())
+            for (row in 0 until rows) {
+                val contribution = if (row == 0) point[last] else BigFraction.ZERO
+                assertEquals(input.rhs[row], point[row] + contribution)
+                assertTrue(point[row] >= BigFraction.ZERO)
+                assertEquals(BigFraction.ZERO, point[columns + row])
+            }
+            assertTrue((rows until last).all { point[it].isZero })
+            if (strict) assertTrue(point[last] > BigFraction.ZERO && point[last] < BigFraction.ONE)
+            else assertEquals(BigFraction.ONE, point[last])
+            assertNull(result.ray)
+            assertNull(result.metrics.decline)
+            assertTrue(result.metrics.work <= limits.maxWork)
+        }
+    }
+
+    @Test
+    fun `Bland leaving order should retain its conflict across permuted logical headings`() {
+        for (headings in listOf(listOf(2, 3), listOf(3, 2))) {
+            val input = ExactContinuationInput(
+                listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)),
+                listOf(BigFraction.ONE, BigFraction.ofLong(2L)),
+                List(4) { BigFraction.ZERO },
+                List(4) { if (it < 2) null else BigFraction.ZERO },
+                headings,
+                List(4) { if (it < 2) ContinuationStatus.LOWER else ContinuationStatus.BASIC },
+            )
+
+            val result = ExactContinuation(input).resume()
+
+            assertNull(result.values)
+            assertEquals(listOf(BigFraction.MINUS_ONE, BigFraction.ONE), assertNotNull(result.ray))
+            assertEquals(2, result.metrics.pivots)
+            assertNull(result.metrics.decline)
+        }
+    }
+
+    @Test
     fun `cancelled coupled pivots should resume a complete exact assignment`() {
         val n = 8
         val input = ExactContinuationInput(
