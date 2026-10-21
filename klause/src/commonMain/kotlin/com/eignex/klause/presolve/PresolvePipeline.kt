@@ -245,7 +245,9 @@ object PresolvePipeline {
                 unchanged = { null },
                 output = { it?.problem ?: seeded },
             ) {
-                BinaryColumnSubstitution.substitute(seeded, context.objectiveIntVars, bakeConfig)
+                BinaryColumnSubstitution.substitute(seeded, context.objectiveIntVars, bakeConfig).also { result ->
+                    presolveBudget?.activeInvocation?.fixedColumns = result?.columns ?: 0
+                }
             }
         }
         var current = substitution?.problem ?: seeded

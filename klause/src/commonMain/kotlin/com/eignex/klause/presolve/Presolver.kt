@@ -243,14 +243,15 @@ object Presolver {
         // seeding its state over the model. Only the infeasible case short-circuits; a feasible
         // strengthening is recomputed (idempotently) by the round engine below.
         val earlyRefutation = if (PresolvePass.STRENGTHEN_COEFFICIENTS in passes) {
+            val token = context.presolveBudget?.observeStops(cancellation) ?: cancellation
             context.presolveBudget.observeRoundPass(
-                PresolvePass.STRENGTHEN_COEFFICIENTS, PresolveLane.FINITE, cancellation,
+                PresolvePass.STRENGTHEN_COEFFICIENTS, PresolveLane.FINITE, token,
                 { problem.presolveSize() }, { true },
             ) { invocation ->
-                val units = PresolveEntrySize(context.presolveBudget).units(problem, cancellation)
+                val units = PresolveEntrySize(context.presolveBudget).units(problem, token)
                 invocation.recordEntries(units)
-                cancellation.charge(PresolvePass.STRENGTHEN_COEFFICIENTS.baseWorkWeight * units)
-                if (Presolve.strengthenCoefficients(problem, cancellation).infeasible) {
+                token.charge(PresolvePass.STRENGTHEN_COEFFICIENTS.baseWorkWeight * units)
+                if (Presolve.strengthenCoefficients(problem, token).infeasible) {
                     PassOutcome.INFEASIBLE
                 } else PassOutcome.UNCHANGED
             } == PassOutcome.INFEASIBLE
