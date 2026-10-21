@@ -221,6 +221,17 @@ solution set.
 
 ### Boolean reductions
 
+Original-clause subsumption (`+clause-subsume`, opt-in) deletes a clause implied by
+a retained subset and removes a target literal when one opposite premise literal
+and the remaining subset justify self-subsuming resolution. It indexes clean
+Boolean clauses of width at most eight, using occurrences, variable signatures and
+a queue of shortened clauses. Candidate and literal visits have separate caps and
+charge the phase token. Each completed edit is equivalent against the live clause
+database, so a rewritten premise remains implied across the final batch and
+cancellation retains only completed reductions. Every assignment and objective
+column survives, including columns shared with arithmetic factors; counting needs
+no reconstruction.
+
 Finite probing and implication harvesting count only Booleans with live factor
 occurrences and no root deduction toward their candidate caps. An empty candidate
 set needs no probe root. The implication graph pins each candidate, propagates and

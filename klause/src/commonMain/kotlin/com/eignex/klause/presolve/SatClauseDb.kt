@@ -92,6 +92,31 @@ internal class SatClauseDb private constructor(
     }
 
     companion object {
+        /** Index only bounded-width original clauses; no variable is eligible for elimination. */
+        fun buildShortClauses(problem: Problem, maxWidth: Int, visit: () -> Boolean): SatClauseDb? {
+            val slots = ArrayList<IntArray?>()
+            val origins = IntArrayList()
+            val occurrences = Array(2 * problem.numBoolVars) { IntArrayList() }
+            for (i in problem.factors.indices) {
+                if (!visit()) return null
+                val clause = problem.factors[i] as? Clause ?: continue
+                val literals = clause.literals
+                if (literals.size > maxWidth || clause.tautological) continue
+                var clean = true
+                for (literal in literals) {
+                    if (!visit()) return null
+                    if (Lit.variable(literal) >= problem.numBoolVars) clean = false
+                }
+                if (!clean) continue
+                val slot = slots.size
+                slots.add(literals)
+                origins.add(i)
+                for (literal in literals) occurrences[literal].add(slot)
+            }
+            return SatClauseDb(problem.numBoolVars, BooleanArray(problem.numBoolVars),
+                slots, origins, occurrences, intArrayOf())
+        }
+
         /** A clause containing a literal and its negation — always true. */
         fun isTautology(lits: IntArray): Boolean {
             val seen = IntHashSet(lits.size)
