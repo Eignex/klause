@@ -191,6 +191,11 @@ eligible for a later slice, adoption closes the bootstrap handles once, and seed
 acquisition renews no allowance. Imported samples carry no worker state or proof
 authority.
 
+A CP bootstrap with unfinished private preparation resumes before local-search
+bootstrap can enter the same source completion service. Both root installation and
+nested preparation retain their handles across this handoff; a pause releases no
+query or native allowance. Local search can proceed once that preparation finishes.
+
 ### Handles and exclusive ownership
 
 Local-search optimization handles keep the live assignment, random generator,

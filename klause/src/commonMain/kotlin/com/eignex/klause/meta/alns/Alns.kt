@@ -13,6 +13,7 @@ import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -615,6 +616,10 @@ internal class Alns(
                     telemetry.bootstrapCpMillis += started.elapsedNow().inWholeMilliseconds
                 }
             }
+            val pendingCp = cpBootstrap
+            if (!cpFinished && (pendingCp?.preparationPending == true ||
+                    (pendingCp as? ReseedGuard)?.canContinuePreparation == true)
+            ) return
             if (neighborhood != null || token() || lsFinished) return
             val lsToken = token or Cancellation { neighborhood != null }
             val started = TimeSource.Monotonic.markNow()

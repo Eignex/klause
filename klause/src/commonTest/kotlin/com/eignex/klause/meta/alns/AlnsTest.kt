@@ -25,6 +25,7 @@ import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -53,6 +54,60 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AlnsTest {
+    @Test
+    fun `unfinished CP preparation retains exclusive completion ownership before LS bootstrap`() {
+        for (nested in listOf(false, true)) {
+            val problem = selectProblem()
+            var prepared = false
+            var cpSlices = 0
+            var cpCloses = 0
+            var lsCalls = 0
+            val cp = object : ResumableSearch, ReseedGuard {
+                override val isDone: Boolean get() = prepared
+                override val preparationPending: Boolean get() = !prepared && !nested
+                override val canContinuePreparation: Boolean get() = !prepared && nested
+                override val canReseed: Boolean get() = prepared
+                override val stats: SolveStats get() = SolveStats.EMPTY
+                override fun runSlice(
+                    global: Cancellation,
+                    sliceMillis: Long,
+                    sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? {
+                    cpSlices++
+                    if (cpSlices == 1) return null
+                    prepared = true
+                    return MinimizeResult.Unknown(TerminationReason.SearchExhausted)
+                }
+                override fun close() { cpCloses++ }
+            }
+            val backtrack = object :
+                ResumableOptimizer<BacktrackParams>,
+                Optimizer<BacktrackParams> by BacktrackSolver(problem) {
+                override fun resumable(objective: LinearObjective, params: BacktrackParams) = cp
+            }
+            val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+                override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
+                    assertTrue(prepared)
+                    lsCalls++
+                    return MinimizeResult.Unknown(TerminationReason.SearchExhausted)
+                }
+            }
+            val handle = Alns(inner = inner, backtrack = backtrack)
+                .resumable(selectObjective, LocalSearchParams())
+
+            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+
+            assertEquals(0, lsCalls)
+            assertEquals(0, cpCloses)
+            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+            handle.close()
+            assertEquals(2, cpSlices)
+            assertEquals(1, lsCalls)
+            assertEquals(1, cpCloses)
+        }
+    }
+
 
     @Test
     fun `available incumbents should start repair without bootstrapping`() {
