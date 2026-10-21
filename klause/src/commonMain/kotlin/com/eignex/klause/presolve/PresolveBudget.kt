@@ -61,6 +61,8 @@ class PresolveBudget(
         observations.add(observation)
     }
 
+    internal val lastInvocation: PresolveInvocationStats? get() = observations.lastOrNull()
+
     internal fun recordPreparation(observation: PresolvePreparationStats) {
         preparation.add(observation)
     }

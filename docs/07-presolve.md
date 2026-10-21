@@ -25,7 +25,16 @@ root bake then establishes the propagation fixpoint of the root model; optional
 failed-literal and singleton arc consistency tiers extend it from the presolve lane,
 so the engine never depends on presolve. Finite rounds follow under one
 bounded-fixpoint scheduler shared with the source lane: a pass above the cheapest
-tier reruns only after other passes changed at least 1% of the model. Presolve and
+tier reruns only after other passes changed at least 1% of the model and met its
+observed cost/yield threshold. Charged analysis and rebuild work, divided by the
+pass's entry weight and retained yield, estimates the intervening changes needed
+before another analysis. Yield is the largest of net occurrences removed, factors
+removed, columns narrowed or columns fixed, with a floor of one. Empty and
+interrupted calls retain their cost; only completed misses can park a pass. These
+signals are deterministic spending heuristics, not predictions or proofs of search
+savings. Direct round schedules without a caller allowance collect observations
+under an unlimited local allowance. Cancellation and phase allowances still bound
+optional work. Presolve and
 an LP-relaxation harvest iterate to a joint fixpoint for at most four rounds, the
 harvest rerunning only when it tightened something. Automatically selected elective
 harvest skips pure clausal satisfaction sources before LP construction unless
