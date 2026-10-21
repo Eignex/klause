@@ -227,7 +227,13 @@ object Presolve {
         problem: BakedProblem,
         objectiveIntCoeffs: Map<Int, Long>,
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
-        cancellation: Cancellation = Cancellation.Never,
+    ): PassDelta = fixDominatedVariables(problem, objectiveIntCoeffs, objectiveBoolCoeffs, Cancellation.Never)
+
+    internal fun fixDominatedVariables(
+        problem: BakedProblem,
+        objectiveIntCoeffs: Map<Int, Long>,
+        objectiveBoolCoeffs: Map<Int, Long>,
+        cancellation: Cancellation,
     ): PassDelta = DominatedVariables.fixDominatedVariables(problem, objectiveIntCoeffs, objectiveBoolCoeffs, cancellation)
 
     /** Dual fixing over a canonical source model. See [DominatedVariables.fixDominatedSourceVariables]. */
