@@ -413,13 +413,13 @@ private class MutableIntBounds(n: Int) : IntervalBounds {
 /** Propagate the row `Σ (sign·coeffs(k))·vars(k) ≤ sign·bound` into [b], returning whether any bound
  *  tightened. Overflow in the exact activity arithmetic aborts this row (returns `false`). */
 @Suppress("ReturnCount", "LoopWithTooManyJumpStatements")
-internal fun propagateRow(
+internal inline fun propagateRow(
     coeffs: LongArray,
     vars: IntArray,
     bound: Long,
     sign: Long,
     b: IntervalBounds,
-    visit: (() -> Boolean)? = null,
+    visit: () -> Boolean = { true },
 ): Boolean =
     try {
         val effBound = mulExact(sign, bound)
@@ -428,7 +428,7 @@ internal fun propagateRow(
         var numInf = 0
         var infIdx = -1
         for (idx in coeffs.indices) {
-            if (visit != null && !visit()) return false
+            if (!visit()) return false
             val a = mulExact(sign, coeffs[idx])
             if (a == 0L) continue
             val v = vars[idx]
@@ -442,7 +442,7 @@ internal fun propagateRow(
         }
         var changed = false
         for (idx in coeffs.indices) {
-            if (visit != null && !visit()) return false
+            if (!visit()) return false
             // A collapsed pair is tighter than the rows imply, so nothing may be derived off it.
             if (b.crossed) break
             val a = mulExact(sign, coeffs[idx])
@@ -481,17 +481,17 @@ internal fun propagateRow(
  * bits, leaves the row possible.
  */
 @Suppress("ReturnCount")
-internal fun rowRefuted(
+internal inline fun rowRefuted(
     coeffs: LongArray,
     vars: IntArray,
     bound: Long,
     sign: Long,
     b: IntervalBounds,
-    visit: (() -> Boolean)? = null,
+    visit: () -> Boolean = { true },
 ): Boolean = try {
     var minActivity = 0L
     for (idx in coeffs.indices) {
-        if (visit != null && !visit()) return false
+        if (!visit()) return false
         val a = mulExact(sign, coeffs[idx])
         if (a == 0L) continue
         val v = vars[idx]
