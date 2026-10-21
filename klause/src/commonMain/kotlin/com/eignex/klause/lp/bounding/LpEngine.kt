@@ -754,9 +754,13 @@ internal class LpEngine(
         val remaining = lpEffortGovernor.remainingWork()?.let {
             (it - minOf(it, sink.lp.standaloneWork)).coerceAtLeast(1L)
         }
+        val recoverWitness = model.m > RationalBasisLimits().dimension
+        if (recoverWitness) sink.lp.observePrimalPhase("PREFIX_REAL_RECOVERY", "REQUESTED", 0L)
         val certified = solver.solve(model, cancellation = params.cancellation,
             workLimit = remaining?.let { minOf(budget, it) } ?: budget,
-            observer = sink.lp.certificationObserver(LpRoute.STANDALONE), counterResults = lpCounterResults)
+            observer = sink.lp.certificationObserver(LpRoute.STANDALONE), counterResults = lpCounterResults,
+            recoverWitness = recoverWitness)
+        if (recoverWitness) sink.lp.observePrimalPhase("PREFIX_REAL_RECOVERY", certified.verdict.name, 0L)
         sink.lp.observePrimalPhase("PREFIX_REAL_CHECK", certified.verdict.name, 0L)
         if (onPoint != null && !params.cancellation() &&
             (certified.verdict == LpVerdict.FEASIBLE || certified.verdict == LpVerdict.ATTAINED_OPTIMUM)

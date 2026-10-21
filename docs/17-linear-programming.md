@@ -136,7 +136,9 @@ work allowance, including prior standalone solves, bound each query. Only an
 infeasible result with a checked source clause can prune the prefix; positive
 points remain relaxation values. An already available exact primal can supply
 source real and finite integer coordinates for phase guidance without
-another solve or point recovery request. Integer columns retain fractional
+another solve. Scheduled prefixes above the dense basis dimension request the
+same bounded sparse recovery as required leaves; their cadence, source admission
+and numerical work allowance remain unchanged. Integer columns retain fractional
 relaxation values; uncarried integers take their current domain minimum. A finite
 integer phase proposal takes the exact ceiling within the live domain bounds;
 it supplies no integrality certificate and retains both search intervals. Mapping
@@ -147,7 +149,7 @@ owner's lifetime, including failed transformations. Solver retirement and search
 undo do not replenish them. It supplies no source witness or deduction. Required
 leaf completion still waits for all finite pins and checks the original source.
 
-Required large-leaf completion requests bounded witness recovery above the
+Required large-leaf and scheduled prefix completion request bounded witness recovery above the
 rational-basis dimension limit. A separate owner of the same exact model performs
 sparse point repair and strict-margin refinement for component numerical solves.
 Independent components can first recover strict points through exact continuation,
@@ -339,7 +341,7 @@ bound crossing before the complete source point is checked. Violated basic bound
 can also propose inverse-row Farkas candidates. Only the full source verifier
 accepts a refutation; a bad point, failed factorization or singular basis supplies
 none. Recovery requests try this basis verification before spending fallback
-refinement work. Optional selected-prefix calls keep their ordinary admission.
+refinement work. Source admission and query scheduling remain caller-owned.
 
 If endpoint perturbations leave basic bounds violated, requested sparse recovery
 uses Bland feasibility pivots with a zero objective. Strict sides shift their

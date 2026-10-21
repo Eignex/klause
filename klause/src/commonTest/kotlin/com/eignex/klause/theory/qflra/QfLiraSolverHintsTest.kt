@@ -29,6 +29,7 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
@@ -48,6 +49,89 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
+    @Test
+    fun `registered real bounds should check a retained point before partial reuse`() {
+        for (incompatible in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(0),
+                numRealVars = 3,
+                realLower = DoubleArray(3),
+                realUpper = doubleArrayOf(1.0, 0.0, 0.0),
+                factors = arrayOf(
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), IntArray(3) { it },
+                        DoubleArray(3) { 1.0 }, LinearOp.LE, 0.0),
+                    Linear(intArrayOf(), doubleArrayOf(), IntArray(3) { it }, DoubleArray(3) { 1.0 },
+                        LinearOp.GE, 0.0),
+                ),
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                    defaultGraphSelections = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val captures = stats.snapshot().lpPointHintCaptures
+                val atom = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                    listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)),
+                    if (incompatible) BigFraction.ofLong(2L).reciprocal() else BigFraction.ZERO))
+
+                val side = if (incompatible) atom.negative else atom.positive
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side)))
+
+                assertEquals(!incompatible, hints.preferredBool(0))
+                assertEquals(if (incompatible) 0L else 1L,
+                    stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED") ?: 0L)
+                assertEquals(incompatible, stats.snapshot().lpPointHintCaptures > captures)
+            }
+        }
+    }
+
+    @Test
+    fun `Boolean-only source rows should preserve checked point reuse in either storage mode`() {
+        for (indexed in listOf(false, true)) {
+            val heads = if (indexed) 300 else 2
+            val reals = if (indexed) 256 else 3
+            val model = Problem(
+                numBoolVars = heads + 1,
+                intBounds = openBounds(0),
+                numRealVars = reals,
+                realLower = DoubleArray(reals),
+                realUpper = DoubleArray(reals),
+                factors = Array<Factor>(heads + 2) { head ->
+                    when {
+                        head < heads -> ReifiedRealLinear(
+                            head, intArrayOf(), doubleArrayOf(), IntArray(reals) { it }, DoubleArray(reals) { 1.0 },
+                            LinearOp.LE, 0.0,
+                        )
+                        head == heads -> Linear(intArrayOf(), doubleArrayOf(), IntArray(reals) { it },
+                            DoubleArray(reals) { 1.0 }, LinearOp.EQ, 0.0)
+                        else -> Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+                    }
+                },
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                    defaultGraphSelections = true))
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(heads + 1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val captures = stats.snapshot().lpPointHintCaptures
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+                assertTrue(captures > 0L)
+                assertEquals(captures, stats.snapshot().lpPointHintCaptures)
+                assertEquals(2L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED"))
+            }
+        }
+    }
+
     @Test
     fun `compatible true and false guards should reuse an indexed working point`() {
         val model = Problem(
@@ -202,7 +286,7 @@ class QfLiraSolverHintsTest {
             intBounds = openBounds(0),
             numRealVars = 256,
             realLower = DoubleArray(256),
-            realUpper = DoubleArray(256),
+            realUpper = DoubleArray(256) { if (it == 0) 1.0 else 0.0 },
             factors = Array<Factor>(302) { head ->
                 when {
                     head < 300 -> ReifiedRealLinear(
@@ -210,9 +294,9 @@ class QfLiraSolverHintsTest {
                         LinearOp.LE, 0.0,
                     )
                     head == 300 -> Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it },
-                        DoubleArray(256) { 1.0 }, LinearOp.EQ, 0.0)
+                        DoubleArray(256) { 1.0 }, LinearOp.GE, 0.0)
                     else -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                        doubleArrayOf(1.0), LinearOp.GE, 0.0)
+                        doubleArrayOf(1.0), LinearOp.GE, 0.5)
                 }
             },
         )
@@ -226,10 +310,11 @@ class QfLiraSolverHintsTest {
             assertIs<ComponentResult.Consistent>(session.initialize())
             val captures = stats.snapshot().lpPointHintCaptures
 
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
-            assertEquals(true, hints.preferredBool(1))
-            assertEquals(captures + 1L, stats.snapshot().lpPointHintCaptures)
+            assertNull(hints.preferredBool(1))
+            assertEquals(captures, stats.snapshot().lpPointHintCaptures)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_INCOMPATIBLE"))
             assertEquals(0L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED") ?: 0L)
         }
     }

@@ -57,10 +57,12 @@ A check proceeds in four steps:
 2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
    the LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
-   A default pure-real indexed point can remain feasible across added guards:
-   when every source term is real, exact checks of all newly assigned unique
-   ordinary heads suffice to retain the point and skip a redundant numerical
-   solve. Shared heads, disjuncts and other arithmetic decisions retire it.
+   Default pure-real checks can retain a feasible point across source updates.
+   Each newly resolved comparison, including shared heads and resolved Boolean
+   coefficients, checks that point before assertion. Registered source bounds
+   also require current source ownership and exact evaluation. If every update
+   holds, the partial check can skip a redundant numerical solve. Failed or
+   unavailable checks discard the point and leave certification to the LP.
 3. **Explain.** An infeasible system produces a conflict from the certified
    infeasibility support: each cited row or bound contributes its premise literals.
    If a cited row or bound has changed in the live LP state, no conflict is
@@ -113,11 +115,11 @@ Default pure-real guidance can index unique activators into the immutable prepar
 rows when retaining eager guard terms exceeds its workspace. It retains only that
 index and a copy of the existing exact point; shared or disjunctive heads receive
 no preference. Selected guard evaluation spends the containing invocation's work
-and deadline allowance. Retraction, restart and changed arithmetic state discard
-the point, while a completed private numerical query does not end its lifetime.
+and deadline allowance. Retraction, restart and unchecked arithmetic changes
+discard the point, while a completed private numerical query does not end its lifetime.
 The private index, returned heads and point share the 65,536-entry admission limit.
-Queued guard updates share that same workspace. Reused points remain private to
-partial checks; complete Boolean states take the ordinary source witness path.
+Both storage forms can retain the same admitted point for checked partial reuse.
+Complete Boolean states take the ordinary source witness path.
 
 ### Results and proof authority
 

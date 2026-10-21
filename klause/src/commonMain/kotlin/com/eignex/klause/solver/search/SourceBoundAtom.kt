@@ -55,6 +55,7 @@ class SourceBoundAtom private constructor(
     override val sourceBound: SourceBoundAtom get() = this
     /** Source coefficients, returned as a copy to preserve registered meaning. */
     val terms: List<SourceBoundTerm> get() = sourceTerms.toList()
+    internal val termCount: Int get() = sourceTerms.size
 
     override fun equals(other: Any?): Boolean {
         val bound = (other as? SourceBoundPredicate)?.sourceBound ?: return false

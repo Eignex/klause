@@ -44,6 +44,75 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `an oversized exact prefix should expose coupled rational coordinates`() {
+        val p = BigFraction.ofLong(2_000_003L)
+        val q = BigFraction.ofLong(2_000_029L)
+        val inverse = (p * q - BigFraction.ONE).reciprocal()
+        val x = (q - BigFraction.ONE) * inverse
+        val y = (p - BigFraction.ONE) * inverse
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), Array<Factor>(1001) { row ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2 + row % 129)),
+                List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ONE)
+        } + arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)), listOf(p, BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ONE),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)), listOf(BigFraction.ONE, q),
+                LinearOp.EQ, BigFraction.ONE),
+        ), numRealVars = 131, realLower = DoubleArray(131), realUpper = DoubleArray(131) { 1.0 })
+        val session = PropagationSession(source)
+        val supplied = ArrayList<List<BigFraction>>()
+        val engine = LpEngine(source, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, learn = true)),
+            SolveStatsSink(backend = "sparse-prefix-point"))
+
+        val refuted = engine.use { it.prefixRealInfeasible(session) { point, stop ->
+            assertFalse(stop())
+            supplied += point
+        } }
+
+        assertFalse(refuted)
+        val point = supplied.single()
+        assertEquals(x, point[0])
+        assertEquals(y, point[1])
+        assertNull(session.boolValue(0))
+        assertFalse(session.intDomain(0).isFixed)
+        val sample = Sample(booleanArrayOf(false), longArrayOf(0), DoubleArray(131) { point[it].toDouble() },
+            exactReals = point.take(131))
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sample))
+    }
+
+    @Test
+    fun `an oversized exact prefix should refute a fractional strict contradiction`() {
+        val p = BigFraction.ofLong(2_000_003L)
+        val q = BigFraction.ofLong(2_000_029L)
+        val inverse = (p * q - BigFraction.ONE).reciprocal()
+        val total = (p + q - BigFraction.ofLong(2L)) * inverse
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), Array<Factor>(1001) { row ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2 + row % 129)),
+                List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ONE)
+        } + arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)), listOf(p, BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ONE),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)), listOf(BigFraction.ONE, q),
+                LinearOp.EQ, BigFraction.ONE),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)), List(2) { BigFraction.ONE },
+                LinearOp.GE, total, strict = true),
+        ), numRealVars = 131, realLower = DoubleArray(131), realUpper = DoubleArray(131) { 1.0 })
+        val session = PropagationSession(source)
+        val engine = LpEngine(source, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, learn = true)),
+            SolveStatsSink(backend = "sparse-prefix-refutation"))
+
+        engine.use {
+            assertTrue(it.prefixRealInfeasible(session))
+
+            assertTrue(assertNotNull(it.pinnedLeafClause).isEmpty())
+            assertNull(session.boolValue(0))
+            assertFalse(session.intDomain(0).isFixed)
+        }
+    }
+
+    @Test
     fun `large pinned strict components should complete with an exact source witness`() {
         val reals = 129
         val source = Problem(0, 0, emptyArray(), Array(1032) { row ->
