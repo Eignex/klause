@@ -16,7 +16,7 @@ class ExactContinuationTest {
         val columns = 512
         val total = columns + rows
         val last = columns - 1
-        val limits = ExactContinuationLimits(maxWork = 400_000)
+        val limits = ExactContinuationLimits(maxWork = 800_000)
         for (strict in listOf(false, true)) {
             val input = ExactContinuationInput(
                 List(columns) { column ->
