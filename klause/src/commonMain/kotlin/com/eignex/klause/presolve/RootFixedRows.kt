@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.complemented
 import com.eignex.klause.ir.impliedLinearRows
+import com.eignex.klause.util.Cancellation
 
 /** Rows whose activators are fixed by root unit clauses. */
 internal fun rootFixedReifiedRows(factors: List<Factor>): List<Linear> =
@@ -18,10 +19,15 @@ internal fun rootFixedReifiedRows(factors: List<Factor>): List<Linear> =
  * Boolean terms and activators are substituted only when root facts determine them. Disjunctive rows
  * are not individually implied; relaxation rows may prove bounds but do not authorize factor removal.
  */
-internal fun presolveLinearRows(factors: List<Factor>, activatedOnly: Boolean = false): List<Linear> {
+internal fun presolveLinearRows(
+    factors: List<Factor>,
+    activatedOnly: Boolean = false,
+    cancellation: Cancellation = Cancellation.Never,
+): List<Linear> {
     val fixed = HashMap<Int, Boolean>()
     val conflicting = HashSet<Int>()
     for (factor in factors) {
+        if (cancellation()) return emptyList()
         if (factor !is Clause || factor.literals.size != 1) continue
         val literal = factor.literals[0]
         val variable = Lit.variable(literal)
@@ -31,9 +37,11 @@ internal fun presolveLinearRows(factors: List<Factor>, activatedOnly: Boolean = 
     for (variable in conflicting) fixed.remove(variable)
     return buildList {
         for (factor in factors) {
+            if (cancellation()) return@buildList
             // A clause has no integer or real columns to specialize.
             if (factor is Clause) continue
             for (row in factor.impliedLinearRows) {
+                if (cancellation()) return@buildList
                 if (activatedOnly && row.activator == LinearRow.ALWAYS) continue
                 val truth = if (row.activator == LinearRow.ALWAYS) true else fixed[row.activator] ?: continue
                 if ((if (truth) row.relation else row.relation.complemented()) == LinearOp.NE) continue

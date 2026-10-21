@@ -139,6 +139,9 @@ Coefficient strengthening divides an integer or pseudo-Boolean row by the gcd of
 coefficients and rounds the bound inward; an indivisible equality is infeasible.
 Diophantine tightening confines each `x_i` in `sum(a_i * x_i) = b` to one residue
 class modulo `gcd(a_j : j != i)` and moves its bounds to the nearest member.
+Residue extraction and source-bound narrowing poll the phase token. Finite carving
+charges each live value visited and polls in chunks of at most 64 values; interruption
+discards the unfinished carve and retains completed narrowings.
 Dependent-equality removal runs fraction-free elimination over declared unconditional
 integer equality rows, dropping a redundant factor only when its complete meaning is
 one equality, and refuting a block with no rational solution. Multi-row conjunctions
