@@ -269,6 +269,11 @@ Keep one observable behavior per test, using arrange, act, assert. Parameterize
 variants of one behavior and separate semantically different behaviors.
 Reuse existing fixtures/helpers. JVM tests must stay below 300 ms.
 
+Unit tests and their resource/setup tasks use local deterministic fixtures or fakes.
+They do not make network requests or provision external tools. Ordinary Gradle
+dependency resolution is separate from test execution. External-reference integration
+runs belong in klause-lab and remain outside `check` and `lintDocs`.
+
 ### Source style and boundaries
 
 Prefer clear names and types. Comments explain soundness, performance or lifecycle
