@@ -29,6 +29,12 @@ tier reruns only after other passes changed at least 1% of the model. Presolve a
 an LP-relaxation harvest iterate to a joint fixpoint for at most four rounds, the
 harvest rerunning only when it tightened something.
 
+The round-boundary diminishing-return check uses a model-size heuristic: finite
+hosts count live factors plus integer-domain endpoint spans, with both individual
+spans and the total saturating at `Long.MAX_VALUE`. Incremental and fresh-rebuild
+hosts use the same nonnegative calculation. This size measure does not estimate
+measured runtime utility; saturation can hide a reduction until the total fits.
+
 | Family | Passes |
 |---|---|
 | Linear | Coefficient strengthening, Diophantine bound tightening, linear bound fusion, affine singleton elimination, sub-sum aggregation, dependent-equality removal, singleton inequality projection |
