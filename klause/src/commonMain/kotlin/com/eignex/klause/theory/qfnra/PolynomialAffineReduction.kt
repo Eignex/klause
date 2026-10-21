@@ -140,6 +140,15 @@ internal class PolynomialAffineReduction private constructor(
                 }
             }
             if (!inconsistent) {
+                val quadraticChecking = preparePolynomialQuadraticRefutation(current, arithmetic)
+                var quadraticConflict: Boolean? = null
+                while (quadraticConflict == null) {
+                    quadraticConflict = quadraticChecking.next()
+                    if (quadraticConflict == null) yield(null)
+                }
+                inconsistent = quadraticConflict
+            }
+            if (!inconsistent) {
                 val consequenceChecking = preparePolynomialConsequenceRefutation(current, arithmetic)
                 var consequenceConflict: Boolean? = null
                 while (consequenceConflict == null) {

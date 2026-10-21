@@ -274,6 +274,12 @@ their endpoints. Consequences with fewer variables than the larger premise are
 retained ahead of the original predicates, ordered by variable count. The original
 bounds and nonlinear constraints remain required; strictness in either endpoint
 makes the consequence strict. No variable-dependent coefficient is divided out.
+Convex quadratic predicates are also checked against each affine predicate on the
+same coordinates. Exact stationary certificates and the quadratic kernel's
+semidefiniteness check can prove a positive lower bound, or a zero lower bound
+excluded by a strict premise. These checks only refute the regional conjunction;
+their anchors do not become witness proposals, and a declined certificate leaves
+the predicates available for CAD.
 The reduced conjunction supplies projection predicates; the original regional
 predicates supply the witness check for both rewrites and coordinate elimination.
 [PolynomialProjection](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
