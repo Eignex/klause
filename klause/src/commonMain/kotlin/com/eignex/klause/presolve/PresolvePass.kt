@@ -569,6 +569,7 @@ enum class PresolvePass(
 
     internal fun namespaceEligible(problem: Problem): Boolean = when (this) {
         SUBSUME_CLAUSES -> OriginalClauseSubsumption.eligible(problem)
+        AGGREGATE_SUB_SUMS -> problem.numIntVars >= 3
         ELIMINATE_BOOL_VARS, ELIMINATE_BLOCKED_CLAUSES, IMPLICATION_GRAPH,
         FOLD_COMPARISON_CLAUSES, PROBE_FAILED_LITERALS -> problem.numBoolVars > 0
         ELIMINATE_AFFINE_SINGLETONS, REDUCE_DIOPHANTINE, PROJECT_SINGLETON_INEQUALITIES,
