@@ -359,6 +359,7 @@ internal class LiveQfLraSystem(
             else -> comparison.op
         }
         var intervalUsed = false
+        var residualUsed = false
         fun side(upper: Boolean, strict: Boolean): SearchAtomPremise? {
             fun sufficient(value: BigFraction, endpointStrict: Boolean): Boolean {
                 if (!work.admitted(value) || !work.preflight(value, threshold)) return false
@@ -373,20 +374,25 @@ internal class LiveQfLraSystem(
                 }
             }
             if (term.coefficients.size > 1) {
-                if (!consume(term.coefficients.size + 1)) return null
-                var value = BigFraction.ZERO
-                var endpointStrict = false
-                val premises = ArrayList<SearchAtomPremise>()
-                for ((variable, coefficient) in term.coefficients) {
-                    if (!work.admitted(coefficient) || variable !in 0 until columns) return null
-                    val variableUpper = upper == (coefficient.signum() > 0)
-                    val active = state.activeSide(variable, variableUpper)?.side ?: return null
-                    if (!work.admitted(active.number.value)) return null
-                    value = work.subtractProduct(value, coefficient.negated(), active.number.value) ?: return null
-                    endpointStrict = endpointStrict || active.strict
-                    premises += lp.activeBoundPremise(variable, variableUpper) ?: return null
+                fun coordinateInterval(): SearchAtomPremise? {
+                    if (!consume(term.coefficients.size + 1)) return null
+                    var value = BigFraction.ZERO
+                    var endpointStrict = false
+                    val premises = ArrayList<SearchAtomPremise>()
+                    for ((variable, coefficient) in term.coefficients) {
+                        if (!work.admitted(coefficient) || variable !in 0 until columns) return null
+                        val variableUpper = upper == (coefficient.signum() > 0)
+                        val active = state.activeSide(variable, variableUpper)?.side ?: return null
+                        if (!work.admitted(active.number.value)) return null
+                        value = work.subtractProduct(value, coefficient.negated(), active.number.value) ?: return null
+                        endpointStrict = endpointStrict || active.strict
+                        premises += lp.activeBoundPremise(variable, variableUpper) ?: return null
+                    }
+                    return SearchAtomPremise.All(premises).takeIf { sufficient(value, endpointStrict) }
                 }
-                return SearchAtomPremise.All(premises).takeIf { sufficient(value, endpointStrict) }
+                return (coordinateInterval() ?: residualDefinitionProof(
+                    term.coefficients, upper, work, ::consume, ::sufficient,
+                )?.also { residualUsed = true })
                     ?.also { intervalUsed = true }
             }
             val variable = term.coefficients.keys.singleOrNull() ?: return null
@@ -454,7 +460,104 @@ internal class LiveQfLraSystem(
                 }
             }
         } ?: return null
-        return ImpliedSmtComparison(proved.first, term.premise(proved.second), intervalUsed).takeUnless { stop() }
+        return ImpliedSmtComparison(proved.first, term.premise(proved.second), intervalUsed, residualUsed)
+            .takeUnless { stop() }
+    }
+
+    private fun residualDefinitionProof(
+        target: Map<Int, BigFraction>,
+        upper: Boolean,
+        work: MixedPointArithmetic,
+        consume: (Int) -> Boolean,
+        sufficient: (BigFraction, Boolean) -> Boolean,
+    ): SearchAtomPremise? {
+        val state = lp.state ?: return null
+        if (!consume(target.size + 1)) return null
+        for ((variable, coefficient) in target) {
+            if (variable !in 0 until columns || !work.admitted(coefficient)) return null
+        }
+        val pivot = target.entries.firstOrNull { (variable, coefficient) ->
+            state.activeSide(variable, upper == (coefficient.signum() > 0)) == null
+        }?.key ?: target.keys.first()
+        var visited = 0
+        for ((coefficients, auxiliary) in definitions) {
+            if (visited == 64 || !consume(1)) break
+            visited++
+            val coefficient = coefficients[pivot] ?: continue
+            val row = auxiliary - state.model.n
+            if (row !in 0 until state.model.m || !state.rows.row(row).active ||
+                !state.model.row(row).global || !work.admitted(coefficient) || coefficient.isZero
+            ) continue
+            val multiplier = work.quotient(target.getValue(pivot), coefficient) ?: continue
+            val auxiliaryUpper = upper == (multiplier.signum() > 0)
+            val active = state.activeSide(auxiliary, auxiliaryUpper)?.side ?: continue
+            val premise = lp.activeBoundPremise(auxiliary, auxiliaryUpper) ?: continue
+            if (!consume(target.size + coefficients.size + 1)) break
+            if (!work.admitted(active.number.value) || coefficients.values.any { !work.admitted(it) }) continue
+            // T = multiplier * A + residual; both owned sums may have free source coordinates.
+            val residual = LinkedHashMap<Int, BigFraction>()
+            var complete = true
+            for ((variable, weight) in target) {
+                val other = coefficients[variable]
+                val value = if (other == null) weight else work.subtractProduct(weight, multiplier, other)
+                if (value == null) {
+                    complete = false
+                    break
+                }
+                if (!value.isZero) residual[variable] = value
+            }
+            if (!complete) continue
+            for ((variable, weight) in coefficients) {
+                if (variable in target) continue
+                val value = work.subtractProduct(BigFraction.ZERO, multiplier, weight)
+                if (value == null) {
+                    complete = false
+                    break
+                }
+                if (!value.isZero) residual[variable] = value
+            }
+            if (!complete) continue
+            val endpoint = ownedTermEndpoint(residual, upper, work, consume) ?: continue
+            val value = work.subtractProduct(endpoint.value, multiplier.negated(), active.number.value) ?: continue
+            if (sufficient(value, active.strict || endpoint.strict)) {
+                return SearchAtomPremise.All(listOf(premise, endpoint.premise))
+            }
+        }
+        return null
+    }
+
+    private fun ownedTermEndpoint(
+        coefficients: Map<Int, BigFraction>,
+        upper: Boolean,
+        work: MixedPointArithmetic,
+        consume: (Int) -> Boolean,
+    ): SmtBoundEndpoint? {
+        if (!consume(2 * coefficients.size + 1)) return null
+        if (coefficients.isEmpty()) {
+            return SmtBoundEndpoint(BigFraction.ZERO, false, SearchAtomPremise.All(emptyList()))
+        }
+        val scale = coefficients.getValue(checkNotNull(coefficients.keys.minOrNull()))
+        if (!work.admitted(scale)) return null
+        val normalized = LinkedHashMap<Int, BigFraction>()
+        for ((variable, coefficient) in coefficients) {
+            if (variable !in 0 until columns || !work.admitted(coefficient)) return null
+            normalized[variable] = work.quotient(coefficient, scale) ?: return null
+        }
+        val column = normalized.keys.singleOrNull() ?: definitions[normalized] ?: return null
+        val state = lp.state ?: return null
+        if (column !in 0 until state.model.numVars) return null
+        if (column >= columns) {
+            val row = column - state.model.n
+            if (row !in 0 until state.model.m || !state.rows.row(row).active || !state.model.row(row).global) {
+                return null
+            }
+        }
+        val columnUpper = upper == (scale.signum() > 0)
+        val active = state.activeSide(column, columnUpper)?.side ?: return null
+        if (!work.admitted(active.number.value)) return null
+        val premise = lp.activeBoundPremise(column, columnUpper) ?: return null
+        val value = work.subtractProduct(BigFraction.ZERO, scale.negated(), active.number.value) ?: return null
+        return SmtBoundEndpoint(value, active.strict, premise)
     }
 
     fun assertAtom(atom: SourceBoundAtom, premise: SearchAtomPremise): Boolean {
@@ -563,10 +666,12 @@ internal class LiveQfLraSystem(
 }
 
 internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
+private class SmtBoundEndpoint(val value: BigFraction, val strict: Boolean, val premise: SearchAtomPremise)
 internal data class ImpliedSmtComparison(
     val truth: Boolean,
     val premise: SearchAtomPremise,
     val interval: Boolean = false,
+    val residual: Boolean = false,
 )
 
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
