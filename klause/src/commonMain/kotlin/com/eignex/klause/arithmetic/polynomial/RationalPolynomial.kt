@@ -1,6 +1,12 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 
 internal class RationalPolynomial(coefficients: List<BigFraction>) {
     private val captured = coefficients.dropLastWhile { it.isZero }
@@ -69,11 +75,23 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
 
     fun evaluate(value: RationalPolynomial, at: BigFraction): BigFraction {
         arithmetic.step()
-        var result = BigFraction.ZERO
-        for (coefficient in value.coefficients.asReversed()) {
+        if (value.degree <= 0 || at.isZero) return value[0]
+        val coefficients = value.coefficients
+        var denominator = BIG_ONE
+        for (coefficient in coefficients) {
             arithmetic.step()
-            result = result * at + coefficient
+            denominator = denominator / denominator.gcd(coefficient.den) * coefficient.den
         }
+        var numerator = BIG_ZERO
+        var pointDenominator = BIG_ONE
+        for (index in coefficients.indices.reversed()) {
+            arithmetic.step()
+            val coefficient = coefficients[index]
+            numerator = numerator * at.num + coefficient.num * (denominator / coefficient.den) * pointDenominator
+            if (index > 0) pointDenominator *= at.den
+        }
+        val result = BigFraction.of(numerator, denominator * pointDenominator)
+        arithmetic.step()
         return result
     }
 
