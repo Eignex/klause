@@ -57,7 +57,8 @@ class ExactLinearTest {
             val row = ExactLinear.of(intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofRealVar(0)),
                 listOf(exact, exact), LinearOp.EQ, exact)
             val source = Problem(1, 0, emptyArray(), arrayOf(row), numRealVars = 1,
-                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
 
             val result = LeafRealSolver(source, null).use { it.solve(Sample(booleanArrayOf(boolean), longArrayOf())) }
 

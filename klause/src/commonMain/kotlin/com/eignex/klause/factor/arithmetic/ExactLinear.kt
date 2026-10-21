@@ -165,7 +165,9 @@ class ExactLinear private constructor(
                     if (complemented) coefficient.negated() else coefficient
             }
             val kept = terms.filterValues { !it.isZero }
-            val denominator = kept.values.fold(threshold.den) { scale, value -> scale / scale.gcd(value.den) * value.den }
+            val denominator = kept.values.fold(threshold.den) { scale, value ->
+                scale / scale.gcd(value.den) * value.den
+            }
             val multiplier = BigFraction.of(if (relation == LinearOp.GE) -denominator else denominator, BIG_ONE)
             val integerStrict = strict && kept.keys.none(Term::isReal)
             val bound = (threshold * multiplier).num - if (integerStrict) BIG_ONE else BIG_ZERO

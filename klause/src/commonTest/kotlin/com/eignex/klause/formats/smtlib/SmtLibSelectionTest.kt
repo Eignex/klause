@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Lit
@@ -86,7 +87,11 @@ class SmtLibSelectionTest {
 
         val result = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0))
 
-        assertEquals(2, parsed.model.factors.filterIsInstance<Element>().size)
+        val condition = parsed.boolVarNames.getValue("b")
+        val branches = parsed.model.factors.filterIsInstance<ExactLinear>().filter {
+            it.variables.ints.isNotEmpty() && condition in it.variables.boolVars
+        }
+        assertEquals(2, branches.size)
         assertIs<SolveResult.Unsat>(result)
     }
 
@@ -253,9 +258,12 @@ class SmtLibSelectionTest {
 
             val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
 
-            val selections = parsed.model.factors.filterIsInstance<Element>()
+            val condition = parsed.boolVarNames.getValue("b")
+            val selections = parsed.model.factors.filterIsInstance<ExactLinear>().filter {
+                it.variables.ints.isNotEmpty() && it.variables.boolVars.isNotEmpty()
+            }
             assertTrue(selections.isNotEmpty())
-            assertEquals(1, selections.map { it.idx }.distinct().size)
+            assertEquals(listOf(condition), selections.flatMap { it.variables.boolVars.toList() }.distinct())
             assertEquals(
                 if (branch) magnitude else "-$magnitude",
                 assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment

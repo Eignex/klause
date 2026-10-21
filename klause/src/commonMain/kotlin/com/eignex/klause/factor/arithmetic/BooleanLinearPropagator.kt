@@ -49,9 +49,10 @@ internal class BooleanLinearPropagator(private val row: ExactLinear) : Propagato
         return lower to upper
     }
 
-    private fun booleanPremises(state: PropagationState): IntArray = row.variables.boolVars.toList().mapNotNull { variable ->
-        state.boolValues[variable]?.let { Lit.make(variable, !it) }
-    }.toIntArray()
+    private fun booleanPremises(state: PropagationState): IntArray =
+        row.variables.boolVars.toList().mapNotNull { variable ->
+            state.boolValues[variable]?.let { Lit.make(variable, !it) }
+        }.toIntArray()
 
     private fun reason(state: PropagationState): IntArray? {
         val integerPremises = state.composeIntVarAtomAntecedents(vars)
@@ -102,7 +103,9 @@ internal class BooleanLinearPropagator(private val row: ExactLinear) : Propagato
             val zeroImpossible = wideNeverHolds(relation, otherLower, otherUpper, bound)
             val oneImpossible = wideNeverHolds(relation, otherLower + coefficient, otherUpper + coefficient, bound)
             if (zeroImpossible && oneImpossible) return false
-            if ((zeroImpossible || oneImpossible) && !state.pinBool(variable, zeroImpossible, reason(state))) return false
+            if ((zeroImpossible || oneImpossible) && !state.pinBool(variable, zeroImpossible, reason(state))) {
+                return false
+            }
         }
         val premises = booleanPremises(state)
         // Unknown Boolean terms contribute an interval; each numeric side uses its weakest compatible threshold.
