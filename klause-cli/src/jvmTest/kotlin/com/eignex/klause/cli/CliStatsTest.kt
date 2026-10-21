@@ -167,6 +167,7 @@ class CliStatsTest {
         val stats = SolveStats(
             presolve = PresolveStats(
                 effort = presolveEffortStats(PresolveConfig.NONE, budget, Duration.ZERO),
+                clauseLiteralsRemoved = budget.clauseLiteralsRemoved,
             ),
         )
 

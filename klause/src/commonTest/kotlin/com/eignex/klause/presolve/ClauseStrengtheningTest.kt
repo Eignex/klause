@@ -13,6 +13,7 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
@@ -96,15 +97,13 @@ class ClauseStrengtheningTest {
     }
 
     @Test
-    fun `clauses containing private atoms should remain outside source strengthening`() {
-        val problem = Problem(2, 0, emptyArray(), listOf(
-            Clause(intArrayOf(0, 4)),
-            Clause(intArrayOf(1, 4, 2)),
-        ))
-
-        val delta = ClauseStrengthening.strengthenSource(problem, Cancellation.Never)
-
-        assertTrue(delta.isEmpty)
+    fun `canonical source construction should reject clauses containing private atoms`() {
+        assertFailsWith<IllegalArgumentException> {
+            Problem(2, 0, emptyArray(), listOf(
+                Clause(intArrayOf(0, 4)),
+                Clause(intArrayOf(1, 4, 2)),
+            ))
+        }
     }
 
     @Test
@@ -207,6 +206,26 @@ class ClauseStrengtheningTest {
         assertEquals(listOf(2, 4), (delta.addedFactors.single() as Clause).literals.toList())
         assertEquals(null, delta.domains)
         assertEquals(null, delta.reconstruct)
+    }
+
+    @Test
+    fun `source preparation should report committed clause removals without optional effort stats`() {
+        val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(0)), Clause(intArrayOf(1, 2))))
+        for (metered in listOf(false, true)) {
+            val budget = if (metered) PresolveBudget(Long.MAX_VALUE) else null
+
+            val prepared = PresolvePipeline.prepareSource(
+                problem,
+                config = PresolveConfig.parse("clause-strengthen"),
+                solutionSetSensitive = true,
+                presolveBudget = budget,
+            )
+
+            assertEquals(if (metered) 1L else null, prepared.stats.clauseLiteralsRemoved)
+            assertEquals(listOf("clause-strengthen"), prepared.stats.passes)
+            assertEquals(null, prepared.stats.effort)
+            assertTrue(prepared.mapping.guarantees.bijection)
+        }
     }
 
     @Test
