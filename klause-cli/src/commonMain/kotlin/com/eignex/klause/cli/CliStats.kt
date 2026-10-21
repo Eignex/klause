@@ -532,45 +532,6 @@ private fun round4(x: Double): String {
     return if (r == r.toLong().toDouble()) "${r.toLong()}" else "$r"
 }
 
-/** Terse presolve stat pairs for `-s`: which passes fired, the net constraint drop, and proven
- *  infeasibility — just enough to show presolve did something and which techniques, kept small so it
- *  doesn't crowd out the solve counters (the verbose readout is `dry-run-presolve`). Empty when
- *  presolve was off or a no-op. */
-internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
-    val p = stats.presolve ?: return emptyList()
-    if (p.passes.isEmpty() && p.constraintsRemoved == 0 && !p.infeasible && p.effort == null) return emptyList()
-    val out = ArrayList<Pair<String, String>>()
-    p.effort?.let { e ->
-        out += "presolveEmphasis" to e.emphasis
-        out += "presolveAbortFraction" to "${e.abortFraction}"
-        out += "presolveMaxRounds" to "${e.maxRounds}"
-        out += "presolveProbeBudgetPerVar" to "${e.probeBudgetPerVar}"
-        out += "presolveProbeTotalBudget" to "${e.probeTotalBudget}"
-        out += "presolvePreparationMs" to "${e.elapsed.inWholeMilliseconds}"
-        e.work?.let { out += "presolveWork" to "$it" }
-        e.allowance?.let { out += "presolveWorkAllowance" to "$it" }
-        e.rounds?.let { out += "presolveRoundEntries" to "$it" }
-        e.probeCalls?.let { out += "presolveProbeCalls" to "$it" }
-        e.rootConstructionEntries?.let { out += "presolveRootConstructionEntries" to "$it" }
-        e.rootPropagationWork?.let { out += "presolveRootPropagationWork" to "$it" }
-        for ((id, calls) in e.passCalls.entries.sortedBy { it.key }) out += "presolveCalls_$id" to "$calls"
-    }
-    if (p.passes.isNotEmpty()) out += "presolvePasses" to p.passes.joinToString(",")
-    if (p.constraintsRemoved != 0) out += "presolveConstraintsRemoved" to "${p.constraintsRemoved}"
-    if (p.infeasible) out += "presolveInfeasible" to "true"
-    // The LP harvest's own contribution, broken out so it can be measured apart from the net counts above.
-    p.lpHarvest?.let { lp ->
-        if (lp.skipped) out += "lpHarvestSkipped" to "true"
-        if (lp.rootInfeasible) out += "lpHarvestRootInfeasible" to "true"
-        if (lp.boundsShaved != 0) out += "lpHarvestBoundsShaved" to "${lp.boundsShaved}"
-        if (lp.objectiveLbRaised) out += "lpHarvestObjectiveLb" to "true"
-        if (lp.constraintsRemoved != 0) out += "lpHarvestConstraintsRemoved" to "${lp.constraintsRemoved}"
-        if (lp.equalitiesAdded != 0) out += "lpHarvestEqualitiesAdded" to "${lp.equalitiesAdded}"
-        if (lp.relaxationNnz != 0) out += "lpHarvestRelaxationNnz" to "${lp.relaxationNnz}"
-    }
-    return out
-}
-
 private fun continuationStatPairs(prefix: String, stats: LpContinuationStats): List<Pair<String, String>> {
     if (stats.calls == 0L) return emptyList()
     return buildList {

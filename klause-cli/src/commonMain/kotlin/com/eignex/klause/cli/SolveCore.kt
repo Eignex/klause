@@ -265,6 +265,7 @@ internal object SolveCore {
     ) {
         val passes = stats?.passes.orEmpty()
         errPrintln("presolve dry-run:")
+        printPresolveDiagnostics(stats)
         // Heap after ingest, which is the quantity an OOM at `-Xmx` is about. Retained is what
         // the built problem holds; peak includes the transients the build passed through, so a large gap
         // points at a structure that is materialized and dropped rather than one that is kept.

@@ -50,6 +50,7 @@ internal fun solveLinearSource(
         when (val outcome = result.result.outcome) {
             FiniteSolveOutcome.PreparedOnly -> {
                 printFiniteLinearSourcePreparation(result.result.preparation.problem)
+                printPresolveDiagnostics(result.preparationStats)
                 return
             }
 

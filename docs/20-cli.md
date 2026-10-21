@@ -163,10 +163,21 @@ Source routes use the same `presolvePreparationMs`, work, allowance, round-entry
 pass-call fields as finite execution. Empty and stopped preparations retain these
 observations even when no reduction fired. `presolveWork` uses phase units;
 construction entries and root propagation work are native counters whose converted
-cost is already included. Detailed pass and preparation-stage observations belong
-to the [effort snapshot](07-presolve.md#observations), including native work under
-containing controls. They are not additional CLI totals. The preparation duration
-excludes theory search.
+cost is already included. The preparation duration excludes theory search.
+
+The [effort snapshot](07-presolve.md#observations) is summarized under
+`presolveInvocation_<LANE>_<pass>_<OUTCOME>_` and
+`presolveStage_<LANE>_<STAGE>_<OUTCOME>_`. Each observed group reports calls,
+exclusive nanoseconds (`Ns`), phase `Work`, separate `NativeWork` and summed
+input/output dimensions. Pass groups also report `RebuildWork` (included in
+`Work`), narrowed and fixed columns. Occurrences cover only the accompanying
+`OccurrenceCalls`; absent occurrence totals mean unobserved. Eligibility skips,
+empty analyses and interruptions retain their own groups, ordered by key. Output
+size depends on the pass/stage catalogue and outcomes, not the number of calls.
+
+`presolveInvocationWork + presolveStageWork + presolveUnattributedWork` equals
+`presolveWork`. Native totals remain separate and must not be added to that sum.
+`dry-run-presolve` prints the same keys on stderr alongside its model summary.
 
 ### Source interpretation controls
 
