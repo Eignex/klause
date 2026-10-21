@@ -44,8 +44,10 @@ class AlgebraicArithmeticTest {
             var retainedLeft: AlgebraicReal? = null
             var retainedRight: AlgebraicReal? = null
 
-            val order = arithmetic.compareWithRefinements(if (rootOnLeft) root else rational, if (rootOnLeft) rational else root,
-                { retainedLeft = it }, { retainedRight = it })
+            val order = arithmetic.compareWithRefinements(
+                if (rootOnLeft) root else rational, if (rootOnLeft) rational else root,
+                { retainedLeft = it }, { retainedRight = it },
+            )
 
             val retained = assertNotNull(if (rootOnLeft) retainedLeft else retainedRight)
             assertEquals(0, order)
