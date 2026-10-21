@@ -82,8 +82,11 @@ source namespace.
 `SourceMapping` binds a phase and its reconstruction to the actual source and reduced
 model objects; composition requires the preceding target to be the following source,
 and equal variable or factor counts do not establish that association. A
-reconstructed column is excluded from direct definition and search hints; untouched
-columns keep their source orientation and ordered branching hints. A custom
+reconstructed column is excluded from direct definition hints. Ordered search hints
+can follow integer aliases of the form `x = y + c` for translation-invariant variable
+selectors with minimum or maximum values; bound-based selectors and other value
+choices require direct coordinates. Untouched columns keep their source orientation
+and ordered branching hints. A custom
 reconstruction without direct correspondence withholds hint projection.
 
 Objective adjustments map reduced values into source units as `scale * value +

@@ -3,6 +3,11 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.ValueSelection
+import com.eignex.klause.ir.VariableSelection
+import com.eignex.klause.presolve.RebuildStep
+import com.eignex.klause.presolve.SourceMapping
+import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
 
@@ -41,6 +46,44 @@ internal fun SearchHints.remapped(mapping: VarRemap, cancellation: Cancellation)
         if (bools.isNotEmpty() || ints.isNotEmpty()) groups += group.copy(boolVars = bools, intVars = ints)
     }
     return if (cancellation()) null else copy(tiers = groups)
+}
+
+internal fun SearchHints.remapped(mapping: SourceMapping, cancellation: Cancellation): SearchHints? {
+    val direct = mapping.retainedCoordinates(cancellation) ?: return null
+    val translated = mapping.translatedCoordinates(cancellation) ?: return null
+    val groups = ArrayList<SearchGroup>(tiers.size)
+    for (group in tiers) {
+        // Bound comparisons and midpoint choices need the source values, not just their ordering.
+        val coordinates = if (group.varSelector != VariableSelection.SmallestLowerBound &&
+            group.varSelector != VariableSelection.LargestUpperBound &&
+            group.valueSelector in setOf(ValueSelection.Minimum, ValueSelection.Maximum)
+        ) translated else direct
+        val mapped = copy(tiers = listOf(group)).remapped(coordinates, cancellation) ?: return null
+        groups += mapped.tiers
+    }
+    return if (cancellation()) null else copy(tiers = groups)
+}
+
+private fun SourceMapping.translatedCoordinates(cancellation: Cancellation): VarRemap? {
+    var translated = VarRemap(IntArray(source.numBoolVars) { it }, IntArray(source.numIntVars) { it })
+    for (stage in stages) {
+        val retained = stage.retainedCoordinates(cancellation) ?: return null
+        val ints = IntArray(retained.intCount) { retained.int(it) }
+        for (step in stage.rebuild.steps) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (step is RebuildStep.AffineValue && step.termVars.size == 1 &&
+                step.termCoeffs.single() == step.divisor && step.divisor != 0L &&
+                step.constTerm % step.divisor == 0L
+            ) {
+                ints[step.variable] = ints[step.termVars.single()]
+            }
+        }
+        translated = translated.followedBy(
+            VarRemap(IntArray(retained.boolCount) { retained.bool(it) }, ints), cancellation,
+        ) ?: return null
+    }
+    return if (cancellation()) null else translated
 }
 
 internal fun VarRemap.followedBy(next: VarRemap, cancellation: Cancellation): VarRemap? {

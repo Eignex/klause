@@ -297,7 +297,9 @@ A curated single-core mixed optimization pool with at least six configured arms
 keeps unrestricted first-fail search beside a source annotation on nonbinary
 finite-CP models with a circuit or subcircuit constraint, when the annotation selects
 integer first-fail with minimum values. A tiered annotation restricts candidate
-scope, so the unrestricted worker adds a distinct branching capability. It adds at
+scope, so the unrestricted worker adds a distinct branching capability. Search tiers
+follow safe translated integer aliases through presolve, including circuit successor
+offsets, before admission and worker construction. It adds at
 most one complete worker and no allowance.
 
 #### Finite objective recipe diversity
