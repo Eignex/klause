@@ -17,6 +17,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
@@ -38,6 +39,40 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverConflictTest {
+    @Test
+    fun `a sibling should reclaim free definitions before asserting its source rows`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(5.0, 5.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 3.0), LinearOp.LE, 4.0),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(ComponentCheck.Feasible, session.check())
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("LP_DEFINITION_COMPACTION"))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("LP_DEFINITION_RETIRED_ROW"))
+            assertEquals(2, component.lpMetrics?.retainedRows)
+        }
+    }
+
     @Test
     fun `a false source clause should conflict despite feasible real bounds`() {
         val model = Problem(

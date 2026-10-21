@@ -14,7 +14,14 @@ import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -27,6 +34,8 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -36,6 +45,173 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLraSystemTest {
+    @Test
+    fun `a declined cleanup should wait for a different matrix before another preparation`() {
+        var reject = false
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                        !reject && delegate.adopt(state, token)
+                }
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), axiom))
+            assertTrue(lp.atLevel(0))
+            system.retract()
+            reject = true
+            val before = lp.state
+            assertEquals(0, system.reclaimFreeDefinitions(Cancellation.Never))
+            assertTrue(lp.state === before)
+            val preparations = lp.metrics?.preparationAttempts
+            reject = false
+            system.retract()
+
+            assertEquals(0, system.reclaimFreeDefinitions(Cancellation.Never))
+
+            assertEquals(preparations, lp.metrics?.preparationAttempts)
+            assertTrue(system.assertRow(row(listOf(1, 2), 4), axiom))
+            system.retract()
+            assertEquals(1, system.reclaimFreeDefinitions(Cancellation.Never))
+            assertEquals(listOf(1L), assertNotNull(lp.state).rows.entries().map { it.id })
+        }
+    }
+
+    @Test
+    fun `reclaimed definitions should recreate both cached polarities with fresh row identities`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(system.assertRow(row(listOf(1, 2), 4), axiom))
+            assertTrue(lp.atLevel(1))
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), axiom))
+            assertTrue(system.assertRow(row(listOf(-2, -2), -2), axiom))
+            assertTrue(system.assertRow(row(listOf(1, -1), 2), axiom))
+            assertTrue(lp.atLevel(0))
+            system.retract()
+
+            assertEquals(2, system.reclaimFreeDefinitions(Cancellation.Never))
+            assertTrue(system.assertRow(row(listOf(1, 1), 5), axiom))
+            assertTrue(system.assertRow(row(listOf(-2, -2), -8), axiom))
+            val result = assertNotNull(lp.solve())
+
+            val point = assertNotNull(result.exactPrimal)
+            assertTrue(point[0] + point[1] >= BigFraction.ofLong(4))
+            assertTrue(point[0] + point[1] <= BigFraction.ofLong(5))
+            assertTrue(point[0] + BigFraction.ofLong(2) * point[1] <= BigFraction.ofLong(4))
+            assertEquals(listOf(0L, 3L), assertNotNull(lp.state).rows.entries().map { it.id })
+        }
+    }
+
+    @Test
+    fun `surviving cached definitions should follow their compacted logical columns`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), axiom))
+            assertTrue(lp.atLevel(0))
+            system.retract()
+            assertTrue(system.assertRow(row(listOf(1, 2), 4), axiom))
+
+            assertEquals(1, system.reclaimFreeDefinitions(Cancellation.Never))
+            assertTrue(system.assertRow(row(listOf(1, 2), 3), axiom))
+
+            assertEquals(BigFraction.ofLong(3), lp.state?.activeSide(2, true)?.side?.number?.value)
+            assertEquals(listOf(1L), assertNotNull(lp.state).rows.entries().map { it.id })
+            val point = assertNotNull(assertNotNull(lp.solve()).exactPrimal)
+            assertTrue(point[0] + BigFraction.ofLong(2) * point[1] <= BigFraction.ofLong(3))
+        }
+    }
+
+    @Test
+    fun `a small free minority should retain its existing numerical owner`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), axiom))
+            assertTrue(system.assertRow(row(listOf(1, 2), 4), axiom))
+            assertTrue(lp.atLevel(1))
+            assertTrue(system.assertRow(row(listOf(1, -1), 2), axiom))
+            assertTrue(lp.atLevel(0))
+            system.retract()
+            val before = lp.state
+            val preparations = lp.metrics?.preparationAttempts
+
+            assertEquals(0, system.reclaimFreeDefinitions(Cancellation.Never))
+
+            assertTrue(lp.state === before)
+            assertEquals(preparations, lp.metrics?.preparationAttempts)
+        }
+    }
+
+    @Test
+    fun `stopped reclamation should preserve its debit and cached source definition`() {
+        for (limit in listOf(1L, 10L, 18L, 30L)) {
+            var work = 0L
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = work >= limit
+                override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            }
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source(), lp)
+                assertTrue(system.install())
+                assertTrue(lp.atLevel(1))
+                assertTrue(system.assertRow(row(listOf(1, 1), 3), axiom))
+                assertTrue(lp.atLevel(0))
+                system.retract()
+                val before = lp.state
+
+                assertEquals(0, system.reclaimFreeDefinitions(token))
+
+                assertTrue(work >= limit)
+                assertTrue(lp.state === before)
+                assertTrue(system.assertRow(row(listOf(1, 1), 2), axiom))
+                assertEquals(1, assertNotNull(lp.state).model.m)
+                assertEquals(BigFraction.ofLong(2), lp.state?.activeSide(2, true)?.side?.number?.value)
+            }
+        }
+    }
+
+    @Test
+    fun `a recreated source conflict should exclude retired sibling premises`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), premise(0)))
+            session.popTo(0)
+            system.retract()
+            assertEquals(1, system.reclaimFreeDefinitions(Cancellation.Never))
+            session.publish(SearchDecision.Bool(Lit.make(1, true)))
+            session.publish(SearchDecision.Bool(Lit.make(2, true)))
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), premise(1)))
+            assertTrue(system.assertRow(row(listOf(-1, -1), -4), premise(2)))
+
+            val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
+
+            assertEquals(listOf(Lit.make(1, false), Lit.make(2, false)),
+                assertNotNull(conflict.explanation).literals.sorted())
+        }
+    }
+
     @Test
     fun `sparse shared definitions should preserve exact source equalities`() {
         val factors = arrayOf<Factor>(

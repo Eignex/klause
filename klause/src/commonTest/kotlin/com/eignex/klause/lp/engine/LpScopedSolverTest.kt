@@ -7,6 +7,7 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,6 +18,327 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
+    @Test
+    fun `an explicit live token should not bypass the containing reclamation stop`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(zero),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(), integral = false)),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+        )
+        var stopped = false
+        LpScopedSolver(LpExactState(source), cancellation = Cancellation { stopped }).use { owner ->
+            assertNotNull(owner.solve())
+            val before = owner.state
+            val preparations = owner.metrics.preparationAttempts
+            val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+            stopped = true
+
+            assertFalse(owner.reclaimFreeRows(before, setOf(0L), remap, Cancellation.Never))
+
+            assertSame(before, owner.state)
+            assertEquals(preparations, owner.metrics.preparationAttempts)
+        }
+    }
+
+    @Test
+    fun `scoped suspended and inactive definitions should not enter permanent reclamation`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(zero),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(), integral = false)),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+        )
+        for (kind in listOf("scoped", "suspended", "inactive")) {
+            val identity = when (kind) {
+                "scoped" -> LpRowIdentity(0L, 1)
+                "suspended" -> LpRowIdentity(0L, null, active = false, suspendedAt = 1)
+                else -> LpRowIdentity(0L, null, active = false)
+            }
+            val before = LpExactState(
+                source, scopes = if (kind == "inactive") emptyList() else listOf(0),
+                rows = LpScopedRows(listOf(identity), 0L),
+            )
+            LpScopedSolver(before).use { owner ->
+                val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+
+                assertFalse(owner.reclaimFreeRows(before, setOf(0L), remap), kind)
+
+                assertSame(before, owner.state)
+                assertEquals(0L, owner.metrics.createdOwners)
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation after compact preparation should preserve the live numerical authority`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))), listOf(zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
+                ExactLpColumn(ExactLpBounds(), integral = false),
+            ),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+        )
+        var interrupt = false
+        var cancelled = false
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? {
+                        val result = delegate.prepareLogicals(token)
+                        if (interrupt) cancelled = true
+                        return result
+                    }
+                }
+            }
+        }
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(engineFactory = factory)).use { owner ->
+            val result = assertNotNull(owner.solve())
+            val before = owner.state
+            val work = owner.metrics.preparationWork
+            val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+            interrupt = true
+
+            assertFalse(owner.reclaimFreeRows(before, setOf(0L), remap, Cancellation { cancelled }))
+
+            assertTrue(cancelled)
+            assertSame(before, owner.state)
+            assertSame(result, owner.lastResult)
+            assertTrue(owner.metrics.preparationWork > work)
+            assertEquals(1L, owner.metrics.currentOwners)
+        }
+    }
+
+    @Test
+    fun `reclamation should preserve rows with remaining semantic obligations`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        for (kind in listOf("declared", "asserted", "integral", "cost", "strict", "premise", "tag", "local", "rhs")) {
+            val logical = ExactLpColumn(
+                if (kind == "declared") ExactLpBounds(lower = ExactLpSide(zero)) else ExactLpBounds(),
+                integral = kind == "integral",
+                tag = if (kind == "tag") 0 else -1,
+            )
+            val metadata = ExactLpRow(
+                global = kind != "local",
+                strict = kind == "strict",
+                premises = if (kind == "premise") ExactLpPremises(emptyList(), listOf(0)) else null,
+            )
+            val source = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(if (kind == "rhs") one else zero),
+                listOf(ExactLpColumn(ExactLpBounds()), logical),
+                listOf(metadata),
+                ExactLpObjective(listOf(zero, if (kind == "cost") one else zero)),
+            )
+            LpScopedSolver(LpExactState(source)).use { owner ->
+                if (kind == "asserted") assertTrue(owner.assertBound(1, true, ExactLpSide(one), 7L))
+                val before = owner.state
+                val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+
+                assertFalse(owner.reclaimFreeRows(before, setOf(0L), remap), kind)
+
+                assertSame(before, owner.state)
+                assertEquals(0L, owner.metrics.createdOwners)
+            }
+        }
+    }
+
+    @Test
+    fun `a stale or mismatched reclamation plan should leave numerical authority unchanged`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))), listOf(zero),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(), integral = false)),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+        )
+        for (kind in listOf("stale", "foreign", "rows", "structural")) {
+            LpScopedSolver(LpExactState(source)).use { owner ->
+                val captured = owner.state
+                if (kind == "stale") assertTrue(owner.push())
+                val before = owner.state
+                val rows = if (kind == "rows") before.rows else before.rows.deactivate(setOf(0))
+                val remap = LpLayoutRemap(source.n, rows, if (kind == "structural") emptyList() else listOf(0))
+
+                assertFalse(owner.reclaimFreeRows(captured, setOf(if (kind == "foreign") 1L else 0L), remap), kind)
+
+                assertSame(before, owner.state)
+                assertEquals(0L, owner.metrics.createdOwners)
+            }
+        }
+    }
+
+    @Test
+    fun `cancelled reclamation should preserve the last result and spent metadata work`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))), listOf(zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
+                ExactLpColumn(ExactLpBounds(), integral = false),
+            ),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+        )
+        var work = 0L
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = work > 0L
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            val result = assertNotNull(owner.solve())
+            val before = owner.state
+            val preparations = owner.metrics.preparationAttempts
+            val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+
+            assertFalse(owner.reclaimFreeRows(before, setOf(0L), remap, token))
+
+            assertTrue(work > 0L)
+            assertSame(before, owner.state)
+            assertSame(result, owner.lastResult)
+            assertEquals(preparations, owner.metrics.preparationAttempts)
+        }
+    }
+
+    @Test
+    fun `failed compact owner adoption should preserve the donor and account for rejected preparation`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))), listOf(zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
+                ExactLpColumn(ExactLpBounds(), integral = false),
+            ),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+        )
+        var reject = false
+        var closed = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                        !reject && delegate.adopt(state, token)
+                    override fun close() {
+                        closed++
+                        delegate.close()
+                    }
+                }
+            }
+        }
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(engineFactory = factory)).use { owner ->
+            val result = assertNotNull(owner.solve())
+            val before = owner.state
+            val work = owner.metrics.preparationWork
+            val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+            reject = true
+
+            assertFalse(owner.reclaimFreeRows(before, setOf(0L), remap))
+
+            assertSame(before, owner.state)
+            assertSame(result, owner.lastResult)
+            assertTrue(owner.metrics.preparationWork > work)
+            assertEquals(1, closed)
+            assertEquals(1L, owner.metrics.currentOwners)
+        }
+    }
+
+    @Test
+    fun `free definition reclamation should preserve the original exact optimum`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)), ExactLpEntry(1, ExactLpNumber.of(-2L)))),
+            listOf(zero, zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(5L)))),
+                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(one)), integral = false),
+                ExactLpColumn(ExactLpBounds(), integral = false),
+            ),
+            listOf(ExactLpRow(), ExactLpRow()),
+            ExactLpObjective(listOf(one, zero, zero)),
+        )
+        val original = LpExactState(source)
+        LpScopedSolver(original).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            val before = owner.state
+            val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(1)))
+
+            assertTrue(owner.reclaimFreeRows(before, setOf(1L), remap))
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(1, owner.state.model.m)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            assertEquals(BigFraction.ONE, result.lowerBound)
+            IndependentExactSourceValidator.validate(original, result)
+            assertEquals(2L, owner.metrics.createdOwners)
+            assertEquals(2L, owner.metrics.preparationAttempts)
+        }
+    }
+
+    @Test
+    fun `free definition reclamation should preserve scoped witnesses through logical remapping`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-2L)), ExactLpEntry(1, ExactLpNumber.of(-1L)))),
+            listOf(zero, zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(5L)))),
+                ExactLpColumn(ExactLpBounds(), integral = false),
+                ExactLpColumn(ExactLpBounds(), integral = false),
+            ),
+            listOf(ExactLpRow(), ExactLpRow()),
+            ExactLpObjective(listOf(one, zero, zero)),
+        )
+        val original = LpExactState(source)
+        LpScopedSolver(original).use { owner ->
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(2, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
+            val before = owner.state
+            val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+
+            assertTrue(owner.reclaimFreeRows(before, setOf(0L), remap))
+
+            val assertion = owner.state.assertions.single()
+            assertEquals(1, assertion.column)
+            assertEquals(7L, assertion.witness)
+            assertEquals(1, assertion.depth)
+            assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.pop(0))
+            val result = assertNotNull(owner.solve())
+            assertEquals(BigFraction.ZERO, result.lowerBound)
+            IndependentExactSourceValidator.validate(original, result)
+            assertEquals(1L, owner.state.rows.lastId)
+        }
+    }
+
     @Test
     fun `new columns rows and bound assertions should publish in one preparation`() {
         val zero = ExactLpNumber.of(0L)

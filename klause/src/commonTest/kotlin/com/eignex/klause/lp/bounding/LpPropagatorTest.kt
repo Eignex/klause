@@ -26,6 +26,7 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
@@ -67,6 +68,118 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `reclamation should not count a new solve or replay an earlier pivot metric`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))), listOf(zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
+                ExactLpColumn(ExactLpBounds(), integral = false),
+            ),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+        )
+        var solves = 0
+        val factory = wrappingFactory { delegate ->
+            object : PersistentLpSolver by delegate {
+                override val lastMetrics: LpSolveMetrics get() = delegate.lastMetrics.copy(pivots = 17)
+                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                    solves++
+                    return delegate.resolveBounds(allowance)
+                }
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            assertNotNull(lp.solveFloat()?.second)
+            assertEquals(17, lp.lastMetrics.pivots)
+            val before = assertNotNull(lp.state)
+            val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+
+            assertFalse(lp.reclaimFreeRows(LpExactState(source), setOf(0L), remap))
+            assertEquals(0, lp.lastMetrics.pivots)
+            assertTrue(lp.reclaimFreeRows(before, setOf(0L), remap))
+
+            assertEquals(0, lp.lastMetrics.pivots)
+            assertEquals(1, solves)
+            assertEquals(2L, lp.metrics?.createdOwners)
+        }
+    }
+
+    @Test
+    fun `failed reclamation should report preparation work once and preserve the donor`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))), listOf(zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
+                ExactLpColumn(ExactLpBounds(), integral = false),
+            ),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+        )
+        var reject = false
+        val factory = wrappingFactory { delegate ->
+            object : PersistentLpSolver by delegate {
+                override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                    !reject && delegate.adopt(state, token)
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            assertNotNull(lp.solve())
+            val before = assertNotNull(lp.state)
+            val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+            val work = assertNotNull(lp.metrics).preparationWork
+            reject = true
+
+            assertFalse(lp.reclaimFreeRows(before, setOf(0L), remap))
+
+            assertSame(before, lp.state)
+            assertTrue(assertNotNull(lp.metrics).preparationWork > work)
+            assertTrue(lp.lastMetrics.workOps > 0L)
+            assertFalse(lp.reclaimFreeRows(LpExactState(source), setOf(0L), remap))
+            assertEquals(0L, lp.lastMetrics.workOps)
+            assertEquals(1L, lp.metrics?.currentOwners)
+        }
+    }
+
+    @Test
+    fun `a reclamation close failure should invalidate authority and preserve the primary exception`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(zero),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(), integral = false)),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+        )
+        val primary = IllegalStateException("retired donor close")
+        val cleanup = IllegalStateException("compact owner close")
+        var closes = 0
+        val factory = wrappingFactory { delegate ->
+            object : PersistentLpSolver by delegate {
+                override fun close() {
+                    delegate.close()
+                    closes++
+                    throw if (closes == 1) primary else cleanup
+                }
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            assertNotNull(lp.solve())
+            val before = assertNotNull(lp.state)
+            val remap = LpLayoutRemap(source.n, before.rows.deactivate(setOf(0)))
+
+            val thrown = assertFailsWith<IllegalStateException> { lp.reclaimFreeRows(before, setOf(0L), remap) }
+
+            assertSame(primary, thrown)
+            assertEquals(listOf(cleanup), thrown.suppressedExceptions)
+            assertNull(lp.state)
+            assertEquals(2, closes)
+        }
+    }
+
     @Test
     fun `premised bound batches should explain the first conflicting prefix`() {
         val problem = Problem(3, 2, Array(2) { IntDomain(0, 10) }, emptyArray())

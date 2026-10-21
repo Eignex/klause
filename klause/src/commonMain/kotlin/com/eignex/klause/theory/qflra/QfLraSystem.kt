@@ -19,6 +19,8 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
@@ -30,6 +32,8 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -168,7 +172,85 @@ internal class LiveQfLraSystem(
     }
     private val terms = normalized.filterKeys { it in initialTerms }.values
         .map { it.term.coefficients }.filter { it.size != 1 }.distinct()
-    private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
+    private var definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
+    private var reclamationPending = false
+    private var lastReclamationAttempt = -1L
+
+    fun retract() {
+        reclamationPending = true
+    }
+
+    fun reclaimFreeDefinitions(cancellation: Cancellation): Int {
+        if (!reclamationPending) return 0
+        reclamationPending = false
+        val before = lp.state ?: return 0
+        if (before.matrixRevision == lastReclamationAttempt || before.model.n != columns ||
+            before.model.m != definitions.size
+        ) return 0
+        cancellation.charge(definitions.size.toLong() + 1L)
+        if (cancellation()) return 0
+        val retired = freeDefinitionRows(before, cancellation) ?: return 0
+        if (retired.isEmpty() || retired.size < before.model.m - retired.size) return 0
+        cancellation.charge(4L * (columns.toLong() + before.model.m) + normalized.size + 2L * retired.size)
+        if (cancellation()) return 0
+        val remap = LpLayoutRemap(columns, before.rows.deactivate(retired))
+        val nextDefinitions = remappedDefinitions(remap, cancellation) ?: return 0
+        val slots = normalized.values.toList()
+        val slotColumns = remappedSlots(slots, remap, before.model.numVars, cancellation) ?: return 0
+        val retiredIds = retired.mapTo(HashSet()) { before.rows.row(it).id }
+        if (cancellation()) return 0
+        lastReclamationAttempt = before.matrixRevision
+        if (!lp.reclaimFreeRows(before, retiredIds, remap, cancellation)) return 0
+        // Cache publication must finish after the native layout commits, even if the token stops meanwhile.
+        definitions = nextDefinitions
+        for (index in slots.indices) slots[index].column = slotColumns[index]
+        return retired.size
+    }
+
+    private fun freeDefinitionRows(before: LpExactState, cancellation: Cancellation): Set<Int>? {
+        val retired = HashSet<Int>()
+        for (column in definitions.values) {
+            if (cancellation()) return null
+            if (column !in columns until before.model.numVars) return null
+            val bounds = before.model.column(column).bounds
+            if (bounds.lower == null && bounds.upper == null) retired += column - columns
+        }
+        return retired
+    }
+
+    private fun remappedDefinitions(
+        remap: LpLayoutRemap,
+        cancellation: Cancellation,
+    ): MutableMap<Map<Int, BigFraction>, Int>? {
+        val nextDefinitions = HashMap<Map<Int, BigFraction>, Int>()
+        for ((term, column) in definitions) {
+            for (coefficient in term.values) {
+                if (cancellation()) return null
+                val bits = coefficient.num.magnitudeBitLength().toLong() + coefficient.den.magnitudeBitLength()
+                cancellation.charge(1L + bits / Long.SIZE_BITS)
+            }
+            if (cancellation()) return null
+            val next = remap.column(column)
+            if (next >= 0) nextDefinitions[term] = next
+        }
+        return nextDefinitions
+    }
+
+    private fun remappedSlots(
+        slots: List<SmtTermSlot>,
+        remap: LpLayoutRemap,
+        previousColumns: Int,
+        cancellation: Cancellation,
+    ): IntArray? {
+        val slotColumns = IntArray(slots.size)
+        for (index in slots.indices) {
+            if (cancellation()) return null
+            val column = slots[index].column
+            if (column < -1 || column >= previousColumns) return null
+            slotColumns[index] = if (column < 0) -1 else remap.column(column)
+        }
+        return slotColumns
+    }
 
     fun install(): Boolean {
         val structural = sourceColumns.map { column ->

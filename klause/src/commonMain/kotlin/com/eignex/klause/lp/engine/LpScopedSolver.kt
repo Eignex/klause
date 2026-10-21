@@ -193,6 +193,55 @@ internal class LpScopedSolver(
     fun compact(remap: LpLayoutRemap, token: Cancellation = cancellation): Boolean =
         edit(token, compaction = remap) { it.compact(remap, token) }
 
+    fun reclaimFreeRows(
+        before: LpExactState,
+        retired: Set<Long>,
+        remap: LpLayoutRemap,
+        token: Cancellation = cancellation,
+    ): Boolean {
+        requireAvailable()
+        editAttempts++
+        lastMetrics = LpSolveMetrics()
+        val stop = if (token === cancellation) cancellation else cancellation or token
+        if (closed || state !== before || retired.isEmpty() || retired.size > before.model.m || stop()) return false
+        val model = before.model
+        stop.charge(saturated(8L * (model.numVars.toLong() + model.m), before.trailStorageUnits))
+        if (stop() || before.rows.activeCount != model.m || remap.retainedColumns.size != model.n) return false
+        val ids = retired.toSet()
+        for (id in ids) {
+            if (stop()) return false
+            val row = before.rows.index(id)
+            if (row < 0 || !freeDefinitionRow(before, row)) return false
+        }
+        for (column in 0 until model.n) {
+            stop.charge(8L * model.columnEntries(column).size + 1L)
+            if (stop()) return false
+        }
+        val next = LpBoundTrail(before)
+        if (!next.deactivate(ids, stop) || !remap.matches(next.state.model, next.state.rows) ||
+            !next.compact(remap, stop) || stop()
+        ) return false
+        // Removing free logical definitions preserves the all-logical identity basis without a donor solve.
+        return replace(next, stop, append = false)
+    }
+
+    private fun freeDefinitionRow(before: LpExactState, row: Int): Boolean {
+        val identity = before.rows.row(row)
+        val column = before.model.n + row
+        val base = before.baseModel.column(column)
+        val active = before.model.column(column)
+        val metadata = before.model.row(row)
+        if (!identity.active || identity.depth != null || identity.suspendedAt != null) return false
+        if (!metadata.global || metadata.strict || metadata.premises != null || !before.model.rhs(row).value.isZero) {
+            return false
+        }
+        return freeDefinitionColumn(base) && freeDefinitionColumn(active) &&
+            before.baseModel.objective.cost(column).value.isZero && before.model.objective.cost(column).value.isZero
+    }
+
+    private fun freeDefinitionColumn(column: ExactLpColumn): Boolean = !column.integral && column.tag == -1 &&
+        column.origin.value.isZero && column.bounds.lower == null && column.bounds.upper == null
+
     val basisLifecycleWork: BasisOperationWork? get() = solver?.basisLifecycleWork
 
     @Suppress("TooGenericExceptionCaught")

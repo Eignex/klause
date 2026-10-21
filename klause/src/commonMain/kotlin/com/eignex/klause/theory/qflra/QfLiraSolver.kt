@@ -989,6 +989,12 @@ class ExactLiraSearchComponent private constructor(
 
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
+        val reclaimed = system.reclaimFreeDefinitions(operationStop)
+        if (reclaimed > 0) {
+            observeCompleteStage("LP_DEFINITION_COMPACTION")
+            repeat(reclaimed) { observeCompleteStage("LP_DEFINITION_RETIRED_ROW") }
+        }
+        if (operationStop()) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
@@ -1489,6 +1495,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        if (sourceInstalled) system.retract()
         for (index in sourceAssertionLevels.indices) {
             if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
         }

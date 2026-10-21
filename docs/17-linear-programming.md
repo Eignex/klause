@@ -142,6 +142,15 @@ live factors are never resized. A projection that cannot import exact authority
 declines without a partial layout: node bounding withholds deductions and leaf
 completion returns indeterminate.
 
+Open linear arithmetic also reclaims unused internal definition rows. This narrow
+transition accepts only permanent, global, nonstrict zero-RHS definitions whose
+continuous logical column has no bound or cost. It retains every structural column
+and stages deactivation and compaction before publishing either. The compact
+all-logical identity basis needs no donor preparation; the prior numerical owner
+remains authoritative until the replacement is ready. Surviving assertions and
+scopes retain their exact witnesses, and metadata and rejected preparation work
+remain charged to the original operation.
+
 ## Floating simplex and basis factors
 
 [SimplexWorkspace](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexWorkspace.kt)

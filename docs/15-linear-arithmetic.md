@@ -43,8 +43,17 @@ A term is normalized before lookup: zero coefficients are dropped and the first
 remaining coefficient is scaled to one, flipping the bound direction for a negative
 scale. `2x + 4y <= 6` and `-x - 2y >= -3` therefore share one slack column. Terms
 first seen under an activator, branch or disjunct get their definition row appended
-on first use, and siblings reuse it. At the root, fixed columns are substituted as
-constants, keeping the premises of both fixing bounds.
+on first use. At the root, fixed columns are substituted as constants, keeping the
+premises of both fixing bounds.
+
+Retraction schedules cleanup in the next arithmetic operation. When at least half
+the installed definitions have no remaining bound, their free continuous logical
+columns and rows are removed together. The source structural coordinates stay in
+place; surviving bound witnesses, scopes and cached term columns follow the exact
+layout remap. A sibling recreates a reclaimed expression with a fresh row identity.
+Cleanup stages one compact numerical owner under the current operation allowance,
+keeps failed preparation work, and preserves the previous layout on refusal. One
+attempt is permitted per matrix revision; a bound-only edit does not renew it.
 
 #### A check
 

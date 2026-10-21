@@ -342,6 +342,22 @@ internal class LpPropagator(
         true
     } == true
 
+    fun reclaimFreeRows(
+        before: LpExactState,
+        retired: Set<Long>,
+        remap: LpLayoutRemap,
+        token: Cancellation = cancellation,
+    ): Boolean {
+        val stop = if (token === cancellation) cancellation else cancellation or token
+        return solveOwned(recordSolve = false) { current ->
+            if (current.state !== before || stop()) return@solveOwned false
+            onEdit(before.model.numVars.toLong())
+            if (!current.reclaimFreeRows(before, retired, remap, stop)) return@solveOwned false
+            retainWitnesses()
+            true
+        } == true
+    }
+
     fun editCuts(edit: LpCutEdit): Boolean = withOwner { current ->
         val before = current.state
         if (edit.sourceState !== before || !edit.isCurrent() || cancellation()) return@withOwner false
@@ -411,11 +427,14 @@ internal class LpPropagator(
             ).also { solved = true }
         }
 
-    private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? = withOwner { current ->
+    private inline fun <T> solveOwned(
+        recordSolve: Boolean = true,
+        action: (LpScopedSolver) -> T,
+    ): T? = withOwner { current ->
         try {
             action(current)
         } finally {
-            recordWork(current)
+            recordWork(current, recordSolve)
         }
     }
 
@@ -446,9 +465,10 @@ internal class LpPropagator(
         return true
     }
 
-    private fun recordWork(current: LpScopedSolver) {
+    private fun recordWork(current: LpScopedSolver, recordSolve: Boolean) {
         val metrics = current.metrics
-        lastMetrics = current.lastMetrics + LpSolveMetrics(
+        val solve = if (recordSolve) current.lastMetrics else LpSolveMetrics()
+        lastMetrics = solve + LpSolveMetrics(
             workOps = metrics.preparationWork - preparedWork,
             initialRefactorizations = (metrics.preparationRefactorizations - preparedRefactors).toInt(),
         )
