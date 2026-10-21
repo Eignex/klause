@@ -30,7 +30,6 @@ import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.plus
 import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -493,23 +492,22 @@ class QfLraSystemTest {
     }
 
     @Test
-    fun `an oversized optional coefficient should preserve the ordinary source assertion`() {
-        val wide = BIG_ONE shl 4096
-        val coefficient = BigFraction.of(wide + BIG_ONE, wide)
+    fun `an unprojectable scoped remainder should preserve the ordinary source assertion`() {
+        val wide = BigFraction.of(BIG_ONE shl 1023, BIG_ONE)
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source(), lp)
             assertTrue(system.install())
             assertTrue(lp.atLevel(1))
-            assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2)), axiom))
-            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2)), axiom))
+            assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(wide)), axiom))
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(wide)), axiom))
             val inequality = ExactRationalInequality(
-                intArrayOf(0, 1), listOf(BigFraction.ONE, coefficient), BigFraction.ofLong(3),
+                intArrayOf(0, 1), listOf(BigFraction.ONE, wide.reciprocal()), BigFraction.ZERO,
             )
 
             assertTrue(system.assertRow(inequality, axiom))
 
             assertNull(lp.state?.activeSide(1, true))
-            assertEquals(BigFraction.ofLong(3), lp.state?.activeSide(2, true)?.side?.number?.value)
+            assertEquals(BigFraction.ZERO, lp.state?.activeSide(2, true)?.side?.number?.value)
         }
     }
 
