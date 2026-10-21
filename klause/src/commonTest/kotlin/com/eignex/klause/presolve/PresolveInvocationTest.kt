@@ -142,6 +142,7 @@ class PresolveInvocationTest {
         val substitution = budget.invocations.single { it.pass == "binary-columns" }
         assertEquals(PresolveInvocationOutcome.CHANGED, substitution.outcome)
         assertEquals(2, substitution.output.booleans - substitution.input.booleans)
+        assertEquals(2, substitution.fixedColumns)
         assertTrue(substitution.rebuildWork > 0L)
         assertTrue(budget.invocations.any { it.pass == "probe-failed-literals" && it.rebuildWork > 0L })
         assertTrue(budget.invocations.all { it.rebuildWork <= it.work })
