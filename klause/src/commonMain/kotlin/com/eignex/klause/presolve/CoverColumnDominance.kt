@@ -105,10 +105,14 @@ internal object CoverColumnDominance {
                 val other = checkNotNull(columns[y])
                 if (column.clauses.size > other.clauses.size ||
                     (column.signature and other.signature) != column.signature
-                ) continue
+                ) {
+                    continue
+                }
                 when (containsAll(other.clauses, column.clauses, work)) {
                     null -> return pins
+
                     false -> continue
+
                     true -> {
                         // Strictly cheaper replacements form an acyclic chain. Its last column
                         // covers every clause of each predecessor, even when intermediate columns pin.

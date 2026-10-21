@@ -343,7 +343,9 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun applySource(problem: Problem, ctx: PresolveContext) =
-            Presolve.fixDominatedSourceVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs, ctx.cancellation)
+            Presolve.fixDominatedSourceVariables(
+                problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs, ctx.cancellation,
+            )
 
         // The finite lane pins into root-propagated domains, which are narrower than the model states,
         // so it fixes columns the declaration alone leaves too wide.
