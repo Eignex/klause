@@ -839,6 +839,7 @@ private class ResidualRealComponent(
     private val phaseTracking = params.phaseSaving || params.targetPhasing
     private val integerPhaseTracking = params.phaseSaving
     private val pointHintsEnabled = phaseTracking && supportsRealPointHints(problem)
+    private val pointSelectionStop = params.cancellation
     private var pointHints: IntArray? = null
     private var integerHints: LongArray? = null
     private var pointHintCursor = 0
@@ -846,8 +847,8 @@ private class ResidualRealComponent(
     fun preferredBooleanVariable(accept: (Int) -> Boolean): Int? {
         val hints = pointHints ?: return null
         while (pointHintCursor < hints.size) {
-            params.cancellation.charge(1L)
-            if (params.cancellation()) return null
+            pointSelectionStop.charge(1L)
+            if (pointSelectionStop()) return null
             val variable = pointHintCursor++
             if ((hints[variable] == 0 || hints[variable] == 1) && accept(variable)) return variable
         }
