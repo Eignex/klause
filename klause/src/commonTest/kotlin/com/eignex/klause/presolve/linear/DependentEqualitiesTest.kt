@@ -67,7 +67,7 @@ class DependentEqualitiesTest {
         val sum = eq(intArrayOf(1, 2, 1), intArrayOf(0, 1, 2), 7)
         val premises = first.linearRows + second.linearRows
         for (form in listOf(LinearForm.Conjunction(premises), LinearForm.Relaxation(premises))) {
-            val factor = object : Factor by first {
+            val factor = object : Factor by sum {
                 override val linearForm: LinearForm = form
             }
             val p = problem(factor, sum)
