@@ -11,6 +11,7 @@ internal class PolynomialAffineReduction private constructor(
     val atoms: List<PolynomialAtom>,
     private val fibres: List<AffineFibre>,
     val inconsistent: Boolean,
+    val changed: Boolean,
 ) {
     val eliminatedCount: Int get() = fibres.size
 
@@ -64,13 +65,14 @@ internal class PolynomialAffineReduction private constructor(
             }
             if (signConflict) {
                 arithmetic.step()
-                yield(PolynomialAffineReduction(current, emptyList(), true))
+                yield(PolynomialAffineReduction(current, emptyList(), true, false))
                 return@sequence
             }
             val fibres = ArrayList<AffineFibre>()
             var inconsistent = false
             var normalizeConjunction = true
             var graphChanges = false
+            var predicatesChanged = false
             while (true) {
                 if (normalizeConjunction) {
                     val preparation = preparePolynomialConjunction(current, arithmetic)
@@ -81,6 +83,7 @@ internal class PolynomialAffineReduction private constructor(
                     }
                     inconsistent = conjunction.inconsistent
                     val changed = conjunction.changed
+                    predicatesChanged = predicatesChanged || changed
                     current = conjunction.atoms
                     if (inconsistent || (!changed && graphChanges)) break
                     normalizeConjunction = false
@@ -169,7 +172,8 @@ internal class PolynomialAffineReduction private constructor(
                 inconsistent = magnitudeConflict
             }
             arithmetic.step()
-            yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent))
+            yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent,
+                predicatesChanged || fibres.isNotEmpty()))
         }.iterator()
     }
 }
