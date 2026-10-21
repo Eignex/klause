@@ -3,6 +3,8 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.arithmetic.polynomial.preparePolynomialRemainder
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.theory.qfnra.PolynomialSigns.NEGATIVE_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.NONZERO_SIGNS
@@ -53,7 +55,59 @@ internal fun preparePolynomialConjunction(
         val signs = if (it.positive) it.signs else negateSigns(it.signs)
         PolynomialAtom(it.polynomial, conjunctionRelation(signs))
     }
+    val reducing = prepareEqualityRemainders(result, arithmetic)
+    var reduced: PolynomialConjunction? = null
+    while (reduced == null) {
+        reduced = reducing.next()
+        if (reduced == null) yield(null)
+    }
     arithmetic.step()
+    yield(PolynomialConjunction(reduced.atoms, reduced.inconsistent, changed || reduced.changed))
+}.iterator()
+
+private fun prepareEqualityRemainders(
+    atoms: List<PolynomialAtom>,
+    arithmetic: PolynomialArithmetic,
+): Iterator<PolynomialConjunction?> = sequence {
+    val equations = atoms.mapNotNull {
+        arithmetic.step()
+        if (it.relation == PolynomialRelation.EQ) it.polynomial else null
+    }
+    if (equations.isEmpty()) {
+        yield(PolynomialConjunction(atoms, false, false))
+        return@sequence
+    }
+    val result = ArrayList<PolynomialAtom>()
+    var changed = false
+    for (atom in atoms) {
+        arithmetic.step()
+        if (atom.relation == PolynomialRelation.EQ) {
+            result.add(atom)
+            continue
+        }
+        var polynomial: Polynomial? = null
+        try {
+            val reducing = preparePolynomialRemainder(atom.polynomial, equations, arithmetic)
+            while (polynomial == null) {
+                polynomial = reducing.next()
+                if (polynomial == null) yield(null)
+            }
+        } catch (_: PolynomialResourceLimit) {
+            polynomial = atom.polynomial
+        }
+        if (polynomial == atom.polynomial) {
+            result.add(atom)
+            continue
+        }
+        changed = true
+        if (polynomial.variables.isEmpty()) {
+            if (!atom.holds(polynomial.coefficient(Monomial.ONE).signum())) {
+                yield(PolynomialConjunction(emptyList(), true, true))
+                return@sequence
+            }
+        } else result.add(PolynomialAtom(polynomial, atom.relation))
+        yield(null)
+    }
     yield(PolynomialConjunction(result, false, changed))
 }.iterator()
 
