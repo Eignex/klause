@@ -159,7 +159,9 @@ class BoundedVariableEliminationTest {
         val delta = BoundedVariableElimination.eliminateSource(problem, (1..64).toSet(), meter)
 
         assertTrue(delta.isEmpty)
-        assertEquals(655_360L, charged)
+        val setup = PresolveBudget(Long.MAX_VALUE)
+        assertNotNull(SatClauseDb.build(problem, (1..64).toSet(), setup.orSpent(Cancellation.Never)))
+        assertEquals(655_360L + setup.spent() + 650L, charged)
     }
 
     @Test
@@ -175,6 +177,26 @@ class BoundedVariableEliminationTest {
 
         assertTrue(delta.isEmpty)
         assertEquals(30L, charged)
+    }
+
+    @Test
+    fun `candidate collection and sorting should stop before eliminating any clause`() {
+        val problem = Problem(4, 0, emptyArray(), listOf(clause(pos(0))))
+        val setup = PresolveBudget(Long.MAX_VALUE)
+        assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(Cancellation.Never)))
+        for (extra in listOf(10L, 50L, 100L)) {
+            val budget = PresolveBudget(setup.spent() + extra)
+
+            val delta = BoundedVariableElimination.eliminateSource(problem, cancellation = budget.orSpent(Cancellation.Never))
+
+            assertTrue(delta.isEmpty)
+            assertEquals(setup.spent() + extra, budget.spent())
+        }
+        val productive = BoundedVariableElimination.eliminateSource(problem)
+        assertContentEquals(intArrayOf(0), productive.droppedIndices)
+        val solved = BooleanArray(4)
+        productive.rebuild.rebuildInto(solved)
+        assertTrue(sat(problem.factors, solved))
     }
 
     @Test
@@ -214,9 +236,12 @@ class BoundedVariableEliminationTest {
             emptyArray(),
             listOf(clause(pos(0))) + List(16) { positive } + List(16) { negative },
         )
+        val setup = PresolveBudget(Long.MAX_VALUE)
+        assertNotNull(SatClauseDb.build(problem, (2..5).toSet(), setup.orSpent(Cancellation.Never)))
+        val preparation = setup.spent() + 80L
         var charged = 0L
         val stop = object : Cancellation {
-            override fun isCancelled(): Boolean = charged >= 2_000L
+            override fun isCancelled(): Boolean = charged >= preparation + 2_000L
             override fun workMeter(): WorkMeter = WorkMeter { charged += it }
         }
 
@@ -224,7 +249,7 @@ class BoundedVariableEliminationTest {
 
         assertContentEquals(intArrayOf(0), delta.droppedIndices)
         assertTrue(delta.addedFactors.isEmpty())
-        assertTrue(charged in 2_000L..4_560L)
+        assertTrue(charged in preparation + 2_000L..preparation + 4_560L)
         val reduced = assertNotNull(problem.withSourcePassDelta(delta))
         for (mask in 0 until 64) {
             val solved = BooleanArray(6) { (mask shr it) and 1 == 1 }
@@ -235,18 +260,21 @@ class BoundedVariableEliminationTest {
     }
 
     @Test
-    fun `cancellation after analysis should decline the complete uncommitted pivot`() {
+    fun `cancellation after pivot analysis should decline the complete uncommitted pivot`() {
         val problem = Problem(2, 0, emptyArray(), listOf(clause(pos(0), pos(1))))
+        val setup = PresolveBudget(Long.MAX_VALUE)
+        assertNotNull(SatClauseDb.build(problem, setOf(1), setup.orSpent(Cancellation.Never)))
+        val preparation = setup.spent() + 20L
         var charged = 0L
         val stop = object : Cancellation {
-            override fun isCancelled(): Boolean = charged > 0L
+            override fun isCancelled(): Boolean = charged > preparation
             override fun workMeter(): WorkMeter = WorkMeter { charged += it }
         }
 
         val delta = BoundedVariableElimination.eliminateSource(problem, setOf(1), stop)
 
         assertTrue(delta.isEmpty)
-        assertTrue(charged > 0L)
+        assertTrue(charged > preparation)
     }
 
     @Test

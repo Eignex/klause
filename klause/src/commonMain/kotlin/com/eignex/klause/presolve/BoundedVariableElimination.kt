@@ -64,19 +64,57 @@ internal object BoundedVariableElimination {
     ): T? {
         val nb = problem.numBoolVars
         if (nb == 0) return null
-        val db = SatClauseDb.build(problem, objectiveBoolVars)
+        val db = SatClauseDb.build(problem, objectiveBoolVars, cancellation) ?: return null
 
         val eliminations = ArrayList<VarElim>()
-        // Cheapest-first: a low-degree variable is likeliest to eliminate within the bound.
-        val order = (0 until nb)
-            .filter { db.eligible[it] }
-            .sortedBy { db.occ(Lit.make(it, true)).size + db.occ(Lit.make(it, false)).size }
+        val order = candidateOrder(db, cancellation) ?: return null
         for (v in order) {
             if (cancellation()) break
             eliminateVar(v, db, eliminations, cancellation)
         }
 
         return delta(db, eliminations.asRebuilds())
+    }
+
+    private fun candidateOrder(db: SatClauseDb, cancellation: Cancellation): IntArray? {
+        val candidates = IntArrayList()
+        val degrees = LongArray(db.numBoolVars)
+        for (v in 0 until db.numBoolVars) {
+            cancellation.charge(BVE_WORK_WEIGHT)
+            if (cancellation()) return null
+            if (!db.eligible[v]) continue
+            candidates.add(v)
+            degrees[v] = db.occ(Lit.make(v, true)).size.toLong() + db.occ(Lit.make(v, false)).size
+        }
+        if (cancellation()) return null
+        var order = candidates.toIntArray()
+        if (cancellation()) return null
+        var scratch = IntArray(order.size)
+        // Stable cheapest-first order keeps the original variable order for equal degrees.
+        var width = 1
+        while (width < order.size) {
+            var lo = 0
+            while (lo < order.size) {
+                val mid = minOf(lo.toLong() + width, order.size.toLong()).toInt()
+                val hi = minOf(mid.toLong() + width, order.size.toLong()).toInt()
+                var left = lo
+                var right = mid
+                for (out in lo until hi) {
+                    cancellation.charge(BVE_WORK_WEIGHT)
+                    if (cancellation()) return null
+                    scratch[out] = if (left < mid && (right >= hi || degrees[order[left]] <= degrees[order[right]])) {
+                        order[left++]
+                    } else order[right++]
+                }
+                lo = hi
+            }
+            val previous = order
+            order = scratch
+            scratch = previous
+            if (width > order.size / 2) break
+            width *= 2
+        }
+        return if (cancellation()) null else order
     }
 
     private fun eliminateVar(v: Int, db: SatClauseDb, eliminations: ArrayList<VarElim>, cancellation: Cancellation) {

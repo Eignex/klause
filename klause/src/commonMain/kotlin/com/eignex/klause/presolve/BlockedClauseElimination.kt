@@ -61,7 +61,7 @@ internal object BlockedClauseElimination {
         delta: (SatClauseDb, SourceRebuilds) -> T,
     ): T? {
         if (problem.numBoolVars == 0) return null
-        val db = SatClauseDb.build(problem, objectiveBoolVars)
+        val db = SatClauseDb.build(problem, objectiveBoolVars, cancellation) ?: return null
 
         val removed = ArrayList<Blocked>()
         // BCE is confluent — removing a blocked clause keeps the rest blocked — so a single sweep,

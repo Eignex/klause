@@ -184,7 +184,7 @@ class OriginalClauseSubsumptionTest {
             val delta = OriginalClauseSubsumption.simplify(problem, budget.orSpent(Cancellation.Never), limits)
 
             assertTrue(delta.isEmpty)
-            assertTrue(budget.spent() in 1L..20L)
+            assertTrue(budget.spent() in 1L..40L)
         }
     }
 

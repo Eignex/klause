@@ -4,8 +4,8 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 
 /**
  * A mutable clause database over the pure-SAT part of a `Problem`, shared by bounded variable elimination
@@ -94,9 +94,13 @@ internal class SatClauseDb private constructor(
     companion object {
         /** Index only bounded-width original clauses; no variable is eligible for elimination. */
         fun buildShortClauses(problem: Problem, maxWidth: Int, visit: () -> Boolean): SatClauseDb? {
+            if (!visit()) return null
             val slots = ArrayList<IntArray?>()
             val origins = IntArrayList()
-            val occurrences = Array(2 * problem.numBoolVars) { IntArrayList() }
+            val occurrences = Array(2 * problem.numBoolVars) {
+                if (!visit()) return null
+                IntArrayList()
+            }
             for (i in problem.factors.indices) {
                 if (!visit()) return null
                 val clause = problem.factors[i] as? Clause ?: continue
@@ -111,8 +115,12 @@ internal class SatClauseDb private constructor(
                 val slot = slots.size
                 slots.add(literals)
                 origins.add(i)
-                for (literal in literals) occurrences[literal].add(slot)
+                for (literal in literals) {
+                    if (!visit()) return null
+                    occurrences[literal].add(slot)
+                }
             }
+            if (!visit()) return null
             return SatClauseDb(
                 problem.numBoolVars,
                 BooleanArray(problem.numBoolVars),
@@ -123,49 +131,66 @@ internal class SatClauseDb private constructor(
             )
         }
 
-        /** A clause containing a literal and its negation — always true. */
-        fun isTautology(lits: IntArray): Boolean {
-            val seen = IntHashSet(lits.size)
-            for (l in lits) {
-                if (Lit.negate(l) in seen) return true
-                seen.add(l)
-            }
-            return false
-        }
-
-        private fun isCleanClause(f: Factor, nb: Int): Boolean = f is Clause && f.allLiteralsBool(nb)
-
         /** Build the database from [problem]'s clean clauses, protecting [objectiveBoolVars]. */
-        fun build(problem: Problem, objectiveBoolVars: Set<Int>): SatClauseDb {
+        fun build(
+            problem: Problem,
+            objectiveBoolVars: Set<Int>,
+            cancellation: Cancellation = Cancellation.Never,
+        ): SatClauseDb? {
+            if (cancellation()) return null
             val nb = problem.numBoolVars
-            val factors = problem.factors
-
-            val eligible = BooleanArray(nb) { it !in objectiveBoolVars }
-            for (f in factors) {
-                if (isCleanClause(f, nb)) continue
-                for (w in f.boolVars) if (w in 0 until nb) eligible[w] = false
+            val eligible = BooleanArray(nb) {
+                if (!visit(cancellation)) return null
+                it !in objectiveBoolVars
             }
-
+            val litOcc = Array(2 * nb) {
+                if (!visit(cancellation)) return null
+                IntArrayList()
+            }
             val slotLits = ArrayList<IntArray?>()
             val slotOrig = IntArrayList()
             val vacuous = IntArrayList()
-            for (i in factors.indices) {
-                val f = factors[i]
-                if (!isCleanClause(f, nb)) continue
-                val lits = (f as Clause).literals
-                if (isTautology(lits)) {
+            for (i in problem.factors.indices) {
+                if (!visit(cancellation)) return null
+                val factor = problem.factors[i]
+                val clause = factor as? Clause
+                var clean = clause != null
+                if (clause != null) {
+                    for (literal in clause.literals) {
+                        if (!visit(cancellation)) return null
+                        if (Lit.variable(literal) >= nb) clean = false
+                    }
+                }
+                if (!clean) {
+                    for (variable in factor.boolVars) {
+                        if (!visit(cancellation)) return null
+                        if (variable in 0 until nb) eligible[variable] = false
+                    }
+                    continue
+                }
+                checkNotNull(clause)
+                if (!visit(cancellation)) return null
+                if (clause.tautological) {
                     vacuous.add(i)
-                } else {
-                    slotLits.add(lits)
-                    slotOrig.add(i)
+                    continue
+                }
+                val slot = slotLits.size
+                slotLits.add(clause.literals)
+                slotOrig.add(i)
+                for (literal in clause.literals) {
+                    if (!visit(cancellation)) return null
+                    litOcc[literal].add(slot)
                 }
             }
-            val litOcc = Array(2 * nb) { IntArrayList() }
-            for (s in slotLits.indices) {
-                val lits = slotLits[s] ?: continue
-                for (l in lits) if (Lit.variable(l) < nb) litOcc[l].add(s)
-            }
+            if (cancellation()) return null
             return SatClauseDb(nb, eligible, slotLits, slotOrig, litOcc, vacuous.toIntArray())
+        }
+
+        private fun visit(cancellation: Cancellation): Boolean {
+            cancellation.charge(SAT_PREPARATION_WORK_WEIGHT)
+            return !cancellation()
         }
     }
 }
+
+private const val SAT_PREPARATION_WORK_WEIGHT = 10L

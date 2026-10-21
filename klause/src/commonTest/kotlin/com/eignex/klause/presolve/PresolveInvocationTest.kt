@@ -2,16 +2,21 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -62,6 +67,42 @@ class PresolveInvocationTest {
         assertTrue(budget.invocations.all { it.input.occurrences == null })
         assertEquals(0L, budget.entrySizeVisits)
         assertEquals(0L, budget.spent())
+    }
+
+    @Test
+    fun `SAT passes should skip database reads when entry accounting exhausts the allowance`() {
+        for (id in listOf("bve", "bce")) {
+            for (lane in PresolveLane.entries) {
+                var reads = 0
+                val clause = Clause(intArrayOf(Lit.make(0, true)))
+                val factor = object : Factor by clause, Propagator by clause.propagatorProjection() {
+                    override val structuralKeyWeight: Int get() = 1
+                    override val boolVars: IntArray
+                        get() {
+                            reads++
+                            return intArrayOf(0)
+                        }
+                }
+                val source = Problem(1, 0, emptyArray(), List(4) { factor })
+                val problem = if (lane == PresolveLane.FINITE) source.bake() else source
+                reads = 0
+                val budget = PresolveBudget(1L)
+                val context = PresolveContext(presolveBudget = budget)
+                val config = PresolveConfig.parse("off,+$id")
+                val token = budget.orSpent(Cancellation.Never)
+
+                when (lane) {
+                    PresolveLane.SOURCE -> Presolver.runSource(problem, config, context, token)
+                    PresolveLane.FINITE -> Presolver.run(assertIs<BakedProblem>(problem), config, context, token)
+                }
+
+                assertEquals(0, reads, "$id $lane")
+                val invocation = budget.invocations.single()
+                assertEquals(PresolveInvocationOutcome.INTERRUPTED, invocation.outcome)
+                assertEquals(84L, budget.spent())
+                assertEquals(budget.spent(), invocation.work)
+            }
+        }
     }
 
     @Test
