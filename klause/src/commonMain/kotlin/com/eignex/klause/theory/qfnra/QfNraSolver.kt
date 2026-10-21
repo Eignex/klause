@@ -1708,30 +1708,49 @@ private fun partialRegionSigns(
     var negativeTerms = false
     for ((monomial, coefficient) in polynomial.terms) {
         arithmetic.step()
-        var value = algebraic.rational(coefficient)
         var pending = false
         var odd = false
         for (variable in monomial.variables) {
             arithmetic.step()
-            val exponent = monomial.exponent(variable)
-            val coordinate = coordinates[variable]
-            if (coordinate == null) {
+            if (variable !in coordinates) {
                 pending = true
-                if (exponent and 1 != 0) odd = true
-            } else {
-                value = algebraic.multiply(value, algebraic.power(coordinate, exponent))
+                if (monomial.exponent(variable) and 1 != 0) odd = true
             }
         }
-        val sign = algebraic.sign(value)
-        if (sign == 0) continue
         if (!pending) {
+            var value = algebraic.rational(coefficient)
+            for (variable in monomial.variables) {
+                arithmetic.step()
+                value = algebraic.multiply(value,
+                    algebraic.power(coordinates.getValue(variable), monomial.exponent(variable)))
+            }
             constant = algebraic.add(constant, value)
         } else {
+            val sign = assignedCoefficientSign(monomial, coefficient, coordinates, arithmetic, algebraic)
+            if (sign == 0) continue
             if (odd) return ALL_SIGNS
             if (sign > 0) positiveTerms = true else negativeTerms = true
         }
     }
     return evenCompletionSigns(algebraic.sign(constant), positiveTerms, negativeTerms)
+}
+
+private fun assignedCoefficientSign(
+    monomial: Monomial,
+    coefficient: BigFraction,
+    coordinates: Map<Int, AlgebraicReal>,
+    arithmetic: PolynomialArithmetic,
+    algebraic: AlgebraicArithmetic,
+): Int {
+    var sign = coefficient.signum()
+    for (variable in monomial.variables) {
+        arithmetic.step()
+        val coordinate = coordinates[variable] ?: continue
+        val factor = algebraic.sign(coordinate)
+        if (factor == 0) return 0
+        if (monomial.exponent(variable) and 1 != 0) sign *= factor
+    }
+    return sign
 }
 
 private fun evenCompletionSigns(constant: Int, positiveTerms: Boolean, negativeTerms: Boolean): Int = when {

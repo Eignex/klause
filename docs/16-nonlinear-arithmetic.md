@@ -293,8 +293,10 @@ roots, and roots become section samples with rational samples in the sectors
 between them. Partial substitution uses exact assigned coordinates to bound a
 predicate's sign when every remaining monomial has even powers and coefficients
 of one sign. A strict constant sign remains strict after adding terms of that
-sign; zero coefficients and boundary completions remain possible. An odd power,
-mixed signs or a representation refusal leaves the prefix open. A predicate
+sign; assigned factors contribute their exact signs and exponent parity without
+constructing coefficient products. Fully assigned terms retain exact values for
+constant cancellation. Zero coefficients and boundary completions remain possible.
+An odd power, mixed signs or a representation refusal leaves the prefix open. A predicate
 whose required truth is impossible for every completion prunes the prefix.
 At a complete sample,
 eliminated coordinates are reconstructed and the full assignment passes the

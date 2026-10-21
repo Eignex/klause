@@ -21,6 +21,24 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `partial coefficients retain irrational factor signs`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        for ((power, relation, sign) in listOf(Triple(1, "<", -1), Triple(2, ">", 1))) {
+            val source = SmtLibPolynomial.parse(
+                "$declarations (assert (= (* x0 x0) 2)) (assert (< x0 0)) " +
+                    "(assert ($relation (* (^ x0 $power) x1 x1) 0)) (assert (= (* x1 x1) 1))",
+            )
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+            val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+            val product = algebraic.multiply(algebraic.power(point.realValue(0), power),
+                algebraic.power(point.realValue(1), 2))
+            assertEquals(sign, algebraic.sign(product))
+        }
+    }
+
+    @Test
     fun `partial even powers retain zero boundary completions`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         for (predicate in listOf(
