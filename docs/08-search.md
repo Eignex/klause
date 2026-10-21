@@ -212,6 +212,12 @@ projection uses the general CP lane. AllDifferent tries its cached incremental p
 before full matching. Assignment-dependent payloads such as live tuples and diagram
 reachability stay state-owned.
 
+An incremental AllDifferent rebuild enumerates value identifiers and checks distinct
+capacity before matching completion. Completion borrows the value lists, warms and
+augments the matching, publishes it to the reversible state, then recomputes support
+and prunes. Only successful pruning publishes the valid flag, domain references and
+fixpoint snapshot. Delta propagation keeps its separate pruning lifecycle.
+
 An inert descriptor requires an explicit reason and cannot claim an exact check, so
 its absent mechanism needs an enforcing peer or separate source certification.
 Objective-bound overlays omit CP propagation, and a sound LP family may decline

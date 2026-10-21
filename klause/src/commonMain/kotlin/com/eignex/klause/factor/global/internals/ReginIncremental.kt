@@ -55,6 +55,20 @@ private fun reginRebuild(
     }
     if (distinct < n) return vars.copyOf()
 
+    return completeReginRebuild(state, vars, cache, inc, premises, valuesPerVar, n, cap)
+}
+
+@Suppress("LongParameterList")
+private fun completeReginRebuild(
+    state: PropagationState,
+    vars: IntArray,
+    cache: ReginCache,
+    inc: ReginIncrementalState,
+    premises: IntArray,
+    valuesPerVar: Array<IntArray>,
+    n: Int,
+    cap: Int,
+): IntArray? {
     // Warm-start the matching from the reversible matching, then augment the rest.
     val matchVar = IntArray(n) { -1 }
     val matchVal = IntArray(cap) { -1 }
