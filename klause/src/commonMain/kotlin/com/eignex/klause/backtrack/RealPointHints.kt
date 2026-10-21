@@ -12,6 +12,69 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.toLongExact
 
+internal class RealPointHints(
+    private val numBooleans: Int,
+    private val numIntegers: Int,
+    private val numReals: Int,
+    private val stop: Cancellation,
+) {
+    private var booleans: IntArray? = null
+    private var integers: LongArray? = null
+    private var cursor = 0
+    private var refreshPending = false
+
+    val available: Boolean get() = booleans != null
+    val needsRefresh: Boolean get() = booleans == null || refreshPending
+    val retainedEntries: Int get() = booleans?.size ?: 0
+
+    fun replace(booleanValues: IntArray, integerValues: LongArray) {
+        require(booleanValues.size == numBooleans)
+        require(integerValues.isEmpty() || integerValues.size == numIntegers)
+        booleans = booleanValues
+        integers = integerValues
+        cursor = 0
+        refreshPending = false
+    }
+
+    fun booleanValue(variable: Int): Long? = when (booleans?.getOrNull(variable)) {
+        0 -> 0L
+        1 -> 1L
+        else -> null
+    }
+
+    fun integerValue(variable: Int): Long? = integers?.getOrNull(variable)
+
+    fun preferredBooleanVariable(accept: (Int) -> Boolean): Int? {
+        val values = booleans ?: return null
+        while (cursor < values.size) {
+            stop.charge(1L)
+            if (stop()) return null
+            val variable = cursor++
+            if ((values[variable] == 0 || values[variable] == 1) && accept(variable)) return variable
+        }
+        return null
+    }
+
+    fun retract(): Boolean {
+        integers = null
+        if (booleans == null) return false
+        // Refresh must admit the retained guesses alongside the replacement workspace.
+        if (2L * numBooleans + numReals + 2L * numIntegers > 65536L) {
+            clear()
+            return false
+        }
+        refreshPending = true
+        return true
+    }
+
+    fun clear() {
+        booleans = null
+        integers = null
+        cursor = 0
+        refreshPending = false
+    }
+}
+
 internal fun integerPointHints(
     problem: Problem,
     point: List<BigFraction>,
@@ -51,8 +114,12 @@ internal fun realPointHints(
     point: List<BigFraction>,
     booleanValue: (Int) -> Boolean?,
     stop: Cancellation,
+    retainedEntries: Int = 0,
 ): IntArray? {
-    if (!supportsRealPointHints(problem) || point.size != problem.numRealVars + problem.numIntVars || stop()) {
+    var entries = problem.numBoolVars.toLong() + problem.numRealVars + 2L * problem.numIntVars + retainedEntries
+    if (!supportsRealPointHints(problem) || point.size != problem.numRealVars + problem.numIntVars ||
+        retainedEntries < 0 || entries > 65536L || stop()
+    ) {
         return null
     }
     stop.charge(8L * (problem.numBoolVars + problem.numRealVars + problem.numIntVars + problem.numFactors + 1L))
@@ -60,7 +127,6 @@ internal fun realPointHints(
     val work = MixedPointArithmetic(stop)
     if (!point.all(work::admitted)) return null
     val hints = IntArray(problem.numBoolVars) { -1 }
-    var entries = problem.numBoolVars.toLong() + problem.numRealVars + 2L * problem.numIntVars
     for (factor in problem.factors) {
         stop.charge(1L)
         if (stop()) return null

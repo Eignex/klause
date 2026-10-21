@@ -104,7 +104,7 @@ its first local witness. Hints supply no incumbent, pruning or publication autho
 
 Finite real completion can use an available exact partial-LP point to guide Boolean
 comparison heads and finite integer values. An existing positive prefix query may
-refresh absent guidance, within four point-mapping attempts over the numerical
+refresh absent or retracted guidance, within four point-mapping attempts over the numerical
 owner's lifetime. Retraction, restart and solver retirement do not renew that limit.
 Exact guard evaluation shares the numerical owner's current work ledger
 and uses at most one fifth of its parent deadline's remaining time. The point keeps
@@ -116,7 +116,11 @@ point. Both interval branches remain available, including when the proposed poin
 lies in a domain hole. Unsafe scalars and oversized indexes decline this optional guidance.
 Disagreeing comparisons sharing a head omit that head. Saved phases, target phases,
 solution phases and forced rephasing retain precedence; disabled phase tracking
-keeps the value selector's order. Retraction and restart discard active point hints.
+keeps the value selector's order. Retraction discards integer guesses and can retain
+unverified Boolean guesses until a scheduled positive query refreshes them. Retention
+requires workspace for both the retained table and its replacement within the same
+entry limit. A declined refresh leaves only the old Boolean ordering available.
+Restart, solver retirement, leaf checking and close discard all active hints.
 Both Boolean alternatives and the complete source checks remain required.
 
 An available finite prefix table can also propose an unassigned comparison head

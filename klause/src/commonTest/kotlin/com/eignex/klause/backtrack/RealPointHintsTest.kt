@@ -17,8 +17,77 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class RealPointHintsTest {
+    @Test
+    fun `retraction should retain Boolean guesses and discard integer guesses`() {
+        val hints = RealPointHints(3, 1, 1, Cancellation.Never)
+        hints.replace(intArrayOf(1, -1, 0), longArrayOf(4))
+        assertEquals(0, hints.preferredBooleanVariable { true })
+
+        assertTrue(hints.retract())
+
+        assertEquals(1L, hints.booleanValue(0))
+        assertNull(hints.integerValue(0))
+        assertTrue(hints.needsRefresh)
+        assertEquals(2, hints.preferredBooleanVariable { true })
+        assertNull(hints.preferredBooleanVariable { true })
+    }
+
+    @Test
+    fun `replacement should refresh retained guesses and restart variable selection`() {
+        val hints = RealPointHints(2, 1, 1, Cancellation.Never)
+        hints.replace(intArrayOf(1, 0), longArrayOf(4))
+        assertEquals(0, hints.preferredBooleanVariable { true })
+        hints.retract()
+
+        hints.replace(intArrayOf(0, 1), longArrayOf(2))
+
+        assertFalse(hints.needsRefresh)
+        assertEquals(0L, hints.booleanValue(0))
+        assertEquals(2L, hints.integerValue(0))
+        assertEquals(0, hints.preferredBooleanVariable { true })
+    }
+
+    @Test
+    fun `retraction should discard guesses without replacement workspace`() {
+        val hints = RealPointHints(32768, 0, 1, Cancellation.Never)
+        hints.replace(IntArray(32768), longArrayOf())
+
+        assertFalse(hints.retract())
+
+        assertFalse(hints.available)
+        assertTrue(hints.needsRefresh)
+        assertNull(hints.booleanValue(0))
+        assertNull(hints.preferredBooleanVariable { true })
+    }
+
+    @Test
+    fun `retained variable proposals should respect containing cancellation`() {
+        var stopped = false
+        val hints = RealPointHints(1, 0, 1, Cancellation { stopped })
+        hints.replace(intArrayOf(1), longArrayOf())
+        hints.retract()
+        stopped = true
+
+        assertNull(hints.preferredBooleanVariable { true })
+    }
+
+    @Test
+    fun `point mapping should charge retained guesses against row workspace`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO, activator = 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+
+        assertNull(realPointHints(source, listOf(BigFraction.ZERO), { null }, Cancellation.Never,
+            retainedEntries = 65533))
+        assertEquals(1, assertNotNull(realPointHints(source, listOf(BigFraction.ZERO),
+            { null }, Cancellation.Never, retainedEntries = 65532))[0])
+    }
+
     @Test
     fun `integer proposals should ceil fractional coordinates within live domain bounds`() {
         val source = Problem(1, 1, arrayOf(IntDomain(-5, 5)), emptyArray(),
