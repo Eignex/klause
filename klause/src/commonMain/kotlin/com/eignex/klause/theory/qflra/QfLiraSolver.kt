@@ -226,6 +226,10 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintValues: IntArray? = null
     private var pointHintIndex: IntArray? = null
     private var pointHintPoint: List<BigFraction>? = null
+    private var pointReuseEnabled = false
+    private var pointReusePoint: List<BigFraction>? = null
+    private var pointReuseGuards = IntArray(0)
+    private var pointReuseGuardCount = 0
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
     private var dirty = true
@@ -341,6 +345,8 @@ class ExactLiraSearchComponent private constructor(
         onDecline: ((HintIndexOutcome) -> Unit)? = null,
     ): Pair<IntArray, SearchCandidateHints>? {
         check(context == null)
+        pointReuseEnabled = false
+        retirePointReuse()
         if (model.numRealVars == 0 && (!defaultOpening || model.numIntVars == 0)) return null
         fun declined(outcome: HintIndexOutcome): Pair<IntArray, SearchCandidateHints>? {
             onDecline?.invoke(outcome)
@@ -404,9 +410,21 @@ class ExactLiraSearchComponent private constructor(
         stop.charge(model.numBoolVars.toLong())
         if (stop()) return declined(HintIndexOutcome.STOPPED)
         val index = IntArray(model.numBoolVars) { UNASSIGNED }
+        var reusable = model.numRealVars <= MAX_POINT_REUSE_COORDINATES &&
+            2L * model.numBoolVars + model.numRealVars < MAX_POINT_HINT_ENTRIES
         for ((row, prepared) in preparedRows.withIndex()) {
             stop.charge(1L)
             if (stop()) return declined(HintIndexOutcome.STOPPED)
+            if (reusable) {
+                for (term in 0 until prepared.row.size) {
+                    stop.charge(1L)
+                    if (stop()) return declined(HintIndexOutcome.STOPPED)
+                    if (!Term.isReal(prepared.row.ref(term))) {
+                        reusable = false
+                        break
+                    }
+                }
+            }
             val head = prepared.row.activator
             if (head == LinearRow.ALWAYS) continue
             if (head !in index.indices) return declined(HintIndexOutcome.INVALID_PRIMITIVE)
@@ -426,6 +444,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintPoint = null
         pointHintIndex = index
         pointHintStop = stop
+        pointReuseEnabled = reusable
         return variables to pointHintProvider(defaultOpening = true, defaultGraphSelections)
     }
 
@@ -454,10 +473,14 @@ class ExactLiraSearchComponent private constructor(
     private fun indexedPointPreference(variable: Int): Boolean? {
         observeCompleteStage("POINT_HINT_INDEXED_CONSULTED")
         val point = pointHintPoint ?: return null
+        return indexedPointTruth(variable, point, pointHintStop).takeIf { partialPointHintAvailable() }
+    }
+
+    private fun indexedPointTruth(variable: Int, point: List<BigFraction>, stop: Cancellation): Boolean? {
         val row = pointHintIndex?.getOrNull(variable)?.takeIf { it >= 0 } ?: return null
-        val work = MixedPointArithmetic(pointHintStop)
-        pointHintStop.charge(1L)
-        if (pointHintStop()) return null
+        val work = MixedPointArithmetic(stop)
+        stop.charge(1L)
+        if (stop()) return null
         val comparison = preparedRows[row].form.hintComparison(
             { head -> bools[head].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
             work::admitted, work::preflight,
@@ -467,7 +490,7 @@ class ExactLiraSearchComponent private constructor(
         for ((column, coefficient) in comparison.terms) {
             slack = work.subtractProduct(slack, coefficient, point.getOrNull(column) ?: return null) ?: return null
         }
-        if (!partialPointHintAvailable()) return null
+        if (stop()) return null
         return when (comparison.op) {
             LinearOp.LE -> if (comparison.strict) slack.signum() > 0 else slack.signum() >= 0
             LinearOp.GE -> if (comparison.strict) slack.signum() < 0 else slack.signum() <= 0
@@ -486,6 +509,9 @@ class ExactLiraSearchComponent private constructor(
         if (partialPointHintAvailable()) context?.boolValue(variable) else null
 
     internal fun releasePartialPointHints() {
+        pointReuseEnabled = false
+        retirePointReuse()
+        pointReuseGuards = IntArray(0)
         defaultDisjunctionHints = false
         pointHintRows = null
         pointHintValues = null
@@ -496,6 +522,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun capturePointHints(point: List<BigFraction>, context: SearchContext, graph: Boolean = false) {
+        retirePointReuse()
         pointHintValues = null
         pointHintPoint = null
         val rows = pointHintRows
@@ -508,6 +535,7 @@ class ExactLiraSearchComponent private constructor(
             if (operationStop() || pointHintStop()) return
             pointHintLevel = context.decisionLevel
             pointHintPoint = copied
+            if (pointReuseEnabled && !graph) pointReusePoint = copied
             smtStats?.observePointHintCapture(graph)
             observeCompleteStage("POINT_HINT_INDEXED_CAPTURE")
             observeCompleteStage(if (graph) "POINT_HINT_GRAPH_CAPTURE" else "POINT_HINT_LP_CAPTURE")
@@ -542,6 +570,60 @@ class ExactLiraSearchComponent private constructor(
         pointHintValues = values
         smtStats?.observePointHintCapture(graph)
         observeCompleteStage(if (graph) "POINT_HINT_GRAPH_CAPTURE" else "POINT_HINT_LP_CAPTURE")
+    }
+
+    private fun retirePointReuse() {
+        pointReusePoint = null
+        pointReuseGuardCount = 0
+    }
+
+    private fun appendPointReuseGuard(variable: Int) {
+        if (pointReusePoint == null) return
+        if ((pointHintIndex?.getOrNull(variable) ?: UNASSIGNED) < 0) {
+            retirePointReuse()
+            return
+        }
+        if (pointReuseGuardCount == pointReuseGuards.size) {
+            val available = MAX_POINT_HINT_ENTRIES - 2 * model.numBoolVars - model.numRealVars
+            val capacity = minOf(available, maxOf(1, pointReuseGuards.size * 2))
+            if (capacity <= pointReuseGuardCount) {
+                retirePointReuse()
+                return
+            }
+            operationStop.charge(capacity.toLong() + 1L)
+            if (operationStop()) {
+                retirePointReuse()
+                return
+            }
+            pointReuseGuards = pointReuseGuards.copyOf(capacity)
+        }
+        pointReuseGuards[pointReuseGuardCount++] = variable
+    }
+
+    private fun reuseCompatiblePoint(context: SearchContext): Boolean {
+        val point = pointReusePoint ?: return false
+        if (!pointReuseEnabled || pointReuseGuardCount == 0 || graphFirst ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
+            bools.none { it == UNASSIGNED } || operationStop() || pointHintStop()
+        ) return false
+        // All-real forms can change only through their activators; other arithmetic changes retire the point.
+        for (index in 0 until pointReuseGuardCount) {
+            val variable = pointReuseGuards[index]
+            val truth = indexedPointTruth(variable, point, operationStop)
+            if (truth == null || truth != (bools[variable] == TRUE)) {
+                observeCompleteStage("POINT_REUSE_INCOMPATIBLE")
+                retirePointReuse()
+                return false
+            }
+        }
+        if (operationStop() || pointHintStop()) return false
+        pointReuseGuardCount = 0
+        candidate = point
+        pointHintPoint = point
+        pointHintLevel = context.decisionLevel
+        dirty = false
+        observeCompleteStage("POINT_REUSE_ACCEPTED")
+        return true
     }
 
     private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? =
@@ -739,6 +821,7 @@ class ExactLiraSearchComponent private constructor(
     }
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) {
+        retirePointReuse()
         floatCandidate = null
         pointHintValues = null
         pointHintPoint = null
@@ -1008,6 +1091,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintPoint = null
         val wasDirty = dirty
         dirty = true
+        if (decision !is SearchDecision.Bool) retirePointReuse()
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
@@ -1017,6 +1101,7 @@ class ExactLiraSearchComponent private constructor(
                 }
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
+                if (variable in arithmeticVariables) appendPointReuseGuard(variable)
                 node = node.copy(
                     retainedReduction = null,
                     disequalityDirections = emptyMap(),
@@ -1234,6 +1319,7 @@ class ExactLiraSearchComponent private constructor(
         if (operationStop()) return ComponentResult.Indeterminate
         val explanation = SearchExplanation(clause)
         dirty = false
+        retirePointReuse()
         candidate = null
         assignment = null
         pointHintValues = null
@@ -1254,9 +1340,15 @@ class ExactLiraSearchComponent private constructor(
             bools.indices.all { context.boolValue(it) != null }
         ) return ComponentResult.Consistent
         val enforced = enforceDisjunctions(context)
-        if (enforced !is ComponentResult.Consistent) return enforced
+        if (enforced !is ComponentResult.Consistent) {
+            retirePointReuse()
+            return enforced
+        }
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
-        if (impliedDisjunct) return ComponentResult.Consistent
+        if (impliedDisjunct) {
+            retirePointReuse()
+            return ComponentResult.Consistent
+        }
         if (!graphFirst && bools.any { it == UNASSIGNED } && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
@@ -1303,6 +1395,9 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Indeterminate
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
+        if (reuseCompatiblePoint(context)) return ComponentResult.Consistent
+        retirePointReuse()
+        if (operationStop()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = lp.solve(sparsePointRecovery = true)
@@ -1606,6 +1701,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        retirePointReuse()
         for (index in sourceAssertionLevels.indices) {
             if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
         }
@@ -1769,6 +1865,7 @@ private const val UNASSIGNED = -1
 private const val DECLINED_HINT = -2
 private const val MAX_POINT_HINT_ENTRIES = 65_536
 private const val MAX_POINT_HINT_BITS = 4096
+private const val MAX_POINT_REUSE_COORDINATES = 4096
 private const val FALSE = 0
 private const val TRUE = 1
 

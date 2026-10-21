@@ -22,6 +22,7 @@ import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -47,6 +48,192 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
+    @Test
+    fun `compatible true and false guards should reuse an indexed working point`() {
+        val model = Problem(
+            numBoolVars = 301,
+            intBounds = openBounds(0),
+            numRealVars = 256,
+            realLower = DoubleArray(256),
+            realUpper = DoubleArray(256),
+            factors = Array<Factor>(301) { head ->
+                if (head < 300) ReifiedRealLinear(
+                    head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    if (head % 2 == 0) LinearOp.LE else LinearOp.GE, 0.0, strict = head % 4 >= 2,
+                ) else Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    LinearOp.EQ, 0.0)
+            },
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val captures = stats.snapshot().lpPointHintCaptures
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+
+            assertEquals(true, hints.preferredBool(4))
+            assertTrue(captures > 0L)
+            assertEquals(captures, stats.snapshot().lpPointHintCaptures)
+            assertEquals(2L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED"))
+        }
+    }
+
+    @Test
+    fun `an incompatible guard should replace its indexed working point`() {
+        val model = Problem(
+            numBoolVars = 301,
+            intBounds = openBounds(0),
+            numRealVars = 256,
+            realLower = DoubleArray(256),
+            realUpper = DoubleArray(256) { if (it == 0) 1.0 else 0.0 },
+            factors = Array<Factor>(301) { head ->
+                if (head < 300) ReifiedRealLinear(
+                    head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    LinearOp.LE, 0.0,
+                ) else Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    LinearOp.GE, 0.0)
+            },
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(1))
+            val captures = stats.snapshot().lpPointHintCaptures
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertEquals(false, hints.preferredBool(1))
+            assertTrue(stats.snapshot().lpPointHintCaptures > captures)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_INCOMPATIBLE"))
+        }
+    }
+
+    @Test
+    fun `reused indexed points should expire across retraction and restart`() {
+        for (restart in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 301,
+                intBounds = openBounds(0),
+                numRealVars = 256,
+                realLower = DoubleArray(256),
+                realUpper = DoubleArray(256),
+                factors = Array<Factor>(301) { head ->
+                    if (head < 300) ReifiedRealLinear(
+                        head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                        LinearOp.LE, 0.0,
+                    ) else Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                        LinearOp.EQ, 0.0)
+                },
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                    defaultGraphSelections = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val captures = stats.snapshot().lpPointHintCaptures
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                if (restart) component.onRestart(session) else session.popTo(0)
+                assertNull(hints.preferredBool(1))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+                assertEquals(true, hints.preferredBool(2))
+                assertEquals(captures + 1L, stats.snapshot().lpPointHintCaptures)
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED"))
+            }
+        }
+    }
+
+    @Test
+    fun `complete Boolean states should retain full source checking after indexed reuse`() {
+        val model = Problem(
+            numBoolVars = 301,
+            intBounds = openBounds(0),
+            numRealVars = 256,
+            realLower = DoubleArray(256),
+            realUpper = DoubleArray(256),
+            factors = Array<Factor>(301) { head ->
+                if (head < 300) ReifiedRealLinear(
+                    head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    if (head % 2 == 0) LinearOp.LE else LinearOp.GE, 0.0, strict = head % 4 >= 2,
+                ) else Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                    LinearOp.EQ, 0.0)
+            },
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            repeat(300) { head ->
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(head, head % 4 < 2))))
+            }
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(300, true))))
+
+            assertEquals(ComponentCheck.Feasible, component.check(session))
+            assertEquals(300L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED"))
+            assertEquals(1L, stats.snapshot().completeSearchLinearChecks)
+            assertEquals(1L, stats.snapshot().completeSearchLinearPoints)
+        }
+    }
+
+    @Test
+    fun `shared guard updates should retire indexed point reuse`() {
+        val model = Problem(
+            numBoolVars = 301,
+            intBounds = openBounds(0),
+            numRealVars = 256,
+            realLower = DoubleArray(256),
+            realUpper = DoubleArray(256),
+            factors = Array<Factor>(302) { head ->
+                when {
+                    head < 300 -> ReifiedRealLinear(
+                        head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                        LinearOp.LE, 0.0,
+                    )
+                    head == 300 -> Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it },
+                        DoubleArray(256) { 1.0 }, LinearOp.EQ, 0.0)
+                    else -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.GE, 0.0)
+                }
+            },
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val captures = stats.snapshot().lpPointHintCaptures
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(true, hints.preferredBool(1))
+            assertEquals(captures + 1L, stats.snapshot().lpPointHintCaptures)
+            assertEquals(0L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED") ?: 0L)
+        }
+    }
+
     @Test
     fun `indexed point hints should preserve strict comparison polarity beyond eager storage`() {
         val model = Problem(

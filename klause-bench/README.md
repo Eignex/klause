@@ -679,6 +679,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpContinuationWork_IMPORT`, `lpContinuationWork_FEASIBILITY` | Exact import and feasibility work; seated targets avoid unchanged conflict sweeps, values visit selected nonzero seats, Bland comparisons exclude higher headings after a violation, and pivots charge copies only for changed rows |
 | `lpRationalBasisWork_FACTOR`, `_PRIMAL`, `_DUAL`, `_RAY` | Exact basis work, including requested singleton reduction and independent residual blocks; dense dimension and aggregate fill limits still apply, and cached factors carry no bound or source-proof authority |
 | `lpPhase_SPARSE_BASIS_RECOVERY_*`, `lpRationalBasisWork_FEASIBILITY` | Requested exact Bland feasibility after endpoint point recovery fails; records completed pivots and witness/conflict or decline outcomes under the containing rational factor ledger |
+| `smtCompleteSearchStage_POINT_REUSE_ACCEPTED`, `_POINT_REUSE_INCOMPATIBLE` | Partial default real checks retaining an indexed working point after exact guard checks, or declining it and returning to ordinary LP solving; complete states still use source witness checking |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Pinned-leaf shape outcomes use `N` for structural columns, `M` for stored rows,

@@ -57,6 +57,10 @@ A check proceeds in four steps:
 2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
    the LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
+   A default pure-real indexed point can remain feasible across added guards:
+   when every source term is real, exact checks of all newly assigned unique
+   ordinary heads suffice to retain the point and skip a redundant numerical
+   solve. Shared heads, disjuncts and other arithmetic decisions retire it.
 3. **Explain.** An infeasible system produces a conflict from the certified
    infeasibility support: each cited row or bound contributes its premise literals.
    If a cited row or bound has changed in the live LP state, no conflict is
@@ -112,6 +116,8 @@ no preference. Selected guard evaluation spends the containing invocation's work
 and deadline allowance. Retraction, restart and changed arithmetic state discard
 the point, while a completed private numerical query does not end its lifetime.
 The private index, returned heads and point share the 65,536-entry admission limit.
+Queued guard updates share that same workspace. Reused points remain private to
+partial checks; complete Boolean states take the ordinary source witness path.
 
 ### Results and proof authority
 
