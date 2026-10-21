@@ -278,4 +278,11 @@ data class PresolveEffortStats(
     val rootConstructionEntries: Long? = null,
     /** Native propagation work across root bakes, probes and repairs; null without a meter. */
     val rootPropagationWork: Long? = null,
-)
+    /** Attempted analyses, including eligibility skips, empty results and interrupted calls. */
+    val invocations: List<PresolveInvocationStats> = emptyList(),
+    /** Factors visited to compute aggregate entry size; null without a meter. */
+    val entrySizeVisits: Long? = null,
+) {
+    /** Shared or mandatory work outside observed invocations; reconciles with [work]. */
+    val unattributedWork: Long? get() = work?.minus(invocations.sumOf { it.work })
+}

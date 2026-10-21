@@ -1,0 +1,161 @@
+package com.eignex.klause.presolve
+
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
+import com.eignex.klause.solver.result.PresolveInvocationStats
+import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolveSizeStats
+import com.eignex.klause.util.Cancellation
+import kotlin.time.Duration
+import kotlin.time.TimeSource
+
+internal class PresolveEntrySize(private val budget: PresolveBudget?) {
+    private var factors: Array<Factor>? = null
+    private var entries = 0L
+
+    fun units(problem: Problem): Long {
+        if (factors !== problem.factors) {
+            entries = budget?.entryUnits(problem.factors) ?: passBaseUnits(problem.factors)
+            factors = problem.factors
+        }
+        return entries
+    }
+}
+
+internal class PresolveInvocation(
+    val pass: String,
+    val lane: PresolveLane,
+    var input: PresolveSizeStats,
+) {
+    val start = TimeSource.Monotonic.markNow()
+    var work = 0L
+    var rebuildWork = 0L
+    var childrenElapsed = Duration.ZERO
+    var outcome = PresolveInvocationOutcome.COMPLETE_MISS
+    var narrowedColumns = 0
+    var fixedColumns = 0
+    var outputOccurrences: Long? = null
+}
+
+internal fun Problem.presolveSize() = PresolveSizeStats(factors.size, numBoolVars, numIntVars)
+
+internal fun <T> PresolveBudget?.observe(
+    pass: PresolvePass,
+    lane: PresolveLane,
+    cancellation: Cancellation,
+    size: () -> PresolveSizeStats,
+    action: (PresolveInvocation?) -> T,
+): T {
+    if (this == null) return action(null)
+    val invocation = PresolveInvocation(pass.id, lane, size())
+    val parent = activeInvocation
+    activeInvocation = invocation
+    var completed = false
+    try {
+        return action(invocation).also { completed = true }
+    } finally {
+        val elapsed = invocation.start.elapsedNow()
+        activeInvocation = parent
+        parent?.let { it.childrenElapsed += elapsed }
+        val outcome = if ((!completed || cancellation()) && invocation.outcome != PresolveInvocationOutcome.REFUTED) {
+            PresolveInvocationOutcome.INTERRUPTED
+        } else invocation.outcome
+        recordInvocation(PresolveInvocationStats(
+            pass = invocation.pass,
+            lane = invocation.lane,
+            outcome = outcome,
+            elapsed = elapsed - invocation.childrenElapsed,
+            work = invocation.work,
+            rebuildWork = invocation.rebuildWork,
+            input = invocation.input,
+            output = size().let {
+                PresolveSizeStats(it.factors, it.booleans, it.integers, invocation.outputOccurrences)
+            },
+            narrowedColumns = invocation.narrowedColumns,
+            fixedColumns = invocation.fixedColumns,
+        ))
+    }
+}
+
+internal fun PresolveInvocation?.record(outcome: PassOutcome) {
+    this?.outcome = when (outcome) {
+        PassOutcome.UNCHANGED -> PresolveInvocationOutcome.COMPLETE_MISS
+        PassOutcome.SKIPPED -> PresolveInvocationOutcome.ELIGIBILITY_SKIP
+        PassOutcome.INTERRUPTED -> PresolveInvocationOutcome.INTERRUPTED
+        PassOutcome.CHANGED -> PresolveInvocationOutcome.CHANGED
+        PassOutcome.INFEASIBLE -> PresolveInvocationOutcome.REFUTED
+    }
+}
+
+internal fun PresolveBudget?.observeRoundPass(
+    pass: PresolvePass,
+    lane: PresolveLane,
+    cancellation: Cancellation,
+    size: () -> PresolveSizeStats,
+    eligible: () -> Boolean,
+    action: (PresolveInvocation?) -> PassOutcome,
+): PassOutcome = observe(pass, lane, cancellation, size) { invocation ->
+    val outcome = when {
+        cancellation() -> PassOutcome.UNCHANGED
+        !eligible() -> PassOutcome.SKIPPED
+        else -> action(invocation)
+    }
+    val result = if (outcome == PassOutcome.UNCHANGED && cancellation()) PassOutcome.INTERRUPTED else outcome
+    invocation.record(result)
+    result
+}
+
+internal fun <T> PresolveBudget?.observeTransform(
+    pass: PresolvePass,
+    input: Problem,
+    cancellation: Cancellation,
+    eligible: () -> Boolean,
+    unchanged: () -> T,
+    output: (T) -> Problem,
+    refuted: (T) -> Boolean = { false },
+    action: () -> T,
+): T {
+    var current = input
+    return observe(pass, PresolveLane.FINITE, cancellation, { current.presolveSize() }) { invocation ->
+        val result = when {
+            cancellation() -> unchanged()
+            !eligible() -> {
+                invocation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
+                unchanged()
+            }
+            else -> {
+                val units = PresolveEntrySize(this).units(input)
+                invocation.recordEntries(units)
+                cancellation.charge(pass.baseWorkWeight * units)
+                action()
+            }
+        }
+        current = output(result)
+        if (current !== input) invocation?.outputOccurrences = null
+        when {
+            refuted(result) -> invocation?.outcome = PresolveInvocationOutcome.REFUTED
+            current !== input -> invocation?.outcome = PresolveInvocationOutcome.CHANGED
+        }
+        result
+    }
+}
+
+internal fun Cancellation.interruptPresolveInvocation() {
+    presolveBudget()?.activeInvocation?.outcome = PresolveInvocationOutcome.INTERRUPTED
+}
+
+internal fun PresolveInvocation?.recordEntries(units: Long) {
+    if (this == null) return
+    val occurrences = units - input.factors
+    input = PresolveSizeStats(input.factors, input.booleans, input.integers, occurrences)
+    outputOccurrences = occurrences
+}
+
+internal fun PresolveInvocation?.recordDelta(inputFactors: Array<Factor>, dropped: IntArray, added: List<Factor>) {
+    if (this == null) return
+    var occurrences = outputOccurrences ?: return
+    for (id in dropped) occurrences -= inputFactors[id].structuralKeyWeight
+    for (factor in added) occurrences += factor.structuralKeyWeight
+    outputOccurrences = occurrences
+}

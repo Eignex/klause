@@ -537,6 +537,15 @@ enum class PresolvePass(
     ),
     ;
 
+    internal fun namespaceEligible(problem: Problem): Boolean = when (this) {
+        ELIMINATE_BOOL_VARS, ELIMINATE_BLOCKED_CLAUSES, IMPLICATION_GRAPH,
+        FOLD_COMPARISON_CLAUSES, PROBE_FAILED_LITERALS -> problem.numBoolVars > 0
+        ELIMINATE_AFFINE_SINGLETONS, REDUCE_DIOPHANTINE, PROJECT_SINGLETON_INEQUALITIES,
+        VALUE_PRECEDENCE, PROBE_INT_BOUNDS, PROBE_INT_HOLES, SUBSTITUTE_BINARY_COLUMNS -> problem.numIntVars > 0
+        MERGE_DUPLICATE_COLUMNS -> problem.numIntVars >= 2
+        else -> true
+    }
+
     /** Independent semantic and multiplicity guarantees under the pass's protected objective. */
     val guarantees: TransformationGuarantees
         get() = when {

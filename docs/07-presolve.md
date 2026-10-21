@@ -146,6 +146,23 @@ successful reductions. Source preparation time excludes theory search; polynomia
 encoder rebuilding belongs to preparation. Routes without a factor preparation
 report the retained allowance and counters with zero time for that phase.
 
+The shared budget retains invocation observations for source and finite round passes,
+construction SAC tiers, binary-column substitution, LP harvest and difference posting.
+Each records its pass and lane, exclusive elapsed time and work, the construction and
+propagation share of that work, and whether eligibility rejected it, analysis completed
+empty, reductions survived, a refutation completed or analysis stopped. Nested SAC work
+belongs to its own observation. Invocation work plus mandatory or shared unattributed
+work equals the phase total; neither a rebuild nor an interrupted call loses its charge.
+Factor and column dimensions, available variable-occurrence counts and explicit column
+narrowings describe reduction yield without another whole-model scan. Yield alone does
+not establish an improvement in solve cost.
+
+Namespace and incremental candidate-shape checks precede full-model pass entry work.
+Entry size is cached for an immutable factor revision; the finite session updates its
+aggregate and live factor count from deltas. Unchanged calls retain their analysis
+charges while reusing that aggregate. Eligibility skips consume only work their cheap
+checks actually perform, and remain distinct from completed empty analysis.
+
 ## Selected reductions
 
 The passes listed under [Pipeline](#pipeline) share the guarantees above. This

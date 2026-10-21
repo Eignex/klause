@@ -238,7 +238,14 @@ object PresolvePipeline {
         val substitution = if (!config.resolved(PresolvePass.SUBSTITUTE_BINARY_COLUMNS, context)) {
             null
         } else {
-            BinaryColumnSubstitution.substitute(seeded, context.objectiveIntVars, bakeConfig)
+            presolveBudget.observeTransform(
+                PresolvePass.SUBSTITUTE_BINARY_COLUMNS, seeded, cancellation,
+                eligible = { hasBinaryCandidate(seeded, context.objectiveIntVars, cancellation) },
+                unchanged = { null },
+                output = { it?.problem ?: seeded },
+            ) {
+                BinaryColumnSubstitution.substitute(seeded, context.objectiveIntVars, bakeConfig)
+            }
         }
         var current = substitution?.problem ?: seeded
         substitution?.let {
@@ -255,15 +262,17 @@ object PresolvePipeline {
             val pre = Presolver.run(current, config, context, cancellation)
             infeasible = infeasible || pre.infeasible
             val harvestResult = harvestPlan?.let {
-                lpHarvestReporting(
-                    pre.problem,
-                    objective,
-                    it,
-                    bakeConfig,
-                    cancellation,
-                    zeroObjectivePricing,
-                    randomSeed,
-                )
+                presolveBudget.observeTransform(
+                    PresolvePass.LP_HARVEST, pre.problem, cancellation,
+                    eligible = { true },
+                    unchanged = { LpHarvestResult(pre.problem, LpHarvestReport(), LpStats()) },
+                    output = { result -> result.problem },
+                    refuted = { result -> result.report.rootInfeasible },
+                ) {
+                    lpHarvestReporting(
+                        pre.problem, objective, it, bakeConfig, cancellation, zeroObjectivePricing, randomSeed,
+                    )
+                }
             }
             harvestResult?.let {
                 harvestStats = harvestStats.mergedWith(it.stats)
@@ -292,7 +301,12 @@ object PresolvePipeline {
         // elimination. After the fixpoint there is no pass left to block.
         val reduced = current
         val posted = if (!infeasible && config.resolved(PresolvePass.POST_DIFFERENCE_SYSTEM, context)) {
-            reduced.withDifferenceSystem()
+            presolveBudget.observeTransform(
+                PresolvePass.POST_DIFFERENCE_SYSTEM, reduced, cancellation,
+                eligible = { reduced.numBoolVars > 0 && reduced.numIntVars >= 2 },
+                unchanged = { reduced },
+                output = { it },
+            ) { reduced.withDifferenceSystem() }
         } else {
             reduced
         }
@@ -376,3 +390,13 @@ private fun needsWideDomainLp(problem: Problem): Boolean {
 private fun preBakeSlice(cancellation: Cancellation, budget: PresolveBudget?): Cancellation = budget?.let {
     it.slice(it.remaining() / 2) or cancellation
 } ?: cancellation
+
+private fun hasBinaryCandidate(problem: BakedProblem, objective: Set<Int>, cancellation: Cancellation): Boolean {
+    for (v in 0 until problem.numIntVars) {
+        cancellation.charge(1L)
+        if (cancellation()) return false
+        val domain = problem.rootIntDomain(v)
+        if (domain.min == 0L && domain.max == 1L && v !in objective) return true
+    }
+    return false
+}
