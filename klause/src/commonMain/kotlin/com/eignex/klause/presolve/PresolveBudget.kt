@@ -5,6 +5,7 @@ import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.solver.result.PresolveInvocationStats
 import com.eignex.klause.solver.result.PresolvePreparationStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.WorkMeter
 
 private const val ROOT_CONSTRUCTION_WEIGHT = 53L
@@ -36,6 +37,8 @@ class PresolveBudget(
     private val preparation = ArrayList<PresolvePreparationStats>()
     private var entryFactors: Array<Factor>? = null
     private var cachedEntryUnits = 0L
+    internal var entryBooleanPins = IntHashSet()
+        private set
 
     /** Invocation observations in completion order, including nested construction stages. */
     val invocations: List<PresolveInvocationStats> get() = observations.toList()
@@ -50,7 +53,8 @@ class PresolveBudget(
     internal fun entryUnits(factors: Array<Factor>): Long {
         if (entryFactors !== factors) {
             entrySizeVisits = saturatedSum(entrySizeVisits, factors.size.toLong())
-            cachedEntryUnits = passBaseUnits(factors)
+            entryBooleanPins = IntHashSet()
+            cachedEntryUnits = passBaseUnits(factors, entryBooleanPins)
             entryFactors = factors
             charge(factors.size.toLong())
         }

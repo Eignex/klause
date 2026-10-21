@@ -1,9 +1,11 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.problemComplexity
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
@@ -20,6 +22,7 @@ import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntHashSet
 
 /**
  * Cost tier of a presolve pass. A [PresolveEmphasis] enables a set of tiers, so the level dial is "how
@@ -58,9 +61,14 @@ internal const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
  * construction. One unit per factor and variable occurrence, weighted by [baseWorkWeight]. Hosts cache
  * this aggregate per factor revision and apply sound eligibility checks before charging analysis.
  */
-internal fun passBaseUnits(factors: Array<Factor>): Long {
+internal fun passBaseUnits(factors: Array<Factor>, booleanPins: IntHashSet? = null): Long {
     var units = factors.size.toLong()
-    for (f in factors) units += f.structuralKeyWeight
+    for (f in factors) {
+        units += f.structuralKeyWeight
+        if (booleanPins != null && f is Clause && f.literals.size == 1) {
+            booleanPins.add(Lit.variable(f.literals[0]))
+        }
+    }
     return units
 }
 
@@ -150,6 +158,7 @@ object Presolver {
             val rebuilds = ArrayList<SourceRebuilds>()
             var changed = 0L
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
+            val booleanPins = PresolveBooleanPins()
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
@@ -159,6 +168,7 @@ object Presolver {
                     { pass.namespaceEligible(current) },
                 ) { invocation ->
                     val units = entrySize.units(current, token)
+                    booleanPins.seed(entrySize.booleanPins)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
                     val delta = pass.applySource(current, ctx.withCancellation(token))
@@ -170,6 +180,7 @@ object Presolver {
                     // A proved range can empty a column whose declaration it intersects, which refutes the
                     // model even though the pass itself only claimed a bound.
                     current = current.withSourcePassDelta(delta) ?: return@observeRoundPass PassOutcome.INFEASIBLE
+                    booleanPins.record(invocation, delta.addedFactors, entrySize::isBooleanPinned)
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                     changed += delta.droppedIndices.size + delta.addedFactors.size + narrowed
                     PassOutcome.CHANGED
@@ -273,6 +284,7 @@ object Presolver {
             var liftDescribedByRebuild = true
             var changed = 0L
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
+            val booleanPins = PresolveBooleanPins()
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
@@ -292,6 +304,8 @@ object Presolver {
                     if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                     changed += changedUnitsOf(delta, current.rootIntDomainsInPlace, invocation)
+                    val root = current.rootDeductions as? PropagationResult.Implied
+                    booleanPins.record(invocation, delta.addedFactors) { root?.boolValueOrNull(it) != null }
                     current = current.withPassDelta(delta, ctx.bakeConfig)
                     PassOutcome.CHANGED
                 }
@@ -352,6 +366,7 @@ object Presolver {
         // state, and the final materialized problem's bake surfaces the infeasibility.
         val host = object : PresolveRoundEngine.RoundHost {
             var subsumeMark: PresolveSession.ChangeMark? = null
+            val booleanPins = PresolveBooleanPins()
 
             // Affine's change-mark at its last firing; a re-run rescans only the variables touched since.
             var affineMark: PresolveSession.ChangeMark? = null
@@ -388,6 +403,7 @@ object Presolver {
                     if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                     changed += changedUnitsOf(delta, input.rootIntDomainsInPlace, invocation)
+                    booleanPins.record(invocation, delta.addedFactors) { session.boolValueOf(it) != null }
                     session.applyDelta(delta)
                     PassOutcome.CHANGED
                 }

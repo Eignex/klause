@@ -54,6 +54,7 @@ class PresolveRoundEngineTest {
         private val work: Map<PresolvePass, Long> = emptyMap(),
         private val interrupted: Set<PresolvePass> = emptySet(),
         private val narrowed: Boolean = false,
+        private val fixed: Boolean = false,
     ) : PresolveRoundEngine.RoundHost {
         val runs = ArrayList<PresolvePass>()
         private var units = 0L
@@ -65,7 +66,14 @@ class PresolveRoundEngineTest {
             runs.add(pass)
             budget?.charge(work[pass] ?: 0L)
             invocation?.let {
-                if (narrowed) it.narrowedColumns = change.toInt() else it.outputOccurrences = size - change
+                when {
+                    fixed -> {
+                        it.fixedColumns = change.toInt()
+                        it.outputOccurrences = size + change
+                    }
+                    narrowed -> it.narrowedColumns = change.toInt()
+                    else -> it.outputOccurrences = size - change
+                }
                 it.interrupted = pass in interrupted
             }
             units += change
@@ -162,6 +170,24 @@ class PresolveRoundEngineTest {
 
                 assertEquals(expected, runs.count { it == expensive })
             }
+        }
+    }
+
+    @Test
+    fun `Boolean pin credit should distinguish five and 289 change rerun thresholds`() {
+        val expensive = PresolvePass.DUAL_FIX
+        val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
+        for ((pins, changes, expected) in listOf(
+            Triple(0L, 288L, 1), Triple(0L, 289L, 2), Triple(64L, 4L, 1), Triple(64L, 5L, 2),
+        )) {
+            val host = ScriptedHost(
+                100, mapOf(expensive to listOf(pins), cheap to listOf(changes)),
+                budget = PresolveBudget(Long.MAX_VALUE), work = mapOf(expensive to 2_881L), fixed = true,
+            )
+
+            val runs = runs(listOf(expensive, cheap), host)
+
+            assertEquals(expected, runs.count { it == expensive })
         }
     }
 

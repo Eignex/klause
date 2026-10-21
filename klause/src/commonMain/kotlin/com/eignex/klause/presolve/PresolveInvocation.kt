@@ -1,6 +1,8 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveInvocationStats
@@ -9,20 +11,45 @@ import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolvePreparationStats
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntHashSet
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 internal class PresolveEntrySize(private val budget: PresolveBudget?) {
     private var factors: Array<Factor>? = null
     private var entries = 0L
+    var booleanPins: IntHashSet? = null
+        private set
 
     fun units(problem: Problem, token: Cancellation): Long {
         if (budget == null && token.workMeter() == null) return 0L
         if (factors !== problem.factors) {
             entries = budget?.entryUnits(problem.factors) ?: passBaseUnits(problem.factors)
+            booleanPins = budget?.entryBooleanPins
             factors = problem.factors
         }
         return entries
+    }
+
+    fun isBooleanPinned(variable: Int): Boolean = booleanPins?.contains(variable) == true
+}
+
+internal class PresolveBooleanPins {
+    private val reported = IntHashSet()
+    private var initial: IntHashSet? = null
+
+    fun seed(pins: IntHashSet?) {
+        if (initial == null) initial = pins
+    }
+
+    fun record(invocation: PresolveInvocation?, added: List<Factor>, alreadyFixed: (Int) -> Boolean) {
+        if (invocation == null) return
+        for (factor in added) {
+            if (factor !is Clause || factor.literals.size != 1) continue
+            val variable = Lit.variable(factor.literals[0])
+            if (variable >= invocation.input.booleans || initial?.contains(variable) == true) continue
+            if (reported.add(variable) && !alreadyFixed(variable)) invocation.fixedColumns++
+        }
     }
 }
 
