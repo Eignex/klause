@@ -337,12 +337,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val coefficients = arithmetic.coefficients(polynomial, variable)
         val captured = captureSpecialization(coefficients, coordinates)
             ?: return this.polynomial(coefficients.map { evaluate(it, coordinates) })
-        val specialized = this.polynomial(captured.coefficients.map { evaluate(it, captured.base) })
-        if (specialized.coefficients.all { arithmetic.step(); it.rational != null }) return specialized
-        return AlgebraicPolynomial(
-            specialized.coefficients,
-            AlgebraicSpecialization(captured.base, captured.coefficients.take(specialized.degree + 1)),
-        )
+        val expressions = captured.coefficients
+        var size = expressions.size
+        while (size > 0 && signAt(expressions[size - 1], captured.base) == 0) size--
+        return AlgebraicPolynomial(AlgebraicSpecialization(captured.base, expressions.take(size)))
     }
 
     private fun captureSpecialization(
@@ -382,7 +380,9 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
     fun evaluate(polynomial: AlgebraicPolynomial, value: AlgebraicReal): AlgebraicReal {
         var result = rational(BigFraction.ZERO)
-        for (coefficient in polynomial.coefficients.asReversed()) result = add(multiply(result, value), coefficient)
+        for (coefficient in polynomial.coefficients(this).asReversed()) {
+            result = add(multiply(result, value), coefficient)
+        }
         return result
     }
 
@@ -390,9 +390,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         arithmetic.step()
         require(!polynomial.isZero) { "zero polynomial has no finite root list" }
         if (polynomial.degree == 0) return emptyList()
+        polynomial.specialization?.let { return CorrelatedAlgebraicRoots(this).roots(it) }
         // Independent coefficient conjugates give a superset of roots. The leading coefficient's
         // annihilator excludes zero, ensuring every conjugate polynomial retains positive degree.
-        val coefficients = polynomial.coefficients
+        val coefficients = polynomial.coefficients(this)
         val rational = ArrayList<BigFraction>()
         for (coefficient in coefficients) {
             arithmetic.step()
@@ -403,7 +404,6 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             arithmetic.denseSize(polynomial.degree)
             return roots(RationalPolynomial(rational))
         }
-        polynomial.specialization?.let { return CorrelatedAlgebraicRoots(this).roots(it) }
         val variable = coefficients.size
         var relation = Polynomial.ZERO
         for ((index, coefficient) in coefficients.withIndex()) {

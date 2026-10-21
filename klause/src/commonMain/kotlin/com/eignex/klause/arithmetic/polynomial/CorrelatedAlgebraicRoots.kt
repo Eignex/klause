@@ -5,6 +5,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 internal class AlgebraicSpecialization(val base: AlgebraicReal, coefficients: List<RationalPolynomial>) {
     private val captured = coefficients.toList()
     val coefficients: List<RationalPolynomial> get() = captured.toList()
+    val degree: Int get() = captured.lastIndex
 }
 
 private typealias FieldPolynomial = List<RationalPolynomial>
@@ -15,15 +16,21 @@ internal class CorrelatedAlgebraicRoots(private val algebraic: AlgebraicArithmet
 
     fun roots(specialization: AlgebraicSpecialization): List<AlgebraicReal> {
         val coefficients = specialization.coefficients
+        arithmetic.denseSize(coefficients.lastIndex)
+        arithmetic.denseSize(specialization.base.definingPolynomial.degree)
         var modulus = rational.squareFree(specialization.base.definingPolynomial)
         var common = modulus
         for (coefficient in coefficients) {
             arithmetic.step()
+            arithmetic.denseSize(coefficient.degree)
             common = rational.gcd(common, coefficient)
         }
         // A null polynomial at an unselected conjugate makes the resultant identically zero.
         if (common.degree > 0) modulus = rational.divideExact(modulus, common)
         val reduced = coefficients.map { arithmetic.step(); rational.divide(it, modulus).second }
+        if (reduced.all { arithmetic.step(); it.degree <= 0 }) {
+            return algebraic.roots(RationalPolynomial(reduced.map { arithmetic.step(); it[0] }))
+        }
         val relation = Polynomial.of(buildList {
             for ((degree, coefficient) in reduced.withIndex()) {
                 for ((exponent, value) in coefficient.coefficients.withIndex()) {
