@@ -1,5 +1,6 @@
 package com.eignex.klause.arithmetic.difference
 
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
@@ -105,9 +106,17 @@ internal class DifferenceGraph(val numVars: Int) {
     }
 
     /** Vertex potentials witnessing feasibility, or an infeasible/abandoned outcome. */
-    fun potentials(
+    inline fun potentials(
         active: BooleanArray? = null,
-        cancelled: () -> Boolean = { false },
+        crossinline cancelled: () -> Boolean = { false },
+        initial: LongArray? = null,
+        noinline onNegativeCycle: ((IntArray) -> Unit)? = null,
+        noinline onWork: ((Long) -> Unit)? = null,
+    ): Potentials = potentials(Cancellation { cancelled() }, active, initial, onNegativeCycle, onWork)
+
+    fun potentials(
+        cancellation: Cancellation,
+        active: BooleanArray? = null,
         initial: LongArray? = null,
         onNegativeCycle: ((IntArray) -> Unit)? = null,
         onWork: ((Long) -> Unit)? = null,
@@ -119,12 +128,12 @@ internal class DifferenceGraph(val numVars: Int) {
         var untilPoll = POLL_INTERVAL
         repeat(numVars) {
             onWork?.invoke(size.toLong())
-            if (cancelled()) return Potentials.Abandoned
+            if (cancellation()) return Potentials.Abandoned
             var changed = false
             for (e in 0 until size) {
                 if (--untilPoll <= 0) {
                     untilPoll = POLL_INTERVAL
-                    if (cancelled()) return Potentials.Abandoned
+                    if (cancellation()) return Potentials.Abandoned
                 }
                 if (active != null && !active[e]) continue
                 val u = from[e]
@@ -138,9 +147,9 @@ internal class DifferenceGraph(val numVars: Int) {
                 }
             }
             if (!changed) return Potentials.Found(dist)
-            val negative = hasNegativePredecessorCycle(predecessor, cancelled, onNegativeCycle, onWork)
+            val negative = hasNegativePredecessorCycle(predecessor, cancellation, onNegativeCycle, onWork)
                 ?: return Potentials.Abandoned
-            if (cancelled()) return Potentials.Abandoned
+            if (cancellation()) return Potentials.Abandoned
             if (negative) return Potentials.Infeasible
         }
         return Potentials.Infeasible
@@ -148,7 +157,7 @@ internal class DifferenceGraph(val numVars: Int) {
 
     private fun hasNegativePredecessorCycle(
         predecessor: IntArray,
-        cancelled: () -> Boolean,
+        cancelled: Cancellation,
         onNegativeCycle: ((IntArray) -> Unit)?,
         onWork: ((Long) -> Unit)?,
     ): Boolean? {
