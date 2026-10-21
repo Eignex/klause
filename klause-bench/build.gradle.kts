@@ -1,4 +1,5 @@
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.URI
 import java.security.MessageDigest
 import java.util.zip.ZipFile
@@ -216,9 +217,18 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
         val downloaded = !cachedArchive.isPresent
         val archive = if (downloaded) File(temporaryDir, "miplib.zip") else cachedArchive.get().asFile
         if (downloaded) {
-            URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
-                .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
-                .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+            fun fetch(location: String) {
+                URI(location).toURL().openConnection().apply {
+                    connectTimeout = 30_000
+                    readTimeout = 30_000
+                    setRequestProperty("Accept", "application/octet-stream")
+                }.getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+            }
+            try {
+                fetch("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
+            } catch (_: IOException) {
+                fetch("https://api.github.com/repos/Eignex/klause/releases/assets/662279198")
+            }
         }
         val hash = MessageDigest.getInstance("SHA-256").digest(archive.readBytes())
             .joinToString("") { "%02x".format(it) }

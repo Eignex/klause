@@ -10,7 +10,7 @@ mkdir -p "$(dirname "$archive")"
 if ! curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
     "$upstream" --output "$archive"; then
     curl --fail --silent --show-error --location --connect-timeout 10 --max-time 60 \
-        --header "Authorization: Bearer ${GH_TOKEN:?GitHub token required for the unpublished CI cache}" \
+        --header "Authorization: Bearer ${GH_TOKEN:?GitHub token required for the CI cache}" \
         --header "Accept: application/octet-stream" "$cache" --output "$archive"
 fi
 printf '%s  %s\n' "$sha256" "$archive" | sha256sum --check --
