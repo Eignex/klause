@@ -1559,6 +1559,23 @@ also collected observations for unmetered library calls; that collection is excl
 from the implementation to preserve their entry cost. Every measured CLI had a
 shared work allowance.
 
+[7126](https://lab.eignex.com/jobs/7126) retained all 32 native points on Metro and
+UF175-064 under aggressive CP/mixed, with two seeds and two repeats. Source probing
+reached Metro's preparation deadline before BVE was called, and BVE made no reduction on UF175,
+so these are recipe controls. [7133](https://lab.eignex.com/jobs/7133) isolated
+`off,+bve` on Metro and `weighted-penalty-complements`, with two seeds and one repeat.
+BVE fired in all 16 records, retaining the same charged preparation work across
+revisions and all native points; the eight tiny-control records reported optimum 5.
+These SAT/WCNF points and proof claims lack independent checker receipts.
+
+[7129](https://lab.eignex.com/jobs/7129) compared the aggregation entry guard at
+`c7dc30db98` and `52f8ca8b67`: 32 cases across CP/mixed/LS/FIXED, two seeds and one
+repeat. ais8 charged 2.2% less preparation work with unchanged search nodes and
+mixed elapsed-time effects. Euler retained its work and 12 source-checked points at
+142857; aggregation did not fire there. The productive three-column boundary is
+covered in both schedules by a deterministic regression. The 16 SAT points lacked
+independent checks, and four Euler LS runs returned no point.
+
 ### Original-clause subsumption
 
 Keep `clause-subsume` opt-in. [Lab comparison 7082](https://lab.eignex.com/jobs/7082)
