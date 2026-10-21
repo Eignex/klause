@@ -1599,6 +1599,20 @@ independent proof checking was unavailable. DIMACS/MaxSAT point checking was als
 unavailable in these comparisons. These candidate-revision measurements support
 the narrow gate and its exceptions, not a final-revision or corpus-wide speedup.
 
+### Original-clause subsumption
+
+Keep `clause-subsume` opt-in. [Lab comparison 7082](https://lab.eignex.com/jobs/7082)
+at `9d0b4c14db` paired `default,-clause-subsume` with `default,+clause-subsume`
+on Metro WCNF, planning WCNF, random SAT and a clause-free MIP control, with seed 1,
+three repeats and ten-second solve limits. Metro reported objective 151 with the
+pass and 191 without it in every repeat; planning reported 2213 in both arms.
+Random SAT used 15 decisions in both arms, with a small elapsed-time cost for the
+enabled pass. The pass made no reduction on either negative control. MIP source
+validation was unavailable because the lab lacked the packaged checker; WCNF/SAT
+records use reported-result admission. This supports bounded opt-in use, without a
+general speedup or independent witness-validation claim. The assignment-preserving
+contract is described in [presolve](../docs/07-presolve.md#boolean-reductions).
+
 ### Portfolio slice policy
 
 Retain the finite schedule's base 5000, maximum 150000 and growth 1.5. The comparison

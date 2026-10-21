@@ -29,7 +29,9 @@ class OriginalClauseSubsumptionTest {
 
     private fun checkModels(problem: Problem, delta: SourceDelta) {
         val expected = models(problem.factors.toList(), problem.numBoolVars)
-        val reduced = if (delta.infeasible) emptySet() else {
+        val reduced = if (delta.infeasible) {
+            emptySet()
+        } else {
             val result = assertNotNull(problem.withSourcePassDelta(delta))
             assertEquals(problem.numBoolVars, result.numBoolVars)
             assertTrue(delta.rebuild.isEmpty)
@@ -56,18 +58,24 @@ class OriginalClauseSubsumptionTest {
     @Test
     fun `all pairs of three variable clauses should preserve every assignment`() {
         val clauses = clauses(3)
-        for (first in clauses) for (second in clauses) {
+        for (first in clauses) {
+            for (second in clauses) {
             val problem = problem(first, second)
             checkModels(problem, OriginalClauseSubsumption.simplify(problem))
+        }
         }
     }
 
     @Test
     fun `all triples of two variable clauses should preserve every assignment`() {
         val clauses = clauses(2)
-        for (first in clauses) for (second in clauses) for (third in clauses) {
+        for (first in clauses) {
+            for (second in clauses) {
+                for (third in clauses) {
             val problem = Problem(2, 0, emptyArray(), listOf(first, second, third))
             checkModels(problem, OriginalClauseSubsumption.simplify(problem))
+        }
+            }
         }
     }
 
@@ -134,12 +142,23 @@ class OriginalClauseSubsumptionTest {
     @Test
     fun `source scheduling should preserve objective columns and mixed theory participation when counting`() {
         val channel = ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
-        val realRow = Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(),
-            realVars = intArrayOf(0), realCoeffs = doubleArrayOf(1.0), op = LinearOp.GE, bound = 0.0)
-        val problem = Problem(3, 1, arrayOf(IntDomain(0, 2)),
+        val realRow = Linear(
+            intVars = intArrayOf(),
+            intCoeffs = doubleArrayOf(),
+            realVars = intArrayOf(0),
+            realCoeffs = doubleArrayOf(1.0),
+            op = LinearOp.GE,
+            bound = 0.0,
+        )
+        val problem = Problem(
+            3,
+            1,
+            arrayOf(IntDomain(0, 2)),
             listOf(clause(0, 2), clause(1, 2, 4), channel, realRow),
-            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val context = PresolveContext(solutionSetSensitive = true, objectiveBoolCoeffs = mapOf(0 to 7L, 1 to -3L))
 
         val prepared = Presolver.runSource(problem, PresolveConfig.parse("off,+clause-subsume"), context)
@@ -156,8 +175,10 @@ class OriginalClauseSubsumptionTest {
     @Test
     fun `candidate and literal caps should stop optional work deterministically`() {
         val problem = problem(clause(0, 2), clause(1, 2, 4))
-        for (limits in listOf(OriginalClauseSubsumption.Limits(candidates = 0),
-            OriginalClauseSubsumption.Limits(literals = 0))) {
+        for (limits in listOf(
+            OriginalClauseSubsumption.Limits(candidates = 0),
+            OriginalClauseSubsumption.Limits(literals = 0),
+        )) {
             val budget = PresolveBudget(Long.MAX_VALUE)
 
             val delta = OriginalClauseSubsumption.simplify(problem, budget.orSpent(Cancellation.Never), limits)
@@ -172,8 +193,11 @@ class OriginalClauseSubsumptionTest {
         val problem = Problem(66, 0, emptyArray(), List(64) { clause(0, 2 * (it + 1), 2 * (it + 2)) })
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val delta = OriginalClauseSubsumption.simplify(problem, budget.orSpent(Cancellation.Never),
-            OriginalClauseSubsumption.Limits(candidates = 32))
+        val delta = OriginalClauseSubsumption.simplify(
+            problem,
+            budget.orSpent(Cancellation.Never),
+            OriginalClauseSubsumption.Limits(candidates = 32),
+        )
 
         assertTrue(delta.isEmpty)
         assertTrue(budget.spent() in 1L..1000L)
