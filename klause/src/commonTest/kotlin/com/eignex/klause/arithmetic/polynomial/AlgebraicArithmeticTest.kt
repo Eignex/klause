@@ -43,7 +43,7 @@ class AlgebraicArithmeticTest {
     @Test
     fun `odd negative coordinate powers should preserve their order`() {
         val coordinates = mapOf(
-            0 to arithmetic.roots(RationalPolynomial.of(2, 0, 0, 1)).single(),
+            0 to arithmetic.refine(arithmetic.roots(RationalPolynomial.of(2, 0, 0, 1)).single()),
             1 to arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last(),
         )
         val source = polynomial.subtract(polynomial.subtract(polynomial.power(Polynomial.variable(0), 5),
@@ -80,7 +80,7 @@ class AlgebraicArithmeticTest {
 
     @Test
     fun `declined point enclosures should retain admitted scalar evaluation`() {
-        val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val value = arithmetic.refine(arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single())
         val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(
             maxDenseCoefficients = 1, maxMatrixCells = 0,
         )))
