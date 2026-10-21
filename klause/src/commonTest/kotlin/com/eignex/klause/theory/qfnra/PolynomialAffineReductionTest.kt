@@ -11,8 +11,39 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PolynomialAffineReductionTest {
+    @Test
+    fun `predicate remainders retain changes without eliminating coordinates`() {
+        val arithmetic = PolynomialArithmetic()
+        val x = Polynomial.variable(0)
+        val y = Polynomial.variable(1)
+        val norm = arithmetic.add(arithmetic.power(x, 2), arithmetic.power(y, 2))
+        val expression = arithmetic.add(norm, x)
+        val equation = PolynomialAtom(arithmetic.subtract(norm, Polynomial.ONE), PolynomialRelation.EQ)
+        val formula = PolynomialFormula.conjunction(listOf(
+            equation,
+            PolynomialAtom(arithmetic.subtract(arithmetic.scale(expression, BigFraction.ofLong(4)),
+                Polynomial.constant(BigFraction.ofLong(5))), PolynomialRelation.GT),
+            PolynomialAtom(arithmetic.subtract(arithmetic.scale(expression, BigFraction.ofLong(3)),
+                Polynomial.constant(BigFraction.ofLong(4))), PolynomialRelation.LT),
+        ), arithmetic)
+        val region = PolynomialBooleanRegion(mapOf(0 to true, 1 to true, 2 to true), emptyMap())
+
+        val result = PolynomialAffineReduction.prepare(formula, region, 2, arithmetic)
+            .asSequence().filterNotNull().single()
+
+        assertFalse(result.inconsistent)
+        assertTrue(result.changed)
+        assertEquals(0, result.eliminatedCount)
+        assertEquals(listOf(equation,
+            PolynomialAtom(arithmetic.subtract(arithmetic.scale(x, BigFraction.ofLong(4)), Polynomial.ONE),
+                PolynomialRelation.GT),
+            PolynomialAtom(arithmetic.subtract(arithmetic.scale(x, BigFraction.ofLong(3)), Polynomial.ONE),
+                PolynomialRelation.LT)), result.atoms)
+    }
+
     @Test
     fun `coincident weak graph bounds eliminate a coordinate with nonlinear occurrences`() {
         val arithmetic = PolynomialArithmetic()
