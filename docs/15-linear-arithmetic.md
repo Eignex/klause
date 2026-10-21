@@ -100,6 +100,9 @@ coefficient premise. Missing terms or explanations leave ordinary search in char
 Each charged sweep visits at most 1,024 source rows, considers 64 open guards and
 evaluates 4,096 entries. It creates no numerical row or query. Private conditioned
 openings keep their own policy, and a partial point supplies no implication proof.
+Completed coverage is reused while matrix, bounds, row activity and pop revisions
+stay unchanged. Retraction and newly available Boolean coefficient inputs reopen
+coverage; that cache only controls optional visits and supplies no logical fact.
 
 #### Disjunctions and disequalities
 

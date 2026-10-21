@@ -217,6 +217,12 @@ class ExactLiraSearchComponent private constructor(
     private var impliedDisjunct = false
     private var impliedSourceGuard = false
     private var sourceGuardCursor = 0
+    private var sourceGuardCovered = 0
+    private var sourceGuardPendingBodies = false
+    private var sourceGuardMatrix = -1L
+    private var sourceGuardBounds = -1L
+    private var sourceGuardRows = -1L
+    private var sourceGuardPop = -1L
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
     }
@@ -1164,6 +1170,7 @@ class ExactLiraSearchComponent private constructor(
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
                 if (bools[variable] == UNASSIGNED) {
+                    if (sourceGuardPendingBodies) resetSourceGuardCoverage()
                     unassignedBooleans--
                     if (completeTraversalObserved) {
                         smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
@@ -1324,15 +1331,28 @@ class ExactLiraSearchComponent private constructor(
         if (!sourceGuardPropagation || model.numIntVars != 0 || hasPrivateReals || preparedRows.isEmpty() ||
             solveContext.certificationPolicy !== ProductionLpCertificationPolicy || lp.state?.conflict != null
         ) return ComponentResult.Consistent
+        val state = lp.state ?: return ComponentResult.Consistent
+        if (sourceGuardMatrix != state.matrixRevision || sourceGuardBounds != state.boundRevision ||
+            sourceGuardRows != state.rowRevision || sourceGuardPop != state.popRevision
+        ) {
+            sourceGuardMatrix = state.matrixRevision
+            sourceGuardBounds = state.boundRevision
+            sourceGuardRows = state.rowRevision
+            sourceGuardPop = state.popRevision
+            resetSourceGuardCoverage()
+        }
+        if (sourceGuardCovered == preparedRows.size) return ComponentResult.Consistent
+        observeCompleteStage("BOUND_GUARD_SWEEP")
         var visited = 0
         var candidates = 0
         var entries = 0
         val work = MixedPointArithmetic(operationStop)
-        while (visited < minOf(preparedRows.size, 1024) && candidates < 64 && entries < 4096) {
+        while (sourceGuardCovered < preparedRows.size && visited < 1024 && candidates < 64 && entries < 4096) {
             operationStop.charge(1L)
             if (operationStop()) return ComponentResult.Indeterminate
             val prepared = preparedRows[sourceGuardCursor]
             sourceGuardCursor = (sourceGuardCursor + 1) % preparedRows.size
+            sourceGuardCovered++
             visited++
             val head = prepared.row.activator
             if (prepared.disjunction || head !in bools.indices || context.boolValue(head) != null) continue
@@ -1342,6 +1362,10 @@ class ExactLiraSearchComponent private constructor(
             candidates++
             operationStop.charge(8L * size)
             if (operationStop()) return ComponentResult.Indeterminate
+            if (prepared.booleans.any { it != head && bools[it] == UNASSIGNED }) {
+                sourceGuardPendingBodies = true
+                continue
+            }
             val comparison = prepared.form.hintComparison(
                 { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
                 work::admitted, work::preflight,
@@ -1363,6 +1387,12 @@ class ExactLiraSearchComponent private constructor(
             observeCompleteStage(if (proved.truth) "BOUND_GUARD_TRUE" else "BOUND_GUARD_FALSE")
         }
         return ComponentResult.Consistent
+    }
+
+    private fun resetSourceGuardCoverage() {
+        sourceGuardCursor = 0
+        sourceGuardCovered = 0
+        sourceGuardPendingBodies = false
     }
 
     private fun assertDisequalities(
@@ -1856,6 +1886,7 @@ class ExactLiraSearchComponent private constructor(
 
     private fun retractSource(decisionLevel: Int) {
         retirePointReuse()
+        resetSourceGuardCoverage()
         for (index in sourceAssertionLevels.indices) {
             if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
         }
