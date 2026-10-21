@@ -375,13 +375,11 @@ private fun citedTerms(
     return cited
 }
 
-// The false literal of [v]'s cited bound [b] loosened by [step].
-private fun boundLiteralLiftedBy(state: PropagationState, v: Int, citeMin: Boolean, b: Long, step: Long): Int =
-    if (citeMin) {
-        Lit.make(state.atomVarGe(v, b - step), false)
-    } else {
-        Lit.make(state.atomVarLe(v, b + step), false)
-    }
+// Select the bound before lookup so both directions share one atom-allocation call site.
+private fun boundLiteralLiftedBy(state: PropagationState, v: Int, citeMin: Boolean, b: Long, step: Long): Int {
+    val threshold = if (citeMin) b - step else b + step
+    return Lit.make(state.atomVarBound(v, threshold, lower = citeMin), false)
+}
 
 // Whether the bound on [v]'s [citeMin] side, established at [level], may be cited weaker than it stands.
 private fun liftable(state: PropagationState, v: Int, citeMin: Boolean, level: Int): Boolean {

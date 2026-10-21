@@ -533,6 +533,9 @@ class PropagationState private constructor(
     /** Allocate (or look up) the atom for `[intVar ≤ threshold]`. */
     fun atomVarLe(intVar: Int, threshold: Long): Int = allocAtom(intVar, kind = AtomKind.LE, threshold = threshold)
 
+    internal fun atomVarBound(intVar: Int, threshold: Long, lower: Boolean): Int =
+        allocAtom(intVar, kind = if (lower) AtomKind.GE else AtomKind.LE, threshold = threshold)
+
     /** Allocate (or look up) the atom for `[intVar = value]`. The negative-polarity literal
      *  of this atom encodes `[intVar ≠ value]`; share the same atom id rather than allocating
      *  a dedicated `Ne` kind. */
