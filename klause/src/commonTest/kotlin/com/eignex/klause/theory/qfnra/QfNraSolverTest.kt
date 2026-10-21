@@ -21,6 +21,55 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `independent missing boundaries avoid Cartesian sample products`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val constraints = (0 until 8).joinToString(" ") {
+            "(assert (= (+ (* x${2 * it} x${2 * it}) (* x${2 * it + 1} x${2 * it + 1})) 1))"
+        }
+        val source = SmtLibPolynomial.parse("$declarations $constraints")
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 2_000_000))
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        for (index in 0 until 8) {
+            val norm = algebraic.add(algebraic.power(point.realValue(2 * index), 2),
+                algebraic.power(point.realValue(2 * index + 1), 2))
+            assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+        }
+    }
+
+    @Test
+    fun `a rejected mixed boundary retains later partial samples`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* x0 x0) 1)) (assert (> (+ (* x1 x1) x0) 0))",
+        )
+        val params = QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 4))
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount, params)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(0, algebraic.compare(point.realValue(0), algebraic.rational(BigFraction.ONE)))
+        assertEquals(0, algebraic.compare(point.realValue(1), algebraic.rational(BigFraction.ZERO)))
+    }
+
+    @Test
+    fun `an independent disequality retains its nonzero samples`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* x0 x0) 1)) (assert (not (= (* x1 x1) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(0, algebraic.compare(algebraic.power(point.realValue(0), 2),
+            algebraic.rational(BigFraction.ONE)))
+        assertTrue(algebraic.sign(algebraic.power(point.realValue(1), 2)) > 0)
+    }
+
+    @Test
     fun `an exact sample can satisfy predicates before their full projection fits`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

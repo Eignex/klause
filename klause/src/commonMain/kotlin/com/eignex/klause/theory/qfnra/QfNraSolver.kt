@@ -230,7 +230,7 @@ internal class QfNraQuery(
                                 Long.MAX_VALUE - work.projectedPolynomials)
                             yield(null)
                             val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
-                                arithmetic, algebraic, work, fixed)
+                                arithmetic, algebraic, work, fixed, if (complete) null else family)
                             if (assignment != null) {
                                 val checked = if (reduction.eliminatedCount == 0) assignment else {
                                     val point = reduction.reconstruct(assignment, arithmetic, algebraic)
@@ -1534,11 +1534,14 @@ private fun searchCells(
     algebraic: AlgebraicArithmetic,
     work: QfNraWork,
     fixed: Map<Int, BigFraction>,
+    family: Set<Polynomial>? = null,
 ): QfNraAssignment? {
     val coordinates = HashMap<Int, AlgebraicReal>()
     if (projection.variableCount == 0) {
         return checkRegionSample(formula, region, coordinates, boolCount, arithmetic, algebraic)
     }
+    val independent = if (family == null) emptySet()
+    else independentRegionAtoms(formula, region, family, fixed, arithmetic)
     val atomLevels = region.atoms.keys.associateWith { index ->
         var level = -1
         for (variable in formula.atoms[index].polynomial.variables) {
@@ -1565,18 +1568,44 @@ private fun searchCells(
         }
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
+        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels)
+        if (rejected != null) {
+            // Unprojected coordinates have one fixed sector sample throughout this family's CAD.
+            if (rejected in independent) return null
+            continue
+        }
         if (frame.level + 1 < projection.variableCount) {
-            if (regionFeasible(formula, region, coordinates, arithmetic, algebraic, atomLevels)) {
-                frames.addLast(liftFrame(projection, frame.level + 1, coordinates, arithmetic, algebraic, fixed))
-            }
+            frames.addLast(liftFrame(projection, frame.level + 1, coordinates, arithmetic, algebraic, fixed))
         } else {
-            val assignment = if (regionFeasible(formula, region, coordinates, arithmetic, algebraic, atomLevels)) {
-                checkRegionSample(formula, region, coordinates, boolCount, arithmetic, algebraic)
-            } else null
-            if (assignment != null) return assignment
+            return checkRegionSample(formula, region, coordinates, boolCount, arithmetic, algebraic)
         }
     }
     return null
+}
+
+private fun independentRegionAtoms(
+    formula: PolynomialFormula,
+    region: PolynomialBooleanRegion,
+    family: Set<Polynomial>,
+    fixed: Map<Int, BigFraction>,
+    arithmetic: PolynomialArithmetic,
+): Set<Int> {
+    val projectedVariables = HashSet<Int>()
+    for (polynomial in family) for (variable in polynomial.variables) {
+        arithmetic.step()
+        projectedVariables.add(variable)
+    }
+    val independent = HashSet<Int>()
+    for (index in region.atoms.keys) {
+        arithmetic.step()
+        val polynomial = formula.atoms[index].polynomial
+        if (polynomial !in family && polynomial.variables.none {
+                arithmetic.step()
+                it in projectedVariables && it !in fixed
+            }
+        ) independent.add(index)
+    }
+    return independent
 }
 
 private class CadFrame(
@@ -1631,16 +1660,25 @@ private fun regionFeasible(
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     atomLevels: Map<Int, Int>? = null,
-): Boolean {
+): Boolean = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels) == null
+
+private fun rejectedRegionAtom(
+    formula: PolynomialFormula,
+    region: PolynomialBooleanRegion,
+    coordinates: Map<Int, AlgebraicReal>,
+    arithmetic: PolynomialArithmetic,
+    algebraic: AlgebraicArithmetic,
+    atomLevels: Map<Int, Int>? = null,
+): Int? {
     for ((index, required) in region.atoms) {
         arithmetic.step()
         val atom = formula.atoms[index]
         val variable = atom.polynomial.mainVariable
         if (variable != null && (atomLevels?.getValue(index) ?: variable) >= coordinates.size) continue
         val sign = algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))
-        if (atom.holds(sign) != required) return false
+        if (atom.holds(sign) != required) return index
     }
-    return true
+    return null
 }
 
 private fun checkRegionSample(
