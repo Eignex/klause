@@ -18,16 +18,16 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.util.Cancellation
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
 import java.util.HexFormat
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 internal object LinearRootOpeningProfile {
     @JvmStatic
@@ -69,9 +69,14 @@ internal object LinearRootOpeningProfile {
         val factory = OpenTheoryPipeline.javaClass.declaredMethods.single {
             it.name.startsWith("engineFor") && it.parameterCount == 1
         }
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            compiled.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = stop,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            compiled.source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+            cancellation = stop,
+        )
+        )
         val model = requireNotNull(invocation.preparedPlan?.model) { "source has no factor inspection view" }
         val request = (invocation.route as? SourceProblemRoute.OpenTheory)?.request
             ?: error("source setup did not select a linear opening")
@@ -132,9 +137,12 @@ internal object LinearRootOpeningProfile {
                 put("sourceIntegerNames", compiled.intVarNames.size)
                 put("sourceRealNames", compiled.realVarNames.size)
                 put("javaVersion", System.getProperty("java.version"))
-                put("runtimeOptions", buildJsonArray {
+                put(
+                    "runtimeOptions",
+                    buildJsonArray {
                     ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-                })
+                }
+                )
             }
             out.resolve("root-opening.json").writeText(result.toString() + "\n")
             decided?.let { out.resolve("decided-stats.txt").writeText(it.stats.toString() + "\n") }
@@ -152,8 +160,11 @@ internal object LinearRootOpeningProfile {
     private fun launch(args: Array<String>, out: File) {
         val command = arrayListOf(
             File(System.getProperty("java.home"), "bin/java").path,
-            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
-            "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
+            "-Xmx3g",
+            "-XX:+UseSerialGC",
+            "-XX:ActiveProcessorCount=1",
+            "--enable-native-access=ALL-UNNAMED",
+            "--add-modules=jdk.incubator.vector",
             "-XX:StartFlightRecording=filename=${out.resolve("measured-profile.jfr")}," +
                 "settings=profile,dumponexit=true",
         )
@@ -162,9 +173,11 @@ internal object LinearRootOpeningProfile {
         }
         command += listOf("-cp", System.getProperty("java.class.path"), javaClass.name)
         command += args
-        out.resolve("launcher.json").writeText(buildJsonObject {
+        out.resolve("launcher.json").writeText(
+            buildJsonObject {
             put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
-        }.toString() + "\n")
+        }.toString() + "\n"
+        )
         val builder = ProcessBuilder(command)
             .redirectOutput(out.resolve("measured.stdout"))
             .redirectError(out.resolve("measured.stderr"))
@@ -180,11 +193,13 @@ internal object LinearRootOpeningProfile {
                 process.waitFor()
             }
             out.resolve("measured.exit").writeText("${process.exitValue()}\n")
-            out.resolve("transport-status.json").writeText(buildJsonObject {
+            out.resolve("transport-status.json").writeText(
+                buildJsonObject {
                 put("timeout", transportTimeout)
                 put("forcedTermination", forced)
                 put("exit", process.exitValue())
-            }.toString() + "\n")
+            }.toString() + "\n"
+            )
         }
         check(!transportTimeout) { "measured root JVM transport timed out" }
         check(process.exitValue() == 0) { "measured root JVM failed" }
