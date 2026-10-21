@@ -98,8 +98,8 @@ internal fun PresolveBudget?.observeRoundPass(
     action: (PresolveInvocation?) -> PassOutcome,
 ): PassOutcome = observe(pass, lane, size) { invocation ->
     val outcome = when {
-        cancellation() -> PassOutcome.UNCHANGED
         !eligible() -> PassOutcome.SKIPPED
+        cancellation() -> PassOutcome.UNCHANGED
         else -> action(invocation)
     }
     val result = if (outcome == PassOutcome.UNCHANGED && invocation?.interrupted == true) {
@@ -122,6 +122,10 @@ internal fun <T> PresolveBudget?.observeTransform(
     var current = input
     return observe(pass, PresolveLane.FINITE, { current.presolveSize() }) { invocation ->
         val result = when {
+            !pass.namespaceEligible(input) -> {
+                invocation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
+                unchanged()
+            }
             cancellation() -> unchanged()
             !eligible() -> {
                 invocation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
