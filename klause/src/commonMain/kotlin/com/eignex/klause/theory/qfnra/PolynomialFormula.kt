@@ -28,8 +28,8 @@ internal class PolynomialFormula private constructor(
     val atoms: List<PolynomialAtom>,
     val booleanVariables: List<Int>,
 ) {
-    fun booleanRegions(arithmetic: PolynomialArithmetic): Iterator<PolynomialBooleanRegion?> =
-        PolynomialBooleanRegions(nodes, root, atoms, arithmetic).prepare()
+    fun booleanRegions(arithmetic: PolynomialArithmetic): PolynomialBooleanRegions =
+        PolynomialBooleanRegions(nodes, root, atoms, arithmetic)
 
     fun refuteBooleans(
         arithmetic: PolynomialArithmetic,

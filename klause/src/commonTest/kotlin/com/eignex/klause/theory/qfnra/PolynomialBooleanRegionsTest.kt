@@ -1,12 +1,14 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
@@ -19,6 +21,72 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
+    @Test
+    fun `numeric cores skip irrelevant completions without losing feasible cubes`() {
+        for (refutedTruth in listOf(false, true)) {
+            val arithmetic = PolynomialArithmetic()
+            val relation = if (refutedTruth) PolynomialRelation.LT else PolynomialRelation.GE
+            val atoms = listOf(PolynomialAtom(arithmetic.power(Polynomial.variable(0), 2), relation),
+                PolynomialAtom(Polynomial.variable(1), PolynomialRelation.GT))
+            val nodes = listOf(FormulaNode.Atom(0), FormulaNode.Atom(1), FormulaNode.BooleanVariable(0),
+                FormulaNode.Not(0), FormulaNode.Not(1), FormulaNode.Not(2),
+                FormulaNode.Junction(intArrayOf(0, 3), conjunction = false),
+                FormulaNode.Junction(intArrayOf(1, 4), conjunction = false),
+                FormulaNode.Junction(intArrayOf(2, 5), conjunction = false),
+                FormulaNode.Junction(intArrayOf(6, 7, 8), conjunction = true))
+            val regions = PolynomialBooleanRegions(nodes, 9, atoms, arithmetic)
+            val feasible = ArrayList<Pair<Boolean?, Boolean?>>()
+            var refuted = 0
+
+            while (regions.hasNext()) {
+                val region = regions.next() ?: continue
+                if (region.atoms[0] == refutedTruth) {
+                    regions.refuted(region, listOf(0))
+                    refuted++
+                } else feasible.add(region.atoms[1] to region.bools[0])
+            }
+
+            assertEquals(1, refuted)
+            assertEquals(4, feasible.size)
+            assertEquals(setOf(false to false, false to true, true to false, true to true), feasible.toSet())
+        }
+    }
+
+    @Test
+    fun `numeric cores belong to the currently issued traversal`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (or (> x 0) (not (> x 0))))")
+        val arithmetic = PolynomialArithmetic()
+        val normalized = PolynomialFormula.normalize(source.formula, arithmetic)
+        val regions = normalized.booleanRegions(arithmetic)
+        regions.asSequence().filterNotNull().first()
+        val foreign = normalized.booleanRegions(arithmetic).asSequence().filterNotNull().first()
+
+        assertFailsWith<IllegalStateException> { regions.refuted(foreign, foreign.atoms.keys.toList()) }
+    }
+
+    @Test
+    fun `numeric cores require nonempty issued source predicates`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (or (> x 0) (not (> x 0))))")
+        val arithmetic = PolynomialArithmetic()
+        val normalized = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        for (indices in listOf(emptyList(), listOf(1))) {
+            val regions = normalized.booleanRegions(arithmetic)
+            val region = regions.asSequence().filterNotNull().first()
+
+            assertFailsWith<IllegalArgumentException> { regions.refuted(region, indices) }
+        }
+    }
+
+    @Test
+    fun `exhausted region traversal throws no such element`() {
+        val source = SmtLibPolynomial.parse("(assert false)")
+        val arithmetic = PolynomialArithmetic()
+        val regions = PolynomialFormula.normalize(source.formula, arithmetic).booleanRegions(arithmetic)
+
+        assertFailsWith<NoSuchElementException> { regions.next() }
+    }
+
     @Test
     fun `retracted decisions should restore both supported implicants`() {
         val source = SmtLibPolynomial.parse(
