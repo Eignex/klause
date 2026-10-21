@@ -459,6 +459,19 @@ enum class PresolvePass(
             Presolve.eliminateSourceBoolVars(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
+    /** Subsumption and self-subsuming resolution of original short clauses, preserving every assignment. */
+    SUBSUME_CLAUSES(
+        "clause-subsume",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = true,
+        autoEligible = false,
+    ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            OriginalClauseSubsumption.simplify(problem, ctx.cancellation)
+    },
+
     /** Blocked-clause elimination over the pure-SAT part: drop a clause blocked on an eligible
      *  literal (every opposite clause clashes elsewhere). The clause is satisfiability-redundant and
      *  rebuilt on reconstruct, so like BVE it is solution-set-sensitive. */
@@ -538,6 +551,7 @@ enum class PresolvePass(
     ;
 
     internal fun namespaceEligible(problem: Problem): Boolean = when (this) {
+        SUBSUME_CLAUSES -> OriginalClauseSubsumption.eligible(problem)
         ELIMINATE_BOOL_VARS, ELIMINATE_BLOCKED_CLAUSES, IMPLICATION_GRAPH,
         FOLD_COMPARISON_CLAUSES, PROBE_FAILED_LITERALS -> problem.numBoolVars > 0
         ELIMINATE_AFFINE_SINGLETONS, REDUCE_DIOPHANTINE, PROJECT_SINGLETON_INEQUALITIES,
