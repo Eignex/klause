@@ -14,6 +14,7 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
@@ -460,7 +461,9 @@ class OpenTheoryEngine internal constructor(
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
                 OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
             }
-            state.smt.observeCompleteSearchStage("BRANCHING_BOOLEANS_${model.numBoolVars}")
+            if (planned.theory is ExactLiraSearchComponent) {
+                state.smt.observeCompleteSearchStage("BRANCHING_BOOLEANS_${model.numBoolVars}")
+            }
             val run = planned.session.openRun(
                 model.numBoolVars,
                 solveParams,
@@ -500,6 +503,8 @@ class OpenTheoryEngine internal constructor(
 
         /** The search this run drives. */
         val session: com.eignex.klause.solver.search.SearchSession get() = planned.session
+
+        internal val lpStats: LpStats get() = stats.lp.snapshot().mergedWith(stats.presolve?.lpStats ?: LpStats())
 
         /** Continue the search: its verdict, or null when the node policy paused it. */
         fun advance(): OpenTheoryResult? = when (val event = run.next()) {

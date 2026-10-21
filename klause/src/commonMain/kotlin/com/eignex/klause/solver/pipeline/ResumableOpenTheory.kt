@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.SearchContext
@@ -34,6 +35,7 @@ internal class ResumableOpenTheory(
     private var expandedThisSlice = false
     private var run: OpenTheoryEngine.OpenTheoryRun? = null
     private var verdict: OpenTheoryResult? = null
+    private var closedLpStats = LpStats()
 
     private val pausing = object : SearchNodePolicy {
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
@@ -57,6 +59,7 @@ internal class ResumableOpenTheory(
     /** The verdict's stats once decided, else the work and progress counters so far. */
     val stats: SolveStats get() = verdict?.stats ?: SolveStats(
         openTheory = state.work.snapshot(), search = progress, smt = state.smt.snapshot(),
+        lp = run?.lpStats ?: closedLpStats,
     )
 
     /**
@@ -93,6 +96,7 @@ internal class ResumableOpenTheory(
     override fun close() {
         val current = run ?: return
         try {
+            closedLpStats = current.lpStats
             if (verdict == null) state.capture(current.session)
             current.close()
         } finally {

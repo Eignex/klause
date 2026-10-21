@@ -694,6 +694,10 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PREFIX_REAL_RECOVERY_*` | Existing oversized exact prefix queries requesting bounded sparse certification, followed by the checked verdict; source assembly, query cadence and positive mapping limits are unchanged |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
+Paused complete-theory workers retain their observed primary LP counters in
+snapshots and after closure, alongside shared search and SMT progress. A paused
+snapshot carries no completed-solve verdict.
+
 Pinned-leaf shape outcomes use `N` for structural columns, `M` for stored rows,
 `A` for active rows and `F` for fixed columns. After fixed terms are omitted,
 `Z`, `S` and `P` count zero-, one- and two-term rows; `U` and `D` count distinct

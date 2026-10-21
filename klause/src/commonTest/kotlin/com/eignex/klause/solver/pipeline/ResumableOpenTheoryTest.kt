@@ -139,6 +139,7 @@ class ResumableOpenTheoryTest {
         assertEquals(n, before.smt.completeSearchBooleanVariables)
         assertEquals(1L, before.smt.completeSearchStages?.get("OPENING"))
         assertTrue(before.smt.conflicts > 0L)
+        assertTrue(before.lp.standalonePasses.sum > 0.0)
 
         search.close()
         search.close()
