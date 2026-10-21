@@ -129,7 +129,15 @@ class PresolveBudget(
      * A cancellation that fires when [outer] does or the whole budget is spent. Work charged through it
      * lands here, whatever meter [outer] carries, and it keeps [outer]'s deadline.
      */
-    fun orSpent(outer: Cancellation): Cancellation = Metered(nativeMeter) { remaining() == 0L } or outer
+    fun orSpent(outer: Cancellation): Cancellation = observeStops(
+        Metered(nativeMeter) { remaining() == 0L } or outer,
+    )
+
+    internal fun observeStops(token: Cancellation): Cancellation = object : Cancellation by token {
+        override fun isCancelled(): Boolean = token().also { stopped ->
+            if (stopped) activeInvocation?.interrupted = true
+        }
+    }
 
     private class Metered(private val meter: WorkMeter, private val fired: () -> Boolean) : Cancellation {
         override fun isCancelled(): Boolean = fired()

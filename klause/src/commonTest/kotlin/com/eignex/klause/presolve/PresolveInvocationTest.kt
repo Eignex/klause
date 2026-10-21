@@ -237,4 +237,20 @@ class PresolveInvocationTest {
 
         assertTrue(budget.rootConstructionEntries > construction)
     }
+    @Test
+    fun `a complete miss that spends the final unit should remain complete`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
+        )
+        val config = PresolveConfig.parse("off,+strengthen")
+        val reference = PresolveBudget(Long.MAX_VALUE)
+        Presolver.runSource(problem, config, PresolveContext(presolveBudget = reference), reference.orSpent(Cancellation.Never))
+        val budget = PresolveBudget(reference.spent())
+
+        Presolver.runSource(problem, config, PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+
+        assertEquals(0L, budget.remaining())
+        assertEquals(PresolveInvocationOutcome.COMPLETE_MISS, budget.invocations.single().outcome)
+    }
 }

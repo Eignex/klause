@@ -150,7 +150,7 @@ object Presolver {
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
-                val token = slice ?: ctx.cancellation
+                val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
                     pass, PresolveLane.SOURCE, token,
                     { current.presolveSize() },
@@ -159,7 +159,7 @@ object Presolver {
                     val units = entrySize.units(current, token)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
-                    val delta = pass.applySource(current, slice?.let(ctx::withCancellation) ?: ctx)
+                    val delta = pass.applySource(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) return@observeRoundPass PassOutcome.UNCHANGED
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
@@ -272,7 +272,7 @@ object Presolver {
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
-                val token = slice ?: ctx.cancellation
+                val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
                     pass, PresolveLane.FINITE, token,
                     { current.presolveSize() },
@@ -281,7 +281,7 @@ object Presolver {
                     val units = entrySize.units(current, token)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
-                    val delta = pass.applyFinite(current, slice?.let(ctx::withCancellation) ?: ctx)
+                    val delta = pass.applyFinite(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) return@observeRoundPass PassOutcome.UNCHANGED
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
@@ -357,7 +357,7 @@ object Presolver {
             var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
-                val token = slice ?: ctx.cancellation
+                val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
                     pass, PresolveLane.FINITE, token,
                     { PresolveSizeStats(session.liveFactorCount, problem.numBoolVars, problem.numIntVars) },
@@ -369,7 +369,7 @@ object Presolver {
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
                     val base = passContext(pass)
-                    val delta = pass.applyFinite(input, slice?.let(base::withCancellation) ?: base)
+                    val delta = pass.applyFinite(input, base.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) return@observeRoundPass PassOutcome.UNCHANGED
                     invocation.recordDelta(input.factors, delta.droppedIndices, delta.addedFactors)
