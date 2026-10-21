@@ -14,10 +14,94 @@ import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
+
+    @Test
+    fun `an exact sample can satisfy predicates before their full projection fits`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* x0 x0) 1)) (assert (> (- (* x1 x1) x0) 0))",
+        )
+        val params = QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 4))
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount, params)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.MINUS_ONE, point.realValue(0).rational)
+        assertEquals(BigFraction.ZERO, point.realValue(1).rational)
+    }
+
+    @Test
+    fun `exhausted partial samples leave unprojected root boundaries searchable`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* x0 x0) 2)) (assert (= (* x0 x1) 1))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(0, algebraic.compare(algebraic.power(point.realValue(0), 2),
+            algebraic.rational(BigFraction.ofLong(2))))
+        assertEquals(0, algebraic.compare(algebraic.multiply(point.realValue(0), point.realValue(1)),
+            algebraic.rational(BigFraction.ONE)))
+    }
+
+    @Test
+    fun `incompatible equality fibres remain refutable after partial sampling`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* x0 x0) 2)) (assert (= (* x0 x1) 1)) " +
+                "(assert (= (* x1 x1) 1))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `a partial projection refusal retains the complete required family`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (> (+ (* x0 x0 x0 x0) (* x1 x1 x1 x1)) 0)) " +
+                "(assert (= (+ (* x0 x0) (* x1 x1)) 1))",
+        )
+        val params = QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 36))
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount, params)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val norm = algebraic.add(algebraic.power(point.realValue(0), 2), algebraic.power(point.realValue(1), 2))
+        assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+        assertTrue(algebraic.sign(algebraic.add(algebraic.power(point.realValue(0), 4),
+            algebraic.power(point.realValue(1), 4))) > 0)
+    }
+
+    @Test
+    fun `containing cancellation withholds exhaustion of a partial projection`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* x0 x0) 2)) (assert (= (* x0 x1) 1))",
+        )
+        var stopped = false
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(cancellation = Cancellation { stopped }), PolynomialCondition())
+        var result: QfNraResult? = null
+        while (result == null && query.stats.liftedCells == 0L) result = query.next()
+        assertNull(result)
+
+        stopped = true
+        while (result == null) result = query.next()
+
+        val unknown = assertIs<QfNraResult.Unknown>(result)
+        assertEquals(QfNraReason.Interrupted, unknown.reason)
+        assertTrue(unknown.stats.liftedCells > 0L)
+    }
 
     @Test
     fun `reduced region observation retains predicates without changing native work`() {

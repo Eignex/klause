@@ -186,35 +186,68 @@ internal class QfNraQuery(
                         ) atom.polynomial else null
                     }
                     val order = polynomialVariableOrder(polynomials, realCount, arithmetic)
-                    val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic,
-                        equations, order, nonzeroPolynomials = nonzero, onElimination = projectionObserver,
-                        onRootSection = {
-                            val roots = checkNotNull(work.equationalRootLevels)
-                            work.equationalRootLevels = roots + minOf(1L, Long.MAX_VALUE - roots)
-                        }) {
-                        val sections = checkNotNull(work.equationalSections)
-                        work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
-                    }
-                    var projection: PolynomialProjection? = null
-                    while (projection == null) {
-                        projection = pending.next()
-                        if (projection == null) yield(null)
-                    }
-                    if (projection.inconsistentEquations) continue
-                    work.projectedPolynomials += minOf(projection.polynomialCount,
-                        Long.MAX_VALUE - work.projectedPolynomials)
-                    yield(null)
-                    val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
-                        arithmetic, algebraic, work, fixed)
-                    if (assignment != null) {
-                        val checked = if (reduction.eliminatedCount == 0) assignment else {
-                            val point = reduction.reconstruct(assignment, arithmetic, algebraic)
-                            checkRegionSample(normalized, region, point, boolCount, arithmetic, algebraic)
-                        }
+                    val ordered = ArrayList<Polynomial>()
+                    val distinct = HashSet<Polynomial>()
+                    for (polynomial in polynomials) {
                         arithmetic.step()
-                        yield(QfNraResult.Satisfiable(checked, work.snapshot()))
-                        return@sequence
+                        if (distinct.add(polynomial)) ordered.add(polynomial)
                     }
+                    val family = LinkedHashSet<Polynomial>()
+                    var included = 0
+                    var finishProjection = false
+                    var complete: Boolean
+                    do {
+                        arithmetic.step()
+                        if (finishProjection) {
+                            while (included < ordered.size) {
+                                arithmetic.step()
+                                family.add(ordered[included++])
+                            }
+                        } else if (included < ordered.size) {
+                            family.add(ordered[included++])
+                        }
+                        complete = included == ordered.size
+                        try {
+                            val selected = family.map { arithmetic.step(); it }
+                            val required = equations.filter { arithmetic.step(); it in family }
+                            val exclusions = nonzero.filter { arithmetic.step(); it in family }
+                            val pending = PolynomialProjection.prepare(selected, realCount, arithmetic,
+                                required, order, nonzeroPolynomials = exclusions, onElimination = projectionObserver,
+                                onRootSection = {
+                                    val roots = checkNotNull(work.equationalRootLevels)
+                                    work.equationalRootLevels = roots + minOf(1L, Long.MAX_VALUE - roots)
+                                }) {
+                                val sections = checkNotNull(work.equationalSections)
+                                work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
+                            }
+                            var projection: PolynomialProjection? = null
+                            while (projection == null) {
+                                projection = pending.next()
+                                if (projection == null) yield(null)
+                            }
+                            if (projection.inconsistentEquations) break
+                            work.projectedPolynomials += minOf(projection.polynomialCount,
+                                Long.MAX_VALUE - work.projectedPolynomials)
+                            yield(null)
+                            val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
+                                arithmetic, algebraic, work, fixed)
+                            if (assignment != null) {
+                                val checked = if (reduction.eliminatedCount == 0) assignment else {
+                                    val point = reduction.reconstruct(assignment, arithmetic, algebraic)
+                                    checkRegionSample(normalized, region, point, boolCount, arithmetic, algebraic)
+                                }
+                                arithmetic.step()
+                                yield(QfNraResult.Satisfiable(checked, work.snapshot()))
+                                return@sequence
+                            }
+                        } catch (stop: PolynomialResourceLimit) {
+                            if (complete) throw stop
+                            // A larger required family can admit a section that avoids the refused projection.
+                            finishProjection = true
+                        }
+                        // A partial projection's rejected samples do not exhaust the source region.
+                        yield(null)
+                    } while (!complete)
                 } catch (stop: PolynomialResourceLimit) {
                     // An incomplete region can be skipped for SAT search, but withholds source exhaustion.
                     if (incomplete == null) incomplete = stop.resource
