@@ -93,20 +93,20 @@ internal fun bareissEchelon(
     val keptRhs = ArrayList<BigInt>()
     for (c in 0 until cols) {
         val bucket = byLead.remove(c) ?: continue
-        // Entries grow with the elimination and the row supports fill in, so a large equality block runs
-        // far past any budget it was given. Polled per pivot: the caller treats a short result as "no
-        // bound derived", which is the same answer it gets when the structure implies nothing.
+        // A partial echelon cannot establish rank or which input rows can be dropped together.
         if (cancellation()) return BareissEchelon(emptyList(), IntArray(0))
         val p = sparsestRow(bucket, w)
         val pivotValue = w[p][c]
         for (q in bucket) {
             if (q == p) continue
-            cancellation.charge(LATTICE_WORK_WEIGHT * (1L + w[q].index.size + w[p].index.size))
+            if (cancellation()) return BareissEchelon(emptyList(), IntArray(0))
+            cancellation.charge(LATTICE_WORK_WEIGHT)
             val factor = w[q][c]
             val g = gcdOf(pivotValue, factor)
             val scaleQ = pivotValue / g
             val scaleP = factor / g
-            val combined = combine(w[q], scaleQ, w[p], scaleP)
+            val combined = combine(w[q], scaleQ, w[p], scaleP, cancellation)
+                ?: return BareissEchelon(emptyList(), IntArray(0))
             var combinedRhs = if (rhs == null) BIG_ZERO else scaleQ * rhs[q] - scaleP * rhs[p]
             val content = content(combined, if (rhs == null) null else combinedRhs)
             val reduced = if (content == BIG_ONE) combined else divide(combined, content)
@@ -143,7 +143,9 @@ private fun combine(
     scaleTarget: BigInt,
     source: SparseIntRow,
     scaleSource: BigInt,
-): SparseIntRow {
+    cancellation: Cancellation,
+): SparseIntRow? {
+    if (cancellation()) return null
     val ti = target.index
     val si = source.index
     val index = IntArray(ti.size + si.size)
@@ -151,7 +153,13 @@ private fun combine(
     var t = 0
     var s = 0
     var n = 0
+    var pending = 0L
     while (t < ti.size || s < si.size) {
+        if (pending >= SUPPORT_WORK_CHUNK) {
+            cancellation.charge(LATTICE_WORK_WEIGHT * pending)
+            pending = 0L
+            if (cancellation()) return null
+        }
         val tc = if (t < ti.size) ti[t] else Int.MAX_VALUE
         val sc = if (s < si.size) si[s] else Int.MAX_VALUE
         val col: Int
@@ -161,12 +169,14 @@ private fun combine(
                 col = tc
                 v = scaleTarget * target.value[t]
                 t++
+                pending++
             }
 
             sc < tc -> {
                 col = sc
                 v = -(scaleSource * source.value[s])
                 s++
+                pending++
             }
 
             else -> {
@@ -174,6 +184,7 @@ private fun combine(
                 v = scaleTarget * target.value[t] - scaleSource * source.value[s]
                 t++
                 s++
+                pending += 2
             }
         }
         if (!v.isZero()) {
@@ -182,6 +193,8 @@ private fun combine(
             n++
         }
     }
+    cancellation.charge(LATTICE_WORK_WEIGHT * pending)
+    if (cancellation()) return null
     if (n == 0) return SparseIntRow.Zero
     return SparseIntRow(index.copyOf(n), Array(n) { value[it]!! })
 }
@@ -204,3 +217,5 @@ private tailrec fun gcdOf(a: BigInt, b: BigInt): BigInt = if (b.isZero()) a.abs(
 // Work units per big-integer entry an elimination step touches, against one simplex op: routing time per unit
 // over the calibration sample's models that reached the reduction (QF_LIA), ~4e-3 ms.
 internal const val LATTICE_WORK_WEIGHT = 1500L
+
+private const val SUPPORT_WORK_CHUNK = 64L

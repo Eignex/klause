@@ -1,8 +1,12 @@
 package com.eignex.klause.presolve.linear
 
-import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.lp.lattice.SparseIntRow
 import com.eignex.klause.lp.lattice.bareissEchelon
 import com.eignex.klause.presolve.SourceDelta
@@ -13,7 +17,7 @@ import com.eignex.klause.util.addExact
 import com.eignex.klause.util.bigIntOf
 
 /**
- * Drop every integer equality that the other equalities already imply, and refute a system of
+ * Drop redundant single-equality factors using declared integer equalities, and refute a system of
  * equalities that has no rational solution at all.
  *
  * Duplicate and proportional rows are bound fusion's and subsumption's business, and a row that
@@ -29,16 +33,22 @@ import com.eignex.klause.util.bigIntOf
 internal object DependentEqualities {
 
     fun dropImplied(problem: Problem, cancellation: Cancellation): SourceDelta {
-        val factorOf = ArrayList<Int>()
+        val droppableFactorOf = ArrayList<Int>()
         val rows = ArrayList<SparseIntRow>()
         val rhs = ArrayList<BigInt>()
         problem.factors.forEachIndexed { i, factor ->
-            if (factor !is Linear || factor.op != LinearOp.EQ) return@forEachIndexed
-            val constants = factor.integerConstants ?: return@forEachIndexed
-            val row = sparseRow(factor, constants::coeff) ?: return@forEachIndexed
-            factorOf.add(i)
-            rows.add(row)
-            rhs.add(bigIntOf(constants.bound))
+            if (cancellation()) return SourceDelta()
+            val declared = factor.impliedLinearRows
+            val droppable = factor.linearForm is LinearForm.Conjunction && declared.size == 1
+            for (row in declared) {
+                if (cancellation()) return SourceDelta()
+                if (row.relation != LinearOp.EQ || !row.isLongUnconditional || !row.isIntegerOnly) continue
+                val constants = row.constants as IntegerConstants
+                val sparse = sparseRow(row, constants::coeff) ?: continue
+                droppableFactorOf.add(if (droppable) i else -1)
+                rows.add(sparse)
+                rhs.add(bigIntOf(constants.bound))
+            }
         }
         // One equality cannot be implied by the others, and an empty system has nothing to imply.
         if (rows.size < 2) return SourceDelta()
@@ -46,18 +56,18 @@ internal object DependentEqualities {
         if (echelon.inconsistent) return SourceDelta(infeasible = true)
         val dependent = echelon.dependentRows
         if (dependent.isEmpty()) return SourceDelta()
-        return SourceDelta(droppedIndices = IntArray(dependent.size) { factorOf[dependent[it]] })
+        return SourceDelta(droppedIndices = dependent.map { droppableFactorOf[it] }.filter { it >= 0 }.toIntArray())
     }
 
     /**
-     * [factor]'s terms as a row sorted by column with repeated columns merged, or null when they cancel or
+     * [row]'s terms as a row sorted by column with repeated columns merged, or null when they cancel or
      * merging them leaves 64 bits — such a row is simply not read, which only ever keeps a row in place.
      */
-    private fun sparseRow(factor: Linear, coeff: (Int) -> Long): SparseIntRow? {
-        val merged = HashMap<Int, Long>(factor.vars.size)
+    private fun sparseRow(row: LinearRow, coeff: (Int) -> Long): SparseIntRow? {
+        val merged = HashMap<Int, Long>(row.size)
         try {
-            for (k in factor.vars.indices) {
-                val v = factor.vars[k]
+            for (k in 0 until row.size) {
+                val v = Term.intVar(row.ref(k))
                 merged[v] = addExact(merged[v] ?: 0L, coeff(k))
             }
         } catch (_: CheckedLongOverflowException) {

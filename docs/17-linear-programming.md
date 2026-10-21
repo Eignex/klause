@@ -38,6 +38,12 @@ the default factory; `ComponentLpSolver` composes it for component-wise OBBT.
 outside it, and consumers use interfaces and factories. See
 [system boundaries](01-introduction.md#system-architecture).
 
+`lp.lattice` is a leaf over `util`, owning exact integer matrix reductions and
+triangular-block bounds. Its sparse fraction-free elimination polls cancellation
+between row combinations and after bounded chunks of support entries, charging
+only visited work. An interrupted reduction returns no rows, pivots, dependency
+indices or inconsistency claim.
+
 ## Exact source row projections
 
 Native exact linear rows keep their rational source meaning independently of
