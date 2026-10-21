@@ -149,6 +149,7 @@ internal class QfNraQuery(
                     if (!regionFeasible(normalized, region, emptyMap(), arithmetic, algebraic)) {
                         val constants = checkNotNull(work.booleanTheoryConstantRefutations)
                         work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
+                        regions.refuted(region)
                         continue
                     }
                     val reducing = PolynomialAffineReduction.prepare(normalized, region, realCount, arithmetic,
@@ -161,7 +162,10 @@ internal class QfNraQuery(
                         reduction = reducing.next()
                         if (reduction == null) yield(null)
                     }
-                    if (reduction.inconsistent) continue
+                    if (reduction.inconsistent) {
+                        regions.refuted(region)
+                        continue
+                    }
                     reducedRegionObserver?.invoke(reduction.atoms)
                     val activeFormula = if (reduction.eliminatedCount == 0) normalized
                     else PolynomialFormula.conjunction(reduction.atoms, arithmetic)
@@ -249,6 +253,7 @@ internal class QfNraQuery(
                         // A partial projection's rejected samples do not exhaust the source region.
                         yield(null)
                     } while (!complete)
+                    regions.refuted(region)
                 } catch (stop: PolynomialResourceLimit) {
                     // An incomplete region can be skipped for SAT search, but withholds source exhaustion.
                     if (incomplete == null) incomplete = stop.resource

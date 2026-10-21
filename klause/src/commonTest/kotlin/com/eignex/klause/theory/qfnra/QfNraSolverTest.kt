@@ -21,6 +21,69 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `graph refutations retain a feasible Boolean alternative with unrelated supports`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val bools = (0 until 32).joinToString(" ") {
+            "(declare-const a$it Bool) (declare-const c$it Bool)"
+        }
+        val supports = (0 until 32).joinToString(" ") { "(or a$it c$it)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) $bools " +
+                "(assert (and (or (and (not b) (= x0 (+ x1 1)) (<= x0 x1)) " +
+                "(and b (= x0 x1))) $supports))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 500_000, polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertTrue(point.boolValue(0))
+        assertEquals(0, algebraic.compare(point.realValue(0), point.realValue(1)))
+        assertEquals(33, point.realCount)
+    }
+
+    @Test
+    fun `graph refutations exhaust guarded numeric alternatives with unrelated supports`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val bools = (0 until 32).joinToString(" ") {
+            "(declare-const a$it Bool) (declare-const c$it Bool)"
+        }
+        val supports = (0 until 32).joinToString(" ") { "(or a$it c$it)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) $bools " +
+                "(assert (and (or (and (not b) (= x0 (+ x1 1)) (<= x0 x1)) " +
+                "(and b (= x2 (- x3 1)) (>= x2 x3))) $supports))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 500_000, polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Unsatisfiable>(result, result.toString())
+    }
+
+    @Test
+    fun `complete polynomial refutations retain a feasible Boolean alternative with unrelated supports`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val bools = (0 until 32).joinToString(" ") {
+            "(declare-const a$it Bool) (declare-const c$it Bool)"
+        }
+        val supports = (0 until 32).joinToString(" ") { "(or a$it c$it)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) $bools " +
+                "(assert (and (or (and (not b) (= (+ (* x0 x0 x0 x0) (- (* x0 x0)) 1) 0)) " +
+                "(and b (= x0 0))) $supports))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 500_000))
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertTrue(point.boolValue(0))
+        assertEquals(0, algebraic.sign(point.realValue(0)))
+        assertEquals(33, point.realCount)
+    }
+
+    @Test
     fun `numeric sign conflicts retain a feasible Boolean alternative with unrelated supports`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val bools = (0 until 32).joinToString(" ") {

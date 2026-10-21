@@ -265,9 +265,13 @@ order. Region capture keeps only supporting literals, and private exclusion
 clauses prevent revisiting a region without entering shared learning.
 Initial regional sign propagation records which signed predicates justify each
 removed coordinate sign. A completed conflict can exclude just those numeric
-premises, independent of unrelated Boolean choices. These explanations belong to
-the issued query region; reductions without source-premise explanations retain
-the complete visited cube.
+premises, independent of unrelated Boolean choices. A completed regional
+refutation without a smaller explanation excludes all of that region's original
+signed numeric predicates, dropping only unrelated Boolean choices. This applies
+to proved reduction contradictions and complete CAD refutations; rejected partial
+samples, resource refusals and interrupted work supply no such exclusion.
+Explanations belong to the issued conditioned query, and a smaller captured sign
+core takes precedence over the whole numeric region.
 Branching follows an unwitnessed root proof to a required leaf and tries that
 truth first; backtracking retains its opposite value. A missing demanded leaf
 leaves the ordinary complete leaf choice available.
