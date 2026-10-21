@@ -153,8 +153,8 @@ internal object MpsSolcheckerInput {
         return Profile(maximize, text, headers, reorderedBoundPairs)
     }
 
-    fun requireNumber(text: String) {
-        require(text.length in 1..31 && decimal.matches(text)) { "number outside upstream decimal input" }
+    fun requireNumber(text: String, maxLength: Int = 31) {
+        require(text.length in 1..maxLength && decimal.matches(text)) { "number outside upstream decimal input" }
         val exponent = text.substringAfter('e', text.substringAfter('E', "0")).toIntOrNull()
         require(exponent != null && exponent in -128..128) { "number outside upstream exponent limit" }
     }

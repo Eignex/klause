@@ -838,6 +838,11 @@ SHA-256 `37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9`.
 It extracts only the checker C++ sources, README, Makefile and MIT license, compiles
 the unchanged upstream main with GMP and zlib, and packages those files and the
 binary in the non-published bench artifact. The optional converter is not extracted.
+The checker uses a release build (`-DNDEBUG`); the adapter bounds numeric input
+before invoking it. MPS tokens retain the 31-character profile. SOL coordinates
+and objectives allow up to 255 characters with exponents between -128 and 128,
+within the upstream 1,024-byte line and rational scratch buffers. Terminating
+rationals convert to decimal exactly; no supplied coordinate or objective is rounded.
 Building requires a C++ compiler and GMP/zlib development packages. Invocation
 supports Linux with GNU `timeout`/`prlimit` and macOS with the system shell limits.
 Other hosts remain unverified. The packaged executable targets the build host;

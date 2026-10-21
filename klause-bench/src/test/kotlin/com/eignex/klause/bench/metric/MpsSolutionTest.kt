@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.metric
 
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -18,6 +19,46 @@ class MpsSolutionTest {
         val solution = MpsSolution.convert(record, "o 0.125\nv x=1/8\n", true)
 
         assertEquals("=obj= 0.125\nx 0.125\n", solution)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "1007.9999999999998863131622783839702606201171875,1007.9999999999998863131622783839702606201171875",
+        "-0.0000000000001136868377216160297393798828125,-1.136868377216160297393798828125E-13",
+        "1564851723957962726619/1759218604441600,889515.2199999999576328946204739622771739959716796875",
+    )
+    fun `long terminating coordinates and objectives should convert without rounding`(value: String, decimal: String) {
+        val point = record.copy(finalWitness = "v x=$value", exactObjective = value)
+
+        val solution = MpsSolution.convert(point, "o $value\nv x=$value\n", true)
+
+        assertEquals("=obj= $decimal\nx $decimal\n", solution)
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [31, 32, 255])
+    fun `solution precision within the upstream buffer profile should be preserved`(digits: Int) {
+        val value = "9".repeat(digits)
+        val point = record.copy(finalWitness = "v x=$value", exactObjective = value)
+
+        val solution = MpsSolution.convert(point, "o $value\nv x=$value\n", true)
+
+        assertEquals("=obj= $value\nx $value\n", solution)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["digits", "positive-exponent", "negative-exponent"])
+    fun `solution numbers exceeding the upstream buffer profile should be declined`(variant: String) {
+        val value = when (variant) {
+            "digits" -> "1".repeat(256)
+            "positive-exponent" -> "1e129"
+            else -> "1e-129"
+        }
+        val point = record.copy(finalWitness = "v x=$value", exactObjective = value)
+
+        assertFailsWith<IllegalArgumentException> {
+            MpsSolution.convert(point, "o $value\nv x=$value\n", true)
+        }
     }
 
     @ParameterizedTest

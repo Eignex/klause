@@ -72,11 +72,17 @@ class MpsSourceValidationTest {
 
     @Tag("external-source-checker")
     @ParameterizedTest
-    @CsvSource("false,valid,false", "true,invalid,true")
+    @CsvSource(
+        "false,valid,false,4.00000001",
+        "true,invalid,true,4.00000001",
+        "false,valid,true,4.00000000000000000000000000000000001",
+        "true,invalid,false,4.00000000000000000000000000000000001",
+    )
     fun `default MIPLIB tolerance should remain distinct from exact feasibility`(
         exact: Boolean,
         expected: String,
         gzip: Boolean,
+        value: String,
     ) {
         val fixture = "mps/float-tiny"
         val ref = ProblemRef(
@@ -86,14 +92,14 @@ class MpsSourceValidationTest {
             Category.OPTIMIZATION,
             Expected.Unknown,
         )
-        val raw = "o 0\nv X1=4.00000001\n"
+        val raw = "o 0\nv X1=$value\n"
         val record = SolveRecord(
             fixture, "klause", null, 1, "free", 1, 10_000, "optimize", false,
             true, 0.0, 1, proven = true, gitSha = "test", timestamp = "test",
             command = if (exact) "cli --exact" else "cli",
             validationPolicy = if (gzip) MPS_GZIP_SOURCE_POLICY else MPS_SOURCE_POLICY,
             sourceHashes = SolveEvidence.sourceHashes(ref), sourceOutputSha256 = sha256(raw.toByteArray()),
-            finalWitness = "v X1=4.00000001", exactObjective = "0",
+            finalWitness = "v X1=$value", exactObjective = "0",
         )
 
         val result = if (gzip) {

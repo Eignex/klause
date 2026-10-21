@@ -50,7 +50,8 @@ internal object MpsSolution {
     private fun decimal(text: String): String {
         val (numerator, denominator) = value(text)
         val result = BigDecimal(numerator).divide(BigDecimal(denominator)).stripTrailingZeros().toString()
-        MpsSolcheckerInput.requireNumber(result)
+        // The 1024-byte GMP scratch holds digits, fractional zeros and exponent expansion; SOL lines also fit.
+        MpsSolcheckerInput.requireNumber(result, maxLength = 255)
         return result
     }
 
