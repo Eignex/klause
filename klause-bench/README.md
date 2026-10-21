@@ -360,6 +360,18 @@ complementary names under the unchanged registry limit. This is isolated naming
 demand: it neither captures the actual rebound fragment nor reproduces earlier
 component registrations, initializes a solver, or proves the opening's refusal cause.
 
+With `inspect=lp-components`, the root diagnostic additionally advances its live run
+under the original ten-second deadline, then inspects the retained exact LP state
+before closing it. An uninitialized LP owner is left uninitialized. The separate
+five-second structural inspection reads at most 100,000 columns, 100,000 rows and
+1,000,000 stored entries; interruption or excess produces an explicit incomplete
+result. `lp-graph.json` retains nonzero column membership, row activity and logical
+bound presence. `lp-components.json` reports components over all retained rows and
+over rows with bounded logical variables, including isolated columns and empty rows.
+The latter graph does not authorize row removal. This is an instrumented
+direct-library applicability diagnostic, with no CLI equivalence, source verdict
+or end-to-end timing claim.
+
 `bench.profile.ExecutionOptionsProfile` compares legacy request parsing, captured frontend
 options and directly typed options while repeatedly resolving the same portfolio settings.
 `rounds` (default seven) alternates mode order after one warmup round; `plans` (default
