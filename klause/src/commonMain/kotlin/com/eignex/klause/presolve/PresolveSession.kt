@@ -122,6 +122,23 @@ internal class PresolveSession(
     // model fire nothing, so this skips most per-pass input reconstruction.
     private var cachedInput: BakedProblem? = null
     private var inputDirty: Boolean = true
+    private var aggregateEntryUnits: Long? = null
+
+    internal fun entryUnits(): Long {
+        aggregateEntryUnits?.let { return it }
+        val input = if (addedLog.isEmpty() && droppedFactorLog.isEmpty() && reseedEpoch == 0) base else passInput()
+        return (cancellation.presolveBudget()?.entryUnits(input.factors) ?: passBaseUnits(input.factors)).also {
+            aggregateEntryUnits = it
+        }
+    }
+
+    private fun updateEntryUnits(dropped: IntArray, added: List<Factor>) {
+        var units = aggregateEntryUnits ?: return
+        for (id in dropped) factors[id]?.let { units -= 1L + it.structuralKeyWeight }
+        for (factor in added) units += 1L + factor.structuralKeyWeight
+        cancellation.charge(dropped.size.toLong() + added.size)
+        aggregateEntryUnits = units
+    }
 
     init {
         for (id in base.factors.indices) recordOccurrences(id, base.factors[id])
@@ -189,11 +206,30 @@ internal class PresolveSession(
         return vars.toIntArray()
     }
 
+    internal fun anyTouchedFactor(
+        mark: ChangeMark?,
+        token: Cancellation,
+        candidate: (Factor) -> Boolean,
+    ): Boolean {
+        if (mark == null || markStale(mark)) return true
+        for (v in touchedIntVarsSince(mark)) {
+            val occurrences = intOcc[v] ?: continue
+            for (k in 0 until occurrences.size) {
+                val factor = factors[occurrences[k]] ?: continue
+                token.charge(1L)
+                if (token()) return false
+                if (candidate(factor)) return true
+            }
+        }
+        return false
+    }
+
     /** Live (non-tombstoned) factors in stable-id order — the current working constraint set. */
     fun liveFactors(): List<Factor> = factors.filterNotNull()
 
     /** Number of live factors. */
-    val liveFactorCount: Int get() = factors.count { it != null }
+    var liveFactorCount: Int = base.factors.size
+        private set
 
     /** Cheap problem-complexity measure: live constraint count plus total int-domain span. Drives the
      *  round engine's diminishing-returns abort. */
@@ -239,10 +275,14 @@ internal class PresolveSession(
      * (a conflict on a pushed narrowing or during re-propagation); the session latches [infeasible].
      */
     fun apply(delta: PresolveDelta): Boolean {
+        updateEntryUnits(delta.droppedIds, delta.addedFactors)
         if (!infeasible) snapshotFeasibleDomains()
         if (delta.droppedIds.isNotEmpty() || delta.addedFactors.isNotEmpty()) occDirty = true
         for (id in delta.droppedIds) {
-            factors[id]?.let { droppedFactorLog.add(it) }
+            factors[id]?.let {
+                droppedFactorLog.add(it)
+                liveFactorCount--
+            }
             state.tombstoneFactor(id)
             factors[id] = null
         }
@@ -252,6 +292,7 @@ internal class PresolveSession(
             val fid = state.addMidlifeFactor(f) // fid == factors.size at this point
             addedIds.add(fid)
             factors.add(f)
+            liveFactorCount++
             addedLog.add(fid)
             recordOccurrences(fid, f)
         }
@@ -422,6 +463,7 @@ internal class PresolveSession(
      *  from-scratch problem for that transition. The output factor set is the live factors minus
      *  [stableDropped], in stable-id order, followed by [added] — the same set [apply] would land on. */
     private fun reseedFromDelta(stableDropped: IntArray, added: List<Factor>, domains: Array<IntDomain>): Boolean {
+        updateEntryUnits(stableDropped, added)
         val dropped = if (stableDropped.isEmpty()) null else stableDropped.toHashSet()
         val out = ArrayList<Factor>(factors.size)
         for (id in factors.indices) {
@@ -441,6 +483,7 @@ internal class PresolveSession(
         stateProblem = eager
         factors.clear()
         factors.addAll(eager.factors)
+        liveFactorCount = eager.factors.size
         // The stable-id space was rebuilt from scratch, so the occurrence lists — and any pass's replayable
         // change history — must be too; bumping the epoch forces a stale-marked pass to rescan.
         for (v in 0 until base.numIntVars) intOcc[v]?.clear()

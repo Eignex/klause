@@ -10,6 +10,8 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
+import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.util.LongHashSet
 import kotlin.random.Random
 
@@ -74,25 +76,55 @@ object RootBaker {
         val base = problem.baked
         if (base !is PropagationResult.Implied) return base
         if (!config.anyEnabled) return base
-        if (problem.cancellation()) return base
         var result: PropagationResult = base
         if (config.probeFailedLiterals) {
-            result = probeFreeBools(problem, base)
+            result = observeTier(problem, PresolvePass.PROBE_FAILED_LITERALS, result) {
+                probeFreeBools(problem, it)
+            }
             if (result is PropagationResult.Unsat) return result
         }
-        if (problem.cancellation()) return result
         if (config.probeIntBounds || config.probeIntHoles) {
-            // wdeg state shared across bound-SAC and hole-SAC: a probe failure under bound-SAC raises
-            // factor weights that then steer hole-SAC's first iteration, and vice versa.
-            val factorWeights = DoubleArray(problem.numFactors) { 1.0 }
-            val rng = Random(config.probeSeed)
-            result = probeBoundSac(problem, result as PropagationResult.Implied, config, factorWeights, rng)
+            // Both tiers share weights so a failed probe steers subsequent integer candidates.
+            val factorWeights by lazy { DoubleArray(problem.numFactors) { 1.0 } }
+            val rng by lazy { Random(config.probeSeed) }
+            result = observeTier(problem, PresolvePass.PROBE_INT_BOUNDS, result) {
+                probeBoundSac(problem, it, config, factorWeights, rng)
+            }
             if (result is PropagationResult.Unsat) return result
-            if (config.probeIntHoles && !problem.cancellation()) {
-                result = probeIntHoles(problem, result as PropagationResult.Implied, config, factorWeights, rng)
+            if (config.probeIntHoles) {
+                result = observeTier(problem, PresolvePass.PROBE_INT_HOLES, result) {
+                    probeIntHoles(problem, it, config, factorWeights, rng)
+                }
             }
         }
         return result
+    }
+
+    private fun observeTier(
+        problem: BakedProblem,
+        pass: PresolvePass,
+        base: PropagationResult,
+        action: (PropagationResult.Implied) -> PropagationResult,
+    ): PropagationResult = problem.cancellation.presolveBudget().observe(
+        pass, PresolveLane.FINITE, problem.cancellation, { problem.presolveSize() },
+    ) { invocation ->
+        when {
+            problem.cancellation() -> base
+            !pass.namespaceEligible(problem) -> {
+                invocation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
+                base
+            }
+            else -> action(base as PropagationResult.Implied).also { result ->
+                if (result is PropagationResult.Implied) {
+                    invocation?.fixedColumns = result.numBools + result.numInts - base.numBools - base.numInts
+                }
+                if (result is PropagationResult.Unsat) {
+                    invocation?.outcome = PresolveInvocationOutcome.REFUTED
+                } else if (result !== base && invocation?.outcome != PresolveInvocationOutcome.INTERRUPTED) {
+                    invocation?.outcome = PresolveInvocationOutcome.CHANGED
+                }
+            }
+        }
     }
 
     /** Interior-value SAC: probe every value strictly between each multi-value int var's current min
@@ -115,8 +147,14 @@ object RootBaker {
             for (v in sacProbeOrder(problem, acc, factorWeights, rng)) {
                 if (problem.cancellation()) return acc
                 if (acc.intValueOrNull(v) != null) continue
-                if (perVarCalls[v] >= config.probeBudgetPerVar) continue
-                if (totalCalls >= config.probeTotalBudget) return acc
+                if (perVarCalls[v] >= config.probeBudgetPerVar) {
+                    problem.cancellation.interruptPresolveInvocation()
+                    continue
+                }
+                if (totalCalls >= config.probeTotalBudget) {
+                    problem.cancellation.interruptPresolveInvocation()
+                    return acc
+                }
                 val orig = problem.rootIntDomain(v)
                 val curMin = acc.intMinOrNullCompat(v) ?: orig.min
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
@@ -128,8 +166,14 @@ object RootBaker {
                 }
                 for (k in (curMin + 1) until curMax) {
                     if (problem.cancellation()) return acc
-                    if (perVarCalls[v] >= config.probeBudgetPerVar) break
-                    if (totalCalls >= config.probeTotalBudget) return acc
+                    if (perVarCalls[v] >= config.probeBudgetPerVar) {
+                        problem.cancellation.interruptPresolveInvocation()
+                        break
+                    }
+                    if (totalCalls >= config.probeTotalBudget) {
+                        problem.cancellation.interruptPresolveInvocation()
+                        return acc
+                    }
                     if (k !in orig) continue
                     if (k in existingHoles) continue
                     perVarCalls[v]++
@@ -218,8 +262,14 @@ object RootBaker {
             for (v in sacProbeOrder(problem, acc, factorWeights, rng)) {
                 if (problem.cancellation()) return acc
                 if (acc.intValueOrNull(v) != null) continue
-                if (perVarCalls[v] >= config.probeBudgetPerVar) continue
-                if (totalCalls >= config.probeTotalBudget) return acc
+                if (perVarCalls[v] >= config.probeBudgetPerVar) {
+                    problem.cancellation.interruptPresolveInvocation()
+                    continue
+                }
+                if (totalCalls >= config.probeTotalBudget) {
+                    problem.cancellation.interruptPresolveInvocation()
+                    return acc
+                }
                 val orig = problem.rootIntDomain(v)
                 val curMin = acc.intMinOrNullCompat(v) ?: orig.min
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
@@ -244,8 +294,14 @@ object RootBaker {
                     continue
                 }
                 if (problem.cancellation()) return acc
-                if (perVarCalls[v] >= config.probeBudgetPerVar) continue
-                if (totalCalls >= config.probeTotalBudget) return acc
+                if (perVarCalls[v] >= config.probeBudgetPerVar) {
+                    problem.cancellation.interruptPresolveInvocation()
+                    continue
+                }
+                if (totalCalls >= config.probeTotalBudget) {
+                    problem.cancellation.interruptPresolveInvocation()
+                    return acc
+                }
                 perVarCalls[v]++
                 totalCalls++
                 problem.cancellation.recordPresolveProbe()

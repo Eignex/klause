@@ -15,6 +15,12 @@ internal enum class PassOutcome {
     /** The pass found nothing to do. */
     UNCHANGED,
 
+    /** A sound cheap applicability check excluded the pass. */
+    SKIPPED,
+
+    /** Analysis stopped without a completed reduction. */
+    INTERRUPTED,
+
     /** The pass rewrote the model. */
     CHANGED,
 
@@ -113,6 +119,7 @@ internal object PresolveRoundEngine {
                     }
 
                     PassOutcome.UNCHANGED -> if (pass.skipAfterEmpty) exhausted.add(pass)
+                    PassOutcome.SKIPPED, PassOutcome.INTERRUPTED -> Unit
                 }
                 if (infeasible) break
                 if (pass.timing != PresolveTiming.FAST) {

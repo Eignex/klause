@@ -1,6 +1,8 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.propagation.RootWorkMeter
+import com.eignex.klause.solver.result.PresolveInvocationStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 
@@ -28,6 +30,32 @@ class PresolveBudget(
     val allowance: Long,
 ) : WorkMeter {
     private var spent = 0L
+    internal var activeInvocation: PresolveInvocation? = null
+    private val observations = ArrayList<PresolveInvocationStats>()
+    private var entryFactors: Array<Factor>? = null
+    private var cachedEntryUnits = 0L
+
+    /** Invocation observations in completion order, including nested construction stages. */
+    val invocations: List<PresolveInvocationStats> get() = observations.toList()
+
+    /** Factors visited solely to compute aggregate entry size, across model revisions. */
+    var entrySizeVisits: Long = 0L
+        private set
+
+    internal fun entryUnits(factors: Array<Factor>): Long {
+        if (entryFactors !== factors) {
+            entrySizeVisits = saturatedSum(entrySizeVisits, factors.size.toLong())
+            cachedEntryUnits = passBaseUnits(factors)
+            entryFactors = factors
+            charge(factors.size.toLong())
+        }
+        return cachedEntryUnits
+    }
+
+    internal fun recordInvocation(observation: PresolveInvocationStats) {
+        observations.add(observation)
+    }
+
     private val nativeMeter = PresolveRootWorkMeter(this)
 
     /** Model entries used to construct root and probe propagation states across rebuilds. */
@@ -40,12 +68,16 @@ class PresolveBudget(
 
     internal fun recordConstruction(entries: Long) {
         rootConstructionEntries = saturatedSum(rootConstructionEntries, entries)
-        charge(weighted(entries, ROOT_CONSTRUCTION_WEIGHT))
+        val units = weighted(entries, ROOT_CONSTRUCTION_WEIGHT)
+        activeInvocation?.let { it.rebuildWork = saturatedSum(it.rebuildWork, minOf(units, Long.MAX_VALUE - spent)) }
+        charge(units)
     }
 
     internal fun recordPropagation(units: Long) {
         rootPropagationWork = saturatedSum(rootPropagationWork, units)
-        charge(weighted(units, ROOT_PROPAGATION_WEIGHT))
+        val work = weighted(units, ROOT_PROPAGATION_WEIGHT)
+        activeInvocation?.let { it.rebuildWork = saturatedSum(it.rebuildWork, minOf(work, Long.MAX_VALUE - spent)) }
+        charge(work)
     }
 
     /** Round entries across source and finite schedules, including final empty scans. */
@@ -76,7 +108,9 @@ class PresolveBudget(
 
     override fun charge(units: Long) {
         if (units <= 0L) return
-        spent = saturatedSum(spent, units)
+        val charged = minOf(units, Long.MAX_VALUE - spent)
+        spent += charged
+        activeInvocation?.let { it.work = saturatedSum(it.work, charged) }
     }
 
     /**
@@ -119,3 +153,6 @@ private fun saturatedSum(total: Long, units: Long): Long =
 
 private fun weighted(units: Long, weight: Long): Long =
     if (units > Long.MAX_VALUE / weight) Long.MAX_VALUE else units * weight
+
+internal fun Cancellation.presolveBudget(): PresolveBudget? =
+    (workMeter() as? PresolveRootWorkMeter)?.budget
