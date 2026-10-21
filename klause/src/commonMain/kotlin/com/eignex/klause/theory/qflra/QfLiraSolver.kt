@@ -215,8 +215,15 @@ class ExactLiraSearchComponent private constructor(
     // Deferred rows are proved by the retained point and must be reasserted when it retires.
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val unassignedSourceInputs = IntArray(preparedRows.size) { preparedRows[it].booleans.size }
+    private var pendingSourceCount = 0
+    // The conservative floor avoids a search for the next word on every removal.
+    private var firstPendingSourceWord = (preparedRows.size + 63) ushr 6
     private val pendingSourceRows = LongArray((preparedRows.size + 63) ushr 6).also { pending ->
-        for (index in preparedRows.indices) if (unassignedSourceInputs[index] == 0) Bits.set(pending, index)
+        for (index in preparedRows.indices) if (unassignedSourceInputs[index] == 0) {
+            Bits.set(pending, index)
+            pendingSourceCount++
+            firstPendingSourceWord = minOf(firstPendingSourceWord, index ushr 6)
+        }
     }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
@@ -632,7 +639,7 @@ class ExactLiraSearchComponent private constructor(
             for (index in sourceAssertionLevels.indices) {
                 if (sourceAssertionLevels[index] == DEFERRED_SOURCE_ROW) {
                     sourceAssertionLevels[index] = -1
-                    if (unassignedSourceInputs[index] == 0) Bits.set(pendingSourceRows, index)
+                    if (unassignedSourceInputs[index] == 0) queueSourceRow(index)
                 }
             }
         }
@@ -1282,22 +1289,41 @@ class ExactLiraSearchComponent private constructor(
             val index = dependencies.rows[position]
             unassignedSourceInputs[index] += delta
             if (unassignedSourceInputs[index] == 0 && sourceAssertionLevels[index] == -1) {
-                Bits.set(pendingSourceRows, index)
+                queueSourceRow(index)
             } else {
-                Bits.clear(pendingSourceRows, index)
+                clearPendingSourceRow(index)
             }
         }
     }
 
+    private fun queueSourceRow(index: Int) {
+        if (Bits.has(pendingSourceRows, index)) return
+        Bits.set(pendingSourceRows, index)
+        pendingSourceCount++
+        firstPendingSourceWord = minOf(firstPendingSourceWord, index ushr 6)
+    }
+
+    private fun clearPendingSourceRow(index: Int) {
+        if (!Bits.has(pendingSourceRows, index)) return
+        Bits.clear(pendingSourceRows, index)
+        pendingSourceCount--
+        if (pendingSourceCount == 0) firstPendingSourceWord = pendingSourceRows.size
+    }
+
     private fun nextPendingSourceRow(from: Int): Int {
-        var word = from ushr 6
+        if (pendingSourceCount == 0) return -1
+        val fromWord = from ushr 6
+        var word = maxOf(fromWord, firstPendingSourceWord)
         if (word >= pendingSourceRows.size) return -1
-        var mask = -1L shl (from and 63)
+        var mask = if (word == fromWord) -1L shl (from and 63) else -1L
         while (word < pendingSourceRows.size) {
             operationStop.charge(1L)
             if (operationStop()) return -1
             val bits = pendingSourceRows[word] and mask
-            if (bits != 0L) return (word shl 6) + bits.countTrailingZeroBits()
+            if (bits != 0L) {
+                if (from == 0) firstPendingSourceWord = word
+                return (word shl 6) + bits.countTrailingZeroBits()
+            }
             word++
             mask = -1L
         }
@@ -1328,7 +1354,7 @@ class ExactLiraSearchComponent private constructor(
             if (deferPoint) {
                 if (pointReusePoint == null) return false
                 sourceAssertionLevels[index] = DEFERRED_SOURCE_ROW
-                Bits.clear(pendingSourceRows, index)
+                clearPendingSourceRow(index)
                 continue
             }
             val leaves = prepared.booleans.map { variable ->
@@ -1370,7 +1396,7 @@ class ExactLiraSearchComponent private constructor(
         if (lp.state?.conflict == null) {
             for (input in batch) {
                 sourceAssertionLevels[input.index] = context.decisionLevel
-                Bits.clear(pendingSourceRows, input.index)
+                clearPendingSourceRow(input.index)
             }
         }
         batch.clear()
@@ -1948,7 +1974,7 @@ class ExactLiraSearchComponent private constructor(
         for (index in sourceAssertionLevels.indices) {
             if (sourceAssertionLevels[index] > decisionLevel) {
                 sourceAssertionLevels[index] = -1
-                if (unassignedSourceInputs[index] == 0) Bits.set(pendingSourceRows, index)
+                if (unassignedSourceInputs[index] == 0) queueSourceRow(index)
             }
         }
         for (variable in bools.indices) {
