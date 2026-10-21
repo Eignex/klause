@@ -50,7 +50,7 @@ internal class SourceClauseBooleanBranching(
         for (index in clause.indices) {
             val literal = clause[index]
             val variable = Lit.variable(literal)
-            if (variable !in 0 until numBoolVars || index and 8191 == 0 && stopped(context)) {
+            if (variable !in 0 until numBoolVars || (index and 8191 == 0 && stopped(context))) {
                 declined = true
                 break
             }
