@@ -113,8 +113,14 @@ internal class SatClauseDb private constructor(
                 origins.add(i)
                 for (literal in literals) occurrences[literal].add(slot)
             }
-            return SatClauseDb(problem.numBoolVars, BooleanArray(problem.numBoolVars),
-                slots, origins, occurrences, intArrayOf())
+            return SatClauseDb(
+                problem.numBoolVars,
+                BooleanArray(problem.numBoolVars),
+                slots,
+                origins,
+                occurrences,
+                intArrayOf(),
+            )
         }
 
         /** A clause containing a literal and its negation — always true. */
