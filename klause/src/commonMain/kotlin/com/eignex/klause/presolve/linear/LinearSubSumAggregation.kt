@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.equivalentLinear
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntLongMap
@@ -30,44 +31,98 @@ internal object LinearSubSumAggregation {
     /** Above this factor count the candidate scan is skipped — the reduction is a density optimisation,
      *  not a correctness need, so forgoing it on giant models keeps presolve bounded (sound). */
     private const val MAX_FACTORS = 200_000
+    private const val MAX_SCAN_WORK = 1_000_000L
+    private const val SCAN_WORK_PER_TERM = 8L
+    private const val CANCEL_POLL_MASK = 63L
+
+    private class Work(private val cancellation: Cancellation) {
+        var visits = 0L
+            private set
+        private var limit = Long.MAX_VALUE
+        private var stopped = false
+
+        fun visit(): Boolean {
+            if (stopped) return false
+            if (visits >= limit || ((visits and CANCEL_POLL_MASK) == 0L && cancellation())) {
+                stopped = true
+                return false
+            }
+            visits++
+            cancellation.charge(1L)
+            return true
+        }
+
+        fun boundScan(terms: Long) {
+            limit = visits + minOf(MAX_SCAN_WORK, SCAN_WORK_PER_TERM * terms)
+        }
+
+        fun canScan(estimate: Long): Boolean = estimate <= limit - visits
+    }
+
+    private class Incidence {
+        val rows = IntArrayList()
+        var termVisits = 0L
+
+        fun add(index: Int, width: Int) {
+            rows.add(index)
+            termVisits += 1L + 2L * width
+        }
+    }
 
     /** A sub-sum definition `y = B + Σ A_j·x_j` read off a unit-pivot equality: the pivot [y], the
      *  constant [b] (`B`), and the partner form `x_j ↦ A_j` in [form]. [defIndex] is the equality's own
      *  factor index, so it is never rewritten against itself. */
     private class Definition(val defIndex: Int, val y: Int, val b: Long, val form: Map<Int, Long>)
 
-    fun aggregateSubSums(problem: Problem): PassDelta {
+    fun aggregateSubSums(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
         val factors = problem.factors
-        if (factors.size > MAX_FACTORS) return PassDelta()
+        if (factors.size > MAX_FACTORS || cancellation()) return PassDelta()
+        val work = Work(cancellation)
 
-        val rows = Array(factors.size) { factors[it].equivalentLinear() }
-        val definitions = collectDefinitions(rows)
+        val rows = arrayOfNulls<Linear>(factors.size)
+        for (i in factors.indices) {
+            if (!work.visit()) return PassDelta()
+            rows[i] = factors[i].equivalentLinear()
+        }
+        val definitions = collectDefinitions(rows, work)
         if (definitions.isEmpty()) return PassDelta()
 
         // Index Linear rows by variable, so a definition is matched only against rows that mention its
         // rarest partner rather than the whole model.
-        val rowsByVar = MutableIntObjectMap<IntArrayList>()
+        val rowsByVar = MutableIntObjectMap<Incidence>()
+        var indexedTerms = 0L
         for (i in factors.indices) {
+            if (!work.visit()) return PassDelta()
             val f = rows[i]
             if (f != null && f.integerConstants != null) {
-                for (v in f.vars) rowsByVar.getOrPut(v) { IntArrayList() }.add(i)
+                for (v in f.vars) {
+                    if (!work.visit()) return PassDelta()
+                    rowsByVar.getOrPut(v) { Incidence() }.add(i, f.vars.size)
+                    indexedTerms++
+                }
             }
         }
+        work.boundScan(indexedTerms)
 
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         val rewritten = HashSet<Int>() // one substitution per row per pass; the round engine re-runs
         val retainedDefinitions = HashSet<Int>()
         for (def in definitions) {
+            if (!work.visit()) break
             if (def.defIndex in rewritten) continue
-            val anchor = rarestPartner(def.form, rowsByVar) ?: continue
-            for (r in 0 until anchor.size) {
-                val i = anchor[r]
+            val anchor = rarestPartner(def.form, rowsByVar, work) ?: continue
+            // Matching reads a candidate and its partners; a successful rewrite reads the row again.
+            val estimate = anchor.termVisits + anchor.rows.size.toLong() * def.form.size
+            if (!work.canScan(estimate)) continue
+            for (r in 0 until anchor.rows.size) {
+                if (!work.visit()) break
+                val i = anchor.rows[r]
                 if (i == def.defIndex || i in rewritten || i in retainedDefinitions) continue
                 val row = rows[i] ?: continue
                 val constants = row.integerConstants ?: continue
-                val k = matchMultiplier(row, constants, def) ?: continue
-                val replacement = rewrite(row, constants, def, k) ?: continue
+                val k = matchMultiplier(row, constants, def, work) ?: continue
+                val replacement = rewrite(row, constants, def, k, work) ?: continue
                 added.add(replacement)
                 dropped.add(i)
                 rewritten.add(i)
@@ -82,18 +137,20 @@ internal object LinearSubSumAggregation {
     /** Every unit-pivot sub-sum definition among the equality [Linear]s: an equality `Σ c_j·v_j = b` with
      *  a variable `v_p` of coefficient `±1` and at least two other terms yields `v_p = c_p·b + Σ_{j≠p}
      *  (−c_p·c_j)·v_j`. The lowest-id unit-coefficient variable is the pivot (deterministic). */
-    private fun collectDefinitions(factors: Array<Linear?>): List<Definition> {
+    private fun collectDefinitions(factors: Array<Linear?>, work: Work): List<Definition> {
         val out = ArrayList<Definition>()
         for (i in factors.indices) {
+            if (!work.visit()) return emptyList()
             val f = factors[i] ?: continue
             if (f.op != LinearOp.EQ || f.vars.size < 3) continue
             val c = f.integerConstants ?: continue
-            val p = unitPivotIndex(f.vars, c) ?: continue
+            val p = unitPivotIndex(f.vars, c, work) ?: continue
             val sign = c.coeff(p) // ±1
             val definition = try {
                 val form = HashMap<Int, Long>(f.vars.size)
                 // A zero coefficient names no partner and cannot determine a multiplier.
                 for (j in f.vars.indices) {
+                    if (!work.visit()) return emptyList()
                     if (j != p && c.coeff(j) != 0L) form[f.vars[j]] = mulExact(-sign, c.coeff(j))
                 }
                 if (form.size < 2) continue
@@ -108,9 +165,10 @@ internal object LinearSubSumAggregation {
 
     /** Index of the lowest-id variable with a `±1` coefficient, or `null` if none — the deterministic
      *  pivot whose isolation keeps every folded coefficient integral. */
-    private fun unitPivotIndex(vars: IntArray, constants: IntegerConstants): Int? {
+    private fun unitPivotIndex(vars: IntArray, constants: IntegerConstants, work: Work): Int? {
         var best = -1
         for (j in vars.indices) {
+            if (!work.visit()) return null
             if (constants.coeff(j) != 1L && constants.coeff(j) != -1L) continue
             if (best < 0 || vars[j] < vars[best]) best = j
         }
@@ -118,11 +176,12 @@ internal object LinearSubSumAggregation {
     }
 
     /** The partner variable of [form] contained in the fewest rows — the cheapest anchor to scan. */
-    private fun rarestPartner(form: Map<Int, Long>, rowsByVar: MutableIntObjectMap<IntArrayList>): IntArrayList? {
-        var best: IntArrayList? = null
+    private fun rarestPartner(form: Map<Int, Long>, rowsByVar: MutableIntObjectMap<Incidence>, work: Work): Incidence? {
+        var best: Incidence? = null
         for (v in form.keys) {
+            if (!work.visit()) return null
             val rows = rowsByVar[v] ?: return null // a partner in no row: no match possible
-            if (best == null || rows.size < best.size) best = rows
+            if (best == null || rows.rows.size < best.rows.size) best = rows
         }
         return best
     }
@@ -130,11 +189,15 @@ internal object LinearSubSumAggregation {
     /** The common integer multiplier `k` with which [row] contains [def]'s whole partner form — every
      *  partner `x_j` present at coefficient `k·A_j`, one nonzero `k` for all — or `null` if the form is
      *  absent, partial, or unevenly scaled (so no exact sub-sum to fold). */
-    private fun matchMultiplier(row: Linear, constants: IntegerConstants, def: Definition): Long? {
+    private fun matchMultiplier(row: Linear, constants: IntegerConstants, def: Definition, work: Work): Long? {
         val coeffByVar = MutableIntLongMap(row.vars.size)
-        for (j in row.vars.indices) coeffByVar.put(row.vars[j], constants.coeff(j))
+        for (j in row.vars.indices) {
+            if (!work.visit()) return null
+            coeffByVar.put(row.vars[j], constants.coeff(j))
+        }
         var k = 0L
         for ((x, a) in def.form) {
+            if (!work.visit()) return null
             if (!coeffByVar.containsKey(x)) return null // partner missing → not a full sub-sum
             val c = coeffByVar.getOrDefault(x, 0L)
             if (a == 0L) return null // a zero form coefficient is no term (collectDefinitions drops these)
@@ -158,24 +221,27 @@ internal object LinearSubSumAggregation {
     /** [row] with `k·Σ A_j·x_j` replaced by the single term `k·y`: drop every partner term, add `k` to
      *  `y`'s coefficient, and shift the bound by `k·B` (moving `k·(y − B)` to the left leaves the same
      *  relation). Coalescing in [Linear]'s constructor folds `k·y` into any existing `y` term. */
-    private fun rewrite(row: Linear, constants: IntegerConstants, def: Definition, k: Long): Linear? = try {
-        val shift = mulExact(k, def.b)
-        if (shift !in -OVERFLOW_GUARD..OVERFLOW_GUARD || constants.bound !in -OVERFLOW_GUARD..OVERFLOW_GUARD) {
-            null
-        } else {
-            val vars = IntArrayList(row.vars.size)
-            val coeffs = ArrayList<Long>(row.vars.size)
-            for (j in row.vars.indices) {
-                if (def.form.containsKey(row.vars[j])) continue // absorbed into k·y
-                if (row.vars[j] == def.y) addExact(constants.coeff(j), k)
-                vars.add(row.vars[j])
-                coeffs.add(constants.coeff(j))
+    private fun rewrite(row: Linear, constants: IntegerConstants, def: Definition, k: Long, work: Work): Linear? {
+        return try {
+            val shift = mulExact(k, def.b)
+            if (shift !in -OVERFLOW_GUARD..OVERFLOW_GUARD || constants.bound !in -OVERFLOW_GUARD..OVERFLOW_GUARD) {
+                null
+            } else {
+                val vars = IntArrayList(row.vars.size)
+                val coeffs = ArrayList<Long>(row.vars.size)
+                for (j in row.vars.indices) {
+                    if (!work.visit()) return null
+                    if (def.form.containsKey(row.vars[j])) continue // absorbed into k·y
+                    if (row.vars[j] == def.y) addExact(constants.coeff(j), k)
+                    vars.add(row.vars[j])
+                    coeffs.add(constants.coeff(j))
+                }
+                vars.add(def.y)
+                coeffs.add(k)
+                Linear(coeffs.toLongArray(), vars.toIntArray(), row.op, addExact(constants.bound, shift))
             }
-            vars.add(def.y)
-            coeffs.add(k)
-            Linear(coeffs.toLongArray(), vars.toIntArray(), row.op, addExact(constants.bound, shift))
+        } catch (_: CheckedLongOverflowException) {
+            null
         }
-    } catch (_: CheckedLongOverflowException) {
-        null
     }
 }

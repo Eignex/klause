@@ -7,17 +7,97 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveContext
+import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LinearSubSumAggregationTest {
+    @Test
+    fun `the scheduled pass should honor an already cancelled phase without charging work`() {
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 2) },
+            listOf(sumDef(), Linear(intArrayOf(1, 1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 3)),
+        )
+        val budget = PresolveBudget(1000)
+        val context = PresolveContext(cancellation = budget.orSpent(Cancellation { true }))
+
+        val delta = PresolvePass.AGGREGATE_SUB_SUMS.applySource(problem, context)
+
+        assertTrue(delta.isEmpty)
+        assertEquals(0L, budget.spent())
+    }
+
+    @Test
+    fun `definition term visits should stop within one poll interval of the phase allowance`() {
+        val width = 128
+        val problem = Problem(
+            0,
+            width,
+            Array(width) { IntDomain(0, 2) },
+            listOf(Linear(IntArray(width) { 2 }, IntArray(width) { it }, LinearOp.EQ, 0)),
+        )
+        val budget = PresolveBudget(16)
+
+        val delta = LinearSubSumAggregation.aggregateSubSums(problem, budget.orSpent(Cancellation.Never))
+
+        assertTrue(delta.isEmpty)
+        assertTrue(budget.spent() in 16L..79L)
+    }
+
+    @Test
+    fun `dense unsuccessful candidates should consume only linear work and leave cheap reductions available`() {
+        val count = 256
+        val factors = List(count) { i ->
+            Linear(intArrayOf(1, i + 2, i + 3), intArrayOf(i, count, count + 1), LinearOp.EQ, 0)
+        } + listOf(
+            Linear(intArrayOf(1, -1, -1), intArrayOf(count + 2, count + 3, count + 4), LinearOp.EQ, 0),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(count + 3, count + 4, count + 5), LinearOp.LE, 3),
+        )
+        val problem = Problem(0, count + 6, Array(count + 6) { IntDomain(0, 2) }, factors)
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val delta = LinearSubSumAggregation.aggregateSubSums(problem, budget.orSpent(Cancellation.Never))
+
+        assertEquals(listOf(factors.lastIndex), delta.droppedIndices.toList())
+        assertEquals(setOf(count + 2, count + 5), (delta.addedFactors.single() as Linear).vars.toSet())
+        assertTrue(budget.spent() in 1L..(40L * factors.size))
+    }
+
+    @Test
+    fun `cancellation during candidate scans should retain completed equivalent rewrites`() {
+        val targets = List(64) {
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 3)
+        }
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 2) }, listOf(sumDef()) + targets)
+        val fullBudget = PresolveBudget(Long.MAX_VALUE)
+        val complete = LinearSubSumAggregation.aggregateSubSums(problem, fullBudget.orSpent(Cancellation.Never))
+        val budget = PresolveBudget(fullBudget.spent() - 64)
+
+        val delta = LinearSubSumAggregation.aggregateSubSums(problem, budget.orSpent(Cancellation.Never))
+
+        assertEquals(targets.size, complete.addedFactors.size)
+        assertTrue(delta.addedFactors.size in 1 until targets.size)
+        assertTrue(budget.spent() in budget.allowance..(budget.allowance + 63))
+        assertTrue(0 !in delta.droppedIndices)
+        val remaining = problem.factors.filterIndexed { i, _ -> i !in delta.droppedIndices } + delta.addedFactors
+        assertEquals(
+            feasible(problem.factors, LongArray(4), LongArray(4) { 2 }),
+            feasible(remaining.toTypedArray(), LongArray(4), LongArray(4) { 2 }),
+        )
+    }
+
     @Test
     fun `a declared sub-sum should fold into a declared target row`() {
         val equality = sumDef()
