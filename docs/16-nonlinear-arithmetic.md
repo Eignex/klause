@@ -245,7 +245,17 @@ implements the decision procedure. The pipeline uses
 
 `solveQfNra` decides a neutral `PolynomialRealFormula`. Normalization expands exact
 rational polynomial expressions and keeps each atom's sign, relation and Boolean
-structure. The procedure then runs in four stages; only the last two are needed for
+structure. Before probing or Boolean search, mandatory numeric predicates are
+extracted with Boolean propagation. Their exact total graph equalities are
+substituted into every atom, including optional branches. Opposite weak bounds may
+supply such an equality; an unforced guarded equation or an equation with a
+variable-dependent leading coefficient cannot eliminate a coordinate. Completed
+substitutions retain reverse fibres. Existing arithmetic representation limits can
+decline a substitution while preserving its completed prefix; cancellation and
+work exhaustion withhold the result. Expansion uses the caller's remaining work
+and representation limits.
+
+The procedure then runs in four stages; only the last two are needed for
 completeness.
 
 **1. Bounded probe.** An optional prefix tries to settle the query cheaply. It
@@ -253,8 +263,10 @@ checks necessary conditions on conjunctive atoms (sign enclosures from coefficie
 signs and monomial parity, magnitude bounds, cancelled common monomials) and
 proposes exact points (rational centers, single-coordinate repairs from roots of a
 specialized equality, coupled lines, dyadic points). Every proposal must pass the
-complete original-formula check. The probe is limited to small formulas and one
-65,536-unit slice; a decline leaves complete CAD available.
+complete formula check. A successful reduced point reconstructs all total graph
+coordinates and passes the original normalized formula before publication. The
+probe is limited to small formulas and one 65,536-unit slice; a decline leaves
+complete CAD available.
 
 **2. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
 enumerates source implicants: assignments of Boolean leaves and signed numeric
