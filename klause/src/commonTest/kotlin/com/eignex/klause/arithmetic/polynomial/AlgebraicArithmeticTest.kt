@@ -6,6 +6,8 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AlgebraicArithmeticTest {
@@ -77,6 +79,89 @@ class AlgebraicArithmeticTest {
         val limited = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
 
         assertFailsWith<PolynomialInterrupted> { limited.roots(source) }
+    }
+
+    @Test
+    fun `comparison refinements preserve operand roots with tighter certified intervals`() {
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+        val left = AlgebraicReal(RationalPolynomial.of(-2, 0, 1), 2, interval)
+        val right = AlgebraicReal(RationalPolynomial.of(-201, 0, 100), 2, interval)
+        var retainedLeft: AlgebraicReal? = null
+        var retainedRight: AlgebraicReal? = null
+
+        val order = arithmetic.compareWithRefinements(left, right, { retainedLeft = it }, { retainedRight = it })
+
+        val a = assertNotNull(retainedLeft)
+        val b = assertNotNull(retainedRight)
+        assertEquals(-1, order)
+        assertEquals(0, arithmetic.compare(left, a))
+        assertEquals(0, arithmetic.compare(right, b))
+        assertTrue(a.upperBound <= b.lowerBound)
+        assertEquals(interval, left.interval)
+        assertEquals(interval, right.interval)
+    }
+
+    @Test
+    fun `rational equality refinements retain the irrational representation root identity`() {
+        val value = BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()
+        for (rootOnLeft in listOf(false, true)) {
+            val root = AlgebraicReal(RationalPolynomial.of(-9, 0, 4), 2,
+                RationalInterval(BigFraction.ONE, BigFraction.ofLong(2)))
+            val rational = arithmetic.rational(value)
+            var retainedLeft: AlgebraicReal? = null
+            var retainedRight: AlgebraicReal? = null
+
+            val order = arithmetic.compareWithRefinements(
+                if (rootOnLeft) root else rational, if (rootOnLeft) rational else root,
+                { retainedLeft = it }, { retainedRight = it },
+            )
+
+            val retained = assertNotNull(if (rootOnLeft) retainedLeft else retainedRight)
+            assertEquals(0, order)
+            assertEquals(value, retained.rational)
+            assertEquals(root.definingCoefficients, retained.definingCoefficients)
+            assertEquals(root.rootIndex, retained.rootIndex)
+            assertNull(if (rootOnLeft) retainedRight else retainedLeft)
+            assertNull(root.rational)
+        }
+    }
+
+    @Test
+    fun `interrupted comparison supplies only completed operand refinements`() {
+        val interval = RationalInterval(BigFraction.ONE, BigFraction.ofLong(2))
+        val left = AlgebraicReal(RationalPolynomial.of(-2, 0, 1), 2, interval)
+        val right = AlgebraicReal(RationalPolynomial.of(-201, 0, 100), 2, interval)
+        var stopped = false
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { stopped }))
+        var retainedLeft: AlgebraicReal? = null
+        var retainedRight: AlgebraicReal? = null
+
+        assertFailsWith<PolynomialInterrupted> {
+            counted.compareWithRefinements(left, right, { retainedLeft = it; stopped = true }, { retainedRight = it })
+        }
+
+        val retained = assertNotNull(retainedLeft)
+        assertEquals(0, arithmetic.compare(left, retained))
+        assertTrue(retained.upperBound < interval.upper)
+        assertNull(retainedRight)
+    }
+
+    @Test
+    fun `a stop after a completed rational refinement withholds the comparison result`() {
+        val value = BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()
+        val root = AlgebraicReal(RationalPolynomial.of(-9, 0, 4), 2,
+            RationalInterval(BigFraction.ONE, BigFraction.ofLong(2)))
+        var stopped = false
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { stopped }))
+        var retained: AlgebraicReal? = null
+
+        assertFailsWith<PolynomialInterrupted> {
+            counted.compareWithRefinements(root, arithmetic.rational(value),
+                { retained = it; stopped = true }, { error("rational operand cannot refine") })
+        }
+
+        assertEquals(value, assertNotNull(retained).rational)
+        assertNull(root.rational)
     }
 
     @Test

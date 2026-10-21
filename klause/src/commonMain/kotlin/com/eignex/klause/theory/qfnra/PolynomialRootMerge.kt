@@ -2,18 +2,19 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 
 internal class PolynomialRootMerge(families: List<List<AlgebraicReal>>, private val algebraic: AlgebraicArithmetic) {
     private val arithmetic = algebraic.arithmetic
     private val roots = families.map { family ->
         arithmetic.step()
-        family.map { arithmetic.step(); it }
+        family.map { arithmetic.step(); ComparisonRoot(it, arithmetic) }
     }
     private val positions = IntArray(roots.size)
     private val heap = ArrayList<Int>()
     private var ordered = false
     private var advancePending = false
-    private var previous: AlgebraicReal? = null
+    private var previous: ComparisonRoot? = null
 
     init {
         for (family in roots.indices) {
@@ -37,11 +38,11 @@ internal class PolynomialRootMerge(families: List<List<AlgebraicReal>>, private 
             val family = heap[0]
             val candidate = roots[family][positions[family]]
             val last = previous
-            if (last == null || algebraic.compare(last, candidate) != 0) {
+            if (last == null || compareRoots(last, candidate) != 0) {
                 arithmetic.step()
                 previous = candidate
                 advancePending = true
-                return candidate
+                return candidate.original
             }
             advanceHead()
         }
@@ -77,8 +78,32 @@ internal class PolynomialRootMerge(families: List<List<AlgebraicReal>>, private 
 
     private fun compare(left: Int, right: Int): Int {
         arithmetic.step()
-        val comparison = algebraic.compare(roots[left][positions[left]], roots[right][positions[right]])
+        val comparison = compareRoots(roots[left][positions[left]], roots[right][positions[right]])
         // Equal roots retain the first projection polynomial's scalar and isolating bounds.
         return if (comparison != 0) comparison else left.compareTo(right)
+    }
+
+    private fun compareRoots(left: ComparisonRoot, right: ComparisonRoot): Int {
+        arithmetic.step()
+        val a = left.value
+        val b = right.value
+        return when {
+            a === b -> 0
+            a.rational != null && b.rational != null -> checkNotNull(a.rational).compareTo(checkNotNull(b.rational))
+            a.upperBound <= b.lowerBound -> -1
+            b.upperBound <= a.lowerBound -> 1
+            else -> algebraic.compareWithRefinements(a, b, left.retain, right.retain)
+        }
+    }
+}
+
+private class ComparisonRoot(val original: AlgebraicReal, arithmetic: PolynomialArithmetic) {
+    var value: AlgebraicReal = original
+        private set
+    val retain: (AlgebraicReal) -> Unit = { refined ->
+        arithmetic.step()
+        check(refined.definingPolynomial === original.definingPolynomial && refined.rootIndex == original.rootIndex)
+        check(refined.lowerBound >= value.lowerBound && refined.upperBound <= value.upperBound)
+        value = refined
     }
 }
