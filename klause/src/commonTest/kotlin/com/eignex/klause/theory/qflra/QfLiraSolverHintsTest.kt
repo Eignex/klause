@@ -50,6 +50,42 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `deferred source batches should preserve conflicts and feasible backjump siblings`() {
+        val heads = 130
+        val model = Problem(
+            numBoolVars = heads + 2,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3) { 1.0 },
+            factors = Array<Factor>(heads + 2) { head ->
+                when {
+                    head < heads -> ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, head + 1.0, head + 2.0), LinearOp.LE, 0.0)
+                    head == heads -> ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.GE, 0.5)
+                    else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.GE, 0.0)
+                }
+            },
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(heads + 2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            repeat(heads) { head ->
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(head, true))))
+            }
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(heads, true))))
+
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(heads, true))))
+        }
+    }
+
+    @Test
     fun `conditioned eager hints should reuse compatible real source updates`() {
         val model = Problem(
             numBoolVars = 4,

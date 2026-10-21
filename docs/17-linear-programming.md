@@ -198,6 +198,11 @@ live factors are never resized. A projection that cannot import exact authority
 declines without a partial layout: node bounding withholds deductions and leaf
 completion returns indeterminate.
 
+Source adapters can append neutral definition rows together before applying a
+bound batch. Lookup publication completes after a committed append even if the
+operation stops, and the new owner retains its stable lifetime cancellation
+adapter. Bound batches keep each side's premise and per-bound modeled work debit.
+
 ## Floating simplex and basis factors
 
 [SimplexWorkspace](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexWorkspace.kt)

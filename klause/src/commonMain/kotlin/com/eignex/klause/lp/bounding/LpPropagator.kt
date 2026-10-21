@@ -319,6 +319,7 @@ internal class LpPropagator(
     }
 
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
+    fun append(rows: List<LpScopedRow>, scoped: Boolean): Boolean = owner?.append(emptyList(), rows, scoped) == true
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
 
     fun compact(

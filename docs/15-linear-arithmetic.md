@@ -46,6 +46,12 @@ first seen under an activator, branch or disjunct get their definition row appen
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
 
+Resolved non-root comparisons assemble in batches of at most 64. Each batch
+appends its missing shared definitions together, then asserts signed bounds with
+their individual premises. Root comparisons remain in source order so each one
+can use fixed columns established by earlier rows. A crossed-bound batch retains
+only its committed prefix; uncommitted source rows receive no assertion stamp.
+
 #### A check
 
 A check proceeds in four steps:

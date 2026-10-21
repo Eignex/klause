@@ -1249,6 +1249,7 @@ class ExactLiraSearchComponent private constructor(
     private fun assertSource(context: SearchContext, deferPoint: Boolean = false): Boolean {
         if (!installSource() || (!deferPoint && !lp.atLevel(context.decisionLevel, operationStop))) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
+        val batch = ArrayList<ResolvedSourceAssertion>()
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
@@ -1277,11 +1278,16 @@ class ExactLiraSearchComponent private constructor(
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
-                if (!system.assertComparison(comparison, null, premise)) return false
-                sourceAssertionLevels[index] = context.decisionLevel
+                batch += ResolvedSourceAssertion(index, comparison, premise)
+                if (batch.size == MAX_SMT_ASSERTION_BATCH) {
+                    if (!assertSourceBatch(context, batch)) return false
+                    if (lp.state?.conflict != null) return true
+                }
             }
         }
         if (deferPoint) return true
+        if (!assertSourceBatch(context, batch)) return false
+        if (lp.state?.conflict != null) return true
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
             if (!system.assertAtom(atom, premise)) return false
@@ -1293,6 +1299,16 @@ class ExactLiraSearchComponent private constructor(
         }
         if (!assertDisequalities(disequalities)) return false
         nodesByLevel.put(context.decisionLevel, node)
+        return true
+    }
+
+    private fun assertSourceBatch(context: SearchContext, batch: MutableList<ResolvedSourceAssertion>): Boolean {
+        if (!system.assertComparisons(batch.map { it.comparison to it.premise }, operationStop)) return false
+        // A crossed-bound batch may commit only its contradictory prefix.
+        if (lp.state?.conflict == null) {
+            for (input in batch) sourceAssertionLevels[input.index] = context.decisionLevel
+        }
+        batch.clear()
         return true
     }
 
@@ -1943,6 +1959,13 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
 private const val UNASSIGNED = -1
 private const val DECLINED_HINT = -2
 private const val DEFERRED_SOURCE_ROW = -2
+
+private class ResolvedSourceAssertion(
+    val index: Int,
+    val comparison: ExactComparison,
+    val premise: SearchAtomPremise,
+)
+
 private const val MAX_POINT_HINT_ENTRIES = 65_536
 private const val MAX_POINT_HINT_BITS = 4096
 private const val FALSE = 0
