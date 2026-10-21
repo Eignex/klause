@@ -877,6 +877,12 @@ factor batches are separate controls.
 
 ## Profiling
 
+`bench.profile.PolynomialWitnessProbeProfile` records the bounded polynomial
+prefix through the query's probe-completion boundary, including mandatory formula
+reduction. An earlier refutation or interruption is recorded as its actual result;
+a still-pending query stops before Boolean regions and projection. Native work and
+charge attribution include every preparation checkpoint.
+
 `profile=cpu|wall|alloc` writes `build/bench-prof.jfr` and prints a flat method table.
 `profile-scope=solve` starts after selection resolution; `all` covers the harness.
 Profiling uses an in-process single `cp`/`fixed` or `ls` engine, cannot profile
