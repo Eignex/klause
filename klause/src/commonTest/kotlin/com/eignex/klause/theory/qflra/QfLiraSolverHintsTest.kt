@@ -27,6 +27,7 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.HintedBooleanBranching
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -40,6 +41,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
+import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.solver.search.followedBy
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
@@ -62,21 +64,27 @@ class QfLiraSolverHintsTest {
                 realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
                 factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
                     intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0)))
-            ExactLiraSearchComponent(model).use { component ->
-                val phases = assertNotNull(component.retainBooleanPhases(Cancellation.Never))
-                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
-                assertIs<ComponentResult.Consistent>(session.initialize())
-                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, truth))))
-                session.popTo(0)
-                val branching = HintedBooleanBranching(BooleanBranching.SourceOrder(1),
-                    phases.followedBy(SearchCandidateHints { !truth }))
+            for (restart in listOf(false, true)) {
+                for (branching in listOf(BooleanBranching.SourceOrder(1), HeuristicBooleanBranching(Vsids(), 1))) {
+                    ExactLiraSearchComponent(model).use { component ->
+                        val phases = assertNotNull(component.retainBooleanPhases(Cancellation.Never))
+                        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                        session.openRun(numBoolVars = 1, booleanBranching = branching)
+                        assertIs<ComponentResult.Consistent>(session.initialize())
+                        assertNotNull(branching.alternatives(session))
+                        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, truth))))
+                        if (restart) assertIs<ComponentResult.Consistent>(session.restart()) else session.popTo(0)
+                        val hinted = HintedBooleanBranching(branching,
+                            phases.followedBy(SearchCandidateHints { !truth }))
 
-                val choices = branching.alternatives(session)
+                        val choices = hinted.alternatives(session)
 
-                assertEquals(listOf(SearchDecision.Bool(Lit.make(0, truth)),
-                    SearchDecision.Bool(Lit.make(0, !truth))), choices)
-                assertNull(session.boolValue(0))
-                assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+                        assertEquals(listOf(SearchDecision.Bool(Lit.make(0, truth)),
+                            SearchDecision.Bool(Lit.make(0, !truth))), choices)
+                        assertNull(session.boolValue(0))
+                        assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+                    }
+                }
             }
         }
     }

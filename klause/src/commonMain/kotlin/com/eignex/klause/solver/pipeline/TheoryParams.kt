@@ -14,7 +14,7 @@ enum class OpenBranching(
     /** Conflict-activity order over the shared session. */
     Activity("activity"),
 
-    /** Activity for a complete mixed default point owner; source order for other openings. */
+    /** Activity with retained linear-real phases or a complete mixed default point owner; source order otherwise. */
     Automatic("auto"),
     ;
 
@@ -35,7 +35,7 @@ data class TheoryParams(
     val openWorkLimit: Long = Long.MAX_VALUE,
     /** Maximum committed shared decisions, independent of open-theory work accounting. */
     val maxDecisions: Long = Long.MAX_VALUE,
-    /** Positive shared-decision restart cadence within each feasibility traversal, or null for none. */
+    /** Positive shared-decision restart cadence; null selects adaptive retained-phase restarts or none. */
     val sharedRestart: Long? = null,
     /** Retained shared learned-clause cap within each feasibility traversal, or null for no cap. */
     val maxLearnedClauses: Int? = null,
