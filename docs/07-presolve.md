@@ -149,6 +149,10 @@ Structural reduction offers each factor its `structuralReduce` hook under curren
 domains, so a pinned global becomes a simpler factor; on source models it reaches
 only factors over closed integer columns. Redundancy and subsumption remove
 duplicate and dominated rows using indices maintained across rounds.
+Clique-implied subsumption builds and extends the conflict graph only when a
+surviving factor is an unconditional single-row Boolean `<=` knapsack with positive
+weights. Its activity bound uses cliques backed by retained clauses and
+cardinalities, so dropping a knapsack cannot remove its own justification.
 Comparison-clause folding replaces a clause over sole-use reified comparison
 indicators with one comparison disjunction. Duplicate-column merging replaces two
 columns with identical linear occurrences by their sum and splits the value back on

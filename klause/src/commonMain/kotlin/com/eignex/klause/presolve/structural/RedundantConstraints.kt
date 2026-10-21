@@ -603,21 +603,26 @@ internal object RedundantConstraints {
      * is unsound.
      */
     private fun dropCliqueImpliedKnapsacks(factors: List<Factor>, cancellation: Cancellation): List<Factor> {
-        // Clauses declare >= rows, so none can be a <= knapsack drop candidate.
-        if (factors.all { it is Clause }) return factors
+        val candidates = ArrayList<Pair<Int, LinearRow>>()
+        for ((i, f) in factors.withIndex()) {
+            // Clauses declare >= rows, so none can be a <= knapsack drop candidate.
+            if (f is Clause) continue
+            val row = (f.linearForm as? LinearForm.Conjunction)?.rows?.singleOrNull() ?: continue
+            if (row.relation == LinearOp.LE && row.isLongUnconditional &&
+                (0 until row.size).all { Term.isBool(row.ref(it)) && row.coeff(it) > 0L }
+            ) {
+                candidates.add(i to row)
+            }
+        }
+        if (candidates.isEmpty()) return factors
         val cliques = maximalPersistentAmoCliques(factors, cancellation)
         if (cliques.isEmpty()) return factors
-        val out = ArrayList<Factor>(factors.size)
-        for (f in factors) {
-            val row = (f.linearForm as? LinearForm.Conjunction)?.rows?.singleOrNull()
-            if (row != null && row.relation == LinearOp.LE && row.isLongUnconditional &&
-                (0 until row.size).all { Term.isBool(row.ref(it)) } && cliqueImpliesKnapsack(row, cliques)
-            ) {
-                continue
-            }
-            out.add(f)
+        val dropped = IntHashSet()
+        for ((i, row) in candidates) {
+            if (cliqueImpliesKnapsack(row, cliques)) dropped.add(i)
         }
-        return out
+        if (dropped.isEmpty()) return factors
+        return factors.filterIndexed { i, _ -> i !in dropped }
     }
 
     /** Whether the AMO [cliques] force `Σ wⱼ·lⱼ ≤ bound` (all weights > 0): greedily cover the
@@ -630,8 +635,7 @@ internal object RedundantConstraints {
     }
 
     private fun cliqueActivityWithinBound(knapsack: LinearRow, cliques: List<Set<Int>>): Boolean {
-        if ((0 until knapsack.size).any { knapsack.coeff(it) <= 0L }) return false
-        // Every weight is > 0 (guarded above), so 0 doubles as the "literal not in the knapsack"
+        // Candidate weights are > 0, so 0 doubles as the "literal not in the knapsack"
         // sentinel for [MutableIntLongMap.getOrDefault].
         val weightByLit = MutableIntLongMap(knapsack.size)
         for (i in 0 until knapsack.size) {
