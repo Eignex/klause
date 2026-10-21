@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -146,6 +147,23 @@ class PresolvePassTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `scheduled source probing should close an open integer side`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
+            openIntHi = booleanArrayOf(true),
+        )
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val prepared = Presolver.runSource(problem, PresolveConfig.parse("off,+probe-open"),
+            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+
+        assertEquals(listOf(PresolvePass.PROBE_OPEN_RANGES), prepared.passesFired)
+        assertEquals(7L, prepared.problem.intBounds.upper(0))
+        assertEquals(PresolveInvocationOutcome.CHANGED, budget.invocations.single().outcome)
     }
 
     @Test
