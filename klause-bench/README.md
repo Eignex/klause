@@ -1561,6 +1561,44 @@ These short summaries support current design decisions. The contracts themselves
 live in the [docs](../docs/README.md) chapters each summary links; raw evidence
 stays outside the repository.
 
+### Elective LP harvest controls
+
+`sets/lp-harvest-controls-v1.txt` fixes four additional SAT controls and two positive
+controls for the automatic clausal satisfaction gate described in
+[presolve](../docs/07-presolve.md#pipeline). Compare `aggressive` with
+`aggressive,+lp-harvest` at one revision, using CP and mixed engines, seeds 3/17
+and three alternating repeats. Retain preparation and full-process time, search
+work, outcomes and source hashes; a reduction count alone does not establish a
+whole-solve benefit.
+
+The original [7046 comparison](https://lab.eignex.com/jobs/7046) found unchanged
+search nodes and no recorded LP reduction on ais8 and uf50-0491, with median
+full-process ON/OFF ratios of 1.31–1.61 across CP and mixed. Its 24 available points
+passed independent original-clause checks with matching source hashes. Two inputs
+at one seed do not establish a corpus-wide speedup. Requested source validation
+must be checked for actual coverage; native completion metadata does not certify
+an independently checked refutation or optimum.
+
+[7070](https://lab.eignex.com/jobs/7070) compared skipping with explicit harvest on
+three larger SATLIB controls, two seeds and three repeats. UF175-064 returned 24
+native feasible points; paired median ON/OFF process ratios were 1.50 for CP and
+1.24 for mixed, with preparation ratios 1.47/1.49. Search work varied. UF250-0100
+and UUF225-097 stayed unknown and reported no root LP passes in either arm, so they
+supply no harvest benefit estimate. Its in-code pigeonhole control failed source loading
+and is excluded.
+
+[7072](https://lab.eignex.com/jobs/7072) replaced that fixture with file-backed
+php4 and tested retaining rewritten nonclausal opportunities. Its broader shape
+test also exposed a symmetry-only bypass, covered by a deterministic regression.
+UF250-0100 returned five native points with no reported root LP passes in either arm,
+illustrating the variability of these deadline-limited runs.
+All 24 set-covering points passed original MiniZinc source checking at objective 4,
+retaining one shaved bound, one removed row and an objective floor in each run.
+The 24 php4 refutations and 24 MaxSAT optima at 1 are native completion reports;
+independent proof checking was unavailable. DIMACS/MaxSAT point checking was also
+unavailable in these comparisons. These candidate-revision measurements support
+the narrow gate and its exceptions, not a final-revision or corpus-wide speedup.
+
 ### Portfolio slice policy
 
 Retain the finite schedule's base 5000, maximum 150000 and growth 1.5. The comparison
