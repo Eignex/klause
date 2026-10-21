@@ -146,6 +146,29 @@ class PropagationStateTest {
     }
 
     @Test
+    fun `undo should discard branch hole reasons before another branch carves`() {
+        val s = freshState(1, 9)
+        val retainedReason = intArrayOf(Lit.make(s.atomVarGe(0, 0), false))
+        val discardedReason = intArrayOf(Lit.make(s.atomVarLe(0, 9), false))
+        enterLevel(s, 0)
+        assertTrue(s.excludeIntValue(0, 3, retainedReason))
+        val mark = s.mark()
+        assertTrue(s.excludeIntValues(0, longArrayOf(5, 7), discardedReason))
+        assertTrue(s.excludeIntValue(0, 8, discardedReason))
+
+        s.undoTo(mark)
+        enterLevel(s, 0)
+        assertTrue(s.excludeIntValue(0, 5, retainedReason))
+
+        assertEquals(retainedReason.toList(), s.holeReasonFor(0, 3)?.toList())
+        assertEquals(retainedReason.toList(), s.holeReasonFor(0, 5)?.toList())
+        assertFalse(s.holeHistHas(0, 7))
+        assertFalse(s.holeHistHas(0, 8))
+        assertTrue(7 in s.intDomains[0])
+        assertTrue(8 in s.intDomains[0])
+    }
+
+    @Test
     fun `batch exclude should keep atom truth consistent across push and pop`() {
         val numVars = 3
         val hi = 9

@@ -161,7 +161,9 @@ failure context, and fresh presolve rebuilds keep the originating cancellation t
 see [presolve](07-presolve.md).
 
 Boolean-only models journal each pin without integer-state padding. Integer undo
-replays saved domains and interior carves. Unconditional root carves are kept in
+replays saved domains and interior carves. Each restored entry truncates the variable's
+hole values, levels, reasons and trail positions together to the recorded history length.
+Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see
 them.
 
