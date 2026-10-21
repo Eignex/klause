@@ -213,10 +213,13 @@ object Presolve {
     ): SourceDelta = SymmetryBreaking.breakSourceSymmetries(problem, objectiveIntVars, objectiveBoolVars, cancellation)
 
     /** Value-precedence breaking over interchangeable value orbits. See [SymmetryBreaking]. */
-    fun breakValuePrecedence(
+    fun breakValuePrecedence(problem: BakedProblem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
+        breakValuePrecedence(problem, objectiveIntVars, Cancellation.Never)
+
+    internal fun breakValuePrecedence(
         problem: BakedProblem,
-        objectiveIntVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        objectiveIntVars: Set<Int>,
+        cancellation: Cancellation,
     ): PassDelta = SymmetryBreaking.breakValuePrecedence(problem, objectiveIntVars, cancellation)
 
     /** Dual fixing / dominated-variable reductions. See [DominatedVariables]. */
