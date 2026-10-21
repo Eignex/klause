@@ -338,6 +338,12 @@ Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
 restarts the operation from authority, and every attempt is charged. Owner-local
 exact factors require the same matrix and ordered basis. An off-status feasible
 point cannot furnish a claimed warm basis.
+Certificate verification admits the complete source before evaluating candidates.
+Exact zero primal columns, objective coefficients and dual multipliers contribute
+no arithmetic; row bounds, strictness and proof support still receive their full
+checks. Fixed-width conversion admits its converted value directly, while values
+or operations outside that width restart from rational authority. Traversal and
+nonzero arithmetic remain charged within the same verification allowance.
 
 Requested sparse recovery eliminates singleton basis rows and columns without
 fill, then factors each independent residual block within the existing dense

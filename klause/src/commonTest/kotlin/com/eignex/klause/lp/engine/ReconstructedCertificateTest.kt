@@ -15,6 +15,68 @@ import kotlin.test.assertTrue
 
 class ReconstructedCertificateTest {
     @Test
+    fun `zero coordinates should preserve equality checks within a bounded allowance`() {
+        val columns = 64
+        val model = LpBuilder().apply {
+            repeat(columns) { addVar(0L, 1L) }
+            repeat(columns) {
+                addRow(IntArray(columns) { it }, LongArray(columns) { 1L }, Relation.EQ, 0L)
+            }
+        }.build(Sense.MINIMIZE)
+        for (valid in listOf(false, true)) {
+            val point = List(columns) { if (!valid && it == 0) BigFraction.ONE else BigFraction.ZERO }
+
+            val result = verifyRationalCertificate(model, point,
+                limits = ReconstructionLimits(maxWork = 60000L))
+
+            if (valid) assertEquals(point, assertNotNull(result.witness).primal)
+            else {
+                assertNull(result.witness)
+                assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+            }
+        }
+    }
+
+    @Test
+    fun `zero dual contributions should preserve objective bounds within a bounded allowance`() {
+        val columns = 64
+        val model = LpBuilder().apply {
+            repeat(columns) { addVar(0L, 1L, cost = if (it == 0) 1L else 0L) }
+            repeat(columns) {
+                addRow(IntArray(columns) { it }, LongArray(columns) { 1L }, Relation.LE, columns.toLong())
+            }
+        }.build(Sense.MINIMIZE)
+
+        val result = verifyRationalCertificate(model, duals = List(columns) { BigFraction.ZERO },
+            limits = ReconstructionLimits(maxWork = 60000L))
+
+        assertEquals(BigFraction.ZERO, assertNotNull(result.bound).value)
+        assertNull(result.witness)
+        assertNull(result.conflict)
+    }
+
+    @Test
+    fun `zero contributions should not bypass source scalar admission`() {
+        val zero = ExactLpNumber.of(0L)
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 200, BIG_ONE))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, huge))),
+            listOf(zero),
+            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))) },
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+
+        val result = verifyRationalCertificate(assertNotNull(LpExactState(source).toWorkingModel()),
+            listOf(BigFraction.ZERO), listOf(BigFraction.ZERO), limits = ReconstructionLimits(maxBits = 128))
+
+        assertNull(result.witness)
+        assertNull(result.bound)
+        assertNull(result.conflict)
+        assertEquals(ReconstructionDecline.BITS, result.metrics.decline)
+    }
+
+    @Test
     fun `a nonoptimal point and a weaker bound should remain independent`() {
         val model = LpBuilder().apply { addVar(0L, 5L, cost = 1L) }.build(Sense.MINIMIZE)
 

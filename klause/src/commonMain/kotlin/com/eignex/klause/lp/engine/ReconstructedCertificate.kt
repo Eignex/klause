@@ -268,7 +268,8 @@ private class FixedReconstructionVerifier(
     }
 
     private fun from(value: BigFraction): Frac128 {
-        meter.fraction(value)
+        // The converted fixed value owns admission; wider values restart from rational authority.
+        meter.step()
         val numeratorBits = value.num.magnitudeBitLength()
         val denominatorBits = value.den.magnitudeBitLength()
         if (numeratorBits > 127 || denominatorBits > 127) throw ReconstructionOverflow()
@@ -318,6 +319,8 @@ private class FixedReconstructionVerifier(
         val x = primal.map { from(it) }.toMutableList()
         val slack = a.rhs.map { from(it) }.toMutableList()
         for (j in 0 until a.n) {
+            meter.step()
+            if (x[j].isZero) continue
             for ((row, coefficient) in a.matrix[j]) slack[row] = minus(slack[row], times(from(coefficient), x[j]))
         }
         x.addAll(slack)
@@ -338,7 +341,8 @@ private class FixedReconstructionVerifier(
                     return null
                 }
             }
-            value = plus(value, times(from(a.costs[j]), x[j]))
+            meter.step()
+            if (!a.costs[j].isZero) value = plus(value, times(from(a.costs[j]), x[j]))
         }
         val sourceObjective = plus(times(value, reciprocal(from(a.scale))), from(a.external))
         val sourcePrimal = List(a.n) { big(plus(x[it], from(a.origins[it]))) }
@@ -349,13 +353,19 @@ private class FixedReconstructionVerifier(
         meter.storage((a.m.toLong() + a.size) * 48L)
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
-        for (i in y.indices) value = plus(value, times(y[i], from(a.rhs[i])))
+        for (i in y.indices) {
+            meter.step()
+            if (!y[i].isZero) value = plus(value, times(y[i], from(a.rhs[i])))
+        }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
         var strict = false
         for (j in 0 until a.size) {
             var d = if (ray) from(BigFraction.ZERO) else from(a.costs[j])
-            for ((row, coefficient) in a.matrix[j]) d = minus(d, times(y[row], from(coefficient)))
+            for ((row, coefficient) in a.matrix[j]) {
+                meter.step()
+                if (!y[row].isZero) d = minus(d, times(y[row], from(coefficient)))
+            }
             val sign = sign(d)
             if (sign != 0) {
                 val upper = sign < 0
@@ -395,6 +405,8 @@ private class BigReconstructionVerifier(
         val x = primal.map { from(it) }.toMutableList()
         val slack = a.rhs.map { from(it) }.toMutableList()
         for (j in 0 until a.n) {
+            meter.step()
+            if (x[j].isZero) continue
             for ((row, coefficient) in a.matrix[j]) slack[row] = minus(slack[row], times(from(coefficient), x[j]))
         }
         x.addAll(slack)
@@ -415,7 +427,8 @@ private class BigReconstructionVerifier(
                     return null
                 }
             }
-            value = plus(value, times(from(a.costs[j]), x[j]))
+            meter.step()
+            if (!a.costs[j].isZero) value = plus(value, times(from(a.costs[j]), x[j]))
         }
         val sourceObjective = plus(times(value, reciprocal(from(a.scale))), from(a.external))
         val sourcePrimal = List(a.n) { big(plus(x[it], from(a.origins[it]))) }
@@ -426,13 +439,19 @@ private class BigReconstructionVerifier(
         meter.storage((a.m.toLong() + a.size) * 48L)
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
-        for (i in y.indices) value = plus(value, times(y[i], from(a.rhs[i])))
+        for (i in y.indices) {
+            meter.step()
+            if (!y[i].isZero) value = plus(value, times(y[i], from(a.rhs[i])))
+        }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
         var strict = false
         for (j in 0 until a.size) {
             var d = if (ray) from(BigFraction.ZERO) else from(a.costs[j])
-            for ((row, coefficient) in a.matrix[j]) d = minus(d, times(y[row], from(coefficient)))
+            for ((row, coefficient) in a.matrix[j]) {
+                meter.step()
+                if (!y[row].isZero) d = minus(d, times(y[row], from(coefficient)))
+            }
             val sign = sign(d)
             if (sign != 0) {
                 val upper = sign < 0
