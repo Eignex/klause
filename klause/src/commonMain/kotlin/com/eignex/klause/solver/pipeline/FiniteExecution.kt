@@ -26,7 +26,6 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.SourceMapping
-import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemClass
@@ -561,7 +560,7 @@ internal fun FinitePipeline.solve(
         request.shape.searchHints
     } else {
         request.shape.searchHints?.let { hints ->
-            preparation.sourceMapping?.retainedCoordinates(stop)?.let { hints.remapped(it, stop) }
+            preparation.sourceMapping?.let { hints.remapped(it, stop) }
         }
     }
     if ((request.shape.sourceInvocation != null && stop()) || executionPlan.decline == PreparedPlanDecline.RESOURCE) {
