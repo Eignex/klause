@@ -31,7 +31,7 @@ class QfNraSolverTest {
         val result = solveQfNra(source.formula, source.boolCount, source.realCount,
             QfNraParams(maximumWork = 2_000_000))
 
-        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
         for (index in 0 until 8) {
             val norm = algebraic.add(algebraic.power(point.realValue(2 * index), 2),
                 algebraic.power(point.realValue(2 * index + 1), 2))
