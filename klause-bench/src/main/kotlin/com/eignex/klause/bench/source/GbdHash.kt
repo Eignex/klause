@@ -2,6 +2,7 @@ package com.eignex.klause.bench.source
 
 import java.io.InputStream
 import java.security.MessageDigest
+import java.util.Locale
 
 /**
  * The Global Benchmark Database's content hash of a DIMACS CNF (`gbdhash`): the MD5 of its clause literals with
@@ -56,7 +57,7 @@ internal object GbdHash {
 
         fun finish(): String {
             if (!clauseEnded) md5.update(" 0".toByteArray())
-            return md5.digest().joinToString("") { "%02x".format(it) }
+            return md5.digest().joinToString("") { "%02x".format(Locale.ROOT, it) }
         }
     }
 }
