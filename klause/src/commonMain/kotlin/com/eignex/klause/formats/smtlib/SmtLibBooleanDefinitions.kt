@@ -6,6 +6,7 @@ import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.lowering.trueLit
+import com.eignex.klause.util.Cancellation
 
 internal fun Compiler.Builder.reifyAnd(literals: List<Int>): Int =
     retainBooleanDefinition { reifyLogical(literals, conjunction = true) }.also { result ->
@@ -20,12 +21,12 @@ internal fun Compiler.Builder.reifyIff(first: Int, second: Int): Int = retainBoo
     when {
         first == second -> trueLit()
         first == Lit.negate(second) -> Lit.negate(trueLit())
-        trueLitCache < 0 -> tseitinIff(first, second)
+        trueLitCache < 0 -> sharedIff(first, second)
         first == trueLitCache -> second
         second == trueLitCache -> first
         first == Lit.negate(trueLitCache) -> Lit.negate(second)
         second == Lit.negate(trueLitCache) -> Lit.negate(first)
-        else -> tseitinIff(first, second)
+        else -> sharedIff(first, second)
     }
 }
 
@@ -46,9 +47,18 @@ private fun Compiler.Builder.reifyLogical(literals: List<Int>, conjunction: Bool
     return when (kept.size) {
         0 -> if (conjunction) trueLit() else Lit.negate(trueLit())
         1 -> kept.single()
-        else -> if (conjunction) tseitinAnd(kept.toList()) else tseitinOr(kept.toList())
+        else -> {
+            val operands = kept.toList()
+            val kind = if (conjunction) SmtBooleanGates.Kind.AND else SmtBooleanGates.Kind.OR
+            booleanGates.literal(kind, operands) {
+                if (conjunction) tseitinAnd(operands) else tseitinOr(operands)
+            }
+        }
     }
 }
+
+private fun Compiler.Builder.sharedIff(first: Int, second: Int): Int =
+    booleanGates.literal(SmtBooleanGates.Kind.IFF, listOf(first, second)) { tseitinIff(first, second) }
 
 private fun Compiler.Builder.booleanWork(units: Long) {
     sourceCancellation.charge(units)
@@ -62,4 +72,43 @@ private inline fun Compiler.Builder.retainBooleanDefinition(define: () -> Int): 
         conditionalEqualities.definePredicate(Lit.variable(literal), factors.subList(start, factors.size))
     }
     return literal
+}
+
+internal class SmtBooleanGates(private val cancellation: Cancellation, private val maxEntries: Int = 65_536) {
+    enum class Kind { AND, OR, IFF }
+
+    private data class Key(val kind: Kind, val inputs: List<Int>)
+
+    private val literals = HashMap<Key, Int>()
+    private var retainedEntries = 0
+
+    init {
+        require(maxEntries >= 0)
+    }
+
+    fun literal(kind: Kind, inputs: List<Int>, create: () -> Int): Int {
+        require(kind != Kind.IFF || inputs.size == 2)
+        val entries = inputs.size.toLong() + 1L
+        cancellation.charge(entries)
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        if (entries > maxEntries) return create()
+        val ordered = inputs.sortedWith { left, right ->
+            cancellation.charge(1L)
+            if (cancellation()) throw PolynomialSourceInterrupted()
+            left.compareTo(right)
+        }
+        cancellation.charge(entries * 2L)
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        val canonical = if (kind == Kind.IFF && ordered.isNotEmpty() && !Lit.isPositive(ordered[0])) {
+            ordered.map(Lit::negate)
+        } else ordered
+        val key = Key(kind, canonical)
+        literals[key]?.let { return it }
+        val literal = create()
+        if (entries <= maxEntries - retainedEntries) {
+            literals[key] = literal
+            retainedEntries += entries.toInt()
+        }
+        return literal
+    }
 }

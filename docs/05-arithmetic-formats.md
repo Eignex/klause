@@ -189,8 +189,13 @@ at their command. The binding tables are discarded after lowering.
 
 Boolean lowering folds constants and literal identities in AND, OR and IFF, so
 empty, duplicate and complementary operands keep their meaning without extra
-gates. Comparison literals are shared within a parse only when their folded exact
-rows agree completely.
+gates. Repeated AND/OR gates share a definition for the same signed inputs, independently
+of operand order. IFF also shares simultaneous input negation. The table belongs
+to one parser builder, retains the first definition's ownership and uses at most
+65,536 key entries, charging each gate's arity plus one. Lookup and normalization
+use the source cancellation token; a declined cache entry still emits its definition.
+Comparison literals are shared within a parse only when their folded exact rows
+agree completely.
 
 Real and mixed comparisons retain `ExactLinear` rows with exact coefficients,
 strictness and Boolean reification, without frontend digit columns; numerical

@@ -145,7 +145,7 @@ class SmtLibSelectionTest {
                     ${if (branch) "g" else "(not g)"}
             """.trimIndent()
             val live = SmtLib.parse("$source\n)))")
-            val parsed = SmtLib.parse("$source\n(= (ite g 7 8) ${if (branch) 7 else 8})\n)))")
+            val parsed = SmtLib.parse("$source\n(= (ite (and c b) 7 8) ${if (branch) 7 else 8})\n)))")
 
             val result = BacktrackSolver.source(parsed.model)
                 .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
