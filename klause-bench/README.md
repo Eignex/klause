@@ -354,9 +354,11 @@ complementary names under the unchanged registry limit. This is isolated naming
 demand: it neither captures the actual rebound fragment nor reproduces earlier
 component registrations, initializes a solver, or proves the opening's refusal cause.
 
-With `inspect=lp-equalities`, the same profile advances its traversal within the
-original ten-second deadline, then captures the retained immutable exact LP state
-before closing it. A separate five-second metadata allowance records coefficients,
+With `inspect=lp-equalities`, the same profile advances within the original
+ten-second deadline and pauses at the first branch checkpoint with an owned LP
+above 128 rows. It captures that immutable state before closing the search;
+terminal inspection alone can lose an owner invalidated by an interrupted edit.
+A separate five-second metadata allowance records coefficients,
 origins, bounds, strictness, costs, premises and stable row identities. Capture is
 limited to 16,384 coordinates, 262,144 metadata entries, 4,096-bit rationals and
 16 MiB; an incomplete or absent state is explicitly declined. The capture neither

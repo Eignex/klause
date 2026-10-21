@@ -1,5 +1,7 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.solver.search.SearchNodeDisposition
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -9,8 +11,37 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class LinearLpEqualityInspectionTest {
+    @Test
+    fun `a checkpoint without an LP state should keep traversal open`() {
+        val checkpoint = LinearLpEqualityCheckpoint { null }
+
+        val result = checkpoint.beforeBranch(SearchSession(emptyList()))
+
+        assertSame(SearchNodeDisposition.Expand, result)
+        assertNull(checkpoint.captured)
+    }
+
+    @Test
+    fun `a paused checkpoint should retain its captured immutable LP state`() {
+        var current = LinearLpEqualitySnapshot(Any(), 129)
+        val first = current
+        val checkpoint = LinearLpEqualityCheckpoint { current }
+        val session = SearchSession(emptyList())
+
+        val paused = checkpoint.beforeBranch(session)
+        current = LinearLpEqualitySnapshot(Any(), 257)
+        val checkedAgain = checkpoint.beforeBranch(session)
+
+        assertSame(SearchNodeDisposition.Pause, paused)
+        assertSame(SearchNodeDisposition.Pause, checkedAgain)
+        assertSame(first, checkpoint.captured)
+        assertEquals(0, checkpoint.decisionLevel)
+    }
+
     @Test
     fun `exact model capture should retain origins signed coefficients strict sides and premises`() {
         val prefix = "com.eignex.klause.lp.engine."

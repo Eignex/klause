@@ -2,6 +2,9 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchNodeDisposition
+import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 import kotlinx.serialization.json.JsonElement
@@ -15,11 +18,17 @@ import java.io.File
 import kotlin.time.Duration.Companion.seconds
 
 internal object LinearLpEqualityInspection {
-    fun inspect(theory: Any?, terminal: OpenTheoryResult?, advanced: Boolean, out: File) {
+    fun inspect(
+        theory: Any?,
+        terminal: OpenTheoryResult?,
+        advanced: Boolean,
+        out: File,
+        checkpoint: LinearLpEqualityCheckpoint? = null,
+    ) {
         val started = System.nanoTime()
         val stop = Cancellation.after(5.seconds)
         val result = buildJsonObject {
-            put("scope", "retained-exact-lp-equality-metadata")
+            put("scope", "retained-exact-lp-equality-checkpoint")
             put("sourceVerdictClaim", false)
             put("cliRoutingEquivalence", "unverified")
             put("traversalAdvanced", advanced)
@@ -27,11 +36,14 @@ internal object LinearLpEqualityInspection {
             put("captureBudgetMs", 5000)
             put("rawTerminal", terminal?.javaClass?.simpleName)
             put("rawTerminalReason", (terminal as? OpenTheoryResult.Unknown)?.reason?.name)
-            val delegate = theory?.javaClass?.declaredFields?.singleOrNull { it.name == "lpDelegate" }
-                ?.apply { isAccessible = true }?.get(theory) as? Lazy<*>
-            val lp = delegate?.takeIf { it.isInitialized() }?.value
-            val state = lp?.let { member(it, "getState") }
-            put("state", if (state == null) declined("retained-lp-state-unavailable") else captureState(state, stop))
+            val held = checkpoint?.captured ?: if (checkpoint == null) snapshotFor(theory) else null
+            put("checkpointReached", checkpoint?.captured != null)
+            put("checkpointRowLimit", LinearLpEqualityCheckpoint.ROW_LIMIT)
+            put("checkpointRows", held?.rows)
+            put("checkpointDecisionLevel", checkpoint?.decisionLevel)
+            val state = held?.state
+            val missing = if (checkpoint == null) "retained-lp-state-unavailable" else "lp-checkpoint-unavailable"
+            put("state", if (state == null) declined(missing) else captureState(state, stop))
             put("elapsedNs", System.nanoTime() - started)
         }
         out.resolve("lp-equalities.json").writeText(result.toString() + "\n")
@@ -39,6 +51,15 @@ internal object LinearLpEqualityInspection {
     }
 
     fun captureModel(model: Any, stop: Cancellation): JsonObject = captured(stop) { captureExactModel(model, it) }
+
+    fun snapshotFor(theory: Any?): LinearLpEqualitySnapshot? {
+        val delegate = theory?.javaClass?.declaredFields?.singleOrNull { it.name == "lpDelegate" }
+            ?.apply { isAccessible = true }?.get(theory) as? Lazy<*>
+        val lp = delegate?.takeIf { it.isInitialized() }?.value ?: return null
+        val state = member(lp, "getState") ?: return null
+        val base = requireNotNull(member(state, "getBaseModel"))
+        return LinearLpEqualitySnapshot(state, member(base, "getM") as Int)
+    }
 
     private fun captureState(state: Any, stop: Cancellation): JsonObject = captured(stop) { budget ->
         val model = requireNotNull(member(state, "getModel"))
@@ -288,4 +309,26 @@ internal object LinearLpEqualityInspection {
     private const val MAX_ENTRIES = 262144
     private const val MAX_BITS = 4096
     private const val MAX_BYTES = 16 * 1024 * 1024
+}
+
+internal data class LinearLpEqualitySnapshot(val state: Any, val rows: Int)
+
+internal class LinearLpEqualityCheckpoint(private val current: () -> LinearLpEqualitySnapshot?) : SearchNodePolicy {
+    var captured: LinearLpEqualitySnapshot? = null
+        private set
+    var decisionLevel: Int? = null
+        private set
+
+    override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+        if (captured != null) return SearchNodeDisposition.Pause
+        val snapshot = current() ?: return SearchNodeDisposition.Expand
+        if (snapshot.rows <= ROW_LIMIT) return SearchNodeDisposition.Expand
+        captured = snapshot
+        decisionLevel = context.decisionLevel
+        return SearchNodeDisposition.Pause
+    }
+
+    companion object {
+        const val ROW_LIMIT = 128
+    }
 }

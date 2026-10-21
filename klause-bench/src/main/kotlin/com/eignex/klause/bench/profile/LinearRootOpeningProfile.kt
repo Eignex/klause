@@ -84,8 +84,12 @@ internal object LinearRootOpeningProfile {
         val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
         val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
         val begin = engine.javaClass.declaredMethods.single { it.name.startsWith("begin") && it.parameterCount == 3 }
+        var theoryToInspect: Any? = null
+        val checkpoint = if (inspection == "lp-equalities") {
+            LinearLpEqualityCheckpoint { LinearLpEqualityInspection.snapshotFor(theoryToInspect) }
+        } else null
         val openingStarted = System.nanoTime()
-        val started = requireNotNull(begin.invoke(engine, params, state, SearchNodePolicy.ExpandAll))
+        val started = requireNotNull(begin.invoke(engine, params, state, checkpoint ?: SearchNodePolicy.ExpandAll))
         val openingNs = System.nanoTime() - openingStarted
         val deadlineElapsedNs = System.nanoTime() - deadlineStarted
         val deadlinePassedAtReturn = stop.deadline()?.hasPassedNow() == true
@@ -94,6 +98,7 @@ internal object LinearRootOpeningProfile {
         try {
             val decided = member(started, "getResult") as? OpenTheoryResult
             val planned = run?.let { field(it, "planned") as PlannedSearch }
+            theoryToInspect = planned?.theory
             val session = planned?.session
             val work = requireNotNull(member(state, "getWork")) as OpenTheoryWorkSink
             val counters = work.snapshot()
@@ -149,7 +154,7 @@ internal object LinearRootOpeningProfile {
             println(result)
             if (inspection == "lp-equalities") {
                 val terminal = run?.let { member(it, "advance") } as? OpenTheoryResult ?: decided
-                LinearLpEqualityInspection.inspect(planned?.theory, terminal, run != null, out)
+                LinearLpEqualityInspection.inspect(planned?.theory, terminal, run != null, out, checkpoint)
             }
         } finally {
             (run as? AutoCloseable)?.close()
