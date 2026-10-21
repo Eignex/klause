@@ -1317,17 +1317,17 @@ class ExactLiraSearchComponent private constructor(
         val threshold = comparison.bound
         return when (comparison.op) {
             LinearOp.LE -> when {
-                lower != null && (lower > threshold || comparison.strict && lower == threshold) -> false
-                upper != null && (upper < threshold || !comparison.strict && upper == threshold) -> true
+                lower != null && (lower > threshold || (comparison.strict && lower == threshold)) -> false
+                upper != null && (upper < threshold || (!comparison.strict && upper == threshold)) -> true
                 else -> null
             }
             LinearOp.GE -> when {
-                upper != null && (upper < threshold || comparison.strict && upper == threshold) -> false
-                lower != null && (lower > threshold || !comparison.strict && lower == threshold) -> true
+                upper != null && (upper < threshold || (comparison.strict && upper == threshold)) -> false
+                lower != null && (lower > threshold || (!comparison.strict && lower == threshold)) -> true
                 else -> null
             }
             LinearOp.EQ, LinearOp.NE -> when {
-                lower != null && lower > threshold || upper != null && upper < threshold ->
+                (lower != null && lower > threshold) || (upper != null && upper < threshold) ->
                     comparison.op == LinearOp.NE
                 lower == threshold && upper == threshold -> comparison.op == LinearOp.EQ
                 else -> null
