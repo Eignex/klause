@@ -21,6 +21,33 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `retained equalities reduce projection predicates without removing coordinates`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val expression = "(+ (* x0 x0) (* x1 x1) x0)"
+        for ((lower, upper) in listOf(
+            "(> (* 4 $expression) 5)" to "(< (* 3 $expression) 4)",
+            "(not (<= (* 4 $expression) 5))" to "(not (>= (* 3 $expression) 4))",
+        )) {
+            val source = SmtLibPolynomial.parse(
+                "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1)) (assert $lower) (assert $upper)",
+            )
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+                QfNraParams(maximumWork = 500_000, polynomialLimits = PolynomialLimits(maxMatrixCells = 9)))
+
+            val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+            assertTrue(algebraic.compare(witness.realValue(0),
+                algebraic.rational(BigFraction.ofLong(4).reciprocal())) > 0)
+            assertTrue(algebraic.compare(witness.realValue(0),
+                algebraic.rational(BigFraction.ofLong(3).reciprocal())) < 0)
+            val norm = algebraic.add(algebraic.power(witness.realValue(0), 2),
+                algebraic.power(witness.realValue(1), 2))
+            assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+            assertEquals(33, witness.realCount)
+        }
+    }
+
+    @Test
     fun `partial even powers retain zero boundary completions`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         for (predicate in listOf(
