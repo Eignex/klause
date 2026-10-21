@@ -67,8 +67,8 @@ data class TheoryParams(
     /**
      * Boolean branching for each feasibility traversal.
      *
-     * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner,
-     * and source order for other openings, including private queries and explicit hint allowances.
+     * [OpenBranching.Automatic] selects activity when a linear-real opening has a retained phase provider,
+     * or for a complete mixed worker with one default point owner. Other openings keep source order.
      * The theory decides the arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,
