@@ -186,4 +186,26 @@ class PresolveInvocationTest {
         assertEquals(2L, changed.input.occurrences)
         assertEquals(1L, changed.output.occurrences)
     }
+    @Test
+    fun `an affine rerun without touched equality shapes should charge only candidate visits`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 2) },
+            List(2) { Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3) },
+        ).bake()
+
+        Presolver.run(
+            problem, PresolveConfig.parse("off,+affine,+subsume"), PresolveContext(presolveBudget = budget),
+            budget.orSpent(Cancellation.Never),
+        )
+
+        val calls = budget.invocations.filter { it.pass == "affine" }
+        assertEquals(listOf(
+            PresolveInvocationOutcome.COMPLETE_MISS,
+            PresolveInvocationOutcome.ELIGIBILITY_SKIP,
+        ), calls.map { it.outcome })
+        assertEquals(2L, calls.last().work)
+        assertEquals(null, calls.last().input.occurrences)
+        assertEquals(2L, budget.entrySizeVisits)
+    }
 }
