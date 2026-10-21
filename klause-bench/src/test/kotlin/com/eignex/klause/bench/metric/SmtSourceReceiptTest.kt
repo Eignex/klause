@@ -10,6 +10,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.serialization.encodeToString
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty
 import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
@@ -22,6 +23,7 @@ class SmtSourceReceiptTest {
     @TempDir
     lateinit var directory: File
 
+    @Tag("external-source-checker")
     @ParameterizedTest
     @CsvSource("1,valid", "2,invalid")
     @EnabledOnOs(OS.LINUX)

@@ -900,7 +900,7 @@ infeasibility certificate is performed. Only an accepted supplied point receives
 feasibility and objective credit. Native proof claims remain uncredited; original
 claims remain in the `reported*` fields.
 
-The build downloads the official `miplib2017-testscript-v1.0.4.zip`, pinned to
+Explicit MIPLIB packaging downloads the official `miplib2017-testscript-v1.0.4.zip`, pinned to
 SHA-256 `37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9`.
 It extracts only the checker C++ sources, README, Makefile and MIT license, compiles
 the unchanged upstream main with GMP and zlib, and packages those files and the
@@ -909,6 +909,13 @@ Building requires a C++ compiler and GMP/zlib development packages. Invocation
 supports Linux with GNU `timeout`/`prlimit` and macOS with the system shell limits.
 Other hosts remain unverified. The packaged executable targets the build host;
 rebuild the bench when changing OS or architecture.
+
+Unit tests, `check` and `lintDocs` do not download or compile this checker.
+On the lab, `./gradlew :klause-bench:sourceValidationIntegrationTest` runs the
+MIPLIB and Dolmen external-checker integration cases. To include MIPLIB in the installed bench artifact, build
+with `./gradlew :klause-bench:installDist -Pbench.mpsSolchecker`.
+The ordinary unit tests retain local input qualification, SOL conversion, receipt
+interpretation, source custody and validation-routing checks.
 
 The adapter inserts a neutral `NAME` header or an empty `RHS` section when the
 original omits those optional headers required by MIPLIB. All original data
