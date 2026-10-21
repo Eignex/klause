@@ -14,6 +14,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.addExact
@@ -60,7 +61,9 @@ internal object DominatedVariables {
         problem: BakedProblem,
         objectiveIntCoeffs: Map<Int, Long>,
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
+        cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
+        if (cancellation()) return PassDelta()
         val safety = scanSafety(problem)
         // Allocated on the first pin: the copy is one entry per column, and a round on a wide model far
         // more often finds nothing to pin than something. Its nullness is also what carries the pinned
@@ -81,7 +84,8 @@ internal object DominatedVariables {
                 safety.upSafe[v] && c <= 0L -> pin(v, d.max)
             }
         }
-        val extra = safety.boolPins(objectiveBoolCoeffs)
+        val extra = safety.boolPins(objectiveBoolCoeffs) +
+            CoverColumnDominance.pins(problem, objectiveBoolCoeffs, cancellation)
         val pinned = domains
         if (pinned == null && extra.isEmpty()) return PassDelta()
         return PassDelta(addedFactors = extra, domains = pinned)
@@ -106,7 +110,9 @@ internal object DominatedVariables {
         problem: Problem,
         objectiveIntCoeffs: Map<Int, Long>,
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
+        cancellation: Cancellation = Cancellation.Never,
     ): SourceDelta {
+        if (cancellation()) return SourceDelta()
         val safety = scanSafety(problem)
         val bounds = problem.intBounds
         // Allocated on the first pin: the copy is two arrays over every column, and a round on a wide
@@ -131,7 +137,8 @@ internal object DominatedVariables {
                 safety.upSafe[v] && c <= 0L && bounds.hasUpper(v) -> pin(v, declared?.max ?: bounds.upper(v))
             }
         }
-        val extra = safety.boolPins(objectiveBoolCoeffs)
+        val extra = safety.boolPins(objectiveBoolCoeffs) +
+            CoverColumnDominance.pins(problem, objectiveBoolCoeffs, cancellation)
         val proved = tightening?.build()
         if (proved == null && extra.isEmpty()) return SourceDelta()
         return SourceDelta(addedFactors = extra, bounds = proved)

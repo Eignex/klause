@@ -219,6 +219,18 @@ reconstruction. Dual fixing pins a variable to a bound when no occurrence or the
 objective prefers the other direction. Folding, merging and dual fixing change the
 solution set.
 
+Boolean cover-column dominance extends dual fixing: an unfixed Boolean read only
+positively by unconditional cover clauses can be pinned false when a strictly
+cheaper, nonnegative-cost Boolean occurs in every one of its clauses. Costs use
+minimize sense; other readers, unit pins and finite root fixings exclude a column.
+Incidence signatures filter candidates from the smallest containing clause before
+exact subset checks. Indexing and comparison visits charge and poll the phase token;
+indexing has an absolute cap and comparisons have both a linear and absolute cap.
+Incomplete indexing publishes nothing; interrupted comparisons retain only completed
+pins. Strictly decreasing replacement costs make batched chains acyclic and preserve
+an optimum through their final covering column. This rule shares dual fixing's
+exclusion from counting, enumeration, sampling and other complete-coverage queries.
+
 ### Boolean reductions
 
 Finite probing and implication harvesting count only Booleans with live factor
