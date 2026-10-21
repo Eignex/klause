@@ -41,10 +41,11 @@ class CancellationTest {
 
     @Test
     fun `or compositions should poll repeated stateful predicates separately`() {
-        for (direct in listOf(false, true)) {
+        for (arity in 2..4) for (direct in listOf(false, true)) {
             var polls = 0
             val predicate = Cancellation { ++polls == 2 }
-            val token = (predicate or predicate) or Cancellation { error("polled after cancellation") }
+            var token = predicate or predicate
+            repeat(arity - 2) { token = token or Cancellation { error("polled after cancellation") } }
 
             val cancelled = if (direct) token.isCancelled() else token()
 

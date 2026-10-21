@@ -1392,9 +1392,6 @@ class ExactLiraSearchComponent private constructor(
             if (proved.interval) {
                 observeCompleteStage(if (proved.truth) "INTERVAL_GUARD_TRUE" else "INTERVAL_GUARD_FALSE")
             }
-            if (proved.residual) {
-                observeCompleteStage(if (proved.truth) "RESIDUAL_GUARD_TRUE" else "RESIDUAL_GUARD_FALSE")
-            }
         }
         return ComponentResult.Consistent
     }

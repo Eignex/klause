@@ -104,12 +104,8 @@ at most 64 definitions. Negative coefficients reverse endpoint selection, and a
 strict input preserves a strict derived endpoint. These interval reasons retain
 every contributing active bound witness and fixed-column premise; they install no
 numerical bound or row and retain no derived proof cache.
-A multi-column target can also be a scaled owned definition plus an already
-bounded residual term. Exact cancellation can leave both original sums bounded
-while their individual source coordinates stay free. Residual normalization only
-looks up existing definitions and retains both live bound reasons.
 Each charged sweep visits at most 1,024 source rows, considers 64 open guards and
-evaluates 4,096 entries, including interval products, residuals and definition visits.
+evaluates 4,096 entries, including interval products and reverse definition visits.
 It creates no numerical row or query. Private conditioned
 openings keep their own policy, and a partial point supplies no implication proof.
 Completed coverage is reused while matrix, bounds, row activity and pop revisions

@@ -151,6 +151,9 @@ private class OrCancellation(
             0 -> return false
             1 -> return tokens[0].isCancelled()
             2 -> return tokens[0].isCancelled() || tokens[1].isCancelled()
+            3 -> return tokens[0].isCancelled() || tokens[1].isCancelled() || tokens[2].isCancelled()
+            4 -> return tokens[0].isCancelled() || tokens[1].isCancelled() || tokens[2].isCancelled() ||
+                tokens[3].isCancelled()
         }
         for (token in tokens) if (token.isCancelled()) return true
         return false
