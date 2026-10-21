@@ -117,6 +117,7 @@ internal object CorpusFetcher {
             FetchMethod.TarballZst -> tarballZst(collection, dir)
             FetchMethod.Zip -> zip(collection, dir)
             is FetchMethod.Files -> files(collection, m, dir)
+            is FetchMethod.GbdFiles -> gbdFiles(collection, m, dir)
         }
         collection.extensionless?.let { (marker, ext) -> nameBare(dir, marker, ext) }
         cache.recordSize(collection.id)
@@ -188,6 +189,28 @@ internal object CorpusFetcher {
                 }
             }
             compress(dir)
+        }.onFailure { dir.deleteRecursively() }.getOrThrow()
+    }
+
+    /** One instance at a time, so the disk never holds more than one decompressed instance beside the stored ones. */
+    private fun gbdFiles(c: ExternalCollection, m: FetchMethod.GbdFiles, dir: File) {
+        dir.mkdirs()
+        // A failed fetch leaves no directory behind: a partial one would read as a fetched collection.
+        runCatching {
+            for (instance in m.instances) {
+                val plain = File(dir, instance.relPath)
+                plain.parentFile.mkdirs()
+                val packed = File(plain.path + ".xz")
+                URI(c.url.trimEnd('/') + "/file/" + instance.hash).toURL().openStream()
+                    .use { input -> packed.outputStream().use { input.copyTo(it) } }
+                runCmd(null, listOf("unxz", "-q", "-f", packed.absolutePath))
+                val hash = plain.inputStream().use(GbdHash::of)
+                require(hash == instance.hash) {
+                    "${c.id}: ${instance.relPath} has content hash $hash, not the pinned ${instance.hash}"
+                }
+                CorpusFiles.compress(plain)
+            }
+            log("fetched ${m.instances.size} instance(s) into '${dir.name}'")
         }.onFailure { dir.deleteRecursively() }.getOrThrow()
     }
 

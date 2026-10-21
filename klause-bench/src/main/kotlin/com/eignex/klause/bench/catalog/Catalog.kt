@@ -97,6 +97,16 @@ internal sealed interface FetchMethod {
         val extension: String,
         val convert: (String, String) -> List<Pair<String, String>>,
     ) : FetchMethod
+
+    /** Download each of [instances] from `<url>/file/<hash>`, where the Global Benchmark Database serves it as
+     *  `.cnf.xz`, keeping it only when its content hash is the pinned one. */
+    data class GbdFiles(val instances: List<GbdInstance>) : FetchMethod
+}
+
+/** A Global Benchmark Database CNF instance pinned by its content [hash]
+ *  ([com.eignex.klause.bench.source.GbdHash]), stored as [relPath] with the result the competition verified. */
+internal data class GbdInstance(val hash: String, val family: String, val name: String, val expected: Expected) {
+    val relPath: String get() = "$family/$name.cnf"
 }
 
 /** A collection fetched on demand, with [license] and the storage rationale in [reason]. */
