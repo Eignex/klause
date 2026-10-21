@@ -3,6 +3,10 @@ plugins {
     kotlin("plugin.serialization")
 }
 
+tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
+    testLogging.events(org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED)
+}
+
 // Coverage belongs to this solver; instrumenting dependencies adds startup work unrelated to its report.
 kover {
     currentProject {
