@@ -93,4 +93,23 @@ class PresolvePreparationTest {
         assertEquals(listOf(3L, 7L), budget.preparationStages.map { it.nativeWork })
         assertEquals(0L, budget.spent())
     }
+
+    @Test
+    fun `a composed preparation token should retain native work attribution`() {
+        val budget = PresolveBudget(0L)
+        var work = 0L
+        val containing = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        val problem = Problem(0, 0, emptyArray(), emptyList())
+
+        budget.observePreparation(
+            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, containing,
+        ) { token, _ -> (token or Cancellation.Never).charge(7L) }
+
+        assertEquals(7L, budget.preparationStages.single().nativeWork)
+        assertEquals(7L, work)
+        assertEquals(0L, budget.spent())
+    }
 }

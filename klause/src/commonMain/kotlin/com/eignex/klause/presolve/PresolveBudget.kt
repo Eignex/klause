@@ -67,13 +67,13 @@ class PresolveBudget(
 
     internal fun preparationCancellation(outer: Cancellation): Cancellation {
         val meter = outer.workMeter()
-        if (meter === nativeMeter || meter is PreparationWorkMeter && meter.budget === this) {
+        if (meter === nativeMeter || (meter is PreparationWorkMeter && meter.budget === this)) {
             return observeStops(outer)
         }
         val recording = PreparationWorkMeter(this, meter)
-        return observeStops(object : Cancellation by outer {
-            override fun invoke(): Boolean = isCancelled()
+        return observeStops(object : Cancellation {
             override fun isCancelled(): Boolean = outer()
+            override fun deadline() = outer.deadline()
             override fun workMeter(): WorkMeter? = if (activeInvocation != null) recording else outer.workMeter()
         })
     }
@@ -159,12 +159,13 @@ class PresolveBudget(
         Metered(nativeMeter) { remaining() == 0L } or outer,
     )
 
-    internal fun observeStops(token: Cancellation): Cancellation = object : Cancellation by token {
-        override fun invoke(): Boolean = isCancelled()
-
+    internal fun observeStops(token: Cancellation): Cancellation = object : Cancellation {
         override fun isCancelled(): Boolean = token().also { stopped ->
             if (stopped) activeInvocation?.interrupted = true
         }
+
+        override fun deadline() = token.deadline()
+        override fun workMeter() = token.workMeter()
     }
 
     private class Metered(private val meter: WorkMeter, private val fired: () -> Boolean) : Cancellation {
