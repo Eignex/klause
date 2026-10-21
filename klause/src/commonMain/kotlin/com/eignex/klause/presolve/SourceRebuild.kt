@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.BIG_ONE
@@ -42,6 +43,9 @@ internal sealed interface RebuildStep {
      * The equivalent-literal form: a merged variable takes its representative's value.
      */
     class CopyLiteral(val variable: Int, val source: Int) : RebuildStep
+
+    /** Give Boolean [variable] the truth of its defining integer comparison, before clause polarity. */
+    class ComparisonValue(val variable: Int, val intVar: Int, val op: LinearOp, val bound: Long) : RebuildStep
 
     /**
      * Set [variable] to the polarity that satisfies the first of [clauses] no other literal satisfies,
@@ -109,6 +113,8 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
     internal val steps: List<RebuildStep> = steps.map { step ->
         when (step) {
             is RebuildStep.CopyLiteral -> RebuildStep.CopyLiteral(step.variable, step.source)
+            is RebuildStep.ComparisonValue ->
+                RebuildStep.ComparisonValue(step.variable, step.intVar, step.op, step.bound)
             is RebuildStep.SatisfyClauses -> RebuildStep.SatisfyClauses(step.variable, step.clauses.map { it.copyOf() })
             is RebuildStep.RepairClause -> RebuildStep.RepairClause(step.clause.copyOf(), step.literal)
             is RebuildStep.AffineValue -> {
@@ -130,8 +136,10 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
     /** Whether this recovers nothing, so a lane can skip adapting its witness at all. */
     val isEmpty: Boolean get() = steps.isEmpty()
 
-    /** Whether any step recovers an integer column, so a lane knows if it must carry values at all. */
-    val touchesInts: Boolean get() = steps.any { it is RebuildStep.AffineValue || it is RebuildStep.QuotientValue }
+    /** Whether any step reads or recovers an integer column, so a lane knows if it must carry values. */
+    val touchesInts: Boolean get() = steps.any {
+        it is RebuildStep.AffineValue || it is RebuildStep.QuotientValue || it is RebuildStep.ComparisonValue
+    }
 
     /**
      * Recover the eliminated columns into [bools] and [ints], the reduced model's values.
@@ -141,6 +149,10 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
      */
     fun rebuildInto(bools: BooleanArray, ints: LongArray) {
         for (step in steps) {
+            if (step is RebuildStep.ComparisonValue) {
+                bools[step.variable] = comparisonHolds(step.op, ints[step.intVar].compareTo(step.bound))
+                continue
+            }
             if (step is RebuildStep.AffineValue) {
                 ints[step.variable] = affineValue(step) { bigIntOf(ints[it]) }.toLongExact()
                 continue
@@ -170,6 +182,10 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
      */
     fun rebuildInto(bools: BooleanArray, ints: Array<BigInt>) {
         for (step in steps) {
+            if (step is RebuildStep.ComparisonValue) {
+                bools[step.variable] = comparisonHolds(step.op, ints[step.intVar].compareTo(bigIntOf(step.bound)))
+                continue
+            }
             if (step is RebuildStep.AffineValue) {
                 ints[step.variable] = affineValue(step) { ints[it] }
                 continue
@@ -210,6 +226,13 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
         return result
     }
 
+    private fun comparisonHolds(op: LinearOp, order: Int): Boolean = when (op) {
+        LinearOp.LE -> order <= 0
+        LinearOp.EQ -> order == 0
+        LinearOp.GE -> order >= 0
+        LinearOp.NE -> order != 0
+    }
+
     /** Recover the Boolean columns alone, for a lane with no integer column to carry. */
     fun rebuildInto(bools: BooleanArray) {
         for (step in steps) rebuildBool(step, bools)
@@ -238,6 +261,8 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
 
                 // Recovered by the value evaluators, which alone know the width to compute it at.
                 is RebuildStep.AffineValue, is RebuildStep.QuotientValue -> Unit
+
+                is RebuildStep.ComparisonValue -> error("comparison reconstruction requires integer coordinates")
             }
         }
     }

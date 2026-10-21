@@ -162,8 +162,11 @@ surviving factor is an unconditional single-row Boolean `<=` knapsack with posit
 weights. Its activity bound uses cliques backed by retained clauses and
 cardinalities, so dropping a knapsack cannot remove its own justification.
 Comparison-clause folding replaces a clause over sole-use reified comparison
-indicators with one comparison disjunction. Duplicate-column merging replaces two
-columns with identical linear occurrences by their sum and splits the value back on
+indicators with one comparison disjunction. Source and finite reconstruction restore
+every consumed indicator from its defining comparison, before clause polarity, after
+later integer reconstructions and before original-source checking or output. These
+Boolean columns are excluded from direct definition and search hints. Duplicate-column
+merging replaces two columns with identical linear occurrences by their sum and splits the value back on
 reconstruction. Dual fixing pins a variable to a bound when no occurrence or the
 objective prefers the other direction. Folding, merging and dual fixing change the
 solution set.

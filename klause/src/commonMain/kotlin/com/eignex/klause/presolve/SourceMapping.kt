@@ -105,6 +105,8 @@ internal fun SourceMapping.retainedCoordinates(cancellation: Cancellation = Canc
             when (step) {
                 is RebuildStep.CopyLiteral -> if (step.variable in bools.indices) bools[step.variable] = -1
 
+                is RebuildStep.ComparisonValue -> if (step.variable in bools.indices) bools[step.variable] = -1
+
                 is RebuildStep.SatisfyClauses -> if (step.variable in bools.indices) bools[step.variable] = -1
 
                 is RebuildStep.RepairClause -> Lit.variable(step.literal).let {

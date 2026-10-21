@@ -177,7 +177,7 @@ internal fun SourceMapping.lift(assignment: OpenTheoryAssignment): OpenTheoryAss
  * pass that renumbered instead would put an id past the end of the witness it produced.
  *
  * Integer values are read at arbitrary precision, which is the width an open route answers in; they are
- * materialized only when a step recovers one, so a Boolean-only reconstruction costs no parsing.
+ * materialized only when a step reads or recovers one, so literal-only reconstruction costs no parsing.
  */
 internal fun SourceRebuilds.lift(
     assignment: OpenTheoryAssignment,

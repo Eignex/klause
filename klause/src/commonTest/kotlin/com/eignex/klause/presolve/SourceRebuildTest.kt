@@ -1,17 +1,68 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.lift
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.plus
 import com.eignex.klause.util.shl
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SourceRebuildTest {
+    @Test
+    fun `comparison reconstruction should read later recovered integers before earlier Boolean aliases`() {
+        val passes = listOf(
+            SourceRebuilds(listOf(RebuildStep.CopyLiteral(1, Lit.make(0, false)))),
+            SourceRebuilds(listOf(RebuildStep.ComparisonValue(0, 0, LinearOp.EQ, 2))),
+            SourceRebuilds(listOf(RebuildStep.AffineValue(0, 1, intArrayOf(1), longArrayOf(1), 1))),
+        )
+        val rebuild = SourceRebuilds.compose(passes)
+        val sample = Sample(booleanArrayOf(false, true), longArrayOf(0, 1),
+            doubleArrayOf(0.5), listOf(BigFraction.ofLong(1) / BigFraction.ofLong(2)))
+
+        val finite = assertNotNull(rebuild.asSampleLift())(sample)
+        val open = rebuild.lift(OpenTheoryAssignment.Sampled(sample), 2, 2)
+
+        assertContentEquals(booleanArrayOf(true, false), finite.bools)
+        assertContentEquals(longArrayOf(2, 1), finite.ints)
+        assertEquals(sample.exactReals, finite.exactReals)
+        assertContentEquals(sample.reals, finite.reals)
+        assertTrue(open.boolValue(0))
+        assertFalse(open.boolValue(1))
+        assertEquals("2", open.intValue(0))
+        assertEquals("1/2", open.realValue(0))
+    }
+
+    @Test
+    fun `comparison reconstruction should preserve exact coordinates beyond Long`() {
+        val huge = bigIntOf(Long.MAX_VALUE) + BIG_ONE
+        val exact = listOf(huge)
+        val sample = Sample(booleanArrayOf(false, true, true, false), longArrayOf(), exactInts = exact)
+        val rebuild = SourceRebuilds(LinearOp.entries.mapIndexed { index, op ->
+            RebuildStep.ComparisonValue(index, 0, op, Long.MAX_VALUE)
+        })
+
+        val restored = assertNotNull(rebuild.asSampleLift())(sample)
+        val open = rebuild.lift(OpenTheoryAssignment.Sampled(sample), 4, 1)
+
+        assertContentEquals(booleanArrayOf(false, false, true, true), restored.bools)
+        assertEquals(exact, restored.exactInts)
+        assertEquals(huge.toString(), open.intValue(0))
+        for (index in LinearOp.entries.indices) assertEquals(restored.boolValue(index), open.boolValue(index))
+        assertTrue(rebuild.touchesInts)
+    }
+
     private fun bools(vararg values: Boolean) = booleanArrayOf(*values)
 
     private fun pos(v: Int) = Lit.make(v, true)
