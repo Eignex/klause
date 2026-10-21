@@ -25,29 +25,33 @@ class PolynomialBooleanRegionsTest {
     fun `numeric cores skip irrelevant completions without losing feasible cubes`() {
         for (refutedTruth in listOf(false, true)) {
             val arithmetic = PolynomialArithmetic()
-            val relation = if (refutedTruth) PolynomialRelation.LT else PolynomialRelation.GE
-            val atoms = listOf(PolynomialAtom(arithmetic.power(Polynomial.variable(0), 2), relation),
+            val lower = if (refutedTruth) PolynomialRelation.GT else PolynomialRelation.LE
+            val upper = if (refutedTruth) PolynomialRelation.LT else PolynomialRelation.GE
+            val atoms = listOf(PolynomialAtom(Polynomial.variable(0), lower),
+                PolynomialAtom(Polynomial.variable(0), upper),
                 PolynomialAtom(Polynomial.variable(1), PolynomialRelation.GT))
-            val nodes = listOf(FormulaNode.Atom(0), FormulaNode.Atom(1), FormulaNode.BooleanVariable(0),
-                FormulaNode.Not(0), FormulaNode.Not(1), FormulaNode.Not(2),
-                FormulaNode.Junction(intArrayOf(0, 3), conjunction = false),
-                FormulaNode.Junction(intArrayOf(1, 4), conjunction = false),
-                FormulaNode.Junction(intArrayOf(2, 5), conjunction = false),
-                FormulaNode.Junction(intArrayOf(6, 7, 8), conjunction = true))
-            val regions = PolynomialBooleanRegions(nodes, 9, atoms, arithmetic)
+            val nodes = listOf(FormulaNode.Atom(0), FormulaNode.Atom(1), FormulaNode.Atom(2),
+                FormulaNode.BooleanVariable(0), FormulaNode.Not(0), FormulaNode.Not(1),
+                FormulaNode.Not(2), FormulaNode.Not(3),
+                FormulaNode.Junction(intArrayOf(0, 4), conjunction = false),
+                FormulaNode.Junction(intArrayOf(1, 5), conjunction = false),
+                FormulaNode.Junction(intArrayOf(2, 6), conjunction = false),
+                FormulaNode.Junction(intArrayOf(3, 7), conjunction = false),
+                FormulaNode.Junction(intArrayOf(8, 9, 10, 11), conjunction = true))
+            val regions = PolynomialBooleanRegions(nodes, 12, atoms, arithmetic)
             val feasible = ArrayList<Pair<Boolean?, Boolean?>>()
             var refuted = 0
 
             while (regions.hasNext()) {
                 val region = regions.next() ?: continue
-                if (region.atoms[0] == refutedTruth) {
-                    regions.refuted(region, listOf(0))
+                if (region.atoms[0] == refutedTruth && region.atoms[1] == refutedTruth) {
+                    regions.refuted(region, listOf(0, 1))
                     refuted++
-                } else feasible.add(region.atoms[1] to region.bools[0])
+                } else feasible.add(region.atoms[2] to region.bools[0])
             }
 
             assertEquals(1, refuted)
-            assertEquals(4, feasible.size)
+            assertEquals(12, feasible.size)
             assertEquals(setOf(false to false, false to true, true to false, true to true), feasible.toSet())
         }
     }
