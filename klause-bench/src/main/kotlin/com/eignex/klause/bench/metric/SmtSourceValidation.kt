@@ -87,6 +87,7 @@ internal object SmtSourceValidation {
         evidenceRoot: File,
         tool: Tool?,
         producerBytes: ByteArray? = null,
+        producerBindings: Map<String, String>? = null,
     ): Result {
         val scope = eligible(record) ?: return Result(unknown("no eligible original SMT claim to check"))
         val started = System.nanoTime()
@@ -110,7 +111,7 @@ internal object SmtSourceValidation {
             val resolved = tool ?: SmtSourceTools.resolve(scope, out)
             val setupMs = (System.nanoTime() - started) / 1_000_000
             val result = resolved.use {
-                validateOriginal(source, record, raw, out, resolved, producer)
+                validateOriginal(source, record, raw, out, resolved, producer, producerBindings)
             }
             check(SolveEvidence.sourceHashes(ref) == record.sourceHashes) { "original source changed during checking" }
             result.copy(stats = captured + result.stats + ("sourceValidationSetupMs" to setupMs.toString()))
@@ -128,11 +129,16 @@ internal object SmtSourceValidation {
         out: File,
         tool: Tool,
         producerBytes: ByteArray = Reports.json.encodeToString(record).toByteArray(),
+        producerBindings: Map<String, String>? = null,
     ): Result {
         val scope = requireNotNull(eligible(record))
         require(source.size <= MAX_SOURCE_BYTES) { "original source exceeds checker limit" }
         require(record.sourceHashes == mapOf("model" to sha256(source))) { "original source hash differs" }
-        require(record.sourceOutputSha256 == sha256(raw.toByteArray())) { "producer stdout hash differs" }
+        if (record.sourceOutputSha256 == null) {
+            require(record.validationPolicy == "reported-result-v1" && producerBindings != null) {
+                "producer stdout binding is missing"
+            }
+        } else require(record.sourceOutputSha256 == sha256(raw.toByteArray())) { "producer stdout hash differs" }
         require(producerBytes.size <= MAX_RECORD_BYTES) { "producer record exceeds checker limit" }
         require(Reports.json.decodeFromString<SolveRecord>(producerBytes.decodeToString()) == record) {
             "producer record bytes differ"
@@ -147,6 +153,9 @@ internal object SmtSourceValidation {
             "stdout.txt" to raw.toByteArray(),
             "record.json" to producerBytes,
         )
+        if (producerBindings != null) require(producerBindings == inputs.mapValues { sha256(it.value) }) {
+            "producer input bindings differ"
+        }
         require(inputs.getValue("model.smt2").size <= MAX_MODEL_BYTES &&
             inputs.getValue("stdout.txt").size <= MAX_MODEL_BYTES &&
             inputs.getValue("record.json").size <= MAX_RECORD_BYTES) { "producer output exceeds checker limit" }

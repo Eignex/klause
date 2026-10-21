@@ -43,7 +43,7 @@ internal object SmtSourceReplay {
         require(bytes.size <= 16 * 1024 * 1024) { "expanded replay request exceeds limit" }
         val request = Reports.json.parseToJsonElement(bytes.decodeToString(throwOnInvalidSequence = true)).jsonObject
         val schema = request.getValue("schema").jsonPrimitive.int
-        require(schema in 1..2)
+        require(schema in 1..3)
         val claimStartTimeoutMs = request["claimStartTimeoutMs"]?.jsonPrimitive?.long ?: 120_000L
         require(claimStartTimeoutMs in 1L..240_000L) { "claim start timeout must be between 1 and 240000 ms" }
         val refutationSolver = when (request["refutationSolver"]?.jsonPrimitive?.content ?: "z3") {
@@ -141,6 +141,8 @@ internal object SmtSourceReplay {
                 val model = element.jsonObject
                 val producerJson = model.getValue("producerJson").jsonPrimitive.content
                 val record = Reports.json.decodeFromString<SolveRecord>(producerJson)
+                val producerBindings = if (schema == 3) model.getValue("bindings").jsonObject
+                    .mapValues { it.value.jsonPrimitive.content } else null
                 val scope = scope(model)
                 require(SmtSourceValidation.eligible(record) == scope)
                 require(record.sourceHashes["model"] == model.getValue("sourceSha256").jsonPrimitive.content)
@@ -154,7 +156,7 @@ internal object SmtSourceReplay {
                 require(record.problem == ref.name) { "producer problem identity differs" }
                 val result = SmtSourceValidation.validateSaved(ref, record,
                     model.getValue("stdout").jsonPrimitive.content, File(out, "case-$index"),
-                    tools.getValue(scope).copy(owned = false), producerJson.toByteArray())
+                    tools.getValue(scope).copy(owned = false), producerJson.toByteArray(), producerBindings)
                 results += buildJsonObject {
                     put("index", index)
                     put("scope", scope)

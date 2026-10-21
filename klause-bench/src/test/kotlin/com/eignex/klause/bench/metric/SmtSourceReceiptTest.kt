@@ -178,6 +178,75 @@ class SmtSourceReceiptTest {
         assertEquals(true, failure.message.orEmpty().contains("differs"))
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    @EnabledOnOs(OS.LINUX)
+    fun `reported producers retain their exact bytes when separate inputs are bound`(feasible: Boolean) {
+        val source = "(set-logic QF_LIA)\n(assert true)\n(check-sat)\n".toByteArray()
+        val model = "(\n)".takeIf { feasible }
+        val raw = if (feasible) "sat\n$model\n" else "unsat\n"
+        val record = SolveRecord("original", "klause", "cp", 1, "free", 3, 10_000,
+            "satisfy", false, feasible, null, null, proven = !feasible, stats = mapOf("exit" to "0"),
+            gitSha = "producer", timestamp = "t", command = "cli original.smt2", finalWitness = model,
+            sourceHashes = mapOf("model" to sha256(source)), validationPolicy = "reported-result-v1")
+        val producer = (Reports.json.encodeToString(record) + "\n").toByteArray()
+        val bindings = mapOf(
+            "source.smt2" to source,
+            "model.smt2" to model.orEmpty().toByteArray(),
+            "response.rsmt2" to (if (feasible) "sat\n$model\n" else "").toByteArray(),
+            "record.json" to producer,
+            "stdout.txt" to raw.toByteArray(),
+        ).mapValues { sha256(it.value) }
+        val binary = File(directory, "tool").absoluteFile.apply {
+            writeText(if (feasible) "#!/bin/sh\nexit 0\n" else "#!/bin/sh\nprintf 'unsat\\n'\n")
+            check(setExecutable(true, true))
+        }
+        val out = File(directory, "check")
+
+        val result = SmtSourceValidation.validateOriginal(source, record, raw, out,
+            SmtSourceValidation.Tool(binary, sha256(binary.readBytes())), producer, bindings)
+
+        assertEquals("valid", result.validation.status)
+        assertContentEquals(producer, File(out, "record.json").readBytes())
+        assertEquals(raw, File(out, "stdout.txt").readText())
+        assertEquals(record, Reports.json.decodeFromString<SolveRecord>(File(out, "record.json").readText()))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["source.smt2", "model.smt2", "response.rsmt2", "record.json", "stdout.txt",
+        "missing", "extra", "absent", "foreign-policy", "embedded-mismatch"])
+    fun `reported replay rejects unbound or inconsistent inputs before invoking the tool`(input: String) {
+        val source = "(set-logic QF_LIA)\n(assert false)\n(check-sat)\n".toByteArray()
+        val raw = "unsat\n"
+        val record = SolveRecord("original", "klause", "cp", 1, "free", 3, 10_000,
+            "satisfy", false, false, null, null, proven = true, stats = mapOf("exit" to "0"),
+            gitSha = "producer", timestamp = "t", command = "cli original.smt2",
+            sourceHashes = mapOf("model" to sha256(source)),
+            sourceOutputSha256 = "0".repeat(64).takeIf { input == "embedded-mismatch" },
+            validationPolicy = if (input == "foreign-policy") SMT_SOURCE_POLICY else "reported-result-v1")
+        val producer = Reports.json.encodeToString(record).toByteArray()
+        val bindings = mapOf(
+            "source.smt2" to sha256(source), "model.smt2" to sha256(byteArrayOf()),
+            "response.rsmt2" to sha256(byteArrayOf()), "record.json" to sha256(producer),
+            "stdout.txt" to sha256(raw.toByteArray()),
+        )
+        val changed = when (input) {
+            "absent" -> null
+            "missing" -> bindings - "stdout.txt"
+            "extra" -> bindings + ("extra" to sha256(byteArrayOf()))
+            "foreign-policy", "embedded-mismatch" -> bindings
+            else -> bindings + (input to "0".repeat(64))
+        }
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            SmtSourceValidation.validateOriginal(source, record, raw, directory,
+                SmtSourceValidation.Tool(File(directory, "absent").absoluteFile, "0".repeat(64)),
+                producer, changed)
+        }
+
+        assertTrue(failure.message.orEmpty().contains("producer"))
+    }
+
     @Test
     @EnabledOnOs(OS.LINUX)
     fun `tool timeout should withhold a completed response`() {

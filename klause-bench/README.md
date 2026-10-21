@@ -900,6 +900,11 @@ claims after two minutes by default. Set `claimStartTimeoutMs` in the request to
 allow up to four minutes, including tool setup, and record that limit in the summary.
 Individual checks retain the ordinary 35-second process limit. Allow separately
 for harness setup, the final check, retrieval and cleanup in the enclosing job limit.
+Schema 3 requires all five exact input hashes in `bindings`. It accepts an unchanged
+`reported-result-v1` producer without an embedded stdout hash only when those hashes
+bind the original source, model, response, producer JSON bytes and separately saved
+stdout. Existing embedded stdout hashes must still agree. The receipt retains the
+original producer bytes and policy; the replay does not enrich or rewrite them.
 Replay supplies no new native decision, proof certificate, optimization or
 performance credit.
 
