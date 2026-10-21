@@ -103,8 +103,10 @@ class PolynomialStrategyAdaptersTest {
         val params = PolynomialTheoryParams(maximumWork = 5_000_000)
 
         println("full frontend transition: solve entered")
-        val result = OpenTheoryPipeline.execute(request, params, FiniteEngine.BACKTRACK).result
+        val execution = OpenTheoryPipeline.execute(request, params, FiniteEngine.BACKTRACK)
+        val result = execution.result
         println("full frontend transition: solve returned")
+        println("full frontend transition: native ${execution.stats}")
 
         assertIs<OpenTheoryResult.Sat>(result, result.toString())
         println("full frontend transition: assertion passed")
