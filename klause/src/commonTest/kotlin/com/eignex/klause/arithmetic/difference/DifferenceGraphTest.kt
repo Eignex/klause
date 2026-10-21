@@ -216,7 +216,7 @@ class DifferenceGraphTest {
         var cycle: IntArray? = null
 
         val result = graph.potentials(
-            cancellation = Cancellation { charged > 0L },
+            cancelled = { charged > 0L },
             onNegativeCycle = { cycle = it },
             onWork = { charged += it },
         )

@@ -169,10 +169,6 @@ meter and releases it before native execution; see
 
 ### Units and boundaries
 
-The CLI compares integer millisecond readings from its platform monotonic clock
-against one absolute deadline. Loading and solving share that instant, and retained
-routing scopes observe changes to it without renewing their work allowance.
-
 | Allowance | Unit and owner | Stop surface |
 |---|---|---|
 | CLI `-t` | Milliseconds, one deadline anchored before loading | Cooperative cancellation; mandatory work can overrun |

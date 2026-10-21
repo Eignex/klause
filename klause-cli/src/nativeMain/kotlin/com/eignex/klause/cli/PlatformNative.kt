@@ -3,7 +3,6 @@ package com.eignex.klause.cli
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 import kotlin.system.exitProcess
-import kotlin.time.TimeSource
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.toKString
@@ -23,10 +22,6 @@ import platform.posix.popen
 import platform.posix.rewind
 import platform.posix.stderr
 import platform.posix.stdout
-
-private val clockOrigin = TimeSource.Monotonic.markNow()
-
-internal actual fun nowMillis(): Long = clockOrigin.elapsedNow().inWholeMilliseconds
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun cliProp(name: String): String? = getenv(name.uppercase().replace('.', '_'))?.toKString()

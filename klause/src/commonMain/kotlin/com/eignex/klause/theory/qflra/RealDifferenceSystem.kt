@@ -35,7 +35,7 @@ internal class RealDifferenceSystem private constructor(
             guard == ALWAYS || bools[Lit.variable(guard)] == if (Lit.isPositive(guard)) 1 else 0
         }
         var cycle: IntArray? = null
-        val result = graph.potentials(stop, active, potentials,
+        val result = graph.potentials(active, stop::invoke, potentials,
             onNegativeCycle = { cycle = it }, onWork = onWork)
         return when (result) {
             Potentials.Abandoned -> Result.Interrupted

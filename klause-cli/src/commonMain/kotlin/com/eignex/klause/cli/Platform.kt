@@ -3,6 +3,9 @@ package com.eignex.klause.cli
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.readText
+import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 // Platform seams for the CLI: the complete list of what differs between the JVM
 // distribution and the native executables. Everything else is common code.
@@ -48,8 +51,15 @@ internal expect fun openFileSource(path: String): CharSource
 /** Read [path] fully into a [String] through [openFileSource], for a consumer that needs the whole text. */
 internal fun readTextFile(path: String): String = openFileSource(path).readText()
 
+private val timeOrigin = TimeSource.Monotonic.markNow()
+
 /** Monotonic clock for deadlines — only ever compared against itself. */
-internal expect fun nowMillis(): Long
+internal fun nowMillis(): Long = timeOrigin.elapsedNow().inWholeMilliseconds
+
+internal fun deadlineMarkAtMillis(instant: Long): ComparableTimeMark? {
+    val offset = instant.milliseconds
+    return if (offset.isFinite()) timeOrigin + offset else null
+}
 
 internal fun fileName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
 
