@@ -19,12 +19,49 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PresolvePipelineTest {
+    @Test
+    fun `disabled elective passes should retain mandatory bake cost separately`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val problem = Problem(1, 0, emptyArray(), emptyList())
+
+        PresolvePipeline.run(problem, null, PresolveConfig.NONE, false, presolveBudget = budget)
+
+        val stage = budget.preparationStages.single { it.stage == PresolvePreparationStage.ROOT_BAKE }
+        assertTrue(stage.work > 0L)
+        assertEquals(budget.spent(), stage.work)
+        assertTrue(budget.invocations.isEmpty())
+    }
+
+    @Test
+    fun `wide prebake LP work should remain attributed with the harvest disabled`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 1_000_000_000) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+
+        PresolvePipeline.run(problem, null, PresolveConfig.NONE, false, presolveBudget = budget)
+
+        val lp = budget.preparationStages.filter {
+            it.stage == PresolvePreparationStage.PRE_BAKE_LP_FEASIBILITY ||
+                it.stage == PresolvePreparationStage.PRE_BAKE_LP_BOUNDS
+        }
+        assertEquals(2, lp.size)
+        assertTrue(lp.all { it.work > 0L })
+        assertEquals(budget.spent(), budget.preparationStages.sumOf { it.work })
+        assertTrue(budget.invocations.isEmpty())
+    }
+
     @Test
     fun `automatic clausal satisfaction harvest should skip before LP construction`() {
         val problem = Problem(

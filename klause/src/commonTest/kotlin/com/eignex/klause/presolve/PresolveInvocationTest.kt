@@ -147,7 +147,9 @@ class PresolveInvocationTest {
         assertTrue(substitution.rebuildWork > 0L)
         assertTrue(budget.invocations.any { it.pass == "probe-failed-literals" && it.rebuildWork > 0L })
         assertTrue(budget.invocations.all { it.rebuildWork <= it.work })
-        assertTrue(budget.invocations.sumOf { it.work } < budget.spent())
+        assertEquals(
+            budget.spent(), budget.invocations.sumOf { it.work } + budget.preparationStages.sumOf { it.work },
+        )
         assertTrue(result.changed)
     }
 
@@ -226,8 +228,10 @@ class PresolveInvocationTest {
         val effort = config.effortStats(budget, kotlin.time.Duration.ZERO)
         val work = effort.invocations.sumOf { it.work }
 
-        assertEquals(budget.spent(), work + requireNotNull(effort.unattributedWork))
-        assertTrue(requireNotNull(effort.unattributedWork) > 0L)
+        assertEquals(
+            budget.spent(), work + effort.preparationStages.sumOf { it.work } + requireNotNull(effort.unattributedWork),
+        )
+        assertEquals(0L, effort.unattributedWork)
         assertEquals(budget.entrySizeVisits, effort.entrySizeVisits)
         assertEquals(budget.invocations.size, effort.invocations.size)
     }

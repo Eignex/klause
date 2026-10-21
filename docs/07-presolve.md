@@ -157,11 +157,22 @@ construction SAC tiers, binary-column substitution, LP harvest and difference po
 Each records its pass and lane, exclusive elapsed time and work, the construction and
 propagation share of that work, and whether eligibility rejected it, analysis completed
 empty, reductions survived, a refutation completed or analysis stopped. Nested SAC work
-belongs to its own observation. Invocation work plus mandatory or shared unattributed
-work equals the phase total; neither a rebuild nor an interrupted call loses its charge.
+belongs to its own observation. Separate preparation observations attribute wide-domain
+pre-bake LPs, root and engine bakes, finite-session construction and materialization,
+source encoder rebuilding, and finite exact-real difference assembly. These operations
+retain observations even when the elective pass catalogue is disabled. Pass work plus
+preparation work and any unattributed remainder equals the phase total; neither a rebuild
+nor an interrupted call loses its charge.
 Factor and column dimensions, available variable-occurrence counts and explicit column
 narrowings describe reduction yield without another whole-model scan. Yield alone does
 not establish an improvement in solve cost.
+
+Preparation observations preserve each operation's cancellation and work meter.
+Operations under containing controls report native visits separately from phase units,
+with existing containing charges forwarded unchanged. Observation does not reprice
+those visits against the elective allowance or renew it. Nested observations own
+their elapsed time and charges exclusively, and the temporary native recorder restores
+the containing meter when preparation ends.
 
 Namespace and incremental candidate-shape checks precede full-model pass entry work.
 Entry size is cached for an immutable factor revision; the finite session updates its

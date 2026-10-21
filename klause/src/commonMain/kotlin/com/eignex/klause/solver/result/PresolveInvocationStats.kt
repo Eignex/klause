@@ -22,6 +22,8 @@ enum class PresolveInvocationOutcome {
     REFUTED,
     /** Analysis stopped; separately completed reductions can remain sound. */
     INTERRUPTED,
+    /** A preparation operation completed. */
+    COMPLETE,
 }
 
 /** Constant-time dimensions; columns include reconstructed or unused declarations. */
@@ -34,6 +36,8 @@ class PresolveSizeStats internal constructor(
     val integers: Int,
     /** Variable occurrences when entry analysis already computed them; null for cheap skips. */
     val occurrences: Long? = null,
+    /** Declared real columns. */
+    val reals: Int = 0,
 )
 
 /** One attempted presolve analysis, including empty and interrupted calls. */
@@ -58,4 +62,6 @@ class PresolveInvocationStats internal constructor(
     val narrowedColumns: Int = 0,
     /** Newly fixed columns explicitly reported by the pass or construction tier. */
     val fixedColumns: Int = 0,
+    /** Native visits outside the phase currency; existing containing charges are forwarded unchanged. */
+    val nativeWork: Long = 0L,
 )

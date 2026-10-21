@@ -18,8 +18,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
-import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -27,6 +27,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.BuiltInEncoderProvider
@@ -46,6 +47,28 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class SourceExecutionTest {
+    @Test
+    fun `polynomial source encoder rebuilding should retain its containing work`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            ContinuousProduct(0, 0, 1),
+        ), numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val original = source.pipelineRequest()
+        val budget = PresolveBudget(1_000_000)
+        val preparation = original.prepareSource(
+            PresolveConfig.parse("off,+bve"), null, Cancellation.Never, Cancellation.Never, budget,
+        )
+
+        val prepared = original.afterSourcePreparation(preparation, Cancellation.Never)
+
+        assertNotNull(prepared)
+        assertTrue(preparation.changed)
+        val stage = budget.preparationStages.single { it.stage == PresolvePreparationStage.SOURCE_ENCODER }
+        assertTrue(stage.nativeWork > 0L)
+        assertEquals(0L, stage.work)
+    }
+
     @Test
     fun `polynomial source probing should reduce Booleans beside a nonlinear real factor`() {
         val source = Problem(2, 0, emptyArray(), arrayOf(

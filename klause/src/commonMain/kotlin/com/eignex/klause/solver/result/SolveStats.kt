@@ -282,7 +282,11 @@ data class PresolveEffortStats(
     val invocations: List<PresolveInvocationStats> = emptyList(),
     /** Factors visited to compute aggregate entry size; null without a meter. */
     val entrySizeVisits: Long? = null,
+    /** Non-catalogue preparation costs, including work outside the phase allowance. */
+    val preparationStages: List<PresolvePreparationStats> = emptyList(),
 ) {
-    /** Shared or mandatory work outside observed invocations; reconciles with [work]. */
-    val unattributedWork: Long? get() = work?.minus(invocations.sumOf { it.work })
+    /** Phase work outside observed passes and preparation stages; reconciles with [work]. */
+    val unattributedWork: Long? get() = work?.let {
+        it - invocations.sumOf { invocation -> invocation.work } - preparationStages.sumOf { stage -> stage.work }
+    }
 }

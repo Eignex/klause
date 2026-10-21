@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.solver.result.PresolveInvocationStats
+import com.eignex.klause.solver.result.PresolvePreparationStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 
@@ -32,11 +33,15 @@ class PresolveBudget(
     private var spent = 0L
     internal var activeInvocation: PresolveInvocation? = null
     private val observations = ArrayList<PresolveInvocationStats>()
+    private val preparation = ArrayList<PresolvePreparationStats>()
     private var entryFactors: Array<Factor>? = null
     private var cachedEntryUnits = 0L
 
     /** Invocation observations in completion order, including nested construction stages. */
     val invocations: List<PresolveInvocationStats> get() = observations.toList()
+
+    /** Preparation operations outside the elective pass catalogue. */
+    val preparationStages: List<PresolvePreparationStats> get() = preparation.toList()
 
     /** Factors visited solely to compute aggregate entry size, across model revisions. */
     var entrySizeVisits: Long = 0L
@@ -54,6 +59,27 @@ class PresolveBudget(
 
     internal fun recordInvocation(observation: PresolveInvocationStats) {
         observations.add(observation)
+    }
+
+    internal fun recordPreparation(observation: PresolvePreparationStats) {
+        preparation.add(observation)
+    }
+
+    internal fun preparationCancellation(outer: Cancellation): Cancellation {
+        val meter = outer.workMeter()
+        if (meter === nativeMeter || meter is PreparationWorkMeter && meter.budget === this) {
+            return observeStops(outer)
+        }
+        val recording = PreparationWorkMeter(this, meter)
+        return observeStops(object : Cancellation by outer {
+            override fun invoke(): Boolean = isCancelled()
+            override fun isCancelled(): Boolean = outer()
+            override fun workMeter(): WorkMeter? = if (activeInvocation != null) recording else outer.workMeter()
+        })
+    }
+
+    internal fun recordPreparationWork(units: Long) {
+        activeInvocation?.let { it.nativeWork = saturatedSum(it.nativeWork, units) }
     }
 
     private val nativeMeter = PresolveRootWorkMeter(this)
@@ -154,8 +180,25 @@ private class PresolveRootWorkMeter(val budget: PresolveBudget) : RootWorkMeter 
     override fun propagation(units: Long) = budget.recordPropagation(units)
 }
 
+private class PreparationWorkMeter(val budget: PresolveBudget, private val outer: WorkMeter?) : RootWorkMeter {
+    override fun charge(units: Long) {
+        budget.recordPreparationWork(units)
+        outer?.charge(units)
+    }
+
+    override fun construction(entries: Long) {
+        budget.recordPreparationWork(entries)
+        (outer as? RootWorkMeter)?.construction(entries)
+    }
+
+    override fun propagation(units: Long) {
+        budget.recordPreparationWork(units)
+        (outer as? RootWorkMeter)?.propagation(units)
+    }
+}
+
 internal fun Cancellation.recordPresolveProbe() {
-    (workMeter() as? PresolveRootWorkMeter)?.budget?.recordProbe()
+    presolveBudget()?.recordProbe()
 }
 
 private fun saturatedSum(total: Long, units: Long): Long =
@@ -164,5 +207,8 @@ private fun saturatedSum(total: Long, units: Long): Long =
 private fun weighted(units: Long, weight: Long): Long =
     if (units > Long.MAX_VALUE / weight) Long.MAX_VALUE else units * weight
 
-internal fun Cancellation.presolveBudget(): PresolveBudget? =
-    (workMeter() as? PresolveRootWorkMeter)?.budget
+internal fun Cancellation.presolveBudget(): PresolveBudget? = when (val meter = workMeter()) {
+    is PresolveRootWorkMeter -> meter.budget
+    is PreparationWorkMeter -> meter.budget
+    else -> null
+}

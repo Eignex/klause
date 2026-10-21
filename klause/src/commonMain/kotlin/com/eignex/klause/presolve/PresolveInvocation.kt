@@ -5,6 +5,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveInvocationStats
 import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolvePreparationStage
+import com.eignex.klause.solver.result.PresolvePreparationStats
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
@@ -32,6 +34,7 @@ internal class PresolveInvocation(
     val start = TimeSource.Monotonic.markNow()
     var work = 0L
     var rebuildWork = 0L
+    var nativeWork = 0L
     var childrenElapsed = Duration.ZERO
     var outcome = PresolveInvocationOutcome.COMPLETE_MISS
     var interrupted = false
@@ -40,16 +43,25 @@ internal class PresolveInvocation(
     var outputOccurrences: Long? = null
 }
 
-internal fun Problem.presolveSize() = PresolveSizeStats(factors.size, numBoolVars, numIntVars)
+internal fun Problem.presolveSize() = PresolveSizeStats(factors.size, numBoolVars, numIntVars, reals = numRealVars)
 
 internal fun <T> PresolveBudget?.observe(
     pass: PresolvePass,
     lane: PresolveLane,
     size: () -> PresolveSizeStats,
     action: (PresolveInvocation?) -> T,
+): T = observe(pass.id, lane, size, null, action)
+
+internal fun <T> PresolveBudget?.observe(
+    id: String,
+    lane: PresolveLane,
+    size: () -> PresolveSizeStats,
+    preparationStage: PresolvePreparationStage?,
+    action: (PresolveInvocation?) -> T,
 ): T {
     if (this == null) return action(null)
-    val invocation = PresolveInvocation(pass.id, lane, size())
+    val invocation = PresolveInvocation(id, lane, size())
+    if (preparationStage != null) invocation.outcome = PresolveInvocationOutcome.COMPLETE
     val parent = activeInvocation
     activeInvocation = invocation
     var completed = false
@@ -64,7 +76,15 @@ internal fun <T> PresolveBudget?.observe(
         ) {
             PresolveInvocationOutcome.INTERRUPTED
         } else invocation.outcome
-        recordInvocation(PresolveInvocationStats(
+        val output = size().let {
+            PresolveSizeStats(it.factors, it.booleans, it.integers, invocation.outputOccurrences, it.reals)
+        }
+        if (preparationStage != null) {
+            recordPreparation(PresolvePreparationStats(
+                preparationStage, lane, outcome, elapsed - invocation.childrenElapsed,
+                invocation.work, invocation.nativeWork, invocation.input, output,
+            ))
+        } else recordInvocation(PresolveInvocationStats(
             pass = invocation.pass,
             lane = invocation.lane,
             outcome = outcome,
@@ -72,11 +92,10 @@ internal fun <T> PresolveBudget?.observe(
             work = invocation.work,
             rebuildWork = invocation.rebuildWork,
             input = invocation.input,
-            output = size().let {
-                PresolveSizeStats(it.factors, it.booleans, it.integers, invocation.outputOccurrences)
-            },
+            output = output,
             narrowedColumns = invocation.narrowedColumns,
             fixedColumns = invocation.fixedColumns,
+            nativeWork = invocation.nativeWork,
         ))
     }
 }
@@ -157,7 +176,7 @@ internal fun Cancellation.interruptPresolveInvocation() {
 internal fun PresolveInvocation?.recordEntries(units: Long) {
     if (this == null) return
     val occurrences = units - input.factors
-    input = PresolveSizeStats(input.factors, input.booleans, input.integers, occurrences)
+    input = PresolveSizeStats(input.factors, input.booleans, input.integers, occurrences, input.reals)
     outputOccurrences = occurrences
 }
 

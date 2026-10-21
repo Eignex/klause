@@ -5,7 +5,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.difference.withDifferenceSystem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
@@ -14,6 +16,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
+import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
@@ -168,19 +172,21 @@ object PresolvePipeline {
         // bake would reach. Coupled wide columns can feed repeated bound narrowing; an isolated
         // wide output with bounded integer inputs uses the ordinary bake instead.
         val sourceProjections = projections?.forEngineView(sourceProblem)
-        val wideCoupling = needsWideDomainLp(sourceProblem)
-        val rootInfeasible = if (!prepared.infeasible && wideCoupling) {
-            lpRootInfeasibleReporting(
-                sourceProblem,
-                objective,
-                LpPlan(bounding = true),
-                preBakeSlice(cancellation, presolveBudget),
-                zeroObjectivePricing,
-                randomSeed,
-                projections = sourceProjections,
-            )
-        } else {
-            LpRootInfeasibleResult(infeasible = false, stats = LpStats())
+        val (wideCoupling, rootInfeasible) = presolveBudget.observePreparation(
+            PresolvePreparationStage.PRE_BAKE_LP_FEASIBILITY, PresolveLane.SOURCE, sourceProblem,
+            preBakeSlice(cancellation, presolveBudget),
+        ) { token, observation ->
+            val wide = needsWideDomainLp(sourceProblem)
+            val result = if (!prepared.infeasible && wide) {
+                lpRootInfeasibleReporting(
+                    sourceProblem, objective, LpPlan(bounding = true), token,
+                    zeroObjectivePricing, randomSeed, projections = sourceProjections,
+                ).also { if (it.infeasible) observation.preparationRefuted() }
+            } else {
+                observation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
+                LpRootInfeasibleResult(infeasible = false, stats = LpStats())
+            }
+            wide to result
         }
         // A refutation reached before the bake is the verdict, and the source model is what carries it: the
         // bake and every round below would only re-derive it at O(span), so the phase stops here and reports
@@ -204,16 +210,15 @@ object PresolvePipeline {
         // so it is sound before the bake. Gated on coupled wide columns so bounded inputs of an isolated
         // output use ordinary propagation.
         val rootBounds = if (wideCoupling) {
-            lpRootBoundsReporting(
-                sourceProblem,
-                objective,
-                LpPlan(bounding = true),
-                preBakeSlice(cancellation, presolveBudget),
-                zeroObjectivePricing,
-                randomSeed,
-                minimumSpan = sourceProblem.settings.largeSpanThreshold,
-                projections = sourceProjections,
-            )
+            presolveBudget.observePreparation(
+                PresolvePreparationStage.PRE_BAKE_LP_BOUNDS, PresolveLane.SOURCE, sourceProblem,
+                preBakeSlice(cancellation, presolveBudget), output = { it.problem },
+            ) { token, _ ->
+                lpRootBoundsReporting(
+                    sourceProblem, objective, LpPlan(bounding = true), token, zeroObjectivePricing, randomSeed,
+                    minimumSpan = sourceProblem.settings.largeSpanThreshold, projections = sourceProjections,
+                )
+            }
         } else {
             LpRootBoundsResult(sourceProblem, LpStats())
         }
@@ -223,9 +228,16 @@ object PresolvePipeline {
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
-        val selected = projections?.forEngineView(prebaked)
-        val baked = if (selected == null) prebaked.bake(cancellation) else prebaked.bake(selected, cancellation)
-        val seeded = RootBaker.reseed(baked, bakeConfig)
+        val (baked, seeded) = presolveBudget.observePreparation(
+            PresolvePreparationStage.ROOT_BAKE, PresolveLane.FINITE, prebaked, cancellation,
+            output = { it.second },
+        ) { token, observation ->
+            val selected = projections?.forEngineView(prebaked)
+            val root = if (selected == null) prebaked.bake(token) else prebaked.bake(selected, token)
+            val probed = RootBaker.reseed(root, bakeConfig)
+            if (probed.baked is PropagationResult.Unsat) observation.preparationRefuted()
+            root to probed
+        }
         val bakeElapsed = bakeStart.elapsedNow()
         val mappings = ArrayList<SourceMapping>()
         mappings.add(prepared.mapping)

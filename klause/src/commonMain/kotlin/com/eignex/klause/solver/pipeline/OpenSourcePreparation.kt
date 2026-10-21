@@ -5,8 +5,12 @@ import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
+import com.eignex.klause.presolve.observePreparation
+import com.eignex.klause.presolve.preparationInterrupted
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
@@ -76,20 +80,23 @@ internal fun PreparedSource.planned(
     model: Problem,
     projections: PreparedFactorProjections? = null,
     cancellation: Cancellation = Cancellation.Never,
-): OpenSourcePreparation.Planned {
-    val selected = projections?.forEngineView(model)?.let { model.componentPlan(it, cancellation = cancellation) }
-        ?: model.componentPlan(cancellation = cancellation)
-    val plan = if (!cancellation() && selected.theoryPipeline == ProblemPipeline.FINITE_CP) {
-        requireNotNull(selected.forLinearConditions(model, retainEmptyTheory = true, cancellation = cancellation)) {
+): OpenSourcePreparation.Planned = budget.observePreparation(
+    PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, model, cancellation,
+) { token, observation ->
+    val selected = projections?.forEngineView(model)?.let { model.componentPlan(it, cancellation = token) }
+        ?: model.componentPlan(cancellation = token)
+    val plan = if (!token() && selected.theoryPipeline == ProblemPipeline.FINITE_CP) {
+        requireNotNull(selected.forLinearConditions(model, retainEmptyTheory = true, cancellation = token)) {
             "source preparation lost the selected arithmetic completion"
         }
     } else selected
     require(
         (plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
-            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN) || cancellation() ||
+            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN) || token() ||
             plan.encodingDecline == EncoderDecline.RESOURCE,
     ) {
         "source preparation left the model without an open-theory route"
     }
-    return OpenSourcePreparation.Planned(this, model, plan)
+    if (plan.encodingDecline == EncoderDecline.RESOURCE) observation.preparationInterrupted()
+    OpenSourcePreparation.Planned(this, model, plan)
 }
