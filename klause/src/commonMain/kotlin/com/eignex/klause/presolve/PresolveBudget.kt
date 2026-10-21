@@ -120,9 +120,9 @@ class PresolveBudget(
      * quantum.
      */
     fun slice(share: Long): Cancellation {
-        if (share <= 0L) return Metered(nativeMeter) { true }
+        if (share <= 0L) return observeStops(Metered(nativeMeter) { true })
         val floor = (remaining() - share).coerceAtLeast(0L)
-        return Metered(nativeMeter) { remaining() <= floor }
+        return observeStops(Metered(nativeMeter) { remaining() <= floor })
     }
 
     /**

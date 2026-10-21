@@ -45,13 +45,11 @@ internal fun Problem.presolveSize() = PresolveSizeStats(factors.size, numBoolVar
 internal fun <T> PresolveBudget?.observe(
     pass: PresolvePass,
     lane: PresolveLane,
-    cancellation: Cancellation,
     size: () -> PresolveSizeStats,
     action: (PresolveInvocation?) -> T,
 ): T {
     if (this == null) return action(null)
     val invocation = PresolveInvocation(pass.id, lane, size())
-    if (cancellation()) invocation.interrupted = true
     val parent = activeInvocation
     activeInvocation = invocation
     var completed = false
@@ -98,7 +96,7 @@ internal fun PresolveBudget?.observeRoundPass(
     size: () -> PresolveSizeStats,
     eligible: () -> Boolean,
     action: (PresolveInvocation?) -> PassOutcome,
-): PassOutcome = observe(pass, lane, cancellation, size) { invocation ->
+): PassOutcome = observe(pass, lane, size) { invocation ->
     val outcome = when {
         cancellation() -> PassOutcome.UNCHANGED
         !eligible() -> PassOutcome.SKIPPED
@@ -122,7 +120,7 @@ internal fun <T> PresolveBudget?.observeTransform(
     action: () -> T,
 ): T {
     var current = input
-    return observe(pass, PresolveLane.FINITE, cancellation, { current.presolveSize() }) { invocation ->
+    return observe(pass, PresolveLane.FINITE, { current.presolveSize() }) { invocation ->
         val result = when {
             cancellation() -> unchanged()
             !eligible() -> {
