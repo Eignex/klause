@@ -27,6 +27,7 @@ import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.MutableLongObjectMap
 import com.eignex.klause.util.addExact
@@ -58,7 +59,9 @@ internal object RedundantConstraints {
         val delta = finishAfterPhase2(problem, ranges, out, cancellation)
         // Phases 3–5 drop factors [reconcile] never saw; feed the full drop set back so the memo retracts
         // every dropped factor's index entry before the next firing.
-        incremental.memo.setPendingSelfDrops(delta.droppedIndices.map { problem.factors[it] })
+        incremental.memo.setPendingSelfDrops(
+            IntArray(delta.droppedIndices.size) { incremental.liveIds[delta.droppedIndices[it]] },
+        )
         if (SUBSUME_DIFFERENTIAL_CHECK) assertMatchesFull(problem, ranges, delta)
         return delta
     }
@@ -212,10 +215,13 @@ internal object RedundantConstraints {
      *  full rebuild of the memo from the whole live set (first run, or after a reseed invalidated it). */
     internal class SubsumeIncremental(
         val rebuild: Boolean,
-        val addedFactors: List<Factor>,
-        val droppedFactors: List<Factor>,
+        val liveIds: IntArray,
+        val addedFactors: List<SubsumeFactor>,
+        val droppedIds: IntArray,
         val memo: SubsumeMemo,
     ) : SubsumeState
+
+    internal class SubsumeFactor(val id: Int, val factor: Factor)
 
     /**
      * Persistent phase-1 (exact-duplicate) and phase-2 (same-vector domination) indices, maintained
@@ -225,24 +231,19 @@ internal object RedundantConstraints {
      *
      * A dropped drop-candidate keeps its bucket offer the round it is dropped (the from-scratch path
      * offers every deduped row *before* deciding drops), so it is retracted only on the next firing:
-     * other passes' drops arrive via [SubsumeIncremental.droppedFactors]; subsume's own drops fall before
+     * other passes' drops arrive via [SubsumeIncremental.droppedIds]; subsume's own drops fall before
      * the next change-mark and are carried over to the next firing internally.
      */
     internal class SubsumeMemo {
         // Long-keyed to avoid boxing the shallow key on every factor: a clause-heavy model registers
         // hundreds of thousands of factors, and a `HashMap<Long, …>` would box the key on each lookup.
-        private val shallowSingle = MutableLongObjectMap<Factor>()
-        private val shallowMulti = MutableLongObjectMap<HashMap<StructuralKey, Factor>>()
+        private val shallowSingle = MutableLongObjectMap<SubsumeFactor>()
+        private val shallowMulti = MutableLongObjectMap<HashMap<StructuralKey, SubsumeFactor>>()
         private val buckets = HashMap<TermKey, Bucket>()
+        private val indexed = MutableIntObjectMap<SubsumeFactor>()
 
-        // Subsume's own drops from the last firing, retracted before this one (see class doc). Includes
-        // phase-3/4/5 drops (fed in by [setPendingSelfDrops]); excludes phase-1 duplicates, which never
-        // entered the indices.
-        private var pendingSelfDrops: List<Factor> = emptyList()
-
-        // Phase-1 duplicates dropped in the last [reconcile]: they have no index footprint, so they must
-        // be excluded from the self-drops retracted next firing.
-        private var lastDups: Set<Factor> = emptySet()
+        // Stable occurrence ids keep a duplicate's retraction separate from its retained representative.
+        private var pendingSelfDrops = IntArray(0)
 
         // Set when a rebuild bailed on the presolve deadline, leaving the indices cleared — the next
         // reconcile must rebuild rather than apply a delta against the empty index.
@@ -252,6 +253,7 @@ internal object RedundantConstraints {
             shallowSingle.clear()
             shallowMulti.clear()
             buckets.clear()
+            indexed.clear()
         }
 
         /** A coefficient-vector bucket: the multiset of `≤` offer bounds (and which are equalities, for
@@ -259,7 +261,7 @@ internal object RedundantConstraints {
         private class Bucket {
             val bounds = MutableLongIntMap()
             val eqBounds = MutableLongIntMap()
-            var rep: Factor? = null
+            var rep: SubsumeFactor? = null
             var repBound = 0L
 
             fun tightest(): Long? {
@@ -293,13 +295,12 @@ internal object RedundantConstraints {
             inc: SubsumeIncremental,
             cancellation: Cancellation = Cancellation.Never,
         ): List<Factor> {
-            val drops = HashSet<Factor>()
-            val dups = HashSet<Factor>()
+            val drops = IntHashSet()
             // A prior firing that bailed mid-rebuild left the memo cleared, so it must rebuild (not apply a
             // delta against an empty index).
             if (inc.rebuild || bailedRebuild) {
                 clearIndices()
-                pendingSelfDrops = emptyList()
+                pendingSelfDrops = IntArray(0)
                 bailedRebuild = false
                 val factors = problem.factors
                 for (i in factors.indices) {
@@ -307,80 +308,80 @@ internal object RedundantConstraints {
                     // (consistent) memo and forces a rebuild next firing; this firing subsumes nothing.
                     if ((i and REBUILD_CANCEL_POLL_MASK) == 0 && cancellation()) {
                         clearIndices()
-                        pendingSelfDrops = emptyList()
-                        lastDups = emptySet()
+                        pendingSelfDrops = IntArray(0)
                         bailedRebuild = true
                         return factors.asList()
                     }
                     cancellation.charge(SUBSUME_WORK_WEIGHT * (1L + factors[i].structuralKeyWeight))
-                    process(factors[i], drops, dups)
+                    process(SubsumeFactor(inc.liveIds[i], factors[i]), drops)
                 }
             } else {
-                for (f in pendingSelfDrops) retract(f)
-                for (f in inc.droppedFactors) retract(f)
+                for (id in pendingSelfDrops) retract(id)
+                for (id in inc.droppedIds) retract(id)
                 for (f in inc.addedFactors) {
-                    cancellation.charge(SUBSUME_WORK_WEIGHT * (1L + f.structuralKeyWeight))
-                    process(f, drops, dups)
+                    cancellation.charge(SUBSUME_WORK_WEIGHT * (1L + f.factor.structuralKeyWeight))
+                    process(f, drops)
                 }
             }
-            lastDups = dups
-            return if (drops.isEmpty()) problem.factors.asList() else problem.factors.filterNot { it in drops }
+            return if (drops.isEmpty()) problem.factors.asList() else
+                problem.factors.filterIndexed { i, _ -> inc.liveIds[i] !in drops }
         }
 
-        /** Record every factor subsume dropped this firing (phases 1–5, by object) so their index entries
-         *  are retracted before the next one. Phase-1 duplicates are filtered out — they never entered the
-         *  indices. Called after phases 3–5, whose drops [reconcile] cannot see. */
-        fun setPendingSelfDrops(allDropped: List<Factor>) {
-            pendingSelfDrops = if (lastDups.isEmpty()) allDropped else allDropped.filterNot { it in lastDups }
+        // Later phases also remove indexed occurrences; duplicates have no entry and retract as a no-op.
+        fun setPendingSelfDrops(allDropped: IntArray) {
+            pendingSelfDrops = allDropped
         }
 
-        // Phase 1: register [f], returning true if it is a fresh survivor and false if it duplicates a
+        // Phase 1: register [entry], returning true if it is a fresh survivor and false if it duplicates a
         // kept factor. Mirrors the from-scratch two-tier dedup — the full structural key is built only on
         // a shallow-key collision — so the lazy single-survivor slot never computes a key.
-        private fun registerP1(f: Factor): Boolean {
+        private fun registerP1(entry: SubsumeFactor): Boolean {
+            val f = entry.factor
             val sk = shallowKey(f)
             val multi = shallowMulti[sk]
             if (multi != null) {
                 val key = f.structuralKey()
                 if (multi.containsKey(key)) return false
-                multi[key] = f
+                multi[key] = entry
                 return true
             }
             val single = shallowSingle[sk]
             if (single == null) {
-                shallowSingle.put(sk, f)
+                shallowSingle.put(sk, entry)
                 return true
             }
-            val singleKey = single.structuralKey()
+            val singleKey = single.factor.structuralKey()
             val fKey = f.structuralKey()
             if (singleKey == fKey) return false
-            shallowMulti.put(sk, hashMapOf(singleKey to single, fKey to f))
+            shallowMulti.put(sk, hashMapOf(singleKey to single, fKey to entry))
             shallowSingle.remove(sk)
             return true
         }
 
-        private fun deregisterP1(f: Factor) {
+        private fun deregisterP1(entry: SubsumeFactor) {
+            val f = entry.factor
             val sk = shallowKey(f)
             val multi = shallowMulti[sk]
             if (multi != null) {
-                multi.remove(f.structuralKey())
+                val key = f.structuralKey()
+                if (multi[key]?.id == entry.id) multi.remove(key)
                 if (multi.size == 1) {
                     shallowSingle.put(sk, multi.values.first())
                     shallowMulti.remove(sk)
                 }
-            } else if (shallowSingle[sk] === f) {
+            } else if (shallowSingle[sk]?.id == entry.id) {
                 shallowSingle.remove(sk)
             }
         }
 
-        // Add [f] to the indices, recording into [drops] any factor it drops (itself as a duplicate, or an
-        // existing representative it dominates); a phase-1 duplicate also goes to [dups] (no index entry).
-        private fun process(f: Factor, drops: HashSet<Factor>, dups: HashSet<Factor>) {
-            if (!registerP1(f)) {
-                drops.add(f)
-                dups.add(f)
+        // Only the first occurrence of a structural key enters the indices and contributes offers.
+        private fun process(entry: SubsumeFactor, drops: IntHashSet) {
+            if (!registerP1(entry)) {
+                drops.add(entry.id)
                 return
             }
+            indexed.put(entry.id, entry)
+            val f = entry.factor
             // Most factors (every Clause, Xor, plain global) offer nothing to the phase-2 buckets, so the
             // touched-key set and the row form are derived only once a factor actually offers.
             @Suppress("DoubleMutabilityForCollection") // deliberately lazily created on the first offer
@@ -392,18 +393,19 @@ internal object RedundantConstraints {
             val keys = touched ?: return
             val member = dropForm(f)?.takeIf { !it.fromEq }
             for (key in keys) {
-                val cand = if (member != null && member.key == key) f else null
+                val cand = if (member != null && member.key == key) entry else null
                 resolve(buckets.getValue(key), cand, member?.bound ?: 0L, drops)
             }
         }
 
-        // Retract a factor that left the live set: remove its offers and phase-1 entry, and clear it as a
-        // representative. Only ever called on factors that were survivors (which always added offers), so
-        // the multiset counts stay balanced; a phase-1 duplicate never added offers and is never retracted.
-        private fun retract(f: Factor) {
-            deregisterP1(f)
+        // An occurrence added then dropped between firings, or dropped twice, has no indexed offers.
+        private fun retract(id: Int) {
+            val entry = indexed[id] ?: return
+            indexed.remove(id)
+            val f = entry.factor
+            deregisterP1(entry)
             forEachOffer(f) { key, bound, eq -> buckets[key]?.removeBound(bound, eq) }
-            forEachOffer(f) { key, _, _ -> buckets[key]?.let { if (it.rep === f) it.rep = null } }
+            forEachOffer(f) { key, _, _ -> buckets[key]?.let { if (it.rep?.id == id) it.rep = null } }
         }
 
         private fun bucketFor(key: TermKey): Bucket = buckets.getOrPut(key) { Bucket() }
@@ -411,7 +413,7 @@ internal object RedundantConstraints {
         // Reconcile a bucket's representative against the (at most one) new drop-candidate [cand]: the
         // earliest row at the tightest bound survives when no equality dominates the bucket, mirroring the
         // from-scratch `keptRep` rule. The existing representative predates [cand], so it wins ties.
-        private fun resolve(bucket: Bucket, cand: Factor?, candBound: Long, drops: HashSet<Factor>) {
+        private fun resolve(bucket: Bucket, cand: SubsumeFactor?, candBound: Long, drops: IntHashSet) {
             val t = bucket.tightest() ?: return
             val dominatedByEq = bucket.eqAtMin()
             val oldRep = bucket.rep
@@ -422,8 +424,8 @@ internal object RedundantConstraints {
                 candQualifies -> cand
                 else -> null
             }
-            if (oldRep != null && oldRep !== newRep) drops.add(oldRep)
-            if (cand != null && cand !== newRep) drops.add(cand)
+            if (oldRep != null && oldRep !== newRep) drops.add(oldRep.id)
+            if (cand != null && cand !== newRep) drops.add(cand.id)
             bucket.rep = newRep
             if (newRep === cand) bucket.repBound = candBound
         }

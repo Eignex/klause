@@ -162,10 +162,11 @@ internal class PresolveSession(
 
     // Append-only logs of every factor add / drop, in application order, so a pass holding a saved
     // [ChangeMark] can replay just the factors that changed since instead of rescanning the live set. A
-    // drop records the factor object (captured before its slot is nulled), since its structural content
-    // is needed to retract it from a pass's persistent index.
+    // drop records both the stable occurrence id and the factor object before its slot is nulled;
+    // shared immutable objects can occupy separate slots.
     private val addedLog = IntArrayList(0)
     private val droppedFactorLog = ArrayList<Factor>()
+    private val droppedIdLog = IntArrayList(0)
 
     // Bumped whenever [reseedFromDelta] rebuilds the stable-id space; a [ChangeMark] taken before it
     // cannot be replayed (its ids name different factors afterwards), so its holder falls back to a full scan.
@@ -186,9 +187,15 @@ internal class PresolveSession(
     /** Stable ids of the factors added since [mark], in application order. */
     fun addedIdsSince(mark: ChangeMark): IntArray = IntArray(addedLog.size - mark.added) { addedLog[mark.added + it] }
 
-    /** The factor objects dropped since [mark], in application order (captured at drop time). */
-    fun droppedFactorsSince(mark: ChangeMark): List<Factor> =
-        droppedFactorLog.subList(mark.dropped, droppedFactorLog.size)
+    /** Stable ids of the occurrences dropped since [mark], in application order. */
+    fun droppedIdsSince(mark: ChangeMark): IntArray =
+        IntArray(droppedIdLog.size - mark.dropped) { droppedIdLog[mark.dropped + it] }
+
+    /** Stable occurrence ids parallel to the current [passInput] factor list. */
+    fun passFactorIds(): IntArray {
+        passInput()
+        return liveIds
+    }
 
     /** The live factor at stable id [id], or `null` if it was tombstoned. */
     fun factorAt(id: Int): Factor? = factors[id]
@@ -276,6 +283,7 @@ internal class PresolveSession(
         for (id in delta.droppedIds) {
             factors[id]?.let {
                 droppedFactorLog.add(it)
+                droppedIdLog.add(id)
                 liveFactorCount--
             }
             state.tombstoneFactor(id)
@@ -485,6 +493,7 @@ internal class PresolveSession(
         for (id in eager.factors.indices) recordOccurrences(id, eager.factors[id])
         addedLog.clear()
         droppedFactorLog.clear()
+        droppedIdLog.clear()
         reseedEpoch++
         occDirty = true
         accounting.flush()

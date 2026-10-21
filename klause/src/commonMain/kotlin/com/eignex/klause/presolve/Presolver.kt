@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.problemComplexity
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
+import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeFactor
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeMemo
 import com.eignex.klause.propagation.BakedProblem
@@ -486,11 +487,11 @@ object Presolver {
         mark: PresolveSession.ChangeMark?,
         memo: SubsumeMemo,
     ): SubsumeIncremental = if (mark == null || session.markStale(mark)) {
-        SubsumeIncremental(rebuild = true, emptyList(), emptyList(), memo)
+        SubsumeIncremental(rebuild = true, session.passFactorIds(), emptyList(), IntArray(0), memo)
     } else {
         val ids = session.addedIdsSince(mark)
-        val added = ArrayList<Factor>(ids.size)
-        for (id in ids) session.factorAt(id)?.let { added.add(it) }
-        SubsumeIncremental(rebuild = false, added, session.droppedFactorsSince(mark), memo)
+        val added = ArrayList<SubsumeFactor>(ids.size)
+        for (id in ids) session.factorAt(id)?.let { added.add(SubsumeFactor(id, it)) }
+        SubsumeIncremental(rebuild = false, session.passFactorIds(), added, session.droppedIdsSince(mark), memo)
     }
 }
