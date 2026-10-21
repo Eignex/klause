@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
-import com.eignex.klause.backtrack.EmaRestartSchedule
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
@@ -452,16 +451,14 @@ class OpenTheoryEngine internal constructor(
             }
             val solveParams = SearchSolveParams(
                 maxDecisions = state.remainingDecisions(),
-                restart = params.sharedRestart?.let(SearchRestart::Every)
-                    ?: if (savedPhases !== SearchCandidateHints.None) EmaRestartSchedule() else SearchRestart.Never,
+                restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
             )
             // Drawn here rather than beside the plan, so a root that propagation already refuted never pays
             // for a proposal no traversal would have read.
             val hints = state.candidateHints(plan, model, cancellation)
             val selectedBranching = when (params.openBranching) {
-                OpenBranching.Automatic -> if (savedPhases !== SearchCandidateHints.None ||
-                    (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
-                        (planned.theory as? ExactLiraSearchComponent)?.defaultMixedPointOwner == true)
+                OpenBranching.Automatic -> if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
+                    (planned.theory as? ExactLiraSearchComponent)?.defaultMixedPointOwner == true
                 ) OpenBranching.Activity else OpenBranching.SourceOrder
                 else -> params.openBranching
             }
