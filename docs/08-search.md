@@ -28,6 +28,10 @@ See [theory roles](14-theories.md#extension-roles-and-completeness). The session
 exchanges Boolean literals, semantic integer bounds and opaque theory decisions
 rather than native CP domains.
 
+In a composed search, the shared clause component enforces source Boolean clauses.
+The arithmetic component's prepared fragment omits those clauses; standalone theory
+fragments retain the source relations their own caller must enforce.
+
 Four owners divide the work:
 
 - [SearchSession](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)

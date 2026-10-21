@@ -209,6 +209,26 @@ class ComponentPlan internal constructor(
         return installedFragment
     }
 
+    internal fun composedTheoryFragment(spec: Problem): Problem {
+        requireBelongsTo(spec)
+        fun sharedClause(index: Int): Boolean = factorOwners[index] == FactorOwner.SHARED &&
+            spec.factors[index] is Clause
+        val fragment = installedFragment
+        if (fragment == null) {
+            val kept = selectedTheoryFactorIndices().filterNot(::sharedClause)
+            return spec.withFactors(Array(kept.size) { spec.factors[kept[it]] },
+                spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
+        }
+        val kept = fragment.factors.indices.filterNot { index ->
+            val encoded = fragment.factors[index] as? EncodedTheoryFactor ?: return@filterNot false
+            val origin = encoded.attribution.sourceFactorIndex
+            origin in spec.factors.indices && spec.factors[origin] === encoded.source && sharedClause(origin)
+        }
+        if (kept.size == fragment.factors.size) return fragment
+        return fragment.rebindEncoding(spec, Array(kept.size) { fragment.factors[kept[it]] },
+            fragment.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
+    }
+
     // Shared clauses stay out because the shared clause component enforces them in the same session.
     internal fun theoryOwnedFragment(spec: Problem): Problem {
         requireBelongsTo(spec)

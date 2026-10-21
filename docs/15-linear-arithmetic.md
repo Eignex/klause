@@ -32,6 +32,9 @@ The linear component sits on two lifecycles at once: the
 assertions. The component turns assigned source rows into LP bounds, and LP
 verdicts into conflicts, branches and witnesses.
 
+Composed search leaves shared Boolean clauses with the clause component, so
+arithmetic preparation and source assertion visit only their remaining relations.
+
 #### Rows as bounds
 
 The component follows the slack-variable design of Dutertre and de Moura: every
