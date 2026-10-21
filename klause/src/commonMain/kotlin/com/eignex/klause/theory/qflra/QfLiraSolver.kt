@@ -1721,7 +1721,8 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
         fixedSelectors.size + 1L
     if (!charge(copies)) return null
     val source = PreparedExactLiraSource(
-        model, exactForms.toList(), preparedRows.toList(), arithmeticRows.toList(), arithmeticVariables.toSet(), fixedSelectors,
+        model, exactForms.toList(), preparedRows.toList(), arithmeticRows.toList(), arithmeticVariables.toSet(),
+        fixedSelectors,
         validated = true,
     )
     return source.takeUnless { stop() }
