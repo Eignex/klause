@@ -22,6 +22,54 @@ import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
     @Test
+    fun `whole numeric refutations remove Boolean choices and preserve smaller cores`() {
+        for (refutedTruth in listOf(false, true)) for (smallerCore in listOf(false, true)) {
+            val arithmetic = PolynomialArithmetic()
+            val lower = if (refutedTruth) PolynomialRelation.GT else PolynomialRelation.LE
+            val upper = if (refutedTruth) PolynomialRelation.LT else PolynomialRelation.GE
+            val atoms = listOf(PolynomialAtom(Polynomial.variable(0), lower),
+                PolynomialAtom(Polynomial.variable(0), upper),
+                PolynomialAtom(Polynomial.variable(1), PolynomialRelation.GT))
+            val nodes = listOf(FormulaNode.Atom(0), FormulaNode.Atom(1), FormulaNode.Atom(2),
+                FormulaNode.BooleanVariable(0), FormulaNode.Not(0), FormulaNode.Not(1),
+                FormulaNode.Not(2), FormulaNode.Not(3),
+                FormulaNode.Junction(intArrayOf(0, 4), conjunction = false),
+                FormulaNode.Junction(intArrayOf(1, 5), conjunction = false),
+                FormulaNode.Junction(intArrayOf(2, 6), conjunction = false),
+                FormulaNode.Junction(intArrayOf(3, 7), conjunction = false),
+                FormulaNode.Junction(intArrayOf(8, 9, 10, 11), conjunction = true))
+            val regions = PolynomialBooleanRegions(nodes, 12, atoms, arithmetic)
+            val feasible = ArrayList<Pair<Boolean?, Boolean?>>()
+            var refuted = 0
+
+            while (regions.hasNext()) {
+                val region = regions.next() ?: continue
+                if (region.atoms[0] == refutedTruth && region.atoms[1] == refutedTruth) {
+                    if (smallerCore) regions.refuted(region, listOf(0, 1))
+                    regions.refuted(region)
+                    refuted++
+                } else feasible.add(region.atoms[2] to region.bools[0])
+            }
+
+            assertEquals(if (smallerCore) 1 else 2, refuted)
+            assertEquals(12, feasible.size)
+            assertEquals(setOf(false to false, false to true, true to false, true to true), feasible.toSet())
+        }
+    }
+
+    @Test
+    fun `whole numeric refutations belong to the currently issued traversal`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (or (> x 0) (not (> x 0))))")
+        val arithmetic = PolynomialArithmetic()
+        val normalized = PolynomialFormula.normalize(source.formula, arithmetic)
+        val regions = normalized.booleanRegions(arithmetic)
+        regions.asSequence().filterNotNull().first()
+        val foreign = normalized.booleanRegions(arithmetic).asSequence().filterNotNull().first()
+
+        assertFailsWith<IllegalStateException> { regions.refuted(foreign) }
+    }
+
+    @Test
     fun `numeric cores skip irrelevant completions without losing feasible cubes`() {
         for (refutedTruth in listOf(false, true)) {
             val arithmetic = PolynomialArithmetic()

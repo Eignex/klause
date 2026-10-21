@@ -36,6 +36,14 @@ internal class PolynomialBooleanRegions(
         return traversal.next()
     }
 
+    fun refuted(region: PolynomialBooleanRegion) {
+        arithmetic.step()
+        check(checkNotNull(issued).region === region)
+        if (refutation != null || region.atoms.isEmpty()) return
+        val indices = region.atoms.keys.map { arithmetic.step(); it }
+        refuted(region, indices)
+    }
+
     fun refuted(region: PolynomialBooleanRegion, atomIndices: List<Int>) {
         arithmetic.step()
         val proof = checkNotNull(issued)
