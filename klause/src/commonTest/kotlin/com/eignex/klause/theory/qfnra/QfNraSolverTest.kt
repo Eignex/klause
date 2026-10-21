@@ -21,6 +21,77 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `zero fibres retain eight separated unit vectors`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val norms = (0 until 8).joinToString(" ") { point ->
+            val terms = (0 until 4).joinToString(" ") { axis ->
+                "(* x${4 * point + axis} x${4 * point + axis})"
+            }
+            "(assert (= (+ $terms) 1))"
+        }
+        val separation = (0 until 8).flatMap { left ->
+            (left + 1 until 8).map { right ->
+                val terms = (0 until 4).joinToString(" ") { axis ->
+                    val difference = "(- x${4 * left + axis} x${4 * right + axis})"
+                    "(* $difference $difference)"
+                }
+                "(assert (>= (+ $terms) 1))"
+            }
+        }.joinToString(" ")
+        val source = SmtLibPolynomial.parse("$declarations $norms $separation")
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 5_000_000))
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        for (left in 0 until 8) {
+            val norm = (0 until 4).fold(algebraic.rational(BigFraction.ZERO)) { sum, axis ->
+                algebraic.add(sum, algebraic.power(point.realValue(4 * left + axis), 2))
+            }
+            assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+            for (right in left + 1 until 8) {
+                val distance = (0 until 4).fold(algebraic.rational(BigFraction.ZERO)) { sum, axis ->
+                    val difference = algebraic.subtract(point.realValue(4 * left + axis),
+                        point.realValue(4 * right + axis))
+                    algebraic.add(sum, algebraic.power(difference, 2))
+                }
+                assertTrue(algebraic.compare(distance, algebraic.rational(BigFraction.ONE)) >= 0)
+            }
+        }
+    }
+
+    @Test
+    fun `a zero product retains its nonzero coordinate alternatives`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* x0 x0) 1)) (assert (= (* x1 x1 x2 x2) 0)) " +
+                "(assert (= (* x1 x1) 1))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertEquals(0, algebraic.compare(algebraic.power(point.realValue(1), 2),
+            algebraic.rational(BigFraction.ONE)))
+        assertEquals(0, algebraic.sign(point.realValue(2)))
+    }
+
+    @Test
+    fun `a weak partial sign bound retains nonzero completions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (= (* x0 x0) 1)) " +
+                "(assert (>= (+ (- (* x0 x0) 1) (* x1 x1)) 0)) (assert (= (* x1 x1) 1))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertEquals(0, algebraic.compare(algebraic.power(point.realValue(1), 2),
+            algebraic.rational(BigFraction.ONE)))
+    }
+
+    @Test
     fun `partial even powers retain zero boundary completions`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         for (predicate in listOf(

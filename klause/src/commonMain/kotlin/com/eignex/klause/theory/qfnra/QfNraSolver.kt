@@ -1576,7 +1576,7 @@ private fun searchCells(
         val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels)
         if (rejected != null) {
             // Unprojected coordinates have one fixed sector sample throughout this family's CAD.
-            if (rejected in independent) return null
+            if (!rejected.usesDerivedCoordinates && rejected.atom in independent) return null
             continue
         }
         if (frame.level + 1 < projection.variableCount) {
@@ -1658,6 +1658,14 @@ private fun liftFrame(
     return CadFrame(level, variable, distinct)
 }
 
+private class RegionConflict(val atom: Int, val usesDerivedCoordinates: Boolean = false)
+
+private class CompletionSigns(val signs: Int, val zeroVariables: Set<Int> = emptySet()) {
+    companion object {
+        val UNKNOWN = CompletionSigns(ALL_SIGNS)
+    }
+}
+
 private fun regionFeasible(
     formula: PolynomialFormula,
     region: PolynomialBooleanRegion,
@@ -1674,27 +1682,98 @@ private fun rejectedRegionAtom(
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     atomLevels: Map<Int, Int>? = null,
-): Int? {
+): RegionConflict? {
+    var zeroVariables: MutableSet<Int>? = null
     for ((index, required) in region.atoms) {
         arithmetic.step()
         val atom = formula.atoms[index]
         val variable = atom.polynomial.mainVariable
         if (variable != null && (atomLevels?.getValue(index) ?: variable) >= coordinates.size) {
             if (atomLevels != null) {
-                val signs = try {
-                    partialRegionSigns(atom.polynomial, coordinates, arithmetic, algebraic)
-                } catch (_: PolynomialResourceLimit) {
-                    ALL_SIGNS
+                val bounds = completionSigns(atom.polynomial, coordinates, arithmetic, algebraic)
+                val possible = bounds.signs and requiredRegionSigns(atom, required)
+                if (possible == 0) return RegionConflict(index)
+                if (possible == ZERO_SIGN && bounds.zeroVariables.isNotEmpty()) {
+                    val pending = zeroVariables ?: HashSet<Int>().also { zeroVariables = it }
+                    for (variable in bounds.zeroVariables) {
+                        arithmetic.step()
+                        pending.add(variable)
+                    }
                 }
-                val allowed = relationSigns(atom.relation)
-                if (signs and (if (required) allowed else ALL_SIGNS xor allowed) == 0) return index
             }
             continue
         }
         val sign = algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))
-        if (atom.holds(sign) != required) return index
+        if (atom.holds(sign) != required) return RegionConflict(index)
     }
+    val pending = zeroVariables ?: return null
+    val conflict = try {
+        completionConflict(formula, region, coordinates, pending, arithmetic, algebraic)
+    } catch (_: PolynomialResourceLimit) {
+        null
+    }
+    return conflict?.let { RegionConflict(it, usesDerivedCoordinates = true) }
+}
+
+private fun requiredRegionSigns(atom: PolynomialAtom, required: Boolean): Int {
+    val allowed = relationSigns(atom.relation)
+    return if (required) allowed else ALL_SIGNS xor allowed
+}
+
+private fun completionConflict(
+    formula: PolynomialFormula,
+    region: PolynomialBooleanRegion,
+    coordinates: Map<Int, AlgebraicReal>,
+    zeros: Set<Int>,
+    arithmetic: PolynomialArithmetic,
+    algebraic: AlgebraicArithmetic,
+): Int? {
+    val completed = HashMap<Int, AlgebraicReal>()
+    for ((variable, value) in coordinates) {
+        arithmetic.step()
+        completed[variable] = value
+    }
+    val zero = algebraic.rational(BigFraction.ZERO)
+    for (variable in zeros) {
+        arithmetic.step()
+        if (variable !in completed) completed[variable] = zero
+    }
+    var changed: Boolean
+    do {
+        arithmetic.step()
+        changed = false
+        for ((index, required) in region.atoms) {
+            arithmetic.step()
+            val atom = formula.atoms[index]
+            val complete = atom.polynomial.variables.all { arithmetic.step(); it in completed }
+            val bounds = if (complete) {
+                CompletionSigns(evenCompletionSigns(
+                    algebraic.sign(algebraic.evaluate(atom.polynomial, completed)), false, false))
+            } else completionSigns(atom.polynomial, completed, arithmetic, algebraic)
+            val possible = bounds.signs and requiredRegionSigns(atom, required)
+            if (possible == 0) return index
+            if (possible != ZERO_SIGN) continue
+            for (variable in bounds.zeroVariables) {
+                arithmetic.step()
+                if (variable !in completed) {
+                    completed[variable] = zero
+                    changed = true
+                }
+            }
+        }
+    } while (changed)
     return null
+}
+
+private fun completionSigns(
+    polynomial: Polynomial,
+    coordinates: Map<Int, AlgebraicReal>,
+    arithmetic: PolynomialArithmetic,
+    algebraic: AlgebraicArithmetic,
+): CompletionSigns = try {
+    partialRegionSigns(polynomial, coordinates, arithmetic, algebraic)
+} catch (_: PolynomialResourceLimit) {
+    CompletionSigns.UNKNOWN
 }
 
 private fun partialRegionSigns(
@@ -1702,21 +1781,23 @@ private fun partialRegionSigns(
     coordinates: Map<Int, AlgebraicReal>,
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
-): Int {
+): CompletionSigns {
     var constant = algebraic.rational(BigFraction.ZERO)
     var positiveTerms = false
     var negativeTerms = false
+    var zeroVariables: MutableSet<Int>? = null
     for ((monomial, coefficient) in polynomial.terms) {
         arithmetic.step()
         var value = algebraic.rational(coefficient)
-        var pending = false
+        var pending: Int? = null
+        var multiple = false
         var odd = false
         for (variable in monomial.variables) {
             arithmetic.step()
             val exponent = monomial.exponent(variable)
             val coordinate = coordinates[variable]
             if (coordinate == null) {
-                pending = true
+                if (pending == null) pending = variable else multiple = true
                 if (exponent and 1 != 0) odd = true
             } else {
                 value = algebraic.multiply(value, algebraic.power(coordinate, exponent))
@@ -1724,14 +1805,21 @@ private fun partialRegionSigns(
         }
         val sign = algebraic.sign(value)
         if (sign == 0) continue
-        if (!pending) {
+        if (pending == null) {
             constant = algebraic.add(constant, value)
         } else {
-            if (odd) return ALL_SIGNS
+            if (odd) return CompletionSigns.UNKNOWN
             if (sign > 0) positiveTerms = true else negativeTerms = true
+            if (!multiple) {
+                val zeros = zeroVariables ?: HashSet<Int>().also { zeroVariables = it }
+                zeros.add(checkNotNull(pending))
+            }
         }
     }
-    return evenCompletionSigns(algebraic.sign(constant), positiveTerms, negativeTerms)
+    val sign = algebraic.sign(constant)
+    val signs = evenCompletionSigns(sign, positiveTerms, negativeTerms)
+    if (signs == ALL_SIGNS) return CompletionSigns.UNKNOWN
+    return CompletionSigns(signs, if (sign == 0) zeroVariables.orEmpty() else emptySet())
 }
 
 private fun evenCompletionSigns(constant: Int, positiveTerms: Boolean, negativeTerms: Boolean): Int = when {

@@ -296,6 +296,11 @@ of one sign. A strict constant sign remains strict after adding terms of that
 sign; zero coefficients and boundary completions remain possible. An odd power,
 mixed signs or a representation refusal leaves the prefix open. A predicate
 whose required truth is impossible for every completion prunes the prefix.
+When a one-sided, zero-constant bound permits only zero, every individually
+supported even-power term must vanish. Prefix reasoning propagates these exact
+zero bindings through the other region predicates until stable. Products over
+several unassigned coordinates do not force individual zeros. The bindings stay
+inside the prefix proof; lifting and assignment capture use their original samples.
 At a complete sample,
 eliminated coordinates are reconstructed and the full assignment passes the
 original formula before capture. Exhausting every cell of the complete projection
