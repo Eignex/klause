@@ -851,9 +851,13 @@ The ordinary unit tests retain local input qualification, SOL conversion, receip
 interpretation, source custody and validation-routing checks.
 
 The adapter inserts a neutral `NAME` header or an empty `RHS` section when the
-original omits those optional headers required by MIPLIB. All original data
-records remain verbatim; the receipt names inserted headers and binds both the
-original `source.mps` and actual `checker.mps` bytes. No numerical values change.
+original omits those optional headers required by MIPLIB. For a column whose first
+two bound records are `UP 1` then `LO 0`, it swaps those records to `LO 0` then
+`UP 1`. The source range stays `[0,1]`, including marker integers: MIPLIB would
+otherwise discard their upper side on the lower-bound record. Decimal spellings
+are compared exactly. All original data records remain verbatim; only this pair's
+order changes. The receipt counts reordered pairs, names inserted headers and binds
+both the original `source.mps` and actual `checker.mps` bytes. No numerical values change.
 The adapter translates the retained final stdout point into SOL variable/value
 lines and `=obj=`. Duplicate or malformed coordinates are declined. MIPLIB's model
 variable census must equal the number of supplied unique coordinates, and any
@@ -880,8 +884,8 @@ Supported source records use one named vector per section without repeated row
 entries, one objective row, consecutive column blocks, unique objective coefficients
 and decimal tokens of at most 31 characters with exponents between -128 and 128.
 RANGES, integer markers, bounds and indicators are delegated to MIPLIB. BV must be
-its column's sole bound record. Lower bounds after an UP record, objective RHS
-offsets, nonterminating rational coordinates,
+its column's sole bound record. Lower bounds after an UP record outside the unit-pair
+normalization, objective RHS offsets, nonterminating rational coordinates,
 rational source tokens, longer numbers, inline section data, multiple free rows,
 unsupported sections and semantics overrides remain unverified. Terminating rational
 coordinates convert exactly to supported decimal SOL tokens. No custom parser or

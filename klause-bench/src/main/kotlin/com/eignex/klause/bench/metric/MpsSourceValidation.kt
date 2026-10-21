@@ -35,6 +35,7 @@ internal object MpsSourceValidation {
         val status: String,
         val exactFeasible: Boolean?,
         val toleranceAccepted: Boolean?,
+        val reorderedBoundPairs: Int = 0,
         val solverSearchQueries: Int = 0,
         val proofCertificateChecked: Boolean = false,
     )
@@ -176,6 +177,7 @@ internal object MpsSourceValidation {
                 profile.insertedHeaders,
                 if (host == "Linux") "linux-address-space-v1" else "darwin-address-space-v1",
                 processes, status, exactFeasible, if (valid) exactFeasible == false else null,
+                reorderedBoundPairs = profile.reorderedBoundPairs,
             )
             val json = Reports.json.encodeToString(receipt)
             File(out, "result.json").writeText(json)
