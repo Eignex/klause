@@ -128,8 +128,8 @@ host speed. `presolve-work-limit=unlimited` removes only the work cap. Effort
 telemetry reports construction, propagation work, converted `presolveWork` and probe
 calls separately.
 
-Unchanged and allowance-stopped source phases retain the same effort ledger as
-successful reductions. Source preparation time excludes theory search; polynomial
+Unchanged and allowance-stopped source and finite phases retain the same effort
+ledger as successful reductions. Source preparation time excludes theory search; polynomial
 encoder rebuilding belongs to preparation. Routes without a factor preparation
 report the retained allowance and counters with zero time for that phase.
 

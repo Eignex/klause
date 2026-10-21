@@ -8,16 +8,17 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.TransformationGuarantees
+import com.eignex.klause.presolve.effortStats
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
-import com.eignex.klause.solver.result.hasActivity
 import com.eignex.klause.solver.withRealDifferenceSystem
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /** Inputs the finite orchestration layer needs before selecting and constructing an engine. */
 class FinitePipelineRequest(
@@ -82,7 +83,7 @@ class FinitePipelinePreparation(
     val objective: LinearObjective?,
     /** Lifts a prepared-model assignment to the source model. */
     val reconstruct: (Sample) -> Sample,
-    /** Presolve statistics, including LP work from a no-op preparation. */
+    /** Preparation statistics, retained even when every analysis is empty. */
     val presolve: PresolveStats?,
     /** Time spent baking the source problem before this preparation began. */
     val constructionBakeElapsed: Duration = Duration.ZERO,
@@ -108,6 +109,7 @@ object FinitePipeline {
 
     /** Apply finite-route presolve policy and return the model ready for engine construction. */
     fun prepare(request: FinitePipelineRequest): FinitePipelinePreparation {
+        val start = TimeSource.Monotonic.markNow()
         val config = if (request.engine.pureLocalSearch && !request.explicitPresolveConfig) {
             request.presolveConfig.forLocalSearch()
         } else {
@@ -142,7 +144,9 @@ object FinitePipeline {
                 prepared.problem,
                 prepared.objective ?: request.objective,
                 { prepared.mapping.reconstructFrom(prepared.problem, it) },
-                prepared.stats,
+                prepared.stats.copy(
+                    effort = config.effortStats(request.presolveBudget, start.elapsedNow()),
+                ),
             ).also {
                 it.sourceMapping = prepared.mapping
                 it.executionPlan = sourcePlan
@@ -202,7 +206,9 @@ object FinitePipeline {
             objective = outcome.objective ?: objective,
             reconstruct = if (mapping === outcome.mapping) outcome.reconstruct
                 else { sample -> mapping.reconstructFrom(finiteModel, sample) },
-            presolve = outcome.stats.takeIf { outcome.changed || it.infeasible || it.lpStats.hasActivity() },
+            presolve = outcome.stats.copy(
+                effort = config.effortStats(request.presolveBudget, start.elapsedNow()),
+            ),
             constructionBakeElapsed = (request.problem as? BakedProblem)?.bakeElapsed ?: Duration.ZERO,
         ).also {
             it.sourceMapping = mapping
