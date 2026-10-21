@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SmtSourceValidationTest {
     private val record = SolveRecord(
@@ -51,62 +52,21 @@ class SmtSourceValidationTest {
     }
 
     @Test
-    fun `independent refutation should retain only an already reported native refutation`() {
+    fun `reported refutation should stand unchecked for comparison with stored references`() {
         val reported = record.copy(feasible = false, proven = true, finalWitness = null)
-        val result = SmtSourceValidation.Result(
-            SourceValidation(
-            "valid",
-            "compared",
-            scope = SmtSourceValidation.REFUTATION,
-        ),
-            mapOf(
-            "independentSourceRefutation" to "true",
-            "sourceValidationSolverQueries" to "1",
-            "sourceValidationProofChecked" to "false",
+        val checked = SmtSourceValidation.apply(
+            reported, SmtSourceValidation.Result(SmtSourceValidation.unknown("not checked")),
         )
-        )
-
-        val checked = SmtSourceValidation.apply(reported, result)
-        val unknown = SmtSourceValidation.apply(reported.copy(feasible = null, proven = false), result)
 
         assertEquals(false, checked.feasible)
-        assertEquals(true, checked.proven)
-        assertNull(checked.checkedWitness)
-        assertEquals("false", checked.stats["sourceValidationProofChecked"])
-        assertNull(unknown.feasible)
-        assertFalse(unknown.proven)
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["unmarked", "query", "reference", "unproven", "unknown", "scope"])
-    fun `incoherent derivation publication should withhold the native claim`(failure: String) {
-        val reported = record.copy(feasible = false, proven = true, finalWitness = null)
-        val producer = when (failure) {
-            "unproven" -> reported.copy(proven = false)
-            "unknown" -> reported.copy(feasible = null, proven = false)
-            else -> reported
-        }
-        val validation = SourceValidation("valid", "source contradiction",
-            scope = if (failure == "scope") SmtSourceValidation.GROUND else SmtSourceValidation.REFUTATION)
-        val stats = mapOf(
-            "independentSourceRefutation" to "true",
-            "sourceValidationSolverQueries" to if (failure == "query") "1" else "0",
-            "sourceValidationDerivationChecked" to if (failure == "unmarked") "false" else "true",
-            "sourceValidationReferenceLogic" to if (failure == "reference") "QF_NRA" else "",
-        )
-
-        val published = SmtSourceValidation.apply(producer, SmtSourceValidation.Result(validation, stats))
-
-        assertNull(published.feasible)
-        assertFalse(published.proven)
-        assertNull(published.checkedWitness)
-        assertEquals("false", published.stats["independentSourceRefutation"])
-        assertEquals("false", published.stats["sourceValidationDerivationChecked"])
+        assertTrue(checked.proven)
+        assertEquals("unknown", checked.stats["sourceValidation"])
     }
 
     @ParameterizedTest
     @ValueSource(
-        strings = ["exit", "killed", "unsupported", "quarantined", "objective", "optimization", "missing-model"],
+        strings = ["exit", "killed", "unsupported", "quarantined", "objective", "optimization", "missing-model",
+            "refutation"],
     )
     fun `ineligible producers should not enter source checking`(kind: String) {
         val changed = when (kind) {
@@ -114,9 +74,10 @@ class SmtSourceValidationTest {
             "objective" -> record.copy(objective = 1.0)
             "optimization" -> record.copy(kind = "optimize")
             "missing-model" -> record.copy(finalWitness = null)
+            "refutation" -> record.copy(feasible = false, proven = true, finalWitness = null)
             else -> record.copy(stats = record.stats + (kind to "stopped"))
         }
 
-        assertNull(SmtSourceValidation.eligible(changed))
+        assertFalse(SmtSourceValidation.eligible(changed))
     }
 }

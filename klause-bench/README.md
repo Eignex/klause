@@ -811,17 +811,17 @@ SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
 Earlier incumbents are unchecked, so attribution is limited to the final objective.
 
 SMT-LIB satisfaction runs opt in with `param=source-validation=true` under policy
-`smt-external-original-claims-v2`. The CLI retains its original budget, seed and
+`smt-external-original-claims-v3`. The CLI retains its original budget, seed and
 engine. The bench invokes established external tools after the native solve;
 there is no internal mathematical checker or custom fallback.
 
-The adapter downloads hash-pinned upstream Dolmen 0.10 and Z3 4.15.3 releases
+The adapter downloads the hash-pinned upstream Dolmen 0.10 release
 into the check's private directory when no executable is configured. It removes
-those executables after checking and does not change host installations. Published
+the executable after checking and does not change host installations. Published
 Dolmen binaries cover Linux x86-64 and macOS ARM64; the macOS asset named
 `dolmen-macos-amd64` contains an ARM64 executable and requires the host's GMP library
 at `/opt/homebrew/opt/gmp/lib/libgmp.10.dylib`. Other platforms need a configured
-Dolmen executable. Z3 release selection covers Linux/macOS x86-64 and ARM64.
+Dolmen executable.
 
 Set `KLAUSE_DOLMEN` to an absolute Dolmen executable path and
 `KLAUSE_DOLMEN_SHA256` to its SHA-256 to override the downloaded release.
@@ -834,18 +834,16 @@ rewritten by the adapter. The [competition Dolmen build](https://github.com/SMT-
 uses external algebraic arithmetic, while upstream release coverage differs.
 A build's existence does not establish compatibility with a particular saved model.
 
-Set `KLAUSE_Z3` and `KLAUSE_Z3_SHA256` to override the independent native UNSAT comparison tool.
-The Z3 CLI receives the complete unchanged source with `-smt2 -T:30 -memory:4096`.
-One complete `unsat` answer can retain an already reported native refutation;
-SAT, UNKNOWN, multiple answers and incomplete output cannot. This compares results
-and does not check a native proof certificate. Independent checking never promotes
-a native UNKNOWN or establishes an optimum.
+Only SAT models are checked. A reported UNSAT has no witness to check, so it stands as reported
+with `sourceValidation=unknown`; the lab compares it with the stored reference verdicts, which flag
+a refutation another solver contradicts. Checking never promotes a native UNKNOWN or establishes
+an optimum.
 
 Saved SMT claims use `validate-solution suite=<id> problem=<name> output=<stdout>
 record=<producer.json> out=<evidence directory>`. Preserve the original producer
 record, including its recorded validation policy. The replay receipt identifies the
 current external policy separately. Optional `checker=<absolute executable>` and
-`checker-sha256=<digest>` select a job-private Dolmen binary for SAT or Z3 for UNSAT;
+`checker-sha256=<digest>` select a job-private Dolmen binary;
 otherwise the configured environment or pinned release supplies the tool. Replay checks the catalog
 source hash and exact retained model/output without invoking the native solver.
 
@@ -871,29 +869,18 @@ or incomplete cleanup withholds acceptance. Linux receipts identify address-spac
 control without claiming a measured RSS peak. Both hosts bound CPU and output file
 size; the tools also enforce their own memory and time limits. The JVM allows 35 seconds
 for the process and bounded cleanup; output streams are each limited to 1 MiB.
-Checker time is separate from native solve and incumbent time. SAT checks issue no
-solver query; incomplete reference output leaves the completed query count unknown.
+Checker time is separate from native solve and incumbent time. Checks issue no solver query.
 Raw cache hits are checked afresh; use `-Dklause.bench.cache=false` for a fresh solve.
 
-`bench.profile.SmtSourceReplay` delegates complete sets of saved SMT claims to
-the same external adapters without running Klause. Supply `input64=<base64 zstd JSON>`
+`bench.profile.SmtSourceReplay` delegates complete sets of saved SMT models to
+the same Dolmen adapter without running Klause. Supply `input64=<base64 zstd JSON>`
 and `sha256=<compressed digest>`. Schema 1 contains `sources` metadata and `models`
 with catalog `suite`/`problem`, exact `producerJson`/`stdout`, source/model hashes,
 and preserved producer `bindings`. Each model uses the complete unchanged catalog
 source and printed model. The replay records tool startup, per-model receipts and
 a final complete/partial summary; non-SAT source markers stay outside Dolmen's
-model-checking scope. Schema 2 uses `claims` with the same fields and a `scope`:
-`ground-original-smt-witness` for SAT models or
-`independent-original-smt-refutation` for already reported native UNSAT claims.
-The latter supplies a null model hash and uses the pinned Z3 CLI. A request can
-select `refutationSolver: "cvc5"` to use upstream cvc5 1.4.2 instead. The adapter
-passes the unchanged original to `--lang=smt2 --tlimit=30000`, with the same process,
-memory, stream, cleanup and receipt requirements. Hash-pinned static release ZIPs
-cover Linux and macOS x86-64/ARM64; `KLAUSE_CVC5` and `KLAUSE_CVC5_SHA256` can
-select an explicit executable. Selection performs one check with the named tool
-and does not try an alternative after an incomplete answer. Its completed
-reference-query count stays separate from native solver invocations; incomplete
-answers remain unverified. Both tools retain memory receipts. Mac replay checks
+model-checking scope. Schema 2 uses `claims` with the same fields and a `scope`, which must be
+`ground-original-smt-witness`. Mac replay checks
 the RSS guard with a below-baseline process allowance before checking claims.
 Requests are limited to 128 KiB encoded/16 MiB expanded. The main stops starting
 claims after two minutes by default. Set `claimStartTimeoutMs` in the request to

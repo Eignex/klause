@@ -11,26 +11,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 
-internal const val SMT_SOURCE_POLICY = "smt-external-original-claims-v2"
+internal const val SMT_SOURCE_POLICY = "smt-external-original-claims-v3"
 
 internal object SmtSourceValidation {
     const val GROUND = "ground-original-smt-witness"
-    const val REFUTATION = "independent-original-smt-refutation"
     private const val MAX_SOURCE_BYTES = 64 * 1024 * 1024
     private const val MAX_MODEL_BYTES = 8 * 1024 * 1024
     private const val MAX_RECORD_BYTES = 4 * 1024 * 1024
 
     internal data class Result(val validation: SourceValidation, val stats: Map<String, String> = emptyMap())
-
-    internal enum class RefutationSolver(val checker: String, val displayName: String) {
-        Z3("z3-reference", "Z3"),
-        CVC5("cvc5-reference", "cvc5");
-
-        fun arguments(source: File): List<String> = when (this) {
-            Z3 -> listOf("-smt2", "-T:30", "-memory:4096", source.absolutePath)
-            CVC5 -> listOf("--lang=smt2", "--tlimit=30000", source.absolutePath)
-        }
-    }
 
     internal data class Tool(
         val executable: File,
@@ -38,7 +27,6 @@ internal object SmtSourceValidation {
         val artifactUrl: String? = null,
         val artifactSha256: String? = null,
         val owned: Boolean = false,
-        val refutationSolver: RefutationSolver = RefutationSolver.Z3,
     ) : AutoCloseable {
         fun verify() {
             require(executable.isAbsolute && executable.isFile && executable.canExecute()) {
@@ -67,8 +55,6 @@ internal object SmtSourceValidation {
         val executableSha256: String,
         val process: SmtToolProcess,
         val status: String,
-        val solverSearchQueries: Int?,
-        val proofCertificateChecked: Boolean = false,
         val artifactUrl: String? = null,
         val artifactSha256: String? = null,
     )
@@ -88,7 +74,14 @@ internal object SmtSourceValidation {
         tool: Tool?,
         producerBytes: ByteArray? = null,
     ): Result {
-        val scope = eligible(record) ?: return Result(unknown("no eligible original SMT claim to check"))
+        if (!eligible(record)) {
+            // A refutation has no witness to check; the lab judges it against stored reference verdicts.
+            return Result(unknown(if (record.feasible == false) {
+                "UNSAT claims are compared with stored reference verdicts"
+            } else {
+                "no eligible original SMT model to check"
+            }))
+        }
         val started = System.nanoTime()
         var directory: File? = null
         var captured: Map<String, String> = emptyMap()
@@ -107,7 +100,7 @@ internal object SmtSourceValidation {
                 "sourceValidationProducerStdout" to raw,
                 "sourceValidationDirectory" to out.absolutePath,
             )
-            val resolved = tool ?: SmtSourceTools.resolve(scope, out)
+            val resolved = tool ?: SmtSourceTools.resolve(out)
             val setupMs = (System.nanoTime() - started) / 1_000_000
             val result = resolved.use {
                 validateOriginal(source, record, raw, out, resolved, producer)
@@ -129,7 +122,7 @@ internal object SmtSourceValidation {
         tool: Tool,
         producerBytes: ByteArray = Reports.json.encodeToString(record).toByteArray(),
     ): Result {
-        val scope = requireNotNull(eligible(record))
+        require(eligible(record)) { "no eligible original SMT model to check" }
         require(source.size <= MAX_SOURCE_BYTES) { "original source exceeds checker limit" }
         require(record.sourceHashes == mapOf("model" to sha256(source))) { "original source hash differs" }
         require(record.sourceOutputSha256 == sha256(raw.toByteArray())) { "producer stdout hash differs" }
@@ -137,13 +130,13 @@ internal object SmtSourceValidation {
         require(Reports.json.decodeFromString<SolveRecord>(producerBytes.decodeToString()) == record) {
             "producer record bytes differ"
         }
-        if (scope == GROUND) require(SolveEvidence.finalWitness(Format.SMTLIB, raw) == record.finalWitness) {
+        require(SolveEvidence.finalWitness(Format.SMTLIB, raw) == record.finalWitness) {
             "model differs from producer stdout"
         }
         val inputs = mapOf(
             "source.smt2" to source,
             "model.smt2" to record.finalWitness.orEmpty().toByteArray(),
-            "response.rsmt2" to (if (scope == GROUND) "sat\n${record.finalWitness}\n" else "").toByteArray(),
+            "response.rsmt2" to "sat\n${record.finalWitness}\n".toByteArray(),
             "stdout.txt" to raw.toByteArray(),
             "record.json" to producerBytes,
         )
@@ -153,98 +146,62 @@ internal object SmtSourceValidation {
         check(out.isDirectory || out.mkdirs())
         for ((name, bytes) in inputs) File(out, name).writeBytes(bytes)
         tool.verify()
-        val arguments = listOf(tool.executable.absolutePath) + if (scope == GROUND) {
-            listOf("--time=30s", "--size=4G", "--strict=false", "--check-model=true",
-                "--report-style=minimal", "--warn=-all", File(out, "source.smt2").absolutePath)
-        } else {
-            tool.refutationSolver.arguments(File(out, "source.smt2"))
-        }
+        val arguments = listOf(tool.executable.absolutePath, "--time=30s", "--size=4G", "--strict=false",
+            "--check-model=true", "--report-style=minimal", "--warn=-all", File(out, "source.smt2").absolutePath)
         val process = SmtSourceReceipt.run(arguments, File(out, "response.rsmt2"), out, 35_000)
         tool.verify()
         check(inputs.all { (name, bytes) -> File(out, name).readBytes().contentEquals(bytes) }) {
             "checker inputs changed"
         }
-        val status = interpret(scope, process)
-        val checker = if (scope == GROUND) "dolmen" else tool.refutationSolver.checker
-        val queries = if (scope == GROUND) 0 else if (process.exit == 0 && !process.timedOut &&
-            process.cleanupComplete && process.stdout.trim() in setOf("sat", "unsat", "unknown")) 1 else null
-        val receipt = Receipt(SMT_SOURCE_POLICY, checker, scope, inputs.mapValues { sha256(it.value) },
-            tool.executable.absolutePath, tool.binarySha256, process, status, queries,
+        val status = interpret(process)
+        val receipt = Receipt(SMT_SOURCE_POLICY, "dolmen", GROUND, inputs.mapValues { sha256(it.value) },
+            tool.executable.absolutePath, tool.binarySha256, process, status,
             artifactUrl = tool.artifactUrl, artifactSha256 = tool.artifactSha256)
         val json = Reports.json.encodeToString(receipt)
         File(out, "result.json").writeText(json)
         return Result(SourceValidation(status, when (status) {
-            "valid" -> if (scope == GROUND) {
-                "Dolmen accepted the original-source model"
-            } else {
-                "${tool.refutationSolver.displayName} returned UNSAT on the original source"
-            }
+            "valid" -> "Dolmen accepted the original-source model"
             "invalid" -> "Dolmen rejected the original-source model"
             else -> when {
                 process.memory?.exceeded == true -> "external SMT checker exceeded its memory limit"
                 process.memory?.qualified() != true -> "external SMT checker memory observation incomplete"
                 else -> "external SMT checking incomplete or unsupported"
             }
-        }, sourceHashes = record.sourceHashes, scope = scope,
-            checkedWitness = record.finalWitness.takeIf { status == "valid" && scope == GROUND }, checker = checker),
+        }, sourceHashes = record.sourceHashes, scope = GROUND,
+            checkedWitness = record.finalWitness.takeIf { status == "valid" }, checker = "dolmen"),
             mapOf(
                 "sourceValidationReceiptJson" to json,
                 "sourceValidationReceiptSha256" to sha256(json.toByteArray()),
                 "sourceValidationBinarySha256" to tool.binarySha256,
                 "sourceValidationCheckMs" to process.elapsedMs.toString(),
-                "sourceValidationSolverQueries" to (queries?.toString() ?: "unknown"),
-                "sourceValidationSolverQueryLimit" to if (scope == REFUTATION) "1" else "0",
-                "sourceValidationProofChecked" to "false",
-                "sourceValidationDerivationChecked" to "false",
-                "independentSourceRefutation" to (status == "valid" && scope == REFUTATION).toString(),
             ))
     }
 
-    internal fun interpret(scope: String, process: SmtToolProcess): String {
+    internal fun interpret(process: SmtToolProcess): String {
         if (process.memory?.qualified() != true) return "unknown"
         if (process.exit != 0 || process.timedOut || !process.cleanupComplete) {
-            return if (scope == GROUND && process.exit == 6 && !process.timedOut && process.cleanupComplete &&
+            return if (process.exit == 6 && !process.timedOut && process.cleanupComplete &&
                 process.stderr.trim() == "E:bad-model") "invalid" else "unknown"
         }
-        return when (scope) {
-            GROUND -> if (process.stdout.isBlank() && process.stderr.isBlank()) "valid" else "unknown"
-            REFUTATION -> if (process.stdout.trim() == "unsat" && process.stderr.isBlank()) "valid" else "unknown"
-            else -> "unknown"
-        }
+        return if (process.stdout.isBlank() && process.stderr.isBlank()) "valid" else "unknown"
     }
 
-    internal fun eligible(record: SolveRecord): String? {
-        if (record.kind != "satisfy" || record.objective != null || record.exactObjective != null ||
-            record.stats["exit"] != "0" || record.command.isEmpty() ||
-            listOf("killed", "unsupported", "quarantined").any { it in record.stats }
-        ) return null
-        return when {
-            record.feasible == true && !record.finalWitness.isNullOrEmpty() -> GROUND
-            record.feasible == false && record.proven -> REFUTATION
-            else -> null
-        }
-    }
+    /** A clean satisfiable answer with a printed model: the only SMT claim an external checker can confirm. */
+    internal fun eligible(record: SolveRecord): Boolean =
+        record.kind == "satisfy" && record.objective == null && record.exactObjective == null &&
+            record.stats["exit"] == "0" && record.command.isNotEmpty() &&
+            listOf("killed", "unsupported", "quarantined").none { it in record.stats } &&
+            record.feasible == true && !record.finalWitness.isNullOrEmpty()
 
+    /** A model is withheld unless Dolmen accepted it; any other claim stands as reported unless a check rejected it. */
     internal fun apply(record: SolveRecord, result: Result): SolveRecord {
-        val scope = eligible(record)
         val validation = result.validation
-        val accepted = validation.status == "valid" && validation.scope == scope && when (scope) {
-            GROUND -> validation.checkedWitness == record.finalWitness
-            REFUTATION -> validation.checkedWitness == null &&
-                result.stats["independentSourceRefutation"] == "true" &&
-                result.stats["sourceValidationSolverQueries"] == "1" &&
-                result.stats["sourceValidationDerivationChecked"] != "true"
-            else -> false
-        }
+        val accepted = eligible(record) && validation.status == "valid" && validation.scope == GROUND &&
+            validation.checkedWitness == record.finalWitness
         val checked = if (accepted) validation else validation.copy(
             status = if (validation.status == "invalid") "invalid" else "unknown", checkedWitness = null,
         )
-        return record.sourceChecked(checked, approximation = false,
-            witnessOnly = !(accepted && scope == REFUTATION)).let {
-            it.copy(stats = it.stats + result.stats + mapOf(
-                "independentSourceRefutation" to (accepted && scope == REFUTATION).toString(),
-                "sourceValidationDerivationChecked" to "false", "sourceValidationProofChecked" to "false",
-            ))
-        }
+        return record.sourceChecked(checked, approximation = false, witnessOnly = record.feasible == true)
+            .let { it.copy(stats = it.stats + result.stats) }
     }
 }

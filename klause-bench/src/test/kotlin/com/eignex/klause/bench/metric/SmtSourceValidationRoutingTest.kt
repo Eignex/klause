@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SmtSourceValidationRoutingTest {
     @Test
@@ -64,5 +65,31 @@ class SmtSourceValidationRoutingTest {
         }
         assertEquals(1, solves)
         assertEquals(2, checks)
+    }
+
+    @Test
+    fun `SMT opt in should keep a reported refutation without running an external tool`() {
+        val ref = ProblemRef(
+            "lia-basic",
+            Format.SMTLIB,
+            corpus("smtlib/lia-basic.smt2"),
+            Category.SAT,
+            Expected.Unknown,
+        )
+        val entry = ResolvedProblem(ref, lazy { error("validation must read original bytes") })
+        val settings = SolverInvocation.Settings(params = listOf("source-validation=true"))
+
+        val (record, _) = SolveMetric.solve(
+            entry, SolverInvocation.KLAUSE, settings,
+            Budget(10_000), UUID.randomUUID().toString(), "t", "producer", installedBuild = { null },
+            invoke = { _, _, _, _, _ ->
+                SolverInvocation.Result(false, null, null, proven = true, stats = mapOf("exit" to "0"),
+                    rawOutput = "unsat\n", command = "cli")
+            },
+        )
+
+        assertEquals(false, record.feasible)
+        assertTrue(record.proven)
+        assertEquals("unknown", record.stats["sourceValidation"])
     }
 }
