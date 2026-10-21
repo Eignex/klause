@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -15,6 +16,7 @@ import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +26,116 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolveInvocationTest {
+    @Test
+    fun `Boolean cover pins should count as fixed columns in source and both finite hosts`() {
+        val pairs = 8
+        val problem = Problem(2 * pairs, 0, emptyArray(), List(pairs) { Clause(intArrayOf(4 * it, 4 * it + 2)) })
+        val costs = (0 until 2 * pairs).associateWith { if (it % 2 == 0) 2L else 1L }
+        for (lane in PresolveLane.entries) {
+            for (config in listOf("off,+dual-fix", "off,+dual-fix,+bce")) {
+                val budget = PresolveBudget(Long.MAX_VALUE)
+                val context = PresolveContext(objectiveBoolCoeffs = costs, presolveBudget = budget)
+                val token = budget.orSpent(Cancellation.Never)
+
+                when (lane) {
+                    PresolveLane.SOURCE -> Presolver.runSource(problem, PresolveConfig.parse(config), context, token)
+                    PresolveLane.FINITE -> Presolver.run(problem.bake(), PresolveConfig.parse(config), context, token)
+                }
+
+                val call = budget.invocations.first { it.pass == "dual-fix" }
+                assertEquals(pairs, call.fixedColumns, "$lane $config")
+                assertEquals(0, call.narrowedColumns)
+                assertEquals(pairs, call.output.factors - call.input.factors)
+                assertEquals(pairs.toLong(), call.output.occurrences!! - call.input.occurrences!!)
+            }
+        }
+    }
+
+    @Test
+    fun `Boolean pin accounting should exclude duplicate and previously reported columns`() {
+        val pins = PresolveBooleanPins()
+        val first = PresolveInvocation("dual-fix", PresolveLane.SOURCE, PresolveSizeStats(0, 3, 0))
+        val second = PresolveInvocation("dual-fix", PresolveLane.SOURCE, PresolveSizeStats(0, 3, 0))
+
+        pins.record(first, listOf(Clause(intArrayOf(0)), Clause(intArrayOf(0)), Clause(intArrayOf(2)))) { it == 1 }
+        pins.record(second, listOf(Clause(intArrayOf(0)), Clause(intArrayOf(2)), Clause(intArrayOf(4)))) { false }
+
+        assertEquals(1, first.fixedColumns)
+        assertEquals(1, second.fixedColumns)
+    }
+
+    @Test
+    fun `existing source unit pins should retain zero fixing credit`() {
+        val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(1))))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        Presolver.runSource(problem, PresolveConfig.parse("off,+dual-fix"), PresolveContext(
+            objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L), presolveBudget = budget,
+        ), budget.orSpent(Cancellation.Never))
+
+        assertEquals(0, budget.invocations.sumOf { it.fixedColumns })
+        assertEquals(2L, budget.entrySizeVisits)
+    }
+
+    @Test
+    fun `initial source pins should stay known after their factor revision is replaced`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val pins = PresolveBooleanPins()
+        val unit = Clause(intArrayOf(0))
+        budget.entryUnits(arrayOf(unit))
+        pins.seed(budget.entryBooleanPins)
+        budget.entryUnits(emptyArray())
+        val invocation = PresolveInvocation("probe", PresolveLane.SOURCE, PresolveSizeStats(0, 1, 0))
+
+        pins.record(invocation, listOf(unit)) { false }
+
+        assertEquals(0, invocation.fixedColumns)
+        assertEquals(1L, budget.entrySizeVisits)
+    }
+
+    @Test
+    fun `finite root fixings should receive no credit when a pass emits their unit again`() {
+        val problem = Problem(3, 0, emptyArray(), listOf(
+            Cardinality(intArrayOf(0), min = 1, max = 1), Clause(intArrayOf(2, 4)),
+        )).bake()
+        for (config in listOf("off,+dual-fix", "off,+dual-fix,+bce")) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+
+            Presolver.run(problem, PresolveConfig.parse(config), PresolveContext(
+                objectiveBoolCoeffs = mapOf(1 to 2L, 2 to 1L), presolveBudget = budget,
+            ), budget.orSpent(Cancellation.Never))
+
+            val call = budget.invocations.first { it.pass == "dual-fix" }
+            assertEquals(2, call.output.factors - call.input.factors)
+            assertEquals(1, call.fixedColumns)
+        }
+    }
+
+    @Test
+    fun `interrupted Boolean cover indexing should receive no fixing credit`() {
+        val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(0, 2))))
+        for (lane in PresolveLane.entries) {
+            val setup = PresolveBudget(Long.MAX_VALUE)
+            if (lane == PresolveLane.FINITE) {
+                PresolveSession(problem.bake(), cancellation = setup.orSpent(Cancellation.Never)).passInput()
+            }
+            val budget = PresolveBudget(setup.spent() + 32L)
+            val context = PresolveContext(objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L), presolveBudget = budget)
+            val token = budget.orSpent(Cancellation.Never)
+            val config = PresolveConfig.parse("off,+dual-fix")
+
+            when (lane) {
+                PresolveLane.SOURCE -> Presolver.runSource(problem, config, context, token)
+                PresolveLane.FINITE -> Presolver.run(problem.bake(), config, context, token)
+            }
+
+            val call = budget.invocations.single()
+            assertEquals(PresolveInvocationOutcome.INTERRUPTED, call.outcome)
+            assertEquals(0, call.fixedColumns)
+            assertEquals(call.input.factors, call.output.factors)
+        }
+    }
+
     @Test
     fun `unsupported clause analyses should skip before entry accounting in either lane`() {
         val problem = Problem(3, 0, emptyArray(), List(8) { Clause(intArrayOf(0, 2, 4)) })

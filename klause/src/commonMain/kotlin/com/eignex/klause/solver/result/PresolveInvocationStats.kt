@@ -60,7 +60,7 @@ class PresolveInvocationStats internal constructor(
     val output: PresolveSizeStats,
     /** Integer columns explicitly narrowed by the pass. */
     val narrowedColumns: Int = 0,
-    /** Newly fixed columns explicitly reported by the pass or construction tier. */
+    /** Distinct new integer or Boolean fixings retained by the pass or construction tier. */
     val fixedColumns: Int = 0,
     /** Native visits outside the phase currency; existing containing charges are forwarded unchanged. */
     val nativeWork: Long = 0L,

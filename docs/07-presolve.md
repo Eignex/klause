@@ -29,9 +29,10 @@ tier reruns only after other passes changed at least 1% of the model and met its
 observed cost/yield threshold. Charged analysis and rebuild work, divided by the
 pass's entry weight and retained yield, estimates the intervening changes needed
 before another analysis. Yield is the largest of net occurrences removed, factors
-removed, reported columns narrowed or columns fixed, with a floor of one. Empty and
-interrupted calls retain their cost; only completed misses can park a pass. These
-signals are deterministic spending heuristics, not predictions or proofs of search
+removed, reported columns narrowed or columns fixed, with a floor of one. Distinct
+new Boolean unit pins count as fixed columns; existing units and finite root fixings
+do not. Empty and interrupted calls retain their cost; only completed misses can
+park a pass. These signals are deterministic spending heuristics, not predictions or proofs of search
 savings. Unmetered calls use the 1% change threshold without adding accounting
 scans. Cancellation and phase allowances still bound optional work. Presolve and
 an LP-relaxation harvest iterate to a joint fixpoint for at most four rounds, the
@@ -160,7 +161,8 @@ observed interruption. Namespace and candidate-shape checks precede entry scans;
 factor-count gates read the finite session's maintained live count. Closed discrete
 sources skip open-range probing, and integer-row-only analyses require integer columns.
 Entry size is cached per immutable factor revision and maintained from finite-session
-deltas. Dimensions, available occurrence counts and explicit column narrowings
+deltas. Entry analysis also caches source unit pins; finite calls read maintained
+root fixings. Dimensions, available occurrence counts and explicit column narrowings
 describe yield without another whole-model scan.
 
 `PresolvePreparationStats` separately attributes pre-bake LPs, root and engine
