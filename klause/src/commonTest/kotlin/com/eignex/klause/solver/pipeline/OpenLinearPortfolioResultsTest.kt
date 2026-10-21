@@ -174,7 +174,7 @@ class OpenLinearPortfolioResultsTest {
         assertTrue(ray.sample.exactReals?.single() != standing.exactReals?.single())
         assertEquals(context.linearValue(ray.sample, Cancellation.Never), folded.value)
         assertEquals(ray.sample.exactReals?.single().toString(), folded.witness.realValue(0))
-        assertSame(standing, folded.linearResult?.incumbent)
-        assertEquals(BigFraction.ofLong(-2), folded.linearResult?.value)
+        assertSame(standing, folded.linearResult.incumbent)
+        assertEquals(BigFraction.ofLong(-2), folded.linearResult.value)
     }
 }

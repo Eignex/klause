@@ -406,7 +406,9 @@ class PortfolioWorkAccountingTest {
             override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch {
                 openingDeadline = params.cancellation.deadline()
                 val until = TimeSource.Monotonic.markNow() + 5.milliseconds
-                while (!until.hasPassedNow()) Unit
+                do {
+                    val waiting = !until.hasPassedNow()
+                } while (waiting)
                 remainingMillis = (checkNotNull(openingDeadline) - TimeSource.Monotonic.markNow())
                     .inWholeMilliseconds.coerceAtLeast(0L)
                 return handle

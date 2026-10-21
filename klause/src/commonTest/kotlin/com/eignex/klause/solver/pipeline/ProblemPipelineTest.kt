@@ -249,7 +249,7 @@ class ProblemPipelineTest {
         ))
 
         assertEquals(1, assertNotNull(route.unplaceable).column)
-        assertEquals("NValue", route.unplaceable?.factorKind)
+        assertEquals("NValue", route.unplaceable.factorKind)
         assertTrue(route.preparedPlan.decline != PreparedPlanDecline.RESOURCE)
         assertFalse(route.problem.intBounds.hasUpper(1))
     }

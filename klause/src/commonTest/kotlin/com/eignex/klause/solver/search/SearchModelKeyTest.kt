@@ -49,21 +49,6 @@ class SearchModelKeyTest {
     }
 
     @Test
-    @Suppress("DEPRECATION")
-    fun `untyped writes should not put an incompatible value under a typed key`() {
-        val key = SearchModelKey(String::class)
-        val session = SearchSession(
-            listOf(object : SearchComponent {
-                override fun contributeModel(model: SearchModel, context: SearchContext) {
-                    model.put(key, 1)
-                }
-            }),
-        )
-
-        assertFailsWith<IllegalArgumentException> { session.model() }
-    }
-
-    @Test
     fun `typed contributions should still have one owning component`() {
         val key = SearchModelKey(String::class)
         val components = List(2) {

@@ -11,10 +11,10 @@ import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.CardinalitySearchComponent
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.Cancellation
@@ -27,7 +27,7 @@ class PlannedSearch internal constructor(
     /** Finite-domain participant, if selected. */
     val cp: CpSearchComponent?,
     /** Theory participant, if selected. */
-    val theory: TheoryComponent?,
+    val theory: SearchComponent?,
     private val resources: SearchInvocationResources,
     internal val candidateHints: SearchCandidateHints = SearchCandidateHints.None,
 ) : AutoCloseable {

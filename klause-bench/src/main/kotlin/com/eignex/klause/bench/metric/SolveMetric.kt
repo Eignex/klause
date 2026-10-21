@@ -21,10 +21,10 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import java.io.File
 import java.time.Instant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 
 /**
  * Runs corpus solves as subprocesses via [SolverInvocation], or in-process when profiling.
@@ -86,7 +86,7 @@ internal data class SolveRecord(
     /**
      * Per-arm portfolio improvement records in arrival order; empty for reference and
      * single-engine solves. Discrete objectives are exact decimal text, with a continuous
-     * objective when needed. Persisted numeric [Attribution.objective] values remain readable.
+     * objective when needed.
      */
     val attribution: List<Attribution> = emptyList(),
     val gitSha: String?,

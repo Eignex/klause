@@ -63,6 +63,7 @@ import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactAlgebraicRealValue
@@ -73,6 +74,7 @@ import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchIntegerBound
 import com.eignex.klause.solver.search.SearchModel
+import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SearchTheoryDecision
@@ -80,7 +82,6 @@ import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.SourceCoordinateAgreement
-import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.snapshotValues
@@ -170,7 +171,7 @@ class ExactLiraSearchComponent private constructor(
     private val preparedSource: PreparedExactLiraSource,
     private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)?,
     private val finiteIntVars: IntArray = intArrayOf(),
-) : TheoryComponent,
+) : SearchComponent,
     SearchBrancher,
     SearchBranchProposal,
     SourceCoordinateAgreement,
@@ -551,14 +552,14 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    override fun checkSourceCoordinates(values: AssembledSearchModel, context: SearchContext): ComponentCheck {
+    override fun checkSourceCoordinates(model: AssembledSearchModel, context: SearchContext): ComponentCheck {
         beginOperation()
         return try {
             if (outcome != ComponentCheck.Feasible || operationStop() || !context.consumeCheck()) {
                 return ComponentCheck.Indeterminate
             }
-            val point = ArrayList<BigFraction>(model.numRealVars + model.numIntVars)
-            for (variable in 0 until model.numRealVars) {
+            val point = ArrayList<BigFraction>(this.model.numRealVars + this.model.numIntVars)
+            for (variable in 0 until this.model.numRealVars) {
                 if (variable >= sourceRealCount) {
                     point += candidate?.get(variable) ?: return coordinateDeclined(context)
                     continue
@@ -566,15 +567,15 @@ class ExactLiraSearchComponent private constructor(
                 lpStop.charge(1L)
                 if (operationStop()) return ComponentCheck.Indeterminate
                 val id = SourceRealId(variable)
-                if (values.valueOf(SearchExactAlgebraicRealValue(id)) != null ||
-                    values.valueOf(SearchExactRealExpressionValue(id)) != null
+                if (model.valueOf(SearchExactAlgebraicRealValue(id)) != null ||
+                    model.valueOf(SearchExactRealExpressionValue(id)) != null
                 ) return coordinateDeclined(context)
-                point += values.valueOf(SearchExactRealValue(id)) ?: return coordinateDeclined(context)
+                point += model.valueOf(SearchExactRealValue(id)) ?: return coordinateDeclined(context)
             }
-            for (variable in 0 until model.numIntVars) {
+            for (variable in 0 until this.model.numIntVars) {
                 lpStop.charge(1L)
                 if (operationStop()) return ComponentCheck.Indeterminate
-                point += values.valueOf(SearchExactIntValue(SourceIntId(variable)))?.asFraction()
+                point += model.valueOf(SearchExactIntValue(SourceIntId(variable)))?.asFraction()
                     ?: return coordinateDeclined(context)
             }
             lpStop.charge(point.size.toLong() + 1L)
@@ -1519,10 +1520,19 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
+    /** Owned exact mixed assignment contributed by this component. */
+    val assignmentKey = SearchModelKey(ExactLiraAssignment::class)
+
+    /** Owned rational assignment for a source without integer coordinates. */
+    val realAssignmentKey = SearchModelKey(ExactLraAssignment::class)
+
     override fun contributeModel(model: SearchModel, context: SearchContext) {
         if (outcome != ComponentCheck.Feasible || context.cancelled()) return
         assignment?.let { value ->
-            model.put(this, if (this.model.numIntVars == 0) ExactLraAssignment(value.bools, value.reals) else value)
+            model.contribute(assignmentKey, value)
+            if (this.model.numIntVars == 0) {
+                model.contribute(realAssignmentKey, ExactLraAssignment(value.bools, value.reals))
+            }
             modelContribution?.invoke(value, model)
         }
     }

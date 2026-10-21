@@ -565,12 +565,11 @@ class SearchSession(
 
     /** Assemble a complete model from the active components at the current shared level. */
     fun model(): AssembledSearchModel {
-        val values = LinkedHashMap<Any, Any>()
+        val values = LinkedHashMap<TypedSearchValueKey<*>, Any>()
         val model = object : SearchModel {
-            @Suppress("OVERRIDE_DEPRECATION")
-            override fun put(key: Any, value: Any) {
+            override fun <V : Any> contribute(key: TypedSearchValueKey<V>, value: V) {
                 check(key !in values) { "duplicate model contribution for $key" }
-                values[key] = if (key is TypedSearchValueKey<*>) key.capture(value) else value
+                values[key] = key.capture(value)
             }
         }
         trail.contributeModel(model)

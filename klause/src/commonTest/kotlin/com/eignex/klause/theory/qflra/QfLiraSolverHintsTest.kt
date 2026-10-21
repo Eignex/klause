@@ -191,7 +191,7 @@ class QfLiraSolverHintsTest {
 
                     assertEquals(expected, hints.preferredBool(0))
                     val result = assertIs<SearchResult.Satisfied>(session.solve(1, candidateHints = hints))
-                    val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+                    val witness = assertNotNull(result.model.valueOf(component.realAssignmentKey))
                     assertEquals(expected, witness.boolValue(0))
                     assertEquals(BigFraction.ZERO, witness.reals.single())
                 }
@@ -268,7 +268,7 @@ class QfLiraSolverHintsTest {
                     } else {
                         val witness = assertNotNull(
                             assertIs<SearchResult.Satisfied>(result)
-                                .model.valueOf<ExactLiraAssignment>(component),
+                                .model.valueOf(component.assignmentKey),
                         )
                         assertContentEquals(Array(if (integerOnly) 2 else 1) { BIG_ONE }, witness.ints)
                         assertEquals(false, witness.boolValue(0))
@@ -386,7 +386,7 @@ class QfLiraSolverHintsTest {
 
             assertEquals(false, hints.preferredBool(0))
             val result = assertIs<SearchResult.Satisfied>(session.solve(1, candidateHints = hints))
-            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            val witness = assertNotNull(result.model.valueOf(component.realAssignmentKey))
             assertEquals(listOf(BigFraction.ONE, BigFraction.ofLong(2)), witness.reals)
         }
     }
@@ -686,7 +686,7 @@ class QfLiraSolverHintsTest {
 
                 val witness = assertNotNull(
                     assertIs<SearchResult.Satisfied>(result).model
-                        .valueOf<ExactLiraAssignment>(component),
+                        .valueOf(component.assignmentKey),
                 )
                 assertEquals(bigIntOf(expected), witness.intValue(0))
             }

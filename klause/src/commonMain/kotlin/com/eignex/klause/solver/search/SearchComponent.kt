@@ -456,16 +456,6 @@ data class SearchSolveParams(
     }
 }
 
-/**
- * Compatibility marker for arithmetic participants in the [SearchComponent] lifecycle.
- *
- * It supplies no additional callbacks or completeness authority. Arithmetic participants implement
- * [SearchComponent] and optional capabilities directly; they must not materialize finite CP domains.
- * [com.eignex.klause.theory.Theory] is a separate batch fragment-checking contract.
- */
-@Deprecated("Implement SearchComponent and its optional capabilities; Theory is a batch checking service")
-interface TheoryComponent : SearchComponent
-
 /** Shared state exposed to components without exposing finite CP domains. */
 interface SearchContext {
     /** Execution controls; custom contexts can inject deadline, accounting and stop diagnostics. */
@@ -541,9 +531,8 @@ interface SearchContext {
 
 /** Mutable model assembly owned by [SearchSession], not by any individual component. */
 interface SearchModel {
-    /** Store one component-owned value under an identity-stable [key]. */
-    @Deprecated("Use contribute with a TypedSearchValueKey")
-    fun put(key: Any, value: Any)
+    /** Contribute a value of the type associated with [key]; assembly captures its ownership. */
+    fun <V : Any> contribute(key: TypedSearchValueKey<V>, value: V)
 }
 
 /**
@@ -563,22 +552,22 @@ data class SearchBoolValue(
 }
 
 /**
- * Untyped source integer key with producer-specific Long or arbitrary-precision representation.
- * Use [SearchExactIntValue] for a typed authoritative coordinate.
+ * Source integer location in a [SourceBoundTerm].
+ * Model contributions use [SearchExactIntValue].
  */
 data class SearchIntValue(
     /** Source integer variable id. */
     val variable: Int,
 ) : SearchValueKey
 
-/** Untyped real key with producer-specific representation; use [SearchExactRealValue] for exact values. */
+/** Source real location in a [SourceBoundTerm]; model contributions use typed exact real keys. */
 data class SearchRealValue(
     /** Source real variable id. */
     val variable: Int,
 ) : SearchValueKey
 
 /** Immutable complete model assembled from all active components. */
-class AssembledSearchModel internal constructor(values: Map<Any, Any>) {
+class AssembledSearchModel internal constructor(values: Map<TypedSearchValueKey<*>, Any>) {
     private val values = values.toMap()
 
     // Registered arithmetic atoms can add Boolean keys beyond the declared source variables.
@@ -599,9 +588,4 @@ class AssembledSearchModel internal constructor(values: Map<Any, Any>) {
         require(key.valueType.isInstance(value)) { "model key has an incompatible value type" }
         return value as V
     }
-
-    /** Unchecked read; opaque values remain borrowed read-only. */
-    @Deprecated("Use valueOf with a TypedSearchValueKey")
-    @Suppress("UNCHECKED_CAST")
-    fun <A : Any> valueOf(key: Any): A? = values[key] as A?
 }

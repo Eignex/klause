@@ -60,7 +60,7 @@ class SourceExecutionControlsTest {
         assertEquals(0L, assertNotNull(request.nodeBudget).limit)
         assertEquals(Long.MAX_VALUE, request.theory.openWorkLimit)
         assertIs<OpenTheoryResult.Sat>(assertIs<OpenTheoryExecution.Satisfy>(result.result).result)
-        assertEquals(0L, request.nodeBudget?.spent)
+        assertEquals(0L, request.nodeBudget.spent)
     }
 
     @Test
@@ -94,7 +94,7 @@ class SourceExecutionControlsTest {
         )))
 
         assertEquals(Long.MAX_VALUE, assertNotNull(request.nonlinearInteger).maximumCandidates)
-        assertEquals(Long.MAX_VALUE, request.nonlinearInteger?.maximumMoves)
+        assertEquals(Long.MAX_VALUE, request.nonlinearInteger.maximumMoves)
         assertNull(request.polynomial.maximumWork)
         assertNull(request.polynomial.maximumDenseCoefficients)
         assertNull(request.polynomial.maximumMatrixCells)

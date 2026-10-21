@@ -122,7 +122,7 @@ class QfLiraSolverConflictTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
             val result = assertIs<SearchResult.Satisfied>(session.solve(1))
 
-            assertEquals(BIG_ZERO, assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints.single())
+            assertEquals(BIG_ZERO, assertNotNull(result.model.valueOf(component.assignmentKey)).ints.single())
         }
     }
 
@@ -224,7 +224,7 @@ class QfLiraSolverConflictTest {
 
             assertEquals(
                 bigIntOf(Long.MAX_VALUE) + BIG_ONE,
-                assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints.single(),
+                assertNotNull(result.model.valueOf(component.assignmentKey)).ints.single(),
             )
         }
     }

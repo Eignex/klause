@@ -31,7 +31,6 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
-import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
@@ -151,7 +150,7 @@ class QfLiraSolverTest {
         )
 
         assertContentEquals(intArrayOf(Lit.make(0, positive = false)), conflict.explanation?.literals)
-        assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        assertNull(session.model().valueOf(component.assignmentKey))
     }
 
     @Test
@@ -220,7 +219,7 @@ class QfLiraSolverTest {
 
             val witness = assertNotNull(
                 assertIs<SearchResult.Satisfied>(result).model
-                    .valueOf<ExactLiraAssignment>(component),
+                    .valueOf(component.assignmentKey),
             )
             assertEquals(BIG_ZERO, witness.intValue(0))
         }
@@ -272,7 +271,7 @@ class QfLiraSolverTest {
         )
 
         assertIs<ComponentCheck.Indeterminate>(session.check())
-        assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        assertNull(session.model().valueOf(component.assignmentKey))
     }
 
     @Test
@@ -455,7 +454,7 @@ class QfLiraSolverTest {
 
             val witness = assertNotNull(
                 assertIs<SearchResult.Satisfied>(result).model
-                    .valueOf<ExactLiraAssignment>(component),
+                    .valueOf(component.assignmentKey),
             )
             assertEquals(bigIntOf(-1), witness.intValue(0))
         }
@@ -484,7 +483,7 @@ class QfLiraSolverTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(1))
-            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            val witness = assertNotNull(result.model.valueOf(component.realAssignmentKey))
             assertEquals(listOf(BigFraction.ZERO, BigFraction.ZERO), witness.reals)
             assertEquals(false, witness.bools[0])
         }
@@ -510,7 +509,7 @@ class QfLiraSolverTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(1))
-            val witness = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val witness = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(BIG_ONE, witness.intValue(0))
             assertEquals(false, witness.bools[0])
         }
@@ -527,7 +526,7 @@ class QfLiraSolverTest {
             privateStopped = true
 
             assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
-            assertNull(session.model().valueOf<ExactLiraAssignment>(owned))
+            assertNull(session.model().valueOf(owned.assignmentKey))
             session.popTo(0)
             privateStopped = false
             assertIs<ComponentResult.Consistent>(session.propagate())
@@ -546,7 +545,7 @@ class QfLiraSolverTest {
 
             assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
 
-            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertNull(session.model().valueOf(component.assignmentKey))
         }
     }
 

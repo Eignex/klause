@@ -191,7 +191,7 @@ class CompiledSourceBindingTest {
             init { constraint(Not(x.present.toExpr())) }
         }
         val compiled = schema.compile()
-        val point = BacktrackSolver(compiled).enumerate().single()
+        val point = BacktrackSolver(compiled.problem.bake()).enumerate().single()
         val original = compiled.sourceBinding.originalProblem
         val column = assertNotNull(compiled.sourceBinding.legacyColumn(schema.x.value.name))
 
@@ -211,7 +211,8 @@ class CompiledSourceBindingTest {
         }
         val compiled = schema.compile(semanticOverrides = SemanticOverrides(pinAbsentOptionalValues = false))
 
-        val points = BacktrackSolver(compiled).enumerate().map { compiled.decode(schema.x.value, it) }.toSet()
+        val points = BacktrackSolver(compiled.problem.bake()).enumerate()
+            .map { compiled.decode(schema.x.value, it) }.toSet()
 
         assertEquals(setOf(-1.0, 1.0), points)
         assertEquals(0, compiled.sourceBinding.originalProblem.numIntVars)

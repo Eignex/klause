@@ -14,7 +14,7 @@ import kotlin.reflect.KClass
  * [snapshot] captures borrowed producer state once during assembly; its result must be immutable.
  */
 interface TypedSearchValueKey<V : Any> : SearchValueKey {
-    /** Runtime check for untyped contribution paths; generic arguments remain the extension's contract. */
+    /** Runtime check for captured contributions; generic arguments remain the extension's contract. */
     val valueType: KClass<V>
 
     /** Owned immutable value retained by the assembled model. Immutable values may be returned unchanged. */
@@ -66,12 +66,6 @@ data class SearchExactRealExpressionValue(
     val variable: SourceRealId,
 ) : TypedSearchValueKey<ExactRealValue> {
     override val valueType: KClass<ExactRealValue> get() = ExactRealValue::class
-}
-
-/** Contribute a value of the type associated with [key]; session assembly captures its ownership. */
-@Suppress("DEPRECATION")
-fun <V : Any> SearchModel.contribute(key: TypedSearchValueKey<V>, value: V) {
-    put(key, value)
 }
 
 @Suppress("UNCHECKED_CAST")

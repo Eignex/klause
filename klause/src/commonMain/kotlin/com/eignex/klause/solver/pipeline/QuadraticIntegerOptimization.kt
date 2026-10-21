@@ -544,7 +544,7 @@ internal class QuadraticIntegerOptimization(
             source.integerCoordinates.map { algebraic.exactInteger(point.realValue(it)) }
         }
         val integral = exact?.all { it != null } == true
-        if (integral && assignment != null) accept(capture(assignment), heuristic = !global)
+        if (integral) accept(capture(assignment), heuristic = !global)
         if (result is QuadraticRelaxationResult.Minimum) {
             if (result.attained && integral) return QuadraticIntegerNode.Closed(
                 result.assignment, result.value, true, result.proof,

@@ -17,7 +17,6 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
-import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.StringCharSource
@@ -233,7 +232,7 @@ class SmtLibConditionalEqualityTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(bigIntOf(5), assignment.ints[parsed.intVarNames.getValue("x")])
         }
     }
@@ -332,7 +331,7 @@ class SmtLibConditionalEqualityTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(bigIntOf(99), assignment.ints[parsed.intVarNames.getValue("x")])
         }
     }
@@ -394,7 +393,7 @@ class SmtLibConditionalEqualityTest {
 
                 val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
                 assertEquals(value == 0, assignment.bools[parsed.boolVarNames.getValue("result")])
             }
         }
@@ -465,7 +464,7 @@ class SmtLibConditionalEqualityTest {
 
                 val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
                 assertEquals(true, assignment.bools[parsed.boolVarNames.getValue("b")])
                 assertEquals(value == 3, assignment.bools[parsed.boolVarNames.getValue("result")])
             }
@@ -529,7 +528,7 @@ class SmtLibConditionalEqualityTest {
 
                 val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
                 assertEquals(value == 1, assignment.bools[parsed.boolVarNames.getValue("result")])
             }
         }
@@ -553,7 +552,7 @@ class SmtLibConditionalEqualityTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(bigIntOf(1), assignment.ints[parsed.intVarNames.getValue("t")])
         }
     }
@@ -576,7 +575,7 @@ class SmtLibConditionalEqualityTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(bigIntOf(Long.MIN_VALUE), assignment.ints[parsed.intVarNames.getValue("x")])
         }
     }
@@ -600,7 +599,7 @@ class SmtLibConditionalEqualityTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(
                 BigFraction.of(bigIntOf(19), bigIntOf(2)),
                 assignment.reals[parsed.realVarNames.getValue("r")],
@@ -698,7 +697,7 @@ class SmtLibConditionalEqualityTest {
 
                 val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
                 assertEquals(bigIntOf(4 - branch), assignment.ints[parsed.intVarNames.getValue("x")])
             }
         }
@@ -722,7 +721,7 @@ class SmtLibConditionalEqualityTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
 
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(bigIntOf(9), assignment.ints[parsed.intVarNames.getValue("x")])
         }
     }

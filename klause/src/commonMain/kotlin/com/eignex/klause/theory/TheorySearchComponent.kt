@@ -3,10 +3,11 @@ package com.eignex.klause.theory
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModel
-import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.solver.search.TypedSearchValueKey
 
 /**
  * Bridges a batch fragment-checking [Theory] into the incremental shared search lifecycle.
@@ -18,10 +19,12 @@ import com.eignex.klause.solver.search.TheoryComponent
  * checks remain indeterminate. Directly incremental components implement
  * [com.eignex.klause.solver.search.SearchComponent] without implementing [Theory].
  */
-class TheorySearchComponent<A>(
+class TheorySearchComponent<A : Any>(
     private val theory: Theory<A>,
+    /** Key for the immutable assignment supplied by the batch service. */
+    val assignmentKey: TypedSearchValueKey<A>,
     private val modelContribution: ((A, SearchModel) -> Unit)? = null,
-) : TheoryComponent {
+) : SearchComponent {
     private var smtStats: SmtStatsSink? = null
     private val bools = IntArray(theory.model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(theory.model.numBoolVars) { -1 }
@@ -103,7 +106,7 @@ class TheorySearchComponent<A>(
 
     override fun contributeModel(model: SearchModel, context: SearchContext) {
         assignment?.let {
-            model.put(this, it)
+            model.contribute(assignmentKey, it)
             modelContribution?.invoke(it, model)
         }
     }

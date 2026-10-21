@@ -44,7 +44,6 @@ internal fun sourceIntegerDefinition(problem: Problem, hint: DefinitionHint.Inte
                     Array(selected.size) { operands[selected[it]] }, hint.bound,
                 )
             }
-            else -> return null
         }
     } else CapturedIntegerDefinition(hint, operands, outputSlot)
     val reads = inputs.indices.filter { it != outputSlot }.mapNotNull { inputs[it].variableOrNull() }

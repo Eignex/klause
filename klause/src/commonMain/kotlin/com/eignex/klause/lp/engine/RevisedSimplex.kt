@@ -1320,7 +1320,7 @@ internal class RevisedSimplex(
             before.boundRevision == after.boundRevision && before.popRevision == after.popRevision &&
             before.rowRevision == after.rowRevision && before.model.objective != after.model.objective
         if (objectiveOnly || (kept && before != null && cachedPrimalOnly)) {
-            if (before?.model?.objective != after?.model?.objective) {
+            if (before.model.objective != after?.model?.objective) {
                 observations.objectiveWarmAttempts++
                 observations.objectiveWarmHits++
             }

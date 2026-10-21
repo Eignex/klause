@@ -8,6 +8,7 @@ import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
+import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,13 +34,13 @@ class TheorySearchComponentTest {
             override fun initialize(context: SearchContext): ComponentResult =
                 context.publish(SearchDecision.IntAtMost(0, 4))
         }
-        val component = TheorySearchComponent(theory)
+        val component = TheorySearchComponent(theory, SearchModelKey(Long::class))
         val session = SearchSession(listOf(publisher, component))
 
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<ComponentCheck.Feasible>(session.check())
 
-        assertEquals(4L, session.model().valueOf<Long>(component))
+        assertEquals(4L, session.model().valueOf(component.assignmentKey))
     }
 
     @Test
@@ -55,7 +56,7 @@ class TheorySearchComponentTest {
             override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Unit> =
                 if (bools[0]) TheoryCheck.Infeasible(SearchExplanation(intArrayOf(1))) else TheoryCheck.Sat(Unit)
         }
-        val session = SearchSession(listOf(TheorySearchComponent(theory)))
+        val session = SearchSession(listOf(TheorySearchComponent(theory, SearchModelKey(Unit::class))))
 
         assertIs<ComponentResult.Consistent>(session.initialize())
         val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
@@ -78,14 +79,14 @@ class TheorySearchComponentTest {
             override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Long> =
                 if (available) TheoryCheck.Sat(7L) else TheoryCheck.Cancelled
         }
-        val component = TheorySearchComponent(theory)
+        val component = TheorySearchComponent(theory, SearchModelKey(Long::class))
         val session = SearchSession(listOf(component))
 
         assertIs<ComponentResult.Indeterminate>(session.initialize())
-        assertNull(session.model().valueOf<Long>(component))
+        assertNull(session.model().valueOf(component.assignmentKey))
         available = true
         assertIs<ComponentCheck.Feasible>(session.check())
-        assertEquals(7L, session.model().valueOf<Long>(component))
+        assertEquals(7L, session.model().valueOf(component.assignmentKey))
     }
 
     @Test
@@ -101,14 +102,14 @@ class TheorySearchComponentTest {
             override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Long> =
                 TheoryCheck.Sat(context.intUpperBound(0) ?: 10L)
         }
-        val component = TheorySearchComponent(theory)
+        val component = TheorySearchComponent(theory, SearchModelKey(Long::class))
         val session = SearchSession(listOf(component))
         assertIs<ComponentResult.Consistent>(session.initialize())
-        assertEquals(10L, session.model().valueOf<Long>(component))
+        assertEquals(10L, session.model().valueOf(component.assignmentKey))
 
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtMost(0, 4)))
 
-        assertEquals(4L, session.model().valueOf<Long>(component))
+        assertEquals(4L, session.model().valueOf(component.assignmentKey))
     }
 
     @Test
@@ -124,15 +125,15 @@ class TheorySearchComponentTest {
             override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Long> =
                 TheoryCheck.Sat(context.intUpperBound(0) ?: 10L)
         }
-        val component = TheorySearchComponent(theory)
+        val component = TheorySearchComponent(theory, SearchModelKey(Long::class))
         val session = SearchSession(listOf(component))
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtMost(0, 4)))
 
         session.popTo(0)
 
-        assertNull(session.model().valueOf<Long>(component))
+        assertNull(session.model().valueOf(component.assignmentKey))
         assertIs<ComponentCheck.Feasible>(session.check())
-        assertEquals(10L, session.model().valueOf<Long>(component))
+        assertEquals(10L, session.model().valueOf(component.assignmentKey))
     }
 }

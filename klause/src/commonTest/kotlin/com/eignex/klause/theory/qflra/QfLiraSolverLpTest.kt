@@ -196,7 +196,7 @@ class QfLiraSolverLpTest {
                 assertEquals(!Lit.isPositive(excluded.literal), session.boolValue(excluded.literal ushr 1))
             }
             val result = assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars))
-            val values = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints
+            val values = assertNotNull(result.model.valueOf(component.assignmentKey)).ints
             for (excluded in listOf(transformed, free)) {
                 val atom = assertIs<SourceBoundAtom>(excluded.payload)
                 val activity = atom.terms.fold(BigFraction.ZERO) { sum, term ->
@@ -254,7 +254,7 @@ class QfLiraSolverLpTest {
                     session.popTo(0)
                     assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
                     val result = assertIs<SearchResult.Satisfied>(session.solve(1))
-                    val value = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single()
+                    val value = assertNotNull(result.model.valueOf(component.realAssignmentKey)).reals.single()
                     assertTrue(value >= BigFraction.ZERO && value <= BigFraction.ofLong(2))
                     assertTrue(
                         coefficients.fold(BigFraction.ZERO) { sum, coefficient ->
@@ -280,7 +280,7 @@ class QfLiraSolverLpTest {
             for (truth in listOf(false, true)) {
                 session.push(SearchDecision.Bool(Lit.make(0, truth)))
                 val result = assertIs<SearchResult.Satisfied>(session.solve(1))
-                val value = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints.single()
+                val value = assertNotNull(result.model.valueOf(component.assignmentKey)).ints.single()
                 assertEquals(if (truth) BIG_ZERO else -BIG_ONE, value)
                 session.popTo(0)
             }
@@ -312,7 +312,7 @@ class QfLiraSolverLpTest {
             )
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
-            val value = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints.single()
+            val value = assertNotNull(result.model.valueOf(component.assignmentKey)).ints.single()
             assertTrue(value > limit)
         }
     }
@@ -345,7 +345,7 @@ class QfLiraSolverLpTest {
             val atom = assertIs<RegisteredTheoryDecision>(branch)
             assertEquals(2, assertIs<SourceBoundAtom>(atom.payload).terms.size)
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
-            val values = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints
+            val values = assertNotNull(result.model.valueOf(component.assignmentKey)).ints
             assertEquals(BIG_ONE, values[0] - values[1])
             assertTrue(values[0] + values[1] >= BIG_ONE)
         }
@@ -374,7 +374,7 @@ class QfLiraSolverLpTest {
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0, maxAtoms = 0))
             session.initialize()
             assertIs<SearchResult.Indeterminate>(session.solve(0))
-            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertNull(session.model().valueOf(component.assignmentKey))
         }
     }
 
@@ -448,7 +448,7 @@ class QfLiraSolverLpTest {
                         assertIs<SearchResult.Indeterminate>(
                             planned.session.solve(0, SearchSolveParams(maxDecisions = 0)),
                         )
-                        assertNull(planned.session.model().valueOf<ExactLiraAssignment>(component))
+                        assertNull(planned.session.model().valueOf(component.assignmentKey))
                     }
                 }
             }
@@ -470,7 +470,7 @@ class QfLiraSolverLpTest {
             )
             assertIs<ComponentResult.Indeterminate>(session.initialize())
             assertIs<ComponentCheck.Indeterminate>(session.check())
-            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertNull(session.model().valueOf(component.assignmentKey))
         }
         assertEquals(1, factory.created)
         assertEquals(1, factory.closed)
@@ -487,14 +487,14 @@ class QfLiraSolverLpTest {
             )
             session.initialize()
             val solved = assertIs<SearchResult.Satisfied>(session.solve(0))
-            val original = assertNotNull(solved.model.valueOf<ExactLiraAssignment>(component)).ints.single()
+            val original = assertNotNull(solved.model.valueOf(component.assignmentKey)).ints.single()
             assertEquals(bigIntOf(0), original)
             stopped = true
             assertIs<ComponentCheck.Indeterminate>(session.check())
-            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertNull(session.model().valueOf(component.assignmentKey))
             stopped = false
             assertIs<ComponentCheck.Feasible>(session.check())
-            val restored = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component)).ints.single()
+            val restored = assertNotNull(session.model().valueOf(component.assignmentKey)).ints.single()
             assertEquals(bigIntOf(0), restored)
         }
     }
@@ -529,7 +529,7 @@ class QfLiraSolverLpTest {
 
                 assertNull(component.nextBranch(session))
                 assertIs<SearchResult.Indeterminate>(session.solve(0))
-                assertNull(session.model().valueOf<Any>(component))
+                assertNull(session.model().valueOf(component.assignmentKey))
                 assertEquals(0L, stats.snapshot().sourceLp.operations)
                 assertTrue(stats.snapshot().continuation.calls > 0L)
             }
@@ -576,7 +576,7 @@ class QfLiraSolverLpTest {
             assertIs<ComponentResult.Consistent>(session.initialize())
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
-            val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals
+            val point = assertNotNull(result.model.valueOf(component.realAssignmentKey)).reals
             assertEquals(BigFraction.ONE, BigFraction.ofLong(3) * point[0] + BigFraction.ofLong(5) * point[1])
             assertTrue(injectedFailures > 0)
             assertTrue(stats.snapshot().continuation.successes > 0L)
@@ -640,7 +640,7 @@ class QfLiraSolverLpTest {
                 }
             }
             assertIs<ComponentCheck.Feasible>(component.check(session))
-            val point = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component)).ints
+            val point = assertNotNull(session.model().valueOf(component.assignmentKey)).ints
             assertEquals(BIG_ONE, point[0] - point[1])
             assertTrue(point[0] + point[1] >= bigIntOf(3))
         }

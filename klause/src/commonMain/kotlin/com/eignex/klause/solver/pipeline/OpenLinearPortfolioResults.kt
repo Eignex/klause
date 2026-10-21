@@ -104,7 +104,7 @@ internal class OpenLinearPortfolioResults(
             val old = standing?.claim as? SourceClaim.Bound
             val oldValue = (old?.value as? SourceValue.Rational)?.value
             if (oldValue == null || values.improves(oldValue, value) ||
-                (oldValue == value && claim.strict && old?.strict != true)
+                (oldValue == value && claim.strict && old.strict != true)
             ) standing = candidate
         }
         return standing

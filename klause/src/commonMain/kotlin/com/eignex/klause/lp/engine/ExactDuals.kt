@@ -143,7 +143,7 @@ private class ExactDualMeter(val limits: ExactDualLimits, private val cancellati
         allocation += bytes
     }
 
-    fun <T : Dyadic> dyadic(value: T): T {
+    fun dyadic(value: Dyadic): Dyadic {
         charge(value.width)
         return value
     }

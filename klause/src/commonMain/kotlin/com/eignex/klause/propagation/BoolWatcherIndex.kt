@@ -65,9 +65,9 @@ internal class BoolWatcherIndex(
                 blockers[lit] = IntArrayList(initialCapacity = 2)
                 if ((lit + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
-            @Suppress("UNCHECKED_CAST")
             val positions = MutableLongIntMap(watcherCount + 1)
             yield(null)
+            @Suppress("UNCHECKED_CAST")
             yield(BoolWatcherIndex(
                 numBoolVars, watches as Array<IntArrayList>, blockers as Array<IntArrayList>, positions,
             ))

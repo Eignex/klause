@@ -468,7 +468,7 @@ internal class RefinementAuthority(val state: LpExactState, val meter: Refinemen
         meter.number(source.objective.scale.value)
         meter.number(source.objective.externalConstant.value)
         model = state.toWorkingModel() ?: meter.stop(LpRefinementDecline.PROJECTION)
-        previousStage?.let { meter.diagnostic?.stage = it }
+        previousStage?.let { meter.diagnostic.stage = it }
     }
 
     fun activity(x: List<BigFraction>): List<BigFraction> {
@@ -911,7 +911,7 @@ private class RefinementRun(
         val previousStage = meter.diagnostic?.stage
         meter.diagnostic?.stage = LpRefinementStage.CHILD_ADMISSION
         val allowance = meter.allowance(true)
-        previousStage?.let { meter.diagnostic?.stage = it }
+        previousStage?.let { meter.diagnostic.stage = it }
         return if (anchor == null) {
             request.source.withWorkingModel(working, meter.token, allowance) { block(it, allowance) }
         } else {

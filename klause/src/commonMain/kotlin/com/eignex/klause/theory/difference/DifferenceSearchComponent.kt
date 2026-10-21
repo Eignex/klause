@@ -16,14 +16,13 @@ import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExplanation
-import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
-import com.eignex.klause.solver.search.TheoryComponent
-import com.eignex.klause.solver.search.contribute
+import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
@@ -40,7 +39,7 @@ class DifferenceSearchComponent private constructor(
     private val model: Problem,
     private val modelIntVars: IntArray,
     private val rootBoundVars: IntArray,
-) : TheoryComponent {
+) : SearchComponent {
     private val base = differenceFragmentOf(model.factors, model.numIntVars, model.intBounds)
     private val rootBoundPlan: RootBoundPlan? = run {
         if (rootBoundVars.isEmpty()) return@run null
@@ -307,14 +306,16 @@ class DifferenceSearchComponent private constructor(
         return if (!hasPositive || !hasNegative || positive == negative) null else positive
     }
 
+    /** Owned integer potential assignment contributed by this component. */
+    val assignmentKey = SearchModelKey(Sample::class)
+
     override fun contributeModel(model: SearchModel, context: SearchContext) {
         assignment?.let { assignment ->
             for (variable in modelIntVars) {
                 val value = assignment.intValue(variable)
-                model.put(SearchIntValue(variable), value)
                 model.contribute(SearchExactIntValue(SourceIntId(variable)), bigIntOf(value))
             }
-            model.put(this, assignment)
+            model.contribute(assignmentKey, assignment)
         }
     }
 

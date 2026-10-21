@@ -275,7 +275,7 @@ internal class SourceConjunctionHints private constructor(
                     usage?.clauseIndex(core != null)
                     if (core == null) return decline(requireNotNull(budget.outcome))
                 }
-                if (shared?.reserve(3) == false) return decline(requireNotNull(shared?.outcome))
+                if (shared?.reserve(3) == false) return decline(requireNotNull(shared.outcome))
                 val pairs = HashSet<Long>()
                 for (clause in clauses) {
                     preparationVisits += 1 + minOf(3, clause.literals.size)
@@ -295,7 +295,7 @@ internal class SourceConjunctionHints private constructor(
                         return decline(HintIndexOutcome.STORAGE)
                     }
                     if (key !in pairs && shared?.reserve(1) == false) {
-                        return decline(requireNotNull(shared?.outcome))
+                        return decline(requireNotNull(shared.outcome))
                     }
                     pairs += key
                 }
@@ -336,7 +336,7 @@ internal class SourceConjunctionHints private constructor(
                         if (entries.toLong() + count + 1L > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.STORAGE)
                         if (!visit(count)) return visitDecline()
                         if (shared?.reserve(count + 1) == false) {
-                            return decline(requireNotNull(shared?.outcome))
+                            return decline(requireNotNull(shared.outcome))
                         }
                         val operands = IntArray(count)
                         var complete = true
@@ -379,7 +379,7 @@ internal class SourceConjunctionHints private constructor(
                         }
                         if (prior != null && (prior.target != target || !prior.inputs.contentEquals(operands))) {
                             gates.remove(variable)
-                            if (shared?.reserve(1) == false) return decline(requireNotNull(shared?.outcome))
+                            if (shared?.reserve(1) == false) return decline(requireNotNull(shared.outcome))
                             ambiguous += variable
                             entries -= prior.inputs.size
                         } else if (prior == null) {

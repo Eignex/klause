@@ -241,16 +241,17 @@ class SearchSessionTest {
 
     @Test
     fun `session should assemble component-owned model values`() {
+        val key = SearchModelKey(String::class)
         val component = object : SearchComponent {
             override fun contributeModel(model: SearchModel, context: SearchContext) {
-                model.put(this, "model")
+                model.contribute(key, "model")
             }
         }
         val session = SearchSession(listOf(component))
 
         val model = session.model()
 
-        assertEquals("model", model.valueOf<String>(component))
+        assertEquals("model", model.valueOf(key))
     }
 
     @Test
@@ -259,7 +260,7 @@ class SearchSessionTest {
 
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
 
-        assertEquals(true, session.model().valueOf<Boolean>(SearchBoolValue(0)))
+        assertEquals(true, session.model().valueOf(SearchBoolValue(0)))
     }
 
     @Test
@@ -658,7 +659,7 @@ class SearchSessionTest {
         val result = assertIs<SearchRunEvent.Satisfied>(run.next())
 
         assertEquals(2, seen)
-        assertEquals(true, result.model.valueOf<Boolean>(SearchBoolValue(0)))
+        assertEquals(true, result.model.valueOf(SearchBoolValue(0)))
     }
 
     @Test
@@ -730,7 +731,7 @@ class SearchSessionTest {
         cancelled = false
         val result = assertIs<SearchRunEvent.Satisfied>(run.next())
 
-        assertEquals(true, result.model.valueOf<Boolean>(SearchBoolValue(0)))
+        assertEquals(true, result.model.valueOf(SearchBoolValue(0)))
         assertEquals(2, checked)
     }
 

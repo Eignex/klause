@@ -151,7 +151,9 @@ class PropagationPreparationTest {
         cancelled = true
         assertNull(seed.next())
         cancelled = false
-        while (seed.next() == null) Unit
+        do {
+            val step = seed.next()
+        } while (step == null)
 
         assertEquals(1, session.decisionLevel)
         assertEquals(expected.work, session.work)
@@ -172,7 +174,9 @@ class PropagationPreparationTest {
 
         assertNull(seed.next())
         assertEquals(1, session.decisionLevel)
-        while (seed.next() == null) Unit
+        do {
+            val step = seed.next()
+        } while (step == null)
 
         assertEquals(260, session.decisionLevel)
         assertTrue((0 until 260).all { session.intDomain(it) == IntDomain(0, 0) })
@@ -196,7 +200,9 @@ class PropagationPreparationTest {
         expected.seed(assumptions)
 
         assertNull(seed.next())
-        while (seed.next() == null) Unit
+        do {
+            val step = seed.next()
+        } while (step == null)
 
         assertEquals(1, session.decisionLevel)
         assertEquals(expected.work, session.work)

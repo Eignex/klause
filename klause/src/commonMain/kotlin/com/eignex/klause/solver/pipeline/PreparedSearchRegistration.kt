@@ -17,7 +17,6 @@ import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceCoordinateAgreement
 import com.eignex.klause.solver.search.SourceCoordinateAgreementComponent
-import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
 
@@ -65,7 +64,7 @@ internal class SearchComponentOpening(
         return false
     }
 
-    fun candidateHints(source: Problem, defaultComponent: TheoryComponent? = null): SearchCandidateHints {
+    fun candidateHints(source: Problem, defaultComponent: SearchComponent? = null): SearchCandidateHints {
         var accounted = false
         fun outcome(value: HintIndexOutcome) {
             accounted = true
@@ -206,7 +205,7 @@ internal class PreparedSearchRegistrations(
                 session.restrictCoordinateContributions(owners)
             }
             val cp = components.filterIsInstance<CpSearchComponent>().firstOrNull()
-            val theory = components.filterIsInstance<TheoryComponent>().firstOrNull()
+            val theory = arithmetic.firstOrNull()?.let { groups[it].firstOrNull() }
             return PlannedSearch(
                 session,
                 cp,
