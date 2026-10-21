@@ -181,6 +181,29 @@ class SolveEvidenceTest {
     }
 
     @Test
+    fun `a model output mapping should replace the final MiniZinc solution and keep its klause comment lines`() {
+        val raw = "x = 1;\n----------\nX_INTRODUCED_3_ = [1, 2];\n% klause-float-component: none\n----------\n"
+        val seen = mutableListOf<String>()
+
+        val witness = SolveEvidence.finalWitness(Format.MINIZINC, raw) { flat ->
+            seen += flat
+            "c = [Red, Green];"
+        }
+
+        assertEquals(listOf("X_INTRODUCED_3_ = [1, 2];"), seen)
+        assertEquals("c = [Red, Green];\n% klause-float-component: none", witness)
+    }
+
+    @Test
+    fun `an exact coordinate only MiniZinc solution should not reach the model output mapping`() {
+        val raw = "% klause-exact: x = 1/3;\n----------\n"
+
+        val witness = SolveEvidence.finalWitness(Format.MINIZINC, raw) { error("no solution to map") }
+
+        assertEquals("\n% klause-exact: x = 1/3;", witness)
+    }
+
+    @Test
     fun `XCSP3 witnesses should keep the last complete instantiation with one v prefix`() {
         val raw = "v <instantiation><list>x</list><values>1</values></instantiation>\no 4\n" +
             "v <instantiation type='solution' cost='3'>\nv   <list> x y </list>\n" +
