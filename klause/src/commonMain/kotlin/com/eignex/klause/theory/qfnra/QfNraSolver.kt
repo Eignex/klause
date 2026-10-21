@@ -111,34 +111,55 @@ internal class QfNraQuery(
             }
             val normalized = PolynomialFormula.normalize(conditioned, arithmetic, fixed)
             yield(null)
+            work.equationalSections = 0
+            val preparingFormula = PolynomialFormulaReduction.prepare(normalized, realCount, arithmetic) {
+                val sections = checkNotNull(work.equationalSections)
+                work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
+            }
+            var formulaReduction: PolynomialFormulaReduction? = null
+            while (formulaReduction == null) {
+                formulaReduction = preparingFormula.next()
+                if (formulaReduction == null) yield(null)
+            }
+            if (formulaReduction.inconsistent) {
+                arithmetic.step()
+                yield(QfNraResult.Unsatisfiable(work.snapshot()))
+                return@sequence
+            }
+            val reducedFormula = formulaReduction.formula
             var refuted = false
             val witness = work.probe {
                 refuted = realCount <= MAX_WITNESS_REALS && (
-                    refutePolynomialSigns(normalized, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS) ||
-                        refutePolynomialMagnitudes(normalized, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS,
+                    refutePolynomialSigns(reducedFormula, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS) ||
+                        refutePolynomialMagnitudes(reducedFormula, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS,
                             MAX_WITNESS_DEGREE, MAX_WITNESS_BITS) ||
-                        refutePolynomialConsequences(normalized, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS,
+                        refutePolynomialConsequences(reducedFormula, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS,
                             MAX_WITNESS_BITS) ||
-                        (boolCount <= MAX_WITNESS_BOOLS && normalized.refuteBooleans(arithmetic, MAX_WITNESS_ATOMS,
+                        (boolCount <= MAX_WITNESS_BOOLS && reducedFormula.refuteBooleans(arithmetic, MAX_WITNESS_ATOMS,
                             MAX_WITNESS_TERMS, MAX_WITNESS_BITS))
                     )
-                if (refuted) null else WitnessProbe(normalized, boolCount, arithmetic, algebraic, work)
+                if (refuted) null else WitnessProbe(reducedFormula, boolCount, arithmetic, algebraic, work)
                     .probeWitness(realCount, fixed, work::coupled)
             }
             if (refuted || witness != null) {
+                val checked = witness?.let {
+                    if (formulaReduction.eliminatedCount == 0) it else {
+                        val point = formulaReduction.reconstruct(it, arithmetic, algebraic)
+                        checkNotNull(checkSample(normalized, point, boolCount, arithmetic, algebraic))
+                    }
+                }
                 arithmetic.step()
                 yield(if (refuted) QfNraResult.Unsatisfiable(work.snapshot())
-                    else QfNraResult.Satisfiable(checkNotNull(witness), work.snapshot()))
+                    else QfNraResult.Satisfiable(checkNotNull(checked), work.snapshot()))
                 return@sequence
             }
             yield(null)
-            work.equationalSections = 0
             work.equationalRootLevels = 0
             work.booleanTheoryRegions = 0
             work.booleanTheoryAtoms = 0
             work.booleanTheoryConstantRefutations = 0
             work.booleanTheoryResourceRefusals = 0
-            val regions = normalized.booleanRegions(arithmetic)
+            val regions = reducedFormula.booleanRegions(arithmetic)
             var incomplete: PolynomialResource? = null
             while (regions.hasNext()) {
                 val region = regions.next()
@@ -151,12 +172,12 @@ internal class QfNraQuery(
                 val atoms = checkNotNull(work.booleanTheoryAtoms)
                 work.booleanTheoryAtoms = atoms + minOf(region.atoms.size.toLong(), Long.MAX_VALUE - atoms)
                 try {
-                    if (!regionFeasible(normalized, region, emptyMap(), arithmetic, algebraic)) {
+                    if (!regionFeasible(reducedFormula, region, emptyMap(), arithmetic, algebraic)) {
                         val constants = checkNotNull(work.booleanTheoryConstantRefutations)
                         work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                         continue
                     }
-                    val reducing = PolynomialAffineReduction.prepare(normalized, region, realCount, arithmetic) {
+                    val reducing = PolynomialAffineReduction.prepare(reducedFormula, region, realCount, arithmetic) {
                         val sections = checkNotNull(work.equationalSections)
                         work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
                     }
@@ -169,7 +190,7 @@ internal class QfNraQuery(
                     reducedRegionObserver?.invoke(reduction.atoms)
                     val activeFormula = if (reduction.changed) {
                         PolynomialFormula.conjunction(reduction.atoms, arithmetic)
-                    } else normalized
+                    } else reducedFormula
                     val activeRegion = if (reduction.changed) {
                         PolynomialBooleanRegion(activeFormula.atoms.indices.associateWith {
                             arithmetic.step()
@@ -239,8 +260,12 @@ internal class QfNraQuery(
                             val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
                                 arithmetic, algebraic, work, fixed, if (complete) null else family)
                             if (assignment != null) {
-                                val checked = if (!reduction.changed) assignment else {
+                                val regionChecked = if (!reduction.changed) assignment else {
                                     val point = reduction.reconstruct(assignment, arithmetic, algebraic)
+                                    checkRegionSample(reducedFormula, region, point, boolCount, arithmetic, algebraic)
+                                }
+                                val checked = if (formulaReduction.eliminatedCount == 0) regionChecked else {
+                                    val point = formulaReduction.reconstruct(regionChecked, arithmetic, algebraic)
                                     checkRegionSample(normalized, region, point, boolCount, arithmetic, algebraic)
                                 }
                                 arithmetic.step()
