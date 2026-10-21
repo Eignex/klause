@@ -105,6 +105,14 @@ equality or order. Rational sector samples lie strictly between ordered algebrai
 boundaries. Evaluation owners cache root counts, coordinate powers and line images
 for one caller, charging lookups to the same token; published values keep no cache.
 
+Polynomial images retain an owned primitive root and their rational polynomial
+expression in that root. Expressions are reduced modulo its defining polynomial,
+without requiring irreducibility. Operations between images of the same indexed
+root combine those expressions before elimination, and comparisons use their
+difference at the root. Image data keeps no arithmetic context; refinement retains
+it, and the requesting caller pays for every use. A captured base that exceeds the
+caller's representation limits leaves ordinary scalar arithmetic available.
+
 Specialization captures coefficients at earlier exact coordinates and trims
 vanished leading coefficients by exact sign. With rational coefficients, lifting
 isolates the polynomial directly. When the coefficients depend on one irrational
