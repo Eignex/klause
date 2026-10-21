@@ -65,6 +65,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
     fun refine(value: AlgebraicReal): AlgebraicReal = AlgebraicReal(
         value.definingPolynomial, value.rootIndex, univariate.refine(value.definingPolynomial, value.interval),
+        value.image,
     )
 
     fun compare(left: AlgebraicReal, right: AlgebraicReal): Int {
@@ -73,6 +74,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         if (left.definingPolynomial == right.definingPolynomial && left.rootIndex == right.rootIndex) return 0
         left.rational?.let { return -compareRational(right, it) }
         right.rational?.let { return compareRational(left, it) }
+        sharedSign(left, right)?.let { return it }
         val common = univariate.gcd(left.definingPolynomial, right.definingPolynomial)
         val sequence = if (common.degree > 0) univariate.sturm(common) else emptyList()
         var a = left
@@ -94,6 +96,15 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
     }
 
     private fun compareRational(value: AlgebraicReal, other: BigFraction): Int {
+        value.image?.let { image ->
+            try {
+                arithmetic.denseSize(image.base.definingPolynomial.degree)
+                val difference = univariate.add(image.polynomial, RationalPolynomial(listOf(other.negated())))
+                return signAt(difference, image.base)
+            } catch (_: PolynomialResourceLimit) {
+                // Image provenance is optional; the scalar's own representation remains available.
+            }
+        }
         var current = value
         while (true) {
             arithmetic.step()
@@ -147,15 +158,23 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         if (remainder.degree <= 0) return rational(remainder[0])
         if (remainder == RationalPolynomial.X) return value
         if (remainder.degree == 1) return affine(value, remainder[1], remainder[0])
+        value.image?.let { image ->
+            try {
+                return evaluate(composeImage(remainder, image), image.base)
+            } catch (_: PolynomialResourceLimit) {
+                // The captured base can be wider than the scalar admitted by this caller.
+            }
+        }
         val y = lift(value.definingPolynomial, 0)
         val relation = arithmetic.subtract(Polynomial.variable(1), lift(remainder, 0))
         val annihilator = extract(arithmetic.resultant(y, relation, 0), 1)
         var current = value
-        return select(annihilator) {
+        val result = select(annihilator) {
             val enclosure = enclose(remainder, current.interval)
             current = refine(current)
             enclosure
         }
+        return captureImage(result, value, remainder)
     }
 
     fun negate(value: AlgebraicReal): AlgebraicReal = affine(value, BigFraction.MINUS_ONE, BigFraction.ZERO)
@@ -178,13 +197,15 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val index = if (scale.signum() > 0) value.rootIndex else {
             realRootCount(value.definingPolynomial) - value.rootIndex + 1
         }
-        return AlgebraicReal(univariate.monic(defining), index, interval)
+        val result = AlgebraicReal(univariate.monic(defining), index, interval)
+        return captureImage(result, value, RationalPolynomial(listOf(offset, scale)))
     }
 
     fun add(left: AlgebraicReal, right: AlgebraicReal): AlgebraicReal {
         arithmetic.step()
         left.rational?.let { return evaluate(RationalPolynomial(listOf(it, BigFraction.ONE)), right) }
         right.rational?.let { return evaluate(RationalPolynomial(listOf(it, BigFraction.ONE)), left) }
+        sharedImage(left, right, product = false)?.let { return it }
         if (compare(left, right) == 0) return evaluate(RationalPolynomial.of(0, 2), left)
         if (compare(left, negate(right)) == 0) return rational(BigFraction.ZERO)
         val first = lift(left.definingPolynomial, 0)
@@ -203,6 +224,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
     fun subtract(left: AlgebraicReal, right: AlgebraicReal): AlgebraicReal {
         arithmetic.step()
+        sharedImage(left, right, product = false, subtract = true)?.let { return it }
         if (compare(left, right) == 0) return rational(BigFraction.ZERO)
         return add(left, negate(right))
     }
@@ -211,6 +233,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         arithmetic.step()
         left.rational?.let { return evaluate(RationalPolynomial(listOf(BigFraction.ZERO, it)), right) }
         right.rational?.let { return evaluate(RationalPolynomial(listOf(BigFraction.ZERO, it)), left) }
+        sharedImage(left, right, product = true)?.let { return it }
         if (compare(left, right) == 0) return evaluate(RationalPolynomial.of(0, 0, 1), left)
         val first = lift(left.definingPolynomial, 0)
         val degree = right.definingPolynomial.degree
@@ -241,6 +264,84 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             current = refine(current)
             enclosure
         }
+    }
+
+    private data class CommonImages(
+        val base: AlgebraicReal,
+        val left: RationalPolynomial,
+        val right: RationalPolynomial,
+    )
+
+    private fun commonImages(left: AlgebraicReal, right: AlgebraicReal): CommonImages? {
+        if (left.image == null && right.image == null) return null
+        if (left.rational != null || right.rational != null) return null
+        arithmetic.step()
+        val a = left.image?.base ?: left
+        val b = right.image?.base ?: right
+        if (a.rootIndex != b.rootIndex) return null
+        arithmetic.denseSize(a.definingPolynomial.degree)
+        arithmetic.denseSize(b.definingPolynomial.degree)
+        if (a.definingPolynomial.degree != b.definingPolynomial.degree) return null
+        for (index in 0..a.definingPolynomial.degree) {
+            arithmetic.step()
+            if (a.definingPolynomial[index] != b.definingPolynomial[index]) return null
+        }
+        return CommonImages(a, left.image?.polynomial ?: RationalPolynomial.X,
+            right.image?.polynomial ?: RationalPolynomial.X)
+    }
+
+    private fun sharedImage(
+        left: AlgebraicReal,
+        right: AlgebraicReal,
+        product: Boolean,
+        subtract: Boolean = false,
+    ): AlgebraicReal? = try {
+        commonImages(left, right)?.let { image ->
+            val polynomial = if (product) univariate.multiply(image.left, image.right)
+            else univariate.add(image.left, if (subtract) {
+                univariate.scale(image.right, BigFraction.MINUS_ONE)
+            } else image.right)
+            evaluate(polynomial, image.base)
+        }
+    } catch (_: PolynomialResourceLimit) {
+        null
+    }
+
+    private fun sharedSign(left: AlgebraicReal, right: AlgebraicReal): Int? = try {
+        commonImages(left, right)?.let { image ->
+            signAt(univariate.add(image.left, univariate.scale(image.right, BigFraction.MINUS_ONE)), image.base)
+        }
+    } catch (_: PolynomialResourceLimit) {
+        null
+    }
+
+    private fun composeImage(polynomial: RationalPolynomial, image: AlgebraicImage): RationalPolynomial {
+        arithmetic.denseSize(image.base.definingPolynomial.degree)
+        var result = RationalPolynomial.ZERO
+        for (coefficient in polynomial.coefficients.asReversed()) {
+            arithmetic.step()
+            result = univariate.divide(univariate.add(univariate.multiply(result, image.polynomial),
+                RationalPolynomial(listOf(coefficient))), image.base.definingPolynomial).second
+        }
+        return result
+    }
+
+    private fun captureImage(
+        result: AlgebraicReal,
+        value: AlgebraicReal,
+        polynomial: RationalPolynomial,
+    ): AlgebraicReal {
+        if (result.rational != null) return result
+        arithmetic.step()
+        val previous = value.image
+        val image = if (previous == null) AlgebraicImage(value, polynomial) else {
+            try {
+                AlgebraicImage(previous.base, composeImage(polynomial, previous))
+            } catch (_: PolynomialResourceLimit) {
+                return result
+            }
+        }
+        return AlgebraicReal(result.definingPolynomial, result.rootIndex, result.interval, image)
     }
 
     fun power(value: AlgebraicReal, exponent: Int): AlgebraicReal {
