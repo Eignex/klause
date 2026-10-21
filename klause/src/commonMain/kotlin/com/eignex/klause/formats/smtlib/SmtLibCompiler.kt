@@ -338,8 +338,9 @@ internal object Compiler {
             return sourceProblem(objective, factors.toTypedArray())
         }
 
-        internal fun refutedSource(): SmtLibProblem = sourceProblem(null,
-            arrayOf(ExactLinear.of(intArrayOf(), emptyList(), LinearOp.EQ, BigFraction.ONE)))
+        internal fun refutedSource(premises: Problem): SmtLibProblem = sourceProblem(null,
+            // Open-bound routing reads rows with source coordinates.
+            premises.factors + ExactLinear.of(intArrayOf(), emptyList(), LinearOp.EQ, BigFraction.ONE))
 
         private fun sourceProblem(objective: LinearObjectiveSpec?, sourceFactors: Array<Factor>): SmtLibProblem {
             val model = Problem(
