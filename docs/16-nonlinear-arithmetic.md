@@ -312,10 +312,10 @@ of one sign. A strict constant sign remains strict after adding terms of that
 sign; zero coefficients and boundary completions remain possible. An odd power,
 mixed signs or a representation refusal leaves the prefix open. A predicate
 whose required truth is impossible for every completion prunes the prefix.
-At a complete sample,
-eliminated coordinates are reconstructed and the full assignment passes the
-original formula before capture. Exhausting every cell of the complete projection
-refutes the region.
+At a complete sample, predicate signs use certified coordinate enclosures before
+exact scalar images when those bounds establish the sign. Eliminated coordinates
+are reconstructed and the full assignment passes the original formula before
+capture. Exhausting every cell of the complete projection refutes the region.
 
 #### Objective-image traversal
 
