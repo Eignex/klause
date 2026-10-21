@@ -101,7 +101,7 @@ class QfLraSystemTest {
             doubleArrayOf(1.0, 2.0), LinearOp.GE, 3.0)
         val upper = ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
             doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
-        val equality = ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+        val equality = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
             doubleArrayOf(1.0, 2.0), LinearOp.EQ, 3.0).linearRows.single().exactForm(2)
         val model = source().withFactors(arrayOf(lower, upper))
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
