@@ -160,6 +160,8 @@ Boolean assignment polarities can survive retraction as saved phases. Caller
 preferences precede them, and they precede an available point's polarity.
 Retained phases and point guidance share
 the 65,536-entry workspace; insufficient space leaves the point provider alone.
+After point guidance releases its storage, the next phase consultation can admit
+the table and copy the current Boolean polarities under the containing allowance.
 These Boolean guesses outlive no component and carry no numerical point or proof.
 
 Default pure-real guidance can index unique activators into the immutable prepared

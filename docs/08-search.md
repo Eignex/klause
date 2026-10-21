@@ -102,6 +102,8 @@ Automatic linear-real traversal with candidate steering enabled can retain Boole
 assignment polarities across retraction and restart. Caller hints take precedence,
 followed by saved phases and then current point guidance. The phase table shares the existing
 65,536-entry private hint workspace and is discarded when its component closes.
+If point guidance releases its storage, a waiting phase provider can occupy that
+space and seed its guesses from the live Boolean assignments.
 It preserves both alternatives and supplies no assignment or proof.
 
 Built-in providers derive preferences from a completed arithmetic point: a single

@@ -123,9 +123,38 @@ class QfLiraSolverHintsTest {
                     else component.retainBooleanPhases(Cancellation.Never)
 
                 assertNotNull(first)
-                assertNull(second)
+                if (phaseFirst) {
+                    assertNull(second)
+                } else {
+                    val phases = assertIs<SearchCandidateHints>(second)
+                    assertNull(phases.preferredBool(0))
+                    val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    val variable = model.numBoolVars - 1
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, false))))
+                    component.releasePartialPointHints()
+                    assertEquals(false, phases.preferredBool(variable))
+                    session.popTo(0)
+                    assertEquals(false, phases.preferredBool(variable))
+                    assertNull(session.boolValue(variable))
+                }
             }
         }
+    }
+
+    @Test
+    fun `closed phase providers should stop observing cancellation`() {
+        var polls = 0
+        val stop = Cancellation { polls++; false }
+        val component = ExactLiraSearchComponent(partialModel())
+        val phases = assertNotNull(component.retainBooleanPhases(stop))
+        component.close()
+        val before = polls
+
+        val preference = phases.preferredBool(0)
+
+        assertNull(preference)
+        assertEquals(before, polls)
     }
 
     @Test

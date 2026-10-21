@@ -235,6 +235,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
     private var savedBooleanPhases: IntArray? = null
+    private var savedBooleanPhaseStop: Cancellation? = null
     private var pointHintIndex: IntArray? = null
     private var pointHintPoint: List<BigFraction>? = null
     private var pointReuseEnabled = false
@@ -356,7 +357,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     internal fun retainBooleanPhases(stop: Cancellation): SearchCandidateHints? {
-        check(context == null && savedBooleanPhases == null)
+        check(context == null && savedBooleanPhaseStop == null)
         val count = model.numBoolVars
         if (count == 0 || count > MAX_POINT_HINT_ENTRIES) return null
         var entries = when {
@@ -372,16 +373,25 @@ class ExactLiraSearchComponent private constructor(
         }
         if (entries + count > MAX_POINT_HINT_ENTRIES) {
             observeCompleteStage("SAVED_PHASE_STORAGE_DECLINED")
-            return null
+        } else {
+            stop.charge(count.toLong() + 1L)
+            if (stop()) return null
+            savedBooleanPhases = IntArray(count) { UNASSIGNED }
+            observeCompleteStage("SAVED_PHASE_ADMITTED")
         }
-        stop.charge(count.toLong() + 1L)
-        if (stop()) return null
-        savedBooleanPhases = IntArray(count) { UNASSIGNED }
-        observeCompleteStage("SAVED_PHASE_ADMITTED")
+        savedBooleanPhaseStop = stop
         return SearchCandidateHints { variable ->
+            val phaseStop = savedBooleanPhaseStop ?: return@SearchCandidateHints null
+            // A point provider can release its workspace after its numerical mechanism is known.
+            if (savedBooleanPhases == null && pointHintRows == null && pointHintIndex == null) {
+                phaseStop.charge(count.toLong() + 1L)
+                if (phaseStop()) return@SearchCandidateHints null
+                savedBooleanPhases = bools.copyOf()
+                observeCompleteStage("SAVED_PHASE_ADMITTED_AFTER_POINT_RELEASE")
+            }
             val phases = savedBooleanPhases ?: return@SearchCandidateHints null
-            stop.charge(1L)
-            if (stop()) null else {
+            phaseStop.charge(1L)
+            if (phaseStop()) null else {
                 val preferred = when (phases.getOrNull(variable)) {
                     TRUE -> true
                     FALSE -> false
@@ -949,6 +959,7 @@ class ExactLiraSearchComponent private constructor(
     }
     override fun close() {
         savedBooleanPhases = null
+        savedBooleanPhaseStop = null
         floatCandidate = null
         releasePartialPointHints()
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
