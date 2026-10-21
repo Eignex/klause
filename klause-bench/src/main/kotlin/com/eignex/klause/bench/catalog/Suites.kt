@@ -233,6 +233,24 @@ internal object Suites {
                 }
             },
             DynamicSuite(
+                "satcomp-compact-v1",
+                "SAT Competition 2022-24 main-track CNF Kissat decides in 5-120 s: 40 pinned instances, " +
+                    "one per family, 20 SAT / 20 UNSAT (fetched from GBD, ~13MB)",
+            ) { sel ->
+                val expected = SatCompCompact.instances.associate { it.relPath to it.expected }
+                CorpusSelection.select(
+                    ExternalCollections.satcompCompact,
+                    CorpusSelection.Layout.Flat("", "cnf"),
+                    sel,
+                    Category.SAT,
+                    format = Format.DIMACS,
+                ).map { ref ->
+                    val verdict = expected.getValue("${ref.name}.cnf")
+                    val category = if (verdict == Expected.Unsat) Category.UNSAT else Category.SAT
+                    ref.copy(expected = verdict, category = category)
+                }
+            },
+            DynamicSuite(
                 "pb-comp",
                 "Pseudo-Boolean Competition 2024 selected OPB set (fetched; 1/family by default)",
                 defaultPerFamily = 1,
@@ -986,6 +1004,17 @@ internal object ExternalCollections {
         satlibClassic("ii", "DIMACS/II/inductive-inference.tar.gz") to Category.SAT,
         satlibClassic("phole", "DIMACS/PHOLE/pigeon-hole.tar.gz") to Category.UNSAT,
         satlibClassic("ais", "AIS/ais.tar.gz") to Category.SAT,
+    )
+
+    /** The `satcomp-compact-v1` instances ([SatCompCompact]), each fetched from the Global Benchmark Database by its
+     *  content hash and checked against it. The collection id carries the version, so a redrawn list is fetched and
+     *  referenced afresh rather than mixed into this one's cache, corpus pack and reference rows. */
+    val satcompCompact = ExternalCollection(
+        id = "satcomp-compact-v1",
+        url = "https://benchmark-database.de",
+        license = "SAT Competition benchmarks (public for research; cite GBD and the competition proceedings)",
+        reason = "40 pinned instances, ~13MB as .cnf.xz; fetched per instance by content hash rather than vendored",
+        fetch = FetchMethod.GbdFiles(SatCompCompact.instances),
     )
     val pbComp2024 = ExternalCollection(
         id = "pb-comp-2024",

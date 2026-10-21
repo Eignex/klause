@@ -473,6 +473,23 @@ Objective-only columns retain zero coefficients in a constraint row; models
 without constraints receive a zero equality. Derived feasibility inputs have
 separate content-addressed cache entries, reference namespaces and source hashes.
 
+`satcomp-compact-v1` is a small, hard CNF set beside the mostly easy `satlib`: 40 SAT
+Competition main-track instances (2022-2024), one per family, 20 SAT and 20 UNSAT, each of
+which the organisers' Kissat entry decided in 5-120 s in the competition. Each is at most 2 MB
+as `.cnf.xz`, 1M variables and 5M clauses: the download is 13 MB, the zstd cache 23 MB, and the
+largest instance 18 MB plain. The
+[pinned list](src/main/kotlin/com/eignex/klause/bench/catalog/SatCompCompact.kt) names each
+instance by its [Global Benchmark Database](https://benchmark-database.de) content hash
+(`gbdhash`: the MD5 of the clauses without comments, header or layout). The fetch downloads
+`benchmark-database.de/file/<hash>` one instance at a time, rejects a mismatched hash and
+stores it as `<family>/<file stem>`. Each problem expects the competition's verified result.
+[`scripts/satcomp-compact.sh`](scripts/satcomp-compact.sh) redraws the list from GBD's
+`meta`/`base` databases and the competitions' detailed results; 2025 publishes no
+per-instance times. A redraw is a new suite and collection version, so problem names and
+reference rows stay bound to the instances they named. The instances are the competitions'
+research benchmarks; cite GBD (Iser and Jabs, SAT 2024) and the competition proceedings.
+Most take a reference over 5 s, so lab selections of the suite use `reference=any`.
+
 Fetched collections live in `~/.cache/klause-bench/corpus/`, respecting
 `XDG_CACHE_HOME` or `-Dklause.bench.corpusCache`. The decimal 60 GB default cap is
 configured by `-Dklause.bench.corpus.maxGb=N` or `KLAUSE_BENCH_CORPUS_MAX_GB=N`;
