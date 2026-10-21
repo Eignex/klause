@@ -2,8 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
-import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.ValueSelection
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceMapping
