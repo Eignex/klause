@@ -320,6 +320,60 @@ internal class LiveQfLraSystem(
         return null
     }
 
+    fun impliedComparison(comparison: ExactComparison, stop: Cancellation): ImpliedSmtComparison? {
+        val work = MixedPointArithmetic(stop)
+        if (stop() || !work.admitted(comparison.bound)) return null
+        val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
+        val term = (key.slot ?: normalized[key] ?: return null).term
+        if (!work.admitted(term.scale) || !work.admitted(term.offset)) return null
+        val residual = work.subtractProduct(comparison.bound, BigFraction.ONE, term.offset) ?: return null
+        val threshold = work.quotient(residual, term.scale) ?: return null
+        if (term.coefficients.isEmpty()) {
+            val order = BigFraction.ZERO.compareTo(threshold)
+            val truth = when (comparison.op) {
+                LinearOp.LE -> if (comparison.strict) order < 0 else order <= 0
+                LinearOp.GE -> if (comparison.strict) order > 0 else order >= 0
+                LinearOp.EQ -> order == 0
+                LinearOp.NE -> order != 0
+            }
+            return ImpliedSmtComparison(truth, term.premise(SearchAtomPremise.All(emptyList())))
+                .takeUnless { stop() }
+        }
+        val column = term.coefficients.keys.singleOrNull() ?: definitions[term.coefficients] ?: return null
+        val state = lp.state ?: return null
+        if (state.conflict != null || column !in 0 until state.model.numVars) return null
+        val op = if (term.scale.signum() >= 0) comparison.op else when (comparison.op) {
+            LinearOp.LE -> LinearOp.GE
+            LinearOp.GE -> LinearOp.LE
+            else -> comparison.op
+        }
+        fun side(upper: Boolean, strict: Boolean): SearchAtomPremise? {
+            val active = state.activeSide(column, upper)?.side ?: return null
+            val value = active.number.value
+            if (!work.admitted(value) || !work.preflight(value, threshold)) return null
+            val order = value.compareTo(threshold)
+            if (if (upper) order > 0 else order < 0) return null
+            if (order == 0 && strict && !active.strict) return null
+            return lp.activeBoundPremise(column, upper)
+        }
+        val proved: Pair<Boolean, SearchAtomPremise> = when (op) {
+            LinearOp.LE -> side(true, comparison.strict)?.let { true to it }
+                ?: side(false, !comparison.strict)?.let { false to it }
+            LinearOp.GE -> side(false, comparison.strict)?.let { true to it }
+                ?: side(true, !comparison.strict)?.let { false to it }
+            LinearOp.EQ, LinearOp.NE -> {
+                val separated = side(true, true) ?: side(false, true)
+                if (separated != null) (op == LinearOp.NE) to separated else {
+                    val lower = side(false, false)
+                    val upper = side(true, false)
+                    if (lower == null || upper == null) null else
+                        (op == LinearOp.EQ) to SearchAtomPremise.All(listOf(lower, upper))
+                }
+            }
+        } ?: return null
+        return ImpliedSmtComparison(proved.first, term.premise(proved.second)).takeUnless { stop() }
+    }
+
     fun assertAtom(atom: SourceBoundAtom, premise: SearchAtomPremise): Boolean {
         val expression = sourceTerms(atom) ?: return false
         return assertTerms(SmtTermKey.of(expression), atom.upper, atom.threshold, atom.strict, premise)
@@ -426,6 +480,7 @@ internal class LiveQfLraSystem(
 }
 
 internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
+internal data class ImpliedSmtComparison(val truth: Boolean, val premise: SearchAtomPremise)
 
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
 // rows and a map-keyed lookup pays a hash probe per entry to compare.

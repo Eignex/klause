@@ -423,6 +423,7 @@ class OpenTheoryEngine internal constructor(
                 it.observePrimaryLpWith(stats.lp.certificationObserver(LpRoute.STANDALONE))
                 it.observeCompleteTraversal()
                 it.useMixedPointCompletion()
+                it.useSourceGuardPropagation()
             }
             planned.session.bindOpenTheoryWork(work)
             when (planned.session.initialize()) {

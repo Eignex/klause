@@ -202,6 +202,7 @@ class ExactLiraSearchComponent private constructor(
     private var unassignedBooleans = model.numBoolVars
     private var completeTraversalObserved = false
     private var mixedPointCompletion = false
+    private var sourceGuardPropagation = false
     private var defaultDisjunctionHints = false
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
@@ -214,6 +215,8 @@ class ExactLiraSearchComponent private constructor(
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
+    private var impliedSourceGuard = false
+    private var sourceGuardCursor = 0
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
     }
@@ -326,6 +329,11 @@ class ExactLiraSearchComponent private constructor(
     internal fun useMixedPointCompletion() {
         check(context == null)
         mixedPointCompletion = true
+    }
+
+    internal fun useSourceGuardPropagation() {
+        check(context == null)
+        sourceGuardPropagation = true
     }
 
     internal fun useDefaultDisjunctionHints() {
@@ -1311,6 +1319,52 @@ class ExactLiraSearchComponent private constructor(
         return true
     }
 
+    private fun propagateSourceGuards(context: SearchContext): ComponentResult {
+        impliedSourceGuard = false
+        if (!sourceGuardPropagation || model.numIntVars != 0 || hasPrivateReals || preparedRows.isEmpty() ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy || lp.state?.conflict != null
+        ) return ComponentResult.Consistent
+        var visited = 0
+        var candidates = 0
+        var entries = 0
+        val work = MixedPointArithmetic(operationStop)
+        while (visited < minOf(preparedRows.size, 1024) && candidates < 64 && entries < 4096) {
+            operationStop.charge(1L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            val prepared = preparedRows[sourceGuardCursor]
+            sourceGuardCursor = (sourceGuardCursor + 1) % preparedRows.size
+            visited++
+            val head = prepared.row.activator
+            if (prepared.disjunction || head !in bools.indices || context.boolValue(head) != null) continue
+            val size = prepared.row.size.toLong() + 1L
+            if (size > 4096L - entries) continue
+            entries += size.toInt()
+            candidates++
+            operationStop.charge(8L * size)
+            if (operationStop()) return ComponentResult.Indeterminate
+            val comparison = prepared.form.hintComparison(
+                { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
+                work::admitted, work::preflight,
+            ) ?: continue
+            val proved = system.impliedComparison(comparison, operationStop) ?: continue
+            val leaves = prepared.booleans.filter { it != head }.map { variable ->
+                SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
+            }
+            val literal = Lit.make(head, proved.truth)
+            val reason = context.explainAtoms(SearchAtomPremise.All(leaves + proved.premise),
+                SearchDecision.Bool(literal)) ?: continue
+            if (operationStop()) return ComponentResult.Indeterminate
+            val result = context.imply(literal, reason)
+            if (result !is ComponentResult.Consistent) return result
+            // A publisher applies its own consequence before the shared session delivers it to peers.
+            val accepted = accept(SearchDecision.Bool(literal), context)
+            if (accepted !is ComponentResult.Consistent) return accepted
+            impliedSourceGuard = true
+            observeCompleteStage(if (proved.truth) "BOUND_GUARD_TRUE" else "BOUND_GUARD_FALSE")
+        }
+        return ComponentResult.Consistent
+    }
+
     private fun assertDisequalities(
         disequalities: List<Triple<RowAddress, ExactComparison, SearchAtomPremise>>,
     ): Boolean {
@@ -1481,6 +1535,10 @@ class ExactLiraSearchComponent private constructor(
             checked = true
             val deferred = assertSource(context, deferPoint = true)
             if (operationStop()) return ComponentResult.Indeterminate
+            if (deferred) {
+                val propagated = propagateSourceGuards(context)
+                if (propagated !is ComponentResult.Consistent || impliedSourceGuard) return propagated
+            }
             if (deferred && reuseCompatiblePoint(context)) return ComponentResult.Consistent
             if (!deferred && pointReusePoint != null) return ComponentResult.Indeterminate
         }
@@ -1490,6 +1548,8 @@ class ExactLiraSearchComponent private constructor(
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
+        val propagated = propagateSourceGuards(context)
+        if (propagated !is ComponentResult.Consistent || impliedSourceGuard) return propagated
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0

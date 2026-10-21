@@ -40,6 +40,114 @@ import kotlin.test.assertTrue
 
 class QfLraSystemTest {
     @Test
+    fun `declared fixed coordinates should imply constant comparison guards`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+            doubleArrayOf(-3.0), LinearOp.LE, -6.0)
+        val model = Problem(1, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(2.0),
+            factors = arrayOf(factor))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(model, lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            for (truth in listOf(false, true)) {
+                val result = assertNotNull(system.impliedComparison(factor.linearRows.single().exactForm(1)
+                    .comparison(truth) { false }, Cancellation.Never))
+
+                assertEquals(truth, result.truth)
+                assertTrue(assertNotNull(session.explainAtoms(result.premise)).literals.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `comparison implications should preserve signed strict endpoints`() {
+        for (activeStrict in listOf(false, true)) for (negative in listOf(false, true)) {
+            for (op in listOf(LinearOp.LE, LinearOp.GE)) for (strict in listOf(false, true)) {
+                val sign = if (negative) -1.0 else 1.0
+                val active = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0, strict = activeStrict)
+                val target = ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0 * sign, 4.0 * sign), op, 6.0 * sign, strict = strict)
+                val model = source().withFactors(arrayOf(active, target))
+                LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                    val system = LiveQfLraSystem(model, lp)
+                    assertTrue(system.install())
+                    val session = SearchSession(listOf(lp))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    session.push(SearchDecision.Bool(Lit.make(0, true)))
+                    assertTrue(system.assertComparison(active.linearRows.single().exactForm(2)
+                        .comparison(true) { false }, null, premise(0)))
+
+                    val result = system.impliedComparison(target.linearRows.single().exactForm(2)
+                        .comparison(true) { false }, Cancellation.Never)
+
+                    val upper = (op == LinearOp.LE) != negative
+                    val expected = if (upper) true.takeIf { !strict || activeStrict }
+                        else false.takeIf { strict || activeStrict }
+                    assertEquals(expected, result?.truth)
+                    if (expected != null) assertEquals(listOf(Lit.make(0, false)),
+                        assertNotNull(session.explainAtoms(assertNotNull(result).premise)).literals.toList())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `equality implications should require both scoped bound premises`() {
+        val lower = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.GE, 3.0)
+        val upper = ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
+        val equality = ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.EQ, 3.0).linearRows.single().exactForm(2)
+        val model = source().withFactors(arrayOf(lower, upper))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(model, lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertTrue(system.assertComparison(lower.linearRows.single().exactForm(2)
+                .comparison(true) { false }, null, premise(0)))
+            assertNull(system.impliedComparison(equality.comparison(true) { false }, Cancellation.Never))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+            assertTrue(system.assertComparison(upper.linearRows.single().exactForm(2)
+                .comparison(true) { false }, null, premise(1)))
+
+            for (truth in listOf(false, true)) {
+                val result = assertNotNull(system.impliedComparison(equality.comparison(truth) { false },
+                    Cancellation.Never))
+                assertEquals(truth, result.truth)
+                assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+                    assertNotNull(session.explainAtoms(result.premise)).literals.toSet())
+            }
+
+            session.popTo(1)
+            assertNull(system.impliedComparison(equality.comparison(true) { false }, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `unowned or stopped comparison lookups should leave numerical state unchanged`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
+        val comparison = factor.linearRows.single().exactForm(2).comparison(true) { false }
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(arrayOf(factor)), lp)
+            assertTrue(system.install())
+            val before = lp.state
+
+            for (stop in listOf(Cancellation.Never, Cancellation { true })) {
+                assertNull(system.impliedComparison(comparison, stop))
+                assertSame(before, lp.state)
+            }
+        }
+    }
+
+    @Test
     fun `batched normalized comparisons should preserve both bound premises`() {
         val upper = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0),
             LinearOp.LE, 3.0).linearRows.single().exactForm(2).comparison(true) { false }

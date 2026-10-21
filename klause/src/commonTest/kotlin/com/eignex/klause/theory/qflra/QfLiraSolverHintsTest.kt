@@ -50,6 +50,75 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `canonical bound implications should retract before a feasible sibling`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 1.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.useSourceGuardPropagation()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(true, session.boolValue(1))
+            assertEquals(setOf(Lit.make(1, true), Lit.make(0, false)),
+                assertNotNull(session.reasonFor(1)).literals.toSet())
+            session.popTo(0)
+            assertNull(session.boolValue(1))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertNull(session.boolValue(1))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+            assertEquals(ComponentCheck.Feasible, session.check())
+        }
+    }
+
+    @Test
+    fun `bound guard reasons should retain resolved Boolean coefficient premises`() {
+        val target = object : Factor by ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+            doubleArrayOf(1.0), LinearOp.LE, 1.0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                TaggedLinearRow(intArrayOf(Term.ofLit(Lit.make(1, true)), Term.ofRealVar(0)),
+                    RealConstants(RealConsts(doubleArrayOf(1.0)), RealConsts(doubleArrayOf(1.0)), 1.0, false),
+                    LinearOp.LE, activator = 2),
+            ))
+        }
+        val model = Problem(
+            numBoolVars = 4,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0), target),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.useSourceGuardPropagation()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertNull(session.boolValue(2))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(true, session.boolValue(2))
+            assertEquals(setOf(Lit.make(2, true), Lit.make(0, false), Lit.make(1, false)),
+                assertNotNull(session.reasonFor(2)).literals.toSet())
+        }
+    }
+
+    @Test
     fun `successive root guards should preserve earlier real bounds`() {
         val model = Problem(
             numBoolVars = 3,

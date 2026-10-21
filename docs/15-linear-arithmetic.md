@@ -89,6 +89,18 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 
+#### Guard implications
+
+Public pure-real traversal can imply an open comparison guard from bounds already
+asserted on the same normalized term. Strict endpoints and negative scaling retain
+their exact meaning; equality requires both bound sides, and separation proves
+disequality. Declared fixed coordinates can reduce a comparison to a constant.
+The shared reason retains the active bound witnesses and every resolved Boolean
+coefficient premise. Missing terms or explanations leave ordinary search in charge.
+Each charged sweep visits at most 1,024 source rows, considers 64 open guards and
+evaluates 4,096 entries. It creates no numerical row or query. Private conditioned
+openings keep their own policy, and a partial point supplies no implication proof.
+
 #### Disjunctions and disequalities
 
 A source disjunction is registered with search as one atom per disjunct; a disjunct
