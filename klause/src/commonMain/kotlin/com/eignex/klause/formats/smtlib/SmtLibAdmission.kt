@@ -121,6 +121,9 @@ private fun parseLinearAdmission(
             allowFunctions = true, semantics = semantics)
         for (command in commands) compiler.command(command)
         val captured = compiler.build()
+        if (captured.transcendental?.hasObjective == true) {
+            smtUnsupported("function objective requires its source expression")
+        }
         val source = builder.refutedSource()
         if (captured.objective != null) captured.bindObjective(source, cancellation) else source
     }

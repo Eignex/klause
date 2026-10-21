@@ -101,6 +101,32 @@ class SmtLibAdmissionTest {
     }
 
     @Test
+    fun `refuted nonlinear premises should retain source objective units and direction`() {
+        val source = SmtLib.parse(
+            "(declare-const x Int) (declare-const y Int) " +
+                "(assert (= (* 2 x) (+ (* 2 y) 1))) (assert (= (* x y) 0)) " +
+                "(maximize (+ 7 (* 2 x)))",
+        )
+
+        assertEquals(ObjectiveSense.MAXIMIZE, source.sense)
+        assertEquals(7L, assertNotNull(source.objective).constant)
+        assertEquals(2L, assertNotNull(source.objective).intCoefficients[source.intVarNames.getValue("x")])
+    }
+
+    @Test
+    fun `refuted integer premises should retain unsupported function objective capture`() {
+        val source = SmtLib.parse(
+            "(declare-const x Int) (declare-const y Int) " +
+                "(assert (= (* 2 x) (+ (* 2 y) 1))) (assert (= (* x y) 0)) " +
+                "(maximize (exp (to_real x)))",
+        )
+
+        val captured = assertIs<TranscendentalProblem>(source.source.originalSource)
+        assertTrue(captured.hasObjective)
+        assertEquals(ObjectiveSense.MAXIMIZE, captured.objectiveSense)
+    }
+
+    @Test
     fun `a provided closeable source should close when admission is already interrupted`() {
         var reads = 0
         var closes = 0
