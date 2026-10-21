@@ -268,6 +268,12 @@ region's required zero equalities, which remain as premises. Linear required
 equalities are solved and substituted, coordinates
 occurring only linearly in inequalities are eliminated by affine pairing, and sign
 propagation can refute the region outright.
+For a coordinate retained by another nonlinear or non-inequality predicate,
+constant-coefficient affine lower and upper bounds also imply a comparison between
+their endpoints. Consequences with fewer variables than the larger premise are
+retained ahead of the original predicates, ordered by variable count. The original
+bounds and nonlinear constraints remain required; strictness in either endpoint
+makes the consequence strict. No variable-dependent coefficient is divided out.
 The reduced conjunction supplies projection predicates; the original regional
 predicates supply the witness check for both rewrites and coordinate elimination.
 [PolynomialProjection](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
