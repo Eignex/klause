@@ -320,6 +320,7 @@ class OpenTheoryMinimizer internal constructor(
                 return null
             }
             sink.backend = route.backendName()
+            val mark = TimeSource.Monotonic.markNow()
             val prepared = PresolvePipeline.prepareSource(
                 source,
                 presolveConfig,
@@ -339,6 +340,7 @@ class OpenTheoryMinimizer internal constructor(
             // a descent whose every side closed would select the finite route, which no round of it can run.
             val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning(), projections, stop).plan
             if (stop() || boundedPlan.encodingDecline == EncoderDecline.RESOURCE) {
+                prepared.elapsed = mark.elapsedNow()
                 sink.presolve = prepared.stats
                 sink.stop()
                 val reason = when {
@@ -366,6 +368,7 @@ class OpenTheoryMinimizer internal constructor(
             }
             val base = when (val closed = prepared.problem.closeOpenBounds(closingCancellation, sink.lp)) {
                 OpenPresolveResult.Refuted -> {
+                    prepared.elapsed = mark.elapsedNow()
                     sink.presolve = prepared.stats
                     sink.stop()
                     verdict = OpenTheoryOptimum.Infeasible(sink.snapshot())
@@ -374,6 +377,8 @@ class OpenTheoryMinimizer internal constructor(
 
                 is OpenPresolveResult.Tightened -> closed.spec
             }
+            prepared.elapsed = mark.elapsedNow()
+            sink.presolve = prepared.stats
             // A second bounded attempt on the same opening model cannot read a stronger input. If the
             // first attempt changed a declared range or saw cancellation, let the round close again.
             reuseOpeningBoundAttempt = base.sameDeclaredIntegerRanges(prepared.problem) &&

@@ -343,7 +343,7 @@ internal fun executeLinearSource(
         }
 
         is SourceExecutionResult.Transcendental -> error("linear source selected function execution")
-    }.also { it.preparationStats = result.preparationStats }
+    }
     val strategy = request.polynomial.strategy
     val nativeClaimsUnrestricted = finiteUnrestricted && if (result is SourceExecutionResult.Polynomial ||
         result is SourceExecutionResult.Quadratic
@@ -396,7 +396,7 @@ internal fun executeLinearSource(
         is SourceExecutionResult.Polynomial -> SourceExecutionResult.Polynomial(invocation, result.result, snapshot)
         is SourceExecutionResult.Quadratic -> SourceExecutionResult.Quadratic(invocation, result.result, snapshot)
         is SourceExecutionResult.Transcendental -> error("linear source selected function execution")
-    }
+    }.also { it.preparationStats = result.preparationStats }
 }
 
 private fun PreparedLinearSource.matchesNativeObjective(

@@ -20,6 +20,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.hasActivity
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.util.Cancellation
+import kotlin.time.TimeSource
 
 /**
  * What the open lane's preparation made of a request, with no theory run.
@@ -173,12 +174,14 @@ object OpenTheoryPipeline {
         val planned = source as? OpenSourcePreparation.Planned
             ?: return OpenPreparation(prepared.problem, sourceStats, closedSides = 0, infeasible = true)
         val lpStats = LpStatsSink(LpRoute.STANDALONE)
+        val mark = TimeSource.Monotonic.markNow()
         val closed = planned.model.closeOpenBounds(request.presolveCancellation, lpStats)
+        prepared.elapsed += mark.elapsedNow()
         val closingStats = lpStats.snapshot()
         val stats = if (!closingStats.hasActivity()) {
-            sourceStats
+            prepared.stats
         } else {
-            val base = sourceStats ?: PresolveStats()
+            val base = prepared.stats
             base.copy(lpStats = base.lpStats.mergedWith(closingStats))
         }
         return when (closed) {

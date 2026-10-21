@@ -46,6 +46,7 @@ import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
+import kotlin.time.TimeSource
 import com.eignex.kumulant.stat.summary.MaxResult
 import com.eignex.kumulant.stat.summary.SumResult
 
@@ -390,12 +391,17 @@ class OpenTheoryEngine internal constructor(
         val model = if (reuseOpeningBoundAttempt) {
             routed.model
         } else {
-            when (
-                val closed = routed.model.closeOpenBounds(
+            val mark = TimeSource.Monotonic.markNow()
+            val closed = try {
+                routed.model.closeOpenBounds(
                     boundCancellation(prepared, cancellation),
                     stats.lp,
                 )
-            ) {
+            } finally {
+                prepared.elapsed += mark.elapsedNow()
+                stats.presolve = prepared.stats
+            }
+            when (closed) {
                 OpenPresolveResult.Refuted -> return OpenTheoryStart.Decided(
                     OpenTheoryResult.Unsat(stats.finish(state)),
                 )
