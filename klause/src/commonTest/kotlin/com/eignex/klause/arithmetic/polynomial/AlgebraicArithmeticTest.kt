@@ -13,6 +13,73 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `algebraic linear lifting retains the selected annihilator root and its bounds`() {
+        val coefficient = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val boundaries = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
+        for (negative in listOf(false, true)) {
+            val constant = if (negative) arithmetic.negate(coefficient) else coefficient
+            val source = arithmetic.polynomial(listOf(constant, arithmetic.rational(BigFraction.ONE)))
+            val expected = boundaries[if (negative) 1 else 0]
+
+            val roots = arithmetic.roots(source)
+
+            assertEquals(1, roots.size)
+            val root = roots.single()
+            assertEquals(0, arithmetic.compare(expected, root))
+            assertEquals(expected.definingCoefficients, root.definingCoefficients)
+            assertEquals(expected.rootIndex, root.rootIndex)
+            assertEquals(expected.lowerBound, root.lowerBound)
+            assertEquals(expected.upperBound, root.upperBound)
+        }
+    }
+
+    @Test
+    fun `algebraic quadratic lifting retains both selected roots and their annihilator bounds`() {
+        val coefficient = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val annihilator = RationalPolynomial(listOf(quarter * quarter, BigFraction.ZERO,
+            BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal(), BigFraction.ZERO, BigFraction.ONE))
+        val boundaries = arithmetic.roots(annihilator)
+        for (negative in listOf(false, true)) {
+            val linear = if (negative) arithmetic.negate(coefficient) else coefficient
+            val source = arithmetic.polynomial(listOf(arithmetic.rational(quarter), linear,
+                arithmetic.rational(BigFraction.ONE)))
+            val expected = if (negative) boundaries.takeLast(2) else boundaries.take(2)
+
+            val roots = arithmetic.roots(source)
+
+            assertEquals(2, roots.size)
+            for (index in roots.indices) {
+                assertEquals(0, arithmetic.compare(expected[index], roots[index]))
+                assertEquals(expected[index].definingCoefficients, roots[index].definingCoefficients)
+                assertEquals(expected[index].rootIndex, roots[index].rootIndex)
+                assertEquals(expected[index].lowerBound, roots[index].lowerBound)
+                assertEquals(expected[index].upperBound, roots[index].upperBound)
+            }
+        }
+    }
+
+    @Test
+    fun `work exhaustion withholds a degree complete algebraic root family`() {
+        val coefficient = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val source = arithmetic.polynomial(listOf(coefficient, arithmetic.rational(BigFraction.ONE)))
+        var spent = 0L
+        var limit = Long.MAX_VALUE
+        val meter = WorkMeter { spent += it }
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= limit
+            override fun workMeter(): WorkMeter = meter
+        }
+        val completed = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
+        assertEquals(1, completed.roots(source).size)
+        limit = spent - 1
+        spent = 0
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
+
+        assertFailsWith<PolynomialInterrupted> { limited.roots(source) }
+    }
+
+    @Test
     fun `completed root counts should fit negative affine transforms in remaining caller work`() {
         var spent = 0L
         var limit = Long.MAX_VALUE

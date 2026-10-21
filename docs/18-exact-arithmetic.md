@@ -103,9 +103,11 @@ for one caller, charging lookups to the same token; published values keep no cac
 Specialization evaluates coefficients at earlier exact coordinates and trims
 vanished leading coefficients by exact sign. With rational coefficients, lifting
 isolates the polynomial directly; otherwise it eliminates algebraic coefficients to
-a rational annihilator, a superset of the roots, and checks every candidate against
-the specialized polynomial. The retained roots are all and only its distinct real
-roots.
+a rational annihilator, a superset of the roots, and checks its candidates against
+the specialized polynomial. Certifying `d` distinct roots of a degree-`d`
+specialization completes the family; later annihilator candidates need no check.
+Retained roots keep their annihilator representation and isolating bounds. They
+are all and only the specialization's distinct real roots.
 
 ### Invocation resources
 

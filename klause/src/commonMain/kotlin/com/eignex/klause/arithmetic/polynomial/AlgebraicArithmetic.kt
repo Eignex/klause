@@ -383,7 +383,17 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             relation = arithmetic.resultant(lift(defining, index), relation, index)
         }
         val annihilator = extract(relation, variable)
-        return roots(annihilator).filter { sign(evaluate(polynomial, it)) == 0 }
+        val candidates = roots(annihilator)
+        val result = ArrayList<AlgebraicReal>()
+        for (candidate in candidates) {
+            arithmetic.step()
+            if (sign(evaluate(polynomial, candidate)) != 0) continue
+            result.add(candidate)
+            // A nonzero degree-d polynomial has at most d distinct real roots.
+            if (result.size == polynomial.degree) break
+        }
+        arithmetic.step()
+        return result
     }
 
     private fun select(polynomial: RationalPolynomial, enclosure: () -> RationalInterval): AlgebraicReal {
