@@ -8,6 +8,7 @@ class AlgebraicReal internal constructor(
     /** One-based index among the defining polynomial's distinct real roots in increasing order. */
     val rootIndex: Int,
     internal val interval: RationalInterval,
+    internal val image: AlgebraicImage? = null,
 ) {
     /** Exact rational value when the root is represented by a point interval; otherwise null. */
     val rational: BigFraction? get() = if (interval.isPoint) interval.lower else null
@@ -21,6 +22,8 @@ class AlgebraicReal internal constructor(
     /** Exact upper isolating bound, excluded for a nonpoint interval. */
     val upperBound: BigFraction get() = interval.upper
 }
+
+internal class AlgebraicImage(val base: AlgebraicReal, val polynomial: RationalPolynomial)
 
 internal class AlgebraicPolynomial private constructor(
     private val captured: List<AlgebraicReal>?,
