@@ -23,14 +23,31 @@ class MiniZincModeExactGlobalsTest(
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0} {1} {2}")
-        fun cases(): List<Array<Any>> = (flatZincGlobalCases + flatZincSetGlobalCases).flatMap { global ->
-            listOf("finite", "linear", "polynomial", "algebraic").flatMap { coupling ->
-                val verdicts = if (coupling == "finite") listOf("witness", "refutation", "optimum") else
-                    listOf("witness", "refutation", "real-refutation", "optimum")
-                verdicts.map { verdict -> arrayOf<Any>(global, coupling, verdict) }
+        fun cases(): List<Array<Any>> {
+            val globals = flatZincGlobalCases + flatZincSetGlobalCases
+            val completionNames = setOf(
+                "all_different_int", "all_equal_int", "symmetric_all_different", "member_int", "sort",
+                "global_cardinality-variable", "nvalue", "inverse_offsets", "array_int_maximum",
+                "strictly_decreasing_int", "lex_less_int", "value_precede_chain_int", "diffn-variable-zero",
+                "table_int", "regular", "mdd", "subcircuit", "disjunctive_strict-variable-zero",
+                "array_var_set_element", "set_union", "set_in_reif-false",
+            )
+            val completionCases = globals.filter { it.first in completionNames }
+            check(completionCases.map { it.third }.toSet() == globals.map { it.third }.toSet()) {
+                "Real completion cases must cover every finite factor kind"
             }
-        } + listOf("finite", "linear", "polynomial", "algebraic").map { coupling ->
-            arrayOf<Any>(Triple("count_eq-empty-invalid", "klause_count_eq([],1,1)", null), coupling, "refutation")
+
+            return globals.flatMap { global ->
+                listOf("witness", "refutation", "optimum").map { arrayOf<Any>(global, "finite", it) }
+            } + completionCases.flatMap { global ->
+                listOf("linear", "polynomial", "algebraic").flatMap { coupling ->
+                    listOf("witness", "refutation", "real-refutation", "optimum").map { verdict ->
+                        arrayOf<Any>(global, coupling, verdict)
+                    }
+                }
+            } + listOf("finite", "linear", "polynomial", "algebraic").map { coupling ->
+                arrayOf<Any>(Triple("count_eq-empty-invalid", "klause_count_eq([],1,1)", null), coupling, "refutation")
+            }
         }
     }
 

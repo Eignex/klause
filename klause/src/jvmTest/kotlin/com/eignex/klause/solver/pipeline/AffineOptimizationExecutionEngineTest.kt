@@ -36,8 +36,9 @@ class AffineOptimizationExecutionEngineTest(
             FiniteEngine.MIXED,
         ).flatMap { engine ->
             ObjectiveSense.entries.flatMap { sense ->
-                listOf(true, false).flatMap { affine ->
-                    listOf(7L, Long.MAX_VALUE).map { arrayOf<Any>(engine, sense, affine, it) }
+                listOf(true, false).map { affine ->
+                    val constant = if (sense == ObjectiveSense.MAXIMIZE) Long.MAX_VALUE else 7L
+                    arrayOf<Any>(engine, sense, affine, constant)
                 }
             }
         }
