@@ -192,10 +192,8 @@ class SelectionEncoderTest {
                 it.session.solve(0)
             }
 
-            assertEquals(
-                2L,
-                assertIs<SearchResult.Satisfied>(result).model.valueOf(SearchExactIntValue(SourceIntId(0)))?.toLongExact(),
-            )
+            val witness = assertIs<SearchResult.Satisfied>(result).model
+            assertEquals(2L, witness.valueOf(SearchExactIntValue(SourceIntId(0)))?.toLongExact())
         }
     }
 
