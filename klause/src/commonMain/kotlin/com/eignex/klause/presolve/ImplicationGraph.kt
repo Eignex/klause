@@ -407,12 +407,12 @@ internal object ImplicationGraph {
     private fun stronglyConnectedComponents(adj: Adjacency, work: GraphWork): IntArray? {
         if (!work.check()) return null
         val n = adj.nodeCount
-        val index = IntArray(n) { -1 }
+        val index = IntArray(n)
         val low = IntArray(n)
         val onStack = BooleanArray(n)
-        val component = IntArray(n) { -1 }
+        val component = IntArray(n)
         val tarjanStack = IntArrayList()
-        var nextIndex = 0
+        var nextIndex = 1
         var nextComponent = 0
 
         // Explicit DFS: each frame tracks the node and how far its neighbour list has been walked.
@@ -420,13 +420,13 @@ internal object ImplicationGraph {
         val callNeighbour = IntArrayList()
         for (root in 0 until n) {
             if (!work.visit()) return null
-            if (index[root] != -1) continue
+            if (index[root] != 0) continue
             callNode.add(root)
             callNeighbour.add(0)
             while (!callNode.isEmpty()) {
                 if (!work.visit()) return null
                 val node = callNode[callNode.size - 1]
-                if (callNeighbour[callNeighbour.size - 1] == 0 && index[node] == -1) {
+                if (callNeighbour[callNeighbour.size - 1] == 0 && index[node] == 0) {
                     index[node] = nextIndex
                     low[node] = nextIndex
                     nextIndex++
@@ -439,7 +439,7 @@ internal object ImplicationGraph {
                 while (ni < neighbours.size) {
                     if (!work.visit()) return null
                     val next = neighbours[ni]
-                    if (index[next] == -1) {
+                    if (index[next] == 0) {
                         callNeighbour[callNeighbour.size - 1] = ni + 1
                         callNode.add(next)
                         callNeighbour.add(0)
