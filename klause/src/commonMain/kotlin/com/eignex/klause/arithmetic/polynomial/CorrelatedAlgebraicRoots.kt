@@ -31,6 +31,14 @@ internal class CorrelatedAlgebraicRoots(private val algebraic: AlgebraicArithmet
         if (reduced.all { arithmetic.step(); it.degree <= 0 }) {
             return algebraic.roots(RationalPolynomial(reduced.map { arithmetic.step(); it[0] }))
         }
+        if (reduced.size == 2) {
+            try {
+                val expression = RootField(specialization.base, modulus).linearRoot(reduced[0], reduced[1])
+                return listOf(algebraic.evaluate(expression, specialization.base))
+            } catch (_: PolynomialResourceLimit) {
+                // The image's matrix can be larger than the joint linear resultant's matrix.
+            }
+        }
         val relation = Polynomial.of(buildList {
             for ((degree, coefficient) in reduced.withIndex()) {
                 for ((exponent, value) in coefficient.coefficients.withIndex()) {
@@ -104,6 +112,9 @@ internal class CorrelatedAlgebraicRoots(private val algebraic: AlgebraicArithmet
                 modulus = rational.divideExact(modulus, a)
             }
         }
+
+        fun linearRoot(constant: RationalPolynomial, leading: RationalPolynomial): RationalPolynomial =
+            negate(multiply(constant, inverse(leading)))
 
         private fun normalize(value: FieldPolynomial): FieldPolynomial {
             arithmetic.step()
