@@ -50,13 +50,15 @@ class LpEngineTest {
             ExactLinear.of(intArrayOf(Term.ofRealVar(row % reals)), listOf(BigFraction.ONE),
                 LinearOp.GE, BigFraction.ZERO, strict = true)
         }, numRealVars = reals, realLower = DoubleArray(reals), realUpper = DoubleArray(reals) { 1.0 })
+        val sink = SolveStatsSink(backend = "required-component-witness")
         val engine = LpEngine(source, LinearObjective(),
             LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
-            SolveStatsSink(backend = "required-component-witness"))
+            sink)
 
         val leaf = engine.use { it.leafCertify(PropagationSession(source)) }
 
-        assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM)
+        assertTrue(leaf.verdict == LpVerdict.FEASIBLE || leaf.verdict == LpVerdict.ATTAINED_OPTIMUM,
+            "leaf=${leaf.verdict}, phases=${sink.snapshot().lp.phases}")
         val point = Sample(booleanArrayOf(), longArrayOf(), leaf.reals,
             exactReals = assertNotNull(leaf.exactReals))
         assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point))

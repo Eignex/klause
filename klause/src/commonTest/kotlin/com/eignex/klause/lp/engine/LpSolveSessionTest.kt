@@ -29,7 +29,9 @@ class LpSolveSessionTest {
             val recovered = owner.solve(model, recoverWitness = true)
 
             assertNull(ordinary.witness)
-            val point = assertNotNull(recovered.witness)
+            val point = assertNotNull(recovered.witness,
+                "verdict=${recovered.verdict}, refinement=${recovered.refinement}, point=${recovered.exactPoint}, " +
+                    "continuation=${recovered.continuation}")
             assertTrue(point.primal[x] > BigFraction.ZERO && point.primal[x] <= BigFraction.ONE)
             assertEquals(BigFraction.ofLong(2L), point.primal[y])
             assertNotNull(checkedLpWitness(model, point.primal))
@@ -48,7 +50,10 @@ class LpSolveSessionTest {
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
 
         LpSolveSession().use { owner ->
-            assertNotNull(owner.solve(assertNotNull(trail.state.ownerWorkingModel()), recoverWitness = true).witness)
+            val initial = owner.solve(assertNotNull(trail.state.ownerWorkingModel()), recoverWitness = true)
+            assertNotNull(initial.witness,
+                "verdict=${initial.verdict}, refinement=${initial.refinement}, point=${initial.exactPoint}, " +
+                    "continuation=${initial.continuation}")
             assertTrue(trail.push())
             assertTrue(trail.assertBound(x, true, ExactLpSide(ExactLpNumber.of(0L)), 7L))
 
@@ -59,7 +64,9 @@ class LpSolveSessionTest {
 
             assertEquals(LpVerdict.INFEASIBLE, conflict.verdict)
             assertNull(conflict.witness)
-            val point = assertNotNull(restored.witness)
+            val point = assertNotNull(restored.witness,
+                "verdict=${restored.verdict}, refinement=${restored.refinement}, point=${restored.exactPoint}, " +
+                    "continuation=${restored.continuation}")
             assertTrue(point.primal[x] > BigFraction.ZERO && point.primal[x] <= BigFraction.ONE)
             assertNotNull(checkedLpWitness(model, point.primal))
         }
