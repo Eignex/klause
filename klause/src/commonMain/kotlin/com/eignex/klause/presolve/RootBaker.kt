@@ -111,11 +111,11 @@ object RootBaker {
         val token = budget?.observeStops(problem.cancellation) ?: problem.cancellation
         return budget.observe(pass, PresolveLane.FINITE, { problem.presolveSize() }) { invocation ->
             when {
-                token() -> base
                 !pass.namespaceEligible(problem) -> {
                     invocation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
                     base
                 }
+                token() -> base
                 else -> action(base as PropagationResult.Implied, token).also { result ->
                     if (result is PropagationResult.Implied) {
                         invocation?.fixedColumns = result.numBools + result.numInts - base.numBools - base.numInts
