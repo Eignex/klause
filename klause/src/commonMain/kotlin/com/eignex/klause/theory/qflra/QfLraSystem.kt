@@ -30,6 +30,8 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -135,6 +137,7 @@ internal class LiveQfLraSystem(
     rowForms: List<List<ExactRowForm>> = source.factors.map { factor ->
         factor.linearRows.map { it.exactForm(source.numRealVars) }
     },
+    private val cancellation: Cancellation = Cancellation.Never,
 ) {
     private val columns = source.numRealVars + source.numIntVars
     private val sourceColumns = source.exactLpSourceColumns()
@@ -290,12 +293,79 @@ internal class LiveQfLraSystem(
         val term = slot.term
         val column = slot.column.takeIf { it >= 0 } ?: (definitionColumn(term.coefficients) ?: return false)
         slot.column = column
-        return lp.assertBound(
+        val normalizedUpper = if (term.scale.signum() < 0) !upper else upper
+        val normalizedThreshold = term.bound(threshold)
+        val normalizedPremise = term.premise(premise)
+        if (!lp.assertBound(
             column,
-            if (term.scale.signum() < 0) !upper else upper,
-            ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
-            term.premise(premise),
+            normalizedUpper,
+            ExactLpSide(ExactLpNumber.of(normalizedThreshold), strict),
+            normalizedPremise,
+        )) return false
+        return assertFixedRemainder(term.coefficients, normalizedUpper, normalizedThreshold, strict, normalizedPremise)
+    }
+
+    private fun assertFixedRemainder(
+        coefficients: Map<Int, BigFraction>,
+        upper: Boolean,
+        threshold: BigFraction,
+        strict: Boolean,
+        premise: SearchAtomPremise,
+    ): Boolean {
+        val state = lp.state ?: return false
+        if (state.depth == 0 || coefficients.size != 2 || state.conflict != null) return true
+        cancellation.charge(3L)
+        if (cancellation()) return false
+        val (column, value) = fixedRemainderColumn(coefficients, threshold) ?: return !cancellation()
+        val remaining = coefficients.entries.single { it.key != column }
+        val coefficient = remaining.value
+        if (!chargeRemainderWork(listOf(coefficient, coefficients.getValue(column), value, threshold))) {
+            return !cancellation()
+        }
+        val bound = (threshold - coefficients.getValue(column) * value) * coefficient.reciprocal()
+        if (!bound.toDouble().isFinite() ||
+            maxOf(bound.num.magnitudeBitLength(), bound.den.magnitudeBitLength()) > 4096
+        ) return true
+        // The permanent term remains context independent; only this consequence carries the fixing.
+        val fixing = SearchAtomPremise.All(listOf(
+            lp.activeBoundPremise(column, false) ?: SearchAtomPremise.Unavailable,
+            lp.activeBoundPremise(column, true) ?: SearchAtomPremise.Unavailable,
+        ))
+        if (cancellation()) return false
+        return lp.assertBound(
+            remaining.key,
+            if (coefficient.signum() < 0) !upper else upper,
+            ExactLpSide(ExactLpNumber.of(bound), strict),
+            SearchAtomPremise.All(listOf(premise, fixing)),
         )
+    }
+
+    private fun fixedRemainderColumn(
+        coefficients: Map<Int, BigFraction>,
+        threshold: BigFraction,
+    ): Pair<Int, BigFraction>? {
+        val state = lp.state ?: return null
+        var fixed: Pair<Int, BigFraction>? = null
+        for ((column, coefficient) in coefficients) {
+            val lower = state.activeSide(column, false)?.side ?: continue
+            val higher = state.activeSide(column, true)?.side ?: continue
+            if (lower.strict || higher.strict || lower.premises != null || higher.premises != null) continue
+            if (!chargeRemainderWork(listOf(lower.number.value, higher.number.value, coefficient, threshold))) {
+                return null
+            }
+            if (lower.number.value != higher.number.value) continue
+            if (fixed != null) return null
+            fixed = column to lower.number.value
+        }
+        return fixed
+    }
+
+    private fun chargeRemainderWork(values: List<BigFraction>): Boolean {
+        val bits = values.map { maxOf(it.num.magnitudeBitLength(), it.den.magnitudeBitLength()) }
+        if (bits.any { it > 4096 }) return false
+        val words = 1L + bits.sumOf { it.toLong() } / Long.SIZE_BITS
+        cancellation.charge(16L * words * words)
+        return !cancellation()
     }
 
     private fun definitionColumn(coefficients: Map<Int, BigFraction>): Int? =

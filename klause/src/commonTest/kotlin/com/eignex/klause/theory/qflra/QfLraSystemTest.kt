@@ -27,6 +27,11 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -319,6 +324,192 @@ class QfLraSystemTest {
             val point = assertNotNull(result.exactPrimal)
             assertTrue(point[0] + point[1] >= BigFraction.ofLong(4))
             assertEquals(1, assertNotNull(lp.state).model.m)
+        }
+    }
+
+    @Test
+    fun `scoped fixed remainders should preserve signed rational bounds and strictness`() {
+        for (strict in listOf(false, true)) {
+            for (negative in listOf(false, true)) {
+                LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                    val system = LiveQfLraSystem(source(), lp)
+                    assertTrue(system.install())
+                    assertTrue(lp.atLevel(1))
+                    assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2)), axiom))
+                    assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2)), axiom))
+                    val inequality = ExactRationalInequality(
+                        intArrayOf(0, 1),
+                        listOf(BigFraction.ofLong(2), BigFraction.ofLong(if (negative) -3 else 3)),
+                        BigFraction.ofLong(5),
+                        strict,
+                    )
+
+                    assertTrue(system.assertRow(inequality, axiom))
+
+                    val active = assertNotNull(lp.state?.activeSide(1, !negative))
+                    val third = BigFraction.ofLong(3).reciprocal()
+                    assertEquals(if (negative) third.negated() else third, active.side.number.value)
+                    assertEquals(strict, active.side.strict)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a scoped remainder conflict should retain the row and both fixing premises`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2)), premise(0)))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2)), premise(1)))
+            session.push(SearchDecision.Bool(Lit.make(2, true)))
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), premise(2)))
+            session.push(SearchDecision.Bool(Lit.make(3, true)))
+            assertTrue(lp.assertBound(1, false, ExactLpSide(ExactLpNumber.of(2)), premise(3)))
+
+            val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
+
+            assertEquals((0..3).map { Lit.make(it, false) }, assertNotNull(conflict.explanation).literals.sorted())
+        }
+    }
+
+    @Test
+    fun `a negative source scale should preserve the scoped lower bound`() {
+        for (fixedColumn in 0..1) {
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source(), lp)
+                assertTrue(system.install())
+                assertTrue(lp.atLevel(1))
+                assertTrue(lp.assertBound(fixedColumn, false, ExactLpSide(ExactLpNumber.of(2)), axiom))
+                assertTrue(lp.assertBound(fixedColumn, true, ExactLpSide(ExactLpNumber.of(2)), axiom))
+                val coefficients = List(2) { if (it == fixedColumn) -2 else -3 }
+
+                assertTrue(system.assertRow(row(coefficients, -5), axiom))
+
+                assertEquals(
+                    BigFraction.ofLong(3).reciprocal(),
+                    lp.state?.activeSide(1 - fixedColumn, false)?.side?.number?.value,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `a sibling should derive its remainder from its own fixing`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            for (fixed in listOf(2L, -2L)) {
+                assertTrue(lp.atLevel(1))
+                assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(fixed)), axiom))
+                assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(fixed)), axiom))
+
+                assertTrue(system.assertRow(row(listOf(1, 1), 3), axiom))
+
+                assertEquals(BigFraction.ofLong(3L - fixed), lp.state?.activeSide(1, true)?.side?.number?.value)
+                assertTrue(lp.atLevel(0))
+                assertNull(lp.state?.activeSide(1, true))
+                assertEquals(1, assertNotNull(lp.state).model.m)
+            }
+        }
+    }
+
+    @Test
+    fun `attached engine premises should withhold a scoped remainder`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            val side = ExactLpSide(ExactLpNumber.of(2), premises = ExactLpPremises(emptyList()))
+            assertTrue(lp.assertBound(0, false, side, axiom))
+            assertTrue(lp.assertBound(0, true, side, axiom))
+
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), axiom))
+
+            assertNull(lp.state?.activeSide(1, true))
+        }
+    }
+
+    @Test
+    fun `an unfixed interval should not supply a scoped remainder`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2), strict = true), axiom))
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(3)), axiom))
+
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), axiom))
+
+            assertNull(lp.state?.activeSide(1, true))
+        }
+    }
+
+    @Test
+    fun `unavailable scoped fixing premises should withhold the conflict explanation`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2))))
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2))))
+            assertTrue(system.assertRow(row(listOf(1, 1), 3), axiom))
+            assertTrue(lp.assertBound(1, false, ExactLpSide(ExactLpNumber.of(2)), axiom))
+
+            val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
+
+            assertNull(conflict.explanation)
+        }
+    }
+
+    @Test
+    fun `a containing stop should retain charged work and withhold the scoped remainder`() {
+        for (limit in listOf(1L, 10L, 30L)) {
+            var work = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = work >= limit
+                override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            }
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source(), lp, cancellation = stop)
+                assertTrue(system.install())
+                assertTrue(lp.atLevel(1))
+                assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2)), axiom))
+                assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2)), axiom))
+
+                assertFalse(system.assertRow(row(listOf(1, 1), 3), axiom))
+
+                assertTrue(work >= limit)
+                assertNull(lp.state?.activeSide(1, true))
+                assertEquals(BigFraction.ofLong(3), lp.state?.activeSide(2, true)?.side?.number?.value)
+            }
+        }
+    }
+
+    @Test
+    fun `an oversized optional coefficient should preserve the ordinary source assertion`() {
+        val wide = BIG_ONE shl 4096
+        val coefficient = BigFraction.of(wide + BIG_ONE, wide)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2)), axiom))
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2)), axiom))
+            val inequality = ExactRationalInequality(
+                intArrayOf(0, 1), listOf(BigFraction.ONE, coefficient), BigFraction.ofLong(3),
+            )
+
+            assertTrue(system.assertRow(inequality, axiom))
+
+            assertNull(lp.state?.activeSide(1, true))
+            assertEquals(BigFraction.ofLong(3), lp.state?.activeSide(2, true)?.side?.number?.value)
         }
     }
 

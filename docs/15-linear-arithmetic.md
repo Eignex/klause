@@ -45,6 +45,12 @@ scale. `2x + 4y <= 6` and `-x - 2y >= -3` therefore share one slack column. Term
 first seen under an activator, branch or disjunct get their definition row appended
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
+Below the root, a two-coordinate term with one exactly fixed coordinate also
+contributes its unary remainder. This bound keeps both fixing premises and the
+source row premise, including strictness and direction reversal. It retracts with
+the assertion scope; the original term definition and bound stay in place for
+siblings and source certification. Optional derivation observes the containing
+operation allowance and declines scalars beyond the certification bit envelope.
 
 #### A check
 

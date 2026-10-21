@@ -283,7 +283,7 @@ class ExactLiraSearchComponent private constructor(
         )
     }
     private val lp: LpPropagator by lpDelegate
-    private val system by lazy { LiveQfLraSystem(model, lp, exactForms) }
+    private val system by lazy { LiveQfLraSystem(model, lp, exactForms, lpStop) }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
