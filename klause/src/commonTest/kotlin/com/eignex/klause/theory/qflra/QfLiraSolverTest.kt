@@ -51,6 +51,56 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `retracted source inputs should restore the complementary reified row`() {
+        val source = Problem(2, intBounds = openBounds(), factors = arrayOf(
+            ReifiedPseudoBoolean(0, longArrayOf(1L), intArrayOf(Lit.make(1, true)), PbOp.LE, 0L),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+        ))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertIs<SearchResult.Satisfied>(session.solve(2))
+        }
+    }
+
+    @Test
+    fun `shared source dependencies should preserve late conflicts and feasible siblings`() {
+        for (size in listOf(1, 65, 130)) {
+            val factors = ArrayList<Factor>()
+            repeat(size) { index ->
+                factors += ReifiedPseudoBoolean(index, longArrayOf(1L, 1L),
+                    intArrayOf(Lit.make(size, true), Lit.make(size, true)), PbOp.LE,
+                    if (index == size - 1) 0L else 2L)
+            }
+            factors += Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)
+            val source = Problem(size + 1, intBounds = openBounds(), factors = factors.toTypedArray())
+            val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+            repeat(2) {
+                prepared.open().use { component ->
+                    val session = SearchSession(listOf(component))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    repeat(size) { head ->
+                        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(head, true))))
+                    }
+                    assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(size, true))))
+
+                    session.popTo(size)
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(size, false))))
+
+                    assertIs<SearchResult.Satisfied>(session.solve(size + 1))
+                }
+            }
+        }
+    }
+
+    @Test
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")
         val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, false)), PbOp.EQ, wide)
