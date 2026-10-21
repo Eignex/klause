@@ -50,6 +50,40 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `interval guard implications should retract before a feasible sibling`() {
+        val model = Problem(numBoolVars = 4, intBounds = openBounds(0), numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, -2.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 2.0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            component.useSourceGuardPropagation()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(true, session.boolValue(2))
+            assertEquals(setOf(Lit.make(2, true), Lit.make(0, false), Lit.make(1, false)),
+                assertNotNull(session.reasonFor(2)).literals.toSet())
+            session.popTo(0)
+            assertNull(session.boolValue(2))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertNull(session.boolValue(2))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(3, false))))
+            assertEquals(ComponentCheck.Feasible, session.check())
+        }
+    }
+
+    @Test
     fun `canonical bound implications should retract before a feasible sibling`() {
         val model = Problem(
             numBoolVars = 3,

@@ -1347,6 +1347,11 @@ class ExactLiraSearchComponent private constructor(
         var candidates = 0
         var entries = 0
         val work = MixedPointArithmetic(operationStop)
+        fun admitEntries(size: Int): Boolean {
+            if (size < 0 || size > 4096 - entries) return false
+            entries += size
+            return true
+        }
         while (sourceGuardCovered < preparedRows.size && visited < 1024 && candidates < 64 && entries < 4096) {
             operationStop.charge(1L)
             if (operationStop()) return ComponentResult.Indeterminate
@@ -1357,8 +1362,7 @@ class ExactLiraSearchComponent private constructor(
             val head = prepared.row.activator
             if (prepared.disjunction || head !in bools.indices || context.boolValue(head) != null) continue
             val size = prepared.row.size.toLong() + 1L
-            if (size > 4096L - entries) continue
-            entries += size.toInt()
+            if (size > Int.MAX_VALUE || !admitEntries(size.toInt())) continue
             candidates++
             operationStop.charge(8L * size)
             if (operationStop()) return ComponentResult.Indeterminate
@@ -1370,7 +1374,7 @@ class ExactLiraSearchComponent private constructor(
                 { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
                 work::admitted, work::preflight,
             ) ?: continue
-            val proved = system.impliedComparison(comparison, operationStop) ?: continue
+            val proved = system.impliedComparison(comparison, operationStop, ::admitEntries) ?: continue
             val leaves = prepared.booleans.filter { it != head }.map { variable ->
                 SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
             }
@@ -1385,6 +1389,9 @@ class ExactLiraSearchComponent private constructor(
             if (accepted !is ComponentResult.Consistent) return accepted
             impliedSourceGuard = true
             observeCompleteStage(if (proved.truth) "BOUND_GUARD_TRUE" else "BOUND_GUARD_FALSE")
+            if (proved.interval) {
+                observeCompleteStage(if (proved.truth) "INTERVAL_GUARD_TRUE" else "INTERVAL_GUARD_FALSE")
+            }
         }
         return ComponentResult.Consistent
     }

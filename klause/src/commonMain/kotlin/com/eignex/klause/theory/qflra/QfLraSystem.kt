@@ -320,8 +320,19 @@ internal class LiveQfLraSystem(
         return null
     }
 
-    fun impliedComparison(comparison: ExactComparison, stop: Cancellation): ImpliedSmtComparison? {
+    fun impliedComparison(
+        comparison: ExactComparison,
+        stop: Cancellation,
+        admitEntries: (Int) -> Boolean = { true },
+    ): ImpliedSmtComparison? {
         val work = MixedPointArithmetic(stop)
+        var entries = 0
+        fun consume(size: Int): Boolean {
+            if (size < 0 || size > 4096 - entries || !admitEntries(size)) return false
+            entries += size
+            stop.charge(8L * size)
+            return !stop()
+        }
         if (stop() || !work.admitted(comparison.bound)) return null
         val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
         val term = (key.slot ?: normalized[key] ?: return null).term
@@ -339,22 +350,94 @@ internal class LiveQfLraSystem(
             return ImpliedSmtComparison(truth, term.premise(SearchAtomPremise.All(emptyList())))
                 .takeUnless { stop() }
         }
-        val column = term.coefficients.keys.singleOrNull() ?: definitions[term.coefficients] ?: return null
+        val column = term.coefficients.keys.singleOrNull() ?: definitions[term.coefficients]
         val state = lp.state ?: return null
-        if (state.conflict != null || column !in 0 until state.model.numVars) return null
+        if (state.conflict != null || (column != null && column !in 0 until state.model.numVars)) return null
         val op = if (term.scale.signum() >= 0) comparison.op else when (comparison.op) {
             LinearOp.LE -> LinearOp.GE
             LinearOp.GE -> LinearOp.LE
             else -> comparison.op
         }
+        var intervalUsed = false
         fun side(upper: Boolean, strict: Boolean): SearchAtomPremise? {
-            val active = state.activeSide(column, upper)?.side ?: return null
-            val value = active.number.value
-            if (!work.admitted(value) || !work.preflight(value, threshold)) return null
-            val order = value.compareTo(threshold)
-            if (if (upper) order > 0 else order < 0) return null
-            if (order == 0 && strict && !active.strict) return null
-            return lp.activeBoundPremise(column, upper)
+            fun sufficient(value: BigFraction, endpointStrict: Boolean): Boolean {
+                if (!work.admitted(value) || !work.preflight(value, threshold)) return false
+                val order = value.compareTo(threshold)
+                return (if (upper) order <= 0 else order >= 0) &&
+                    (order != 0 || !strict || endpointStrict)
+            }
+            if (column != null) {
+                val active = state.activeSide(column, upper)?.side
+                if (active != null && sufficient(active.number.value, active.strict)) {
+                    return lp.activeBoundPremise(column, upper)
+                }
+            }
+            if (term.coefficients.size > 1) {
+                if (!consume(term.coefficients.size + 1)) return null
+                var value = BigFraction.ZERO
+                var endpointStrict = false
+                val premises = ArrayList<SearchAtomPremise>()
+                for ((variable, coefficient) in term.coefficients) {
+                    if (!work.admitted(coefficient) || variable !in 0 until columns) return null
+                    val variableUpper = upper == (coefficient.signum() > 0)
+                    val active = state.activeSide(variable, variableUpper)?.side ?: return null
+                    if (!work.admitted(active.number.value)) return null
+                    value = work.subtractProduct(value, coefficient.negated(), active.number.value) ?: return null
+                    endpointStrict = endpointStrict || active.strict
+                    premises += lp.activeBoundPremise(variable, variableUpper) ?: return null
+                }
+                return SearchAtomPremise.All(premises).takeIf { sufficient(value, endpointStrict) }
+                    ?.also { intervalUsed = true }
+            }
+            val variable = term.coefficients.keys.singleOrNull() ?: return null
+            var visited = 0
+            for ((coefficients, auxiliary) in definitions) {
+                if (visited++ == 64 || !consume(1)) break
+                val coefficient = coefficients[variable] ?: continue
+                val row = auxiliary - state.model.n
+                if (row !in 0 until state.model.m || !state.rows.row(row).active ||
+                    !state.model.row(row).global || !work.admitted(coefficient) || coefficient.isZero
+                ) continue
+                val auxiliaryUpper = upper == (coefficient.signum() > 0)
+                val active = state.activeSide(auxiliary, auxiliaryUpper)?.side ?: continue
+                if (!consume(coefficients.size + 1) || !work.admitted(active.number.value)) continue
+                var value = active.number.value
+                var endpointStrict = active.strict
+                val premises = arrayListOf(lp.activeBoundPremise(auxiliary, auxiliaryUpper) ?: continue)
+                var complete = true
+                // Owned slack columns denote these exact source terms without additional assumptions.
+                for ((other, weight) in coefficients) {
+                    if (other == variable) continue
+                    if (other !in 0 until columns) {
+                        complete = false
+                        break
+                    }
+                    val otherUpper = auxiliaryUpper != (weight.signum() > 0)
+                    val otherSide = state.activeSide(other, otherUpper)?.side
+                    val premise = lp.activeBoundPremise(other, otherUpper)
+                    if (otherSide == null || premise == null || !work.admitted(weight) ||
+                        !work.admitted(otherSide.number.value)
+                    ) {
+                        complete = false
+                        break
+                    }
+                    val next = work.subtractProduct(value, weight, otherSide.number.value)
+                    if (next == null) {
+                        complete = false
+                        break
+                    }
+                    value = next
+                    endpointStrict = endpointStrict || otherSide.strict
+                    premises += premise
+                }
+                if (!complete) continue
+                value = work.quotient(value, coefficient) ?: continue
+                if (sufficient(value, endpointStrict)) {
+                    intervalUsed = true
+                    return SearchAtomPremise.All(premises)
+                }
+            }
+            return null
         }
         val proved: Pair<Boolean, SearchAtomPremise> = when (op) {
             LinearOp.LE -> side(true, comparison.strict)?.let { true to it }
@@ -371,7 +454,7 @@ internal class LiveQfLraSystem(
                 }
             }
         } ?: return null
-        return ImpliedSmtComparison(proved.first, term.premise(proved.second)).takeUnless { stop() }
+        return ImpliedSmtComparison(proved.first, term.premise(proved.second), intervalUsed).takeUnless { stop() }
     }
 
     fun assertAtom(atom: SourceBoundAtom, premise: SearchAtomPremise): Boolean {
@@ -480,7 +563,11 @@ internal class LiveQfLraSystem(
 }
 
 internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
-internal data class ImpliedSmtComparison(val truth: Boolean, val premise: SearchAtomPremise)
+internal data class ImpliedSmtComparison(
+    val truth: Boolean,
+    val premise: SearchAtomPremise,
+    val interval: Boolean = false,
+)
 
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
 // rows and a map-keyed lookup pays a hash probe per entry to compare.

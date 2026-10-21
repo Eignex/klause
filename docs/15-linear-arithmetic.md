@@ -97,8 +97,16 @@ their exact meaning; equality requires both bound sides, and separation proves
 disequality. Declared fixed coordinates can reduce a comparison to a constant.
 The shared reason retains the active bound witnesses and every resolved Boolean
 coefficient premise. Missing terms or explanations leave ordinary search in charge.
+Exact endpoint arithmetic can also bound a term from its individual source columns
+without allocating a slack column. A single source column can be isolated from an
+already owned definition and bounds on its other columns. Each direction examines
+at most 64 definitions. Negative coefficients reverse endpoint selection, and a
+strict input preserves a strict derived endpoint. These interval reasons retain
+every contributing active bound witness and fixed-column premise; they install no
+numerical bound or row and retain no derived proof cache.
 Each charged sweep visits at most 1,024 source rows, considers 64 open guards and
-evaluates 4,096 entries. It creates no numerical row or query. Private conditioned
+evaluates 4,096 entries, including interval products and reverse definition visits.
+It creates no numerical row or query. Private conditioned
 openings keep their own policy, and a partial point supplies no implication proof.
 Completed coverage is reused while matrix, bounds, row activity and pop revisions
 stay unchanged. Retraction and newly available Boolean coefficient inputs reopen

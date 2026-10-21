@@ -40,6 +40,148 @@ import kotlin.test.assertTrue
 
 class QfLraSystemTest {
     @Test
+    fun `unallocated term intervals should preserve signed strict endpoints`() {
+        for (activeStrict in listOf(false, true)) for (negative in listOf(false, true)) {
+            for (op in listOf(LinearOp.LE, LinearOp.GE)) for (strict in listOf(false, true)) {
+                val sign = if (negative) -1.0 else 1.0
+                val upper = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 3.0, strict = activeStrict)
+                val lower = ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0)
+                val target = ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0 * sign, -4.0 * sign), op, 2.0 * sign, strict = strict)
+                LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                    val system = LiveQfLraSystem(source().withFactors(arrayOf(upper, lower, target)), lp)
+                    assertTrue(system.install())
+                    val session = SearchSession(listOf(lp))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    for ((head, factor) in listOf(upper, lower).withIndex()) {
+                        session.push(SearchDecision.Bool(Lit.make(head, true)))
+                        assertTrue(system.assertComparison(factor.linearRows.single().exactForm(2)
+                            .comparison(true) { false }, null, premise(head)))
+                    }
+                    val before = lp.state
+
+                    val result = system.impliedComparison(target.linearRows.single().exactForm(2)
+                        .comparison(true) { false }, Cancellation.Never)
+
+                    val upperSide = (op == LinearOp.LE) != negative
+                    val expected = if (upperSide) true.takeIf { !strict || activeStrict }
+                        else false.takeIf { strict || activeStrict }
+                    assertEquals(expected, result?.truth)
+                    if (expected != null) {
+                        val proved = assertNotNull(result)
+                        assertTrue(proved.interval)
+                        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+                            assertNotNull(session.explainAtoms(proved.premise)).literals.toSet())
+                    }
+                    assertSame(before, lp.state)
+                    assertEquals(0, assertNotNull(lp.state).model.m)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `reverse definition intervals should preserve signed strict endpoints`() {
+        for (activeStrict in listOf(false, true)) for (negative in listOf(false, true)) {
+            for (op in listOf(LinearOp.LE, LinearOp.GE)) for (strict in listOf(false, true)) {
+                val sign = if (negative) -1.0 else 1.0
+                val combined = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, -2.0), LinearOp.LE, 0.0, strict = activeStrict)
+                val lower = ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 2.0)
+                val target = ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1),
+                    doubleArrayOf(sign), op, sign, strict = strict)
+                LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                    val system = LiveQfLraSystem(source().withFactors(arrayOf(combined, lower, target)), lp)
+                    assertTrue(system.install())
+                    val session = SearchSession(listOf(lp))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    for ((head, factor) in listOf(combined, lower).withIndex()) {
+                        session.push(SearchDecision.Bool(Lit.make(head, true)))
+                        assertTrue(system.assertComparison(factor.linearRows.single().exactForm(2)
+                            .comparison(true) { false }, null, premise(head)))
+                    }
+                    val before = lp.state
+
+                    val result = system.impliedComparison(target.linearRows.single().exactForm(2)
+                        .comparison(true) { false }, Cancellation.Never)
+
+                    val lowerSide = (op == LinearOp.GE) != negative
+                    val expected = if (lowerSide) true.takeIf { !strict || activeStrict }
+                        else false.takeIf { strict || activeStrict }
+                    assertEquals(expected, result?.truth)
+                    if (expected != null) {
+                        val proved = assertNotNull(result)
+                        assertTrue(proved.interval)
+                        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
+                            assertNotNull(session.explainAtoms(proved.premise)).literals.toSet())
+                    }
+                    assertSame(before, lp.state)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `interval equality should retain both coordinate endpoints`() {
+        val factors = arrayOf(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1),
+                doubleArrayOf(1.0), LinearOp.LE, 2.0),
+            ReifiedRealLinear(3, intArrayOf(), doubleArrayOf(), intArrayOf(1),
+                doubleArrayOf(1.0), LinearOp.GE, 2.0),
+        )
+        val equality = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 1.0), LinearOp.EQ, 3.0)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(arrayOf<Factor>(*factors, equality)), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for ((head, factor) in factors.withIndex()) {
+                session.push(SearchDecision.Bool(Lit.make(head, true)))
+                assertTrue(system.assertComparison(factor.linearRows.single().exactForm(2)
+                    .comparison(true) { false }, null, premise(head)))
+            }
+
+            for (truth in listOf(false, true)) {
+                val result = assertNotNull(system.impliedComparison(equality.linearRows.single().exactForm(2)
+                    .comparison(truth) { false }, Cancellation.Never))
+                assertEquals(truth, result.truth)
+                assertEquals((0..3).map { Lit.make(it, false) }.toSet(),
+                    assertNotNull(session.explainAtoms(result.premise)).literals.toSet())
+            }
+            session.popTo(3)
+            assertNull(system.impliedComparison(equality.linearRows.single().exactForm(2)
+                .comparison(true) { false }, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `interval proof admission should leave numerical state unchanged`() {
+        val target = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 1.0), LinearOp.LE, 0.0)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(arrayOf(target)), lp)
+            assertTrue(system.install())
+            assertTrue(system.assertRow(row(listOf(1, 0), 0), axiom))
+            assertTrue(system.assertRow(row(listOf(0, 1), 0), axiom))
+            val comparison = target.linearRows.single().exactForm(2).comparison(true) { false }
+            val before = lp.state
+
+            assertNull(system.impliedComparison(comparison, Cancellation.Never) { false })
+            assertNull(system.impliedComparison(comparison, Cancellation { true }))
+            assertTrue(assertNotNull(system.impliedComparison(comparison, Cancellation.Never)).truth)
+            assertSame(before, lp.state)
+        }
+    }
+
+    @Test
     fun `declared fixed coordinates should imply constant comparison guards`() {
         val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
             doubleArrayOf(-3.0), LinearOp.LE, -6.0)
