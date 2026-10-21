@@ -13,6 +13,95 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `linear shared lifting should retain the root relation for later arithmetic`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val x = Polynomial.variable(0)
+        val relation = polynomial.subtract(Polynomial.variable(1),
+            polynomial.subtract(polynomial.power(x, 2), Polynomial.ONE))
+        val specialized = arithmetic.specialize(relation, 1, mapOf(0 to base))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
+
+        val root = caller.roots(specialized).single()
+        val sum = caller.add(root, base)
+
+        assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-11, -3, 3, 1), sum))
+    }
+
+    @Test
+    fun `linear shared lifting should retain an admitted joint resultant after image refusal`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val relation = polynomial.subtract(polynomial.multiply(Polynomial.variable(0), Polynomial.variable(1)),
+            Polynomial.ONE)
+        val specialized = arithmetic.specialize(relation, 1, mapOf(0 to base))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 16)))
+
+        val root = caller.roots(specialized).single()
+
+        assertEquals(0, arithmetic.compare(arithmetic.multiply(base, root), arithmetic.rational(BigFraction.ONE)))
+    }
+
+    @Test
+    fun `related coordinates should share a single coefficient elimination field`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val square = arithmetic.power(base, 2)
+        val z = Polynomial.variable(2)
+        val relation = polynomial.add(polynomial.add(polynomial.power(z, 2),
+            polynomial.multiply(Polynomial.variable(0), z)), Polynomial.variable(1))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
+
+        val roots = caller.roots(caller.specialize(relation, 2, mapOf(0 to base, 1 to square)))
+
+        assertTrue(roots.isEmpty())
+    }
+
+    @Test
+    fun `shared coordinate capture should distinguish different indexed conjugates`() {
+        val bases = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
+        val relation = polynomial.subtract(Polynomial.variable(2),
+            polynomial.add(Polynomial.variable(0), Polynomial.variable(1)))
+
+        val roots = arithmetic.roots(arithmetic.specialize(relation, 2,
+            mapOf(0 to bases.first(), 1 to bases.last())))
+
+        assertEquals(1, roots.size)
+        assertEquals(0, arithmetic.sign(roots.single()))
+    }
+
+    @Test
+    fun `captured related coordinates should use the lifting caller after producer cancellation`() {
+        var cancelled = false
+        val producer = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        val base = producer.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val square = producer.power(base, 2)
+        val z = Polynomial.variable(2)
+        val relation = polynomial.add(polynomial.add(polynomial.power(z, 2),
+            polynomial.multiply(Polynomial.variable(0), z)), Polynomial.variable(1))
+        val specialized = producer.specialize(relation, 2, mapOf(0 to base, 1 to square))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
+        cancelled = true
+
+        val roots = caller.roots(specialized)
+
+        assertTrue(roots.isEmpty())
+    }
+
+    @Test
+    fun `shared coordinate capture should own its expressions after point mutation`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val coordinates = mutableMapOf(0 to base, 1 to arithmetic.power(base, 2))
+        val z = Polynomial.variable(2)
+        val relation = polynomial.add(polynomial.add(polynomial.power(z, 2),
+            polynomial.multiply(Polynomial.variable(0), z)), Polynomial.variable(1))
+        val specialized = arithmetic.specialize(relation, 2, coordinates)
+        coordinates[0] = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        coordinates[1] = arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()
+
+        val roots = arithmetic.roots(specialized)
+
+        assertTrue(roots.isEmpty())
+    }
+
+    @Test
     fun `shared images should add within a single image elimination matrix`() {
         val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
         val square = arithmetic.evaluate(RationalPolynomial.of(0, 0, 1), base)
