@@ -223,6 +223,8 @@ internal object LinearSubSumAggregation {
                 if (bound !in -OVERFLOW_GUARD..OVERFLOW_GUARD || !work.visit()) {
                     null
                 } else {
+                    // Linear retains one zero term to represent a constant comparison.
+                    if (terms.isEmpty()) terms[row.linear.vars[0]] = 0L
                     Linear(terms.values.toLongArray(), terms.keys.toIntArray(), row.linear.op, bound)
                 }
             }
