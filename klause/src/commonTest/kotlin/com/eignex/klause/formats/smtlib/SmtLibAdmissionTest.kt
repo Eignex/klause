@@ -20,7 +20,9 @@ import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -38,6 +40,66 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
+    @Test
+    fun `inconsistent integer scalar equations should retain a linear source`() {
+        val source = SmtLib.parse(
+            "(set-logic QF_LIA) (declare-const x1 Int) (declare-const x2 Int) " +
+                "(declare-const x3 Int) (declare-const x4 Int) " +
+                "(assert (= (+ x1 x2) 8)) (assert (= x1 (* 3 x3))) (assert (= x2 (* 6 x4))) (check-sat)",
+        )
+
+        assertIs<Problem>(source.source.originalSource)
+        assertEquals(setOf("x1", "x2", "x3", "x4"), source.intVarNames.keys)
+    }
+
+    @Test
+    fun `inconsistent integer premises should select a refuted route before nonlinear execution`() {
+        for (product in listOf("", "(assert (= (* x3 x4) 0))")) {
+            val source = SmtLib.parse(
+                "(declare-const x1 Int) (declare-const x2 Int) (declare-const x3 Int) (declare-const x4 Int) " +
+                    "(assert (= (+ x1 x2) 8)) (assert (= x1 (* 3 x3))) (assert (= x2 (* 6 x4))) $product",
+            )
+
+            assertIs<SourceProblemRoute.Refuted>(source.model.pipelineRoute())
+        }
+    }
+
+    @Test
+    fun `feasible integer scalar equations should retain exact linear witnesses`() {
+        val source = SmtLib.parse(
+            "(declare-const x1 Int) (declare-const x2 Int) (declare-const x3 Int) (declare-const x4 Int) " +
+                "(assert (= (+ x1 x2) 9)) (assert (= x1 (* 3 x3))) (assert (= x2 (* 6 x4)))",
+        )
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        val values = source.intVarNames.mapValues { (_, id) -> witness.intValue(id).toLong() }
+        assertEquals(9L, values.getValue("x1") + values.getValue("x2"))
+        assertEquals(3 * values.getValue("x3"), values.getValue("x1"))
+        assertEquals(6 * values.getValue("x4"), values.getValue("x2"))
+    }
+
+    @Test
+    fun `refuted integer premises should not admit unsupported nonlinear syntax`() {
+        for (term in listOf("(/ x x)", "(^ x (- 1))", "(div (* x x) 2)")) {
+            assertFailsWith<UnsupportedSmtException> {
+                SmtLib.parse("(declare-const x Int) (declare-const y Int) " +
+                    "(assert (= (* 2 x) (+ (* 2 y) 1))) (assert (= $term 0))")
+            }
+        }
+    }
+
+    @Test
+    fun `feasible open nonlinear premises should retain exact nonlinear source admission`() {
+        val source = SmtLib.parse(
+            "(declare-const x Int) (declare-const y Int) " +
+                "(assert (= (* 2 x) (+ (* 2 y) 2))) (assert (= (* x y) 0))",
+        )
+
+        assertIs<NonlinearIntegerProblem>(source.source.originalSource)
+    }
+
     @Test
     fun `a provided closeable source should close when admission is already interrupted`() {
         var reads = 0

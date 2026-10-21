@@ -228,7 +228,9 @@ Bounded representable products keep their factor form: Int × Int uses `Product`
 Int × Real `RealProduct` and Real × Real `ContinuousProduct`. Nonlinear lowering
 first closes integer bounds from exact unconditional linear premises; compound
 integer operands receive exact defining equalities, and bounded fixed powers above
-one retain `Power`. Open or overflowing integers keep typed arbitrary-precision
+one retain `Power`. Scalar multiplication stays linear. Refuted integer premises
+retain an explicit contradiction for shared routing after full source validation;
+they do not trigger nonlinear fallback. Open or overflowing integers keep typed arbitrary-precision
 coordinates for [nonlinear integer execution](16-nonlinear-arithmetic.md), and finite
 mixed products compose through [exact polynomial completion](16-nonlinear-arithmetic.md#shared-model-composition).
 A source outside the factor representation keeps an exact expression snapshot with
