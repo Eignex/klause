@@ -136,6 +136,9 @@ class ResumableOpenTheoryTest {
 
         assertTrue(pausedGlue > 0.0, "pausedGlue=$pausedGlue")
         val before = search.stats
+        assertEquals(n, before.smt.completeSearchBooleanVariables)
+        assertEquals(1L, before.smt.completeSearchStages?.get("OPENING"))
+        assertTrue(before.smt.conflicts > 0L)
 
         search.close()
         search.close()
