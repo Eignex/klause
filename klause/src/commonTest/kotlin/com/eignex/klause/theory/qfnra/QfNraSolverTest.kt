@@ -21,6 +21,29 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `independent graph sections reconstruct every coordinate above an irrational base`() {
+        val declarations = (0..128).joinToString(" ") { "(declare-const x$it Real)" }
+        val equations = (0 until 128).joinToString(" ") {
+            "(assert (= x$it (+ (* x128 x128) $it)))"
+        }
+        val source = SmtLibPolynomial.parse(
+            "$declarations $equations (assert (= (* x128 x128) 2)) (assert (> x128 0))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 500_000, polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(129, witness.realCount)
+        assertTrue(algebraic.sign(witness.realValue(128)) > 0)
+        assertEquals(0, algebraic.signAt(RationalPolynomial.of(-2, 0, 1), witness.realValue(128)))
+        for (id in 0 until 128) {
+            assertEquals(0, algebraic.compare(witness.realValue(id),
+                algebraic.rational(BigFraction.ofLong(id.toLong() + 2))))
+        }
+    }
+
+    @Test
     fun `an exact sample can satisfy predicates before their full projection fits`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

@@ -263,7 +263,10 @@ opaque leaves, a proof scan keeps only supporting literals, and private exclusio
 clauses prevent revisiting a region without entering shared learning.
 
 **3. Regional reduction and projection.** Each region's signed predicates form a
-conjunction. Linear required equalities are solved and substituted, coordinates
+conjunction. Required equalities with a nonzero rational coefficient of one
+coordinate define total graph sections. Sections whose replacements do not depend
+on any selected coordinate are substituted together, retaining each reconstruction
+fibre; dependent sections wait for a later pass. Coordinates
 occurring only linearly in inequalities are eliminated by affine pairing, and sign
 propagation can refute the region outright.
 [PolynomialProjection](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)

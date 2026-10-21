@@ -21,6 +21,40 @@ class PolynomialEquationalProjectionTest {
     private val z = Polynomial.variable(2)
 
     @Test
+    fun `independent total sections retain both defining polynomials`() {
+        val square = arithmetic.power(z, 2)
+        val cube = arithmetic.power(z, 3)
+        val equations = listOf(arithmetic.subtract(x, square), arithmetic.subtract(y, cube))
+
+        val sections = equationalSections(equations, equations, arithmetic)
+
+        assertEquals(mapOf(0 to square, 1 to cube), sections.associate { it.variable to it.replacement })
+    }
+
+    @Test
+    fun `dependent total sections leave a defining coordinate for a later pass`() {
+        val equations = listOf(arithmetic.subtract(x, arithmetic.power(y, 2)),
+            arithmetic.subtract(y, arithmetic.power(z, 2)))
+
+        val sections = equationalSections(equations, equations, arithmetic)
+
+        assertEquals(1, sections.size)
+        val section = sections.single()
+        assertTrue(equations.any {
+            arithmetic.substitute(it, section.variable, section.replacement).isZero
+        })
+    }
+
+    @Test
+    fun `a batch cannot eliminate a variable coefficient singular fiber`() {
+        val equation = arithmetic.subtract(arithmetic.multiply(x, y), Polynomial.ONE)
+
+        val sections = equationalSections(listOf(equation), listOf(equation), arithmetic)
+
+        assertTrue(sections.isEmpty())
+    }
+
+    @Test
     fun `a required equation can select a lower source coordinate as the final section`() {
         val equation = arithmetic.subtract(x, arithmetic.power(y, 2))
         val boundary = arithmetic.subtract(arithmetic.power(y, 2), Polynomial.constant(BigFraction.ofLong(2)))

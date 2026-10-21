@@ -12,13 +12,61 @@ internal fun equationalSection(
     family: List<Polynomial>,
     arithmetic: PolynomialArithmetic,
 ): PolynomialEquationalProjection? {
-    if (equations.isEmpty()) return null
+    var best: SectionPivot? = null
+    visitSectionPivots(equations, family, arithmetic) { candidate ->
+        val previous = best
+        if (previous == null || candidate.before(previous)) best = candidate
+    }
+    return best?.projection(arithmetic)
+}
+
+internal fun equationalSections(
+    equations: List<Polynomial>,
+    family: List<Polynomial>,
+    arithmetic: PolynomialArithmetic,
+): List<PolynomialEquationalProjection> {
+    val candidates = ArrayList<SectionPivot>()
+    visitSectionPivots(equations, family, arithmetic) { candidates.add(it) }
+    candidates.sortWith { left, right ->
+        arithmetic.step()
+        when {
+            left.before(right) -> -1
+            right.before(left) -> 1
+            else -> 0
+        }
+    }
+    val targets = HashSet<Int>()
+    val dependencies = HashSet<Int>()
+    val result = ArrayList<PolynomialEquationalProjection>()
+    // Independent replacements commute and cannot reintroduce an eliminated coordinate.
+    for (candidate in candidates) {
+        arithmetic.step()
+        val variable = candidate.variable
+        if (variable in targets || variable in dependencies) continue
+        val inputs = candidate.polynomial.variables.filter {
+            arithmetic.step()
+            it != variable
+        }
+        if (inputs.any { arithmetic.step(); it in targets }) continue
+        result.add(candidate.projection(arithmetic))
+        targets.add(variable)
+        dependencies.addAll(inputs)
+    }
+    return result
+}
+
+private fun visitSectionPivots(
+    equations: List<Polynomial>,
+    family: List<Polynomial>,
+    arithmetic: PolynomialArithmetic,
+    visit: (SectionPivot) -> Unit,
+) {
+    if (equations.isEmpty()) return
     val occurrences = HashMap<Int, Int>()
     for (polynomial in family) for (variable in polynomial.variables) {
         arithmetic.step()
         occurrences[variable] = (occurrences[variable] ?: 0) + 1
     }
-    var best: SectionPivot? = null
     for (polynomial in equations) {
         arithmetic.step()
         val terms = polynomial.terms
@@ -33,19 +81,20 @@ internal fun equationalSection(
             if (term.monomial.exponent(variable) != 1 || counts[variable] != 1) continue
             val fill = (terms.size - 1).toLong() * ((occurrences[variable] ?: 1) - 1)
             val bits = term.coefficient.num.magnitudeBitLength().toLong() + term.coefficient.den.magnitudeBitLength()
-            val candidate = SectionPivot(polynomial, variable, term, fill, bits)
-            if (best == null || candidate.before(best)) best = candidate
+            visit(SectionPivot(polynomial, variable, term, fill, bits))
         }
     }
-    val pivot = best ?: return null
+}
+
+private fun SectionPivot.projection(arithmetic: PolynomialArithmetic): PolynomialEquationalProjection {
     val remainder = ArrayList<PolynomialTerm>()
-    for (term in pivot.polynomial.terms) {
+    for (next in polynomial.terms) {
         arithmetic.step()
-        if (term != pivot.term) remainder.add(term)
+        if (next != term) remainder.add(next)
     }
     // A nonzero rational coefficient makes the section total, including singular base points.
-    val replacement = arithmetic.scale(Polynomial.of(remainder), pivot.term.coefficient.reciprocal().negated())
-    return PolynomialEquationalProjection(pivot.variable, replacement)
+    val replacement = arithmetic.scale(Polynomial.of(remainder), term.coefficient.reciprocal().negated())
+    return PolynomialEquationalProjection(variable, replacement)
 }
 
 private class SectionPivot(

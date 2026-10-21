@@ -94,27 +94,33 @@ internal class PolynomialAffineReduction private constructor(
                     inconsistent = true
                     break
                 }
-                val graph = equationalSection(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
-                if (graph == null) {
+                val graphs = equationalSections(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
+                if (graphs.isEmpty()) {
                     if (!graphChanges) break
                     normalizeConjunction = true
                     continue
                 }
+                val graphsByVariable = graphs.associateBy { arithmetic.step(); it.variable }
                 val rewritten = ArrayList<PolynomialAtom>()
                 for (atom in current) {
                     arithmetic.step()
-                    val polynomial = if (graph.variable in atom.polynomial.variables) {
-                        arithmetic.substitute(atom.polynomial, graph.variable, graph.replacement)
-                    } else atom.polynomial
+                    var polynomial = atom.polynomial
+                    for (variable in atom.polynomial.variables) {
+                        arithmetic.step()
+                        val graph = graphsByVariable[variable] ?: continue
+                        polynomial = arithmetic.substitute(polynomial, variable, graph.replacement)
+                    }
                     if (polynomial.isZero && atom.holds(0)) continue
                     rewritten.add(PolynomialAtom(polynomial, atom.relation))
                     yield(null)
                 }
-                arithmetic.step()
-                fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
+                for (graph in graphs) {
+                    arithmetic.step()
+                    fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
+                    onGraph?.invoke()
+                }
                 current = rewritten
                 graphChanges = true
-                onGraph?.invoke()
                 yield(null)
             }
             if (!inconsistent) {

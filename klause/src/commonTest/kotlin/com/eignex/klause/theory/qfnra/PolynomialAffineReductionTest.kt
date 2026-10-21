@@ -11,8 +11,45 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PolynomialAffineReductionTest {
+    @Test
+    fun `independent graph reductions retain a contradiction between their images`() {
+        val arithmetic = PolynomialArithmetic()
+        val x = Polynomial.variable(0)
+        val y = Polynomial.variable(1)
+        val z = Polynomial.variable(2)
+        val square = arithmetic.power(z, 2)
+        val formula = PolynomialFormula.conjunction(listOf(
+            PolynomialAtom(arithmetic.subtract(x, square), PolynomialRelation.EQ),
+            PolynomialAtom(arithmetic.subtract(y, square), PolynomialRelation.EQ),
+            PolynomialAtom(arithmetic.subtract(x, y), PolynomialRelation.GT),
+        ), arithmetic)
+        val region = PolynomialBooleanRegion(mapOf(0 to true, 1 to true, 2 to true), emptyMap())
+
+        val result = PolynomialAffineReduction.prepare(formula, region, 3, arithmetic)
+            .asSequence().filterNotNull().single()
+
+        assertTrue(result.inconsistent)
+    }
+
+    @Test
+    fun `cancellation during graph capture publishes no reduced region`() {
+        var stopped = false
+        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val z = Polynomial.variable(2)
+        val square = arithmetic.power(z, 2)
+        val formula = PolynomialFormula.conjunction(listOf(
+            PolynomialAtom(arithmetic.subtract(Polynomial.variable(0), square), PolynomialRelation.EQ),
+            PolynomialAtom(arithmetic.subtract(Polynomial.variable(1), square), PolynomialRelation.EQ),
+        ), arithmetic)
+        val region = PolynomialBooleanRegion(mapOf(0 to true, 1 to true), emptyMap())
+        val pending = PolynomialAffineReduction.prepare(formula, region, 3, arithmetic, onGraph = { stopped = true })
+
+        assertFailsWith<PolynomialInterrupted> { pending.asSequence().filterNotNull().single() }
+    }
+
     @Test
     fun `coincident weak graph bounds eliminate a coordinate with nonlinear occurrences`() {
         val arithmetic = PolynomialArithmetic()
