@@ -34,6 +34,8 @@ internal object DiophantineReduction {
     // Work charged per equality scanned, scaled by its length: the residue scan is linear in the row.
     private const val DIOPHANTINE_WORK_WEIGHT = 10L
 
+    private const val POLL_INTERVAL = 64
+
     /** `true` when `|v| < 2³¹`, so a product of two such values stays below 2⁶² — the overflow gate. */
     private fun fitsHalfLong(v: Long): Boolean = v > -(1L shl 31) && v < (1L shl 31)
 
@@ -86,19 +88,37 @@ internal object DiophantineReduction {
      */
     private fun residues(factors: List<Factor>, cancellation: Cancellation): Pair<List<Residue>, Int> {
         val out = ArrayList<Residue>()
-        for (f in presolveLinearRows(factors)) {
+        if (cancellation()) return out to -1
+        for (f in presolveLinearRows(factors, cancellation = cancellation)) {
+            if (cancellation()) return out to -1
             if (f.op != LinearOp.EQ) continue
             cancellation.charge(DIOPHANTINE_WORK_WEIGHT * (1L + f.vars.size))
+            if (cancellation()) return out to -1
             val row = f.integerConstants ?: continue
             if (f.vars.size < 2 || !fitsHalfLong(row.bound)) continue
-            if (f.vars.indices.any { !fitsHalfLong(row.coeff(it)) }) continue
+            var fits = true
+            for (i in f.vars.indices) {
+                if (i % POLL_INTERVAL == 0 && cancellation()) return out to -1
+                if (!fitsHalfLong(row.coeff(i))) {
+                    fits = false
+                    break
+                }
+            }
+            if (!fits) continue
             val n = f.vars.size
             // Prefix / suffix gcd of |coeffs| so `gcd(aⱼ : j ≠ i)` is O(1) per variable.
             val pre = LongArray(n + 1)
             val suf = LongArray(n + 1)
-            for (i in 0 until n) pre[i + 1] = gcd(pre[i], row.coeff(i))
-            for (i in n - 1 downTo 0) suf[i] = gcd(suf[i + 1], row.coeff(i))
+            for (i in 0 until n) {
+                if (i % POLL_INTERVAL == 0 && cancellation()) return out to -1
+                pre[i + 1] = gcd(pre[i], row.coeff(i))
+            }
+            for (i in n - 1 downTo 0) {
+                if (i % POLL_INTERVAL == 0 && cancellation()) return out to -1
+                suf[i] = gcd(suf[i + 1], row.coeff(i))
+            }
             for (j in 0 until n) {
+                if (j % POLL_INTERVAL == 0 && cancellation()) return out to -1
                 val m = gcd(pre[j], suf[j + 1])
                 if (m <= 1L) continue
                 val (root, mod) = solveCongruence(row.coeff(j), row.bound, m) ?: return out to f.vars[j]
@@ -124,6 +144,8 @@ internal object DiophantineReduction {
         val hi = HashMap<Int, Long>()
         val tightening = bounds.tightening()
         for (r in found) {
+            if (cancellation()) break
+            cancellation.charge(1)
             val v = r.column
             if (bounds.hasLower(v)) {
                 val current = lo[v] ?: bounds.lower(v)
@@ -156,6 +178,7 @@ internal object DiophantineReduction {
         val (found, unsolvable) = residues(problem.factors.asList(), cancellation)
         if (unsolvable >= 0) return contradiction(problem, unsolvable)
         for (r in found) {
+            if (cancellation()) break
             val root = r.root
             val mod = r.mod
             val v = r.column
@@ -166,9 +189,16 @@ internal object DiophantineReduction {
             val live = dom.spanOrNull(SIZE_CAP.toLong()) ?: continue
             if (!fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) continue
             val remove = LongArrayList()
-            for (k in 0 until live.size) {
-                val x = live.valueAt(k)
-                if (floorMod(x - root, mod) != 0L) remove.add(x)
+            var scanned = 0
+            while (scanned < live.size) {
+                val end = minOf(scanned + POLL_INTERVAL, live.size)
+                for (k in scanned until end) {
+                    val x = live.valueAt(k)
+                    if (floorMod(x - root, mod) != 0L) remove.add(x)
+                }
+                cancellation.charge((end - scanned).toLong())
+                if (cancellation()) return if (out == null) PassDelta() else PassDelta(domains = out)
+                scanned = end
             }
             if (remove.isEmpty()) continue
             if (out == null) out = problem.rootIntDomains()
