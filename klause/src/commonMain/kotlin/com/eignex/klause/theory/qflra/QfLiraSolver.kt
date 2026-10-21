@@ -781,11 +781,20 @@ class ExactLiraSearchComponent private constructor(
             endOperation(context)
         }
     }
-    override fun propagate(context: SearchContext): ComponentResult = lp.propagate(context)
-    override fun check(context: SearchContext): ComponentCheck = if (finiteIntVars.any { variable ->
+    override fun propagate(context: SearchContext): ComponentResult = lp.propagate(context).also { result ->
+        when (result) {
+            is ComponentResult.Conflict -> observeCompleteStage("PROPAGATION_CONFLICT")
+            ComponentResult.Indeterminate -> observeCompleteStage("PROPAGATION_INCOMPLETE")
+            ComponentResult.Consistent -> Unit
+        }
+    }
+    override fun check(context: SearchContext): ComponentCheck {
+        if (unassignedBooleans > 0) observeCompleteStage("CHECK_WITH_OPEN_BOOLEANS")
+        return if (finiteIntVars.any { variable ->
             context.intLowerBound(variable) == null ||
                 context.intLowerBound(variable) != context.intUpperBound(variable)
         }) ComponentCheck.Indeterminate else lp.check(context)
+    }
     override fun shareSourcePredicates(context: SearchContext): ComponentResult {
         beginOperation()
         return try {
@@ -1475,6 +1484,7 @@ class ExactLiraSearchComponent private constructor(
         lpStop.end()
         if (operationStop() && !context.cancelled()) {
             operationBudgetExhausted = true
+            observeCompleteStage("OPERATION_ALLOWANCE_STOP")
             context.executionControls.reportStop(SearchStopCause.OperationAllowance)
         }
         operationStop = parentStop
@@ -1508,6 +1518,7 @@ class ExactLiraSearchComponent private constructor(
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
+        observeCompleteStage("RELAX_DIRTY")
         floatCandidate = null
         pointHintValues = null
         pointHintPoint = null
@@ -1581,7 +1592,12 @@ class ExactLiraSearchComponent private constructor(
         // Ordinary solving must include every active row whose LP assertion was deferred.
         retirePointReuse()
         val asserted = assertSource(context)
-        if (!asserted || operationStop()) {
+        if (!asserted) {
+            observeCompleteStage("SOURCE_ASSERTION_INCOMPLETE")
+            return ComponentResult.Indeterminate
+        }
+        if (operationStop()) {
+            observeCompleteStage("SOURCE_ASSERTION_STOPPED")
             return ComponentResult.Indeterminate
         }
         val propagated = propagateSourceGuards(context)
@@ -1590,6 +1606,7 @@ class ExactLiraSearchComponent private constructor(
         if (operationStop()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
+        observeCompleteStage("LP_ATTEMPT")
         val result = lp.solve(sparsePointRecovery = true)
         if (complete) {
             val key = if (result == null) "NO_RESULT" else listOf(
@@ -1608,18 +1625,26 @@ class ExactLiraSearchComponent private constructor(
             ).joinToString("_")
             smtStats?.observeCompleteSearchLinearOutcome(key)
         }
-        if (result == null) return ComponentResult.Indeterminate
-        if (operationStop()) return ComponentResult.Indeterminate
+        if (result == null) {
+            observeCompleteStage("LP_NO_RESULT")
+            return ComponentResult.Indeterminate
+        }
+        if (operationStop()) {
+            observeCompleteStage("LP_RESULT_STOPPED")
+            return ComponentResult.Indeterminate
+        }
         dirty = false
         candidate = result.exactPrimal?.take(model.numRealVars + model.numIntVars)
         if (result.verdict == LpVerdict.INFEASIBLE) {
             val explanation = lp.explainConflict(result.conflictSupport, context)
+            observeCompleteStage(if (explanation == null) "LP_CONFLICT_UNEXPLAINED" else "LP_CONFLICT_EXPLAINED")
             smtStats?.observeConflict(explanation)
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
         if (unassignedBooleans > 0) {
+            if (candidate == null) observeCompleteStage("LP_PARTIAL_NO_POINT")
             candidate?.let { capturePointHints(it, context) }
         } else if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
             model.numIntVars > 0 && model.numRealVars > 0 &&

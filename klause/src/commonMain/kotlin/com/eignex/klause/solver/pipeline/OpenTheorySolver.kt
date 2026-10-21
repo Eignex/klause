@@ -460,6 +460,7 @@ class OpenTheoryEngine internal constructor(
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
                 OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
             }
+            state.smt.observeCompleteSearchStage("BRANCHING_BOOLEANS_${model.numBoolVars}")
             val run = planned.session.openRun(
                 model.numBoolVars,
                 solveParams,
