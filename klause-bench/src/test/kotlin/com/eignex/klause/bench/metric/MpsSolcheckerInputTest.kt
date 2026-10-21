@@ -67,7 +67,7 @@ class MpsSolcheckerInputTest {
         val profile = MpsSolcheckerInput.qualify(input)
 
         assertEquals(input.replace(" UP b x $upper\n LO b x $lower", " LO b x $lower\n UP b x $upper"), profile.text)
-        assertEquals(listOf(MpsVar("x", integer, 0.0, 1.0)), Mps.parse(input).variables)
+        assertEquals(listOf(MpsVar("x", integer, lower.toDouble(), 1.0)), Mps.parse(input).variables)
         assertEquals(Mps.parse(input).variables, Mps.parse(profile.text).variables)
         assertEquals(1, profile.reorderedBoundPairs)
         assertEquals(profile.text, MpsSolcheckerInput.qualify(profile.text).text)
