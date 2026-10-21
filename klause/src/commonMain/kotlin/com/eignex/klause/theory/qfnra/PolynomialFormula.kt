@@ -31,6 +31,42 @@ internal class PolynomialFormula private constructor(
     fun booleanRegions(arithmetic: PolynomialArithmetic): Iterator<PolynomialBooleanRegion?> =
         PolynomialBooleanRegions(nodes, root, atoms, arithmetic).prepare()
 
+    fun withAtoms(replacements: List<PolynomialAtom>): PolynomialFormula {
+        require(replacements.size == atoms.size)
+        return PolynomialFormula(nodes, root, replacements.toList(), booleanVariables)
+    }
+
+    fun forcedAtoms(arithmetic: PolynomialArithmetic): List<PolynomialAtom>? {
+        val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
+        if (!state.initialize()) return null
+        for ((index, node) in nodes.withIndex()) {
+            arithmetic.step()
+            if (node !is FormulaNode.Atom) continue
+            val atom = atoms[node.atom]
+            if (atom.polynomial.mainVariable != null) continue
+            val sign = atom.polynomial.terms.firstOrNull()?.coefficient?.signum() ?: 0
+            if (!state.assign(index, if (atom.holds(sign)) TRUE else FALSE)) return null
+        }
+        if (!state.propagate()) return null
+        val result = ArrayList<PolynomialAtom>()
+        for ((index, node) in nodes.withIndex()) {
+            arithmetic.step()
+            if (node !is FormulaNode.Atom) continue
+            val value = state.value(index)
+            if (value == UNASSIGNED) continue
+            val atom = atoms[node.atom]
+            result.add(if (value == TRUE) atom else PolynomialAtom(atom.polynomial, when (atom.relation) {
+                PolynomialRelation.EQ -> PolynomialRelation.NE
+                PolynomialRelation.NE -> PolynomialRelation.EQ
+                PolynomialRelation.LT -> PolynomialRelation.GE
+                PolynomialRelation.LE -> PolynomialRelation.GT
+                PolynomialRelation.GT -> PolynomialRelation.LE
+                PolynomialRelation.GE -> PolynomialRelation.LT
+            }))
+        }
+        return result
+    }
+
     fun refuteBooleans(
         arithmetic: PolynomialArithmetic,
         maximumAtoms: Int,
