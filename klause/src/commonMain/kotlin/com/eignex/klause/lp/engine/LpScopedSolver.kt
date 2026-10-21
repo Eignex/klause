@@ -600,17 +600,13 @@ internal class LpScopedSolver(
                 constructionWork = saturated(constructionWork, candidate.lastMetrics.preparationOps)
                 preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
-            if (!basis.validFor(next.model) || (
-                warm == null &&
-                    (
-                        basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
-                        basis.status.indices.any { (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n) }
-                    )
-            ) ||
-                token()
-            ) {
-                return null
+            val logicalHeadings = warm != null || basis.basicVars.indices.all { row ->
+                basis.basicVars[row] == next.model.n + row
             }
+            val logicalStatuses = warm != null || basis.status.indices.all { column ->
+                (basis.status[column] == VarStatus.BASIC) == (column >= next.model.n)
+            }
+            if (!basis.validFor(next.model) || !logicalHeadings || !logicalStatuses || token()) return null
             preparationSuccesses++
             accepted = true
             return candidate to basis
