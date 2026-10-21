@@ -7,6 +7,7 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,6 +18,146 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
+    @Test
+    fun `private objective bounds should preserve parent authority and close their owners`() {
+        val builder = LpBuilder()
+        builder.addVar(0L, 10L, cost = 1L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            val original = assertNotNull(owner.solve())
+            val region = owner.state
+
+            val bound = owner.objectiveBound(ExactLpObjective(listOf(ExactLpNumber.of(-1L))))
+
+            assertEquals(BigFraction.ofLong(-10L), bound)
+            assertSame(region, owner.state)
+            assertSame(original, owner.lastResult)
+            val metrics = assertNotNull(owner.lastWorkingMetrics)
+            assertEquals(1L, metrics.attempts)
+            assertEquals(metrics.owners.createdOwners, metrics.owners.closedOwners)
+            assertTrue(metrics.measuredWork > 0L)
+            assertTrue(owner.lastObjectivePreparationWork > 0L)
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `objective queries should use the active scoped bounds and restore siblings`() {
+        val builder = LpBuilder()
+        builder.addVar(0L, 10L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val objective = ExactLpObjective(listOf(ExactLpNumber.of(1L)))
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(4L)), 0L))
+            assertEquals(BigFraction.ofLong(4L), owner.objectiveBound(objective))
+
+            assertTrue(owner.pop(0))
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2L)), 1L))
+
+            assertEquals(BigFraction.ZERO, owner.objectiveBound(objective))
+            assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.state.activeSide(0, true)).side.number.value)
+        }
+    }
+
+    @Test
+    fun `cancelled query setup should retain work without a child or stale metrics`() {
+        val builder = LpBuilder()
+        builder.addVar(0L, 10L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            val original = assertNotNull(owner.solve())
+            val objective = ExactLpObjective(listOf(ExactLpNumber.of(1L)))
+            assertNotNull(owner.objectiveBound(objective))
+            var charged = 0L
+            val token = object : Cancellation {
+                override fun isCancelled() = charged > 0L
+                override fun workMeter() = WorkMeter { charged += it }
+            }
+
+            assertNull(owner.objectiveBound(objective, token))
+
+            assertTrue(charged > 0L)
+            assertEquals(charged, owner.lastObjectivePreparationWork)
+            assertNull(owner.lastWorkingMetrics)
+            assertSame(original, owner.lastResult)
+        }
+    }
+
+    @Test
+    fun `declined objective certificates should not publish a floating bound`() {
+        val builder = LpBuilder()
+        builder.addVar(2L, 10L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+        LpScopedSolver(LpExactState(source), context = context).use { owner ->
+            val region = owner.state
+
+            assertNull(owner.objectiveBound(ExactLpObjective(listOf(ExactLpNumber.of(1L)))))
+
+            assertSame(region, owner.state)
+            assertNull(owner.lastResult)
+            val metrics = assertNotNull(owner.lastWorkingMetrics)
+            assertEquals(metrics.owners.createdOwners, metrics.owners.closedOwners)
+        }
+    }
+
+    @Test
+    fun `unbounded private objectives should leave the source solve available`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())), emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            val original = assertNotNull(owner.solve())
+
+            assertNull(owner.objectiveBound(ExactLpObjective(listOf(ExactLpNumber.of(1L)))))
+
+            assertSame(original, owner.lastResult)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, assertNotNull(owner.solve()).verdict)
+        }
+    }
+
+    @Test
+    fun `cancellation after a child solve should discard its bound and close the child`() {
+        var stop = false
+        var stopOnSolve = false
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(allowance).also { if (stopOnSolve) stop = true }
+                }
+            }
+        }
+        val builder = LpBuilder()
+        builder.addVar(0L, 10L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory)).use { owner ->
+            val original = assertNotNull(owner.solve())
+            stopOnSolve = true
+
+            assertNull(owner.objectiveBound(ExactLpObjective(listOf(ExactLpNumber.of(1L))), Cancellation { stop }))
+
+            assertTrue(stop)
+            assertSame(original, owner.lastResult)
+            val metrics = assertNotNull(owner.lastWorkingMetrics)
+            assertEquals(metrics.owners.createdOwners, metrics.owners.closedOwners)
+            assertTrue(metrics.measuredWork > 0L)
+        }
+    }
+
     @Test
     fun `new columns rows and bound assertions should publish in one preparation`() {
         val zero = ExactLpNumber.of(0L)

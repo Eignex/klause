@@ -91,6 +91,16 @@ fixing allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoin
 Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
+Objective queries can also run in a private working scope over the current exact
+matrix, right-hand sides and bounds. The child changes only the objective, uses
+the existing effort and certification limits, and closes on every exit. Its
+certified bound is tied to the unchanged parent region; it supplies no parent
+feasibility or objective result. The parent retains its preceding certified result,
+while child solves, construction and certification remain separately accounted.
+Consumers may explain a deduction with the whole active region when a smaller
+certificate support is unavailable. State identity and complete source premises
+are required before publication.
+
 ### Cuts
 
 Cuts aggregate exact source rows and apply their rounding rule's bound and

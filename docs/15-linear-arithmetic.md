@@ -67,6 +67,16 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 
+After a non-conflicting partial LP check, the component queries one unresolved
+reified comparison in cyclic source-row order. Comparisons inside disjunctions or
+with Boolean arithmetic terms are excluded. Private objectives minimize the
+comparison's original linear expression and its negation. Only certified exact
+bounds that force the comparison or its complement imply its Boolean activator;
+floating values supply no implication. The reason includes every active region
+premise and the implied literal. Missing premises withhold the deduction, and
+shared retraction removes it with its antecedents. Each ordinary check queries at
+most one comparison and two objectives under the containing operation allowance.
+
 #### Disjunctions and disequalities
 
 A source disjunction is registered with search as one atom per disjunct; a disjunct

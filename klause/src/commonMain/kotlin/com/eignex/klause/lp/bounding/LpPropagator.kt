@@ -5,6 +5,7 @@ import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.DEFAULT_REFACTOR_UPDATE_LIMIT
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpModel
+import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -81,6 +82,8 @@ internal data class LpPremisedBound(
     val premise: SearchAtomPremise,
 )
 
+internal class LpRegionBound(val state: LpExactState, val value: BigFraction)
+
 internal class LpPropagator(
     private val policy: LpSearchPolicy,
     private val effort: () -> LpEffortProfile = { LpEffortProfile() },
@@ -146,6 +149,62 @@ internal class LpPropagator(
             cited.side.premises?.let { leaves += it.asPremise() }
         }
         return context.explainAtoms(SearchAtomPremise.All(leaves))
+    }
+
+    fun objectiveBound(objective: ExactLpObjective): LpRegionBound? = withOwner { current ->
+        val parent = current.state
+        val profile = effort()
+        var started = false
+        try {
+            if (cancellation()) return@withOwner null
+            started = true
+            val value = current.objectiveBound(
+                objective, cancellation, profile.continuation, profile.fullContinuation, certificationObserver,
+            ) ?: return@withOwner null
+            if (current.state !== parent || cancellation()) return@withOwner null
+            LpRegionBound(parent, value)
+        } finally {
+            if (started) {
+                current.lastWorkingMetrics?.let { child ->
+                    lastMetrics += child.solves + LpSolveMetrics(
+                        workOps = (child.measuredWork - child.solves.workOps).coerceAtLeast(0L),
+                    )
+                }
+                lastMetrics += LpSolveMetrics(workOps = current.lastObjectivePreparationWork)
+            }
+        }
+    }
+
+    fun explainRegion(region: LpExactState, context: SearchContext): SearchExplanation? {
+        val current = state ?: return null
+        if (region !== current || proofContext !== context || cancellation() || context.cancelled()) return null
+        cancellation.charge(8L * (current.model.numVars.toLong() + current.model.m) + 1L)
+        if (cancellation()) return null
+        val leaves = ArrayList<SearchAtomPremise>()
+        for (row in 0 until current.model.m) {
+            if (cancellation()) return null
+            if (current.rows.row(row).active) {
+                val metadata = current.model.row(row)
+                if (!metadata.global) {
+                    cancellation.charge(8L * (metadata.premises?.size ?: 0L) + 1L)
+                    if (cancellation()) return null
+                    leaves += metadata.premises.asPremise()
+                }
+            }
+        }
+        for (column in 0 until current.model.numVars) {
+            if (cancellation()) return null
+            for (upper in listOf(false, true)) {
+                val side = current.activeSide(column, upper) ?: continue
+                if (side.witness < 0L && side.side.premises == null) continue
+                cancellation.charge(8L * (side.side.premises?.size ?: 0L) + 1L)
+                if (cancellation()) return null
+                activeBoundPremise(column, upper)?.let(leaves::add)
+            }
+        }
+        cancellation.charge(4096L)
+        if (cancellation()) return null
+        return context.explainAtoms(SearchAtomPremise.All(leaves)).takeUnless { cancellation() }
     }
 
     private fun ExactLpPremises?.asPremise(): SearchAtomPremise {

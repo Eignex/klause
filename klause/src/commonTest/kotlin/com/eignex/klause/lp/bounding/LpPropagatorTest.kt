@@ -68,6 +68,59 @@ import kotlin.test.assertTrue
 
 class LpPropagatorTest {
     @Test
+    fun `objective bounds should explain the complete current region and reject stale identity`() {
+        val problem = Problem(2, 1, arrayOf(IntDomain(0, 10)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            session.publish(SearchDecision.Bool(Lit.make(0, true)))
+            session.publish(SearchDecision.Bool(Lit.make(1, true)))
+            val column = base.intColOf[0]
+            assertIs<LpBoundBatchResult.Applied>(
+                lp.assertBounds(
+                    listOf(
+                        LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(2L)),
+                            SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(0, true)))),
+                        LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(5L)),
+                            SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(1, true)))),
+                    ),
+                ),
+            )
+            val bound = assertNotNull(lp.objectiveBound(assertNotNull(lp.state).model.objective))
+
+            assertEquals(BigFraction.ofLong(2L), bound.value)
+            assertEquals(listOf(1, 3), assertNotNull(lp.explainRegion(bound.state, session)).literals.sorted())
+            assertNull(lp.explainRegion(bound.state, SearchSession(listOf(lp))))
+            assertTrue(lp.assertBound(column, false, ExactLpSide(ExactLpNumber.of(3L))))
+            assertNull(lp.explainRegion(bound.state, session))
+        }
+    }
+
+    @Test
+    fun `an unavailable region premise should withhold a private bound implication`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            assertIs<LpBoundBatchResult.Applied>(
+                lp.assertBounds(
+                    listOf(LpPremisedBound(base.intColOf[0], false, ExactLpSide(ExactLpNumber.of(2L)),
+                        SearchAtomPremise.Unavailable)),
+                ),
+            )
+            val bound = assertNotNull(lp.objectiveBound(assertNotNull(lp.state).model.objective))
+
+            assertNull(lp.explainRegion(bound.state, session))
+        }
+    }
+
+    @Test
     fun `premised bound batches should explain the first conflicting prefix`() {
         val problem = Problem(3, 2, Array(2) { IntDomain(0, 10) }, emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)))
