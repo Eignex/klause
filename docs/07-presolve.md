@@ -191,7 +191,9 @@ premises but remain intact. Guarded or
 disjunctive rows are excluded, and interrupted elimination publishes no deduction.
 
 Sub-sum aggregation contracts a defining equality's partner terms to its output
-variable, retaining the equality. Rarest-partner incidence and row widths bound
+variable, retaining the equality. A unit pivot and two distinct integer partners
+are required; models with fewer than three integer columns skip entry analysis.
+Rarest-partner incidence and row widths bound
 candidate scans by indexed size and an absolute work cap.
 
 Opt-in `+sparsify` subtracts retained unconditional integer equalities from complete

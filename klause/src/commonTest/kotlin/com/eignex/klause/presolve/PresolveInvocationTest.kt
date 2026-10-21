@@ -1,8 +1,10 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
@@ -14,6 +16,32 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolveInvocationTest {
+    @Test
+    fun `aggregation without a pivot and two integer partners should skip entry analysis`() {
+        for (numInts in 0..2) {
+            for (lane in PresolveLane.entries) {
+                val problem = Problem(
+                    3, numInts, Array(numInts) { IntDomain(0, 10) },
+                    listOf(Clause(IntArray(3) { Lit.make(it, true) })),
+                )
+                val budget = PresolveBudget(Long.MAX_VALUE)
+                val context = PresolveContext(presolveBudget = budget)
+                val config = PresolveConfig.parse("off,+aggregate")
+                val token = budget.orSpent(Cancellation.Never)
+
+                when (lane) {
+                    PresolveLane.SOURCE -> Presolver.runSource(problem, config, context, token)
+                    PresolveLane.FINITE -> Presolver.run(problem.bake(), config, context, token)
+                }
+
+                val invocation = budget.invocations.single()
+                assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, invocation.outcome)
+                assertEquals(0L, invocation.work)
+                assertEquals(0L, budget.entrySizeVisits)
+            }
+        }
+    }
+
     @Test
     fun `Boolean namespace skips should avoid whole model entry work`() {
         val problem = Problem(
