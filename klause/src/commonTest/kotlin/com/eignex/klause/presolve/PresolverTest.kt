@@ -22,6 +22,69 @@ import kotlin.test.assertTrue
 
 class PresolverTest {
     @Test
+    fun `explicit source strengthening under off should refute an indivisible equality`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 2)),
+            listOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+        )
+
+        for (config in listOf(
+            PresolveConfig.parse("off,+strengthen"),
+            PresolveConfig(PresolveEmphasis.OFF, mapOf(PresolvePass.STRENGTHEN_COEFFICIENTS to true)),
+        )) {
+            val prepared = Presolver.runSource(problem, config)
+
+            assertTrue(prepared.infeasible)
+            assertEquals(listOf(PresolvePass.STRENGTHEN_COEFFICIENTS), prepared.passesFired)
+        }
+    }
+
+    @Test
+    fun `explicit finite strengthening under off should reduce coefficients`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3)),
+        ).bake()
+
+        val prepared = Presolver.run(problem, PresolveConfig.parse("off,+strengthen"))
+
+        assertEquals(listOf(PresolvePass.STRENGTHEN_COEFFICIENTS), prepared.passesFired)
+        val row = prepared.problem.factors.filterIsInstance<Linear>().single()
+        assertEquals(1L, row.bound)
+        assertEquals(listOf(1L, 1L), (0 until row.size).map { row.coeff(it) })
+    }
+
+    @Test
+    fun `an explicit zero round cap should suppress enabled source and finite passes`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3)),
+        )
+        val baked = problem.bake()
+        for (config in listOf(
+            PresolveConfig.parse("off,+strengthen").withEffort(maxRounds = 0),
+            PresolveConfig(
+                PresolveEmphasis.OFF, mapOf(PresolvePass.STRENGTHEN_COEFFICIENTS to true), maxRounds = 0,
+            ),
+            PresolveConfig.parse("off"),
+            PresolveConfig.parse("off,-strengthen"),
+            PresolveConfig.parse("off,+strengthen,-strengthen"),
+        )) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val context = PresolveContext(presolveBudget = budget)
+
+            val source = Presolver.runSource(problem, config, context)
+            val finite = Presolver.run(baked, config, context)
+
+            assertSame(problem, source.problem)
+            assertSame(baked, finite.problem)
+            assertEquals(emptyList(), source.passesFired)
+            assertEquals(emptyList(), finite.passesFired)
+            assertEquals(emptyMap(), budget.passCalls)
+        }
+    }
+
+    @Test
     fun `default clausal optimization should retain native clause propagation`() {
         val problem = Problem(
             3,

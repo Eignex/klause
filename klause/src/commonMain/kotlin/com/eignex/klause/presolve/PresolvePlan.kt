@@ -81,7 +81,9 @@ class PresolveConfig(
     /** Fractional complexity reduction below which a round ends iteration. */
     val abortFraction: Double = 0.001,
     /** Maximum rounds per source or finite pass schedule. */
-    val maxRounds: Int = emphasis.maxRounds,
+    val maxRounds: Int = if (emphasis == PresolveEmphasis.OFF &&
+        overrides.any { (pass, enabled) -> enabled && pass.stage == PresolvePass.Stage.PROBLEM }
+    ) PresolveEmphasis.DEFAULT.maxRounds else emphasis.maxRounds,
 ) {
     init {
         require(abortFraction.isFinite() && abortFraction in 0.0..1.0)
