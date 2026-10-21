@@ -2,6 +2,7 @@ package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
@@ -13,6 +14,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
@@ -65,6 +67,53 @@ class RedundantConstraintsTest {
     private fun dom(n: Int, hi: Int) = Array(n) { IntDomain(0, hi.toLong()) }
     private fun le(b: Int, vararg vc: Int) =
         Linear(IntArray(vc.size / 2) { vc[2 * it + 1] }, IntArray(vc.size / 2) { vc[2 * it] }, LinearOp.LE, b)
+
+    @Test
+    fun `an exclusion triangle without an eligible knapsack should spend no clique work`() {
+        val exclusions = listOf(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+        )
+        for (extra in listOf(
+            null,
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
+            PseudoBoolean(longArrayOf(5, 0, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 6),
+            PseudoBoolean(longArrayOf(5, -2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 6),
+            PseudoBoolean(longArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.GE, 2),
+            PseudoBoolean(longArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.EQ, 2),
+            Cardinality(intArrayOf(pos(0), pos(1), pos(2)), 0, 1),
+        )) {
+            val model = Problem(3, 2, dom(2, 1), exclusions + listOfNotNull(extra))
+            val budget = PresolveBudget(1_000_000)
+
+            val delta = Presolve.removeRedundantSourceConstraints(model, budget.orSpent(Cancellation.Never))
+
+            assertTrue(delta.isEmpty, "unexpected reduction with $extra")
+            assertEquals(0L, budget.spent(), "unexpected clique work with $extra")
+        }
+    }
+
+    @Test
+    fun `an eligible knapsack implied by an exclusion triangle should spend clique work and be dropped`() {
+        val model = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+                PseudoBoolean(longArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 5),
+            ),
+        )
+        val budget = PresolveBudget(1_000_000)
+
+        val delta = Presolve.removeRedundantSourceConstraints(model, budget.orSpent(Cancellation.Never))
+
+        assertEquals(listOf(3), delta.droppedIndices.toList())
+        assertTrue(budget.spent() > 0L)
+    }
 
     @Test
     fun `a declared knapsack implied by a clique should be dropped without finite domains`() {
