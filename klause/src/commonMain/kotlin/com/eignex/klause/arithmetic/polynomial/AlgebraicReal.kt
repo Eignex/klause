@@ -22,7 +22,10 @@ class AlgebraicReal internal constructor(
     val upperBound: BigFraction get() = interval.upper
 }
 
-internal class AlgebraicPolynomial internal constructor(coefficients: List<AlgebraicReal>) {
+internal class AlgebraicPolynomial internal constructor(
+    coefficients: List<AlgebraicReal>,
+    val specialization: AlgebraicSpecialization? = null,
+) {
     private val captured = coefficients.toList()
     val coefficients: List<AlgebraicReal> get() = captured.toList()
     val degree: Int get() = captured.lastIndex

@@ -13,6 +13,130 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `shared coefficient conjugates should retain only the selected quadratic roots`() {
+        val bases = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
+        val x = Polynomial.variable(0)
+        val y = Polynomial.variable(1)
+        val relation = polynomial.add(polynomial.add(polynomial.power(y, 2), polynomial.multiply(x, y)), x)
+
+        val families = bases.map { arithmetic.roots(arithmetic.specialize(relation, 1, mapOf(0 to it))) }
+
+        assertEquals(listOf(2, 0), families.map { it.size })
+        for (root in families.first()) {
+            assertEquals(0, arithmetic.sign(arithmetic.evaluate(relation, mapOf(0 to bases.first(), 1 to root))))
+        }
+    }
+
+    @Test
+    fun `shared coefficient lifting should retain rational and repeated irrational roots once`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val y = Polynomial.variable(1)
+        val rationalFactor = polynomial.subtract(y, Polynomial.ONE)
+        val irrationalFactor = polynomial.subtract(y, Polynomial.variable(0))
+        val relation = polynomial.multiply(polynomial.power(rationalFactor, 2), polynomial.power(irrationalFactor, 2))
+
+        val roots = arithmetic.roots(arithmetic.specialize(relation, 1, mapOf(0 to base)))
+
+        assertEquals(2, roots.size)
+        assertEquals(0, arithmetic.compare(roots[0], arithmetic.rational(BigFraction.ONE)))
+        assertEquals(0, arithmetic.compare(roots[1], base))
+    }
+
+    @Test
+    fun `shared coefficient lifting should exclude null unselected conjugates`() {
+        val base = arithmetic.roots(RationalPolynomial.of(0, -2, 0, 1)).last()
+        val relation = polynomial.multiply(Polynomial.variable(0),
+            polynomial.subtract(polynomial.power(Polynomial.variable(1), 2), Polynomial.ONE))
+
+        val roots = arithmetic.roots(arithmetic.specialize(relation, 1, mapOf(0 to base)))
+
+        assertEquals(2, roots.size)
+        assertEquals(0, arithmetic.compare(roots[0], arithmetic.rational(BigFraction.MINUS_ONE)))
+        assertEquals(0, arithmetic.compare(roots[1], arithmetic.rational(BigFraction.ONE)))
+    }
+
+    @Test
+    fun `shared coefficient division should exclude factors where its divisor vanishes`() {
+        val bases = arithmetic.roots(RationalPolynomial.of(6, 0, -5, 0, 1))
+        val base = bases[2]
+        val x = Polynomial.variable(0)
+        val leading = polynomial.subtract(polynomial.power(x, 2), Polynomial.constant(BigFraction.ofLong(3)))
+        val relation = polynomial.subtract(polynomial.multiply(leading, Polynomial.variable(1)), x)
+
+        val roots = arithmetic.roots(arithmetic.specialize(relation, 1, mapOf(0 to base)))
+
+        assertEquals(1, roots.size)
+        assertEquals(0, arithmetic.compare(roots.single(), arithmetic.negate(base)))
+    }
+
+    @Test
+    fun `shared coefficient zero tests should retain the selected defining factor`() {
+        val base = arithmetic.roots(RationalPolynomial.of(6, 0, -5, 0, 1))[2]
+        val x = Polynomial.variable(0)
+        val y = Polynomial.variable(1)
+        val zero = polynomial.subtract(polynomial.power(x, 2), Polynomial.constant(BigFraction.ofLong(2)))
+        val relation = polynomial.subtract(polynomial.add(polynomial.power(y, 2), polynomial.multiply(zero, y)), x)
+
+        val roots = arithmetic.roots(arithmetic.specialize(relation, 1, mapOf(0 to base)))
+
+        assertEquals(2, roots.size)
+        for (root in roots) assertEquals(0, arithmetic.compare(arithmetic.power(root, 2), base))
+    }
+
+    @Test
+    fun `shared specialization should capture rational substitutions and its original base`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val x = Polynomial.variable(0)
+        val relation = polynomial.subtract(Polynomial.variable(2), polynomial.multiply(x, Polynomial.variable(1)))
+        val coordinates = mutableMapOf(0 to base, 1 to arithmetic.rational(BigFraction.ofLong(3)))
+        val specialized = arithmetic.specialize(relation, 2, coordinates)
+        coordinates[0] = arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()
+        coordinates[1] = arithmetic.rational(BigFraction.ofLong(4))
+
+        val roots = arithmetic.roots(specialized)
+
+        assertEquals(1, roots.size)
+        assertEquals(0, arithmetic.compare(roots.single(), arithmetic.evaluate(RationalPolynomial.of(0, 3), base)))
+    }
+
+    @Test
+    fun `captured shared specialization should obey the lifting caller matrix limit`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val relation = polynomial.subtract(polynomial.power(Polynomial.variable(1), 2), Polynomial.variable(0))
+        val specialized = arithmetic.specialize(relation, 1, mapOf(0 to base))
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val failure = assertFailsWith<PolynomialResourceLimit> { limited.roots(specialized) }
+
+        assertEquals(PolynomialResource.MATRIX_CELLS, failure.resource)
+    }
+
+    @Test
+    fun `captured shared specialization should obey the lifting caller dense limit`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val relation = polynomial.subtract(polynomial.power(Polynomial.variable(1), 2), Polynomial.variable(0))
+        val specialized = arithmetic.specialize(relation, 1, mapOf(0 to base))
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 2)))
+
+        val failure = assertFailsWith<PolynomialResourceLimit> { limited.roots(specialized) }
+
+        assertEquals(PolynomialResource.DENSE_COEFFICIENTS, failure.resource)
+    }
+
+    @Test
+    fun `completed shared lifting should still obey caller cancellation`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val relation = polynomial.subtract(polynomial.power(Polynomial.variable(1), 2), Polynomial.variable(0))
+        val specialized = arithmetic.specialize(relation, 1, mapOf(0 to base))
+        var cancelled = false
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        limited.roots(specialized)
+        cancelled = true
+
+        assertFailsWith<PolynomialInterrupted> { limited.roots(specialized) }
+    }
+
+    @Test
     fun `completed root counts should fit negative affine transforms in remaining caller work`() {
         var spent = 0L
         var limit = Long.MAX_VALUE
