@@ -667,6 +667,9 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PINNED_REAL_LEAF_EXPLANATION_DECLINE_ROOT` | Refused row provenance, source scope, bound premise, referenced-prefix storage or literal truth |
 | `lpPhase_PINNED_REAL_LEAF_HANDOFF_ROOT` | Required real conflict resolution: `NO_CLAUSE`, `BACKJUMP`, `EXHAUSTED` or `CHRONOLOGICAL` |
 | `lpPhase_PINNED_REAL_LEAF_RECOVERY_ROOT` | Required large-leaf witness recovery requests and resulting exact verdicts under the existing refinement limits |
+| `lpPhase_EXACT_REFINEMENT_<route>`, `lpPhase_STRICT_REFINEMENT_<route>` | Refinement decline, inclusive time, charged work and numerical pivots; strict-margin work and time are subsets of exact refinement |
+| `lpPhase_COMPONENT_POINT_RECOVERY_<route>` | Failed direct component-point recovery followed by exact continuation, with structural column count, row count and terminal decline in the outcome |
+| `openHintIndexSourceLimit`, `openHintIndexStorageLimit`, `openHintIndexInvalidPrimitive`, `openHintIndexStopped` | Opening guidance admission declines, including the primitive provider before any clause index is available |
 | `lpPhase_PREFIX_REAL_ADMISSION_ROOT`, `lpPhase_PREFIX_REAL_COMPACTION_ROOT` | Optional selected-prefix assembly and actual row admission with open finite coordinates |
 | `lpPhase_PREFIX_REAL_CHECK_ROOT`, `lpPhase_PREFIX_REAL_EXPLANATION_ROOT` | Exact prefix query verdict and emitted source clause length; positive points carry no source witness authority |
 | `lpPhase_PREFIX_REAL_HANDOFF_ROOT` | Native conflict handling for a checked selected-prefix source clause |

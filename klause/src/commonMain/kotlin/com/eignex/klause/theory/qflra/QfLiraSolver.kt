@@ -52,6 +52,7 @@ import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.search.AssembledSearchModel
@@ -335,29 +336,36 @@ class ExactLiraSearchComponent private constructor(
         stop: Cancellation,
         defaultOpening: Boolean = false,
         defaultGraphSelections: Boolean = false,
+        onDecline: ((HintIndexOutcome) -> Unit)? = null,
     ): Pair<IntArray, SearchCandidateHints>? {
         check(context == null)
         if (model.numRealVars == 0 && (!defaultOpening || model.numIntVars == 0)) return null
-        if (model.numBoolVars == 0 || model.numBoolVars > MAX_POINT_HINT_ENTRIES ||
-            preparedRows.size > MAX_POINT_HINT_ENTRIES || stop()
-        ) {
+        fun declined(outcome: HintIndexOutcome): Pair<IntArray, SearchCandidateHints>? {
+            onDecline?.invoke(outcome)
             return null
         }
+        if (model.numBoolVars == 0 || model.numBoolVars > MAX_POINT_HINT_ENTRIES ||
+            preparedRows.size > MAX_POINT_HINT_ENTRIES
+        ) {
+            return declined(HintIndexOutcome.SOURCE_LIMIT)
+        }
+        if (stop()) return declined(HintIndexOutcome.STOPPED)
         var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
         val rows = ArrayList<PreparedSourceRow>()
         val variables = LinkedHashSet<Int>()
         for (prepared in preparedRows) {
             stop.charge(1)
-            if (stop()) return null
+            if (stop()) return declined(HintIndexOutcome.STOPPED)
             if (prepared.row.activator == LinearRow.ALWAYS) continue
-            if (prepared.row.activator !in bools.indices) return null
+            if (prepared.row.activator !in bools.indices) return declined(HintIndexOutcome.INVALID_PRIMITIVE)
             entries += prepared.row.size.toLong() + 1L
-            if (entries > MAX_POINT_HINT_ENTRIES) return null
+            if (entries > MAX_POINT_HINT_ENTRIES) return declined(HintIndexOutcome.STORAGE)
             rows += prepared
             variables += prepared.row.activator
         }
         stop.charge(rows.size.toLong() + variables.size + 1L)
-        if (stop() || rows.isEmpty()) return null
+        if (stop()) return declined(HintIndexOutcome.STOPPED)
+        if (rows.isEmpty()) return declined(HintIndexOutcome.NO_PROVIDER)
         pointHintRows = rows.toList()
         pointHintStop = stop
         return variables.toIntArray() to SearchCandidateHints { variable ->

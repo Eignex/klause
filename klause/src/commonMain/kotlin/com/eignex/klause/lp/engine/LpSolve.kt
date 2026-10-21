@@ -587,6 +587,21 @@ private fun certifyLpResultWithin(
                 recovered.conflict != null || recovered.unboundedness != null,
             LpCertifierCost.Metered(recovered.metrics.work),
         )
+        observer?.observePhase(LpPhaseMetrics(
+            LpSolvePhase.EXACT_REFINEMENT, recovered.metrics.decline?.name ?: "COMPLETE",
+            recovered.metrics.elapsed.inWholeNanoseconds, recovered.metrics.work,
+            recovered.metrics.pivots, recovered.metrics.rounds,
+        ))
+        if (recovered.metrics.strictAttempts > 0) observer?.observePhase(LpPhaseMetrics(
+            LpSolvePhase.STRICT_REFINEMENT,
+            when {
+                recovered.metrics.strictWitnesses > 0 -> "WITNESS"
+                recovered.metrics.strictConflicts > 0 -> "CONFLICT"
+                else -> recovered.metrics.decline?.name ?: "NO_PACKAGE"
+            },
+            recovered.metrics.strictElapsed.inWholeNanoseconds, recovered.metrics.strictWork,
+            steps = recovered.metrics.strictAttempts,
+        ))
         numericalWitness = numericalWitness ?: recovered.witness
         numericalBound = recovered.bound ?: numericalBound
         numericalConflict = numericalConflict ?: recovered.conflict
@@ -1498,6 +1513,11 @@ private fun continueComponentWitness(
     meter.completed(continued.metrics.work, continued.metrics.allocation)
     observer?.observeContinuation(continued.metrics)
     observer?.observe(LpCertifier.RATIONAL, continued.metrics.success, LpCertifierCost.Reported)
+    observer?.observePhase(LpPhaseMetrics(
+        LpSolvePhase.COMPONENT_POINT_RECOVERY,
+        "N_${model.n}_M_${model.m}_${continued.metrics.decline?.name ?: "COMPLETE"}",
+        continued.metrics.elapsedNs, continued.metrics.work, continued.metrics.pivots,
+    ))
     return policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })?.witness?.let {
         policy.acceptNullable(LpCertifier.EXACT_BASIS, it)
     }
