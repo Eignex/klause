@@ -98,6 +98,8 @@ internal class QfNraQuery(
     var projectionObserver: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null
     var reducedRegionObserver: ((List<PolynomialAtom>) -> Unit)? = null
     val stats: QfNraStats get() = work.snapshot()
+    var probeCompleted: Boolean = false
+        private set
     private var result: QfNraResult? = null
     private val preparation = sequence<QfNraResult?> {
         val algebraic = AlgebraicArithmetic(arithmetic)
@@ -141,6 +143,7 @@ internal class QfNraQuery(
                 if (refuted) null else WitnessProbe(reducedFormula, boolCount, arithmetic, algebraic, work)
                     .probeWitness(realCount, fixed, work::coupled)
             }
+            probeCompleted = true
             if (refuted || witness != null) {
                 val checked = witness?.let {
                     if (formulaReduction.eliminatedCount == 0) it else {

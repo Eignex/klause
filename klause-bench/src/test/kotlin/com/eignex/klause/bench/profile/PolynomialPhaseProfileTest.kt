@@ -81,13 +81,14 @@ class PolynomialPhaseProfileTest {
     }
 
     @Test
-    fun `a completed refutation retains normalization probe and completion checkpoints`() {
+    fun `a completed refutation retains normalization and terminal checkpoints`() {
         val trace = PolynomialPhaseProfile.PhaseAccess().measure("(assert false)")
 
         assertEquals("Unsatisfiable", trace.result)
         assertEquals(trace.nativeWork, trace.chargeSum)
         assertEquals("Pending", trace.checkpoints.first().result)
-        assertEquals("Pending", trace.checkpoints[1].result)
+        assertEquals("Unsatisfiable", trace.checkpoints.last().result)
+        assertTrue(trace.checkpoints.dropLast(1).all { it.result == "Pending" })
         assertNull(trace.containingDeadlineStack)
     }
 }
