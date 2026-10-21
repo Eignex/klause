@@ -208,4 +208,33 @@ class PresolveInvocationTest {
         assertEquals(null, calls.last().input.occurrences)
         assertEquals(2L, budget.entrySizeVisits)
     }
+    @Test
+    fun `effort snapshots should reconcile invocation work with shared construction`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val config = PresolveConfig.parse("off,+binary-columns,+probe-failed-literals")
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
+        )
+
+        PresolvePipeline.run(problem, null, config, false, presolveBudget = budget)
+        val effort = config.effortStats(budget, kotlin.time.Duration.ZERO)
+        val work = effort.invocations.sumOf { it.work }
+
+        assertEquals(budget.spent(), work + requireNotNull(effort.unattributedWork))
+        assertTrue(requireNotNull(effort.unattributedWork) > 0L)
+        assertEquals(budget.entrySizeVisits, effort.entrySizeVisits)
+        assertEquals(budget.invocations.size, effort.invocations.size)
+    }
+
+    @Test
+    fun `materializing a certified refutation should retain the phase construction meter`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val problem = Problem(1, 0, emptyArray(), emptyList()).bake(budget.orSpent(Cancellation.Never))
+        val construction = budget.rootConstructionEntries
+
+        RootBaker.provenInfeasible(problem, BakeConfig.NONE)
+
+        assertTrue(budget.rootConstructionEntries > construction)
+    }
 }

@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
@@ -271,7 +272,12 @@ object PresolvePipeline {
                 ) {
                     lpHarvestReporting(
                         pre.problem, objective, it, bakeConfig, cancellation, zeroObjectivePricing, randomSeed,
-                    )
+                    ).also { result ->
+                        presolveBudget?.activeInvocation?.let { invocation ->
+                            invocation.narrowedColumns = result.report.boundsShaved
+                            if (result.report.skipped) invocation.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
+                        }
+                    }
                 }
             }
             harvestResult?.let {

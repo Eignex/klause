@@ -19,4 +19,6 @@ fun PresolveConfig.effortStats(budget: PresolveBudget?, elapsed: Duration): Pres
         probeCalls = budget?.probeCalls,
         rootConstructionEntries = budget?.rootConstructionEntries,
         rootPropagationWork = budget?.rootPropagationWork,
+        invocations = budget?.invocations.orEmpty(),
+        entrySizeVisits = budget?.entrySizeVisits,
     )
