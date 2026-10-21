@@ -105,9 +105,7 @@ complementary alternative. Propagation and complete component checks keep their
 authority, and a hypothetical value supplies no arithmetic fact or feasibility claim.
 
 Automatic linear-real traversal with candidate steering enabled can retain Boolean
-assignment polarities across retraction and restart. An available retained-phase
-provider selects conflict-driven variable activity; explicit branching choices and
-disabled candidate steering keep their existing variable selection. Caller hints take precedence,
+assignment polarities across retraction and restart. Caller hints take precedence,
 followed by saved phases and then current point guidance. The phase table shares the existing
 65,536-entry private hint workspace and is discarded when its component closes.
 If point guidance releases its storage, a waiting phase provider can occupy that
