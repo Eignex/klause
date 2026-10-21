@@ -1,5 +1,7 @@
 import java.io.FileOutputStream
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 import org.gradle.process.ExecOperations
@@ -206,17 +208,24 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
     @get:Input abstract val archiveSha256: Property<String>
     @get:OutputDirectory abstract val upstream: DirectoryProperty
 
+    /** Where verified archives are kept by hash, outside any checkout, so a fresh worktree builds offline. */
+    @get:Internal abstract val cache: DirectoryProperty
+
     @TaskAction
     fun download() {
         val root = upstream.get().asFile
         root.mkdirs()
-        val archive = File(temporaryDir, "miplib.zip")
-        URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
-            .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
-            .getInputStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
-        val hash = MessageDigest.getInstance("SHA-256").digest(archive.readBytes())
-            .joinToString("") { "%02x".format(it) }
-        check(hash == archiveSha256.get()) { "MIPLIB distribution hash differs" }
+        val archive = cache.get().file("${archiveSha256.get()}.zip").asFile
+        if (!archive.isFile || sha256(archive) != archiveSha256.get()) {
+            archive.parentFile.mkdirs()
+            // Staged beside the cached copy, so the move that publishes it is atomic: a concurrent build sees all or none.
+            val partial = Files.createTempFile(archive.parentFile.toPath(), "miplib-", ".part").toFile()
+            URI("https://miplib.zib.de/downloads/miplib2017-testscript-v${version.get()}.zip")
+                .toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
+                .getInputStream().use { input -> partial.outputStream().use { input.copyTo(it) } }
+            check(sha256(partial) == archiveSha256.get()) { "MIPLIB distribution hash differs" }
+            Files.move(partial.toPath(), archive.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        }
         ZipFile(archive).use { zip ->
             for (name in listOf("LICENSE", "checker/README", "checker/Makefile",
                 "checker/src/main.cpp", "checker/src/model.cpp", "checker/src/model.h",
@@ -228,8 +237,10 @@ abstract class DownloadMpsSolcheckerTask : DefaultTask() {
                 }
             }
         }
-        check(archive.delete())
     }
+
+    private fun sha256(file: File): String = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+        .joinToString("") { "%02x".format(it) }
 }
 val prepareMpsSolchecker = tasks.register<DownloadMpsSolcheckerTask>("prepareMpsSolchecker") {
     group = "build"
@@ -237,6 +248,7 @@ val prepareMpsSolchecker = tasks.register<DownloadMpsSolcheckerTask>("prepareMps
     version.set(miplibVersion)
     archiveSha256.set(miplibArchiveSha256)
     upstream.set(miplibDirectory.map { it.dir("upstream") })
+    cache.set(File(gradle.gradleUserHomeDir, "caches/klause-bench/miplib-solchecker"))
 }
 val miplibBinary = miplibDirectory.map { it.file("solchecker") }
 val compileMpsSolchecker = tasks.register<Exec>("compileMpsSolchecker") {
