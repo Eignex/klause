@@ -19,6 +19,40 @@ import kotlin.time.Duration
 
 class PresolveSharedTest {
     @Test
+    fun `complexity should count factors and endpoint spans exactly when representable`() {
+        assertEquals(0L, PresolveShared.problemComplexity(0, emptyArray()))
+        for ((domains, expected) in listOf(
+            emptyArray<IntDomain>() to 3L,
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE), IntDomain(Long.MAX_VALUE, Long.MAX_VALUE)) to 3L,
+            arrayOf(IntDomain(-5, 5).excludeValue(0)) to 13L,
+            arrayOf(IntDomain(0, 3_000_000_000_000_000_000L)) to 3_000_000_000_000_000_003L,
+            arrayOf(IntDomain(Long.MIN_VALUE, -4)) to Long.MAX_VALUE,
+            arrayOf(IntDomain(0, Long.MAX_VALUE - 4), IntDomain(0, 1)) to Long.MAX_VALUE,
+        )) {
+            val complexity = PresolveShared.problemComplexity(3, domains)
+
+            assertEquals(expected, complexity, domains.contentToString())
+        }
+    }
+
+    @Test
+    fun `complexity should saturate overflowing endpoint differences and aggregate spans`() {
+        for (domains in listOf(
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            arrayOf(IntDomain(Long.MIN_VALUE, 0)),
+            arrayOf(IntDomain(-1, Long.MAX_VALUE)),
+            arrayOf(IntDomain(0, Long.MAX_VALUE)),
+            arrayOf(IntDomain(0, Long.MAX_VALUE - 2), IntDomain(0, 1)),
+            Array(4) { IntDomain(0, 3_000_000_000_000_000_000L) },
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE), IntDomain(0, 1)),
+        )) {
+            val complexity = PresolveShared.problemComplexity(3, domains)
+
+            assertEquals(Long.MAX_VALUE, complexity, domains.contentToString())
+        }
+    }
+
+    @Test
     fun `rebuilding and reseeding should preserve captured resource settings`() {
         val settings = ProblemSettings(DomainStorageSettings(8), 17, 101, 203)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList(), settings = settings).bake()

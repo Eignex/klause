@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.presolve.PresolveShared.problemComplexity
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
@@ -197,14 +198,7 @@ internal class PresolveSession(
 
     /** Cheap problem-complexity measure: live constraint count plus total int-domain span. Drives the
      *  round engine's diminishing-returns abort. */
-    fun complexity(): Long {
-        var c = liveFactorCount.toLong()
-        for (v in 0 until base.numIntVars) {
-            val d = state.intDomains[v]
-            c += d.max - d.min
-        }
-        return c
-    }
+    fun complexity(): Long = problemComplexity(liveFactorCount, state.intDomains)
 
     /** The current tightened domain of int var [v] on the persistent state. */
     fun intDomainOf(v: Int): IntDomain = state.intDomains[v]

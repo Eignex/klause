@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PresolveShared.problemComplexity
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
@@ -46,22 +47,6 @@ internal const val CAPPED_PROBE_BUDGET_PER_VAR = 256
 internal const val CAPPED_PROBE_TOTAL_BUDGET = 20_000
 internal const val AGGRESSIVE_PROBE_BUDGET_PER_VAR = 4_096
 internal const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
-
-/** Cheap problem-complexity measure for the effectiveness abort: constraint count plus total domain
- *  span. Drops when a pass removes a constraint or tightens a domain; a round that instead grows the
- *  problem (symmetry breaking adding ordering constraints) simply doesn't trip the abort. */
-private fun problemComplexity(problem: BakedProblem): Long {
-    var c = problem.factors.size.toLong()
-    for (v in 0 until problem.numIntVars) {
-        val d = problem.rootIntDomain(v)
-        // A clamped-wide column's span, and the running sum over several of them, exceed Long; saturate as
-        // [PresolveShared.maxIntSpan] does, so a wrapped negative total cannot make the round-boundary
-        // abort read a reduction that never happened.
-        val span = d.max - d.min
-        c = if (span < 0L || c > Long.MAX_VALUE - span) Long.MAX_VALUE else c + span
-    }
-    return c
-}
 
 /**
  * The work a pass does over the whole model beyond what it charges itself — the scan that finds nothing, the
@@ -257,7 +242,7 @@ object Presolver {
                 return PassOutcome.CHANGED
             }
 
-            override fun complexity(): Long = problemComplexity(current)
+            override fun complexity(): Long = problemComplexity(current.factors.size, current.rootIntDomainsInPlace)
 
             override fun modelSize(): Long = modelSizeOf(current.factors.size, current)
 

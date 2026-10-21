@@ -14,6 +14,18 @@ import com.eignex.klause.util.IntHashSet
 /** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
 
+    fun problemComplexity(factorCount: Int, domains: Array<IntDomain>): Long {
+        var complexity = factorCount.toLong()
+        for (domain in domains) {
+            val span = domain.max - domain.min
+            // Ordered endpoints can differ by more than Long.MAX_VALUE;
+            // several representable spans can also overflow their sum.
+            if (span < 0L || complexity > Long.MAX_VALUE - span) return Long.MAX_VALUE
+            complexity += span
+        }
+        return complexity
+    }
+
     /**
      * Apply [delta] while retaining the canonical source representation, or null when it refutes.
      *
