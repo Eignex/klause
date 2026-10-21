@@ -135,8 +135,12 @@ Coefficient strengthening divides an integer or pseudo-Boolean row by the gcd of
 coefficients and rounds the bound inward; an indivisible equality is infeasible.
 Diophantine tightening confines each `x_i` in `sum(a_i * x_i) = b` to one residue
 class modulo `gcd(a_j : j != i)` and moves its bounds to the nearest member.
-Dependent-equality removal runs fraction-free elimination over the equality block,
-dropping `0 = 0` rows and refuting a block with no rational solution. Sub-sum
+Dependent-equality removal runs fraction-free elimination over declared unconditional
+integer equality rows, dropping a redundant factor only when its complete meaning is
+one equality, and refuting a block with no rational solution. Multi-row conjunctions
+and relaxations can supply premises but remain intact; disjunctive and reified rows
+are excluded. Elimination polls between row combinations and during support merges,
+charges visited entries and discards every partial deduction on interruption. Sub-sum
 aggregation replaces a row's copy of a defining equality's right-hand side by its
 variable. Linear bound fusion merges matching upper and lower bounds into an equality
 or refutes crossing ones. These preserve the solution set. Affine singleton

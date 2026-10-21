@@ -1,8 +1,11 @@
 package com.eignex.klause.lp.lattice
 
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BareissEchelonTest {
@@ -70,5 +73,41 @@ class BareissEchelonTest {
     fun `row reduced to a nonzero constant should not be reported dependent`() {
         val e = bareissEchelon(sparseRows(longArrayOf(1, 1), longArrayOf(2, 2)), 2, vec(4, 9))
         assertEquals(emptyList(), e.dependentRows.toList())
+    }
+
+    @Test
+    fun `cancellation within a support merge should discard all partial deductions`() {
+        val row = sparseIntRow((0 until 129).associateWith { bigIntOf(1) })
+        var spent = 0L
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 65 * LATTICE_WORK_WEIGHT
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+
+        val e = bareissEchelon(listOf(SparseIntRow.Zero, SparseIntRow.Zero, row, row), 129, vec(0, 1, 1, 1), token)
+
+        assertTrue(e.rows.isEmpty())
+        assertTrue(e.pivots.isEmpty())
+        assertTrue(e.rhs.isEmpty())
+        assertTrue(e.dependentRows.isEmpty())
+        assertFalse(e.inconsistent)
+        assertEquals(65 * LATTICE_WORK_WEIGHT, spent)
+    }
+
+    @Test
+    fun `completed merges should charge every input entry once`() {
+        for (width in listOf(1, 3, 129)) {
+            val row = sparseIntRow((0 until width).associateWith { bigIntOf(1) })
+            var spent = 0L
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            }
+
+            val e = bareissEchelon(listOf(row, row), width, vec(1, 1), token)
+
+            assertEquals(listOf(1), e.dependentRows.toList())
+            assertEquals((1L + 2L * width) * LATTICE_WORK_WEIGHT, spent)
+        }
     }
 }
