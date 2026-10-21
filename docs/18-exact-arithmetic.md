@@ -116,9 +116,12 @@ caller's representation limits leaves ordinary scalar arithmetic available.
 Specialization captures coefficients at earlier exact coordinates and trims
 vanished leading coefficients by exact sign. With rational coefficients, lifting
 isolates the polynomial directly. When the coefficients depend on one irrational
-coordinate, specialization keeps their rational polynomial expressions in that
-coordinate. Scalar coefficient images are materialized only for scalar polynomial
-evaluation, under the requesting caller's resource context. A joint resultant
+coordinate, or several known images of the same indexed root, specialization
+keeps their rational polynomial expressions in that root. Scalar coefficient images
+are materialized only for scalar polynomial evaluation, under the requesting
+caller's resource context. A linear polynomial has one root, computed by exact
+division in the selected root's field and retained as a shared image. A private
+representation refusal leaves joint elimination available. A joint resultant
 supplies a rational annihilator for lifting. Sturm variations
 over the ordered field of the captured root select its specialized roots from that
 annihilator's isolating intervals; one-sided endpoint signs exclude boundary roots
