@@ -23,10 +23,11 @@ class CliPresolveStatsTest {
         val config = PresolveConfig.parse("off,+strengthen,+bve")
         PresolvePipeline.run(problem, null, config, false, presolveBudget = budget)
         val effort = config.effortStats(budget, Duration.ZERO)
+        val observedWork = effort.invocations.sumOf { it.work } + effort.preparationStages.sumOf { it.work }
         val repeated = effort.copy(
             invocations = List(100) { effort.invocations }.flatten(),
             preparationStages = List(100) { effort.preparationStages }.flatten(),
-            work = requireNotNull(effort.work) + 99 * (effort.invocations.sumOf { it.work } + effort.preparationStages.sumOf { it.work }),
+            work = requireNotNull(effort.work) + 99 * observedWork,
         )
 
         val once = presolveStatPairs(SolveStats(presolve = PresolveStats(effort = effort))).toMap()
