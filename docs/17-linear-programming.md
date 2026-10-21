@@ -175,6 +175,9 @@ consumer. Original-source checks still gate every published witness.
 intersects assertions exactly and keeps a source premise for each accepted side.
 Batches publish witnesses only for a committed prefix; crossed bounds cite both
 sides, and pop restores bounds and deactivates scoped rows.
+Assertion validation walks sorted scope marks together with assertion positions;
+repeated marks preserve the depth of empty scopes. Shared assertion prefixes keep
+their checked authority while appended assertions validate their row and witness.
 
 A nonbasic bound change updates the basic values by `-B^-1 A(j) delta(x(j))`; pop
 reseats nonbasics and recomputes `x(B) = B^-1 (b - N x(N))`. Compatible edits and

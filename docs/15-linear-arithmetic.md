@@ -121,6 +121,8 @@ and deadline allowance. Retraction, restart and unchecked arithmetic changes
 discard the point, while a completed private numerical query does not end its lifetime.
 The private index, returned heads and point share the 65,536-entry admission limit.
 Both storage forms can retain the same admitted point for checked partial reuse.
+An eager table without Boolean coefficients stays valid with that immutable point;
+Boolean-dependent tables are evaluated against the current assignments on reuse.
 Complete Boolean states can submit the retained point to the full source witness
 check. A missing disjunct or disequality direction leaves completion to ordinary
 solving and branching.

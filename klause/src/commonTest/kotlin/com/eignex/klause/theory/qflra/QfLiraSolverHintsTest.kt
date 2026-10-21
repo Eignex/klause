@@ -50,6 +50,84 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `unchanged real points should preserve eager guard preferences without recapturing them`() {
+        val model = Problem(
+            numBoolVars = 5,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = Array<Factor>(5) { head ->
+                if (head < 4) ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), IntArray(3) { it },
+                    DoubleArray(3) { 1.0 }, LinearOp.LE, 0.0)
+                else Linear(intArrayOf(), doubleArrayOf(), IntArray(3) { it }, DoubleArray(3) { 1.0 },
+                    LinearOp.GE, 0.0)
+            },
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(5))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val captures = stats.snapshot().lpPointHintCaptures
+
+            repeat(3) { head ->
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(head, true))))
+            }
+
+            assertEquals(true, hints.preferredBool(3))
+            assertEquals(captures, stats.snapshot().lpPointHintCaptures)
+            assertEquals(3L, stats.snapshot().completeSearchStages?.get("POINT_HINT_STABLE_REUSE"))
+        }
+    }
+
+    @Test
+    fun `retained eager hints with Boolean coefficients should follow assigned source values`() {
+        for (value in listOf(false, true)) {
+            val declaration = object : Factor by ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(),
+                IntArray(3) { it }, DoubleArray(3) { 1.0 }, LinearOp.GE, 1.0) {
+                override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                    TaggedLinearRow(
+                        intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofRealVar(0),
+                            Term.ofRealVar(1), Term.ofRealVar(2)),
+                        RealConstants(RealConsts(doubleArrayOf(1.0)), RealConsts(DoubleArray(3) { 1.0 }), 1.0, false),
+                        LinearOp.GE,
+                        activator = 1,
+                    ),
+                ))
+            }
+            val model = Problem(
+                numBoolVars = 4,
+                intBounds = openBounds(0),
+                numRealVars = 3,
+                realLower = DoubleArray(3),
+                realUpper = DoubleArray(3),
+                factors = arrayOf(declaration, Linear(intArrayOf(), doubleArrayOf(), IntArray(3) { it },
+                    DoubleArray(3) { 1.0 }, LinearOp.GE, 0.0)),
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                    defaultGraphSelections = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertNull(hints.preferredBool(1))
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, value))))
+
+                assertEquals(value, hints.preferredBool(1))
+                assertEquals(0L, stats.snapshot().completeSearchStages?.get("POINT_HINT_STABLE_REUSE") ?: 0L)
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED"))
+            }
+        }
+    }
+
+    @Test
     fun `deferred compatible guards should be asserted before solving an incompatible guard`() {
         val model = Problem(
             numBoolVars = 3,

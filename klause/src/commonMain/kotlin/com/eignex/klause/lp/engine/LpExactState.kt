@@ -170,15 +170,16 @@ internal class LpExactState internal constructor(
     // Checks the assertions from [from] on; the ones before it were checked when the state that shares them was built.
     private fun validateAssertions(from: Int) {
         val witnesses = HashSet<Long>()
+        var assertionDepth = 0
         for (index in from until activeAssertions.size) {
+            while (assertionDepth < scopeMarks.size && scopeMarks[assertionDepth] <= index) assertionDepth++
             val assertion = activeAssertions[index]
             require(assertion.column in 0 until baseModel.numVars && assertion.witness >= 0L)
-            require(assertion.column < baseModel.n || rows.row(assertion.column - baseModel.n).active)
-            require(
-                assertion.column < baseModel.n ||
-                    assertion.depth >= (rows.row(assertion.column - baseModel.n).depth ?: 0),
-            )
-            require(assertion.depth == scopeMarks.count { it <= index })
+            if (assertion.column >= baseModel.n) {
+                val row = rows.row(assertion.column - baseModel.n)
+                require(row.active && assertion.depth >= (row.depth ?: 0))
+            }
+            require(assertion.depth == assertionDepth)
             require(witnesses.add(assertion.witness))
         }
         if (from > 0 && witnesses.isNotEmpty()) {

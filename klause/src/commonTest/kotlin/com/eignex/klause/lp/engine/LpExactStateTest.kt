@@ -7,6 +7,7 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -14,6 +15,42 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpExactStateTest {
+    @Test
+    fun `repeated scope marks should preserve assertion depths in fresh and extended states`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val assertions = listOf(
+            LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(1L)), 0L, 2),
+            LpBoundAssertion(0, true, ExactLpSide(ExactLpNumber.of(5L)), 1L, 5),
+            LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), 2L, 6),
+        )
+        val scopes = listOf(0, 0, 1, 1, 1, 2)
+        for (incremental in listOf(false, true)) {
+            val previous = LpExactState(source, assertions.take(2), scopes.take(5))
+
+            val state = LpExactState(source, assertions, scopes, rows = previous.rows,
+                previous = previous.takeIf { incremental })
+
+            assertEquals(ExactLpSide(ExactLpNumber.of(2L)), state.activeSide(0, false)?.side)
+            assertEquals(ExactLpSide(ExactLpNumber.of(5L)), state.activeSide(0, true)?.side)
+            assertEquals(6, state.depth)
+        }
+    }
+
+    @Test
+    fun `assertion depths should reject a mismatch across repeated scope marks`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val scopes = listOf(0, 0, 1, 1, 1, 2)
+        for (depth in listOf(0, 1, 2, 3, 4, 6)) {
+            val assertions = listOf(
+                LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(1L)), 0L, 2),
+                LpBoundAssertion(0, true, ExactLpSide(ExactLpNumber.of(5L)), 1L, depth),
+                LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), 2L, 6),
+            )
+
+            assertFailsWith<IllegalArgumentException> { LpExactState(source, assertions, scopes) }
+        }
+    }
+
     @Test
     fun `cached owner views should respect cancellation and caller projection isolation`() {
         val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
