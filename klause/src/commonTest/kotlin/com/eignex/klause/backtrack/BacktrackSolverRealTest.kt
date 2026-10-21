@@ -78,15 +78,13 @@ class BacktrackSolverRealTest {
 
     @Test
     fun `source real clauses should retain integer guards in a fresh peer`() {
-        val source = Problem(2, 2, Array(2) { IntDomain(0, 1) }, Array<Factor>(1002) {
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, Array<Factor>(1002) {
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1),
                 Term.ofRealVar(2), Term.ofIntVar(0)), List(4) { BigFraction.ONE },
                 LinearOp.GE, BigFraction.ONE)
-        } + arrayOf<Factor>(
-            ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
-                LinearOp.EQ, BigFraction.ZERO),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+        } + ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
+            LinearOp.EQ, BigFraction.ZERO),
+            numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
         val pool = SharedClausePool(shareMaxLbd = 0, shareMaxLen = 0)
 
@@ -96,6 +94,7 @@ class BacktrackSolverRealTest {
 
         val sat = assertIs<SolveResult.Sat>(result)
         assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
+        assertTrue(sat.stats.search.fails.sum > 0.0)
         val peer = PropagationSession(source)
         assertIs<PropagationResult.Implied>(peer.seed(Assumptions.None))
         peer.boundGeLit(1, 1, true)
