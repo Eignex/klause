@@ -12,7 +12,7 @@ Commands run from the repository root unless shown otherwise.
 | Run or select cases | [Build](#build-and-run), [selection](#selection-and-named-sets), [corpus](#catalog-and-corpus) |
 | Run remote experiments or regression schedules | [Klause-lab](#klause-lab) |
 | Identify and compare measurements | [Provenance](#installed-build-provenance), [records](#saved-results), [comparisons](#comparing-configurations) |
-| Check source claims | [Validation](#source-validation) |
+| Record witnesses for checking | [Witness records](#witness-records) |
 | Investigate cost | [Profiling](#profiling), [focused probes](#focused-probes), [LP replay](#lp-capture-and-replay) |
 | Review retained design decisions | [Design evidence](#design-evidence) |
 
@@ -47,7 +47,6 @@ forwarded to the bench JVM. Keep the CLI distribution and runtime fixed during a
 | `select [filters]` | Emit instance identities as JSON lines; `features=true` adds structural features, `files=true` the resolved model, data and include paths |
 | `solve [filters]` | Run one configuration over the selection |
 | `solve-one suite=<id> problem=<name> [filters] [out=<dir>]` | Run one selected identity and save a case record |
-| `validate-solution suite=<id> problem=<name> output=<path>` | Check saved MiniZinc, XCSP3 or SMT output without solving again |
 | `provenance out=<path>` | Capture installed-build and runtime identities |
 | `corpus status`, `corpus gc`, `corpus compress [path]` | Inspect, evict or compress fetched collections |
 | `mine [by=config\|suite\|family\|format\|category\|kind] <cases.json> ...` | Report portfolio holder share, set cover, work and rewards; retain quarantined cases |
@@ -138,13 +137,11 @@ its selection. Use `reference=any` in lab specs to preserve frozen membership.
 
 Settings, budgets, non-default solver seeds, parameters and labels distinguish
 configuration directories. Run configurations separately to compare them.
-`param=source-validation=true` opts MiniZinc integer, XCSP3, MPS and SMT-LIB runs into independent
-source-witness checking and is consumed by the bench before CLI launch.
 
 The `divmod` suite retains self-authored scalar, affine wide, equivalent linear and
 joint-conflict sources, plus signed MiniZinc and XCSP3 inputs. The adjacent FlatZinc
-fixture supports direct CLI captures. MiniZinc and
-XCSP3 runs use `param=source-validation=true` for original-source witness checking.
+fixture supports direct CLI captures. Klause-lab checks their recorded MiniZinc and
+XCSP3 witnesses against the original sources.
 
 `mps-linear-source-v1` retains self-authored decimal mixed rows, enabled/disabled
 indicators, shared contradictions, constant objectives, bound closure, wide numbers
@@ -318,18 +315,14 @@ These are in-process preparation costs under JFR, not solver verdicts or proof c
 
 `bench.profile.CompletionInitializationProfile` measures actual internal repair consumers
 without adding a published library debug API. It generates a hybrid finite-domain and
-scaled dense-linear source, alternates fresh/retained owners, cancels root installation,
-and checks the final exact source point with the configured Z3 executable. Use
+scaled dense-linear source, alternates fresh/retained owners and cancels root installation. Use
 `rows=N attempts=N rounds=N cancel=early|charged`; defaults are 128 rows, 64 cancellation
 attempts and five measured rounds after warmup. `charged` stops after native LP work
 reaches the invocation meter; `early` stops at a fixed initial poll. A completed search
 must not be retained after an interrupted attempt. Native preparation charges are recorded separately from LP interruption charges.
-On Linux x86-64, an unset `klause.bench.z3` provisions the pinned Z3 4.15.3.0
-executable from its SHA-256-checked wheel before measurement; another platform
-requires an explicitly configured reference executable. The tool writes source/pinned SMT,
-raw measurements and checker output under `out=DIR` or `$OUT`, and prints runtime,
-loaded library/tool jar and reference binary identities. Source checking and setup
-are outside the measured query spans. JFR instrumentation remains part of profile jobs;
+The tool writes the source SMT and raw measurements under `out=DIR` or `$OUT`, and
+prints runtime and loaded library/tool jar identities. Setup is outside the measured
+query spans. JFR instrumentation remains part of profile jobs;
 these measurements are preparation diagnostics, not ordinary end-to-end solve timings.
 
 `bench.profile.LinearRootOpeningProfile` inspects an original catalog source's
@@ -383,7 +376,7 @@ Cases disable result caching, alternate configurations across seeds/repetitions,
 and retain installed-build provenance when supported by the selected revision.
 Check failed, unsupported and missing cases before interpreting comparisons.
 Lab agreement and regression confirmation remain recorded-result evidence;
-[independent source validation](#source-validation) defines stronger checks.
+Klause-lab's [witness checking](#witness-records) defines stronger checks.
 `profileCli` requires AWS execution and explicit `parallel: 1`; its instrumented
 timing stays separate from ordinary comparisons.
 Its whole-CLI phase tables attribute visible stack frames to shared source
@@ -515,36 +508,6 @@ Fixtures with a directory README record their identities and licenses there:
 the [smoke corpus](smoke-corpus/README.md) and the
 [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md). The
 remaining committed fixtures are recorded here.
-
-### XCSP3 source checking
-
-The self-authored Apache-2.0 [region-counts-tiny.xml](src/test/resources/xcsp3/region-counts-tiny.xml)
-combines grouped Boolean membership sums with variable conditions, region-size
-vector lookup and starred extension tuples. Complete-search tests check returned
-named witnesses against the original XML. The contradictory count variant requires
-four region memberships across three cells, while every cell belongs to exactly one
-region. It exercises source lowering and complete search without a wall-clock budget.
-
-The self-authored Apache-2.0
-[reified-hole-tiny.xml](src/test/resources/xcsp3/reified-hole-tiny.xml)
-ties a disequality indicator to a table that can remove its target without moving
-the domain bounds. A branch with that hole conflicts with the opposite indicator.
-After rollback and learning, a source-checked assignment using the restored target
-must remain feasible.
-
-### FlatZinc witness
-
-[voltage_divider.fzn](src/test/resources/flatzinc/voltage_divider.fzn)
-is Hakan Kjellerstrand's `minizinc/voltage_divider/voltage_divider.mzn` from the
-Hakank corpus at revision `cfdfb67f9a22836ab6b9de0ee3940c6947742bec`,
-compiled with MiniZinc 2.9.7 and Klause's globals library. The MIT notice remains
-in the fixture. Local-path
-comments were removed. All 15 original flattened predicates and six scalar range
-bounds remain. The test checks exact witness coordinates without solver lowering.
-Source SHA-256 is
-`ab64d949341580bf5ea6c556e6d708b2285f40593f0de49b881f15869aa4d88e`;
-fixture SHA-256 is
-`e8353427783116d2980f3b0c05579d493fb072e92c18d38008fec458c3f840f7`.
 
 ## Installed-build provenance
 
@@ -728,292 +691,35 @@ including a nonzero exit after a verdict. Lab command exits belong to the contai
 harness process. Older records without this field leave the child exit unavailable;
 a witness or proof marker does not establish a zero process exit.
 
-## Source validation
+## Witness records
 
+klause-bench solves and records; it checks no witness itself. Every record says
+`validationPolicy=reported-result-v1`: its feasibility, objective and proof claims are
+the solver's own report. [Klause-lab](https://github.com/Eignex/klause-lab/blob/main/deploy/SETUP.md#source-witness-validation)
+checks witnesses against the original sources with established external checkers
+(the official XCSP3 solution checker, the MIPLIB solchecker, MiniZinc with Gecode and
+Dolmen), reading `finalWitness`, `exactObjective`, `objective` and `sourceHashes`
+from the record.
 
-MiniZinc float runs independently check the final complete witness; integer runs
-opt in with `param=source-validation=true`. The cache retains paired FlatZinc/DZN
-`.ozn` mappings keyed by source/data and solver-library contents. Compiler outputs
-are reconstructed, source variables pinned, then recompiled with the standard
-library and matching data seed. The pinned source objective is compared exactly.
+`finalWitness` keeps the final complete candidate as the solver printed it:
+
+| Format | `finalWitness` |
+|---|---|
+| MiniZinc | The last complete DZN solution from its first assignment, then its `% klause-exact:`, `% klause-coordinate:` and `% klause-float-` lines |
+| XCSP3 | The last complete `<instantiation>`, prefixed once with `v ` |
+| SMT-LIB | The last complete model, from its `(` line to its `)` line, with newline line endings |
+| MPS, OPB, DIMACS, WCNF | The last `v ` line |
 
 Authoritative rational coordinates travel as `% klause-exact: name = value;`
-comments beside decimal assignments and survive in `finalWitness`. Mixed exact/grid
-witnesses use `% klause-coordinate:` with `% klause-float-component:` provenance;
-the grid coordinate is the exact binary64 value of the decoded point, not an exact
-source claim. An authoritative objective coordinate overrides decimal display.
-Pure grid witnesses use original MiniZinc source pinning. Mixed witnesses use the
-independent flattened-text checker across every component. The witness policy is
-`minizinc-source-witness-v3`. `sourceValidation` is `valid`,
-`invalid` or `unknown`; `sourceValidationScope` distinguishes `minizinc-source`
-from `flatzinc-binary64`. The independent flattened-text checker interprets float
-literals as exact binary64 rationals and checks supported predicates/bounds; it
-does not establish decimal-rational MiniZinc semantics. `floatApproximation`
-records the lowering policy. See [input semantics](../docs/03-input-semantics.md).
+comments beside decimal assignments. Mixed exact/grid witnesses use
+`% klause-coordinate:` with `% klause-float-component:` provenance; the grid
+coordinate is the exact binary64 value of the decoded point, not an exact source
+claim. A Klause run of a MiniZinc model with float variables records
+`stats.floatApproximation`, which is `true` when Klause solves it on a binary64
+grid; such claims are approximations. See [input semantics](../docs/03-input-semantics.md).
 
-Unsupported syntax, missing coordinates, residual constraints, compiler failure
-or the ten-second external timeout leave validation unknown. Checking is outside
-the solve budget; hashes must match and stay stable. Rejected/unchecked grid
-candidates earn no solution credit. A checked grid witness proves feasibility,
-not a source optimum/refutation. `reportedFeasible`, `reportedObjective` and
-`reportedProven` retain the original claims. Integer opt-in also captures stdout
-SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
-Earlier incumbents are unchecked, so attribution is limited to the final objective.
-
-SMT-LIB satisfaction runs opt in with `param=source-validation=true` under policy
-`smt-external-original-claims-v3`. The CLI retains its original budget, seed and
-engine. The bench invokes established external tools after the native solve;
-there is no internal mathematical checker or custom fallback.
-
-The adapter downloads the hash-pinned upstream Dolmen 0.10 release
-into the check's private directory when no executable is configured. It removes
-the executable after checking and does not change host installations. Published
-Dolmen binaries cover Linux x86-64 and macOS ARM64; the macOS asset named
-`dolmen-macos-amd64` contains an ARM64 executable and requires the host's GMP library
-at `/opt/homebrew/opt/gmp/lib/libgmp.10.dylib`. Other platforms need a configured
-Dolmen executable.
-
-Set `KLAUSE_DOLMEN` to an absolute Dolmen executable path and
-`KLAUSE_DOLMEN_SHA256` to its SHA-256 to override the downloaded release.
-SAT checking passes the complete original
-source unchanged and supplies `sat` followed by the exact final printed model on
-stdin. Dolmen receives `--check-model=true --strict=false --report-style=minimal
---warn=-all --time=30s --size=4G`. Only a clean successful check accepts the model.
-Algebraic syntax must be supported by the selected Dolmen build; `root-obj` is not
-rewritten by the adapter. The [competition Dolmen build](https://github.com/SMT-COMP/dolmen)
-uses external algebraic arithmetic, while upstream release coverage differs.
-A build's existence does not establish compatibility with a particular saved model.
-
-Only SAT models are checked. A reported UNSAT has no witness to check, so it stands as reported
-with `sourceValidation=unknown`; the lab compares it with the stored reference verdicts, which flag
-a refutation another solver contradicts. Checking never promotes a native UNKNOWN or establishes
-an optimum.
-
-Saved SMT claims use `validate-solution suite=<id> problem=<name> output=<stdout>
-record=<producer.json> out=<evidence directory>`. Preserve the original producer
-record, including its recorded validation policy. The replay receipt identifies the
-current external policy separately. Optional `checker=<absolute executable>` and
-`checker-sha256=<digest>` select a job-private Dolmen binary;
-otherwise the configured environment or pinned release supplies the tool. Replay checks the catalog
-source hash and exact retained model/output without invoking the native solver.
-
-Unavailable tools, unsupported input, timeout, interruption, changed bytes or
-incomplete cleanup leave the claim unverified. Release downloads are bounded to
-64 MiB and 30 seconds of observed elapsed time, with finite connection/read timeouts.
-Extracted executables are bounded to 128 MiB. Executables are checked against their
-hash before and after use; receipts retain release URLs and archive digests. Adjacent `smt-source-check-*` directories retain original
-source/model/stdout, the producer record, the exact tool response input and a receipt
-binding those bytes to the executable hash, command, true exit, timing and raw streams.
-Linux enforces a 4 GiB address-space limit. macOS samples the live process tree's
-resident bytes and stops checking after an observed 4 GiB excess. The system
-`time -l` utility retains the waited child's kernel RSS high-water value separately
-from checker output. Receipts bind its log hash, sampled peak, sample count, kernel
-peak, limit, completeness and exceedance. Sampling is an observed process-tree guard;
-well-formed zero-RSS rows are terminal observations only after every captured process
-has exited, with one bounded process-reaper wait. They add no positive sample and
-cannot replace the waited-child kernel high-water evidence. Missing live processes,
-malformed rows and earlier failed observations continue to withhold acceptance.
-The kernel high-water value covers the waited child rather than a continuous
-aggregate tree measurement. An excessive peak, missing or malformed observation,
-or incomplete cleanup withholds acceptance. Linux receipts identify address-space
-control without claiming a measured RSS peak. Both hosts bound CPU and output file
-size; the tools also enforce their own memory and time limits. The JVM allows 35 seconds
-for the process and bounded cleanup; output streams are each limited to 1 MiB.
-Checker time is separate from native solve and incumbent time. Checks issue no solver query.
-Raw cache hits are checked afresh; use `-Dklause.bench.cache=false` for a fresh solve.
-
-`bench.profile.SmtSourceReplay` delegates complete sets of saved SMT models to
-the same Dolmen adapter without running Klause. Supply `input64=<base64 zstd JSON>`
-and `sha256=<compressed digest>`. Schema 1 contains `sources` metadata and `models`
-with catalog `suite`/`problem`, exact `producerJson`/`stdout`, source/model hashes,
-and preserved producer `bindings`. Each model uses the complete unchanged catalog
-source and printed model. The replay records tool startup, per-model receipts and
-a final complete/partial summary; non-SAT source markers stay outside Dolmen's
-model-checking scope. Schema 2 uses `claims` with the same fields and a `scope`, which must be
-`ground-original-smt-witness`. Mac replay checks
-the RSS guard with a below-baseline process allowance before checking claims.
-Requests are limited to 128 KiB encoded/16 MiB expanded. The main stops starting
-claims after two minutes by default. Set `claimStartTimeoutMs` in the request to
-allow up to four minutes, including tool setup, and record that limit in the summary.
-Individual checks retain the ordinary 35-second process limit. Allow separately
-for harness setup, the final check, retrieval and cleanup in the enclosing job limit.
-Replay supplies no new native decision, proof certificate, optimization or
-performance credit.
-
-### MPS independent point validation
-
-MPS runs opt in with `param=source-validation=true` under policy
-`mps-miplib2017-point-v1`. The bench invokes the established
-[MIPLIB solchecker 1.0.4](https://miplib.zib.de/download.html), with its own original-MPS
-reader and GMP rational evaluator. No solver query, repair, optimum check or
-infeasibility certificate is performed. Only an accepted supplied point receives
-feasibility and objective credit. Native proof claims remain uncredited; original
-claims remain in the `reported*` fields.
-
-Explicit MIPLIB packaging downloads the official `miplib2017-testscript-v1.0.4.zip`, pinned to
-SHA-256 `37b21a7f1ee968aed60675fb070c9286eccc6a953c8bc50120c9246b052b47b9`.
-It extracts only the checker C++ sources, README, Makefile and MIT license, compiles
-the unchanged upstream main with GMP and zlib, and packages those files and the
-binary in the non-published bench artifact. The optional converter is not extracted.
-Building requires a C++ compiler and GMP/zlib development packages. Invocation
-supports Linux with GNU `timeout`/`prlimit` and macOS with the system shell limits.
-Other hosts remain unverified. The packaged executable targets the build host;
-rebuild the bench when changing OS or architecture.
-
-Unit tests, `check` and `lintDocs` do not download or compile this checker.
-On the lab, `./gradlew :klause-bench:sourceValidationIntegrationTest` runs the
-MIPLIB and Dolmen external-checker integration cases. To include MIPLIB in the installed bench artifact, build
-with `./gradlew :klause-bench:installDist -Pbench.mpsSolchecker`.
-The ordinary unit tests retain local input qualification, SOL conversion, receipt
-interpretation, source custody and validation-routing checks.
-
-The adapter inserts a neutral `NAME` header or an empty `RHS` section when the
-original omits those optional headers required by MIPLIB. For a column whose first
-two bound records are `UP 1` then `LO 0`, it swaps those records to `LO 0` then
-`UP 1`. The source range stays `[0,1]`, including marker integers: MIPLIB would
-otherwise discard their upper side on the lower-bound record. Decimal spellings
-are compared exactly. All original data records remain verbatim; only this pair's
-order changes. The receipt counts reordered pairs, names inserted headers and binds
-both the original `source.mps` and actual `checker.mps` bytes. No numerical values change.
-The adapter translates the retained final stdout point into SOL variable/value
-lines and `=obj=`. Duplicate or malformed coordinates are declined. MIPLIB's model
-variable census must equal the number of supplied unique coordinates, and any
-unexpected-variable diagnostic declines the result. Together these checks require
-every original variable exactly once, including unconstrained variables. The
-source sense, final witness, exact reported objective and full stdout must agree
-with the producer record. A successful exit alone supplies no credit: complete
-`Integrality`, `Constraints` and `Objective` results must all pass.
-
-An exact pass uses explicit zero linear and integrality tolerances. A default run
-also performs a pass with linear tolerance `1e-7` and integrality tolerance zero;
-objective equality must pass the zero-tolerance run. The receipt distinguishes
-`exactFeasible` and `toleranceAccepted`. This version adopts upstream MIPLIB
-acceptance, which differs from the solver's source-tolerance policy. Upstream
-1.0.4 scales a row side by
-`max(1, positiveActivity, negativeActivity, abs(side))`, with the negative sum
-retaining its sign; bounds use `max(1, abs(bound), abs(value))`. It uses finite
-`1e20` sentinels for open sides. These checks can decline points accepted by the
-solver; a declined point receives no validation credit. Equal numeric tolerances
-do not establish equal acceptance policies.
-
-The adapter screens known upstream reader limitations without evaluating rows.
-Supported source records use one named vector per section without repeated row
-entries, one objective row, consecutive column blocks, unique objective coefficients
-and decimal tokens of at most 31 characters with exponents between -128 and 128.
-RANGES, integer markers, bounds and indicators are delegated to MIPLIB. BV must be
-its column's sole bound record. Lower bounds after an UP record outside the unit-pair
-normalization, objective RHS offsets, nonterminating rational coordinates,
-rational source tokens, longer numbers, inline section data, multiple free rows,
-unsupported sections and semantics overrides remain unverified. Terminating rational
-coordinates convert exactly to supported decimal SOL tokens. No custom parser or
-mathematical checker supplies a fallback.
-
-Each check retains original source, complete stdout, producer JSON, SOL, request,
-upstream license, process logs and receipt in an adjacent `mps-source-check-*`
-directory. SHA-256 bindings cover all inputs; the receipt identifies the upstream
-archive and actual executable bytes, command, PID, exit, stream hashes and cleanup.
-The executable is removed after checking. Input/source changes or incomplete checks
-withhold credit. The saved result retains producer-record JSON, source retrieval
-identity and complete receipt JSON with its hash. Timing stays outside solver and
-incumbent timing. The policy separates raw-solve cache entries; cached points are
-checked afresh.
-
-Each native invocation has a 30-second JVM wall deadline and disabled core dumps.
-Linux uses a 4 GiB address-space limit, 30-second CPU backstop and 1 MiB per output
-file; GNU timeout also bounds wall time if its JVM owner is lost. macOS adds 4 GiB
-to the pre-exec shell virtual-size baseline and applies the result as an absolute
-address-space limit, retaining both numbers in stdout.
-It also uses a 30-second CPU limit and at most 1 MiB per file through the system
-shell. The shell baseline includes Darwin shared mappings; it is not a native
-post-exec resident-memory measurement. Owner loss leaves a CPU bound rather than
-an independent wall bound. Receipts name the actual resource policy. The JVM has a
-70-second preparation/checking allowance, terminates owned
-descendants on cancellation and reaps its child within five seconds. Failed limit
-setup cannot earn credit. Source input is limited to 64 MiB, producer records to
-4 MiB and ordinary stdout to 8 MiB.
-
-`param=source-validation-gzip=true` selects `mps-miplib2017-point-gzip-v1`.
-The JVM retains losslessly compressed stdout, with an 8 MiB compressed and 64 MiB
-decoded limit. SOL conversion reads the complete original producer stdout before
-compression; the checker consumes SOL rather than decoding stdout. Receipt bindings
-retain both transport and original stdout hashes. The flag requires explicit MPS
-source validation and is removed before invoking the solver.
-
-XCSP3 integer runs opt in with `param=source-validation=true`. The installed bench
-includes the independent `org.xcsp:xcsp3-tools:2.5` `SolutionChecker`, also used by
-the ACE distribution. It checks a copied original XML source against the final
-complete named integer instantiation and its exact reported objective. Every
-source variable must appear once, including unconstrained variables and expanded
-array cells. Duplicate, unknown, missing, malformed and out-of-domain coordinates,
-violated constraints and incorrect objectives are rejected. Compact variable/value
-forms are outside this checking surface. Reified/soft constraints, multiple
-objectives, unsupported checker callbacks, oversized integer coordinates and the
-ten-second/512 MiB checker subprocess limit leave checking `unknown`. An arithmetic guard admits only audited callbacks before
-the pinned checker runs.
-Zero-offset circuits audit successor indexes before the reference checker's
-distinctness and cycle traversal; nonzero offsets and out-of-range successors
-remain unknown.
-It checks signed integer task endpoints, cumulative loads at task boundaries,
-bin-packing loads, ordered offsets and knapsack products/totals with exact integers.
-Direct sums require every assigned product and running total to fit a signed
-integer, including constant and variable coefficients. The source parser expands
-array lists, groups, slides and blocks for these checks. Expression sums admit
-unweighted terms and constant or variable coefficients. Every expression node,
-intermediate addition/product and weighted term must fit a signed long and agree
-with the pinned evaluator; the exact sum must fit a signed integer. This guards
-the checker's long multiplication before its exact accumulation, including
-cancellation between large terms. Embedded expression parameters in group/slide
-templates remain unknown when the pinned parser cannot expand them. Indexed vector elements admit only `rank="any"`,
-constant or variable entries, and an in-range index whose exact offset fits a signed
-integer. Matrix elements audit row and column offsets separately, check the selected row's bounds (including ragged rows),
-and bound every source entry to the reference checker's integer range. For satisfaction sources containing only
-matrix selections, ragged matrices use an exact source-cell equality check with a distinct checker identity;
-the pinned reference loader assumes a rectangular constant matrix. Mixed constraint sets or objectives keep
-the reference checker and can remain unknown. Ranked and unindexed elements remain unchecked.
-
-Supported expression trees are evaluated with `BigInteger` and compared with the
-pinned evaluator, including its normalized intension tree. Matching cancellation
-results remain checkable; any disagreement or unsupported operation leaves checking
-`unknown`. Supported expressions include integer arithmetic (except powers),
-comparisons and Boolean operators. Hybrid extension tuples, set expressions, powers,
-logical meta-constraints, flow, channel, circuit and indexed extrema
-remain outside the audited surface. Direct variable objectives retain the pinned
-checker's exact sum/product/minimum/maximum/distinct-value aggregates; expression
-objectives require the same exact arithmetic agreement. Nonconstant objective
-coefficients and expression integers above 4096 bits leave checking `unknown`.
-
-XCSP records use `validationPolicy=xcsp3-source-witness-v3` and
-`sourceValidationScope=xcsp3-source`; `sourceValidationChecker` identifies the
-pinned checker. `sourceHashes` binds the original plain source before solving
-and is checked for stability during validation. `finalWitness` and
-`sourceOutputSha256` retain the reported assignment and output identity;
-`checkedWitness` retains only a source-valid assignment, with the checked objective
-as its `cost` attribute. Invalid candidates earn no feasibility, objective or proof
-credit. Unknown checks retain reported claims without a checked witness.
-`reported-result-v1` records have no independent checking. Witness checking
-establishes feasibility and objective equality; any optimum or infeasibility claim
-remains the solver's proof claim, recorded separately as `reportedProven`.
-
-```sh
-./gradlew :klause-bench:bench --args="validate-solution suite=hakank problem=arbitrage_loops/arbitrage_loops output=/path/to/solver.out"
-./gradlew :klause-bench:bench --args="validate-solution suite=xcsp3-core problem=sum-opt-tiny output=/path/to/solver.out"
-```
-
-`validate-solution` prints a structured validation result, source hashes, checker
-identity and the checked XCSP assignment when accepted, without solving again.
-
-`com.eignex.klause.bench.profile.XcspWitnessReplay` checks saved witnesses on a
-remote profile without invoking the solver. Its single argument is a base64 gzip
-JSON array containing `sourceRevision`, original `source`, `sourceSha256`, original
-`witness`, `witnessSha256` and optional exact integer `objective`. Keep the encoded payload below 100 KiB for the lab shell; split larger collections
-into separate jobs.
-Hashes are verified before checking. It retains the original records, installed harness/runtime
-hashes, checker command, process exit, timeout, stdout/stderr and each check outcome.
-Each checker subprocess has one active processor, a 512 MiB heap and ten seconds.
-The lab's executed revision and setup identity belong with these results;
-`sourceRevision` describes the historical capture and is not the replay build.
-Acceptance certifies source feasibility and objective values, not optimality or
-infeasibility proofs.
+`param=source-validation` and `param=source-validation-gzip` are no longer bench
+settings: like any other `param=`, they reach the CLI, which rejects unknown keys.
 
 ## Comparing configurations
 
@@ -1426,8 +1132,8 @@ repair through its private solve context. Its default is false. It retains the
 existing repair, arithmetic and containing-work limits and still requires exact
 row and coordinate verification; a repaired point supplies no optimum proof.
 `cases.json` retains supplied points and source hashes; `sources/` contains the
-original bytes. Independent validation uses the established MIPLIB checker under
-the [MPS input and receipt contract](#mps-independent-point-validation).
+original bytes. Klause-lab checks MPS points independently with the MIPLIB solchecker
+(see [witness records](#witness-records)).
 Returned points retain their exact-source or configured source-tolerance guarantee;
 exact requests reject tolerance-only points. Original objective values are recomputed
 from source numbers and returned coordinates, including tolerance witnesses. The
@@ -1452,14 +1158,13 @@ model/data, compiled FlatZinc, source-variable mappings, supplied values, compil
 build/runtime hashes. `proposals.json` records the initial objective and every
 candidate's predicted and committed complete cost, exact integer objective and
 move. Up to sixteen complete improving candidates retain their source assignments
-and run the existing independent MiniZinc source checker with an exact integer
-objective. Other candidates retain an explicit unchecked status. Each candidate
+as `candidate-N.out` DZN witnesses for checking in Klause-lab. Each candidate
 starts from the same assignment; restoration recomputes
 payloads. Definition propagation and all model constraints participate in grading.
 
 This inspects a prepared neighborhood, with no solver walk or runtime-parity claim.
 Its model grades are separate from independent original-source checks; only a valid
-source-check receipt supports candidate witness credit. This does not certify an
+Klause-lab check supports candidate witness credit. This does not certify an
 optimum or refutation. Keep raw results outside the repository and
 pair the diagnostic with uninstrumented source-checked whole-CLI comparisons.
 
@@ -1471,8 +1176,8 @@ array of `{name, format, text, ints, bools, moves}` objects. Formats are `flatzi
 `smtlib` and `xcsp3`; assignments list every compiled coordinate, and each supplied move
 is `{id, value}`. `seed` pins initialization. Real coordinates and out-of-domain values
 are refused. The probe uses ordinary finite scoring without inferred definitions. The `product-aliases`
-suite supplies MiniZinc square, fixed-power, result-alias and guarded-power source regressions;
-use `param=source-validation=true` to check their complete original-source witnesses.
+suite supplies MiniZinc square, fixed-power, result-alias and guarded-power source regressions,
+whose recorded witnesses Klause-lab checks against the original sources.
 
 Run the committed main through the lab client at an immutable revision. It retains
 source texts, hashes, installed-build/runtime/dependency identities and every predicted,
@@ -1481,20 +1186,14 @@ saving its records. Agreement checks incremental state consistency; original-sou
 witness validation remains a separate obligation. This profile measures no solve
 throughput and verifies no proof.
 
-`PowerMoveSourceProfile` accepts the same `sources` and `seed` arguments for
-FlatZinc inputs. It retains the incremental records, then checks each complete
-coordinate assignment against the independent original FlatZinc predicate checker.
-Zero complete cost must agree with an exact valid source witness; unsupported checks
-fail the diagnostic. Signed powers, aliases, zero exponents and overflow use original
-source numbers. `source-checks.json` keeps source hashes, coordinates, check scope and
-agreement separately from native grading. Run it through the same AWS lab profile
-client at a pinned revision. Alternatively, `suite=<catalog suite> problem=<name>`
+`PowerMoveSourceProfile` with `suite=<catalog suite> problem=<name>`
 freshly compiles a MiniZinc source and retains its original files, compiled FlatZinc,
 compiler/build identity and parsed native Power factors without solving. It fails
 when compilation retains no Power relation. `factorKind=Abs`, `RealAbs` or `GridAbs`
 selects an absolute-value retention check; `exact=true` selects exact float parsing.
+Other arguments run `IncrementalMoveProfile` unchanged.
 The `abs-relations` suite supplies integer magnitudes, aliases, Boolean scopes,
-optional values and real forms for original MiniZinc compilation and source checks,
+optional values and real forms for original MiniZinc compilation,
 plus XCSP3 distance and Boolean-scope source fixtures.
 These diagnostics measure no throughput
 and export no proofs.
@@ -1504,13 +1203,13 @@ and export no proofs.
 `./gradlew :klause-bench:test` checks the harness. Explicit `solveCampaign` runs,
 `:klause:basisTrace --args="verify"` and `--args="replay"` are opt-in fixture
 checks; numerical declines and missing inputs keep their normal semantics.
-Run source-verifier regressions with its pinned requirements. Benchmarks, captures
+Benchmarks, captures
 and timing probes do not run as part of ordinary repository checks.
 
 `source-ownership` contains self-authored original MiniZinc mixed integer/real
 product controls, including an unrelated finite distinctness constraint and an
-excluded integer value. Run CP/LS with default and exact modes; the harness records
-the original MiniZinc source check separately from compiled FlatZinc semantics.
+excluded integer value. Run CP/LS with default and exact modes; Klause-lab checks
+the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
@@ -1748,7 +1447,7 @@ The original-source controls at revision
 conditions, actual claims, checker identities and runtime artifact hashes. Independent
 standard-library rational checkers accept fourteen supported claims across quadratic
 MIN/MAX, affine MPS and strict/mixed SMT sources. The maintained
-[probe and checker workflow](#source-validation) owns these controls.
+[witness records](#witness-records) and Klause-lab's checking own these controls.
 
 The controls include a decimal objective beyond binary64 precision, adjacent integer
 branch coverage, Boolean branch coverage, a Farkas refutation, improving integer/real

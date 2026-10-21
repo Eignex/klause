@@ -11,7 +11,7 @@ import kotlin.test.assertNotEquals
 class BenchCacheTest {
 
     @Test
-    fun `cache reuse should require the same executed build and validation policy`() {
+    fun `cache reuse should require the same executed build`() {
         val root = Files.createTempDirectory("benchcache").toFile()
         try {
             val model = File(root, "model.fzn").apply { writeText("solve satisfy;") }
@@ -26,16 +26,6 @@ class BenchCacheTest {
             )) {
                 assertNotEquals(baseline, BenchCache.keyFor(model, null, "klause", budget, changed))
             }
-            for (policy in listOf(PINNED_SOURCE_POLICY, XCSP_SOURCE_POLICY)) {
-                assertNotEquals(
-                    baseline,
-                    BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = policy),
-                )
-            }
-            assertNotEquals(
-                BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = "xcsp3-source-witness-v1"),
-                BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = XCSP_SOURCE_POLICY),
-            )
         } finally {
             root.deleteRecursively()
         }

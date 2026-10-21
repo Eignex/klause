@@ -101,8 +101,6 @@ internal data class SolveRecord(
     val sourceHashes: Map<String, String> = emptyMap(),
     /** Final rendered candidate, retained for independent checks when the raw stream is not transferred. */
     val finalWitness: String? = null,
-    val sourceOutputSha256: String? = null,
-    val checkedWitness: String? = null,
     val processTimeToFirstFeasibleMs: Long? = null,
     val processTimeToBestMs: Long? = null,
     val exactObjective: String? = null,
@@ -153,7 +151,7 @@ internal object SolveMetric {
         val features = ReferenceStore.load()
         val resultRows = ArrayList<ReferenceEntry>()
         for (entry in entries) {
-            val (rec, raw) = solve(entry, solverId, settings, budget, tag, timestamp, sha, evidenceRoot = outDir)
+            val (rec, raw) = solve(entry, solverId, settings, budget, tag, timestamp, sha)
             raw?.let { File(outDir, flat(entry) + ".out").writeText(it) }
             File(outDir, flat(entry) + ".json").writeText(Reports.json.encodeToString(rec))
             val suite = ReferenceStore.suiteOf(entry.ref)
@@ -193,7 +191,7 @@ internal object SolveMetric {
         val sha = Reports.readGitSha()
         val name = ref.name.replace('/', '_')
         val (rec, raw) = runCatching { Runners.resolve(ref, settings.exact) }.fold(
-            { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha, evidenceRoot = dir) },
+            { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha) },
             { failure -> loadFailureRecord(ref, solverId, settings, budget, timestamp, sha, failure) to null },
         )
         raw?.let { File(dir, "$name.out").writeText(it) }
@@ -277,13 +275,6 @@ internal object SolveMetric {
         },
         invoke: (ResolvedProblem, String, SolverInvocation.Settings, Budget, Boolean) -> SolverInvocation.Result =
             SolverInvocation::run,
-        evidenceRoot: File = File("output", tag),
-        validateMps: (ProblemRef, SolveRecord, String, Boolean, File) -> MpsSourceValidation.Result =
-            MpsSourceValidation::validate,
-        validateMpsGzip: (ProblemRef, SolveRecord, String, Boolean, File) -> MpsSourceValidation.Result =
-            MpsSourceValidation::validateGzip,
-        validateSmt: (ProblemRef, SolveRecord, String, File) -> SmtSourceValidation.Result =
-            SmtSourceValidation::validate,
     ): Pair<SolveRecord, String?> {
         val optimize = entry.objective != null
         val kind = if (optimize) "optimize" else "satisfy"
@@ -293,93 +284,26 @@ internal object SolveMetric {
         return runCatching {
             sourceHashes = SolveEvidence.sourceHashes(entry.ref)
             provenance = installedBuild()
-            val sourceParams = SourceValidationParams(settings)
-            val checkSource = solverId == SolverInvocation.KLAUSE && (entry.hasFloats || sourceParams.requested)
-            require(!sourceParams.requested || entry.ref.format in setOf(
-                Format.MINIZINC, Format.XCSP3, Format.MPS, Format.SMTLIB,
-            )) {
-                "source-validation requires a MiniZinc, XCSP3, MPS or SMT-LIB source"
-            }
-            require(!sourceParams.gzip || (solverId == SolverInvocation.KLAUSE && entry.ref.format == Format.MPS)) {
-                "source-validation-gzip requires a Klause MPS source"
-            }
-            val policy = if (checkSource) {
-                when (entry.ref.format) {
-                    Format.XCSP3 -> XCSP_SOURCE_POLICY
-                    Format.MPS -> if (sourceParams.gzip) MPS_GZIP_SOURCE_POLICY else MPS_SOURCE_POLICY
-                    Format.SMTLIB -> SMT_SOURCE_POLICY
-                    else -> PINNED_SOURCE_POLICY
-                }
-            } else {
-                REPORTED_RESULT_POLICY
-            }
             compiler = if (entry.ref.format == Format.MINIZINC) MiniZincCompatibility.compiler else null
-            val key = BenchCache.keyFor(entry.ref, tag, budget, provenance, settings, policy)
+            val key = BenchCache.keyFor(entry.ref, tag, budget, provenance, settings)
             val r = BenchCache.load(key)
-                ?: invoke(entry, solverId, sourceParams.solverSettings, budget, optimize)
+                ?: invoke(entry, solverId, settings, budget, optimize)
                     .also { BenchCache.store(key, it) }
-            val reported = record(entry, solverId, settings, budget, kind, timestamp, sha, r)
-                .copy(
-                    validationPolicy = policy,
+            // A float model Klause solves on a grid is marked, so a reader knows its claims are approximations.
+            val approximation = if (solverId == SolverInvocation.KLAUSE && entry.hasFloats) {
+                mapOf("floatApproximation" to entry.floatApproximation.toString())
+            } else {
+                emptyMap()
+            }
+            record(entry, solverId, settings, budget, kind, timestamp, sha, r).let { reported ->
+                reported.copy(
+                    stats = reported.stats + approximation,
                     compilerIdentity = compiler,
                     sourceHashes = sourceHashes,
-                    finalWitness = if (r.feasible == true) {
-                        SolveEvidence.finalWitness(entry.ref.format, r.rawOutput)
-                    } else {
-                        null
-                    },
-                    sourceOutputSha256 = if (sourceParams.requested) sha256(r.rawOutput.toByteArray()) else null,
+                    finalWitness = SolveEvidence.finalWitness(entry.ref.format, r.rawOutput)
+                        .takeIf { r.feasible == true },
                 )
-            val checked = if (checkSource && entry.ref.format == Format.SMTLIB) {
-                val smt = validateSmt(entry.ref, reported, r.rawOutput, evidenceRoot)
-                val bound = if (smt.validation.sourceHashes.isNotEmpty() &&
-                    smt.validation.sourceHashes != reported.sourceHashes
-                ) {
-                    smt.copy(validation = SmtSourceValidation.unknown(
-                        "validation source hashes differ from solve record",
-                    ))
-                } else {
-                    smt
-                }
-                SmtSourceValidation.apply(reported, bound)
-            } else if (checkSource) {
-                val mps = if (entry.ref.format == Format.MPS) {
-                    val validate = if (sourceParams.gzip) validateMpsGzip else validateMps
-                    validate(entry.ref, reported, r.rawOutput, settings.exact, evidenceRoot)
-                } else {
-                    null
-                }
-                val validation = mps?.validation ?: if (r.feasible == true) {
-                    if (entry.ref.format == Format.XCSP3) {
-                        Xcsp3SourceValidation.validate(entry.ref, r.rawOutput, r.exactObjective)
-                    } else {
-                        MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective, r.exactObjective)
-                    }
-                } else {
-                    if (entry.ref.format == Format.XCSP3) {
-                        Xcsp3SourceChecker.result("unknown", "no feasible candidate to check")
-                    } else {
-                        SourceValidation("unknown", "no feasible candidate to check")
-                    }
-                }
-                val boundValidation = if (validation.sourceHashes.isNotEmpty() &&
-                    validation.sourceHashes != reported.sourceHashes
-                ) {
-                    validation.copy(
-                        status = "unknown",
-                        reason = "validation source hashes differ from solve record",
-                        sourceHashes = reported.sourceHashes,
-                        checkedWitness = null,
-                    )
-                } else {
-                    validation
-                }
-                reported.sourceChecked(boundValidation, entry.floatApproximation, witnessOnly = mps != null)
-                    .let { it.copy(stats = it.stats + mps?.stats.orEmpty()) }
-            } else {
-                reported
-            }
-            checked to r.rawOutput
+            } to r.rawOutput
         }.getOrElse { failure ->
             val record = errorRecord(entry, solverId, settings, budget, kind, timestamp, sha)
                 .copy(

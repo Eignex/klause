@@ -1,6 +1,5 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.bench.metric.SmtSourceTools
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
@@ -20,11 +19,10 @@ import java.io.File
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
-/** Measures actual completion initialization retries and checks their exact source witnesses. */
+/** Measures actual completion initialization retries. */
 object CompletionInitializationProfile {
-    /** Runs the configured cancellation trace and writes measurements and independently checked source points. */
+    /** Runs the configured cancellation trace and writes its measurements. */
     @JvmStatic
     fun main(args: Array<String>) {
         val options = Options(args)
@@ -35,8 +33,6 @@ object CompletionInitializationProfile {
         meter.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
         val records = ArrayList<String>()
-        val witnesses = ArrayList<Sample>()
-        prepareReference(options.out)
         metadata(options, source)
         for (round in 0..options.rounds) {
             val modes = if (round % 2 == 0) listOf("retained", "fresh") else listOf("fresh", "retained")
@@ -44,12 +40,10 @@ object CompletionInitializationProfile {
                 val result = measure(options, access, model, mode) { meter.getThreadAllocatedBytes(thread) }
                 val record = "round=$round mode=$mode " + result.first
                 records += record
-                witnesses += result.second
                 println("MEASURE $record")
             }
         }
         options.out.resolve("measurements.txt").writeText(records.joinToString("\n", postfix = "\n"))
-        validate(options.out, source, witnesses)
     }
 
     private class Options(args: Array<String>) {
@@ -231,47 +225,6 @@ object CompletionInitializationProfile {
         println("TOOL ${tool.name} sha256=${hash(tool)}")
     }
 
-    private fun prepareReference(out: File) {
-        if (System.getProperty("klause.bench.z3") != null) return
-        val tool = SmtSourceTools.provisionZ3(out.resolve("reference"))
-        System.setProperty("klause.bench.z3", tool.executable.absolutePath)
-        out.resolve("reference-provenance.txt").writeText(
-            "url=${tool.artifactUrl}\narchiveSha256=${tool.artifactSha256}\nbinarySha256=${tool.binarySha256}\n",
-        )
-    }
-
-    private fun validate(out: File, source: String, witnesses: List<Sample>) {
-        val checks = buildString {
-            append(source)
-            for (sample in witnesses) {
-                val real = checkNotNull(sample.exactReals)
-                append("(push 1)\n(assert (= i 0))\n(assert (= j 1))\n")
-                append("(assert (= x (/ 1 3)))\n(assert (= y (/ 1 9)))\n")
-                append("(assert (= i ${sample.exactIntValue(0)}))\n")
-                append("(assert (= j ${sample.exactIntValue(1)}))\n")
-                append("(assert (= x ${smt(real[0])}))\n(assert (= y ${smt(real[1])}))\n(check-sat)\n(pop 1)\n")
-            }
-            append("(push 1)\n(assert (= i j))\n(check-sat)\n(pop 1)\n")
-        }
-        val input = out.resolve("source-checks.smt2").apply { writeText(checks) }
-        val output = out.resolve("source-checks.out")
-        val z3 = File(System.getProperty("klause.bench.z3", "z3"))
-        val identity = if (z3.isFile) "sha256=${hash(z3.readBytes())}" else z3.path
-        val process = ProcessBuilder(z3.path, "-smt2", "-T:20", "-memory:512",
-            input.absolutePath).redirectOutput(output).redirectError(out.resolve("source-checks.err")).start()
-        try {
-            check(process.waitFor(30, TimeUnit.SECONDS)) { "source checking timed out" }
-            check(process.exitValue() == 0) { "source checking failed" }
-            val actual = output.readLines().map(String::trim).filter(String::isNotEmpty)
-            check(actual == List(witnesses.size + 1) { "sat" } + "unsat") { "source checking rejected a record" }
-            println("SOURCE_CHECK witnesses=${witnesses.size} binaryIdentity=$identity " +
-                "checkerArgs=-smt2,-T:20,-memory:512 exportedProofVerification=false")
-        } finally {
-            if (process.isAlive) process.destroyForcibly()
-        }
-    }
-
-    private fun smt(value: BigFraction): String = "(/ ${value.num} ${value.den})"
     private fun hash(bytes: ByteArray): String = hex(MessageDigest.getInstance("SHA-256").digest(bytes))
     private fun hash(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")

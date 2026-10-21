@@ -145,4 +145,60 @@ class SolveEvidenceTest {
 
         assertEquals(if (extra.isEmpty()) model else null, witness)
     }
+
+    @Test
+    fun `MiniZinc witnesses should keep the final solution and its klause comment lines byte for byte`() {
+        val raw = "% started\nx = 1;\n----------\n" +
+            "% klause-exact: x = 3/2;\n  x = 2;\n% note\ny = [1, 2];\n" +
+            "% klause-coordinate: X_INTRODUCED_4_ = 7;\n% klause-float-grid: 0.5\n_objective = 3;\n" +
+            "----------\n==========\n% solveTime=0.1\n"
+
+        val witness = SolveEvidence.finalWitness(Format.MINIZINC, raw)
+
+        assertEquals(
+            "  x = 2;\ny = [1, 2];\n_objective = 3;\n" +
+                "% klause-exact: x = 3/2;\n% klause-coordinate: X_INTRODUCED_4_ = 7;\n% klause-float-grid: 0.5",
+            witness,
+        )
+    }
+
+    @Test
+    fun `a MiniZinc solution of exact coordinates alone should keep only those lines`() {
+        val raw = "% klause-exact: x = 1/3;\n% klause-coordinate: y = 2;\n----------\n"
+
+        val witness = SolveEvidence.finalWitness(Format.MINIZINC, raw)
+
+        assertEquals("\n% klause-exact: x = 1/3;\n% klause-coordinate: y = 2;", witness)
+    }
+
+    @Test
+    fun `a MiniZinc solution should start at its first assignment line`() {
+        val raw = "noise line\nx = [\n  1, 2\n];\n=====UNSAT=====\n----------\n"
+
+        val witness = SolveEvidence.finalWitness(Format.MINIZINC, raw)
+
+        assertEquals("x = [\n  1, 2\n];", witness)
+    }
+
+    @Test
+    fun `XCSP3 witnesses should keep the last complete instantiation with one v prefix`() {
+        val raw = "v <instantiation><list>x</list><values>1</values></instantiation>\no 4\n" +
+            "v <instantiation type='solution' cost='3'>\nv   <list> x y </list>\n" +
+            "v   <values> 1 2 </values>\nv </instantiation>\ns OPTIMUM FOUND\n"
+
+        val witness = SolveEvidence.finalWitness(Format.XCSP3, raw)
+
+        assertEquals(
+            "v <instantiation type='solution' cost='3'>\n  <list> x y </list>\n  <values> 1 2 </values>\n" +
+                "</instantiation>",
+            witness,
+        )
+    }
+
+    @Test
+    fun `an unterminated XCSP3 instantiation should carry no witness`() {
+        val raw = "v <instantiation>\nv <list>x</list>\n"
+
+        assertNull(SolveEvidence.finalWitness(Format.XCSP3, raw))
+    }
 }

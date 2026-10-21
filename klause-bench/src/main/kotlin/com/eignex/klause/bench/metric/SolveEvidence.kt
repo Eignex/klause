@@ -7,8 +7,12 @@ import com.eignex.klause.bench.source.CorpusFiles
 import java.security.MessageDigest
 import java.util.Locale
 
+/** How a record's claims were judged: the solver's own report, unchecked by the bench. */
+internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
+
 internal object SolveEvidence {
     private const val MAX_WITNESS_CHARS = 8 * 1024 * 1024
+    private val ASSIGNMENT = Regex("^\\s*[A-Za-z_][A-Za-z_0-9]*\\s*=")
 
     fun sourceHashes(ref: ProblemRef): Map<String, String> = buildMap {
         val sources = listOfNotNull("model" to ref.source, ref.data?.let { "data" to it })
@@ -21,11 +25,11 @@ internal object SolveEvidence {
 
     fun finalWitness(format: Format, raw: String): String? {
         val witness = when (format) {
-            Format.MINIZINC -> MiniZincSourceValidation.retainedWitness(raw)
+            Format.MINIZINC -> miniZincWitness(raw)
 
             Format.SMTLIB -> finalSmtModel(raw)
 
-            Format.XCSP3 -> Xcsp3SourceValidation.candidate(raw)?.let { "v $it" }
+            Format.XCSP3 -> xcspInstantiation(raw)?.let { "v $it" }
 
             Format.OPB, Format.DIMACS, Format.WCNF, Format.MPS ->
                 raw.lineSequence().lastOrNull { it.startsWith("v ") }
@@ -33,6 +37,43 @@ internal object SolveEvidence {
             else -> null
         }
         return witness?.takeIf { it.length <= MAX_WITNESS_CHARS }
+    }
+
+    /** The last complete DZN solution, with the `% klause-exact:`, `% klause-coordinate:` and `% klause-float-`
+     *  lines of that solution appended; an exact-coordinate-only solution keeps those lines alone. */
+    private fun miniZincWitness(raw: String): String? = (
+        miniZincSolution(raw)
+            ?: if (exactCoordinates(raw) != null) "" else null
+        )?.let { candidate ->
+        val comments = raw.split("----------").dropLast(1).lastOrNull()
+            ?.lineSequence()?.filter {
+                it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") ||
+                    it.startsWith("% klause-float-")
+            }?.joinToString("\n").orEmpty()
+        if (comments.isEmpty()) candidate else candidate + "\n" + comments
+    }
+
+    private fun exactCoordinates(raw: String): String? = raw.split("----------").dropLast(1).lastOrNull()
+        ?.lineSequence()?.filter { it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") }
+        ?.map { it.substringAfter(": ") }?.toList()?.takeIf { it.isNotEmpty() }?.joinToString("\n")
+
+    /** The assignments of the last complete DZN solution, from its first assignment line on. */
+    private fun miniZincSolution(raw: String): String? {
+        val complete = raw.split("----------").dropLast(1).lastOrNull() ?: return null
+        val lines = complete.lineSequence().filter { line ->
+            val trimmed = line.trim()
+            trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====")
+        }.toList()
+        val start = lines.indexOfFirst { ASSIGNMENT.containsMatchIn(it) }
+        return if (start < 0) null else lines.drop(start).joinToString("\n")
+    }
+
+    /** The last complete XCSP3 `<instantiation>` of the `v ` lines, without their prefix. */
+    private fun xcspInstantiation(raw: String): String? {
+        val lines = raw.lineSequence().filter { it.startsWith("v ") }.map { it.removePrefix("v ") }.toList()
+        val start = lines.indexOfLast { it.trimStart().startsWith("<instantiation") }
+        val witness = lines.drop(start.coerceAtLeast(0)).joinToString("\n").trim()
+        return witness.takeIf { it.endsWith("</instantiation>") }
     }
 
     private fun finalSmtModel(raw: String): String? {

@@ -7,7 +7,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class SolveMetricResultTest {
     @Test
@@ -41,122 +40,6 @@ class SolveMetricResultTest {
         timestamp = "t",
         command = "c",
     )
-
-    @Test
-    fun `XCSP records should retain checked witnesses separately from reported claims`() {
-        val reported = rec(true, 10.0, 100, true).copy(
-            finalWitness = "v <instantiation/>",
-            validationPolicy = XCSP_SOURCE_POLICY,
-            sourceHashes = mapOf("model" to "abc"),
-        )
-        val validation = Xcsp3SourceChecker.result("valid", "source checked", "v <instantiation cost='10'/>")
-
-        val checked = reported.sourceChecked(validation, approximation = false)
-        val decoded = Reports.json.decodeFromString<SolveRecord>(Reports.json.encodeToString(checked))
-
-        assertEquals(validation.checkedWitness, decoded.checkedWitness)
-        assertEquals(reported.finalWitness, decoded.finalWitness)
-        assertEquals(reported.sourceHashes, decoded.sourceHashes)
-        assertEquals("valid", decoded.stats["sourceValidation"])
-        assertEquals("xcsp3-source", decoded.stats["sourceValidationScope"])
-        assertEquals("true", decoded.stats["reportedProven"])
-    }
-
-    @Test
-    fun `unchecked XCSP candidates should retain reported claims without a checked witness`() {
-        val reported = rec(true, 10.0, 100, true).copy(finalWitness = "v <instantiation/>")
-
-        val checked = reported.sourceChecked(Xcsp3SourceChecker.result("unknown", "unsupported"), approximation = false)
-
-        assertNull(checked.checkedWitness)
-        assertEquals(reported.finalWitness, checked.finalWitness)
-        assertEquals("unknown", checked.stats["sourceValidation"])
-        assertEquals("true", checked.stats["reportedFeasible"])
-    }
-
-    @Test
-    fun `a source rejected result should receive no solution or proof credit`() {
-        val record = rec(true, 1.001466, 100, true).copy(exactObjective = "500733/500000")
-
-        val checked = record.sourceChecked(SourceValidation("invalid", "source contradiction"), approximation = false)
-        val row = SolveMetric.resultRow("s", checked, "cfg", null)
-
-        assertEquals(null, row.feasible)
-        assertEquals(null, row.objective)
-        assertEquals(null, row.exactObjective)
-        assertEquals(false, row.proven)
-        assertEquals(10_000, row.elapsedMs)
-        assertEquals("1.001466", checked.stats["reportedObjective"])
-    }
-
-    @Test
-    fun `source valid grid witnesses should keep feasibility but not optimality credit`() {
-        val record = rec(true, 1.0, 100, true)
-
-        val checked = record.sourceChecked(SourceValidation("valid", "grounded"), approximation = true)
-
-        assertEquals(true, checked.feasible)
-        assertEquals(1.0, checked.objective)
-        assertEquals(false, checked.proven)
-        assertEquals(100, checked.timeToBestMs)
-    }
-
-    @Test
-    fun `unchecked grid witnesses and grid refutations should remain undecided`() {
-        for (feasible in listOf(true, false)) {
-            val record = rec(feasible, if (feasible) 1.0 else null, 100, true)
-
-            val checked = record.sourceChecked(SourceValidation("unknown", "residual"), approximation = true)
-
-            assertEquals(null, checked.feasible)
-            assertEquals(null, checked.objective)
-            assertEquals(false, checked.proven)
-            assertEquals(null, checked.timeToBestMs)
-        }
-    }
-
-    @Test
-    fun `a source valid exact result should retain its proof`() {
-        val checked = rec(true, 1.0, 100, true)
-            .sourceChecked(SourceValidation("valid", "grounded"), approximation = false)
-
-        assertEquals(true, checked.proven)
-        assertEquals(true, checked.feasible)
-    }
-
-    @Test
-    fun `a checked MPS witness should retain feasibility and withhold optimum credit`() {
-        val reported = rec(true, 1.0, 100, true).copy(finalWitness = "v x=1")
-        val validation = SourceValidation("valid", "ground checked", checkedWitness = "v x=1")
-
-        val checked = reported.sourceChecked(validation, approximation = false, witnessOnly = true)
-
-        assertEquals(true, checked.feasible)
-        assertEquals(false, checked.proven)
-        assertEquals("v x=1", checked.checkedWitness)
-        assertEquals("true", checked.stats["reportedProven"])
-        assertEquals(reported.elapsedMs, checked.elapsedMs)
-    }
-
-    @Test
-    fun `unchecked MPS witnesses and refutations should receive no result credit`() {
-        for (feasible in listOf(true, false, null)) {
-            for (status in listOf("unknown", "invalid")) {
-                val reported = rec(feasible, 1.0, 100, true).copy(finalWitness = "v x=1")
-
-                val checked = reported.sourceChecked(MpsSourceValidation.unknown("unavailable").copy(status = status),
-                    approximation = false, witnessOnly = true)
-
-                assertNull(checked.feasible)
-                assertNull(checked.objective)
-                assertNull(checked.timeToBestMs)
-                assertNull(checked.checkedWitness)
-                assertEquals(false, checked.proven)
-                assertEquals(reported.finalWitness, checked.finalWitness)
-                assertEquals(feasible.toString(), checked.stats["reportedFeasible"])
-            }
-        }
-    }
 
     @Test
     fun `a solved row should report time-to-best tagged with config and joined features`() {

@@ -8,13 +8,11 @@ import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
-import java.io.File
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import kotlin.test.assertNull
 
 class SolveMetricTest {
     private val ref = ProblemRef("fam/inst", Format.MINIZINC, corpus("absent.mzn"), Category.CSP, Expected.Unknown)
@@ -73,65 +71,47 @@ class SolveMetricTest {
     }
 
     @Test
-    fun `source checking should retain complete subprocess diagnostics`() {
-        val mps = ProblemRef("bounded-decimal-constant", Format.MPS,
-            corpus("mps-linear-source-v1/bounded-decimal-constant.mps"), Category.OPTIMIZATION, Expected.Unknown)
-        val entry = ResolvedProblem(mps, lazy { error("source parsing must stay lazy") })
-        val diagnostics = "source preparation: factors 3, ints 1, reals 0\n"
-
-        val (result, _) = SolveMetric.solve(entry, SolverInvocation.KLAUSE,
-            SolverInvocation.Settings(params = listOf("source-validation=true")), Budget(),
+    fun `a solve should retain complete subprocess diagnostics`() {
+        val (result, _) = SolveMetric.solve(entry(), SolverInvocation.KLAUSE, SolverInvocation.Settings(), Budget(),
             UUID.randomUUID().toString(), "now", "fixture", installedBuild = { null },
             invoke = { _, _, _, _, _ ->
                 SolverInvocation.Result(null, null, null, proven = false, stats = emptyMap(), rawOutput = "",
-                    command = "cli", stderr = diagnostics, stderrComplete = true)
-            }, validateMps = { _, _, _, _, _ ->
-                MpsSourceValidation.Result(SourceValidation("unknown", "diagnostic only"))
+                    command = "cli", stderr = DIAGNOSTICS, stderrComplete = true)
             })
 
-        assertEquals(diagnostics, result.stderr)
+        assertEquals(DIAGNOSTICS, result.stderr)
         assertEquals(true, result.stderrComplete)
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = [false, true])
-    fun `MPS checking should select its transport policy without changing native settings`(gzip: Boolean) {
-        val mps = ProblemRef("bounded-decimal-constant", Format.MPS,
-            corpus("mps-linear-source-v1/bounded-decimal-constant.mps"), Category.OPTIMIZATION, Expected.Unknown)
-        val entry = ResolvedProblem(mps, lazy { error("source parsing must stay lazy") })
-        val settings = SolverInvocation.Settings(params = listOf("source-validation=true",
-            "source-validation-gzip=$gzip", "bt-arm=satOptimized"))
-        val raw = "o 1/8\nv I=0 X=1/10\n"
-        val policies = mutableListOf<String>()
+    @Test
+    fun `a former source validation param should reach the solver and leave the claims unchecked`() {
+        val settings = SolverInvocation.Settings(params = listOf("source-validation=true", "bt-arm=satOptimized"))
         var invoked: SolverInvocation.Settings? = null
-        val validate: (ProblemRef, SolveRecord, String, Boolean, File) -> MpsSourceValidation.Result =
-            { _, producer, output, _, _ ->
-                assertEquals(raw, output)
-                assertEquals(sha256(raw.toByteArray()), producer.sourceOutputSha256)
-                policies += producer.validationPolicy
-                MpsSourceValidation.Result(SourceValidation("valid", "checked",
-                    checkedWitness = producer.finalWitness, checker = MPS_GROUND_CHECKER))
-            }
 
-        val (result, _) = SolveMetric.solve(entry, SolverInvocation.KLAUSE, settings, Budget(),
+        val (result, _) = SolveMetric.solve(entry(), SolverInvocation.KLAUSE, settings, Budget(),
             UUID.randomUUID().toString(), "now", "fixture", installedBuild = { null },
             invoke = { _, _, native, _, _ ->
                 invoked = native
-                SolverInvocation.Result(true, 0.125, 1, proven = false, stats = emptyMap(), rawOutput = raw,
-                    command = "cli", exactObjective = "1/8")
-            }, validateMps = { a, b, c, d, e ->
-                check(!gzip)
-                validate(a, b, c, d, e)
-            }, validateMpsGzip = { a, b, c, d, e ->
-                check(gzip)
-                validate(a, b, c, d, e)
+                SolverInvocation.Result(true, 0.125, 1, proven = true, stats = emptyMap(),
+                    rawOutput = "o 1/8\nv I=0 X=1/10\n", command = "cli", exactObjective = "1/8")
             })
 
-        val policy = if (gzip) MPS_GZIP_SOURCE_POLICY else MPS_SOURCE_POLICY
-        assertEquals(listOf(policy), policies)
-        assertEquals(policy, result.validationPolicy)
-        assertEquals(settings.copy(params = listOf("bt-arm=satOptimized")), invoked)
+        assertEquals(settings, invoked)
+        assertEquals(REPORTED_RESULT_POLICY, result.validationPolicy)
+        assertEquals("v I=0 X=1/10", result.finalWitness)
+        assertEquals("1/8", result.exactObjective)
         assertEquals(true, result.feasible)
-        assertEquals(false, result.proven)
+        assertEquals(true, result.proven)
+        assertNull(result.stats["sourceValidation"])
+    }
+
+    private fun entry(): ResolvedProblem {
+        val mps = ProblemRef("bounded-decimal-constant", Format.MPS,
+            corpus("mps-linear-source-v1/bounded-decimal-constant.mps"), Category.OPTIMIZATION, Expected.Unknown)
+        return ResolvedProblem(mps, lazy { error("source parsing must stay lazy") })
+    }
+
+    private companion object {
+        const val DIAGNOSTICS = "source preparation: factors 3, ints 1, reals 0\n"
     }
 }
