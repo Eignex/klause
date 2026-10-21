@@ -581,7 +581,8 @@ class QfLiraSolverDifferenceTest {
                 component.solveWith(
                     LpSolveContext(
                         certificationPolicy = LpCertificationPolicy { certifier, success ->
-                            success && certifier != LpCertifier.EXACT_FARKAS && certifier != LpCertifier.RATIONAL
+                            success && certifier != LpCertifier.EXACT_FARKAS &&
+                                certifier != LpCertifier.RATIONAL && certifier != LpCertifier.INTEGER
                         },
                     ),
                 )

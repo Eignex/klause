@@ -1218,7 +1218,7 @@ class ExactLiraSearchComponent private constructor(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
-        if (bools.any { it == UNASSIGNED }) {
+        if (candidate == null && bools.any { it == UNASSIGNED }) {
             propagateGuardBound(context)?.let { return it }
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()

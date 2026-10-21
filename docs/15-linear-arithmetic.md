@@ -67,8 +67,9 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 
-After a non-conflicting partial LP check, the component queries one unresolved
-reified comparison in cyclic source-row order. Comparisons inside disjunctions or
+When a non-conflicting partial LP check has no exact point, the component queries
+one unresolved reified comparison in cyclic source-row order. Comparisons inside
+disjunctions or
 with Boolean arithmetic terms are excluded. Private objectives minimize the
 comparison's original linear expression and its negation. Only certified exact
 bounds that force the comparison or its complement imply its Boolean activator;
