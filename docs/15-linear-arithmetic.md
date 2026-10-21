@@ -32,11 +32,6 @@ The linear component sits on two lifecycles at once: the
 assertions. The component turns assigned source rows into LP bounds, and LP
 verdicts into conflicts, branches and witnesses.
 
-Automatic pure-real traversal chooses Boolean inputs of arithmetic rows before the
-remaining Booleans, in source-variable order within each group. Both polarities
-still pass through ordinary candidate guidance and complete checks. Explicit
-source-order and activity choices keep their requested branching policy.
-
 #### Rows as bounds
 
 The component follows the slack-variable design of Dutertre and de Moura: every
