@@ -69,7 +69,7 @@ class LpAffineContinuationTest {
             limits = limits,
             targetMetrics = target,
         )
-        assertTrue(trail.pop())
+        assertTrue(trail.pop(0))
 
         val feasible = continueExactLp(
             assertNotNull(trail.state.toWorkingModel()),
