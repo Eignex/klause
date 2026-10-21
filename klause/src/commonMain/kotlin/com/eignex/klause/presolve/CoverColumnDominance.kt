@@ -42,6 +42,15 @@ internal object CoverColumnDominance {
     fun pins(problem: Problem, costs: Map<Int, Long>, cancellation: Cancellation): List<Factor> {
         if (costs.isEmpty() || problem.numBoolVars > MAX_COLUMNS || cancellation()) return emptyList()
         val work = Work(cancellation)
+        var hasPositiveCost = false
+        for (cost in costs.values) {
+            if (!work.visit()) return emptyList()
+            if (cost > 0L) {
+                hasPositiveCost = true
+                break
+            }
+        }
+        if (!hasPositiveCost) return emptyList()
         val eligible = BooleanArray(problem.numBoolVars) { true }
         val columns = arrayOfNulls<Column>(problem.numBoolVars)
         val root = (problem as? BakedProblem)?.rootDeductions as? PropagationResult.Implied

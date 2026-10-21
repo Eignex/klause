@@ -158,6 +158,34 @@ class CoverColumnDominanceTest {
     }
 
     @Test
+    fun `an interrupted index should not overlook a late unsupported reader`() {
+        val problem = Problem(2, 0, emptyArray(), listOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+        ))
+        for (limit in 0L..40L) {
+            val budget = PresolveBudget(limit)
+
+            val pins = CoverColumnDominance.pins(problem, mapOf(0 to 2L, 1 to 1L),
+                budget.orSpent(Cancellation.Never))
+
+            assertTrue(pins.isEmpty())
+        }
+    }
+
+    @Test
+    fun `both scheduled lanes should retain the supplied cancellation`() {
+        val problem = Problem(2, 0, emptyArray(), listOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+        ))
+        val context = PresolveContext(objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L),
+            cancellation = Cancellation { true })
+
+        assertTrue(PresolvePass.DUAL_FIX.applySource(problem, context).isEmpty)
+        assertTrue(PresolvePass.DUAL_FIX.applyFinite(problem.bake(), context).isEmpty)
+    }
+
+    @Test
     fun `unaffordable broad candidate scans should stop at a linear work ceiling`() {
         val width = 128
         val factors = (0 until width).map { row ->
@@ -170,7 +198,7 @@ class CoverColumnDominanceTest {
         val pins = CoverColumnDominance.pins(problem, costs, budget.orSpent(Cancellation.Never))
 
         assertTrue(pins.isEmpty())
-        val indexEntries = width.toLong() + width + 2L * width * (width - 1)
+        val indexEntries = 1L + width + width + 2L * width * (width - 1)
         assertTrue(budget.spent() <= 17L * indexEntries)
         assertFalse(budget.spent() == 0L)
     }
@@ -186,6 +214,7 @@ class CoverColumnDominanceTest {
         val witness = prepared.reconstruct(assertNotNull(result.assignment))
 
         assertTrue(prepared.changed)
+        assertTrue("dual-fix" in prepared.stats.passes)
         assertFalse(witness.boolValue(0))
         assertTrue(witness.boolValue(1))
         assertEquals(1L, objective.evaluateLong(witness))
