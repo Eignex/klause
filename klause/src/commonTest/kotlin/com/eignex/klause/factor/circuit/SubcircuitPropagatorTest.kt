@@ -17,6 +17,7 @@ import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.propagation.setIntAsDecision
 import com.eignex.klause.propagation.undoTo
 import kotlin.random.Random
 import kotlin.test.Test
@@ -35,8 +36,7 @@ class SubcircuitPropagatorTest {
         assertNull(state.runToFixpoint(allFactors = true))
         state.undoLogging = true
         val mark = state.mark()
-        state.currentLevel = 1
-        assertTrue(state.setInt(4, 2))
+        assertTrue(state.setIntAsDecision(4, 2))
 
         assertNull(state.runToFixpoint(allFactors = false))
 
@@ -100,7 +100,7 @@ class SubcircuitPropagatorTest {
         check(state.tightenIntMax(0, 1))
         check(state.tightenIntMin(1, 0))
         check(state.tightenIntMax(1, 0))
-        check(state.tightenIntMax(2, 1))
+        check(state.tightenIntMin(2, 3))
         check(state.tightenIntMin(3, 1))
         state.currentFactor = 0
 
