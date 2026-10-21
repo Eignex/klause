@@ -1547,11 +1547,13 @@ private fun searchCells(
     }
     val independent = if (family == null) emptySet()
     else independentRegionAtoms(formula, region, family, fixed, arithmetic)
+    val dependents = HashMap<Int, MutableList<Int>>()
     val atomLevels = region.atoms.keys.associateWith { index ->
         var level = -1
         for (variable in formula.atoms[index].polynomial.variables) {
             arithmetic.step()
             level = maxOf(level, projection.level(variable))
+            dependents.getOrPut(variable) { ArrayList() }.add(index)
         }
         level
     }
@@ -1573,7 +1575,7 @@ private fun searchCells(
         }
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
-        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels)
+        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels, dependents)
         if (rejected != null) {
             // Unprojected coordinates have one fixed sector sample throughout this family's CAD.
             if (!rejected.usesDerivedCoordinates && rejected.atom in independent) return null
@@ -1682,6 +1684,7 @@ private fun rejectedRegionAtom(
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     atomLevels: Map<Int, Int>? = null,
+    dependents: Map<Int, List<Int>> = emptyMap(),
 ): RegionConflict? {
     var zeroVariables: MutableSet<Int>? = null
     for ((index, required) in region.atoms) {
@@ -1708,7 +1711,7 @@ private fun rejectedRegionAtom(
     }
     val pending = zeroVariables ?: return null
     val conflict = try {
-        completionConflict(formula, region, coordinates, pending, arithmetic, algebraic)
+        completionConflict(formula, region, coordinates, pending, dependents, arithmetic, algebraic)
     } catch (_: PolynomialResourceLimit) {
         null
     }
@@ -1725,6 +1728,7 @@ private fun completionConflict(
     region: PolynomialBooleanRegion,
     coordinates: Map<Int, AlgebraicReal>,
     zeros: Set<Int>,
+    dependents: Map<Int, List<Int>>,
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
 ): Int? {
@@ -1734,34 +1738,32 @@ private fun completionConflict(
         completed[variable] = value
     }
     val zero = algebraic.rational(BigFraction.ZERO)
-    for (variable in zeros) {
+    val pending = ArrayDeque<Int>()
+    val queued = HashSet<Int>()
+    fun bindZero(variable: Int) {
         arithmetic.step()
-        if (variable !in completed) completed[variable] = zero
-    }
-    var changed: Boolean
-    do {
-        arithmetic.step()
-        changed = false
-        for ((index, required) in region.atoms) {
+        if (variable in completed) return
+        completed[variable] = zero
+        for (index in dependents[variable].orEmpty()) {
             arithmetic.step()
-            val atom = formula.atoms[index]
-            val complete = atom.polynomial.variables.all { arithmetic.step(); it in completed }
-            val bounds = if (complete) {
-                CompletionSigns(evenCompletionSigns(
-                    algebraic.sign(algebraic.evaluate(atom.polynomial, completed)), false, false))
-            } else completionSigns(atom.polynomial, completed, arithmetic, algebraic)
-            val possible = bounds.signs and requiredRegionSigns(atom, required)
-            if (possible == 0) return index
-            if (possible != ZERO_SIGN) continue
-            for (variable in bounds.zeroVariables) {
-                arithmetic.step()
-                if (variable !in completed) {
-                    completed[variable] = zero
-                    changed = true
-                }
-            }
+            if (queued.add(index)) pending.addLast(index)
         }
-    } while (changed)
+    }
+    for (variable in zeros) bindZero(variable)
+    while (pending.isNotEmpty()) {
+        arithmetic.step()
+        val index = pending.removeFirst()
+        queued.remove(index)
+        val atom = formula.atoms[index]
+        val complete = atom.polynomial.variables.all { arithmetic.step(); it in completed }
+        val bounds = if (complete) {
+            CompletionSigns(evenCompletionSigns(
+                algebraic.sign(algebraic.evaluate(atom.polynomial, completed)), false, false))
+        } else completionSigns(atom.polynomial, completed, arithmetic, algebraic)
+        val possible = bounds.signs and requiredRegionSigns(atom, region.atoms.getValue(index))
+        if (possible == 0) return index
+        if (possible == ZERO_SIGN) for (variable in bounds.zeroVariables) bindZero(variable)
+    }
     return null
 }
 

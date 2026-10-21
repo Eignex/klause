@@ -298,7 +298,8 @@ mixed signs or a representation refusal leaves the prefix open. A predicate
 whose required truth is impossible for every completion prunes the prefix.
 When a one-sided, zero-constant bound permits only zero, every individually
 supported even-power term must vanish. Prefix reasoning propagates these exact
-zero bindings through the other region predicates until stable. Products over
+zero bindings through dependent region predicates until stable; predicates whose
+coordinates stay unchanged retain their checked sign bounds. Products over
 several unassigned coordinates do not force individual zeros. The bindings stay
 inside the prefix proof; lifting and assignment capture use their original samples.
 At a complete sample,
