@@ -165,7 +165,9 @@ class RedundantConstraintsTest {
         val memo = SubsumeMemo()
         val incremental = SubsumeIncremental(true, intArrayOf(0, 1), emptyList(), intArrayOf(), memo)
         val ranges = ColumnRanges.of(problem.intBounds)
-        val stopped = RedundantConstraints.removeRedundantConstraints(problem, ranges, incremental, Cancellation { true })
+        val stopped = RedundantConstraints.removeRedundantConstraints(
+            problem, ranges, incremental, Cancellation { true },
+        )
         assertTrue(stopped.isEmpty)
 
         val recovered = checkIncrementalAssignments(
