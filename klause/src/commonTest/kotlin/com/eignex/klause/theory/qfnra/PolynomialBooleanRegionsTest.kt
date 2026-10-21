@@ -18,6 +18,59 @@ import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
     @Test
+    fun `root proof demand chooses a relevant first leaf`() {
+        for ((predicate, truth) in listOf(
+            "(or b0 b1 b2)" to true,
+            "(not (and b0 b1 b2))" to false,
+        )) {
+            val source = SmtLibPolynomial.parse(
+                "(declare-const b0 Bool) (declare-const b1 Bool) (declare-const b2 Bool) (assert $predicate)",
+            )
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+            val region = formula.booleanRegions(arithmetic).asSequence().filterNotNull().first()
+
+            assertEquals(mapOf(0 to truth), region.bools)
+            assertTrue(region.atoms.isEmpty())
+        }
+    }
+
+    @Test
+    fun `proof directed decisions retain the opposite Boolean branch`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const b0 Bool) (declare-const b1 Bool) " +
+                "(assert (or (and b0 (not b1)) (and (not b0) b1)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+        assertEquals(setOf(mapOf(0 to true, 1 to false), mapOf(0 to false, 1 to true)),
+            regions.map { it.bools }.toSet())
+        assertEquals(2, regions.size)
+    }
+
+    @Test
+    fun `a refuted demanded region retains its checked numeric alternative`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const b Bool) " +
+                "(assert (or (and b (= (* x0 x0) 2) (= (* x0 x1) 1) (= (* x1 x1) 1)) " +
+                "(and (not b) (= x0 3) (= x1 0))))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertEquals(false, point.boolValue(0))
+        assertEquals(BigFraction.ofLong(3), point.realValue(0).rational)
+        assertEquals(BigFraction.ZERO, point.realValue(1).rational)
+        assertEquals(2L, result.stats.booleanTheoryRegions)
+    }
+
+    @Test
     fun `graph substitutions expose strict nonzero factors within the matrix allowance`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         for ((predicate, sign) in listOf(

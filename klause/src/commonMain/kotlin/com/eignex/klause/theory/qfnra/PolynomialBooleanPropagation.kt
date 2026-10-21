@@ -28,9 +28,15 @@ internal class PolynomialBooleanPropagation(
 
     fun decide(): Boolean {
         val leaf = unassignedLeaf() ?: return false
+        return decide(leaf, FALSE)
+    }
+
+    fun decide(leaf: Int, value: Int): Boolean {
+        require(nodes[leaf] is FormulaNode.BooleanVariable || nodes[leaf] is FormulaNode.Atom)
+        require(values[leaf] == UNASSIGNED && (value == FALSE || value == TRUE))
         arithmetic.step()
-        choices.add(Choice(leaf, trail.size))
-        check(assign(leaf, FALSE))
+        choices.add(Choice(leaf, trail.size, value))
+        check(assign(leaf, value))
         return true
     }
 
@@ -155,14 +161,14 @@ internal class PolynomialBooleanPropagation(
                 arithmetic.step()
                 values[trail.removeAt(trail.lastIndex)] = UNASSIGNED
             }
-            if (!choice.triedTrue) {
-                choice.triedTrue = true
-                return assign(choice.node, TRUE)
+            if (!choice.triedOther) {
+                choice.triedOther = true
+                return assign(choice.node, TRUE - choice.firstValue)
             }
             choices.removeAt(choices.lastIndex)
         }
         return false
     }
 
-    private class Choice(val node: Int, val mark: Int, var triedTrue: Boolean = false)
+    private class Choice(val node: Int, val mark: Int, val firstValue: Int, var triedOther: Boolean = false)
 }

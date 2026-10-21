@@ -16,6 +16,7 @@ internal class PolynomialBooleanRegions(
     private val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
     private val exclusions = ArrayList<List<Literal>>()
     private val signs = PolynomialBooleanSigns(nodes, atoms, state, arithmetic)
+    private var decision: Literal? = null
 
     fun prepare(): Iterator<PolynomialBooleanRegion?> = sequence<PolynomialBooleanRegion?> {
         if (!initialize()) return@sequence
@@ -32,7 +33,8 @@ internal class PolynomialBooleanRegions(
             }
             val proof = proof()
             if (proof == null) {
-                check(state.decide())
+                val next = decision
+                check(if (next == null) state.decide() else state.decide(next.node, next.value))
             } else {
                 yield(proof.region)
                 arithmetic.step()
@@ -90,6 +92,7 @@ internal class PolynomialBooleanRegions(
     }
 
     private fun proof(): Proof? {
+        decision = null
         val witnessed = BooleanArray(nodes.size)
         val selected = IntArray(nodes.size) { -1 }
         for ((index, node) in nodes.withIndex()) {
@@ -102,8 +105,48 @@ internal class PolynomialBooleanRegions(
                 is FormulaNode.Junction -> witnessed(index, node, witnessed, selected)
             }
         }
-        if (!witnessed[root]) return null
+        if (!witnessed[root]) {
+            decision = demandedLeaf(witnessed)
+            return null
+        }
         return capture(selected)
+    }
+
+    private fun demandedLeaf(witnessed: BooleanArray): Literal? {
+        var index = root
+        var required = TRUE
+        while (true) {
+            arithmetic.step()
+            val value = state.value(index)
+            if ((value != UNASSIGNED && value != required) || witnessed[index]) return null
+            when (val node = nodes[index]) {
+                is FormulaNode.BooleanVariable, is FormulaNode.Atom -> return Literal(index, required)
+                is FormulaNode.Constant -> return null
+                is FormulaNode.Not -> {
+                    index = node.child
+                    required = TRUE - required
+                }
+                is FormulaNode.Junction -> {
+                    index = demandedChild(node, required, witnessed) ?: return null
+                }
+            }
+        }
+    }
+
+    private fun demandedChild(node: FormulaNode.Junction, required: Int, witnessed: BooleanArray): Int? {
+        val decisive = if (node.conjunction) FALSE else TRUE
+        if (required != decisive) return node.children.firstOrNull {
+            arithmetic.step()
+            !witnessed[it]
+        }
+        var pending: Int? = null
+        for (child in node.children) {
+            arithmetic.step()
+            val value = state.value(child)
+            if (value == required && !witnessed[child]) return child
+            if (pending == null && value == UNASSIGNED) pending = child
+        }
+        return pending
     }
 
     private fun witnessed(
