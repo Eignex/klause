@@ -24,6 +24,29 @@ private class RecordingCertificationPolicy(private val accept: Boolean) : LpCert
 }
 
 class LpCertificationPolicyTest {
+    @Test
+    fun `retained sparse refutations should respect the certifier policy`() {
+        val model = LpBuilder().apply {
+            repeat(129) { addRealVar(0.0, 100.0) }
+            addRealRow(intArrayOf(0), doubleArrayOf(1.0), Relation.EQ, 0.1)
+            addRealRow(intArrayOf(0), doubleArrayOf(0.1), Relation.EQ, 0.010000000000000002)
+            for (column in 1..128) {
+                addRealRow(intArrayOf(column, column - 1), doubleArrayOf(1.0, -1.0), Relation.EQ, 0.1)
+            }
+        }.build(Sense.MINIMIZE)
+        RevisedSimplex(model).use { solver ->
+            val numerical = assertNotNull(solver.solve(null))
+            val admitted = certifyLpResult(model, solver, numerical, sparsePointRecovery = true)
+            val withheld = certifyLpResult(model, solver, numerical, sparsePointRecovery = true,
+                policy = LpCertificationPolicy { certifier, success ->
+                    success && certifier != LpCertifier.EXACT_FARKAS
+                })
+
+            assertEquals(LpVerdict.INFEASIBLE, admitted.verdict)
+            assertNull(withheld.conflict)
+            assertTrue(withheld.verdict != LpVerdict.INFEASIBLE)
+        }
+    }
 
     @Test
     fun `forced decline should reject supplied certificates on legacy and retained models`() {

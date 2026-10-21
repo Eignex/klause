@@ -312,9 +312,12 @@ internal class ComponentLpSolver(
                 results[index].basis,
                 cache = solvers[index].exactBasisCache ?: ExactBasisCache(),
                 cancellation = cancellation,
+                limits = ExactBasisLimits(sparse = recovery != null),
                 observer = observer,
             )
-            if (exact.singularRank != null) solvers[index].rejectSingularBasis(part.model, results[index].basis)
+            if (exact.singularRank != null || exact.metrics.decline == ExactBasisDecline.SINGULAR) {
+                solvers[index].rejectSingularBasis(part.model, results[index].basis)
+            }
             val witness = policy.acceptNullable(
                 LpCertifier.EXACT_BASIS,
                 exact.witness,

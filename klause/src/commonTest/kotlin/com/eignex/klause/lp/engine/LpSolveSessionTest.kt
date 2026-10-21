@@ -12,6 +12,25 @@ import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
     @Test
+    fun `requested recovery should refute a large rounded equality system`() {
+        val model = LpBuilder().apply {
+            repeat(129) { addRealVar(0.0, 100.0) }
+            addRealRow(intArrayOf(0), doubleArrayOf(1.0), Relation.EQ, 0.1)
+            addRealRow(intArrayOf(0), doubleArrayOf(0.1), Relation.EQ, 0.010000000000000002)
+            for (column in 1..128) {
+                addRealRow(intArrayOf(column, column - 1), doubleArrayOf(1.0, -1.0), Relation.EQ, 0.1)
+            }
+        }.build(Sense.MINIMIZE)
+        val exact = assertNotNull(LpExactState(assertNotNull(model.authoritativeModel())).ownerWorkingModel())
+
+        val result = LpSolveSession().use { it.solve(exact, recoverWitness = true) }
+
+        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+        assertNull(result.witness)
+        assertNotNull(result.conflict)
+    }
+
+    @Test
     fun `requested component recovery should produce a strict witness beyond the basis ceiling`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)

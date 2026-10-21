@@ -677,6 +677,7 @@ from the record. Added diagnostics use the existing string-valued `stats` map.
 | `lpPhase_PREFIX_REAL_POINT_ROOT` | Positive-primal mapping attempts, their four-attempt lifetime limit, available real and finite integer relaxation coordinates, or a missing exact primal; fractional integers remain guidance, with no additional numerical query |
 | `lpPhase_PREFIX_REAL_HINT_ROOT` | Optional preparation when guidance is absent; ready vectors report open and total Boolean heads. Selections distinguish integers, matching Boolean heads and missing Boolean heads; matching candidates report retained-phase precedence or Boolean/integer fallback use. Retraction, restart, leaf checking and close report vector disposal |
 | `lpContinuationWork_IMPORT`, `lpContinuationWork_FEASIBILITY` | Exact import and feasibility work; seated targets avoid unchanged conflict sweeps, values visit selected nonzero seats, Bland comparisons exclude higher headings after a violation, and pivots charge copies only for changed rows |
+| `lpRationalBasisWork_FACTOR`, `_PRIMAL`, `_DUAL`, `_RAY` | Exact basis work, including requested singleton reduction and independent residual blocks; dense dimension and aggregate fill limits still apply, and cached factors carry no bound or source-proof authority |
 | `armFailure.<label>` | Bounded CLI JSON diagnostic; a retired arm need not invalidate a sibling verdict |
 
 Pinned-leaf shape outcomes use `N` for structural columns, `M` for stored rows,

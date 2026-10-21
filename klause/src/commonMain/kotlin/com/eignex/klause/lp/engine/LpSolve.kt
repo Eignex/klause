@@ -635,6 +635,37 @@ private fun certifyLpResultWithin(
             withheldConflict = conflict == null
         }
     }
+    fun checkNumericalBasis() {
+        val floated = result ?: return
+        val checked = verifyExactBasis(
+            model,
+            floated.basis,
+            cache = solver.exactBasisCache ?: ExactBasisCache(),
+            cancellation = cancellation,
+            limits = ExactBasisLimits(sparse = sparsePointRecovery),
+            observer = observer,
+        )
+        exactBasis = checked
+        if (checked.singularRank != null || checked.metrics.decline == ExactBasisDecline.SINGULAR) {
+            continuationTarget()
+            solver.rejectSingularBasis(model, floated.basis)
+        }
+        numericalWitness = checked.witness ?: numericalWitness
+        numericalBound = checked.bound ?: numericalBound
+        numericalConflict = checked.conflict ?: numericalConflict
+        if (!withheldConflict && numericalWitness == null && checked.conflict != null) {
+            conflict = policy.acceptNullable(LpCertifier.RATIONAL, checked.conflict)?.let {
+                policy.acceptNullable(LpCertifier.EXACT_FARKAS, it)
+            }?.let { policy.acceptNullable(LpCertifier.EXACT_BASIS, it) }
+            withheldConflict = conflict == null
+            if (conflict != null && state == null) ray = checked.integerRay
+        }
+        val point = if (withheldWitness) null else policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.witness)
+        if (point != null && (witness == null || point.objective < requireNotNull(witness).objective)) witness = point
+        val basisBound = if (withheldBound) null else policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.bound)
+        val stronger = policy.acceptNullable(LpCertifier.RATIONAL, basisBound)
+        if (stronger != null && (bound == null || stronger.value > requireNotNull(bound).value)) bound = stronger
+    }
     if (result != null && (bound?.value != witness?.objective || witness == null) && !stopped()) {
         reconstruction = reconstructCertificate(
             model,
@@ -702,7 +733,12 @@ private fun certifyLpResultWithin(
         witness = recoveredWitness
         numericalWitness = witness ?: numericalWitness
     }
-    if (result != null && numericalWitness == null && refinement != null &&
+    if (result != null && numericalWitness == null && numericalConflict == null && sparsePointRecovery &&
+        model.m > RationalBasisLimits().dimension && !stopped()
+    ) {
+        checkNumericalBasis()
+    }
+    if (result != null && numericalWitness == null && numericalConflict == null && refinement != null &&
         model.m > RationalBasisLimits().dimension && policy === ProductionLpCertificationPolicy && !stopped()
     ) {
         pointAttempted = true
@@ -734,37 +770,21 @@ private fun certifyLpResultWithin(
         numericalWitness = point
         witness = policy.acceptNullable(LpCertifier.EXACT_POINT, point)
     }
-    if (result != null && (numericalWitness == null || numericalBound?.value != numericalWitness?.objective) &&
-        !stopped()
+    if (result != null && numericalConflict == null &&
+        (numericalWitness == null || numericalBound?.value != numericalWitness?.objective) && !stopped()
     ) {
         refine()
     }
     val legacyBasis = refined == null || refined.metrics.decline == LpRefinementDecline.DISABLED ||
         refined.metrics.decline == LpRefinementDecline.AUTHORITY
-    if (result != null && legacyBasis &&
+    if (result != null && legacyBasis && exactBasis == null && numericalConflict == null &&
         (witness == null || bound?.value != requireNotNull(witness).objective) && !stopped()
     ) {
-        val checked = verifyExactBasis(
-            model,
-            result.basis,
-            cache = solver.exactBasisCache ?: ExactBasisCache(),
-            cancellation = cancellation,
-            observer = observer,
-        )
-        exactBasis = checked
-        if (checked.singularRank != null) {
-            continuationTarget()
-            solver.rejectSingularBasis(model, result.basis)
-        }
-        numericalWitness = checked.witness ?: numericalWitness
-        numericalBound = checked.bound ?: numericalBound
-        val point = if (withheldWitness) null else policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.witness)
-        if (point != null && (witness == null || point.objective < requireNotNull(witness).objective)) witness = point
-        val basisBound = if (withheldBound) null else policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.bound)
-        val stronger = policy.acceptNullable(LpCertifier.RATIONAL, basisBound)
-        if (stronger != null && (bound == null || stronger.value > requireNotNull(bound).value)) bound = stronger
+        checkNumericalBasis()
     }
-    if (result != null && witness == null && !pointAttempted && !withheldWitness && !stopped()) {
+    if (result != null && witness == null && numericalConflict == null &&
+        !pointAttempted && !withheldWitness && !stopped()
+    ) {
         val point = exactPointWitness(model, result.primal, observer)
         numericalWitness = point ?: numericalWitness
         witness = policy.acceptNullable(LpCertifier.EXACT_POINT, point)
@@ -814,10 +834,11 @@ private fun certifyLpResultWithin(
                 rayRow = solver.infeasibleRow,
                 cache = solver.exactBasisCache ?: ExactBasisCache(),
                 cancellation = cancellation,
+                limits = ExactBasisLimits(sparse = sparsePointRecovery),
                 observer = observer,
             )
             exactBasis = checked
-            if (checked.singularRank != null) {
+            if (checked.singularRank != null || checked.metrics.decline == ExactBasisDecline.SINGULAR) {
                 continuationTarget()
                 solver.rejectSingularBasis(model, basis)
             }

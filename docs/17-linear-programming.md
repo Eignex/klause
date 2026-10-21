@@ -326,6 +326,21 @@ restarts the operation from authority, and every attempt is charged. Owner-local
 exact factors require the same matrix and ordered basis. An off-status feasible
 point cannot furnish a claimed warm basis.
 
+Requested sparse recovery eliminates singleton basis rows and columns without
+fill, then factors each independent residual block within the existing dense
+dimension limit. The full coordinate, entry, fill, scalar, work, allocation and
+time limits still bound the invocation. Forward and transpose solves use the same
+immutable elimination order and residual factors; changed bounds and objectives
+are checked against fresh authority even when those factors are reused.
+
+A strict point candidate can seat nonbasic bounds with an infinitesimal direction
+and solve its exact basis equations. A positive rational step stays below every
+bound crossing before the complete source point is checked. Violated basic bounds
+can also propose inverse-row Farkas candidates. Only the full source verifier
+accepts a refutation; a bad point, failed factorization or singular basis supplies
+none. Recovery requests try this basis verification before spending fallback
+refinement work. Optional selected-prefix calls keep their ordinary admission.
+
 ### Farkas and recession checks
 
 For `M = [A | I]`, a Farkas contradiction requires

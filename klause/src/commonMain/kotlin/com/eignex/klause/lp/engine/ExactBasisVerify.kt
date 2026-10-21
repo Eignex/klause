@@ -4,7 +4,6 @@ import com.eignex.klause.simplex.basis.RationalBasisBuild
 import com.eignex.klause.simplex.basis.RationalBasisFactors
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.basis.RationalBasisOrder
-import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.util.BIG_ONE
@@ -21,6 +20,7 @@ import com.eignex.klause.util.unaryMinus
 internal data class ExactBasisLimits(
     val factor: RationalBasisLimits = RationalBasisLimits(),
     val verification: ReconstructionLimits = ReconstructionLimits(),
+    val sparse: Boolean = false,
 )
 
 internal enum class ExactBasisPhase {
@@ -92,7 +92,7 @@ private class CachedExactBasis(
     val state: LpExactState?,
     val matrix: List<List<Pair<Int, BigFraction>>>,
     val headings: IntArray,
-    val factors: RationalBasisFactors,
+    val factors: ExactBasisFactorization,
 )
 
 // A cache belongs to one numerical owner. Failed builds spend only their enclosing invocation budget.
@@ -138,7 +138,7 @@ internal class ExactBasisCache(private val propose: ((ExactBasisAuthority) -> Ra
         return RationalBasisOrder(rows, columns)
     }
 
-    fun find(current: ExactBasisAuthority): RationalBasisFactors? {
+    fun find(current: ExactBasisAuthority): ExactBasisFactorization? {
         val previous = cached ?: return null
         current.meter.charge(current.model.numVars.toLong() + current.matrix.sumOf { it.size.toLong() })
         val oldState = previous.state
@@ -153,7 +153,7 @@ internal class ExactBasisCache(private val propose: ((ExactBasisAuthority) -> Ra
         return previous.factors
     }
 
-    fun install(current: ExactBasisAuthority, completed: RationalBasisFactors) {
+    fun install(current: ExactBasisAuthority, completed: ExactBasisFactorization) {
         current.meter.charge(bytes = 64L + current.headings.size * 4L)
         cached = CachedExactBasis(
             current.model.n,
@@ -189,7 +189,8 @@ private val dimensionDeclinedBasis = ExactBasisVerification(
 )
 
 internal fun ExactBasisLimits.admitsDimensions(model: LpModel): Boolean =
-    model.m <= factor.dimension && model.numVars.toLong() <= verification.maxCoordinates
+    (model.m <= factor.dimension || (sparse && factor.dimension > 0)) &&
+        model.numVars.toLong() <= verification.maxCoordinates
 
 internal fun verifyExactBasis(
     model: LpModel,
@@ -225,6 +226,10 @@ internal fun verifyExactBasis(
         val cached = cache.find(authority)
         if (cached != null) meter.reuse++
         val factors = cached ?: run {
+            if (model.m > limits.factor.dimension) {
+                meter.phase = ExactBasisPhase.FACTOR
+                return@run buildSparseExactBasis(authority).also { cache.install(authority, it) }
+            }
             val matrix = authority.basisMatrix()
             meter.phase = ExactBasisPhase.FACTOR
             val proposed = cache.proposedOrder(authority)
@@ -233,7 +238,10 @@ internal fun verifyExactBasis(
             val build = RationalBasisFactors.factor(matrix, proposed, allowance, meter.token)
             meter.record(build.stats)
             when (build) {
-                is RationalBasisBuild.Ready -> build.factors.also { cache.install(authority, it) }
+                is RationalBasisBuild.Ready -> {
+                    meter.charge(bytes = 32L)
+                    DenseExactBasisFactorization(build.factors).also { cache.install(authority, it) }
+                }
 
                 is RationalBasisBuild.Singular -> {
                     singularRank = build.rank
@@ -251,17 +259,56 @@ internal fun verifyExactBasis(
             val rhs = authority.primalRhs()
             meter.phase = ExactBasisPhase.PRIMAL
             val basics = solveExactBasis(factors, rhs, false, meter)
-            val primal = authority.sourcePrimal(basics)
+            var primal = authority.sourcePrimal(basics)
+            var basisSeats = true
             // Publish this complete independent witness before BTRAN can exhaust the remaining budget.
             val point = verifyBasisCandidates(model, authority, primal, null, null, meter)
             witness = point.witness
             point.metrics.decline?.takeUnless { it == ReconstructionDecline.CANDIDATE }?.let { meter.stop(it) }
+            val sparseRecovery = limits.sparse && model.m > limits.factor.dimension
+            val rejected = ArrayList<Int>(3)
+            if (witness == null && sparseRecovery) {
+                authority.violatedBasic(basics)?.let(rejected::add)
+                for (allSeats in listOf(false, true)) {
+                    val recovered = authority.strictPrimal(factors, basics, allSeats)
+                    recovered.violatedRow?.let { if (it !in rejected) rejected.add(it) }
+                    val candidate = recovered.primal ?: continue
+                    val checked = verifyBasisCandidates(
+                        model, authority, candidate, null, null, meter, withBasis = false,
+                    )
+                    witness = checked.witness
+                    checked.metrics.decline?.takeUnless { it == ReconstructionDecline.CANDIDATE }
+                        ?.let { meter.stop(it) }
+                    if (witness != null) {
+                        primal = candidate
+                        basisSeats = false
+                        break
+                    }
+                }
+            }
             meter.phase = ExactBasisPhase.DUAL
             val dual = solveExactBasis(factors, authority.costs, true, meter)
-            val checked = verifyBasisCandidates(model, authority, primal, dual, null, meter)
+            val checked = verifyBasisCandidates(model, authority, primal, dual, null, meter, basisSeats)
             witness = checked.witness ?: witness
             bound = checked.bound
             complementary = checked.complementary
+            if (witness == null && sparseRecovery) {
+                for (slot in rejected) {
+                    meter.phase = ExactBasisPhase.RAY
+                    meter.charge(model.m.toLong(), model.m * 32L)
+                    val seed = List(model.m) { if (it == slot) BigFraction.ONE else BigFraction.ZERO }
+                    val ray = solveExactBasis(factors, seed, true, meter)
+                    val refutation = verifyBasisCandidates(model, authority, null, null, ray, meter)
+                    conflict = refutation.conflict
+                    support = refutation.conflictSupport
+                    refutation.metrics.decline?.takeUnless { it == ReconstructionDecline.CANDIDATE }
+                        ?.let { meter.stop(it) }
+                    if (conflict != null) {
+                        integerRay = projectBasisConflict(model.m, requireNotNull(conflict), meter)
+                        break
+                    }
+                }
+            }
             checked.metrics.decline?.let { meter.stop(it) }
         } else {
             meter.phase = ExactBasisPhase.RAY
@@ -304,6 +351,9 @@ private fun observeBasisVerification(
         LpCertifierCost.Reported,
     )
     if (rayRow == null) observer?.observe(LpCertifier.RATIONAL, result.bound != null, LpCertifierCost.Reported)
+    if (rayRow == null && result.conflict != null) {
+        observer?.observe(LpCertifier.EXACT_FARKAS, true, LpCertifierCost.Reported)
+    }
 }
 
 private fun orderPermutation(order: IntArray): Boolean {
@@ -315,24 +365,14 @@ private fun orderPermutation(order: IntArray): Boolean {
     return true
 }
 
-private fun solveExactBasis(
-    factors: RationalBasisFactors,
+internal fun solveExactBasis(
+    factors: ExactBasisFactorization,
     rhs: List<BigFraction>,
     transpose: Boolean,
     meter: ExactBasisMeter,
 ): List<BigFraction> {
-    val allowance = meter.factorLimits()
     meter.solves++
-    val result = factors.solve(rhs, transpose, allowance, meter.token)
-    meter.record(result.stats)
-    return when (result) {
-        is RationalBasisSolve.Solved -> result.values
-
-        is RationalBasisSolve.Declined -> {
-            if (result.reason.name == "CANCELLED") meter.poll()
-            throw ExactBasisStop(ExactBasisDecline.valueOf(result.reason.name))
-        }
-    }
+    return factors.solve(rhs, transpose, meter)
 }
 
 private fun verifyBasisCandidates(
@@ -342,6 +382,7 @@ private fun verifyBasisCandidates(
     dual: List<BigFraction>?,
     ray: List<BigFraction>?,
     meter: ExactBasisMeter,
+    withBasis: Boolean = true,
 ): ReconstructedCertificate {
     meter.phase = ExactBasisPhase.VERIFICATION
     val result = verifyRationalCertificate(
@@ -349,7 +390,7 @@ private fun verifyBasisCandidates(
         primal,
         dual,
         ray,
-        Basis(authority.headings, authority.statuses),
+        if (withBasis) Basis(authority.headings, authority.statuses) else null,
         meter.token,
         meter.verificationLimits(),
     )

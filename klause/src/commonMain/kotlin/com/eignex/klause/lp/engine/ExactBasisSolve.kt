@@ -74,6 +74,29 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
         return fraction(a + b)
     }
 
+    fun subtract(a: BigFraction, b: BigFraction): BigFraction {
+        arithmetic(a, b)
+        return fraction(a - b)
+    }
+
+    fun compare(a: BigFraction, b: BigFraction): Int {
+        arithmetic(a, b)
+        return a.compareTo(b)
+    }
+
+    fun multiply(a: BigFraction, b: BigFraction): BigFraction {
+        if (a.isZero || b.isZero) return fraction(BigFraction.ZERO)
+        arithmetic(a, b)
+        return fraction(a * b)
+    }
+
+    fun divide(a: BigFraction, b: BigFraction): BigFraction {
+        if (b.isZero) stop(ExactBasisDecline.SINGULAR)
+        if (a.isZero) return fraction(BigFraction.ZERO)
+        arithmetic(a, b)
+        return fraction(a * b.reciprocal())
+    }
+
     fun subtractProduct(a: BigFraction, b: BigFraction, c: BigFraction): BigFraction {
         arithmetic(b, c)
         val product = fraction(b * c)
