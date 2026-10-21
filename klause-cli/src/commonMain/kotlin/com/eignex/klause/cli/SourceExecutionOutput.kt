@@ -56,7 +56,8 @@ internal fun solveCapturedSource(
     )
     val reporting = object : OutputProtocol by output {
         override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
-            output.onStatistics(stats.copy(presolve = result.preparationStats ?: stats.presolve), solveTimeMs, solutions)
+            val observed = stats.copy(presolve = result.preparationStats ?: stats.presolve)
+            output.onStatistics(observed, solveTimeMs, solutions)
         }
     }
     val complete = result.completeSearchAdmitted
