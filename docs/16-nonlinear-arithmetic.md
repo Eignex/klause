@@ -259,7 +259,9 @@ complete original-formula check. The probe is limited to small formulas and one
 **2. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
 enumerates source implicants: assignments of Boolean leaves and signed numeric
 predicates that make the formula true. Propagation treats numeric predicates as
-opaque leaves, a proof scan keeps only supporting literals, and private exclusion
+opaque leaves. Each query retains witnessed node truths and junction support
+counts; assignments and retractions refresh affected nodes in child-before-parent
+order. Region capture keeps only supporting literals, and private exclusion
 clauses prevent revisiting a region without entering shared learning.
 Branching follows an unwitnessed root proof to a required leaf and tries that
 truth first; backtracking retains its opposite value. A missing demanded leaf
