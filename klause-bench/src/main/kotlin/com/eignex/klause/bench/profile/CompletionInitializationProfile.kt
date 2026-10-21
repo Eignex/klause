@@ -1,7 +1,6 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.SmtSourceTools
-import com.eignex.klause.bench.metric.SmtSourceValidation
 import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
@@ -235,7 +234,7 @@ object CompletionInitializationProfile {
 
     private fun prepareReference(out: File) {
         if (System.getProperty("klause.bench.z3") != null) return
-        val tool = SmtSourceTools.provision(SmtSourceValidation.REFUTATION, out.resolve("reference"))
+        val tool = SmtSourceTools.provisionZ3(out.resolve("reference"))
         System.setProperty("klause.bench.z3", tool.executable.absolutePath)
         out.resolve("reference-provenance.txt").writeText(
             "url=${tool.artifactUrl}\narchiveSha256=${tool.artifactSha256}\nbinarySha256=${tool.binarySha256}\n",

@@ -9,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty
 import org.junit.jupiter.api.condition.EnabledOnOs
@@ -31,7 +30,7 @@ class SmtSourceReceiptTest {
         val source = "(set-logic QF_LIA)\n(declare-const x Int)\n(assert (= x 1))\n(check-sat)\n".toByteArray()
         val model = "(\n(define-fun x () Int $value)\n)"
         val raw = "sat\n$model\n"
-        val tool = SmtSourceTools.provision(SmtSourceValidation.GROUND, directory)
+        val tool = SmtSourceTools.provision(directory)
         val record = SolveRecord("original", "klause", "cp", 1, "free", 3, 10_000,
             "satisfy", false, true, null, 5, proven = false, stats = mapOf("exit" to "0"),
             gitSha = "producer", timestamp = "t", command = "cli original.smt2", finalWitness = model,
@@ -44,69 +43,10 @@ class SmtSourceReceiptTest {
 
         assertEquals(status, result.validation.status)
         assertEquals(model.takeIf { status == "valid" }, result.validation.checkedWitness)
-        assertEquals("0", result.stats["sourceValidationSolverQueries"])
         assertFalse(SmtSourceValidation.apply(record, result).proven)
         assertEquals(source.decodeToString(), File(directory, "check/source.smt2").readText())
         assertEquals("sat\n$model\n", File(directory, "check/response.rsmt2").readText())
         assertContentEquals(producerBytes, File(directory, "check/record.json").readBytes())
-    }
-
-    @ParameterizedTest
-    @CsvSource("false,valid", "true,unknown")
-    @EnabledOnOs(OS.LINUX)
-    @EnabledIfSystemProperty(named = "os.arch", matches = "amd64|x86_64")
-    fun `reference should retain only an agreeing original refutation`(assertion: String, status: String) {
-        val source = "(set-logic QF_LIA)\n(assert $assertion)\n(check-sat)\n".toByteArray()
-        val raw = "unsat\n"
-        val tool = SmtSourceTools.provision(SmtSourceValidation.REFUTATION, directory)
-        val record = SolveRecord("original", "klause", "cp", 1, "free", 3, 10_000,
-            "satisfy", false, false, null, null, proven = true, stats = mapOf("exit" to "0"),
-            gitSha = "producer", timestamp = "t", command = "cli original.smt2",
-            sourceHashes = mapOf("model" to sha256(source)), sourceOutputSha256 = sha256(raw.toByteArray()),
-            validationPolicy = SMT_SOURCE_POLICY)
-
-        val result = SmtSourceValidation.validateOriginal(source, record, raw, File(directory, "check"),
-            tool)
-
-        assertEquals(status, result.validation.status)
-        assertEquals(status == "valid", SmtSourceValidation.apply(record, result).proven)
-        assertEquals("1", result.stats["sourceValidationSolverQueries"])
-        assertEquals("false", result.stats["sourceValidationProofChecked"])
-    }
-
-    @ParameterizedTest
-    @CsvSource("Z3,z3-reference", "CVC5,cvc5-reference")
-    @EnabledOnOs(OS.LINUX)
-    fun `selected refutation solvers retain their command and producer bindings`(name: String, checker: String) {
-        val source = "(set-logic QF_LIA)\n(assert false)\n(check-sat)\n".toByteArray()
-        val raw = "unsat\n"
-        val record = SolveRecord("original", "klause", "cp", 1, "free", 3, 10_000,
-            "satisfy", false, false, null, null, proven = true, stats = mapOf("exit" to "0"),
-            gitSha = "producer", timestamp = "t", command = "cli original.smt2",
-            sourceHashes = mapOf("model" to sha256(source)), sourceOutputSha256 = sha256(raw.toByteArray()),
-            validationPolicy = SMT_SOURCE_POLICY)
-        val binary = File(directory, "tool").absoluteFile.apply {
-            writeText("#!/bin/sh\nprintf '%s\\n' \"\$@\" > arguments.txt\nprintf 'unsat\\n'\n")
-            check(setExecutable(true, true))
-        }
-        val solver = SmtSourceValidation.RefutationSolver.valueOf(name)
-        val tool = SmtSourceValidation.Tool(binary, sha256(binary.readBytes()), refutationSolver = solver)
-        val out = File(directory, "check")
-
-        val result = SmtSourceValidation.validateOriginal(source, record, raw, out, tool)
-        val receipt = Reports.json.decodeFromString<SmtSourceValidation.Receipt>(
-            result.stats.getValue("sourceValidationReceiptJson"))
-
-        assertEquals("valid", result.validation.status)
-        assertEquals(checker, receipt.checker)
-        assertEquals(tool.binarySha256, receipt.executableSha256)
-        assertEquals(listOf("source.smt2", "model.smt2", "response.rsmt2", "stdout.txt", "record.json")
-            .associateWith { sha256(File(out, it).readBytes()) }, receipt.bindings)
-        val expected = if (name == "Z3") listOf("-smt2", "-T:30", "-memory:4096")
-            else listOf("--lang=smt2", "--tlimit=30000")
-        assertEquals(expected + File(out, "source.smt2").absolutePath, File(out, "arguments.txt").readLines())
-        assertEquals("1", result.stats["sourceValidationSolverQueries"])
-        assertTrue(SmtSourceValidation.apply(record, result).proven)
     }
 
     @ParameterizedTest
@@ -117,16 +57,7 @@ class SmtSourceReceiptTest {
             if (failure in setOf("parser", "foreign-error")) "E:parsing-error\n" else "",
             SourceToolMemory(SourceToolMemory.LINUX, SourceToolMemory.LIMIT, true, false))
 
-        assertEquals("unknown", SmtSourceValidation.interpret(SmtSourceValidation.GROUND, process))
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["sat", "unknown", "unsat\nunsat", "unsat\n(error bad)"])
-    fun `reference answers other than one complete unsat should withhold refutation`(answer: String) {
-        val process = SmtToolProcess(listOf("z3"), 0, 1, false, true, answer, "",
-            SourceToolMemory(SourceToolMemory.LINUX, SourceToolMemory.LIMIT, true, false))
-
-        assertEquals("unknown", SmtSourceValidation.interpret(SmtSourceValidation.REFUTATION, process))
+        assertEquals("unknown", SmtSourceValidation.interpret(process))
     }
 
     @Test
@@ -184,7 +115,7 @@ class SmtSourceReceiptTest {
         val process = SmtSourceReceipt.run(listOf("/bin/sleep", "60"), input, directory, 100)
 
         assertEquals(true, process.timedOut)
-        assertEquals("unknown", SmtSourceValidation.interpret(SmtSourceValidation.GROUND, process))
+        assertEquals("unknown", SmtSourceValidation.interpret(process))
     }
 
     @ParameterizedTest
@@ -209,7 +140,7 @@ class SmtSourceReceiptTest {
         }
         val process = SmtToolProcess(listOf("dolmen"), 0, 1, false, true, "", "", memory)
 
-        assertEquals(status, SmtSourceValidation.interpret(SmtSourceValidation.GROUND, process))
+        assertEquals(status, SmtSourceValidation.interpret(process))
     }
 
     @ParameterizedTest
