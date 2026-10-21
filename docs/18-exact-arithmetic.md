@@ -105,6 +105,14 @@ equality or order. Rational sector samples lie strictly between ordered algebrai
 boundaries. Evaluation owners cache root counts, coordinate powers and line images
 for one caller, charging lookups to the same token; published values keep no cache.
 
+Sign checks first use the scalars' owned isolating bounds and exact polynomial
+enclosures. A strictly positive lower bound or strictly negative upper bound
+certifies the corresponding sign; only a singleton zero enclosure certifies zero.
+An enclosure containing or touching zero leaves exact image construction and
+root comparison available. This applies to complete multivariate points and
+lifting candidates with algebraic coefficients. Enclosure work belongs to the
+requesting caller, and a private representation refusal retains the scalar route.
+
 Polynomial images retain an owned primitive root and their rational polynomial
 expression in that root. Expressions are reduced modulo its defining polynomial,
 without requiring irreducibility. Operations between images of the same indexed
@@ -126,7 +134,7 @@ supplies a rational annihilator for lifting. Sturm variations
 over the ordered field of the captured root select its specialized roots from that
 annihilator's isolating intervals; one-sided endpoint signs exclude boundary roots
 and retain distinct repeated roots. Reducible defining polynomials are restricted
-to factors containing the selected root before field division. With multiple
+to factors containing the selected root before field division. With unrelated
 irrational coordinates, lifting eliminates independent coefficient annihilators
 and checks each candidate by exact algebraic evaluation. Every route returns all
 and only the specialized polynomial's distinct real roots.

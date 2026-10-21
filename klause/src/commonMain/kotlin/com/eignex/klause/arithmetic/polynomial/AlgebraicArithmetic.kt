@@ -74,6 +74,8 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         if (left.definingPolynomial == right.definingPolynomial && left.rootIndex == right.rootIndex) return 0
         left.rational?.let { return -compareRational(right, it) }
         right.rational?.let { return compareRational(left, it) }
+        if (left.interval.upper <= right.interval.lower) return -1
+        if (right.interval.upper <= left.interval.lower) return 1
         sharedSign(left, right)?.let { return it }
         val common = univariate.gcd(left.definingPolynomial, right.definingPolynomial)
         val sequence = if (common.degree > 0) univariate.sturm(common) else emptyList()
@@ -96,6 +98,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
     }
 
     private fun compareRational(value: AlgebraicReal, other: BigFraction): Int {
+        arithmetic.step()
+        value.rational?.let { return it.compareTo(other) }
+        if (value.interval.upper <= other) return -1
+        if (value.interval.lower >= other) return 1
         value.image?.let { image ->
             try {
                 arithmetic.denseSize(image.base.definingPolynomial.degree)
@@ -136,6 +142,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
     fun signAt(polynomial: RationalPolynomial, value: AlgebraicReal): Int {
         arithmetic.step()
         value.rational?.let { return univariate.evaluate(polynomial, it).signum() }
+        enclosedSign {
+            arithmetic.denseSize(polynomial.degree)
+            enclose(polynomial, value.interval)
+        }?.let { return it }
         val remainder = univariate.divide(polynomial, value.definingPolynomial).second
         if (remainder.degree <= 0) return remainder[0].signum()
         val common = univariate.gcd(remainder, value.definingPolynomial)
@@ -370,6 +380,13 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             power(coordinate, exponent)
         }
 
+    fun signAt(polynomial: Polynomial, coordinates: Map<Int, AlgebraicReal>): Int =
+        enclosedSign {
+            encloseAt(polynomial) { variable, exponent ->
+                intervalPower(coordinates.getValue(variable).interval, exponent)
+            }
+        } ?: sign(evaluate(polynomial, coordinates))
+
     fun pointEvaluation(coordinates: Map<Int, AlgebraicReal>): PointEvaluation = PointEvaluation(coordinates)
 
     inner class PointEvaluation internal constructor(coordinates: Map<Int, AlgebraicReal>) {
@@ -389,6 +406,13 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
         fun evaluate(polynomial: Polynomial): AlgebraicReal =
             capturedConstantPoint()?.evaluate(polynomial) ?: evaluateAt(polynomial, ::power)
+
+        fun signAt(polynomial: Polynomial): Int {
+            capturedConstantPoint()?.let { return sign(it.evaluate(polynomial)) }
+            return enclosedSign {
+                encloseAt(polynomial) { variable, exponent -> intervalPower(coordinate(variable).interval, exponent) }
+            } ?: sign(evaluateAt(polynomial, ::power))
+        }
 
         private fun capturedConstantPoint(): AffineLineEvaluation.Point? {
             arithmetic.step()
@@ -536,6 +560,16 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         return result
     }
 
+    fun signAt(polynomial: AlgebraicPolynomial, value: AlgebraicReal): Int =
+        enclosedSign {
+            var result = RationalInterval(BigFraction.ZERO, BigFraction.ZERO)
+            for (coefficient in polynomial.coefficients(this).asReversed()) {
+                arithmetic.step()
+                result = intervalAdd(intervalMultiply(result, value.interval), coefficient.interval)
+            }
+            result
+        } ?: sign(evaluate(polynomial, value))
+
     fun roots(polynomial: AlgebraicPolynomial): List<AlgebraicReal> {
         arithmetic.step()
         require(!polynomial.isZero) { "zero polynomial has no finite root list" }
@@ -571,7 +605,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             relation = arithmetic.resultant(lift(defining, index), relation, index)
         }
         val annihilator = extract(relation, variable)
-        return roots(annihilator).filter { sign(evaluate(polynomial, it)) == 0 }
+        return roots(annihilator).filter { signAt(polynomial, it) == 0 }
     }
 
     private fun select(polynomial: RationalPolynomial, enclosure: () -> RationalInterval): AlgebraicReal {
@@ -608,6 +642,49 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             result = intervalAdd(intervalMultiply(result, interval), RationalInterval(coefficient, coefficient))
         }
         return result
+    }
+
+    private inline fun enclosedSign(enclosure: () -> RationalInterval): Int? = try {
+        arithmetic.step()
+        val bounds = enclosure()
+        when {
+            bounds.lower.signum() > 0 -> 1
+            bounds.upper.signum() < 0 -> -1
+            bounds.isPoint && bounds.lower.isZero -> 0
+            else -> null
+        }
+    } catch (_: PolynomialResourceLimit) {
+        // Enclosures are optional certificates; the exact scalar route keeps its admission limits.
+        null
+    }
+
+    private inline fun encloseAt(
+        polynomial: Polynomial,
+        power: (Int, Int) -> RationalInterval,
+    ): RationalInterval {
+        var result = RationalInterval(BigFraction.ZERO, BigFraction.ZERO)
+        for ((monomial, coefficient) in polynomial.terms) {
+            arithmetic.step()
+            var term = RationalInterval(coefficient, coefficient)
+            for (variable in monomial.variables) {
+                arithmetic.step()
+                term = intervalMultiply(term, power(variable, monomial.exponent(variable)))
+            }
+            result = intervalAdd(result, term)
+        }
+        return result
+    }
+
+    private fun intervalPower(interval: RationalInterval, exponent: Int): RationalInterval {
+        arithmetic.step()
+        if (exponent == 0) return RationalInterval(BigFraction.ONE, BigFraction.ONE)
+        arithmetic.denseSize(exponent)
+        val lower = arithmetic.power(Polynomial.constant(interval.lower), exponent).coefficient(Monomial.ONE)
+        val upper = arithmetic.power(Polynomial.constant(interval.upper), exponent).coefficient(Monomial.ONE)
+        if (exponent and 1 != 0) return RationalInterval(lower, upper)
+        val minimum = if (interval.lower.signum() <= 0 && interval.upper.signum() >= 0) BigFraction.ZERO
+            else if (lower <= upper) lower else upper
+        return RationalInterval(minimum, if (lower >= upper) lower else upper)
     }
 
     private fun intervalAdd(left: RationalInterval, right: RationalInterval): RationalInterval =

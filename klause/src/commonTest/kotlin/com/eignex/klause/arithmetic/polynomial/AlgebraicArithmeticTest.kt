@@ -13,6 +13,161 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `independent point signs should avoid algebraic image elimination`() {
+        val coordinates = mapOf(
+            0 to arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last(),
+            1 to arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last(),
+        )
+        val source = polynomial.add(Polynomial.ONE,
+            polynomial.add(Polynomial.variable(0), Polynomial.variable(1)))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val sign = caller.signAt(source, coordinates)
+
+        assertEquals(1, sign)
+    }
+
+    @Test
+    fun `even point powers should retain negative enclosures across zero`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val value = AlgebraicReal(base.definingPolynomial, base.rootIndex,
+            RationalInterval(BigFraction.ofLong(-2), BigFraction.ofLong(2)))
+        val source = polynomial.negate(polynomial.add(Polynomial.ONE, polynomial.power(Polynomial.variable(0), 2)))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val sign = caller.signAt(source, mapOf(0 to value))
+
+        assertEquals(-1, sign)
+    }
+
+    @Test
+    fun `odd negative coordinate powers should preserve their order`() {
+        val coordinates = mapOf(
+            0 to arithmetic.roots(RationalPolynomial.of(2, 0, 0, 1)).single(),
+            1 to arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last(),
+        )
+        val source = polynomial.subtract(polynomial.subtract(polynomial.power(Polynomial.variable(0), 5),
+            Polynomial.variable(1)), Polynomial.ONE)
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val sign = caller.signAt(source, coordinates)
+
+        assertEquals(-1, sign)
+    }
+
+    @Test
+    fun `point signs should retain exact zero when enclosures overlap`() {
+        val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val source = polynomial.subtract(Polynomial.variable(0), Polynomial.variable(1))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val sign = caller.signAt(source, mapOf(0 to value, 1 to value))
+
+        assertEquals(0, sign)
+    }
+
+    @Test
+    fun `point signs should not treat an enclosure touching zero as zero`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val value = AlgebraicReal(base.definingPolynomial, base.rootIndex,
+            RationalInterval(BigFraction.ZERO, BigFraction.ofLong(2)))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val sign = caller.signAt(Polynomial.variable(0), mapOf(0 to value))
+
+        assertEquals(1, sign)
+    }
+
+    @Test
+    fun `declined point enclosures should retain admitted scalar evaluation`() {
+        val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(
+            maxDenseCoefficients = 1, maxMatrixCells = 0,
+        )))
+
+        val sign = caller.signAt(Polynomial.variable(0), mapOf(0 to value))
+
+        assertEquals(1, sign)
+    }
+
+    @Test
+    fun `point sign certificates should observe requesting caller cancellation`() {
+        val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val source = polynomial.add(Polynomial.ONE, Polynomial.variable(0))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
+
+        assertFailsWith<PolynomialInterrupted> { caller.signAt(source, mapOf(0 to value)) }
+    }
+
+    @Test
+    fun `point sign certificates should retain captured coordinates after map mutation`() {
+        val coordinates = mutableMapOf(0 to arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last())
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+        val point = caller.pointEvaluation(coordinates)
+        val source = polynomial.add(Polynomial.ONE, Polynomial.variable(0))
+        coordinates[0] = arithmetic.rational(BigFraction.ofLong(-4))
+
+        val sign = point.signAt(source)
+
+        assertEquals(1, sign)
+    }
+
+    @Test
+    fun `owned sign certificates should survive producer cancellation`() {
+        var cancelled = false
+        val producer = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        val value = producer.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val source = polynomial.add(Polynomial.ONE, Polynomial.variable(0))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+        cancelled = true
+
+        val sign = caller.signAt(source, mapOf(0 to value))
+
+        assertEquals(1, sign)
+    }
+
+    @Test
+    fun `algebraic coefficient signs should avoid unrelated scalar images`() {
+        val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val constant = arithmetic.add(base, arithmetic.rational(BigFraction.ONE))
+        val source = arithmetic.polynomial(listOf(constant, arithmetic.rational(BigFraction.ONE)))
+        val value = arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val sign = caller.signAt(source, value)
+
+        assertEquals(1, sign)
+    }
+
+    @Test
+    fun `algebraic coefficient signs should retain exact zero on a selected root`() {
+        val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
+        val source = arithmetic.polynomial(listOf(arithmetic.negate(value), arithmetic.rational(BigFraction.ONE)))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val sign = caller.signAt(source, value)
+
+        assertEquals(0, sign)
+    }
+
+    @Test
+    fun `separated univariate signs should retain the caller without wide base division`() {
+        val defining = RationalPolynomial(List(13) { index ->
+            when (index) {
+                0 -> BigFraction.ofLong(-2)
+                12 -> BigFraction.ONE
+                else -> BigFraction.ZERO
+            }
+        })
+        val value = arithmetic.roots(defining).last()
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 2)))
+
+        val sign = caller.signAt(RationalPolynomial.of(1, 1), value)
+
+        assertEquals(1, sign)
+    }
+
+    @Test
     fun `linear shared lifting should retain the root relation for later arithmetic`() {
         val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
         val x = Polynomial.variable(0)
