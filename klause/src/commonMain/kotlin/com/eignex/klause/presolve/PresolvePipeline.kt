@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
@@ -8,6 +9,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.difference.withDifferenceSystem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.LpStats
@@ -149,6 +151,8 @@ object PresolvePipeline {
         } else {
             null
         }
+        val automaticClausalSatisfaction = harvestPlan != null &&
+            config.overrides[PresolvePass.LP_HARVEST] != true && linearObjective == null && problem.isClausal()
         val objective = linearObjective ?: LinearObjective()
 
         // Coefficient strengthening runs in the source phase, before [RootBaker.reseed] forces the
@@ -267,7 +271,10 @@ object PresolvePipeline {
             val harvestResult = harvestPlan?.let {
                 presolveBudget.observeTransform(
                     PresolvePass.LP_HARVEST, pre.problem, cancellation,
-                    eligible = { true },
+                    // Cardinality rewrites strengthen clause relaxations; propagator-only symmetry adds no LP rows.
+                    eligible = {
+                        !automaticClausalSatisfaction || pre.problem.factors.any { factor -> factor is Cardinality }
+                    },
                     unchanged = { LpHarvestResult(pre.problem, LpHarvestReport(), LpStats()) },
                     output = { result -> result.problem },
                     refuted = { result -> result.report.rootInfeasible },

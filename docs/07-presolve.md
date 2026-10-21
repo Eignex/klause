@@ -27,7 +27,13 @@ so the engine never depends on presolve. Finite rounds follow under one
 bounded-fixpoint scheduler shared with the source lane: a pass above the cheapest
 tier reruns only after other passes changed at least 1% of the model. Presolve and
 an LP-relaxation harvest iterate to a joint fixpoint for at most four rounds, the
-harvest rerunning only when it tightened something.
+harvest rerunning only when it tightened something. Automatically selected elective
+harvest skips pure clausal satisfaction sources before LP construction unless
+clause rewrites expose cardinality constraints that can strengthen the relaxation.
+Propagator-only symmetry handling supplies no LP rows and retains the skip. An
+explicit `+lp-harvest` enables it; nonclausal sources and optimization retain their
+harvest eligibility. The separate wide-integer pre-bake
+LP safety checks do not depend on this gate.
 
 The round-boundary diminishing-return check uses a model-size heuristic: finite
 hosts count live factors plus integer-domain endpoint spans, with both individual
