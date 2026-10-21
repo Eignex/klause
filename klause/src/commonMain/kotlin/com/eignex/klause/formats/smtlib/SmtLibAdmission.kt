@@ -113,6 +113,25 @@ private fun parseLinearAdmission(
         builder.command(command.factorSourceSymbols(cancellation))
         if (!scope.command(command)) smtUnsupported("source symbol or expression sort is invalid in its lexical scope")
     }
+    return try {
+        buildLinearAdmission(builder, commands, cancellation, semantics)
+    } catch (_: SmtLibRefutedPremises) {
+        // Refutation does not excuse unsupported syntax elsewhere in the source.
+        val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
+            allowFunctions = true, semantics = semantics)
+        for (command in commands) compiler.command(command)
+        val captured = compiler.build()
+        val source = builder.refutedSource()
+        if (captured.objective != null) captured.bindObjective(source, cancellation) else source
+    }
+}
+
+private fun buildLinearAdmission(
+    builder: Compiler.Builder,
+    commands: List<SExpr>,
+    cancellation: Cancellation,
+    semantics: EffectiveSourceSemantics,
+): SmtLibProblem {
     if (builder.objectiveSpec == null) return builder.build()
     var captureFailure: UnsupportedSmtException? = null
     val objective = try {

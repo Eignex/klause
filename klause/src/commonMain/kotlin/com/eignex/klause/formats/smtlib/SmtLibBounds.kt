@@ -65,25 +65,44 @@ internal fun Compiler.Builder.inferBounds() {
 internal fun Compiler.Builder.hasOpenProductOperand(): Boolean {
     if (intDomains.none { it is PresolveDomain.Open }) return false
     val pending = ArrayDeque<Pair<SExpr, Boolean>>()
+    val operands = ArrayDeque<ProductOperand>()
     for (assertion in asserts) pending.addLast(assertion to false)
     while (pending.isNotEmpty()) {
         if (sourceCancellation()) throw PolynomialSourceInterrupted()
-        val (node, product) = pending.removeLast()
+        val (node, visited) = pending.removeLast()
         when (node) {
-            is SExpr.Atom -> if (product &&
-                intNames[node.text]?.let { intDomains[it] is PresolveDomain.Open } == true
-            ) {
-                return true
-            }
+            is SExpr.Atom -> operands.addLast(ProductOperand(
+                constant = node.text.firstOrNull()?.isDigit() == true,
+                open = intNames[node.text]?.let { intDomains[it] is PresolveDomain.Open } == true,
+            ))
             is SExpr.SList -> {
+                if (!visited) {
+                    pending.addLast(node to true)
+                    for (child in node.items.drop(1)) pending.addLast(child to false)
+                    continue
+                }
                 val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
-                val operand = product || head == "*" || head == "^"
-                for (child in node.items.drop(1)) pending.addLast(child to operand)
+                val children = List((node.items.size - 1).coerceAtLeast(0)) { operands.removeLast() }
+                val open = children.any { it.open }
+                val nonlinear = when (head) {
+                    "*" -> children.count { !it.constant } > 1
+                    "^" -> (node.items.getOrNull(2) as? SExpr.Atom)?.text !in setOf("0", "1")
+                    else -> false
+                }
+                if (nonlinear && open) return true
+                operands.addLast(ProductOperand(
+                    constant = head in setOf("+", "-", "*", "/", "^") && children.all { it.constant },
+                    open = open,
+                ))
             }
         }
     }
     return false
 }
+
+private class ProductOperand(val constant: Boolean, val open: Boolean)
+
+internal class SmtLibRefutedPremises : RuntimeException()
 
 internal fun Compiler.Builder.closeProductBounds() {
     if (productBoundsClosed || intDomains.none { it is PresolveDomain.Open }) return
@@ -96,7 +115,10 @@ internal fun Compiler.Builder.closeProductBounds() {
                 row.coeffs.map { BigFraction.ofLong(it) }, row.op, BigFraction.ofLong(row.bound))
         })
     val closed = when (val outcome = premises.closeOpenBounds(sourceCancellation)) {
-        OpenPresolveResult.Refuted -> smtUnsupported("nonlinear source has refuted integer premises")
+        OpenPresolveResult.Refuted -> {
+            if (sourceCancellation()) throw PolynomialSourceInterrupted()
+            throw SmtLibRefutedPremises()
+        }
         is OpenPresolveResult.Tightened -> outcome.spec
     }
     if (sourceCancellation()) throw PolynomialSourceInterrupted()

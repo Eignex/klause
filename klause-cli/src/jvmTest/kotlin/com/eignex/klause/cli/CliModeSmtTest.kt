@@ -15,6 +15,27 @@ import kotlin.test.assertTrue
 class CliModeSmtTest {
 
     @Test
+    fun `SMT inconsistent integer scalar equations should print unsat from the refuted route`() {
+        val source = File.createTempFile("integer-premises", ".smt2").apply {
+            writeText(
+                "(set-logic QF_LIA) (declare-const x1 Int) (declare-const x2 Int) " +
+                    "(declare-const x3 Int) (declare-const x4 Int) " +
+                    "(assert (= (+ x1 x2) 8)) (assert (= x1 (* 3 x3))) (assert (= x2 (* 6 x4))) (check-sat)",
+            )
+        }
+
+        val output = try {
+            capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
+        } finally {
+            source.delete()
+        }
+
+        assertEquals("unsat", output.lineSequence().first())
+        assertTrue("; frontendRoutingOutcome=refuted" in output.lines(), output)
+        assertFalse("incomplete_nia" in output, output)
+    }
+
+    @Test
     fun `SMT function witness should use exact closed value constructors`() {
         val source = File.createTempFile("function-exp", ".smt2").apply {
             writeText("(declare-const x Real) (assert (= (exp x) 2)) (check-sat)")

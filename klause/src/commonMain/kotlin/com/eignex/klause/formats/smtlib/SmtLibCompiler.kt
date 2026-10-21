@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
@@ -333,14 +334,18 @@ internal object Compiler {
             )
             val objective = compactConditionalColumns(removed, compiledObjective)
             factors.addAll(affineRealTables.infer())
-            val sourceBounds = modelIntBounds()
+            return sourceProblem(objective, factors.toTypedArray())
+        }
 
+        internal fun refutedSource(): SmtLibProblem = sourceProblem(null, arrayOf(Clause(intArrayOf())))
+
+        private fun sourceProblem(objective: LinearObjectiveSpec?, sourceFactors: Array<Factor>): SmtLibProblem {
             val model = Problem(
                 settings = settings,
                 semantics = semantics,
                 numBoolVars = nextBool,
-                intBounds = sourceBounds,
-                factors = factors.toTypedArray(),
+                intBounds = modelIntBounds(),
+                factors = sourceFactors,
                 numRealVars = nextReal,
                 realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
                 realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
