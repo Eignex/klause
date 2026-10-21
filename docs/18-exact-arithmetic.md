@@ -107,10 +107,16 @@ for one caller, charging lookups to the same token; published values keep no cac
 
 Specialization evaluates coefficients at earlier exact coordinates and trims
 vanished leading coefficients by exact sign. With rational coefficients, lifting
-isolates the polynomial directly; otherwise it eliminates algebraic coefficients to
-a rational annihilator, a superset of the roots, and checks every candidate against
-the specialized polynomial. The retained roots are all and only its distinct real
-roots.
+isolates the polynomial directly. When the coefficients depend on one irrational
+coordinate, specialization captures their rational polynomial expressions in that
+coordinate. A joint resultant supplies a rational annihilator. Sturm variations
+over the ordered field of the captured root select its specialized roots from that
+annihilator's isolating intervals; one-sided endpoint signs exclude boundary roots
+and retain distinct repeated roots. Reducible defining polynomials are restricted
+to factors containing the selected root before field division. With multiple
+irrational coordinates, lifting eliminates independent coefficient annihilators
+and checks each candidate by exact algebraic evaluation. Every route returns all
+and only the specialized polynomial's distinct real roots.
 
 ### Invocation resources
 
