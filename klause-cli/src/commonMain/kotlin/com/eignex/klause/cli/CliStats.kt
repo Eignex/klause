@@ -553,6 +553,7 @@ internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
         e.probeCalls?.let { out += "presolveProbeCalls" to "$it" }
         e.rootConstructionEntries?.let { out += "presolveRootConstructionEntries" to "$it" }
         e.rootPropagationWork?.let { out += "presolveRootPropagationWork" to "$it" }
+        e.clauseLiteralsRemoved?.let { out += "presolveClauseLiteralsRemoved" to "$it" }
         for ((id, calls) in e.passCalls.entries.sortedBy { it.key }) out += "presolveCalls_$id" to "$calls"
     }
     if (p.passes.isNotEmpty()) out += "presolvePasses" to p.passes.joinToString(",")

@@ -179,6 +179,19 @@ enum class PresolvePass(
             )
     },
 
+    /** Shorten a mandatory clause by resolution with a retained clause, preserving every assignment. */
+    STRENGTHEN_CLAUSES(
+        "clause-strengthen",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = true,
+        autoEligible = true,
+    ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            ClauseStrengthening.strengthenSource(problem, ctx.cancellation)
+    },
+
     /** Drop the integer equalities the other equalities imply, by exact elimination over the equality
      *  block, and refute a block with no rational solution. Catches a row dependent through three or more
      *  others, which pairwise fusion and subsumption cannot; runs after them so duplicates are gone.

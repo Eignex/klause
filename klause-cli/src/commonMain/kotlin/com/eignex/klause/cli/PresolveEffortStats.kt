@@ -24,4 +24,5 @@ internal fun presolveEffortStats(
         probeCalls = budget?.probeCalls,
         rootConstructionEntries = budget?.rootConstructionEntries,
         rootPropagationWork = budget?.rootPropagationWork,
+        clauseLiteralsRemoved = budget?.clauseLiteralsRemoved,
     )

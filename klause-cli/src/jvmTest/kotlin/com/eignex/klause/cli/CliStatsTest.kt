@@ -174,6 +174,7 @@ class CliStatsTest {
 
         assertEquals("1", pairs["presolveRootConstructionEntries"])
         assertEquals("0", pairs["presolveRootPropagationWork"])
+        assertEquals("0", pairs["presolveClauseLiteralsRemoved"])
         assertEquals("53", pairs["presolveWork"])
         assertEquals("0", pairs["presolveProbeCalls"])
     }

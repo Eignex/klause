@@ -56,6 +56,10 @@ class PresolveBudget(
     val passCalls: Map<String, Int> get() = calls.toMap()
     private val calls = HashMap<String, Int>()
 
+    /** Literals removed by committed, assignment-set-preserving source clause replacements. */
+    var clauseLiteralsRemoved: Long = 0
+        internal set
+
     /** Root-bake propagation probes across reseeds and tiers, including repair calls. */
     var probeCalls: Long = 0
         private set
@@ -112,6 +116,10 @@ private class PresolveRootWorkMeter(val budget: PresolveBudget) : RootWorkMeter 
 
 internal fun Cancellation.recordPresolveProbe() {
     (workMeter() as? PresolveRootWorkMeter)?.budget?.recordProbe()
+}
+
+internal fun Cancellation.recordClauseStrengthening() {
+    (workMeter() as? PresolveRootWorkMeter)?.budget?.let { it.clauseLiteralsRemoved++ }
 }
 
 private fun saturatedSum(total: Long, units: Long): Long =

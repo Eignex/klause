@@ -278,4 +278,6 @@ data class PresolveEffortStats(
     val rootConstructionEntries: Long? = null,
     /** Native propagation work across root bakes, probes and repairs; null without a meter. */
     val rootPropagationWork: Long? = null,
+    /** Literals removed by completed source clause-strengthening replacements. */
+    val clauseLiteralsRemoved: Long? = null,
 )

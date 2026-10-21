@@ -33,7 +33,7 @@ harvest rerunning only when it tightened something.
 |---|---|
 | Linear | Coefficient strengthening, Diophantine bound tightening, linear bound fusion, affine singleton elimination, sub-sum aggregation, dependent-equality removal, singleton inequality projection |
 | Structural | Redundancy and subsumption, structural reduction, comparison-clause folding, duplicate-column merging, dual fixing |
-| Boolean | Implication graph, bounded variable elimination, blocked clause elimination, at-most-one clique merging, XOR unit derivation |
+| Boolean | Clause strengthening, implication graph, bounded variable elimination, blocked clause elimination, at-most-one clique merging, XOR unit derivation |
 | Symmetry | Symmetry breaking and value precedence |
 | Probing | Failed literals, integer bounds and holes, open ranges |
 | Around the rounds | Binary column substitution, LP harvest, difference-system posting |
@@ -157,6 +157,17 @@ objective prefers the other direction. Folding, merging and dual fixing change t
 solution set.
 
 ### Boolean reductions
+
+Clause strengthening keeps a mandatory donor `L OR A` and replaces a mandatory
+target `NOT L OR A OR B` with `A OR B`. Each checked resolution preserves every
+assignment, including values read by other factors and objectives, so it needs no
+reconstruction and remains enabled for counting. Only clean Boolean clauses
+participate. An occurrence index supplies candidates; current exact literal sets
+decide each replacement. Construction, candidate checks and copies share the phase
+token. Cancellation retains completed replacements and discards an unfinished one;
+final delta work is reserved before the first replacement. Effort telemetry counts
+the literals removed by committed replacements. The moderate pass uses the shared
+round schedule.
 
 The implication graph pins each free Boolean, propagates and records forced
 literals; mutual-implication cycles collapse to one representative and transitively
