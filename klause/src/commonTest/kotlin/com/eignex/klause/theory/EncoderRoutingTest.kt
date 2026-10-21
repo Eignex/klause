@@ -68,12 +68,14 @@ import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBoolValue
+import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.toLongExact
 import com.eignex.skema.SchemaDef
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -602,7 +604,7 @@ class EncoderRoutingTest {
         assertEquals(FactorOwner.CP, plan.factorOwner(0))
         assertTrue(plan.factorEncoded(0))
         val model = assertIs<SearchResult.Satisfied>(result).model
-        assertEquals(1L, model.valueOf<Long>(com.eignex.klause.solver.search.SearchIntValue(0)))
+        assertEquals(1L, model.valueOf(SearchExactIntValue(SourceIntId(0)))?.toLongExact())
     }
 
     @Test
@@ -674,7 +676,7 @@ class EncoderRoutingTest {
         }
 
         val model = assertIs<SearchResult.Satisfied>(result).model
-        assertEquals(true, model.valueOf<Boolean>(SearchBoolValue(0)))
+        assertEquals(true, model.valueOf(SearchBoolValue(0)))
     }
 
     @Test

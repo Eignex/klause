@@ -464,7 +464,9 @@ class PortfolioIncumbentAcceptanceTest {
         val slowCheck = WitnessCheck { _, _ ->
             checks++
             val until = TimeSource.Monotonic.markNow() + 2.milliseconds
-            while (!until.hasPassedNow()) Unit
+            do {
+                val waiting = !until.hasPassedNow()
+            } while (waiting)
             null
         }
 

@@ -101,7 +101,7 @@ class LinearOptimizationExecutionTest {
                 authority.evidence.verify(bound, context.withLinearAuthority()),
             )
             assertSame(assertNotNull(observed), execution.acceptedIncumbent)
-            assertSame(observed?.sample, authority.incumbent)
+            assertSame(observed.sample, authority.incumbent)
             assertEquals(third, authority.value)
         }
     }

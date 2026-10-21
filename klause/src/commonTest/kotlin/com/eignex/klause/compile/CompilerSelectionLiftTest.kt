@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.model.IntLit
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.element
 import com.eignex.klause.schema.eq
@@ -30,7 +31,7 @@ class CompilerSelectionLiftTest {
             val relation by constraint { b iff (max(x, IntLit(1)) eq 2) }
         }
         val compiled = S().compile()
-        val solver = BacktrackSolver(compiled)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val choice = compiled.boolVarIdByName.getValue("b")
         val value = compiled.intVarIdByName.getValue("x")
 
@@ -50,7 +51,7 @@ class CompilerSelectionLiftTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val presence = compiled.boolVarIdByName.getValue("x__present")
 
         for (present in listOf(false, true)) {
@@ -80,7 +81,7 @@ class CompilerSelectionLiftTest {
 
         assertEquals(listOf(true, false), extrema.map { it.max })
         assertEquals(listOf(1, 0, 1), extrema.first().xs.toList())
-        assertIs<SolveResult.Sat>(BacktrackSolver(compiled).solve(BacktrackParams(randomSeed = 0)))
+        assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 0)))
     }
 
     @Test
@@ -92,7 +93,7 @@ class CompilerSelectionLiftTest {
         }
         val compiled = S().compile()
         val selection = compiled.problem.factors.filterIsInstance<Element>().single()
-        val solver = BacktrackSolver(compiled)
+        val solver = BacktrackSolver(compiled.problem.bake())
 
         assertEquals(0, selection.indexOffset)
         assertEquals(compiled.intVarIdByName.getValue("x").toLong(), selection.arr[1])
@@ -119,8 +120,9 @@ class CompilerSelectionLiftTest {
         val compiled = S().compile()
 
         assertEquals(1, compiled.problem.factors.filterIsInstance<Element>().size)
-        val sample = assertIs<SolveResult.Sat>(BacktrackSolver(compiled).solve(BacktrackParams(randomSeed = 0)))
-            .assignment
+        val sample = assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 0)),
+        ).assignment
         assertEquals(true, sample.bools[compiled.boolVarIdByName.getValue("b")])
         assertEquals(2L, sample.ints[compiled.intVarIdByName.getValue("y")])
     }

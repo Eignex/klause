@@ -790,7 +790,7 @@ private fun certifyLpResultWithin(
         conflict = accepted?.conflict?.let { policy.acceptNullable(LpCertifier.EXACT_FARKAS, it) }
         // Continuation proves feasibility only. Its point, found after refinement ran without one, seeds the
         // refinement that can prove the optimum.
-        if (witness != null && bound?.value != witness?.objective && !stopped()) refine()
+        if (witness != null && bound?.value != witness.objective && !stopped()) refine()
     }
     if (continued == null) {
         capturedTarget?.let {

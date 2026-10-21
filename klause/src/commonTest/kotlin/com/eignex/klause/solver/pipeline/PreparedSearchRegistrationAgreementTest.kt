@@ -29,7 +29,7 @@ import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
-import com.eignex.klause.solver.search.contribute
+import com.eignex.klause.solver.search.TypedSearchValueKey
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
@@ -445,7 +445,7 @@ class PreparedSearchRegistrationAgreementTest {
         )
         val arithmetic = AlgebraicArithmetic(PolynomialArithmetic())
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        val coordinates: List<Map<Any, Any>> = listOf(
+        val coordinates: List<Map<TypedSearchValueKey<*>, Any>> = listOf(
             mapOf(SearchExactAlgebraicRealValue(SourceRealId(0)) to root),
             mapOf(SearchExactRealExpressionValue(SourceRealId(0)) to ExactRealValue(ExactRealExpression.Pi)),
         )

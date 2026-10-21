@@ -4,8 +4,6 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -15,6 +13,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class SourceSolvableTest(private val direction: String) {
@@ -54,7 +54,7 @@ class SourceSolvableTest(private val direction: String) {
         assertEquals("x=$optimum" to optimum, points.last())
         assertEquals(Verdict.OPTIMAL, completed)
         assertSame(assertNotNull(solvable.sourceInvocation), solvable.finiteShape.sourceInvocation)
-        assertSame(source, solvable.sourceInvocation?.source?.originalSource)
+        assertSame(source, solvable.sourceInvocation.source?.originalSource)
         assertNull(solvable.definitionalSweep)
         assertNull(solvable.lsObjective)
     }

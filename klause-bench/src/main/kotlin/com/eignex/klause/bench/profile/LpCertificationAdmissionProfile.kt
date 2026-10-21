@@ -92,7 +92,7 @@ object LpCertificationAdmissionProfile {
             "verifyExactBasis",
             modelType,
             basisType,
-            Integer::class.java,
+            Int::class.javaObjectType,
             basisCache.javaClass,
             Cancellation::class.java,
             basisLimits.javaClass,

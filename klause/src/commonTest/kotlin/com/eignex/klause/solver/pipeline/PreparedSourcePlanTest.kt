@@ -17,6 +17,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.ScoringProjectionProvider
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
@@ -31,7 +32,7 @@ import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBoolValue
-import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncodedTheoryFactor
@@ -46,6 +47,7 @@ import com.eignex.klause.theory.LinearEncodingFormula
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -520,8 +522,8 @@ class PreparedSourcePlanTest {
             assertSame(clause, retained.source)
             assertEquals(1, retained.attribution.linearGuards.size)
             val witness = assertIs<SearchResult.Satisfied>(result).model
-            assertEquals(positive, witness.valueOf<Boolean>(SearchBoolValue(0)))
-            assertTrue(assertNotNull(witness.valueOf<Long>(SearchIntValue(0))) >= 1L)
+            assertEquals(positive, witness.valueOf(SearchBoolValue(0)))
+            assertTrue(assertNotNull(witness.valueOf(SearchExactIntValue(SourceIntId(0)))?.toLongExact()) >= 1L)
         }
     }
 

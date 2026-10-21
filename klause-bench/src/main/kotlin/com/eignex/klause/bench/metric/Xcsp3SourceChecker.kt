@@ -3,7 +3,6 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.report.Reports
 import java.io.File
 import java.io.StringReader
-import java.lang.reflect.Array as ReflectArray
 import java.math.BigInteger
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlinx.serialization.encodeToString
@@ -25,6 +24,7 @@ import org.xcsp.parser.entries.XObjectives.OObjectiveSpecial
 import org.xcsp.parser.entries.XObjectives.XObj
 import org.xcsp.parser.entries.XVariables.XVarInteger
 import org.xml.sax.InputSource
+import java.lang.reflect.Array as ReflectArray
 
 internal object Xcsp3SourceChecker {
     private const val CHECKER = "org.xcsp:xcsp3-tools:2.5"
@@ -287,9 +287,9 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
         val list = c.childs[0].value as? Array<*> ?: decline("element list")
         if (list.any { it !is XVarInteger && it !is Number }) decline("element list")
         val rank = c.childs[1].attributes.entries.singleOrNull { it.key.name == "rank" }?.value
-        if (rank != null && rank.toString().lowercase() != "any") decline("ranked element")
+        if (rank != null && rank.lowercase() != "any") decline("ranked element")
         val start = c.childs[0].attributes.entries.singleOrNull { it.key.name == "startIndex" }?.value
-            ?.let { it.toString().toIntOrNull() ?: decline("element start index") } ?: 0
+            ?.let { it.toIntOrNull() ?: decline("element start index") } ?: 0
         val index = integers(c.childs[1].value).single() - BigInteger.valueOf(start.toLong())
         integer(index, "element index offset")
         if (index < BigInteger.ZERO || index >= BigInteger.valueOf(list.size.toLong())) decline("element index range")
@@ -302,10 +302,10 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
         val indexes = c.childs[1].value as? Array<*> ?: decline("matrix element indexes")
         if (indexes.size != 2 || indexes.any { it !is XVarInteger }) decline("matrix element indexes")
         val rank = c.childs[1].attributes.entries.singleOrNull { it.key.name == "rank" }?.value
-        if (rank != null && rank.toString().lowercase() != "any") decline("ranked matrix element")
+        if (rank != null && rank.lowercase() != "any") decline("ranked matrix element")
         val offsets = listOf("startRowIndex", "startColIndex").map { name ->
             c.childs[0].attributes.entries.singleOrNull { it.key.name == name }?.value
-                ?.let { it.toString().toIntOrNull() ?: decline("matrix element start index") } ?: 0
+                ?.let { it.toIntOrNull() ?: decline("matrix element start index") } ?: 0
         }
         val positions = indexes.indices.map { axis ->
             val position = integers(checkNotNull(indexes[axis])).single() - BigInteger.valueOf(offsets[axis].toLong())

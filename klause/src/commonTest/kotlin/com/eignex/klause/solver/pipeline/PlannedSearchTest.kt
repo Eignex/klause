@@ -14,18 +14,16 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.propagation.CpIntId
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.BooleanSearchResult
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
-import com.eignex.klause.solver.search.SearchIntValue
-import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -62,7 +60,6 @@ class PlannedSearchTest {
         assertIs<ComponentResult.Consistent>(planned.session.initialize())
         val result = assertIs<BooleanSearchResult.Satisfied>(planned.session.solveBoolean(1))
 
-        assertNotNull(result.model.valueOf<Any>(SearchRealValue(0)))
         assertNotNull(result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
     }
 
@@ -78,9 +75,8 @@ class PlannedSearchTest {
         assertIs<ComponentResult.Consistent>(planned.session.initialize())
         val result = assertIs<SearchResult.Satisfied>(planned.session.solve(0))
 
-        val sample = checkNotNull(result.model.valueOf<Sample>(checkNotNull(planned.cp)))
+        val sample = checkNotNull(result.model.valueOf(checkNotNull(planned.cp).assignmentKey))
         assertEquals(0L, sample.ints[0])
-        assertEquals(0L, result.model.valueOf<Long>(SearchIntValue(0)))
         assertEquals(bigIntOf(0), result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
     }
 
@@ -101,7 +97,6 @@ class PlannedSearchTest {
 
         val result = assertIs<SearchResult.Satisfied>(planned.session.solve(0))
 
-        assertNotNull(result.model.valueOf<Long>(SearchIntValue(1)))
         assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(1))))
         val projection = model.componentPlan().cpProjection(model, mapOf(0 to IntDomain(0, 3), 2 to IntDomain(0, 3)))
         assertEquals(CpIntId(1), projection.cpId(SourceIntId(2)))
@@ -180,7 +175,7 @@ class PlannedSearchTest {
 
         assertEquals(7L, planned.session.intLowerBound(HYBRID_X))
         assertEquals(7L, planned.session.intUpperBound(HYBRID_X))
-        assertEquals(7L, planned.session.model().valueOf<Long>(SearchIntValue(HYBRID_X)))
+        assertEquals(7L, planned.session.model().valueOf(SearchExactIntValue(SourceIntId(HYBRID_X)))?.toLongExact())
         val branch = assertNotNull(planned.session.branchAlternatives())
         assertTrue(
             branch.all { decision ->

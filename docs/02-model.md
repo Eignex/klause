@@ -354,7 +354,7 @@ Source-keyed values (`SearchBoolValue`, `SearchExactIntValue`,
 `SearchExactRealValue` and the algebraic and symbolic real forms) let each
 component contribute only the coordinates it owns. The open pipeline assembles
 them into an exact snapshot; missing or multiply represented coordinates withhold
-publication. [Typed contributions](19-api.md#typed-contributions-and-migration)
+publication. [Typed contributions](19-api.md#typed-contributions)
 define the decoding boundary.
 
 ### Public strategy construction

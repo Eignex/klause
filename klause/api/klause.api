@@ -43,8 +43,6 @@ public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Pi : co
 public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Power : com/eignex/klause/arithmetic/real/ExactRealExpression {
 	public final fun component1 ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
 	public final fun component2 ()I
-	public final fun copy (Lcom/eignex/klause/arithmetic/real/ExactRealExpression;I)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Power;
-	public static synthetic fun copy$default (Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Power;Lcom/eignex/klause/arithmetic/real/ExactRealExpression;IILjava/lang/Object;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Power;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBase ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
 	public final fun getExponent ()I
@@ -212,9 +210,7 @@ public final class com/eignex/klause/backtrack/BacktrackRecipe {
 
 public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver, com/eignex/klause/solver/Solver {
 	public static final field Companion Lcom/eignex/klause/backtrack/BacktrackSolver$Companion;
-	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;)V
-	public fun <init> (Lcom/eignex/klause/schema/VariableSchema;)V
 	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
 	public fun count (Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
 	public fun describe (Lcom/eignex/klause/backtrack/BacktrackParams;)Ljava/lang/String;
@@ -5012,10 +5008,8 @@ public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex
 
 public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver {
 	public static final field Companion Lcom/eignex/klause/localsearch/LocalSearchSolver$Companion;
-	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (Lcom/eignex/klause/schema/VariableSchema;)V
 	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
 	public fun count (Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
 	public fun describe (Lcom/eignex/klause/localsearch/LocalSearchParams;)Ljava/lang/String;
@@ -9373,6 +9367,7 @@ public final class com/eignex/klause/propagation/CpSearchComponent : com/eignex/
 	public fun blockModel (Lcom/eignex/klause/solver/search/AssembledSearchModel;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public final fun getAssignmentKey ()Lcom/eignex/klause/solver/search/SearchModelKey;
 	public fun getPrefersNativeConflictAnalysis ()Z
 	public fun getResolvesAfterModelBlock ()Z
 	public fun getRetainsOwnExplanations ()Z
@@ -12174,7 +12169,7 @@ public final class com/eignex/klause/solver/pipeline/PlannedSearch : java/lang/A
 	public fun close ()V
 	public final fun getCp ()Lcom/eignex/klause/propagation/CpSearchComponent;
 	public final fun getSession ()Lcom/eignex/klause/solver/search/SearchSession;
-	public final fun getTheory ()Lcom/eignex/klause/solver/search/TheoryComponent;
+	public final fun getTheory ()Lcom/eignex/klause/solver/search/SearchComponent;
 }
 
 public final class com/eignex/klause/solver/pipeline/PlannedSearchKt {
@@ -14682,7 +14677,6 @@ public final class com/eignex/klause/solver/result/UnsoundnessException : java/l
 
 public final class com/eignex/klause/solver/search/AssembledSearchModel {
 	public final fun valueOf (Lcom/eignex/klause/solver/search/TypedSearchValueKey;)Ljava/lang/Object;
-	public final fun valueOf (Ljava/lang/Object;)Ljava/lang/Object;
 }
 
 public abstract interface class com/eignex/klause/solver/search/BooleanBranching {
@@ -15391,7 +15385,7 @@ public final class com/eignex/klause/solver/search/SearchLearnedDbParams {
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchModel {
-	public abstract fun put (Ljava/lang/Object;Ljava/lang/Object;)V
+	public abstract fun contribute (Lcom/eignex/klause/solver/search/TypedSearchValueKey;Ljava/lang/Object;)V
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchModelBlocker : com/eignex/klause/solver/search/SearchComponent {
@@ -15463,10 +15457,6 @@ public final class com/eignex/klause/solver/search/SearchModelKey : com/eignex/k
 	public synthetic fun <init> (Lkotlin/reflect/KClass;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun getValueType ()Lkotlin/reflect/KClass;
 	public fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
-}
-
-public final class com/eignex/klause/solver/search/SearchModelKeyKt {
-	public static final fun contribute (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/TypedSearchValueKey;Ljava/lang/Object;)V
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchModelPolicy {
@@ -15937,21 +15927,6 @@ public final class com/eignex/klause/solver/search/SourceCoordinateAgreementComp
 	public fun retract (I)V
 }
 
-public abstract interface class com/eignex/klause/solver/search/TheoryComponent : com/eignex/klause/solver/search/SearchComponent {
-}
-
-public final class com/eignex/klause/solver/search/TheoryComponent$DefaultImpls {
-	public static fun assert (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
-	public static fun check (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
-	public static fun contributeModel (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
-	public static fun getRetainsOwnExplanations (Lcom/eignex/klause/solver/search/TheoryComponent;)Z
-	public static fun initialize (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
-	public static fun onRestart (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)V
-	public static fun propagate (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
-	public static fun reasonFor (Lcom/eignex/klause/solver/search/TheoryComponent;I)Lcom/eignex/klause/solver/search/SearchExplanation;
-	public static fun retract (Lcom/eignex/klause/solver/search/TheoryComponent;I)V
-}
-
 public abstract interface class com/eignex/klause/solver/search/TypedSearchValueKey : com/eignex/klause/solver/search/SearchValueKey {
 	public abstract fun getValueType ()Lkotlin/reflect/KClass;
 	public fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
@@ -16272,12 +16247,13 @@ public final class com/eignex/klause/theory/TheoryRealId {
 	public final synthetic fun unbox-impl ()I
 }
 
-public final class com/eignex/klause/theory/TheorySearchComponent : com/eignex/klause/solver/search/TheoryComponent {
-	public fun <init> (Lcom/eignex/klause/theory/Theory;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/eignex/klause/theory/Theory;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+public final class com/eignex/klause/theory/TheorySearchComponent : com/eignex/klause/solver/search/SearchComponent {
+	public fun <init> (Lcom/eignex/klause/theory/Theory;Lcom/eignex/klause/solver/search/TypedSearchValueKey;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/eignex/klause/theory/Theory;Lcom/eignex/klause/solver/search/TypedSearchValueKey;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public final fun getAssignmentKey ()Lcom/eignex/klause/solver/search/TypedSearchValueKey;
 	public fun getRetainsOwnExplanations ()Z
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun onRestart (Lcom/eignex/klause/solver/search/SearchContext;)V
@@ -16286,7 +16262,7 @@ public final class com/eignex/klause/theory/TheorySearchComponent : com/eignex/k
 	public fun retract (I)V
 }
 
-public final class com/eignex/klause/theory/difference/DifferenceSearchComponent : com/eignex/klause/solver/search/TheoryComponent {
+public final class com/eignex/klause/theory/difference/DifferenceSearchComponent : com/eignex/klause/solver/search/SearchComponent {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[I)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/ir/Problem;[I)V
@@ -16294,6 +16270,7 @@ public final class com/eignex/klause/theory/difference/DifferenceSearchComponent
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public final fun getAssignmentKey ()Lcom/eignex/klause/solver/search/SearchModelKey;
 	public fun getRetainsOwnExplanations ()Z
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun onRestart (Lcom/eignex/klause/solver/search/SearchContext;)V
@@ -16330,7 +16307,7 @@ public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com/eignex/klause/solver/search/SearchBranchProposal, com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/SourceCoordinateAgreement, com/eignex/klause/solver/search/TheoryComponent, java/lang/AutoCloseable {
+public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com/eignex/klause/solver/search/SearchBranchProposal, com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/SearchComponent, com/eignex/klause/solver/search/SourceCoordinateAgreement, java/lang/AutoCloseable {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[ILkotlin/jvm/functions/Function2;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[ILkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function2;)V
@@ -16340,7 +16317,9 @@ public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com
 	public fun checkSourceCoordinates (Lcom/eignex/klause/solver/search/AssembledSearchModel;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun close ()V
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public final fun getAssignmentKey ()Lcom/eignex/klause/solver/search/SearchModelKey;
 	public fun getBranchKind ()Lcom/eignex/klause/solver/search/SearchBranchKind;
+	public final fun getRealAssignmentKey ()Lcom/eignex/klause/solver/search/SearchModelKey;
 	public fun getRetainsOwnExplanations ()Z
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun nextBranch (Lcom/eignex/klause/solver/search/SearchContext;)Ljava/util/List;
@@ -16361,52 +16340,6 @@ public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBools ()[Z
 	public final fun getReals ()Ljava/util/List;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/theory/qflra/SourceBoundAtom : com/eignex/klause/solver/search/SourceBoundPredicate {
-	public static final field Companion Lcom/eignex/klause/theory/qflra/SourceBoundAtom$Companion;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getSourceBound ()Lcom/eignex/klause/solver/search/SourceBoundAtom;
-	public final fun getStrict ()Z
-	public final fun getTerms ()Ljava/util/List;
-	public final fun getThreshold ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun getUpper ()Z
-	public fun hashCode ()I
-}
-
-public final class com/eignex/klause/theory/qflra/SourceBoundAtom$Companion {
-	public final fun integerSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/theory/qflra/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
-	public static synthetic fun integerSplit$default (Lcom/eignex/klause/theory/qflra/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/theory/qflra/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
-	public final fun rationalSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZLcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/theory/qflra/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
-	public static synthetic fun rationalSplit$default (Lcom/eignex/klause/theory/qflra/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZLcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/theory/qflra/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
-}
-
-public final class com/eignex/klause/theory/qflra/SourceBoundLimits {
-	public fun <init> ()V
-	public fun <init> (II)V
-	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()I
-	public final fun component2 ()I
-	public final fun copy (II)Lcom/eignex/klause/theory/qflra/SourceBoundLimits;
-	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/SourceBoundLimits;IIILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/SourceBoundLimits;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getMaxBits ()I
-	public final fun getMaxTerms ()I
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/theory/qflra/SourceBoundTerm {
-	public fun <init> (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/search/SearchValueKey;
-	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun copy (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/theory/qflra/SourceBoundTerm;
-	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/SourceBoundTerm;Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/SourceBoundTerm;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCoefficient ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun getSource ()Lcom/eignex/klause/solver/search/SearchValueKey;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

@@ -11,6 +11,7 @@ import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntegerBound
@@ -19,8 +20,6 @@ import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchTheoryDecision
-import com.eignex.klause.solver.search.TheoryComponent
-import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.util.BIG_ONE
@@ -58,7 +57,7 @@ internal class QuadraticIntegerComponent(
     private val root: PolynomialCondition,
     private val step: () -> Unit,
     private val complete: (PolynomialCondition, SearchContext) -> QuadraticIntegerNode,
-) : TheoryComponent, SearchBrancher, SearchBranchProposal, SearchNodePolicy {
+) : SearchComponent, SearchBrancher, SearchBranchProposal, SearchNodePolicy {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
     private val owner = Any()

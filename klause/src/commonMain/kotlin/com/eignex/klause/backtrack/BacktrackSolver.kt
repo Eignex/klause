@@ -90,14 +90,6 @@ class BacktrackSolver internal constructor(
         fun source(schema: VariableSchema): SourceStrategy = source(schema.compile())
     }
 
-    /** Finite-only facade over a [CompiledSchema]; use [source] for shared model breadth. */
-    @Deprecated("Finite-only facade; use BacktrackSolver.source(compiled) for shared source execution.")
-    constructor(compiled: CompiledSchema) : this(compiled.problem.bake(), LpSolveContext.Production)
-
-    /** Compile [schema] into this finite-only facade; use [source] for shared model breadth. */
-    @Deprecated("Finite-only facade; use BacktrackSolver.source(schema) for shared source execution.")
-    constructor(schema: VariableSchema) : this(schema.compile().problem.bake(), LpSolveContext.Production)
-
     /** Solve once and return a [SolveResult]. */
     fun solve(): SolveResult = solve(BacktrackParams())
 

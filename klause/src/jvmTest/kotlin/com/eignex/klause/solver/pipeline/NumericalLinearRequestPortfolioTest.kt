@@ -17,14 +17,14 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class NumericalLinearRequestPortfolioTest(private val engine: FiniteEngine, private val cores: Int) {
@@ -60,7 +60,7 @@ class NumericalLinearRequestPortfolioTest(private val engine: FiniteEngine, priv
         assertSame(source, result.invocation.preparedPlan?.originalSource)
         assertNull(source.objective)
         assertEquals(listOf(BigFraction.ZERO), assertNotNull(result.linearSource?.incumbent).values)
-        assertEquals(LinearSourceConclusion.SATISFIABLE, result.linearSource?.conclusion)
+        assertEquals(LinearSourceConclusion.SATISFIABLE, result.linearSource.conclusion)
     }
 
     @Test

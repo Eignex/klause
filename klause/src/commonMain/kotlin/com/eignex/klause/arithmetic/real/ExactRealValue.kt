@@ -49,6 +49,7 @@ sealed interface ExactRealExpression {
     }
 
     /** Nonnegative integer power. */
+    @ConsistentCopyVisibility
     data class Power internal constructor(
         /** Exact base. */
         val base: ExactRealExpression,

@@ -12,7 +12,7 @@ internal fun LpModel.hasStrictSides(meter: RefinementMeter): Boolean {
         val bounds = source.column(column).bounds
         bounds.lower?.strict == true || bounds.upper?.strict == true
     } || (0 until m).any { source.row(it).strict }
-    previousStage?.let { meter.diagnostic?.stage = it }
+    previousStage?.let { meter.diagnostic.stage = it }
     return strict
 }
 

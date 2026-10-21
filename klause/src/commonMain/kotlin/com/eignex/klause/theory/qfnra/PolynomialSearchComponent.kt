@@ -8,13 +8,12 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.FiniteFactorEnforcement
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
-import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.completedSearchSample
-import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.util.Cancellation
 
 internal class PolynomialSearchComponent(
@@ -22,7 +21,7 @@ internal class PolynomialSearchComponent(
     private val invocation: PolynomialTheoryInvocation,
     integerColumns: Map<Int, Int> = emptyMap(),
     private val capture: ((QfNraAssignment, SearchContext) -> Sample)? = null,
-) : TheoryComponent, PreparingSearchComponent, FiniteFactorEnforcer {
+) : SearchComponent, PreparingSearchComponent, FiniteFactorEnforcer {
     private val integerColumns = integerColumns.toMap()
     val witnessKey = SearchModelKey(QfNraAssignment::class)
     private var signature: PolynomialSignature? = null

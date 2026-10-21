@@ -128,7 +128,6 @@ internal fun PolynomialRealFormula.remap(remap: VarRemap): PolynomialRealFormula
                 val operands = when (node) {
                     is PolynomialRealFormula.And -> node.operands
                     is PolynomialRealFormula.Or -> node.operands
-                    else -> error("unreachable")
                 }
                 if (combine) {
                     val args = List(operands.size) { values.removeLast() }.reversed()
@@ -250,7 +249,6 @@ private fun polynomialFormulasEqual(left: PolynomialRealFormula, right: Polynomi
                         firstOperands = first.operands
                         secondOperands = second.operands
                     }
-                    else -> error("unreachable")
                 }
                 if (firstOperands.size != secondOperands.size) return false
                 for (index in firstOperands.indices) work.addLast(firstOperands[index] to secondOperands[index])

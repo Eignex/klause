@@ -15,14 +15,13 @@ import com.eignex.klause.solver.search.SearchConflictResolver
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExplanation
-import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchIntegerBound
 import com.eignex.klause.solver.search.SearchLearnedConflict
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelBlocker
+import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.bigIntOf
@@ -322,15 +321,17 @@ class CpSearchComponent(
         nativeLevelBySharedLevel.truncateTo(decisionLevel + 1)
     }
 
+    /** Owned finite assignment contributed by this component. */
+    val assignmentKey = SearchModelKey(Sample::class)
+
     override fun contributeModel(model: SearchModel, context: com.eignex.klause.solver.search.SearchContext) {
         for (variable in 0 until session.problem.numIntVars) {
             val value = session.intDomain(variable).min
             val source = sourceIntId(variable)
-            model.put(SearchIntValue(source), value)
             model.contribute(SearchExactIntValue(SourceIntId(source)), bigIntOf(value))
         }
-        model.put(
-            this,
+        model.contribute(
+            assignmentKey,
             Sample(
                 BooleanArray(session.problem.numBoolVars) { variable -> session.boolValue(variable) ?: false },
                 LongArray(session.problem.numIntVars) { variable -> session.intDomain(variable).min },
@@ -354,7 +355,7 @@ class CpSearchComponent(
         model: com.eignex.klause.solver.search.AssembledSearchModel,
         context: com.eignex.klause.solver.search.SearchContext,
     ): ComponentResult {
-        val sample = checkNotNull(model.valueOf<Sample>(this))
+        val sample = checkNotNull(model.valueOf(assignmentKey))
         val nogood = session.assignmentNogood(
             sample.bools,
             sample.ints,

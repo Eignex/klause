@@ -8,10 +8,10 @@ import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.tools.Profiler
-import kotlinx.serialization.Serializable
 import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.serialization.Serializable
 
 /**
  * Uniform subprocess solving: every solver is run as an external process emitting MiniZinc-format
@@ -590,8 +590,7 @@ internal object SolverInvocation {
 /**
  * A portfolio incumbent record parsed from `%%%klause-arm:`. [exactObjective] stores
  * model-oriented discrete cost as decimal text; [continuousObjective] stores the whole
- * cost when a continuous column contributes. [objective] only decodes numeric persisted
- * records; it is never written and is not exact.
+ * cost when a continuous column contributes.
  *
  * Arrival order may differ from improvement order because publication and emission
  * use separate critical sections. Find the best holder with [SolveMetric.best].
@@ -599,7 +598,6 @@ internal object SolverInvocation {
 @Serializable
 internal data class Attribution(
     val label: String,
-    @Deprecated("Use exactObjective or continuousObjective") val objective: Double? = null,
     val exactObjective: String? = null,
     val continuousObjective: Double? = null,
     val elapsedMs: Long,

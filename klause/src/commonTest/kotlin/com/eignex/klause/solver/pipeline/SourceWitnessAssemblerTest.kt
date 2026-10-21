@@ -26,7 +26,7 @@ import com.eignex.klause.solver.search.SearchExactRealExpressionValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.solver.search.contribute
+import com.eignex.klause.solver.search.TypedSearchValueKey
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
@@ -45,7 +45,7 @@ class SourceWitnessAssemblerTest {
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(1.0),
         )
-        val values: Map<Any, Any> = mapOf(
+        val values: Map<TypedSearchValueKey<*>, Any> = mapOf(
             SearchBoolValue(0) to true,
             SearchExactIntValue(SourceIntId(0)) to parseBigInt("1"),
             SearchExactRealValue(SourceRealId(0)) to BigFraction.ONE,

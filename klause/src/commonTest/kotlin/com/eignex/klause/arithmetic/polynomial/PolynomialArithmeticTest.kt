@@ -221,7 +221,9 @@ class PolynomialArithmeticTest {
             val stopped = assertFailsWith<PolynomialResourceLimit> {
                 if (prepared) {
                     val pending = limited.preparePrincipalSubresultants(left, right, 0)
-                    while (pending.next() == null) Unit
+                    do {
+                        val step = pending.next()
+                    } while (step == null)
                 } else limited.principalSubresultants(left, right, 0)
             }
 

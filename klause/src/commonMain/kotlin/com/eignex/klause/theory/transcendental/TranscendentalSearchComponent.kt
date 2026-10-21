@@ -12,7 +12,6 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchTheoryDecision
-import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.util.Cancellation
 

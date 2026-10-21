@@ -114,8 +114,7 @@ Coverage is defined by [nonlinear integer](16-nonlinear-arithmetic.md),
 
 The JVM and Kotlin/Native API dumps record published descriptors, but publication
 alone does not make a type an extension contract. Unlisted mechanisms in the packages
-above are implementation APIs. Supported replacements keep the old descriptors with
-warning-level deprecations rather than an immediate break.
+above are implementation APIs.
 
 `FiniteSolveRequest` and the portfolio plan requests accept immutable
 `ExecutionOptions`, for example `ExecutionOptions(ExecutionOption.seed(7L))`; the
@@ -147,7 +146,7 @@ indeterminate checking without a witness or refutation, and decided answers appl
 only to the checked fragment. See
 [theory roles](14-theories.md#extension-roles-and-completeness).
 
-## Typed contributions and migration
+## Typed contributions
 
 `TypedSearchValueKey<V>` associates a key with its immutable value type; its
 capture function freezes borrowed producer state once during assembly. Equal keys
@@ -158,8 +157,9 @@ must agree on value type, and only one component may contribute a given key. Use
 `SearchExactAlgebraicRealValue` an `AlgebraicReal`, and
 `SearchExactRealExpressionValue` an `ExactRealValue`; `SearchBoolValue` carries
 `Boolean`. A source real has one authoritative representation key. Other theory
-symbols use extension-defined keys. The untyped `SearchModel.put`/`valueOf` and
-legacy value keys remain as deprecated, borrowed read-only compatibility paths.
+symbols use extension-defined keys. Complete component assignments use explicit
+`assignmentKey` values; batch adapters receive a typed assignment key at construction.
+`SearchIntValue` and `SearchRealValue` identify locations in source-bound predicates.
 
 The assembled model is captured, so a retained sink cannot add values after
 publication. The open executor decodes source scalar keys through a source-bound

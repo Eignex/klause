@@ -149,7 +149,7 @@ class Element private constructor(
             val hi = indexOffset.toLong() + arr.size - 1
             // Structural bound rewrites carry IntRange endpoints.
             if (hi > Int.MAX_VALUE) return Unchanged
-            if (maxOf(idxDom.min, lo.toLong()) > minOf(idxDom.max, hi.toLong())) return Unchanged
+            if (maxOf(idxDom.min, lo.toLong()) > minOf(idxDom.max, hi)) return Unchanged
             return Rewrite(listOf(resultEquals(arr[0])), mapOf(idx to lo..hi.toInt()))
         }
         return Unchanged

@@ -112,7 +112,7 @@ class LinearAuthorityInvocationTest {
 
         assertNull(result?.terminal)
         assertNotNull(result?.incumbent)
-        assertNull(result?.bound)
+        assertNull(result.bound)
     }
 
     @Test
@@ -247,7 +247,7 @@ class LinearAuthorityInvocationTest {
         assertNull(result?.terminal)
         assertEquals(TerminationReason.Cancelled, result?.reason)
         assertNotNull(result?.incumbent)
-        val bound = assertIs<SourceClaim.Bound>(assertNotNull(result?.bound).claim)
+        val bound = assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim)
         assertEquals(SourceValue.Rational(BigFraction.ONE), bound.value)
     }
 

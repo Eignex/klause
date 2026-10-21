@@ -24,6 +24,7 @@ import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchRunEvent
+import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
@@ -147,7 +148,7 @@ class OpenTheorySolverTest {
 
             val result = assertIs<SearchRunEvent.Satisfied>(planned.session.openRun(model.numBoolVars).next())
 
-            assertNotNull(result.model.valueOf<Sample>(assertNotNull(planned.theory)))
+            assertNotNull(result.model.valueOf(assertIs<DifferenceSearchComponent>(planned.theory).assignmentKey))
         }
     }
 

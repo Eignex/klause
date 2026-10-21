@@ -340,7 +340,7 @@ class NumericalLinearRequestTest {
         val optimum = assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
         assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), optimum.value)
         assertEquals(BigFraction.ofLong(2), assertNotNull(result.linearSource?.incumbent).objective)
-        assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+        assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource.conclusion)
         assertSame(source, result.invocation.preparedPlan?.originalSource)
     }
 

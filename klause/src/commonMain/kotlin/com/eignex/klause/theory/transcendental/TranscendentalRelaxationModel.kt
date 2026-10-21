@@ -102,7 +102,6 @@ internal class TranscendentalRelaxationModel(
                 val children = when (source) {
                     is TranscendentalExpression.Sum -> source.operands
                     is TranscendentalExpression.Product -> source.operands
-                    else -> error("unreachable")
                 }.map { expression(it, guard) }
                 val product = source is TranscendentalExpression.Product
                 val neutral = if (product) BigFraction.ONE else BigFraction.ZERO

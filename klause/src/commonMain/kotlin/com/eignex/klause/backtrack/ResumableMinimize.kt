@@ -1205,7 +1205,7 @@ internal class ResumableMinimize(
             model: com.eignex.klause.solver.search.AssembledSearchModel,
             context: SearchContext,
         ): SearchModelDisposition {
-            val sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf<Sample>(cp))
+            val sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf(cp.assignmentKey))
             // The leaf is the engine's own claim, re-derived here from every factor before it can become an
             // incumbent: an assignment the composed fixpoint refutes is an engine defect, never a solution. A check
             // the deadline cut short refutes nothing, so the leaf stands.

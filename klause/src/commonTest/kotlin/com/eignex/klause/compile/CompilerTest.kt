@@ -110,7 +110,7 @@ class CompilerTest {
             assertTrue(LpAutoConfig.recommend(secondBaked).bounding)
             for (compiled in listOf(first, second)) {
                 val result = assertIs<SolveResult.Sat>(
-                    BacktrackSolver(compiled).solve(BacktrackParams(assumptions = pins)),
+                    BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(assumptions = pins)),
                 )
                 assertEquals(2L, result.assignment.ints[0])
             }

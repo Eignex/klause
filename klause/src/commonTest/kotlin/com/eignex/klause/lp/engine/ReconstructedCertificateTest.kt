@@ -104,7 +104,7 @@ class ReconstructedCertificateTest {
             )
 
             assertEquals(listOf(value), assertNotNull(result.witness).primal)
-            assertEquals(value, result.witness?.objective)
+            assertEquals(value, result.witness.objective)
             assertEquals(value, result.bound?.value)
         }
     }

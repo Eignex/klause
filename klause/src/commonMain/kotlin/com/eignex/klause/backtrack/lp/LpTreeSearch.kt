@@ -250,7 +250,7 @@ internal fun LpEngine.lbTreeSearch(
                 while (!token()) {
                     val next = run.next()
                     if (next !is SearchRunEvent.Satisfied) break
-                    offer(requireNotNull(next.model.valueOf<Sample>(cp)), discreteChecked = true)
+                    offer(requireNotNull(next.model.valueOf(cp.assignmentKey)), discreteChecked = true)
                 }
                 best?.let(::LpTreeSeed)
             }

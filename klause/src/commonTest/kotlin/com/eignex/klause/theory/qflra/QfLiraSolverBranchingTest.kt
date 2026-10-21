@@ -130,7 +130,7 @@ class QfLiraSolverBranchingTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(BIG_ONE, assignment.ints[0])
             assertTrue(stats.snapshot().sourceLp.operations > 0L)
             assertEquals(0L, stats.snapshot().reductionRequests)
@@ -326,7 +326,7 @@ class QfLiraSolverBranchingTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val assignment = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(listOf(BIG_ONE, BIG_ZERO), assignment.ints.toList())
         }
     }
@@ -378,7 +378,7 @@ class QfLiraSolverBranchingTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(1))
 
-            val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            val point = assertNotNull(result.model.valueOf(component.realAssignmentKey))
             assertEquals(false, point.bools.single())
             assertTrue(point.reals.single() <= BigFraction.ONE)
         }
@@ -422,7 +422,7 @@ class QfLiraSolverBranchingTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
-            val point = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            val point = assertNotNull(result.model.valueOf(component.assignmentKey))
             assertEquals(BIG_ONE, point.ints.single())
             assertEquals(BigFraction.ONE, point.reals.single())
             assertTrue(stats.snapshot().sourceLp.operations > 0L)

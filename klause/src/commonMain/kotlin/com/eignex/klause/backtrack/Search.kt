@@ -189,7 +189,7 @@ internal class CpSatisfactionTraversal(
         sink,
         slice,
     )
-    private lateinit var completion: BacktrackCompletion
+    private val completion: BacktrackCompletion
     private var run: SearchRun? = null
     private var sharedSession: SearchSession? = null
     private var rootLp: LpFeasibilityComponent? = null
@@ -643,7 +643,7 @@ private sealed interface BacktrackCompletion {
         override fun sample(
             model: com.eignex.klause.solver.search.AssembledSearchModel,
             cp: CpSearchComponent,
-        ): Sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf(cp))
+        ): Sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf(cp.assignmentKey))
     }
 
     class ResidualReal(private val component: ResidualRealComponent) : BacktrackCompletion {

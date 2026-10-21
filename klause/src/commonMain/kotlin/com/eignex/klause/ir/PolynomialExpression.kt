@@ -104,7 +104,6 @@ internal fun PolynomialExpression.remap(remap: VarRemap): PolynomialExpression {
                 val operands = when (node) {
                     is PolynomialExpression.Sum -> node.operands
                     is PolynomialExpression.Product -> node.operands
-                    else -> error("unreachable")
                 }
                 if (combine) {
                     val args = List(operands.size) { values.removeLast() }.reversed()
@@ -157,7 +156,6 @@ internal fun polynomialExpressionsEqual(left: PolynomialExpression, right: Polyn
                         firstOperands = first.operands
                         secondOperands = second.operands
                     }
-                    else -> error("unreachable")
                 }
                 if (firstOperands.size != secondOperands.size) return false
                 for (index in firstOperands.indices) work.addLast(firstOperands[index] to secondOperands[index])

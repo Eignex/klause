@@ -19,9 +19,7 @@ import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchExecutionControls
-import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
-import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.BIG_ONE
@@ -89,7 +87,6 @@ internal class AbsRealCompletion(private val source: Problem) {
                 values.contribute(SearchExactIntValue(SourceIntId(id)), value)
             }
             assignment.reals.forEachIndexed { id, value ->
-                values.put(SearchRealValue(id), value)
                 values.contribute(SearchExactRealValue(SourceRealId(id)), value)
             }
         }.use { component ->

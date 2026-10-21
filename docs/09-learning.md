@@ -234,7 +234,7 @@ Components contribute immutable values through typed keys, one owner per key, an
 the assembled model reads them without copying. Exact source integer and real keys
 preserve arbitrary-precision and rational coordinates; extensions can add open keys
 whose payloads must be immutable. See
-[API migration and mappings](19-api.md#typed-contributions-and-migration).
+[Typed contributions and mappings](19-api.md#typed-contributions).
 
 ## Primal heuristics and statistics
 

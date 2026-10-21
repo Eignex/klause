@@ -73,7 +73,7 @@ class QfLiraSolverDifferenceTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
 
             assertIs<ComponentCheck.Feasible>(component.check(session))
-            val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
+            val witness = assertNotNull(session.model().valueOf(component.realAssignmentKey))
             assertTrue(witness.reals.single() >= BigFraction.ofLong(-2L))
             assertTrue(witness.reals.single() <= BigFraction.ZERO)
             assertNull(component.lpMetrics)
@@ -117,7 +117,7 @@ class QfLiraSolverDifferenceTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
 
             assertIs<ComponentCheck.Feasible>(component.check(session))
-            val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
+            val witness = assertNotNull(session.model().valueOf(component.realAssignmentKey))
             assertTrue(witness.reals.single() >= BigFraction.of(bigIntOf(1), bigIntOf(3)))
             assertTrue(witness.reals.single() <= BigFraction.of(bigIntOf(1), bigIntOf(2)))
             assertNull(component.lpMetrics)
@@ -161,7 +161,7 @@ class QfLiraSolverDifferenceTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
             assertIs<ComponentCheck.Feasible>(component.check(session))
-            val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
+            val witness = assertNotNull(session.model().valueOf(component.realAssignmentKey))
             assertTrue(witness.reals.single() > BigFraction.ZERO)
             assertEquals(true, witness.bools[1])
         }
@@ -184,7 +184,7 @@ class QfLiraSolverDifferenceTest {
             assertIs<ComponentResult.Indeterminate>(session.initialize())
 
             assertIs<ComponentCheck.Indeterminate>(component.check(session))
-            assertNull(session.model().valueOf<ExactLraAssignment>(component))
+            assertNull(session.model().valueOf(component.realAssignmentKey))
             assertNull(component.lpMetrics)
         }
     }
@@ -240,7 +240,7 @@ class QfLiraSolverDifferenceTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(4))
 
-            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            val witness = assertNotNull(result.model.valueOf(component.realAssignmentKey))
             assertTrue(witness.reals[0] <= BigFraction.ZERO)
             assertTrue(witness.reals[1] > BigFraction.ZERO)
             assertTrue(witness.reals[0] + witness.reals[1] >= BigFraction.ONE)
@@ -300,7 +300,7 @@ class QfLiraSolverDifferenceTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(4))
 
-            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            val witness = assertNotNull(result.model.valueOf(component.realAssignmentKey))
             assertEquals(true, witness.bools[1])
             assertTrue(witness.reals.single() <= BigFraction.ONE.negated())
         }
@@ -353,7 +353,7 @@ class QfLiraSolverDifferenceTest {
 
                 val result = assertIs<SearchResult.Satisfied>(session.solve(1))
 
-                val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+                val witness = assertNotNull(result.model.valueOf(component.realAssignmentKey))
                 assertEquals(false, witness.bools.single())
                 assertTrue(witness.reals.single() > BigFraction.ZERO)
                 assertTrue(witness.reals.single() < BigFraction.ONE)
@@ -491,7 +491,7 @@ class QfLiraSolverDifferenceTest {
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(2))
 
-            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            val witness = assertNotNull(result.model.valueOf(component.realAssignmentKey))
             assertEquals(false, witness.bools[0])
             assertEquals(false, witness.bools[1])
             assertTrue(witness.reals.single() > BigFraction.ZERO)

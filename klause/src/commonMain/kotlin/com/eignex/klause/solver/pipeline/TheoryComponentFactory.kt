@@ -10,12 +10,8 @@ import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
-import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchModel
-import com.eignex.klause.solver.search.SearchRealValue
-import com.eignex.klause.solver.search.TheoryComponent
-import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
@@ -27,7 +23,7 @@ internal fun ComponentPlan.theoryComponent(
     spec: Problem,
     smtStats: SmtStatsSink? = null,
     theorySolveStop: Cancellation? = null,
-): TheoryComponent? =
+): SearchComponent? =
     openTheoryComponent(encodedTheoryFragment(spec) ?: theoryFragment(spec), smtStats, theorySolveStop)
 
 @Suppress("TooGenericExceptionCaught") // Invocation cleanup preserves an arbitrary primary failure.
@@ -36,11 +32,11 @@ internal fun ComponentPlan.openTheoryComponent(
     smtStats: SmtStatsSink? = null,
     theorySolveStop: Cancellation? = null,
     preparedSource: PreparedExactLiraComponentFactory? = null,
-): TheoryComponent? {
+): SearchComponent? {
     val resources = SearchInvocationResources()
     val opening = SearchComponentOpening(Cancellation.Never, smtStats, theorySolveStop, resources)
     return try {
-        theoryComponentFactory(fragment) { preparedSource }?.invoke(opening)?.single() as? TheoryComponent
+        theoryComponentFactory(fragment) { preparedSource }?.invoke(opening)?.single()
     } catch (failure: Throwable) {
         resources.closeAfter(failure)
         throw failure
@@ -92,7 +88,7 @@ internal fun ComponentPlan.theoryComponentFactory(
         ProblemPipeline.EXACT_LRA -> { opening ->
             exact(opening) { assignment, model ->
                 assignment.reals.forEachIndexed { variable, value ->
-                    model.put(SearchRealValue(variable), value)
+
                     model.contribute(SearchExactRealValue(SourceRealId(variable)), value)
                 }
             }
@@ -102,12 +98,11 @@ internal fun ComponentPlan.theoryComponentFactory(
             exact(opening) { assignment, model ->
                 assignment.ints.forEachIndexed { variable, value ->
                     if (intOwner(variable) == IntVariableOwner.THEORY) {
-                        model.put(SearchIntValue(variable), value)
                         model.contribute(SearchExactIntValue(SourceIntId(variable)), value)
                     }
                 }
                 assignment.reals.forEachIndexed { variable, value ->
-                    model.put(SearchRealValue(variable), value)
+
                     model.contribute(SearchExactRealValue(SourceRealId(variable)), value)
                 }
             }

@@ -15,6 +15,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
@@ -30,13 +31,14 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.search.ComponentResult
-import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -190,7 +192,10 @@ class SelectionEncoderTest {
                 it.session.solve(0)
             }
 
-            assertEquals(2L, assertIs<SearchResult.Satisfied>(result).model.valueOf<Long>(SearchIntValue(0)))
+            assertEquals(
+                2L,
+                assertIs<SearchResult.Satisfied>(result).model.valueOf(SearchExactIntValue(SourceIntId(0)))?.toLongExact(),
+            )
         }
     }
 

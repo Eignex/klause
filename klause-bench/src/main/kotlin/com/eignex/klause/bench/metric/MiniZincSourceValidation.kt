@@ -257,7 +257,7 @@ internal fun SolveRecord.sourceChecked(
                 val retained = ExactObjective.value(exactObjective, objective)
                 val attributed = ExactObjective.value(
                     incumbent.exactObjective.takeIf { incumbent.continuousObjective == null },
-                    incumbent.continuousObjective ?: incumbent.objective,
+                    incumbent.continuousObjective,
                 )
                 retained == null || attributed?.compareTo(retained) == 0
             }
