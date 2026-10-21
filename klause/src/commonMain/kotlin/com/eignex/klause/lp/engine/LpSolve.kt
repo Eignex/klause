@@ -679,11 +679,12 @@ private fun certifyLpResultWithin(
         } else {
             null
         }
-        try {
-            witness = component?.exactWitness(observer, policy, cancellation, recovery)
+        val recoveredWitness = try {
+            component?.exactWitness(observer, policy, cancellation, recovery)
         } finally {
             meter?.let { componentRecoveryElapsed += it.finish(decline).elapsed }
         }
+        witness = recoveredWitness
         numericalWitness = witness ?: numericalWitness
     }
     if (result != null && numericalWitness == null && refinement != null &&
