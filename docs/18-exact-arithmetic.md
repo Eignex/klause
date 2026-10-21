@@ -89,6 +89,12 @@ square-free decomposition and Sturm sequences isolate all distinct real roots;
 nonpoint isolating intervals contain exactly one root, and point intervals certify
 a rational root.
 
+Evaluation at a rational coordinate clears the coefficient denominators by their
+positive least common multiple. Homogeneous integer Horner evaluation retains the
+coordinate denominator power, then one normalization returns the full exact
+rational image. Preparation and evaluation use the requesting caller's work and
+cancellation scope; owned polynomials keep their existing read admission.
+
 `AlgebraicReal` is an owned read-only scalar: an ascending rational coefficient
 list, a one-based index among the distinct real roots, and exact isolating bounds.
 Defining polynomials need not be minimal. Comparison uses exact gcd and
