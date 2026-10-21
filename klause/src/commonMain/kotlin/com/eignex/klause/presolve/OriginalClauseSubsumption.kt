@@ -15,8 +15,8 @@ internal object OriginalClauseSubsumption {
 
     internal class Limits(val candidates: Long = 100_000L, val literals: Long = 1_000_000L)
 
-    fun eligible(problem: Problem): Boolean = problem.numBoolVars in 1..MAX_BOOL_VARS &&
-        problem.factors.size <= MAX_FACTORS
+    fun eligible(numBoolVars: Int, factorCount: Int): Boolean = numBoolVars in 1..MAX_BOOL_VARS &&
+        factorCount <= MAX_FACTORS
 
     private class Work(private val cancellation: Cancellation, private val limits: Limits) {
         private val meter = cancellation.workMeter()
@@ -69,7 +69,7 @@ internal object OriginalClauseSubsumption {
         cancellation: Cancellation = Cancellation.Never,
         limits: Limits = Limits(),
     ): SourceDelta {
-        if (cancellation() || !eligible(problem)) {
+        if (cancellation() || !eligible(problem.numBoolVars, problem.factors.size)) {
             return SourceDelta()
         }
         val work = Work(cancellation, limits)

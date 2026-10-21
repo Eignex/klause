@@ -412,10 +412,7 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun applySource(problem: Problem, ctx: PresolveContext): SourceDelta {
-            val bounds = problem.intBounds
-            if (problem.numRealVars == 0 &&
-                (0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }
-            ) return SourceDelta()
+            if (!namespaceEligible(problem)) return SourceDelta()
             return Presolve.probeSource(problem, PROBE_PASS_MAX_CANDIDATES, ctx.cancellation)
         }
     },
@@ -567,12 +564,14 @@ enum class PresolvePass(
     ),
     ;
 
-    internal fun namespaceEligible(problem: Problem): Boolean = when (this) {
-        SUBSUME_CLAUSES -> OriginalClauseSubsumption.eligible(problem)
+    internal fun namespaceEligible(problem: Problem, factorCount: Int = problem.factors.size): Boolean = when (this) {
+        SUBSUME_CLAUSES -> OriginalClauseSubsumption.eligible(problem.numBoolVars, factorCount)
+        PROBE_OPEN_RANGES -> problem.numRealVars > 0 || problem.intBounds.hasOpenSides
         AGGREGATE_SUB_SUMS -> problem.numIntVars >= 3
         ELIMINATE_BOOL_VARS, ELIMINATE_BLOCKED_CLAUSES, IMPLICATION_GRAPH,
         FOLD_COMPARISON_CLAUSES, PROBE_FAILED_LITERALS -> problem.numBoolVars > 0
         ELIMINATE_AFFINE_SINGLETONS, REDUCE_DIOPHANTINE, PROJECT_SINGLETON_INEQUALITIES,
+        FUSE_LINEAR_BOUNDS, DROP_DEPENDENT_EQUALITIES, SPARSIFY_LINEAR_ROWS,
         VALUE_PRECEDENCE, PROBE_INT_BOUNDS, PROBE_INT_HOLES, SUBSTITUTE_BINARY_COLUMNS -> problem.numIntVars > 0
         MERGE_DUPLICATE_COLUMNS -> problem.numIntVars >= 2
         else -> true

@@ -22,6 +22,10 @@ class IntBounds internal constructor(
     /** Number of integer columns. */
     val size: Int get() = lowerBounds.size
 
+    internal val hasOpenSides: Boolean by lazy {
+        (openLo?.cardinality() ?: 0) > 0 || (openHi?.cardinality() ?: 0) > 0
+    }
+
     /** Whether column [v] has a finite lower bound. */
     fun hasLower(v: Int): Boolean = !isOpenLower(v)
 

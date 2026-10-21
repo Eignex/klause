@@ -157,7 +157,9 @@ retain their counters with zero phase time.
 phase work, including its construction/propagation share. Outcomes distinguish an
 eligibility skip, completed empty analysis, retained reductions, refutation and
 observed interruption. Namespace and candidate-shape checks precede entry scans;
-entry size is cached per immutable factor revision and maintained from finite-session
+factor-count gates read the finite session's maintained live count. Closed discrete
+sources skip open-range probing, and integer-row-only analyses require integer columns.
+Entry size is cached per immutable factor revision and maintained from finite-session
 deltas. Dimensions, available occurrence counts and explicit column narrowings
 describe yield without another whole-model scan.
 
