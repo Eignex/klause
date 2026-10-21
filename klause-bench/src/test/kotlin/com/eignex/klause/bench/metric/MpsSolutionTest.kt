@@ -36,7 +36,7 @@ class MpsSolutionTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = [31, 32, 255])
+    @ValueSource(ints = [31, 32, 159])
     fun `solution precision within the upstream buffer profile should be preserved`(digits: Int) {
         val value = "9".repeat(digits)
         val point = record.copy(finalWitness = "v x=$value", exactObjective = value)
@@ -47,12 +47,14 @@ class MpsSolutionTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["digits", "positive-exponent", "negative-exponent"])
+    @ValueSource(strings = ["digits", "positive-exponent", "negative-exponent", "expanded-integer", "expanded-fraction"])
     fun `solution numbers exceeding the upstream buffer profile should be declined`(variant: String) {
         val value = when (variant) {
-            "digits" -> "1".repeat(256)
+            "digits" -> "1".repeat(160)
             "positive-exponent" -> "1e129"
-            else -> "1e-129"
+            "negative-exponent" -> "1e-129"
+            "expanded-integer" -> "${"1".repeat(32)}e128"
+            else -> "0.${"1".repeat(32)}e-128"
         }
         val point = record.copy(finalWitness = "v x=$value", exactObjective = value)
 

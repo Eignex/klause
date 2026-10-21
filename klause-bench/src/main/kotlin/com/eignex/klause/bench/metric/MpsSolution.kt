@@ -49,7 +49,12 @@ internal object MpsSolution {
 
     private fun decimal(text: String): String {
         val (numerator, denominator) = value(text)
-        val result = BigDecimal(numerator).divide(BigDecimal(denominator)).stripTrailingZeros().toString()
+        val decimal = BigDecimal(numerator).divide(BigDecimal(denominator)).stripTrailingZeros()
+        // Preserve the source profile's expanded numerator and denominator sizes for GMP scratch operations.
+        require(maxOf(decimal.precision(), decimal.scale(), decimal.precision() - decimal.scale()) <= 159) {
+            "solution number exceeds upstream rational buffer profile"
+        }
+        val result = decimal.toString()
         // The 1024-byte GMP scratch holds digits, fractional zeros and exponent expansion; SOL lines also fit.
         MpsSolcheckerInput.requireNumber(result, maxLength = 255)
         return result

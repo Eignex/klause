@@ -841,7 +841,9 @@ binary in the non-published bench artifact. The optional converter is not extrac
 The checker uses a release build (`-DNDEBUG`); the adapter bounds numeric input
 before invoking it. MPS tokens retain the 31-character profile. SOL coordinates
 and objectives allow up to 255 characters with exponents between -128 and 128,
-within the upstream 1,024-byte line and rational scratch buffers. Terminating
+with expanded numerators and power-of-ten denominators limited to 159 digits,
+preserving the source profile's arithmetic sizes within the upstream 1,024-byte
+line and rational scratch buffers. Terminating
 rationals convert to decimal exactly; no supplied coordinate or objective is rounded.
 Building requires a C++ compiler and GMP/zlib development packages. Invocation
 supports Linux with GNU `timeout`/`prlimit` and macOS with the system shell limits.
