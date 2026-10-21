@@ -21,6 +21,28 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `missing coupled boundaries refine already projected coordinates`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        for (predicates in listOf("(and (> (* x0 x1) (/ 1 4)) (< (* x0 x1) (/ 1 3)))",
+            "(and (not (<= (* x0 x1) (/ 1 4))) (not (>= (* x0 x1) (/ 1 3))))")) {
+            val source = SmtLibPolynomial.parse(
+                "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1)) (assert $predicates)",
+            )
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+                QfNraParams(maximumWork = 500_000))
+
+            val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+            assertEquals(33, point.realCount)
+            val norm = algebraic.add(algebraic.power(point.realValue(0), 2), algebraic.power(point.realValue(1), 2))
+            assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+            val product = algebraic.multiply(point.realValue(0), point.realValue(1))
+            assertTrue(algebraic.compare(product, algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(4)))) > 0)
+            assertTrue(algebraic.compare(product, algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(3)))) < 0)
+        }
+    }
+
+    @Test
     fun `orthogonal representatives retain zero vectors in complemented regions`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

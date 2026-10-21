@@ -289,19 +289,20 @@ preserves delineability including repeated roots and vanishing leading
 coefficients. A required equality with a provably nonzero leading coefficient
 restricts its level to that equation's roots.
 
-Projection and lifting alternate over an increasing family in source polynomial
-order. Every lifted sample is checked against all region predicates, including
+Projection and lifting alternate over an increasing polynomial family. Every
+lifted sample is checked against all region predicates, including
 those whose boundaries have not been projected. Rejected samples from a partial
 family cannot exhaust the region: refutation requires the complete family's CAD
 or an exact contradiction between required equalities. A representation refusal
 on a partial family advances to the complete family under the same caller's
 remaining allowance. Projection counters accumulate completed stages.
 
-A rejected predicate over coordinates absent from a partial family's polynomials
-has the same truth at every sample of that family: each absent coordinate has one
-sector sample, or its fixed value. This rejection advances to the next source
-polynomial instead of enumerating the remaining Cartesian product. Predicates
-depending on a varying projected coordinate retain cell traversal.
+A rejected predicate whose polynomial is absent from the partial family requests
+that boundary for the next projection. Its truth may vary inside the current
+cells, including along coordinates already used by projected polynomials. A
+rejection whose boundary is present retains cell traversal. Without a requested
+boundary, growth selects the next missing source polynomial. The family grows
+monotonically, and refutation still requires complete-family exhaustion.
 
 **4. Lifting and truth.** Traversal walks the levels in order. Each projection
 polynomial is specialized at the earlier coordinates, the
