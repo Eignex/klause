@@ -27,7 +27,7 @@ class LpSolveSessionTest {
 
         assertEquals(LpVerdict.INFEASIBLE, result.verdict)
         assertNull(result.witness)
-        assertNotNull(result.conflict)
+        assertNotNull(result.rationalConflict)
     }
 
     @Test

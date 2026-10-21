@@ -43,7 +43,7 @@ class LpCertificationPolicyTest {
                 })
 
             assertEquals(LpVerdict.INFEASIBLE, admitted.verdict)
-            assertNull(withheld.conflict)
+            assertNull(withheld.rationalConflict)
             assertTrue(withheld.verdict != LpVerdict.INFEASIBLE)
         }
     }
