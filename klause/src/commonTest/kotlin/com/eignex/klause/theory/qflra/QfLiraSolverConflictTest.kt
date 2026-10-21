@@ -16,9 +16,14 @@ import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchRealValue
@@ -35,9 +40,198 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverConflictTest {
+    @Test
+    fun `a finite selector should force its open source row before Boolean completion`() {
+        val open = Bits(2).also { it.set(1) }
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 0), open, open),
+            factors = arrayOf(
+                ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.NE, LinearOp.EQ), longArrayOf(0, 1)),
+                ReifiedLinear(0, intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 7),
+            ),
+        )
+        source.componentPlan().search(source, emptyMap()).use { planned ->
+            assertNotNull(planned.cp)
+            val component = assertIs<ExactLiraSearchComponent>(planned.theory)
+            val stats = SmtStatsSink()
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = planned.session
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntEqual(0, 0L)))
+            assertNull(session.boolValue(0))
+
+            val result = session.push(SearchDecision.IntAtLeast(1, 2L))
+
+            assertIs<ComponentResult.Conflict>(result)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("FIXED_SELECTOR_DISJUNCT_IMPLIED"))
+            assertEquals(0L, stats.snapshot().completeSearchLinearChecks)
+        }
+    }
+
+    @Test
+    fun `a forced source row should explain both shared fixing sides`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(2),
+            factors = arrayOf(ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.NE, LinearOp.EQ),
+                longArrayOf(0, 1))))
+        ExactLiraSearchComponent(source).use { component ->
+            val received = ArrayList<RegisteredTheoryDecision>()
+            val receiver = object : SearchComponent by component {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    if (decision is SearchDecision.Theory) {
+                        received += assertIs<RegisteredTheoryDecision>(decision.decision)
+                    }
+                    return component.assert(decision, context)
+                }
+            }
+            val session = SearchSession(listOf(receiver), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val lower = SearchDecision.IntAtLeast(0, 0L)
+            val upper = SearchDecision.IntAtMost(0, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(lower))
+
+            assertIs<ComponentResult.Consistent>(session.push(upper))
+
+            val forced = received.single()
+            val reason = assertNotNull(session.reasonFor(Lit.variable(forced.literal)))
+            assertEquals(setOf(forced.literal, assertNotNull(session.atomLiteral(lower)) xor 1,
+                assertNotNull(session.atomLiteral(upper)) xor 1), reason.literals.toSet())
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `a different selector sibling should retract the old forced row`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(2), factors = arrayOf(
+            ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.NE, LinearOp.EQ), longArrayOf(0, 1)),
+            ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.NE, LinearOp.EQ), longArrayOf(1, 2)),
+        ))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntEqual(0, 0L)))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.IntAtLeast(1, 2L)))
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntEqual(0, 1L)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtLeast(1, 2L)))
+            session.popTo(1)
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.IntAtMost(1, 1L)))
+        }
+    }
+
+    @Test
+    fun `an active opposite row should conflict with both selector fixing premises`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(2),
+            factors = arrayOf(ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.NE, LinearOp.EQ),
+                longArrayOf(0, 1))))
+        ExactLiraSearchComponent(source).use { component ->
+            val received = ArrayList<RegisteredTheoryDecision>()
+            val receiver = object : SearchComponent by component {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    if (decision is SearchDecision.Theory) {
+                        received += assertIs<RegisteredTheoryDecision>(decision.decision)
+                    }
+                    return component.assert(decision, context)
+                }
+            }
+            val session = SearchSession(listOf(receiver), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntEqual(0, 0L)))
+            val forced = received.single()
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(forced.literal xor 1)))
+            val lower = SearchDecision.IntAtLeast(0, 0L)
+            val upper = SearchDecision.IntAtMost(0, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(lower))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(upper))
+
+            assertEquals(setOf(forced.literal, assertNotNull(session.atomLiteral(lower)) xor 1,
+                assertNotNull(session.atomLiteral(upper)) xor 1), assertNotNull(conflict.explanation).literals.toSet())
+        }
+    }
+
+    @Test
+    fun `full completion should reuse a forced row name and validate the original source`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(2),
+            factors = arrayOf(ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.NE, LinearOp.EQ),
+                longArrayOf(0, 1))))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1, maxAtoms = 4))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntEqual(0, 0L)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+
+            val point = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(listOf(BIG_ZERO, BIG_ONE), point.ints.toList())
+            assertEquals(listOf(true), point.bools.toList())
+        }
+    }
+
+    @Test
+    fun `a full atom registry should withhold an optional forced row without stopping the prefix`() {
+        val source = Problem(numBoolVars = 1, intBounds = openBounds(2),
+            factors = arrayOf(ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.NE, LinearOp.EQ),
+                longArrayOf(0, 1))))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1, maxAtoms = 2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntEqual(0, 0L)))
+
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertNull(session.boolValue(0))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `forced scalar disjuncts should preserve their source bound polarity`() {
+        for ((relation, violation) in listOf(LinearOp.LE to SearchDecision.IntAtLeast(1, 3L),
+            LinearOp.GE to SearchDecision.IntAtMost(1, 1L))) {
+            val source = Problem(numBoolVars = 1, intBounds = openBounds(2),
+                factors = arrayOf(ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.NE, relation),
+                    longArrayOf(0, 2))))
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntEqual(0, 0L)))
+
+                assertIs<ComponentResult.Conflict>(session.push(violation))
+            }
+        }
+    }
+
+    @Test
+    fun `a forced disjunct with unresolved Boolean terms should wait for their actual values`() {
+        val declaration = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0) {
+            override val linearForm: LinearForm = LinearForm.Disjunction(listOf(
+                TaggedLinearRow(intArrayOf(Term.ofIntVar(0)), IntegerConstants(constsOf(longArrayOf(1)), 0L),
+                    LinearOp.NE),
+                TaggedLinearRow(intArrayOf(Term.ofLit(Lit.make(0, true))),
+                    IntegerConstants(constsOf(longArrayOf(1)), 1L), LinearOp.EQ),
+            ))
+        }
+        val source = Problem(numBoolVars = 2, intBounds = openBounds(), factors = arrayOf(declaration))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntEqual(0, 0L)))
+            assertNull(session.boolValue(0))
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(1)))
+            assertNull(session.boolValue(1))
+        }
+    }
+
     @Test
     fun `a false source clause should conflict despite feasible real bounds`() {
         val model = Problem(

@@ -206,6 +206,7 @@ class ExactLiraSearchComponent private constructor(
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
     private val disjunctOwner = Any()
+    private val forcedDisjuncts = HashMap<RowAddress, DisjunctAtom>()
     private val hasSourceDisjunctions = model.factors.any { it.linearForm is LinearForm.Disjunction }
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
@@ -650,23 +651,31 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun nameableDisjunct(row: LinearRow): Boolean {
+        if (row.relation != LinearOp.LE && row.relation != LinearOp.GE) return false
         if (row.booleanVariables().isNotEmpty() || (0 until row.size).any { term ->
                 val ref = row.ref(term)
                 Term.isReal(ref) && Term.realVar(ref) >= sourceRealCount
             }) return false
-        val comparison = row.exactComparison(model.numRealVars, truth = true) { false }
-        return comparison.terms.isNotEmpty() && (comparison.op == LinearOp.LE || comparison.op == LinearOp.GE)
+        return true
     }
 
-    private fun registerDisjunct(row: LinearRow, context: SearchContext, address: RowAddress): DisjunctAtom? {
-        if (!nameableDisjunct(row)) {
+    private fun registerDisjunct(
+        row: LinearRow,
+        context: SearchContext,
+        address: RowAddress,
+        stop: Cancellation = Cancellation.Never,
+    ): DisjunctAtom? {
+        val comparison = if (nameableDisjunct(row)) {
+            exactForms[address.factor][address.row].comparison(true) { false }
+        } else null
+        if (comparison == null || comparison.terms.isEmpty()) {
             val atom = context.registerAtom(
                 NamedDisjunctDecision(disjunctOwner, address, holds = true),
                 NamedDisjunctDecision(disjunctOwner, address, holds = false),
             ) ?: return null
             return DisjunctAtom(atom.positive, atom.negative, address)
         }
-        val comparison = row.exactComparison(model.numRealVars, truth = true) { false }
+        if (stop !== Cancellation.Never && !chargeDisjunctName(comparison, stop)) return null
         val terms = comparison.terms.map { (column, coefficient) ->
             val source = if (column < model.numRealVars) {
                 SearchRealValue(column)
@@ -703,6 +712,58 @@ class ExactLiraSearchComponent private constructor(
             // An equality is two bounds and a disequality a union of two, so neither is one exact pair.
             LinearOp.EQ, LinearOp.NE -> null
         }
+    }
+
+    private fun chargeDisjunctName(comparison: ExactComparison, stop: Cancellation): Boolean {
+        val width = comparison.terms.size.toLong() + 1L
+        stop.charge(width * width + 8L * width)
+        if (stop()) return false
+        for (value in comparison.terms.values + comparison.bound) {
+            val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 2L
+            val words = bits / Long.SIZE_BITS + 1L
+            stop.charge(words * words)
+            if (stop()) return false
+        }
+        return true
+    }
+
+    private fun enforceFixedSelectorDisjunctions(context: SearchContext): ComponentResult {
+        impliedDisjunct = false
+        for (selector in preparedSource.fixedSelectors) {
+            operationStop.charge(12L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            val premise = selector.premise(context) ?: continue
+            val atom = forcedDisjunct(selector, context)
+            if (atom == null) {
+                if (operationStop()) return ComponentResult.Indeterminate
+                continue
+            }
+            if (context.truth(atom.holds) == true) continue
+            val reason = context.explainAtoms(
+                premise, SearchDecision.Theory(atom.holds), cancellation = operationStop,
+            )
+            if (reason == null) {
+                if (operationStop()) return ComponentResult.Indeterminate
+                continue
+            }
+            if (operationStop()) return ComponentResult.Indeterminate
+            val implied = context.imply(atom.holds.literal, reason)
+            if (implied !is ComponentResult.Consistent) return implied
+            impliedDisjunct = true
+            observeCompleteStage("FIXED_SELECTOR_DISJUNCT_IMPLIED")
+        }
+        return ComponentResult.Consistent
+    }
+
+    private fun forcedDisjunct(selector: FixedSelectorDisjunction, context: SearchContext): DisjunctAtom? {
+        val address = RowAddress(selector.factor, selector.row)
+        forcedDisjuncts[address]?.let { return it }
+        val row = model.factors[address.factor].linearRows[address.row]
+        operationStop.charge(8L * (row.size.toLong() + 1L))
+        if (operationStop()) return null
+        val registered = registerDisjunct(row, context, address, operationStop) ?: return null
+        forcedDisjuncts[address] = registered
+        return registered
     }
 
     // The shared engine sees each disjunct only as an atom, so the disjunction itself is held here; a
@@ -1136,6 +1197,9 @@ class ExactLiraSearchComponent private constructor(
         if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
             bools.indices.all { context.boolValue(it) != null }
         ) return ComponentResult.Consistent
+        val selected = enforceFixedSelectorDisjunctions(context)
+        if (selected !is ComponentResult.Consistent) return selected
+        if (impliedDisjunct) return ComponentResult.Consistent
         val enforced = enforceDisjunctions(context)
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
@@ -1552,6 +1616,7 @@ private class PreparedExactLiraSource(
     val preparedRows: List<PreparedSourceRow>,
     val arithmeticRows: List<LinearRow>,
     val arithmeticVariables: Set<Int>,
+    val fixedSelectors: List<FixedSelectorDisjunction>,
     val validated: Boolean,
 )
 
@@ -1571,9 +1636,14 @@ private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
     val arithmeticRows = model.factors.flatMap { it.linearRows }.filter { row ->
         (0 until row.size).any { !Term.isBool(row.ref(it)) }
     }
-    val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
+    val fixedSelectors = requireNotNull(FixedSelectorDisjunction.prepare(model, Cancellation.Never))
+    val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toMutableSet()
+    for (selector in fixedSelectors) {
+        arithmeticVariables += model.factors[selector.factor].linearRows[selector.row].booleanVariables()
+    }
     return PreparedExactLiraSource(
-        model, exactForms, preparedRows, arithmeticRows, arithmeticVariables, validated = false,
+        model, exactForms, preparedRows, arithmeticRows, arithmeticVariables,
+        fixedSelectors, validated = false,
     )
 }
 
@@ -1638,10 +1708,20 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
         if (!charge(forms.size.toLong() + 1L)) return null
         exactForms += forms.toList()
     }
-    val copies = exactForms.size.toLong() + preparedRows.size + arithmeticRows.size + arithmeticVariables.size + 1L
+    val fixedSelectors = FixedSelectorDisjunction.prepare(model, stop) ?: return null
+    for (selector in fixedSelectors) {
+        val row = model.factors[selector.factor].linearRows[selector.row]
+        if (!charge(row.size.toLong() + 2L)) return null
+        for (variable in row.booleanVariables()) {
+            if (!charge(1L)) return null
+            arithmeticVariables += variable
+        }
+    }
+    val copies = exactForms.size.toLong() + preparedRows.size + arithmeticRows.size + arithmeticVariables.size +
+        fixedSelectors.size + 1L
     if (!charge(copies)) return null
     val source = PreparedExactLiraSource(
-        model, exactForms.toList(), preparedRows.toList(), arithmeticRows.toList(), arithmeticVariables.toSet(),
+        model, exactForms.toList(), preparedRows.toList(), arithmeticRows.toList(), arithmeticVariables.toSet(), fixedSelectors,
         validated = true,
     )
     return source.takeUnless { stop() }

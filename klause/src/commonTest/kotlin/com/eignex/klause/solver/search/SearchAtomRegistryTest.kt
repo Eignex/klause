@@ -3,6 +3,7 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -14,6 +15,67 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SearchAtomRegistryTest {
+    @Test
+    fun `metered explanations should retain every active source antecedent`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.push(SearchDecision.Bool(0))
+        session.push(SearchDecision.Bool(2))
+        val premise = SearchAtomPremise.All(listOf(
+            SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+            SearchAtomPremise.Asserted(SearchDecision.Bool(2)),
+        ))
+        var charged = 0L
+        val meter = WorkMeter { charged += it }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val explanation = session.explainAtoms(premise, cancellation = stop)
+
+        assertContentEquals(session.explainAtoms(premise)?.literals, explanation?.literals)
+        assertEquals(setOf(1, 3), assertNotNull(explanation).literals.toSet())
+        assertTrue(charged > 0L)
+    }
+
+    @Test
+    fun `cancelled explanation expansion should retain its debit and publish no clause`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.push(SearchDecision.Bool(0))
+        val premise = SearchAtomPremise.All(List(10) { SearchAtomPremise.Asserted(SearchDecision.Bool(0)) })
+        var charged = 0L
+        val meter = WorkMeter { charged += it }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 24L
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        assertNull(session.explainAtoms(premise, cancellation = stop))
+        val spent = charged
+        assertTrue(spent >= 24L)
+        assertNull(session.explainAtoms(premise, cancellation = stop))
+        assertEquals(spent, charged)
+    }
+
+    @Test
+    fun `metered explanations should not accept missing foreign or oversized support`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.push(SearchDecision.Bool(0))
+        val local = assertNotNull(session.registerAtom(Symbol("local"), Symbol("local complement")))
+        session.push(SearchDecision.Theory(local.positive))
+        val foreign = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        val atom = assertNotNull(foreign.registerAtom(Symbol("foreign"), Symbol("other")))
+        val cases = listOf(
+            SearchAtomPremise.Unavailable to 4096,
+            SearchAtomPremise.Asserted(SearchDecision.Theory(atom.positive)) to 4096,
+            SearchAtomPremise.All(listOf(SearchAtomPremise.Asserted(SearchDecision.Bool(0)))) to 1,
+        )
+
+        for ((premise, limit) in cases) {
+            assertNull(session.explainAtoms(premise, maxNodes = limit, cancellation = Cancellation.Never))
+        }
+    }
+
     @Test
     fun `integer bound names should share exact complements through rollback`() {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))

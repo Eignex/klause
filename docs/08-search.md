@@ -115,9 +115,13 @@ owns these neutral exact bounds. Integer splits keep adjacent thresholds, ration
 splits keep complementary strictness, and terms are normalized before registration.
 Coefficient growth, size limits or registry capacity decline without installing a
 partial pair, and retraction preserves atom meanings. Only the linear adapter turns
-the predicates into LP rows. The linear component names a source disjunction when
-arithmetic branching reaches it; a group that cannot be fully named leaves the search
-indeterminate.
+the predicates into LP rows. Arithmetic branching names a source disjunction's
+alternatives; a group that cannot be fully named leaves the search indeterminate.
+An exactly fixed selector can name and imply its forced row earlier, following
+[linear disjunction propagation](15-linear-arithmetic.md#disjunctions-and-disequalities).
+Its explanation expands both fixing premises under the operation token, charging
+visited nodes, queued edges and the resulting clause before publication. Missing,
+foreign or stopped support withholds that implication.
 
 ### Assembly and registration
 

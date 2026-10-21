@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.search
 
+import com.eignex.klause.util.Cancellation
+
 /**
  * Stable Boolean names for complementary immutable payloads in one source-root search session.
  *
@@ -121,8 +123,17 @@ fun SearchContext.explainAtoms(
     premise: SearchAtomPremise,
     conclusion: SearchDecision? = null,
     maxNodes: Int = 4096,
+): SearchExplanation? = explainAtoms(premise, conclusion, maxNodes, Cancellation.Never)
+
+internal fun SearchContext.explainAtoms(
+    premise: SearchAtomPremise,
+    conclusion: SearchDecision? = null,
+    maxNodes: Int = 4096,
+    cancellation: Cancellation,
 ): SearchExplanation? {
-    if (maxNodes <= 0) return null
+    if (maxNodes <= 0 || cancellation()) return null
+    cancellation.charge(8L)
+    if (cancellation()) return null
     val literals = LinkedHashSet<Int>()
     if (conclusion != null) literals.add(atomLiteral(conclusion) ?: return null)
     val pending = ArrayDeque<SearchAtomPremise>()
@@ -131,6 +142,8 @@ fun SearchContext.explainAtoms(
     var remaining = maxNodes
     while (pending.isNotEmpty()) {
         if (remaining-- <= 0) return null
+        cancellation.charge(6L)
+        if (cancellation()) return null
         when (val current = pending.removeLast()) {
             is SearchAtomPremise.Asserted -> {
                 val literal = atomLiteral(current.decision) ?: return null
@@ -141,6 +154,8 @@ fun SearchContext.explainAtoms(
             is SearchAtomPremise.All -> {
                 if (!expanded.add(current)) continue
                 if (current.premises.size > remaining - pending.size) return null
+                cancellation.charge(current.premises.size.toLong())
+                if (cancellation()) return null
                 pending.addAll(current.premises)
             }
 
@@ -148,5 +163,6 @@ fun SearchContext.explainAtoms(
         }
     }
     if (literals.size > maxNodes) return null
-    return SearchExplanation(literals.toIntArray())
+    cancellation.charge(literals.size.toLong() + 1L)
+    return if (cancellation()) null else SearchExplanation(literals.toIntArray())
 }

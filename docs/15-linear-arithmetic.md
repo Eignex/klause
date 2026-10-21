@@ -76,6 +76,16 @@ rather than handing search a clause, because a learned clause could be forgotten
 a database reduction. It propagates like a clause: when all but one disjunct has
 failed, the last is implied.
 
+A binary disjunction `x != k` or `R` can also imply `R` while source Booleans
+remain open. The guard must be an unconditional integral unary comparison with
+coefficient one, and the shared lower and upper bounds must both fix `x` to `k`.
+The implication cites both bound premises and uses the existing row name and
+shared delivery path. Only the forced row is named; remaining alternatives retain
+their ordinary registration and complete-source checks. Retraction removes its
+assertion with the fixing scope. Candidate preparation, naming and explanation
+walks spend the containing controls; missing support or naming capacity withholds
+the deduction.
+
 A disequality `t != b` is satisfied by either strict side. If the current bounds
 already exclude one side, the component asserts the other; otherwise, at a complete
 Boolean state, it registers the split `t < b` against `t > b`.
