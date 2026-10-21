@@ -92,7 +92,6 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
@@ -214,17 +213,6 @@ class ExactLiraSearchComponent private constructor(
     private val preparedRows = preparedSource.preparedRows
     // Deferred rows are proved by the retained point and must be reasserted when it retires.
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
-    private val unassignedSourceInputs = IntArray(preparedRows.size) { preparedRows[it].booleans.size }
-    private var pendingSourceCount = 0
-    // The conservative floor avoids a search for the next word on every removal.
-    private var firstPendingSourceWord = (preparedRows.size + 63) ushr 6
-    private val pendingSourceRows = LongArray((preparedRows.size + 63) ushr 6).also { pending ->
-        for (index in preparedRows.indices) if (unassignedSourceInputs[index] == 0) {
-            Bits.set(pending, index)
-            pendingSourceCount++
-            firstPendingSourceWord = minOf(firstPendingSourceWord, index ushr 6)
-        }
-    }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
     private var impliedSourceGuard = false
@@ -637,10 +625,7 @@ class ExactLiraSearchComponent private constructor(
     private fun retirePointReuse() {
         if (pointReusePoint != null) {
             for (index in sourceAssertionLevels.indices) {
-                if (sourceAssertionLevels[index] == DEFERRED_SOURCE_ROW) {
-                    sourceAssertionLevels[index] = -1
-                    if (unassignedSourceInputs[index] == 0) queueSourceRow(index)
-                }
+                if (sourceAssertionLevels[index] == DEFERRED_SOURCE_ROW) sourceAssertionLevels[index] = -1
             }
         }
         pointReusePoint = null
@@ -769,7 +754,6 @@ class ExactLiraSearchComponent private constructor(
         pollContextStop = solveStop != null && solveStop !== contextStop
         beginOperation()
         return try {
-            operationStop.charge(2L * preparedRows.size + pendingSourceRows.size + 1L)
             graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
             if (graphFirst) smtStats?.observeRealGraphOpening()
@@ -1186,7 +1170,6 @@ class ExactLiraSearchComponent private constructor(
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
                 if (bools[variable] == UNASSIGNED) {
-                    updateSourceInputs(variable, -1)
                     if (sourceGuardPendingBodies) resetSourceGuardCoverage()
                     unassignedBooleans--
                     if (completeTraversalObserved) {
@@ -1280,66 +1263,11 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
-    private fun updateSourceInputs(variable: Int, delta: Int) {
-        val dependencies = preparedSource.dependencies
-        val start = dependencies.offsets[variable]
-        val end = dependencies.offsets[variable + 1]
-        if (delta < 0) operationStop.charge((end - start).toLong())
-        for (position in start until end) {
-            val index = dependencies.rows[position]
-            unassignedSourceInputs[index] += delta
-            if (unassignedSourceInputs[index] == 0 && sourceAssertionLevels[index] == -1) {
-                queueSourceRow(index)
-            } else {
-                clearPendingSourceRow(index)
-            }
-        }
-    }
-
-    private fun queueSourceRow(index: Int) {
-        if (Bits.has(pendingSourceRows, index)) return
-        Bits.set(pendingSourceRows, index)
-        pendingSourceCount++
-        firstPendingSourceWord = minOf(firstPendingSourceWord, index ushr 6)
-    }
-
-    private fun clearPendingSourceRow(index: Int) {
-        if (!Bits.has(pendingSourceRows, index)) return
-        Bits.clear(pendingSourceRows, index)
-        pendingSourceCount--
-        if (pendingSourceCount == 0) firstPendingSourceWord = pendingSourceRows.size
-    }
-
-    private fun nextPendingSourceRow(from: Int): Int {
-        if (pendingSourceCount == 0) return -1
-        val fromWord = from ushr 6
-        var word = maxOf(fromWord, firstPendingSourceWord)
-        if (word >= pendingSourceRows.size) return -1
-        var mask = if (word == fromWord) -1L shl (from and 63) else -1L
-        while (word < pendingSourceRows.size) {
-            operationStop.charge(1L)
-            if (operationStop()) return -1
-            val bits = pendingSourceRows[word] and mask
-            if (bits != 0L) {
-                if (from == 0) firstPendingSourceWord = word
-                return (word shl 6) + bits.countTrailingZeroBits()
-            }
-            word++
-            mask = -1L
-        }
-        return -1
-    }
-
     private fun assertSource(context: SearchContext, deferPoint: Boolean = false): Boolean {
         if (!installSource() || (!deferPoint && !lp.atLevel(context.decisionLevel, operationStop))) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         val batch = ArrayList<ResolvedSourceAssertion>()
-        var cursor = 0
-        while (true) {
-            val index = nextPendingSourceRow(cursor)
-            if (index < 0) break
-            cursor = index + 1
-            val prepared = preparedRows[index]
+        for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             val assertedLevel = sourceAssertionLevels[index]
             if ((deferPoint && assertedLevel != -1) || assertedLevel >= 0) continue
@@ -1354,7 +1282,6 @@ class ExactLiraSearchComponent private constructor(
             if (deferPoint) {
                 if (pointReusePoint == null) return false
                 sourceAssertionLevels[index] = DEFERRED_SOURCE_ROW
-                clearPendingSourceRow(index)
                 continue
             }
             val leaves = prepared.booleans.map { variable ->
@@ -1372,7 +1299,6 @@ class ExactLiraSearchComponent private constructor(
                 }
             }
         }
-        if (operationStop()) return false
         if (deferPoint) return true
         if (!assertSourceBatch(context, batch)) return false
         if (lp.state?.conflict != null) return true
@@ -1394,10 +1320,7 @@ class ExactLiraSearchComponent private constructor(
         if (!system.assertComparisons(batch.map { it.comparison to it.premise }, operationStop)) return false
         // A crossed-bound batch may commit only its contradictory prefix.
         if (lp.state?.conflict == null) {
-            for (input in batch) {
-                sourceAssertionLevels[input.index] = context.decisionLevel
-                clearPendingSourceRow(input.index)
-            }
+            for (input in batch) sourceAssertionLevels[input.index] = context.decisionLevel
         }
         batch.clear()
         return true
@@ -1972,14 +1895,10 @@ class ExactLiraSearchComponent private constructor(
         retirePointReuse()
         resetSourceGuardCoverage()
         for (index in sourceAssertionLevels.indices) {
-            if (sourceAssertionLevels[index] > decisionLevel) {
-                sourceAssertionLevels[index] = -1
-                if (unassignedSourceInputs[index] == 0) queueSourceRow(index)
-            }
+            if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
-                updateSourceInputs(variable, 1)
                 unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
@@ -2039,43 +1958,8 @@ private class PreparedExactLiraSource(
     val preparedRows: List<PreparedSourceRow>,
     val arithmeticRows: List<LinearRow>,
     val arithmeticVariables: Set<Int>,
-    val dependencies: SourceRowDependencies,
     val validated: Boolean,
 )
-
-private class SourceRowDependencies(val offsets: IntArray, val rows: IntArray)
-
-private fun sourceRowDependencies(
-    numBooleans: Int,
-    rows: List<PreparedSourceRow>,
-    stop: Cancellation,
-): SourceRowDependencies? {
-    fun charge(size: Long): Boolean {
-        stop.charge(size)
-        return !stop()
-    }
-    if (numBooleans == Int.MAX_VALUE || !charge(numBooleans.toLong() + 1L)) return null
-    val offsets = IntArray(numBooleans + 1)
-    for (row in rows) {
-        if (!charge(row.booleans.size.toLong() + 1L)) return null
-        for (variable in row.booleans) offsets[variable + 1]++
-    }
-    var total = 0L
-    for (index in 1 until offsets.size) {
-        if (!charge(1L)) return null
-        total += offsets[index]
-        if (total > Int.MAX_VALUE) return null
-        offsets[index] = total.toInt()
-    }
-    if (!charge(total + offsets.size)) return null
-    val targets = IntArray(total.toInt())
-    val positions = offsets.copyOf()
-    for ((index, row) in rows.withIndex()) {
-        if (!charge(row.booleans.size.toLong() + 1L)) return null
-        for (variable in row.booleans) targets[positions[variable]++] = index
-    }
-    return SourceRowDependencies(offsets, targets)
-}
 
 private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
     val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
@@ -2095,8 +1979,7 @@ private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
     }
     val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
     return PreparedExactLiraSource(
-        model, exactForms, preparedRows, arithmeticRows, arithmeticVariables,
-        requireNotNull(sourceRowDependencies(model.numBoolVars, preparedRows, Cancellation.Never)), validated = false,
+        model, exactForms, preparedRows, arithmeticRows, arithmeticVariables, validated = false,
     )
 }
 
@@ -2163,10 +2046,9 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
     }
     val copies = exactForms.size.toLong() + preparedRows.size + arithmeticRows.size + arithmeticVariables.size + 1L
     if (!charge(copies)) return null
-    val dependencies = sourceRowDependencies(model.numBoolVars, preparedRows, stop) ?: return null
     val source = PreparedExactLiraSource(
         model, exactForms.toList(), preparedRows.toList(), arithmeticRows.toList(), arithmeticVariables.toSet(),
-        dependencies, validated = true,
+        validated = true,
     )
     return source.takeUnless { stop() }
 }

@@ -55,10 +55,6 @@ Completed assertion stamps also survive subsequent root publications: a row whos
 Boolean inputs are fixed keeps the same meaning, and tighter root bounds preserve
 its earlier assertion. Newly resolved rows still follow source order and use the
 fixed-column substitutions available when they are first asserted.
-Immutable Boolean-to-row dependencies feed an invocation-owned pending bitmap.
-Rows become ready only when every Boolean input is assigned, and drain in source
-order. Popping an assertion or retiring its retained point restores pending rows;
-retracted Boolean inputs withhold their rows until those inputs are assigned again.
 
 #### A check
 
