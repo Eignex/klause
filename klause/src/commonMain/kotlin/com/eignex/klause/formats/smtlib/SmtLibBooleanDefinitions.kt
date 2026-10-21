@@ -89,16 +89,13 @@ internal class SmtBooleanGates(private val cancellation: Cancellation, private v
     fun literal(kind: Kind, inputs: List<Int>, create: () -> Int): Int {
         require(kind != Kind.IFF || inputs.size == 2)
         val entries = inputs.size.toLong() + 1L
-        cancellation.charge(entries)
-        if (cancellation()) throw PolynomialSourceInterrupted()
+        work(entries)
         if (entries > maxEntries) return create()
         val ordered = inputs.sortedWith { left, right ->
-            cancellation.charge(1L)
-            if (cancellation()) throw PolynomialSourceInterrupted()
+            work(1L)
             left.compareTo(right)
         }
-        cancellation.charge(entries * 2L)
-        if (cancellation()) throw PolynomialSourceInterrupted()
+        work(entries * 2L)
         val canonical = if (kind == Kind.IFF && ordered.isNotEmpty() && !Lit.isPositive(ordered[0])) {
             ordered.map(Lit::negate)
         } else ordered
@@ -110,5 +107,10 @@ internal class SmtBooleanGates(private val cancellation: Cancellation, private v
             retainedEntries += entries.toInt()
         }
         return literal
+    }
+
+    private fun work(units: Long) {
+        cancellation.charge(units)
+        if (cancellation()) throw PolynomialSourceInterrupted()
     }
 }
