@@ -16,6 +16,7 @@ import com.eignex.klause.lp.rowRefuted
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.freeBooleanProbeCandidates
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -45,7 +46,7 @@ internal object Probing {
      *
      * Binary implications are dropped; this pass persists only units and unconditional bounds.
      *
-     * Idempotent: a Boolean already pinned by a unit clause is not probed and a bound already at least
+     * Idempotent: an unused or root-fixed Boolean is not probed and a bound already at least
      * as tight is not re-applied, so the round engine reaches a fixpoint instead of churning. Bounded by
      * [maxCandidates] free Booleans per invocation (in id order); a later round re-enters with the units
      * this one derived excluded from the free set.
@@ -54,33 +55,20 @@ internal object Probing {
      * ORSA J. Computing 6(4), 1994, https://doi.org/10.1287/ijoc.6.4.445
      */
     fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: Cancellation): PassDelta {
-        val pinned = IntHashSet()
-        for (f in problem.factors) {
-            if (f is Clause && f.literals.size == 1) pinned.add(Lit.variable(f.literals[0]))
-        }
-
         val units = ArrayList<Factor>()
         val domains = problem.rootIntDomains()
         var domainsChanged = false
-        var probed = 0
-        var v = 0
-        while (v < problem.numBoolVars && probed < maxCandidates) {
+        for (v in problem.freeBooleanProbeCandidates(maxCandidates, cancellation)) {
             if (cancellation()) break
-            if (v in pinned) {
-                v++
-                continue
-            }
-            probed++
             val tryTrue = problem.propagate(Assumptions.None.withBool(v, true), cancellation)
             if (tryTrue is PropagationResult.Unsat) {
                 units.add(Clause(intArrayOf(Lit.make(v, false))))
-                v++
                 continue
             }
+            if (cancellation()) break
             val tryFalse = problem.propagate(Assumptions.None.withBool(v, false), cancellation)
             if (tryFalse is PropagationResult.Unsat) {
                 units.add(Clause(intArrayOf(Lit.make(v, true))))
-                v++
                 continue
             }
             domainsChanged = harvestCommonBounds(
@@ -89,7 +77,6 @@ internal object Probing {
                 problem,
                 domains,
             ) || domainsChanged
-            v++
         }
 
         if (units.isEmpty() && !domainsChanged) return PassDelta()
@@ -115,6 +102,7 @@ internal object Probing {
      * was proved, since a partial propagation still only derives implied bounds.
      */
     fun probeSource(problem: Problem, maxCandidates: Int, cancellation: Cancellation): SourceDelta {
+        if (cancellation()) return SourceDelta()
         val probe = OpenRangeProbe(problem, cancellation)
         if (!probe.hasRows) return SourceDelta()
         if (!probe.propagateRoot() || !probe.probeAll(maxCandidates)) return SourceDelta(infeasible = true)
@@ -183,8 +171,9 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val rowSign = LongArrayList()
     private val rowGuard = IntArrayList()
     private val rowGuardValue = LongArrayList()
-    private val incidenceStart: IntArray
-    private val incidence: IntArray
+    private var incidenceStart = IntArray(0)
+    private var incidence = IntArray(0)
+    private var prepared = false
 
     // Each entry packs `(col shl 2) | (wasOpen shl 1) | side`, side 0 for the lower bound; the value is the
     // bound the entry replaced.
@@ -198,31 +187,60 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private var conflict = false
     override val crossed: Boolean get() = conflict
 
-    val hasRows: Boolean get() = rowCols.isNotEmpty()
+    val hasRows: Boolean get() = prepared && rowCols.isNotEmpty()
 
     init {
+        prepare()
+    }
+
+    private fun visit(): Boolean {
+        if (stopped) return false
+        cancellation.charge(PROBE_SOURCE_WORK_WEIGHT)
+        if ((cancellation.workMeter() != null || poll.due()) && cancellation()) stopped = true
+        return !stopped
+    }
+
+    private fun prepare() {
         val bounds = problem.intBounds
         for (v in 0 until numInts) {
+            if (!visit()) return
             loOpen[v] = bounds.isOpenLower(v)
             hiOpen[v] = bounds.isOpenUpper(v)
             if (!loOpen[v]) lo[v] = bounds.lower(v)
             if (!hiOpen[v]) hi[v] = bounds.upper(v)
         }
-        for (factor in problem.factors) for (row in factor.impliedLinearRows) compile(row)
+        for (factor in problem.factors) {
+            if (!visit()) return
+            for (row in factor.impliedLinearRows) {
+                if (!visit()) return
+                compile(row)
+            }
+        }
         val counts = IntArray(numCols + 1)
-        forEachIncidence { col, _ -> counts[col + 1]++ }
-        for (c in 0 until numCols) counts[c + 1] += counts[c]
+        if (!forEachIncidence { col, _ -> counts[col + 1]++ }) return
+        for (c in 0 until numCols) {
+            if (!visit()) return
+            counts[c + 1] += counts[c]
+        }
         incidenceStart = counts.copyOf()
         incidence = IntArray(counts[numCols])
-        forEachIncidence { col, row -> incidence[counts[col]++] = row }
+        prepared = forEachIncidence { col, row -> incidence[counts[col]++] = row }
     }
 
-    private inline fun forEachIncidence(action: (col: Int, row: Int) -> Unit) {
+    private inline fun forEachIncidence(action: (col: Int, row: Int) -> Unit): Boolean {
         for (h in rowCols.indices) {
-            for (col in rowCols[h]) action(col, h)
+            if (!visit()) return false
+            for (col in rowCols[h]) {
+                if (!visit()) return false
+                action(col, h)
+            }
             val guard = rowGuard[h]
-            if (guard >= 0) action(guard, h)
+            if (guard >= 0) {
+                if (!visit()) return false
+                action(guard, h)
+            }
         }
+        return true
     }
 
     // Literal terms become 0/1 columns: a negative literal `c·¬b` is `c − c·b`, so its constant moves to
@@ -234,6 +252,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         var shift = 0L
         try {
             for (k in 0 until row.size) {
+                if (!visit()) return
                 val ref = row.ref(k)
                 val c = constants.coeff(k)
                 when {
@@ -330,6 +349,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
 
     private fun fixed(col: Int): Boolean = !loOpen[col] && !hiOpen[col] && lo[col] == hi[col]
 
+    // Retraction must finish even after cancellation so no hypothetical bound reaches the root delta.
     private fun undoTo(mark: Int) {
         while (trail.size > mark) {
             val last = trail.size - 1
@@ -352,21 +372,21 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
 
     private fun process(h: Int) {
         val cols = rowCols[h]
-        cancellation.charge(PROBE_SOURCE_WORK_WEIGHT * (1L + cols.size))
+        if (!visit()) return
         val guard = rowGuard[h]
         val coeffs = rowCoeffs[h]
         val bound = rowBound[h]
         val sign = rowSign[h]
         if (guard >= 0 && !fixed(guard)) {
-            if (rowRefuted(coeffs, cols, bound, sign, this)) {
+            if (rowRefuted(coeffs, cols, bound, sign, this, ::visit)) {
                 if (rowGuardValue[h] == 1L) setHi(guard, 0L) else setLo(guard, 1L)
             }
         } else if (guard < 0 || lo[guard] == rowGuardValue[h]) {
             // A row with no column left has nothing to narrow, so only the refutation can fire.
             if (cols.isEmpty()) {
-                if (rowRefuted(coeffs, cols, bound, sign, this)) conflict = true
+                if (rowRefuted(coeffs, cols, bound, sign, this, ::visit)) conflict = true
             } else {
-                propagateRow(coeffs, cols, bound, sign, this)
+                propagateRow(coeffs, cols, bound, sign, this, ::visit)
             }
         }
     }
@@ -381,12 +401,15 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
             val col = queue.removeFirst()
             queued[col] = false
             for (k in incidenceStart[col] until incidenceStart[col + 1]) {
+                if (!visit()) break
+                visits++
+                if (visits > cap) {
+                    stopped = true
+                    break
+                }
                 process(incidence[k])
-                if (crossed) break
+                if (crossed || stopped) break
             }
-            visits += incidenceStart[col + 1] - incidenceStart[col]
-            if (poll.due() && cancellation()) stopped = true
-            if (visits > cap) break
         }
         while (queue.isNotEmpty()) queued[queue.removeFirst()] = false
         return !crossed
@@ -394,6 +417,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
 
     fun propagateRoot(): Boolean {
         for (h in rowCols.indices) {
+            if (stopped) break
             process(h)
             if (crossed) return false
         }
@@ -416,6 +440,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         var probed = 0
         var b = 0
         while (b < problem.numBoolVars && probed < maxCandidates && !stopped) {
+            if (!visit()) break
             val col = numInts + b++
             if (fixed(col) || incidenceStart[col] == incidenceStart[col + 1]) continue
             probed++
@@ -430,12 +455,14 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         val mark = trail.size
         setLo(col, 1L)
         val trueHolds = propagate()
-        if (trueHolds) recordTouched(mark)
+        if (trueHolds && !stopped) recordTouched(mark)
         undoTo(mark)
+        if (stopped) return true
         setHi(col, 0L)
         val falseHolds = propagate()
-        if (trueHolds && falseHolds) collectCommon(mark)
+        if (trueHolds && falseHolds && !stopped) collectCommon(mark)
         undoTo(mark)
+        if (stopped) return true
         when {
             !trueHolds && !falseHolds -> return false
             !trueHolds -> setHi(col, 0L)
@@ -459,6 +486,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         touchedLoOpen.clear()
         touchedHiOpen.clear()
         for (k in mark until trail.size) {
+            if (!visit()) return
             val col = trail[k] ushr 2
             if (stamp[col] == probeId) continue
             stamp[col] = probeId
@@ -476,6 +504,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         pending.clear()
         pendingValue.clear()
         for (k in mark until trail.size) {
+            if (!visit()) return
             val entry = trail[k]
             val col = entry ushr 2
             if (stamp[col] != probeId) continue

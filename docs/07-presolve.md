@@ -180,9 +180,13 @@ solution set.
 
 ### Boolean reductions
 
-The implication graph pins each free Boolean, propagates and records forced
-literals; mutual-implication cycles collapse to one representative and transitively
-implied binary clauses drop. Bounded variable elimination resolves out a Boolean in
+Finite probing and implication harvesting count only Booleans with live factor
+occurrences and no root deduction toward their candidate caps. An empty candidate
+set needs no probe root. The implication graph pins each candidate, propagates and
+records forced literals; mutual-implication cycles collapse to one representative and transitively
+implied binary clauses drop. Graph construction, node and edge traversal, and SCC
+discovery charge and poll in bounded chunks. Interrupted reachability restores the
+candidate clause's edges, and incomplete SCC discovery publishes no merges. Bounded variable elimination resolves out a Boolean in
 clean clauses and no objective when resolvents do not outnumber the clauses they
 replace. Blocked clause elimination removes clauses whose resolvents on some literal
 are tautologies, repairing them on reconstruction. These are satisfiability
@@ -199,7 +203,11 @@ to keep one representative; objective variables are excluded, and value preceden
 breaks value symmetry. Both are off for solution-set-sensitive queries. Probing pins
 each free Boolean both ways: a conflicting polarity yields a unit, and a bound implied
 by both holds unconditionally. Integer and open-range probing apply singleton arc
-consistency to bounds and holes. Only units and unconditional bounds persist.
+consistency to bounds and holes. Open-range compilation, incidence construction,
+root-row visits and queued incidence scans charge and poll throughout, including
+individual row terms. Interruption keeps proved root bounds and rolls back the
+active hypothetical branch before publication. Only units and unconditional bounds
+persist.
 Source probing and symmetry defer to finite preparation for models containing only
 closed discrete columns. With real columns present, their supported Boolean and
 integer reductions run in the source phase even when every integer column is
