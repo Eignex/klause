@@ -334,7 +334,11 @@ source verdict, and cannot establish a default-route recovery.
 
 `bench.profile.LinearSourceShape` accepts `suite=ID problem=NAME sha256=HEX` and
 retains the hash-matched original, build identity, declaration/lowered dimensions,
-factor kinds and exact-row predicate counts. Predicate identity removes only the
+factor kinds, exact-row predicate counts and binary Real selection selector counts.
+Selector identity groups finite `0..1` indexes with a single unit reified equality
+or disequality at one by their signed Boolean guard. It reports duplicate columns
+and guard fanout in the prepared model without changing the model.
+Predicate identity removes only the
 activator before using `ExactLinear` structural keys; it does not reason about
 signs, implications or source satisfiability. Raw coordinate/activated-row entry
 counts describe the parsed source, independently of runtime fragment admission.

@@ -7,8 +7,12 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -63,6 +67,24 @@ internal object LinearSourceShape {
         val model = requireNotNull(invocation.preparedPlan?.model) { "source has no factor inspection view" }
         val exactRows = model.factors.filterIsInstance<ExactLinear>()
         val activatedRows = exactRows.filter { it.activator != LinearRow.ALWAYS }
+        val realSelections = model.factors.filterIsInstance<RealElement>()
+        val binarySelectionIndexes = realSelections.filter { it.indexOffset == 0 && it.size == 2 }
+            .map { it.idx }.toSet()
+        val selectorDefinitions = model.factors.filterIsInstance<ReifiedLinear>().mapNotNull { row ->
+            val constants = row.integerConstants ?: return@mapNotNull null
+            if (row.vars.size != 1 || constants.coeff(0) != 1L || constants.bound != 1L ||
+                row.op !in setOf(LinearOp.EQ, LinearOp.NE)
+            ) return@mapNotNull null
+            val column = row.vars[0]
+            if (column !in binarySelectionIndexes || !model.intBounds.hasLower(column) ||
+                !model.intBounds.hasUpper(column) || model.intBounds.lower(column) != 0L ||
+                model.intBounds.upper(column) != 1L
+            ) return@mapNotNull null
+            val guard = Lit.make(row.auxBoolVar, positive = row.op == LinearOp.EQ)
+            column to guard
+        }.groupBy({ it.first }, { it.second })
+        val guardSelectors = selectorDefinitions.filterValues { it.size == 1 }.entries
+            .groupBy({ it.value.single() }, { it.key })
         val predicates = HashSet<StructuralKey>()
         for (row in exactRows) {
             val constants = row.constants
@@ -89,6 +111,18 @@ internal object LinearSourceShape {
             put("compiledIntegers", model.numIntVars)
             put("compiledReals", model.numRealVars)
             put("compiledFactors", model.factors.size)
+            put("realSelections", realSelections.size)
+            put("binaryRealSelectionIndexes", binarySelectionIndexes.size)
+            put("singleGuardBinarySelectionIndexes", guardSelectors.values.sumOf { it.size })
+            put("distinctBinarySelectionGuards", guardSelectors.size)
+            put("duplicateBinarySelectionIndexes", guardSelectors.values.sumOf { it.size - 1 })
+            put("maxBinarySelectionIndexesPerGuard", guardSelectors.values.maxOfOrNull { it.size } ?: 0)
+            put("binarySelectionGuardFanoutHistogram", buildJsonObject {
+                guardSelectors.values.groupingBy { it.size }.eachCount().toSortedMap()
+                    .forEach { (fanout, count) -> put(fanout.toString(), count) }
+            })
+            put("selectionEquivalence",
+                "Prepared binary RealElement indexes in 0..1 with one unit reified EQ/NE definition at 1; same signed guard only")
             put("factorKinds", buildJsonObject {
                 model.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
                     .forEach { (kind, count) -> put(kind, count) }
