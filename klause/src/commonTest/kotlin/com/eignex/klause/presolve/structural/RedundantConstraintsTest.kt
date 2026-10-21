@@ -13,9 +13,17 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.BakeConfig
+import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
+import com.eignex.klause.presolve.Presolver
+import com.eignex.klause.presolve.asSourceDelta
+import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeFactor
+import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
+import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeMemo
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
@@ -24,12 +32,14 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class RedundantConstraintsTest {
-    private fun isFeasible(problem: Problem, ints: LongArray): Boolean {
+    private fun isFeasible(problem: Problem, ints: LongArray, boolMask: Int = 0): Boolean {
         var a = Assumptions.None
         for (v in 0 until problem.numIntVars) a = a.withInt(v, ints[v])
+        for (v in 0 until problem.numBoolVars) a = a.withBool(v, boolMask and (1 shl v) != 0)
         return problem.propagate(a) !is PropagationResult.Unsat
     }
 
@@ -62,6 +72,130 @@ class RedundantConstraintsTest {
             assertTrue(delta.isEmpty, "$name: expected no change")
         }
         return out
+    }
+
+    @Test
+    fun `duplicate clauses should preserve every assignment in source and finite presolve`() {
+        for (shared in listOf(true, false)) {
+            val clause = Clause(intArrayOf(pos(0), pos(1)))
+            val duplicate = if (shared) clause else Clause(intArrayOf(pos(0), pos(1)))
+            val problem = Problem(2, 0, emptyArray(), listOf(clause, duplicate))
+            val config = PresolveConfig.parse("off,+subsume")
+
+            val source = Presolver.runSource(problem, config).problem
+            val finite = Presolver.run(problem.bake(), config).problem
+
+            for (reduced in listOf(source, finite)) {
+                for (mask in 0..3) {
+                    assertEquals(mask != 0, isFeasible(reduced, longArrayOf(), mask), "shared=$shared mask=$mask")
+                    assertEquals(isFeasible(problem, longArrayOf(), mask), isFeasible(reduced, longArrayOf(), mask))
+                }
+                assertEquals(1, reduced.factors.size)
+            }
+        }
+    }
+
+    private fun checkIncrementalAssignments(problem: Problem, incremental: SubsumeIncremental): Problem {
+        val ranges = ColumnRanges.of(problem.intBounds)
+        val full = RedundantConstraints.removeRedundantConstraints(problem, ranges)
+        val delta = RedundantConstraints.removeRedundantConstraints(problem, ranges, incremental)
+        val reduced = assertNotNull(problem.withSourcePassDelta(delta.asSourceDelta()))
+        assertEquals(full.droppedIndices.toList(), delta.droppedIndices.toList())
+        val values = if (problem.numIntVars == 0) 0..0L else 0..2L
+        for (mask in 0 until (1 shl problem.numBoolVars)) {
+            for (x in values) {
+                for (y in values) {
+                    val ints = longArrayOf(x, y)
+                    assertEquals(
+                        isFeasible(problem, ints, mask), isFeasible(reduced, ints, mask),
+                        "mask=$mask ints=${ints.toList()}",
+                    )
+                }
+            }
+        }
+        return reduced
+    }
+
+    @Test
+    fun `mixed duplicate rows should preserve every assignment across retractions and readditions`() {
+        for (shared in listOf(true, false)) {
+            val clause = Clause(intArrayOf(pos(0), pos(1)))
+            val loose = le(2, 0, 1, 1, 1)
+            val tight = le(1, 0, 1, 1, 1)
+            val memo = SubsumeMemo()
+            val original = Problem(2, 2, dom(2, 2), listOf(
+                clause, loose,
+                if (shared) clause else Clause(intArrayOf(pos(0), pos(1))),
+                if (shared) loose else le(2, 0, 1, 1, 1),
+                tight,
+            ))
+            checkIncrementalAssignments(
+                original, SubsumeIncremental(true, intArrayOf(0, 1, 2, 3, 4), emptyList(), intArrayOf(), memo),
+            )
+            val replaced = Problem(2, 2, dom(2, 2), listOf(clause, loose))
+            checkIncrementalAssignments(
+                replaced,
+                SubsumeIncremental(false, intArrayOf(0, 5), listOf(SubsumeFactor(5, loose)), intArrayOf(4), memo),
+            )
+            checkIncrementalAssignments(
+                replaced, SubsumeIncremental(false, intArrayOf(0, 5), emptyList(), intArrayOf(6), memo),
+            )
+            val added = Problem(2, 2, dom(2, 2), listOf(clause, loose, loose, tight))
+            checkIncrementalAssignments(
+                added,
+                SubsumeIncremental(
+                    false, intArrayOf(0, 5, 7, 8), listOf(SubsumeFactor(7, loose), SubsumeFactor(8, tight)),
+                    intArrayOf(), memo,
+                ),
+            )
+            val restored = Problem(2, 2, dom(2, 2), listOf(clause, loose))
+            checkIncrementalAssignments(
+                restored,
+                SubsumeIncremental(
+                    false, intArrayOf(0, 9), listOf(SubsumeFactor(9, loose)), intArrayOf(8), memo,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `an interrupted duplicate rebuild should recover its occurrence index`() {
+        val clause = Clause(intArrayOf(pos(0), pos(1)))
+        val problem = Problem(2, 0, emptyArray(), listOf(clause, clause))
+        val memo = SubsumeMemo()
+        val incremental = SubsumeIncremental(true, intArrayOf(0, 1), emptyList(), intArrayOf(), memo)
+        val ranges = ColumnRanges.of(problem.intBounds)
+        val stopped = RedundantConstraints.removeRedundantConstraints(problem, ranges, incremental, Cancellation { true })
+        assertTrue(stopped.isEmpty)
+
+        val recovered = checkIncrementalAssignments(
+            problem, SubsumeIncremental(false, intArrayOf(0, 1), emptyList(), intArrayOf(), memo),
+        )
+
+        assertEquals(1, recovered.factors.size)
+    }
+
+    @Test
+    fun `an unchanged duplicate memo should charge no repeated registration work`() {
+        val clause = Clause(intArrayOf(pos(0), pos(1)))
+        val problem = Problem(2, 0, emptyArray(), listOf(clause, clause))
+        val memo = SubsumeMemo()
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val token = budget.orSpent(Cancellation.Never)
+        val ranges = ColumnRanges.of(problem.intBounds)
+        RedundantConstraints.removeRedundantConstraints(
+            problem, ranges, SubsumeIncremental(true, intArrayOf(0, 1), emptyList(), intArrayOf(), memo), token,
+        )
+        val firstWork = budget.spent()
+        val reduced = Problem(2, 0, emptyArray(), listOf(clause))
+
+        val delta = RedundantConstraints.removeRedundantConstraints(
+            reduced, ranges, SubsumeIncremental(false, intArrayOf(0), emptyList(), intArrayOf(), memo), token,
+        )
+
+        assertTrue(delta.isEmpty)
+        assertEquals(60L, firstWork)
+        assertEquals(firstWork, budget.spent())
     }
 
     private fun dom(n: Int, hi: Int) = Array(n) { IntDomain(0, hi.toLong()) }

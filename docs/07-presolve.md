@@ -216,7 +216,9 @@ solution-set-sensitive queries.
 
 Structural reduction calls each factor's `structuralReduce` hook under current
 domains; source execution restricts this to closed integer columns. Redundancy and
-subsumption use indexes maintained across rounds. Clique-implied subsumption admits
+subsumption use indexes maintained across rounds. Duplicate removal and index
+retraction identify stable factor occurrences, so repeated references to one immutable
+factor retain one representative. Clique-implied subsumption admits
 only unconditional positive Boolean knapsacks and derives activity bounds from
 retained clauses/cardinalities, so a dropped row cannot justify its own removal.
 

@@ -20,6 +20,24 @@ import kotlin.test.assertTrue
 
 class PresolveSessionTest {
     @Test
+    fun `shared factors should keep distinct stable ids across additions and drops`() {
+        val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val session = PresolveSession(Problem(2, 0, emptyArray(), listOf(clause, clause)).bake())
+        val originalIds = session.passFactorIds()
+        val mark = session.changeMark()
+        assertTrue(session.apply(PresolveDelta(droppedIds = intArrayOf(1), addedFactors = listOf(clause))))
+        assertTrue(session.apply(PresolveDelta(droppedIds = intArrayOf(2))))
+
+        assertEquals(listOf(0, 1), originalIds.toList())
+        assertEquals(listOf(0), session.passFactorIds().toList())
+        assertEquals(listOf(1, 2), session.droppedIdsSince(mark).toList())
+        assertSame(clause, session.factorAt(0))
+        assertEquals(null, session.factorAt(1))
+        assertEquals(null, session.factorAt(2))
+    }
+
+
+    @Test
     fun `incremental and rebuilt complexity should agree across factor drops and domain narrowings`() {
         for (domains in listOf(
             emptyArray<IntDomain>(),
