@@ -7,8 +7,10 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,6 +19,105 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
+    @Test
+    fun `retracted decisions should restore both supported implicants`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) (declare-const c Bool) " +
+                "(assert (and (or a b) (or (not a) c)))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+
+        val regions = formula.booleanRegions(PolynomialArithmetic()).asSequence().filterNotNull().toList()
+
+        assertEquals(setOf(mapOf(0 to false, 1 to true), mapOf(0 to true, 2 to true)),
+            regions.map { it.bools }.toSet())
+    }
+
+    @Test
+    fun `junction truth changes should retain every required supporting literal`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) " +
+                "(assert (or (and a b) (and (not a) (not b))))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+
+        val regions = formula.booleanRegions(PolynomialArithmetic()).asSequence().filterNotNull().toList()
+
+        assertEquals(setOf(mapOf(0 to false, 1 to false), mapOf(0 to true, 1 to true)),
+            regions.map { it.bools }.toSet())
+    }
+
+    @Test
+    fun `retracted alternatives should select their own supporting child`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) (assert (or a b))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+
+        val regions = formula.booleanRegions(PolynomialArithmetic()).asSequence().filterNotNull().toList()
+
+        assertEquals(setOf(mapOf(0 to true), mapOf(1 to true)), regions.map { it.bools }.toSet())
+    }
+
+    @Test
+    fun `interleaved region searches should retain separate proof state`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) (assert (or a b))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        val first = formula.booleanRegions(PolynomialArithmetic()).asSequence().filterNotNull().iterator()
+        val second = formula.booleanRegions(PolynomialArithmetic()).asSequence().filterNotNull().iterator()
+
+        val firstAlternative = first.next()
+        val secondAlternative = second.next()
+        val firstRemainder = first.asSequence().map { it.bools }.toList()
+        val secondRemainder = second.asSequence().map { it.bools }.toList()
+
+        assertEquals(firstAlternative.bools, secondAlternative.bools)
+        assertEquals(firstRemainder, secondRemainder)
+        assertEquals(1, firstRemainder.size)
+    }
+
+    @Test
+    fun `supported conjunctions should fit the containing caller work`() {
+        val source = PolynomialRealFormula.And(List(512) { index ->
+            PolynomialRealFormula.Or(listOf(
+                PolynomialRealFormula.BooleanVariable(SourceBoolId(index * 2)),
+                PolynomialRealFormula.BooleanVariable(SourceBoolId(index * 2 + 1)),
+            ))
+        })
+        val formula = PolynomialFormula.normalize(source, PolynomialArithmetic())
+        var spent = 0L
+        val meter = WorkMeter { spent += it }
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 500000
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val region = formula.booleanRegions(PolynomialArithmetic(cancellation))
+            .asSequence().filterNotNull().first()
+
+        for (index in 0 until 512) {
+            assertTrue(region.bools[index * 2] == true || region.bools[index * 2 + 1] == true)
+        }
+        assertTrue(region.atoms.isEmpty())
+    }
+
+    @Test
+    fun `cancelled region search should withhold later implicants`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) (assert (or a b))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        var cancelled = false
+        val regions = formula.booleanRegions(PolynomialArithmetic(Cancellation { cancelled }))
+            .asSequence().filterNotNull().iterator()
+        regions.next()
+        cancelled = true
+
+        assertFailsWith<PolynomialInterrupted> { regions.hasNext() }
+    }
+
     @Test
     fun `root proof demand chooses a relevant first leaf`() {
         for ((predicate, truth) in listOf(
