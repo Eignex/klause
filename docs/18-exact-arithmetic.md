@@ -70,6 +70,11 @@ keys. Lexicographic comparison inspects the largest variable first, so callers r
 IDs to choose an elimination order. Derivatives, substitution and exact division
 never convert to floating values.
 
+Ordered multivariate remainder division retains irreducible terms while reducing
+the remaining terms by the supplied divisors. The input differs from its remainder
+by a polynomial combination of those divisors. Prepared cursors retain this work
+across suspension and expose only the completed remainder.
+
 Bareiss elimination computes Sylvester determinants with exact division.
 Resultants handle zero, shared-factor and constant cases; principal subresultant
 coefficients use the truncated Sylvester matrices, with a direct formula when both
