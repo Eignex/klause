@@ -141,7 +141,7 @@ object Presolver {
         val passes = problemPasses(problem, config, context, PresolvePass.Capability.SOURCE)
         if (passes.isEmpty() || config.maxRounds == 0) return SourcePresolved(problem)
         val ctx = context.withCancellation(cancellation)
-            .withPresolveBudget(context.presolveBudget ?: PresolveBudget(Long.MAX_VALUE))
+            .withPresolveBudget(context.presolveBudget)
         val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
 
@@ -256,7 +256,7 @@ object Presolver {
         val ctx = context.withCancellation(cancellation)
             .withAffineUnderdetermined(underdetermined)
             .withAffinePivotOrder(config.affinePivotOrder)
-            .withPresolveBudget(context.presolveBudget ?: PresolveBudget(Long.MAX_VALUE))
+            .withPresolveBudget(context.presolveBudget)
 
         // Incremental path for the default FAST+MEDIUM rounds: one persistent [PresolveSession] absorbs
         // each pass's delta instead of rebuilding a `Problem` per firing pass. Scoped away from any
