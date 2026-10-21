@@ -24,6 +24,31 @@ import kotlin.test.assertIs
 
 class PhaseSavingTest {
     @Test
+    fun `candidate variable eligibility should follow Boolean phase fallback`() {
+        for (kind in listOf("unobserved", "saved", "target", "solution", "forced", "disabled")) {
+            val session = boolSession(1)
+            session.pinBool(0, false)
+            val phase = PhaseSaving(1, 0, BacktrackParams(phaseSaving = kind != "disabled",
+                targetPhasing = kind != "disabled", solutionPhasing = true, rephaseInterval = 1))
+            when (kind) {
+                "saved" -> phase.capture(VarRef.Bool(0), session)
+                "target" -> phase.captureTargetIfDeeper(session, 1)
+                "solution" -> {
+                    phase.onSolution(Sample(booleanArrayOf(false), longArrayOf()))
+                    phase.setManagedMode(PhaseMode.STABLE)
+                }
+                "forced" -> repeat(3) { phase.onConflictTick() }
+            }
+
+            val eligible = phase.acceptsBooleanCandidate(0)
+            phase.applyPhase(VarRef.Bool(0), sequenceOf(0L, 1L), candidate = true).toList()
+
+            assertEquals(kind == "unobserved", eligible)
+            assertEquals(eligible, phase.candidateUses > 0L)
+        }
+    }
+
+    @Test
     fun `integer candidates should only fill enabled unobserved phases`() {
         for (enabled in listOf(false, true)) {
             val phase = PhaseSaving(0, 1, BacktrackParams(phaseSaving = enabled))

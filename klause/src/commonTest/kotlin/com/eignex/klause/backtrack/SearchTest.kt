@@ -1,15 +1,22 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.Impact
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.CpBranching
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
@@ -22,6 +29,47 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SearchTest {
+    @Test
+    fun `point variable proposals should preserve both branches for unobserved phases`() {
+        for (enabled in listOf(false, true)) {
+            val native = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))
+            val cp = CpSearchComponent(native, branching = CpBranching.None)
+            val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(2))
+            val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+                phaseSaving = enabled, randomSeed = 0L)
+            val brancher = BacktrackBrancher(native, params, sink = null, restart = NoRestartSchedule)
+            brancher.realPointPreference = { variable -> if (variable == VarRef.Bool(1)) 1L else null }
+            brancher.realPointVariablePreference = { accept -> 1.takeIf(accept) }
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val alternatives = brancher.nextBranch(session)
+
+            val variable = if (enabled) 1 else 0
+            assertEquals(SearchDecision.Bool(Lit.make(variable, enabled)), alternatives?.first())
+            assertEquals(setOf(SearchDecision.Bool(Lit.make(variable, false)),
+                SearchDecision.Bool(Lit.make(variable, true))), alternatives?.toSet())
+        }
+    }
+
+    @Test
+    fun `point variable proposals should defer to retained phases after retraction`() {
+        val native = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))
+        val cp = CpSearchComponent(native, branching = CpBranching.None)
+        val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(2))
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            phaseSaving = true, randomSeed = 0L)
+        val brancher = BacktrackBrancher(native, params, sink = null, restart = NoRestartSchedule)
+        brancher.realPointPreference = { variable -> if (variable == VarRef.Bool(1)) 1L else null }
+        brancher.realPointVariablePreference = { accept -> 1.takeIf(accept) }
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+        session.popTo(0)
+
+        val alternatives = brancher.nextBranch(session)
+
+        assertEquals(SearchDecision.Bool(Lit.make(0, false)), alternatives?.first())
+    }
+
     private fun problemOf(vararg domains: IntDomain): Problem = Problem(
         numBoolVars = 0,
         numIntVars = domains.size,

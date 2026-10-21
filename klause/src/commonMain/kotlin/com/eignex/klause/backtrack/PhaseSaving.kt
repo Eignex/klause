@@ -50,6 +50,23 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
         managedMode = mode
     }
 
+    fun acceptsBooleanCandidate(variable: Int): Boolean {
+        if (!boolPhaseTracking || boolPhaseSet?.getOrNull(variable) != false) return false
+        val solution = solutionBools != null && hasSolution && variable < solutionBools.size
+        return when (booleanSource(solution)) {
+            RephaseMode.TARGET -> boolTargetSet?.getOrNull(variable) != true
+            RephaseMode.SOLUTION -> !solution
+            RephaseMode.SAVED -> true
+            else -> false
+        }
+    }
+
+    private fun booleanSource(solution: Boolean): RephaseMode = when (managedMode) {
+        PhaseMode.STABLE -> if (solution) RephaseMode.SOLUTION else RephaseMode.TARGET
+        PhaseMode.FOCUSED -> RephaseMode.SAVED
+        PhaseMode.UNMANAGED -> rephaseMode
+    }
+
     /**
      * If a value is cached for [varRef], prepend it to the heuristic's [values] order (dropping it
      * from the rest so it isn't tried twice); otherwise pass [values] through unchanged. For a Boolean
@@ -82,11 +99,7 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
             // A managing schedule pins the source (stable → dive on the best solution/target, focused →
             // plain saved); otherwise the autonomous rephase rotation chooses. Each source falls back to
             // the saved phase when its array isn't populated, so a disabled feature is a no-op.
-            val source = when (managedMode) {
-                PhaseMode.STABLE -> if (solutionFirst != null) RephaseMode.SOLUTION else RephaseMode.TARGET
-                PhaseMode.FOCUSED -> RephaseMode.SAVED
-                PhaseMode.UNMANAGED -> rephaseMode
-            }
+            val source = booleanSource(solutionFirst != null)
             val preferred: Long? = when (source) {
                 RephaseMode.SOLUTION -> solutionFirst ?: savedOrCandidate()
 

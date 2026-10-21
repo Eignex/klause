@@ -78,6 +78,8 @@ class BacktrackSolverRealTest {
             assertEquals(true, sat.assignment.bools[1])
             assertEquals(0L, sat.stats.search.fails.sum.toLong())
             assertTrue((sat.stats.lp.phases["PREFIX_REAL_HINT_ROOT"]?.outcomes?.get("PHASE_FALLBACK") ?: 0L) > 0L)
+            assertTrue((sat.stats.lp.phases["PREFIX_REAL_HINT_ROOT"]?.outcomes
+                ?.get("SELECTED_GUARD_VARIABLE") ?: 0L) > 0L)
             assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, sat.assignment))
         }
     }

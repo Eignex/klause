@@ -119,6 +119,13 @@ solution phases and forced rephasing retain precedence; disabled phase tracking
 keeps the value selector's order. Retraction and restart discard active point hints.
 Both Boolean alternatives and the complete source checks remain required.
 
+An available finite prefix table can also propose an unassigned comparison head
+before the configured variable selector. The proposal must have no retained phase
+and must be eligible for candidate fallback under the current phase regime;
+explicit search branching keeps precedence. An amortized cursor visits each table
+entry once, sharing the containing work and cancellation. Choosing a head installs
+both Boolean alternatives through the normal brancher and supplies no source fact.
+
 ### Source bound atoms
 
 Fractional source integers split at exact floor/ceiling thresholds: Long values in

@@ -212,6 +212,7 @@ internal class CpSatisfactionTraversal(
             completion.lpResource?.let {
                 resources.own(it)
                 lpResources.add(it)
+                traversal.brancher.realPointVariablePreference = completion::preferredBooleanVariable
             }
             val lp = if (params.lpConfig != null || params.lpPlan != LpPlan()) {
                 LpFeasibilityComponent(problem, cp, params, sink, solveContext).also {
@@ -487,6 +488,10 @@ internal class BacktrackBrancher(
     private var restartCount = 0L
     private var preferImportedSolution = false
     var realPointPreference: ((VarRef) -> Long?)? = null
+    var realPointVariablePreference: (((Int) -> Boolean) -> Int?)? = null
+    private val acceptsPointVariable: (Int) -> Boolean = { variable ->
+        phase.acceptsBooleanCandidate(variable) && session.boolValue(variable) == null
+    }
 
     init {
         if (params.phaseSaving || params.targetPhasing) {
@@ -501,11 +506,12 @@ internal class BacktrackBrancher(
     }
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
+        if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
         val variable = branching.pick(session)
             ?.takeIf(::isOpen)
+            ?: pointVariable()
             ?: variables.pick(session, rng)
             ?: return null
-        if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
         val candidate = realPointPreference?.invoke(variable)
         val previousUses = phase.candidateUses
         val preferred = branching.orderValues(
@@ -541,6 +547,13 @@ internal class BacktrackBrancher(
             context.requestCancellationPoll()
         }
         return alternatives
+    }
+
+    private fun pointVariable(): VarRef.Bool? {
+        val variable = realPointVariablePreference?.invoke(acceptsPointVariable)
+            ?.takeIf(acceptsPointVariable) ?: return null
+        sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "SELECTED_GUARD_VARIABLE", 0L)
+        return VarRef.Bool(variable)
     }
 
     private fun isOpen(variable: VarRef): Boolean = when (variable) {
@@ -655,6 +668,7 @@ private fun SearchDecision.asSelectorDecision(): Pair<VarRef, Long>? = when (thi
 private sealed interface BacktrackCompletion {
     val lpResource: LpSearchResource? get() = null
     fun preferredValue(variable: VarRef): Long? = null
+    fun preferredBooleanVariable(accept: (Int) -> Boolean): Int? = null
 
     fun addTo(components: MutableList<SearchComponent>)
 
@@ -672,6 +686,8 @@ private sealed interface BacktrackCompletion {
     class ResidualReal(private val component: ResidualRealComponent) : BacktrackCompletion {
         override val lpResource: LpSearchResource get() = component
         override fun preferredValue(variable: VarRef): Long? = component.preferredValue(variable)
+        override fun preferredBooleanVariable(accept: (Int) -> Boolean): Int? =
+            component.preferredBooleanVariable(accept)
 
         override fun addTo(components: MutableList<SearchComponent>) {
             components += component
@@ -825,6 +841,18 @@ private class ResidualRealComponent(
     private val pointHintsEnabled = phaseTracking && supportsRealPointHints(problem)
     private var pointHints: IntArray? = null
     private var integerHints: LongArray? = null
+    private var pointHintCursor = 0
+
+    fun preferredBooleanVariable(accept: (Int) -> Boolean): Int? {
+        val hints = pointHints ?: return null
+        while (pointHintCursor < hints.size) {
+            params.cancellation.charge(1L)
+            if (params.cancellation()) return null
+            val variable = pointHintCursor++
+            if ((hints[variable] == 0 || hints[variable] == 1) && accept(variable)) return variable
+        }
+        return null
+    }
 
     fun preferredValue(variable: VarRef): Long? {
         val hints = pointHints ?: return null
@@ -847,6 +875,7 @@ private class ResidualRealComponent(
         if (pointHints != null) sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", reason, 0L)
         pointHints = null
         integerHints = null
+        pointHintCursor = 0
     }
 
     override fun propagate(context: SearchContext): ComponentResult {
@@ -881,6 +910,7 @@ private class ResidualRealComponent(
             if (usable && hints != null) {
                 pointHints = hints
                 integerHints = integers
+                pointHintCursor = 0
                 var total = 0
                 var open = 0
                 for (head in hints.indices) if (hints[head] == 0 || hints[head] == 1) {
