@@ -73,7 +73,10 @@ private fun presolveLedgerStatPairs(effort: PresolveEffortStats): List<Pair<Stri
     }
 }
 
-private fun presolveSizeStatPairs(prefix: String, sizes: List<PresolveSizeStats>): List<Pair<String, String>> = buildList {
+private fun presolveSizeStatPairs(
+    prefix: String,
+    sizes: List<PresolveSizeStats>,
+): List<Pair<String, String>> = buildList {
     add(prefix + "Factors" to "${sizes.sumOf { it.factors.toLong() }}")
     add(prefix + "Booleans" to "${sizes.sumOf { it.booleans.toLong() }}")
     add(prefix + "Integers" to "${sizes.sumOf { it.integers.toLong() }}")

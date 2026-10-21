@@ -32,7 +32,9 @@ class PresolveRecordTest {
             } else {
                 "var 0..10: x; constraint int_lin_le([1], [x], 7); solve satisfy;"
             })
-            val dialect = if (extension == "smt2") SolverInvocation.Dialect.SMT_LIB else SolverInvocation.Dialect.MINIZINC
+            val dialect = if (extension == "smt2") {
+                SolverInvocation.Dialect.SMT_LIB
+            } else SolverInvocation.Dialect.MINIZINC
             fun invoke(limit: Long): SolverInvocation.Result {
                 val output = ByteArrayOutputStream()
                 val previous = System.out
@@ -61,7 +63,8 @@ class PresolveRecordTest {
             val ref = ProblemRef("presolve", format, ProblemSource.Vendored(model.name), Category.CSP, Expected.Unknown)
             val (record, _) = SolveMetric.solve(
                 ResolvedProblem(ref, lazy { error("subprocess input stays lazy") }), SolverInvocation.KLAUSE,
-                SolverInvocation.Settings(engine = "fixed"), Budget(1000), UUID.randomUUID().toString(), "time", "revision",
+                SolverInvocation.Settings(engine = "fixed"), Budget(1000),
+                UUID.randomUUID().toString(), "time", "revision",
                 installedBuild = { null }, invoke = { _, _, _, _, _ -> result },
             )
             val restored = Reports.json.decodeFromString<SolveRecord>(Reports.json.encodeToString(record))
