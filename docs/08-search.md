@@ -126,8 +126,12 @@ refresh absent or retracted guidance, within four point-mapping attempts over th
 owner's lifetime. Retraction, restart and solver retirement do not renew that limit.
 Exact guard evaluation shares the numerical owner's current work ledger
 and uses at most one fifth of its parent deadline's remaining time. The point keeps
-real coordinates followed by finite integer relaxation values, without rounding
-or treating integrality as established. Uncarried integers take a value from their
+real coordinates followed by finite integer relaxation values. General comparisons
+evaluate these exact values. For a unit equality or
+disequality linking a Boolean to a finite `0..1` integer, a fractional coordinate
+instead proposes the nearest bit, choosing zero on a tie. This changes only the
+Boolean preference; integer coordinates and source checks keep their exact meaning.
+Uncarried integers take a value from their
 current finite domain. With integer phase saving enabled, the ceiling of a relaxed
 integer coordinate, clipped to its live domain bounds, supplies a fallback split
 point. Both interval branches remain available, including when the proposed point

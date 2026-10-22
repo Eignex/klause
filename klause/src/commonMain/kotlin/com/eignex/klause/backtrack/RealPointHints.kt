@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
@@ -115,6 +116,7 @@ internal fun realPointHints(
     booleanValue: (Int) -> Boolean?,
     stop: Cancellation,
     retainedEntries: Int = 0,
+    onRoundedBinary: ((Boolean) -> Unit)? = null,
 ): IntArray? {
     var entries = problem.numBoolVars.toLong() + problem.numRealVars + 2L * problem.numIntVars + retainedEntries
     if (!supportsRealPointHints(problem) || point.size != problem.numRealVars + problem.numIntVars ||
@@ -155,9 +157,36 @@ internal fun realPointHints(
                 LinearOp.EQ -> slack.isZero
                 LinearOp.NE -> !slack.isZero
             }
-            val value = if (truth) 1 else 0
+            val rounded = (factor as? ReifiedLinear)?.let { binaryPointPreference(problem, it, point, work) }
+            if (stop()) return null
+            if (rounded != null) onRoundedBinary?.invoke(rounded != truth)
+            if (stop()) return null
+            val value = if (rounded ?: truth) 1 else 0
             hints[head] = if (hints[head] == -1 || hints[head] == value) value else -2
         }
     }
     return hints.takeUnless { stop() }
+}
+
+private fun binaryPointPreference(
+    problem: Problem,
+    channel: ReifiedLinear,
+    point: List<BigFraction>,
+    work: MixedPointArithmetic,
+): Boolean? {
+    val constants = channel.integerConstants ?: return null
+    if (channel.vars.size != 1 || constants.coeff(0) != 1L || constants.bound !in 0L..1L ||
+        channel.op !in setOf(LinearOp.EQ, LinearOp.NE)
+    ) return null
+    val variable = channel.vars[0]
+    val bounds = problem.intBounds
+    if (!bounds.hasLower(variable) || !bounds.hasUpper(variable) || bounds.lower(variable) != 0L ||
+        bounds.upper(variable) != 1L
+    ) return null
+    val value = point[problem.numRealVars + variable]
+    if (value.isInteger()) return null
+    val halfSlack = work.subtractProduct(BigFraction.ONE, BigFraction.ofLong(2), value) ?: return null
+    val bit = if (halfSlack.signum() < 0) 1L else 0L
+    val equal = bit == constants.bound
+    return if (channel.op == LinearOp.EQ) equal else !equal
 }
