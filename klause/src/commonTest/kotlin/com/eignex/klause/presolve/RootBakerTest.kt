@@ -125,7 +125,7 @@ class RootBakerTest {
             for (excluded in listOf(false, true)) {
                 val pins = mutableListOf<Long>()
                 var polls = 0
-                val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, Long.MIN_VALUE)
+                val row = Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, Long.MIN_VALUE)
                 val factor = object : Factor by row, Propagator {
                     override fun propagate(state: PropagationState, factorId: Int): Boolean {
                         val current = state.intDomains[0]
