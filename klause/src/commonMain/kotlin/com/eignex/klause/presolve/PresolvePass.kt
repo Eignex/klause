@@ -303,7 +303,7 @@ enum class PresolvePass(
         // Root-propagated domains can close a side the declaration left open, so the finite lane pins a
         // column the source form would have to rebuild from its row.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
-            Presolve.projectSingletonInequalities(problem, ctx.objectiveIntVars)
+            Presolve.projectSingletonInequalities(problem, ctx.objectiveIntVars, ctx.cancellation)
     },
 
     /** Interchangeable-variable / block / value symmetry breaking.

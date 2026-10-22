@@ -232,6 +232,10 @@ Bound fusion combines matching sides into an equality or refutes crossing bounds
 These reductions preserve the solution set. Affine singleton elimination and
 singleton inequality projection require reconstruction; projection stays off for
 solution-set-sensitive queries.
+Singleton projection meters occurrence construction, row specialization, candidate
+and rewrite scans through the invocation token in both lanes. It polls at bounded
+strides and before publishing each row with its reconstruction; an interrupted
+occurrence index supplies no projection, and completed rows survive a later stop.
 
 ### Structural reductions
 
