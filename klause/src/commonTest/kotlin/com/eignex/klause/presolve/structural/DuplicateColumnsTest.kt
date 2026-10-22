@@ -13,6 +13,7 @@ import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
@@ -23,11 +24,38 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.plus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DuplicateColumnsTest {
+    @Test
+    fun `merging extreme columns in successive batches should round trip every aggregate`() {
+        val domains = arrayOf(
+            IntDomain(-Long.MAX_VALUE, -Long.MAX_VALUE + 20),
+            IntDomain(Long.MAX_VALUE - 20, Long.MAX_VALUE),
+            IntDomain(-5, 5),
+        )
+        val problem = BakedProblem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = domains,
+            factors = listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 100)),
+            alreadyFolded = true,
+        )
+
+        val delta = DuplicateColumns.mergeDuplicateColumns(problem)
+
+        assertTrue(!delta.isEmpty)
+        val reconstruct = checkNotNull(delta.reconstruct)
+        for (z in -25L..25L) {
+            val result = reconstruct(Sample(BooleanArray(0), longArrayOf(z, 0, 0))).ints
+            for (v in domains.indices) assertTrue(result[v] in domains[v].min..domains[v].max)
+            assertEquals(bigIntOf(z), bigIntOf(result[0]) + bigIntOf(result[1]) + bigIntOf(result[2]))
+        }
+    }
+
     @Test
     fun `duplicate declared columns should reconstruct a feasible assignment`() {
         val source = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)

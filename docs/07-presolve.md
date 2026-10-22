@@ -232,8 +232,10 @@ retained clauses/cardinalities, so a dropped row cannot justify its own removal.
 Comparison-clause folding combines sole-use reified indicators into one comparison
 disjunction. Reconstruction restores their truth after integer reconstruction and
 before source checking, and excludes them from direct search/definition hints.
-Duplicate-column merging replaces matching linear columns by their sum and splits
-the value on reconstruction. Dual fixing selects a bound when neither occurrences
+Duplicate-column merging replaces matching linear columns by their representable
+sum. Reconstruction computes the feasible split interval and difference exactly,
+including at extreme source endpoints, and undoes successive folds last first.
+Dual fixing selects a bound when neither occurrences
 nor the objective prefer the opposite direction. These change the solution set.
 
 Boolean cover dominance extends dual fixing: a positive-cost unfixed Boolean read
