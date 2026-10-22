@@ -167,7 +167,7 @@ class CliModePublicationTest {
             override fun onVerdictContext(context: VerdictContext) {
                 terminal = true
             }
-            override fun onComplete(verdict: Verdict) = error("cancelled publication cannot emit $verdict after $values")
+            override fun onComplete(verdict: Verdict) = error("unexpected terminal $verdict after $values")
         }
 
         try {
