@@ -769,11 +769,14 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun agreementSourceRows(context: SearchContext): List<ExactRationalInequality>? {
+    private fun agreementSourceRows(
+        context: SearchContext,
+        origins: MutableList<IntArray>? = null,
+    ): List<ExactRationalInequality>? {
         lpStop.charge(model.numIntVars.toLong() + model.numRealVars + preparedRows.size + 1L)
         if (operationStop()) return null
         val bounded = node.withPublishedBounds(model.numIntVars, context::intLowerBound, context::intUpperBound)
-        return reduction.sourceRows(bools, bounded, lpStop)
+        return reduction.sourceRows(bools, bounded, lpStop, origins)
     }
 
     private fun coordinateDeclined(context: SearchContext): ComponentCheck {
@@ -1449,18 +1452,25 @@ class ExactLiraSearchComponent private constructor(
         if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage)
     }
 
-    private fun sourceEqualityConflict(context: SearchContext): Boolean {
-        lpStop.charge(model.numBoolVars.toLong() + 1L)
-        if (model.numIntVars != 0 || hasSourceDisjunctions || node.sourceBranches.isNotEmpty() ||
-            node.rowAssertions.isNotEmpty() || node.disequalityDirections.isNotEmpty() ||
-            solveContext.certificationPolicy !== ProductionLpCertificationPolicy || operationStop() ||
-            bools.any { it == UNASSIGNED }
+    private fun sourceEqualityConflictScope(): Boolean = model.numIntVars == 0 && !hasSourceDisjunctions &&
+        admitsMixedEqualityRepair(model.numRealVars) &&
+        node.sourceBranches.isEmpty() && node.rowAssertions.isEmpty() && node.disequalityDirections.isEmpty() &&
+        solveContext.certificationPolicy === ProductionLpCertificationPolicy
+
+    private fun sourceEqualityConflict(
+        context: SearchContext,
+        origins: List<IntArray>,
+        support: IntArray,
+    ): Boolean {
+        lpStop.charge(model.numBoolVars.toLong() + support.size + 1L)
+        if (!sourceEqualityConflictScope() || support.isEmpty() || operationStop() || bools.any { it == UNASSIGNED }
         ) return false
         val variables = LinkedHashSet<Int>()
-        for (prepared in preparedRows) {
-            lpStop.charge(4L * prepared.booleans.size + 1L)
+        for (row in support) {
+            val booleans = origins.getOrNull(row) ?: return false
+            lpStop.charge(4L * booleans.size + 1L)
             if (operationStop()) return false
-            for (variable in prepared.booleans) {
+            for (variable in booleans) {
                 variables += variable
                 if (variables.size > MAX_EQUALITY_CONFLICT_PREMISES) return false
             }
@@ -1480,6 +1490,7 @@ class ExactLiraSearchComponent private constructor(
         outcome = ComponentCheck.Infeasible(explanation)
         smtStats?.observeConflict(explanation)
         observeCompleteStage("SOURCE_EQUALITY_CONFLICT")
+        observeCompleteStage("SOURCE_EQUALITY_CONFLICT_PREMISES_${variables.size}")
         return true
     }
 
@@ -1549,16 +1560,23 @@ class ExactLiraSearchComponent private constructor(
             val retained = floatCandidate
             floatCandidate = null
             if (retained != null) {
-                val rows = agreementSourceRows(context)
+                val origins = if (sourceEqualityConflictScope()) ArrayList<IntArray>() else null
+                val rows = agreementSourceRows(context, origins)
                 if (rows != null) {
-                    var sourceInfeasible = false
+                    var sourceInfeasible: IntArray? = null
+                    val reportInfeasible: ((IntArray) -> Unit)? = if (origins == null) null else { support ->
+                        sourceInfeasible = support
+                    }
                     candidate = completeMixedPoint(model.numRealVars, model.numIntVars, retained, rows, lpStop,
                         onStage = ::observeCompleteStage,
-                        onSourceInfeasible = { sourceInfeasible = true },
+                        onSourceInfeasible = reportInfeasible,
                         realCompletion = { columns, residual, token ->
                             reduction.completeReals(columns, residual, token, ::observeCompleteStage)
                         })
-                    if (candidate == null && sourceInfeasible && sourceEqualityConflict(context)) return null
+                    val support = sourceInfeasible
+                    if (candidate == null && support != null && origins != null &&
+                        sourceEqualityConflict(context, origins, support)
+                    ) return null
                 } else {
                     observeCompleteStage("RECOVERY_ROWS_UNAVAILABLE")
                 }
@@ -2149,24 +2167,38 @@ private class ExactLiraReductionCache(
         }
     } ?: ExactLiraReduction.Interrupted
 
-    fun sourceRows(bools: IntArray, node: SearchNode, cancellation: Cancellation): List<ExactRationalInequality>? {
+    fun sourceRows(
+        bools: IntArray,
+        node: SearchNode,
+        cancellation: Cancellation,
+        origins: MutableList<IntArray>? = null,
+    ): List<ExactRationalInequality>? {
+        if (origins?.isNotEmpty() == true) return null
         val rows = ArrayList<ExactRationalInequality>()
+        val unconditional = intArrayOf()
+        fun add(row: ExactRationalInequality) {
+            rows += row
+            if (origins != null) {
+                cancellation.charge(1L)
+                origins.add(unconditional)
+            }
+        }
         val published = node.branches.associateBy { it.variable }
         for (integer in 0 until model.numIntVars) {
             if (cancellation()) return null
             val column = model.numRealVars + integer
             val branch = published[integer]
             maxOfNullable(model.intBounds.lowerAsBigInteger(integer), branch?.lower)?.let {
-                rows += exactColumnLower(column, it.asFraction())
+                add(exactColumnLower(column, it.asFraction()))
             }
             minOfNullable(model.intBounds.upperAsBigInteger(integer), branch?.upper)?.let {
-                rows += exactColumnUpper(column, it.asFraction())
+                add(exactColumnUpper(column, it.asFraction()))
             }
         }
         for (real in 0 until model.numRealVars) {
             if (cancellation()) return null
-            model.realLower[real].takeIf(Double::isFinite)?.let { rows += exactColumnLower(real, it.asFraction()) }
-            model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
+            model.realLower[real].takeIf(Double::isFinite)?.let { add(exactColumnLower(real, it.asFraction())) }
+            model.realUpper[real].takeIf(Double::isFinite)?.let { add(exactColumnUpper(real, it.asFraction())) }
         }
         val complete = node.forEachSelectedRow(model, disjunctionAtoms) { factor, index, row ->
             if (cancellation()) return null
@@ -2177,13 +2209,20 @@ private class ExactLiraReductionCache(
             } else {
                 null
             }
+            val before = rows.size
             comparison.rowsInto(rows, direction)
+            if (origins != null) {
+                cancellation.charge(2L * row.size + rows.size - before + 1L)
+                if (cancellation()) return null
+                val variables = row.booleanVariables().toIntArray()
+                repeat(rows.size - before) { origins.add(variables) }
+            }
         }
         for (atom in node.sourceBranches) {
             if (cancellation()) return null
-            rows += atom.sourceRows(model.numRealVars)
+            for (row in atom.sourceRows(model.numRealVars)) add(row)
         }
-        return rows.takeIf { complete }
+        return rows.takeIf { complete && !cancellation() && (origins == null || origins.size == rows.size) }
     }
 }
 

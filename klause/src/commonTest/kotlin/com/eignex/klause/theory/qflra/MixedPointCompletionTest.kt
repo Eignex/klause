@@ -19,6 +19,28 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `source contradictions should exclude unused original rows from their support`() {
+        val rows = listOf(
+            exactColumnUpper(3, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(), emptyList(), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(0, BigFraction.ZERO), exactColumnUpper(0, BigFraction.ZERO),
+            exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(2), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+        )
+        var support: IntArray? = null
+
+        val point = completeMixedPoint(4, 0, DoubleArray(4), rows, Cancellation.Never,
+            onSourceInfeasible = { support = it })
+
+        assertNull(point)
+        assertEquals((2..8).toSet(), assertNotNull(support).toSet())
+    }
+
+    @Test
     fun `pure source equality contradictions should report infeasibility`() {
         for (strict in listOf(false, true)) {
             val rows = listOf(

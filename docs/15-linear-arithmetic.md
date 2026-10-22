@@ -72,8 +72,10 @@ state can use [witness recovery](#witness-recovery) with an empty integer tail.
 The recovered point must pass every selected exact source row before publication.
 Paired source equations can also reduce an inequality to a false constant, proving
 the selected real rows infeasible. A complete pure-real state with no additional
-theory branches can explain that contradiction using all source-row Boolean
-premises, within the search explanation limit. Cancellation withholds the conflict.
+theory branches can explain that contradiction using the Boolean premises of the
+rows used in the equality derivation and false inequality. Pivot and substitution
+support retain original row identities within the repair-entry and search
+explanation limits. Cancellation withholds the conflict.
 
 #### Disjunctions and disequalities
 

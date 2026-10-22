@@ -15,7 +15,7 @@ internal fun completeMixedPoint(
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
-    onSourceInfeasible: (() -> Unit)? = null,
+    onSourceInfeasible: ((IntArray) -> Unit)? = null,
     realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)? = null,
 ): List<BigFraction>? {
     onStage?.invoke("RECOVERY_ATTEMPT")
@@ -73,7 +73,9 @@ internal fun completeMixedPoint(
         }
     }
     val residual = ArrayList<ExactRationalInequality>()
-    for (row in rows) {
+    val residualSources = if (integerColumns == 0 && onSourceInfeasible != null) ArrayList<Int>() else null
+    for (rowIndex in rows.indices) {
+        val row = rows[rowIndex]
         stop.charge(row.columns.size.toLong() + 1L)
         if (stop()) return declined("RECOVERY_STOPPED")
         var bound = row.rhs
@@ -95,18 +97,26 @@ internal fun completeMixedPoint(
             }
         } else {
             residual += ExactRationalInequality(real.toIntArray(), coefficients, bound, row.strict)
+            residualSources?.add(rowIndex)
         }
     }
     if (residual.any { it.columns.size > 2 }) {
         onStage?.invoke("RECOVERY_EQUALITY_REPAIR_ATTEMPT")
-        val repair = prepareMixedEqualityRepair(realColumns, residual, stop, onStage)
+        val repair = prepareMixedEqualityRepair(realColumns, residual, stop, onStage,
+            trackSourceRows = residualSources != null)
         val repaired = realGuess?.let { repair?.point(it) }
         if (stop()) return declined("RECOVERY_STOPPED")
         for (difference in listOf(false, true)) {
             val reals = if (difference) repair?.completePoint(residual, realCompletion) else repaired
             if (stop()) return declined("RECOVERY_STOPPED")
             // Guessed integer coordinates cannot supply a refutation of the source model.
-            if (integerColumns == 0 && repair?.lastResidualInfeasible == true) onSourceInfeasible?.invoke()
+            val support = repair?.lastResidualInfeasibleRows
+            if (integerColumns == 0 && support != null && residualSources != null) {
+                stop.charge(support.size.toLong() + 1L)
+                if (stop()) return declined("RECOVERY_STOPPED")
+                if (support.any { it !in residualSources.indices }) return declined("RECOVERY_SOURCE_INPUT")
+                onSourceInfeasible?.invoke(IntArray(support.size) { residualSources[support[it]] })
+            }
             if (stop()) return declined("RECOVERY_STOPPED")
             if (reals == null) continue
             val point = reals + integers
