@@ -135,6 +135,11 @@ and root conflicts through a trusted root view, without another propagation bake
 Every nonempty delta invalidates that view's captured deductions. Final materialization uses
 the same path unless optional probing requires a fresh bake over the live factors;
 an established conflict needs no probing.
+Incremental interior exclusions visit current members, skipping numeric gaps without
+materializing a value array. Column visits and each 64-member stride charge and poll
+the phase token. If installation stops, a reseed from the compact complete domain
+delta preserves restrictions that a factor rewrite may depend on; completed atom
+mutations and conflicts remain authoritative.
 Finite probing and implication harvesting retain the pass token, including its
 native-work meter. Value precedence uses that token throughout value-orbit
 discovery and stops posting chains when it fires.
