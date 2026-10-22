@@ -27,21 +27,11 @@ internal class PolynomialRemainder(divisors: List<Polynomial>, private val arith
             yield(polynomial)
             return@sequence
         }
-        val pending = HashMap<Monomial, BigFraction>()
-        for (term in polynomial.terms) {
-            arithmetic.step()
-            pending[term.monomial] = term.coefficient
-        }
+        val pending = RemainderTerms(polynomial, arithmetic)
         val remainder = ArrayList<PolynomialTerm>()
-        while (pending.isNotEmpty()) {
+        while (!pending.isEmpty) {
             arithmetic.step()
-            var leading: Monomial? = null
-            for (monomial in pending.keys) {
-                arithmetic.step()
-                if (leading == null || monomial > leading) leading = monomial
-            }
-            val monomial = checkNotNull(leading)
-            val term = PolynomialTerm(monomial, pending.getValue(monomial))
+            val term = pending.leading()
             var cancelled = false
             for (divisor in candidates(term.monomial)) {
                 arithmetic.step()
@@ -56,18 +46,14 @@ internal class PolynomialRemainder(divisors: List<Polynomial>, private val arith
                     if (product == null) yield(null)
                 }
                 for (reduction in product.terms) {
-                    arithmetic.step()
-                    val coefficient = (pending[reduction.monomial] ?: BigFraction.ZERO) +
-                        reduction.coefficient.negated()
-                    if (coefficient.isZero) pending.remove(reduction.monomial)
-                    else pending[reduction.monomial] = coefficient
+                    pending.subtract(reduction)
                 }
                 cancelled = true
                 break
             }
             if (!cancelled) {
                 remainder.add(term)
-                pending.remove(term.monomial)
+                pending.removeLeading()
             }
             yield(null)
         }
@@ -104,3 +90,97 @@ internal class PolynomialRemainder(divisors: List<Polynomial>, private val arith
 }
 
 private class RemainderDivisor(val index: Int, val polynomial: Polynomial, val leading: PolynomialTerm)
+
+private class RemainderTerms(polynomial: Polynomial, private val arithmetic: PolynomialArithmetic) {
+    private class Entry(val monomial: Monomial, var coefficient: BigFraction, var position: Int)
+
+    private val entries = HashMap<Monomial, Entry>()
+    private val heap = ArrayList<Entry>()
+    val isEmpty: Boolean get() = heap.isEmpty()
+
+    init {
+        for (term in polynomial.terms.asReversed()) {
+            arithmetic.step()
+            val entry = Entry(term.monomial, term.coefficient, heap.size)
+            entries[term.monomial] = entry
+            heap.add(entry)
+        }
+    }
+
+    fun leading(): PolynomialTerm {
+        arithmetic.step()
+        val entry = heap.first()
+        return PolynomialTerm(entry.monomial, entry.coefficient)
+    }
+
+    fun subtract(term: PolynomialTerm) {
+        arithmetic.step()
+        val entry = entries[term.monomial]
+        val coefficient = (entry?.coefficient ?: BigFraction.ZERO) + term.coefficient.negated()
+        if (entry != null) {
+            if (coefficient.isZero) removeAt(entry.position)
+            else entry.coefficient = coefficient
+        } else if (!coefficient.isZero) {
+            val added = Entry(term.monomial, coefficient, heap.size)
+            entries[term.monomial] = added
+            heap.add(added)
+            siftUp(added.position)
+        }
+    }
+
+    fun removeLeading() = removeAt(0)
+
+    private fun removeAt(position: Int) {
+        arithmetic.step()
+        entries.remove(heap[position].monomial)
+        val moved = heap.removeAt(heap.lastIndex)
+        if (position == heap.size) return
+        heap[position] = moved
+        moved.position = position
+        if (position > 0) {
+            arithmetic.step()
+            if (moved.monomial > heap[(position - 1) ushr 1].monomial) {
+                siftUp(position)
+                return
+            }
+        }
+        siftDown(position)
+    }
+
+    private fun siftUp(start: Int) {
+        var position = start
+        val entry = heap[position]
+        while (position > 0) {
+            arithmetic.step()
+            val parent = (position - 1) ushr 1
+            if (heap[parent].monomial >= entry.monomial) break
+            heap[position] = heap[parent]
+            heap[position].position = position
+            position = parent
+        }
+        heap[position] = entry
+        entry.position = position
+    }
+
+    private fun siftDown(start: Int) {
+        var position = start
+        val entry = heap[position]
+        while (position < heap.size / 2) {
+            arithmetic.step()
+            val left = position * 2 + 1
+            val right = left + 1
+            var child = left
+            if (right < heap.size) {
+                arithmetic.step()
+                if (heap[right].monomial > heap[left].monomial) child = right
+            }
+            arithmetic.step()
+            if (heap[child].monomial <= entry.monomial) break
+            heap[position] = heap[child]
+            heap[position].position = position
+            position = child
+        }
+        heap[position] = entry
+        entry.position = position
+    }
+}
