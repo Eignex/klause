@@ -40,33 +40,12 @@ internal fun Compiler.Builder.exclusiveIntegerSelection(
         factors.add(Clause(conditions.toIntArray() + reifyEq(value, default)))
         return factors.subList(start, factors.size).toList()
     }
-    if (conditions.size == 1) {
-        adjacentConstantSelection(result, conditions[0], arms[0], default)?.let { return it }
-    }
     val entries = longArrayOf(selectionColumn(default).toLong()) +
         arms.map { selectionColumn(it).toLong() }.toLongArray()
     val index = selectionIndex(conditions)
     val relation = Element(index, result, entries, arrIsVars = true, indexOffset = 0)
     factors.add(relation)
     return listOf(relation)
-}
-
-private fun Compiler.Builder.adjacentConstantSelection(
-    result: Int,
-    condition: Int,
-    whenTrue: LinComb,
-    whenFalse: LinComb,
-): List<Factor>? {
-    if (whenTrue.coeffs.isNotEmpty() || whenFalse.coeffs.isNotEmpty()) return null
-    val lower = minOf(whenTrue.constant, whenFalse.constant)
-    val upper = maxOf(whenTrue.constant, whenFalse.constant)
-    val domain = (intDomains[result] as? PresolveDomain.Finite)?.domain ?: return null
-    if (lower == Long.MAX_VALUE || upper != lower + 1L || domain.min < lower || domain.max > upper) return null
-    val relation = if (Lit.isPositive(condition)) LinearOp.EQ else LinearOp.NE
-    val channel = ReifiedLinear(Lit.variable(condition), longArrayOf(1), intArrayOf(result),
-        relation, whenTrue.constant)
-    factors.add(channel)
-    return listOf(channel)
 }
 
 internal fun Compiler.Builder.realSelection(condition: Int, whenTrue: RealComb, whenFalse: RealComb): RealComb {

@@ -110,6 +110,9 @@ internal object LinearSourceShape {
             put("integerSelections", integerSelections.size)
             put("constantIntegerSelections", integerSelections.count { !it.arrIsVars })
             put("resolvedConstantBinaryIntegerSelections", constantBinaryTables.size)
+            put("booleanValueIntegerSelections", constantBinaryTables.count {
+                (it[0] == 0L && it[1] == 1L) || (it[0] == 1L && it[1] == 0L)
+            })
             put("equalEntryBinaryIntegerSelections", constantBinaryTables.count { it[0] == it[1] })
             put("unitStepBinaryIntegerSelections", constantBinaryTables.count {
                 (it[0] != Long.MAX_VALUE && it[1] == it[0] + 1L) ||

@@ -343,6 +343,7 @@ counts; the combined set counts an index used by both factor kinds once. Constan
 integer tables are counted separately from tables of integer variables.
 For binary integer indexes bounded within `0..1`, it also resolves fixed integer
 entries and counts constant tables with equal entries or a unit signed step.
+Tables with the two Boolean values `0` and `1` have a separate count.
 Boolean gate counts recognize complete two-input AND/OR and IFF clause families.
 Signatures preserve signed inputs; IFF also folds simultaneous input negation.
 Private counts exclude declared Booleans and heads read by non-clause factors.
