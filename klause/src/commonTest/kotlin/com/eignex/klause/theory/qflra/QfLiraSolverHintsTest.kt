@@ -51,12 +51,13 @@ class QfLiraSolverHintsTest {
     @Test
     fun `compatible eager guards should retain point guidance without another LP capture`() {
         val model = Problem(
-            numBoolVars = 4, intBounds = openBounds(0), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            numBoolVars = 4, intBounds = openBounds(0), numRealVars = 3,
+            realLower = DoubleArray(3), realUpper = DoubleArray(3),
             factors = Array<Factor>(4) { head ->
-                if (head < 3) ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), if (head == 1) LinearOp.GE else LinearOp.LE, 0.0, strict = head == 1)
-                else Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0)
+                if (head < 3) ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    DoubleArray(3) { 1.0 }, if (head == 1) LinearOp.GE else LinearOp.LE, 0.0, strict = head == 1)
+                else Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 },
+                    LinearOp.EQ, 0.0)
             },
         )
         val stats = SmtStatsSink()
@@ -79,21 +80,25 @@ class QfLiraSolverHintsTest {
     @Test
     fun `an incompatible eager guard should replay earlier deferred rows`() {
         val model = Problem(
-            numBoolVars = 3, intBounds = openBounds(0), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            numBoolVars = 3, intBounds = openBounds(0), numRealVars = 3,
+            realLower = DoubleArray(3), realUpper = doubleArrayOf(1.0, 0.0, 0.0),
             factors = arrayOf(
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 },
                     LinearOp.LE, 0.0),
-                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 },
                     LinearOp.LE, 0.0),
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 }, LinearOp.GE, 0.0),
             ),
         )
+        val stats = SmtStatsSink()
         ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
             assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_ACCEPTED"))
 
             val result = session.push(SearchDecision.Bool(Lit.make(1, false)))
 
@@ -106,14 +111,15 @@ class QfLiraSolverHintsTest {
     fun `eager reused point guidance should expire across retraction and restart`() {
         for (restart in listOf(false, true)) {
             val model = Problem(
-                numBoolVars = 3, intBounds = openBounds(0), numRealVars = 1,
-                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                numBoolVars = 3, intBounds = openBounds(0), numRealVars = 3,
+                realLower = DoubleArray(3), realUpper = DoubleArray(3),
                 factors = arrayOf(
-                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 },
                         LinearOp.LE, 0.0),
-                    ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 },
                         LinearOp.LE, 0.0),
-                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 },
+                        LinearOp.EQ, 0.0),
                 ),
             )
             val stats = SmtStatsSink()
@@ -138,14 +144,14 @@ class QfLiraSolverHintsTest {
     @Test
     fun `complete eager reused points should retain full source checking`() {
         val model = Problem(
-            numBoolVars = 3, intBounds = openBounds(0), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            numBoolVars = 3, intBounds = openBounds(0), numRealVars = 3,
+            realLower = DoubleArray(3), realUpper = DoubleArray(3),
             factors = arrayOf(
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 },
                     LinearOp.LE, 0.0),
-                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 },
                     LinearOp.GE, 0.0, strict = true),
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 }, LinearOp.EQ, 0.0),
             ),
         )
         val stats = SmtStatsSink()
