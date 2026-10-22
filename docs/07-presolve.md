@@ -228,6 +228,8 @@ retraction identify stable factor occurrences, so repeated references to one imm
 factor retain one representative. Clique-implied subsumption admits
 only unconditional positive Boolean knapsacks and derives activity bounds from
 retained clauses/cardinalities, so a dropped row cannot justify its own removal.
+Strict-subset domination uses checked arithmetic for extra activity and scaled
+bounds; an overflowing attempt supplies no reduction.
 
 Comparison-clause folding combines sole-use reified indicators into one comparison
 disjunction. Reconstruction restores their truth after integer reconstruction and

@@ -11,6 +11,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.ExactWitness
+import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.ColumnRanges
@@ -28,6 +31,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -314,6 +318,87 @@ class RedundantConstraintsTest {
         val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
 
         assertEquals(listOf(1), delta.droppedIndices.toList())
+    }
+
+    @Test
+    fun `unsafe subset activity arithmetic should preserve every source assignment`() {
+        val large = 1L shl 62
+        val cases = listOf(
+            Triple(arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
+                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, large), intArrayOf(0, 1), LinearOp.LE, 0L)), 1),
+            Triple(arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
+                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, large),
+                    Linear(longArrayOf(4, 1), intArrayOf(0, 1), LinearOp.LE, 1L)), 2),
+            Triple(arrayOf(IntDomain(0, 1), IntDomain(-4, 0)),
+                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, -large), intArrayOf(0, 1), LinearOp.LE, 0L)), 1),
+            Triple(arrayOf(IntDomain(0, 1), IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 1)),
+                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0L)), 0),
+            Triple(arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
+                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, Long.MAX_VALUE - 2),
+                    Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1L)), 3),
+            Triple(arrayOf(IntDomain(-2, 0), IntDomain(0, 1)),
+                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, -large),
+                    Linear(longArrayOf(4, 1), intArrayOf(0, 1), LinearOp.LE, 1L)), 0),
+            Triple(arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
+                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, large, large), intArrayOf(0, 1, 2), LinearOp.LE, 0L)), 1),
+            Triple(arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(1, 1)),
+                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, -large - 1, -large - 1), intArrayOf(0, 1, 2), LinearOp.LE, 0L)), 1),
+        )
+        for ((domains, factors, expectedCount) in cases) {
+            val problem = Problem(0, domains.size, domains, factors)
+
+            val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
+            val reduced = Presolver.runSource(problem, PresolveConfig.parse("off,+subsume")).problem
+
+            assertTrue(delta.isEmpty)
+            assertEquals(expectedCount, checkExactSubsetAssignments(problem, reduced))
+        }
+    }
+
+    @Test
+    fun `safe extreme subset activity should remove a genuinely dominated row`() {
+        val large = 1L shl 62
+        for (coefficient in listOf(large, -large)) {
+            val domains = arrayOf(IntDomain(0, 1), if (coefficient > 0) IntDomain(-2, -1) else IntDomain(1, 2))
+            val problem = Problem(0, 2, domains, listOf(
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                Linear(longArrayOf(1, coefficient), intArrayOf(0, 1), LinearOp.LE, 0L),
+            ))
+
+            val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
+            val reduced = Presolver.runSource(problem, PresolveConfig.parse("off,+subsume")).problem
+
+            assertEquals(listOf(1), delta.droppedIndices.toList())
+            assertEquals(2, checkExactSubsetAssignments(problem, reduced))
+        }
+    }
+
+    private fun checkExactSubsetAssignments(source: Problem, reduced: Problem): Int {
+        var count = 0
+        val assignments = (0 until source.numIntVars).fold(listOf(emptyList<Long>())) { points, v ->
+            val domain = source.finiteIntDomain(v)
+            points.flatMap { point -> (domain.min..domain.max).map { point + it } }
+        }
+        for (values in assignments) {
+            val witness = object : ExactWitness {
+                override fun truth(boolVar: Int): Boolean = error("no Boolean columns")
+                override fun at(column: Int): BigFraction = BigFraction.ofLong(values[column])
+            }
+            val before = source.factors.all { factor ->
+                factor.linearRows.all { it.exactComparison(0, true, witness::truth).holdsAt(witness) }
+            }
+            val after = reduced.factors.all { factor ->
+                factor.linearRows.all { it.exactComparison(0, true, witness::truth).holdsAt(witness) }
+            }
+            assertEquals(before, after, "values=$values")
+            if (before) count++
+        }
+        return count
     }
 
     @Test
