@@ -98,6 +98,7 @@ private fun run(args: Array<String>) {
     // Anchor the `-t` budget once, before parsing/baking, so the bake and the solve share one
     // deadline instead of each restarting the clock.
     common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }
+    common.startDebugStatistics(cliProp("klause.debug") == "true")
     val mode = pickMode(common, path)
     val session = sessions.getValue(mode)
     // Peak heap has to be watched from before the parse, since ingest is what the dry-run measures and

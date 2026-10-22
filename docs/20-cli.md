@@ -90,6 +90,8 @@ Solver-control flags are common to every mode; `--help` lists every parameter.
 - `-a` / `--all-solutions`, `-n <count>`: enumeration (satisfy). `-i` is accepted as a
   no-op, since optimization always streams improvements.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
+- `--debug`: enable statistics and lightweight runtime instrumentation. The same
+  setting is available as `klause.debug=true` / `KLAUSE_DEBUG=true`.
 - `-p <n>`: parallelism. Portfolio engines run sequentially at `n=1` and use up to
   `n` lanes otherwise; `fixed` rejects `n>1`. Pool size auto-tunes from `n`,
   overridable with `--param arms=N`.
@@ -142,6 +144,17 @@ apply. Exhausted candidates or work yield UNKNOWN; LS and ALNS keep checked incu
 and neighborhood exhaustion supplies no global claim.
 
 ### Statistics
+
+`--debug` adds `runtimeDebug=true` and `jvmCompilationSupported` to the statistics.
+On a JVM with compilation-time monitoring, `jvmCompilationStartupMs` is the
+accumulated compilation time at the first snapshot, before input loading, and
+`jvmCompilationMs` is the increase through loading and solving to the final
+statistics snapshot. Their sum is the accumulated time at that snapshot. These
+are approximate compiler-thread elapsed milliseconds, summed across compiler
+threads, rather than solver CPU time or a fraction of wall time. Unsupported
+runtimes, including native executables, omit the numeric counters. The collector
+is initialized only for debug runs; `-s` alone does not enable it. Debug mode does
+not start JFR, compilation logs or heap sampling.
 
 `-s` adds statistics to every format's output. `solvePipeline` names the selected
 entry point or terminal admission outcome (`finite-cp`, `open-theory`,

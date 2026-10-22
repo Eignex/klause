@@ -78,6 +78,13 @@ class BuildProvenanceTest {
     }
 
     @Test
+    fun `runtime instrumentation should enter the provenance fingerprint`() {
+        val environment = mapOf("KLAUSE_DEBUG" to "true")
+
+        assertEquals(environment, runtimeOptions(environment))
+    }
+
+    @Test
     fun `a manifest should reuse captured hashes and bind each case runtime options`() = withRoot { root ->
         val launcher = distribution(root)
         val runtime = File(root, "jdk")

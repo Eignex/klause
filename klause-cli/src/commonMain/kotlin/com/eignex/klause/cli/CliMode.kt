@@ -181,6 +181,8 @@ internal class CommonOptions {
     var verbose = false
     var exact = false
     var statistics = false
+    var debug = false
+    internal var debugStats: CliDebugStats? = null
     var allSolutions = false
     var solutionCap: Long? = null
     var parallel: Int? = null
@@ -320,6 +322,12 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.STANDARD,
         help = "print solving statistics (%%%mzn-stat lines for FlatZinc)",
     ) { o.statistics = true },
+    FlagSpec(
+        listOf("--debug"),
+        false,
+        FlagGroup.KLAUSE,
+        help = "print statistics with lightweight runtime instrumentation",
+    ) { o.debug = true },
     FlagSpec(
         listOf("-v", "--verbose"),
         false,

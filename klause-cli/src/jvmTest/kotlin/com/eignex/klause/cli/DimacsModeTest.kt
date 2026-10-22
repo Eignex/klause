@@ -31,6 +31,15 @@ class DimacsModeTest {
     }.absolutePath
 
     @Test
+    fun `debug should print runtime counters with a terminal admission result`() {
+        val out = capture { assertEquals(0, runCli(arrayOf("--debug", cnf("p cnf 1 2\n1 0\n-1 0\n")))) }
+
+        assertTrue("s UNSATISFIABLE" in out, out)
+        assertTrue("c runtimeDebug=true" in out, out)
+        assertTrue("c jvmCompilationSupported=" in out, out)
+    }
+
+    @Test
     fun `native conflict coverage should be printed separately from open theory coverage`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),

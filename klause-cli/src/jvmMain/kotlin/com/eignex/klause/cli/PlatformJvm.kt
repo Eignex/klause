@@ -12,6 +12,11 @@ import kotlin.system.exitProcess
 internal actual fun cliProp(name: String): String? =
     System.getProperty(name) ?: System.getenv(name.uppercase().replace('.', '_'))
 
+internal actual fun platformDebugStats(): CliDebugStats {
+    val compiler = ManagementFactory.getCompilationMXBean()?.takeIf { it.isCompilationTimeMonitoringSupported }
+    return CliDebugStats { compiler?.totalCompilationTime }
+}
+
 internal actual fun flushCliOutput() {
     System.out.flush()
     check(!System.out.checkError()) { "CLI output failed" }
