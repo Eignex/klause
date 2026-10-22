@@ -23,8 +23,7 @@ import com.eignex.klause.util.IntHashSet
  */
 internal object BlockedClauseElimination {
 
-    /** Poll the cancellation once per this many clauses considered. */
-    private const val CANCEL_POLL_MASK = 0xFF
+    private const val ATTEMPT_VISIT_CAP = 65_536
 
     /** Skip the blocked check on a literal whose opposite occurs in more than this many clauses — a work
      *  bound so a high-degree literal cannot make the check quadratic. */
@@ -66,11 +65,10 @@ internal object BlockedClauseElimination {
         val removed = ArrayList<Blocked>()
         // BCE is confluent — removing a blocked clause keeps the rest blocked — so a single sweep,
         // retiring clauses as it goes, is sound; later checks simply see fewer clauses to clash against.
-        var considered = 0
         for (s in 0 until db.slotCount) {
+            if (cancellation()) break
             val c = db.clause(s) ?: continue
-            if ((considered++ and CANCEL_POLL_MASK) == 0 && cancellation()) break
-            val blocking = blockingLiteral(db, c, cancellation) ?: continue
+            val blocking = blockingLiteral(db, c, AttemptWork(cancellation)) ?: continue
             db.remove(s)
             removed.add(Blocked(c, blocking))
         }
@@ -79,38 +77,64 @@ internal object BlockedClauseElimination {
     }
 
     /** A literal of [c] whose variable is eligible and on which [c] is blocked, or `null`. */
-    private fun blockingLiteral(db: SatClauseDb, c: IntArray, cancellation: Cancellation): Int? {
-        cancellation.charge(BCE_WORK_WEIGHT * (1L + c.size))
+    private fun blockingLiteral(db: SatClauseDb, c: IntArray, work: AttemptWork): Int? {
+        if (!work.visit()) return null
         for (l in c) {
+            if (!work.visit()) return null
             if (!db.eligible[Lit.variable(l)]) continue
-            if (blockedOn(db, c, l, cancellation)) return l
+            if (blockedOn(db, c, l, work)) return l
+            if (work.stopped) return null
         }
         return null
     }
 
     /** Whether [c] is blocked on [l]: every live clause containing `¬l` clashes with [c] elsewhere. */
-    private fun blockedOn(db: SatClauseDb, c: IntArray, l: Int, cancellation: Cancellation): Boolean {
+    private fun blockedOn(db: SatClauseDb, c: IntArray, l: Int, work: AttemptWork): Boolean {
         val opposite = db.occ(Lit.negate(l))
         if (opposite.size > OCCURRENCE_CAP) return false
-        cancellation.charge(BCE_WORK_WEIGHT * (c.size.toLong() + opposite.size))
+        if (opposite.size == 0) return true
         val v = Lit.variable(l)
-        val cLits = IntHashSet(c.size)
-        for (k in c) if (Lit.variable(k) != v) cLits.add(k)
+        val cLits = IntHashSet()
+        for (k in c) {
+            if (!work.visit()) return false
+            if (Lit.variable(k) != v) cLits.add(k)
+        }
         for (i in 0 until opposite.size) {
+            if (!work.visit()) return false
             val d = db.clause(opposite[i]) ?: continue
-            if (!clashesElsewhere(cLits, d, v)) return false
+            if (!clashesElsewhere(cLits, d, v, work)) return false
         }
         return true
     }
 
     /** Whether some literal of [d] (over a variable other than [v]) has its negation in [cLits] — the
      *  clash that makes the `C`/`D` resolvent on [v] a tautology. */
-    private fun clashesElsewhere(cLits: IntHashSet, d: IntArray, v: Int): Boolean {
+    private fun clashesElsewhere(cLits: IntHashSet, d: IntArray, v: Int, work: AttemptWork): Boolean {
         for (dl in d) {
+            if (!work.visit()) return false
             if (Lit.variable(dl) == v) continue
             if (Lit.negate(dl) in cLits) return true
         }
         return false
+    }
+
+    private class AttemptWork(private val cancellation: Cancellation) {
+        private var visits = 0
+        var stopped = false
+            private set
+
+        fun visit(): Boolean {
+            if (stopped) return false
+            if (visits >= ATTEMPT_VISIT_CAP) {
+                stopped = true
+                cancellation.presolveBudget()?.activeInvocation?.interrupted = true
+                return false
+            }
+            visits++
+            cancellation.charge(BCE_WORK_WEIGHT)
+            stopped = cancellation()
+            return !stopped
+        }
     }
 
     /** A removed blocked clause and the literal it was blocked on. */
@@ -127,5 +151,5 @@ internal object BlockedClauseElimination {
         SourceRebuilds(asReversed().map { RebuildStep.RepairClause(it.clause, it.blockingLit) })
 }
 
-// Work units per occurrence visited, relative to one simplex operation.
+// Work units per clause, candidate, occurrence or literal visited, relative to one simplex operation.
 private const val BCE_WORK_WEIGHT = 10L

@@ -36,8 +36,8 @@ internal object BoundedVariableElimination {
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
-    ): PassDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild ->
-        db.toDelta(rebuild)
+    ): PassDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild, infeasible ->
+        if (infeasible) PassDelta(infeasible = true) else db.toDelta(rebuild)
     } ?: PassDelta()
 
     /**
@@ -52,15 +52,15 @@ internal object BoundedVariableElimination {
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
-    ): SourceDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild ->
-        db.toSourceDelta(rebuild)
+    ): SourceDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild, infeasible ->
+        if (infeasible) SourceDelta(infeasible = true) else db.toSourceDelta(rebuild)
     } ?: SourceDelta()
 
     private fun <T> run(
         problem: Problem,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
-        delta: (SatClauseDb, SourceRebuilds) -> T,
+        delta: (SatClauseDb, SourceRebuilds, Boolean) -> T,
     ): T? {
         val nb = problem.numBoolVars
         if (nb == 0) return null
@@ -70,10 +70,12 @@ internal object BoundedVariableElimination {
         val order = candidateOrder(db, cancellation) ?: return null
         for (v in order) {
             if (cancellation()) break
-            eliminateVar(v, db, eliminations, cancellation)
+            if (eliminateVar(v, db, eliminations, cancellation)) {
+                return delta(db, eliminations.asRebuilds(), true)
+            }
         }
 
-        return delta(db, eliminations.asRebuilds())
+        return delta(db, eliminations.asRebuilds(), false)
     }
 
     private fun candidateOrder(db: SatClauseDb, cancellation: Cancellation): IntArray? {
@@ -119,16 +121,21 @@ internal object BoundedVariableElimination {
         return if (cancellation()) null else order
     }
 
-    private fun eliminateVar(v: Int, db: SatClauseDb, eliminations: ArrayList<VarElim>, cancellation: Cancellation) {
+    private fun eliminateVar(
+        v: Int,
+        db: SatClauseDb,
+        eliminations: ArrayList<VarElim>,
+        cancellation: Cancellation,
+    ): Boolean {
         val work = PivotWork(cancellation)
-        if (!work.visit()) return
+        if (!work.visit()) return false
         val posSlots = IntArrayList()
         val negSlots = IntArrayList()
         val posLits = ArrayList<IntArray>()
         val negLits = ArrayList<IntArray>()
-        if (!gather(db, Lit.make(v, true), posSlots, posLits, work)) return
-        if (!gather(db, Lit.make(v, false), negSlots, negLits, work)) return
-        if (posLits.isEmpty() && negLits.isEmpty()) return
+        if (!gather(db, Lit.make(v, true), posSlots, posLits, work)) return false
+        if (!gather(db, Lit.make(v, false), negSlots, negLits, work)) return false
+        if (posLits.isEmpty() && negLits.isEmpty()) return false
 
         val clauses = ArrayList<IntArray>(posLits.size + negLits.size)
         clauses.addAll(posLits)
@@ -140,35 +147,38 @@ internal object BoundedVariableElimination {
         if (posLits.isEmpty() || negLits.isEmpty()) {
             resolvents = emptyList()
         } else {
-            if (posLits.size.toLong() * negLits.size > RESOLVENT_PRODUCT_CAP) return
+            if (posLits.size.toLong() * negLits.size > RESOLVENT_PRODUCT_CAP) return false
             val removedVolume = clauses.sumOf { it.size.toLong() }
             var addedVolume = 0L
             val out = ArrayList<IntArray>()
             val seen = HashSet<List<Int>>() // exact literal-set identity — a lossy hash could drop a needed resolvent
             for (a in posLits.indices) {
                 for (b in negLits.indices) {
-                    if (!work.visit()) return
+                    if (!work.visit()) return false
                     val r = resolve(posLits[a], negLits[b], v, work)
-                    if (work.stopped) return
+                    if (work.stopped) return false
                     if (r == null) continue // tautology
-                    if (r.size > RESOLVENT_WIDTH_CAP) return
+                    // A complete empty resolvent refutes the input even if the pivot is not committed.
+                    if (r.isEmpty()) return true
+                    if (r.size > RESOLVENT_WIDTH_CAP) return false
                     if (seen.add(r.sorted())) {
                         addedVolume += r.size
-                        if (addedVolume > removedVolume) return
+                        if (addedVolume > removedVolume) return false
                         out.add(r)
                     }
-                    if (out.size > clauses.size) return // unbounded: give up before committing
+                    if (out.size > clauses.size) return false // unbounded: give up before committing
                 }
             }
             resolvents = out
         }
 
-        if (cancellation()) return
+        if (cancellation()) return false
         // Commit only a complete pivot, retaining earlier eliminations if this pivot is declined.
         for (k in 0 until posSlots.size) db.remove(posSlots[k])
         for (k in 0 until negSlots.size) db.remove(negSlots[k])
         for (r in resolvents) db.add(r)
         eliminations.add(VarElim(v, clauses))
+        return false
     }
 
     /** Collect the live slots (and their literals) that contain [lit] into the parallel lists. */

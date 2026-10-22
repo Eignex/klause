@@ -8,6 +8,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DimacsModeTest {
@@ -56,6 +57,21 @@ class DimacsModeTest {
         val out = capture { main(arrayOf(cnf("p cnf 1 2\n1 0\n-1 0\n"))) }
         assertTrue("s UNSATISFIABLE" in out, out)
         assertTrue("SATISFIABLE" !in out.replace("UNSATISFIABLE", ""), out)
+    }
+
+    @Test
+    fun `BVE contradictions should print UNSATISFIABLE without a load error`() {
+        for (text in listOf(
+            "p cnf 1 2\n1 0\n-1 0\n",
+            "p cnf 2 4\n1 2 0\n1 -2 0\n-1 2 0\n-1 -2 0\n",
+        )) {
+            val out = capture {
+                assertEquals(0, runCli(arrayOf("--presolve", "off,+bve", cnf(text))))
+            }
+
+            assertTrue("s UNSATISFIABLE" in out.lines(), out)
+            assertTrue(out.lines().none { it.startsWith("v ") }, out)
+        }
     }
 
     @Test

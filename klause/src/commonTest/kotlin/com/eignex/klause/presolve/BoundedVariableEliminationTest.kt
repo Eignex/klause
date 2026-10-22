@@ -12,6 +12,7 @@ import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -58,6 +59,95 @@ class BoundedVariableEliminationTest {
 
     private fun mentions(problem: Problem, v: Int): Boolean =
         problem.factors.filterIsInstance<Clause>().any { c -> c.literals.any { Lit.variable(it) == v } }
+
+    @Test
+    fun `empty resolvents should refute contradictory units and the four binary clauses in both lanes`() {
+        val contradictions = listOf(
+            listOf(clause(pos(0)), clause(neg(0))),
+            listOf(
+                clause(pos(0), pos(1)), clause(pos(0), neg(1)),
+                clause(neg(0), pos(1)), clause(neg(0), neg(1)),
+            ),
+        )
+        for (clauses in contradictions) {
+            val problem = Problem(2, 0, emptyArray(), clauses)
+
+            val finite = BoundedVariableElimination.eliminate(problem)
+            val source = BoundedVariableElimination.eliminateSource(problem)
+
+            assertTrue(finite.infeasible)
+            assertTrue(source.infeasible)
+            assertTrue(finite.addedFactors.isEmpty())
+            assertTrue(source.addedFactors.isEmpty())
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val prepared = Presolver.runSource(
+                problem, PresolveConfig.parse("off,+bve"), PresolveContext(presolveBudget = budget),
+                budget.orSpent(Cancellation.Never),
+            )
+            assertTrue(prepared.infeasible)
+            assertEquals(PresolveInvocationOutcome.REFUTED, budget.invocations.single().outcome)
+            assertTrue(PresolvePipeline.run(problem, null, PresolveConfig.parse("off,+bve"), false).stats.infeasible)
+        }
+    }
+
+    @Test
+    fun `a completed empty resolvent should survive cancellation at the next poll`() {
+        val problem = Problem(1, 0, emptyArray(), listOf(clause(pos(0)), clause(neg(0))))
+        val setup = PresolveBudget(Long.MAX_VALUE)
+        assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(Cancellation.Never)))
+        for (finite in listOf(false, true)) {
+            val budget = PresolveBudget(setup.spent() + 10L + 60L)
+            val token = budget.orSpent(Cancellation.Never)
+
+            val infeasible = if (finite) {
+                BoundedVariableElimination.eliminate(problem, cancellation = token).infeasible
+            } else {
+                BoundedVariableElimination.eliminateSource(problem, cancellation = token).infeasible
+            }
+
+            assertTrue(infeasible)
+            assertTrue(token())
+            assertEquals(budget.allowance, budget.spent())
+        }
+        val entryWork = problem.factors.size +
+            passBaseUnits(problem.factors) * PresolvePass.ELIMINATE_BOOL_VARS.baseWorkWeight
+        val budget = PresolveBudget(entryWork + setup.spent() + 10L + 60L)
+        val token = budget.orSpent(Cancellation.Never)
+
+        val prepared = Presolver.runSource(
+            problem, PresolveConfig.parse("off,+bve"), PresolveContext(presolveBudget = budget), token,
+        )
+
+        assertTrue(prepared.infeasible)
+        assertTrue(token())
+        assertEquals(PresolveInvocationOutcome.REFUTED, budget.invocations.single().outcome)
+    }
+
+    @Test
+    fun `interruption before an empty resolvent is complete should publish no refutation`() {
+        val clauses = listOf(clause(pos(0))) + List(251) { clause(neg(0)) }
+        val problem = Problem(1, 0, emptyArray(), clauses)
+        val setup = PresolveBudget(Long.MAX_VALUE)
+        assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(Cancellation.Never)))
+        for (finite in listOf(false, true)) {
+            val budget = PresolveBudget(setup.spent() + 10L + 2_540L)
+            val token = budget.orSpent(Cancellation.Never)
+
+            val delta = if (finite) {
+                BoundedVariableElimination.eliminate(problem, cancellation = token).let {
+                    SourceDelta(it.droppedIndices, it.addedFactors, infeasible = it.infeasible, rebuild = it.rebuild)
+                }
+            } else {
+                BoundedVariableElimination.eliminateSource(problem, cancellation = token)
+            }
+
+            assertTrue(!delta.infeasible)
+            assertTrue(delta.isEmpty)
+            assertTrue(token())
+            assertEquals(setup.spent() + 10L + 2_560L, budget.spent())
+        }
+        assertTrue(BoundedVariableElimination.eliminateSource(problem).infeasible)
+    }
 
     @Test
     fun `elimination should discard tautological resolvents`() {
