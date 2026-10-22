@@ -22,7 +22,7 @@ internal fun completeMixedPoint(
         onStage?.invoke(stage)
         return null
     }
-    if (realColumns !in 1..10000 || integerColumns !in 1..100000 || rows.size > 100000) {
+    if (realColumns !in 1..10000 || integerColumns !in 0..100000 || rows.size > 100000) {
         return declined("RECOVERY_INPUT")
     }
     if (stop()) return declined("RECOVERY_STOPPED")

@@ -18,6 +18,19 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `pure real strict residual completion should replace a boundary guess`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE, strict = true),
+        )
+
+        val point = assertNotNull(completeMixedPoint(1, 0, doubleArrayOf(0.0), rows, Cancellation.Never))
+
+        assertTrue(point[0] > BigFraction.ZERO && point[0] < BigFraction.ONE)
+        assertTrue(point.satisfiesSourceRows(rows))
+    }
+
+    @Test
     fun `source prefixes should satisfy rows outside the difference fragment`() {
         val rows = listOf(
             ExactRationalInequality(
@@ -32,17 +45,20 @@ class MixedPointCompletionTest {
             ),
         )
 
-        val point = assertNotNull(
-            completeMixedPoint(
-                3,
-                1,
-                doubleArrayOf(0.5, 0.5, 1.0, 1.0),
-                rows,
-                Cancellation.Never,
-            ),
-        )
+        for (integerColumns in listOf(0, 1)) {
+            val point = assertNotNull(
+                completeMixedPoint(
+                    3,
+                    integerColumns,
+                    doubleArrayOf(0.5, 0.5, 1.0, 1.0).copyOf(3 + integerColumns),
+                    rows,
+                    Cancellation.Never,
+                ),
+            )
 
-        assertTrue(point.satisfiesSourceRows(rows))
+            assertEquals(3 + integerColumns, point.size)
+            assertTrue(point.satisfiesSourceRows(rows))
+        }
     }
 
     @Test
@@ -56,17 +72,19 @@ class MixedPointCompletionTest {
             ),
         )
 
-        val point = assertNotNull(
-            completeMixedPoint(
-                3,
-                1,
-                doubleArrayOf(1.0 / 3, 1.0 / 3, 1.0 / 3, 1.0),
-                rows,
-                Cancellation.Never,
-            ),
-        )
+        for (integerColumns in listOf(0, 1)) {
+            val point = assertNotNull(
+                completeMixedPoint(
+                    3,
+                    integerColumns,
+                    doubleArrayOf(1.0 / 3, 1.0 / 3, 1.0 / 3, 1.0).copyOf(3 + integerColumns),
+                    rows,
+                    Cancellation.Never,
+                ),
+            )
 
-        assertTrue(point.satisfiesSourceRows(rows))
+            assertTrue(point.satisfiesSourceRows(rows))
+        }
     }
 
     @Test
@@ -90,18 +108,20 @@ class MixedPointCompletionTest {
             ExactRationalInequality(intArrayOf(2), listOf(BigFraction.ONE), BigFraction.ONE, strict = true),
         )
 
-        val point = assertNotNull(
-            completeMixedPoint(
-                3,
-                1,
-                doubleArrayOf(1.0 / 3, 1.0 / 3, 0.7, 1.0),
-                rows,
-                Cancellation.Never,
-            ),
-        )
+        for (integerColumns in listOf(0, 1)) {
+            val point = assertNotNull(
+                completeMixedPoint(
+                    3,
+                    integerColumns,
+                    doubleArrayOf(1.0 / 3, 1.0 / 3, 0.7, 1.0).copyOf(3 + integerColumns),
+                    rows,
+                    Cancellation.Never,
+                ),
+            )
 
-        assertEquals(third + third, point[2])
-        assertTrue(point.satisfiesSourceRows(rows))
+            assertEquals(third + third, point[2])
+            assertTrue(point.satisfiesSourceRows(rows))
+        }
     }
 
     @Test
@@ -283,22 +303,27 @@ class MixedPointCompletionTest {
     fun `inconsistent real residuals should not produce a witness`() {
         val rows = listOf(exactColumnLower(0, BigFraction.ONE), exactColumnUpper(0, BigFraction.ZERO))
 
-        val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, 1.0), rows, Cancellation.Never)
+        for (integerColumns in listOf(0, 1)) {
+            val point = completeMixedPoint(1, integerColumns, doubleArrayOf(0.0, 1.0).copyOf(1 + integerColumns),
+                rows, Cancellation.Never)
 
-        assertNull(point)
+            assertNull(point)
+        }
     }
 
     @Test
     fun `stopped completion should retain caller work without publishing a point`() {
-        var charged = 0L
-        val stop = object : Cancellation {
-            override fun isCancelled(): Boolean = charged > 0L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        for (integerColumns in listOf(0, 1)) {
+            var charged = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = charged > 0L
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+
+            val point = completeMixedPoint(1, integerColumns, DoubleArray(1 + integerColumns), emptyList(), stop)
+
+            assertNull(point)
+            assertTrue(charged > 0L)
         }
-
-        val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, 1.0), emptyList(), stop)
-
-        assertNull(point)
-        assertTrue(charged > 0L)
     }
 }

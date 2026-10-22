@@ -1430,7 +1430,7 @@ class ExactLiraSearchComponent private constructor(
         if (bools.any { it == UNASSIGNED }) {
             candidate?.let { capturePointHints(it, context) }
         } else if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
-            model.numIntVars > 0 && model.numRealVars > 0 &&
+            model.numRealVars > 0 &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy
         ) {
             val coordinates = model.numRealVars + model.numIntVars

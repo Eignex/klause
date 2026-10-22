@@ -67,6 +67,10 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 
+When an optimal float point has no exact primal package, a complete pure-real
+state can use [witness recovery](#witness-recovery) with an empty integer tail.
+The recovered point must pass every selected exact source row before publication.
+
 #### Disjunctions and disequalities
 
 A source disjunction is registered with search as one atom per disjunct; a disjunct
@@ -340,7 +344,8 @@ refutation.
 
 The LP can finish with a float optimum but no exact primal package. Once every
 Boolean and disjunction is chosen and every finite integer is fixed, the component
-tries to turn that float point into an exact witness:
+tries to turn that float point into an exact witness. The same recovery serves
+pure-real models with an empty integer tail:
 
 1. Round the integer coordinates of the float point as private guesses and
    substitute them into all selected source rows and branch bounds.
