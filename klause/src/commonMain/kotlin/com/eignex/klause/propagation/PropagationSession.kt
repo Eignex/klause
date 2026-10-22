@@ -1054,6 +1054,14 @@ class PropagationSession private constructor(
                 bVals.add(b)
             }
         }
+        return buildImpliedResult(iRaw, bKeys, bVals)
+    }
+
+    private fun buildImpliedResult(
+        iRaw: IntArrayList,
+        bKeys: IntArrayList,
+        bVals: ArrayList<Boolean>,
+    ): PropagationResult.Implied {
         val iKeys = IntArrayList()
         val iVals = LongArrayList()
         var minKeys = EmptyIntArray
