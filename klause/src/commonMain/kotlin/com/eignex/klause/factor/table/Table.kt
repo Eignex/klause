@@ -209,7 +209,7 @@ class Table private constructor(
                     for (k in 0 until arity) kept.add(tuples[t * arity + k])
                 }
             } else if (survivors == null) {
-                survivors = LongArrayList(tuples.size - arity)
+                survivors = LongArrayList(t * arity)
                 for (k in 0 until t * arity) survivors.add(tuples[k])
             }
         }
