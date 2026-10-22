@@ -7,12 +7,14 @@ import com.eignex.klause.factor.global.internals.countPresentOccurrences
 import com.eignex.klause.factor.global.internals.proposeRandomRotations
 import com.eignex.klause.factor.global.internals.proposeRandomSwaps
 import com.eignex.klause.factor.saturatedAdd
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
 internal class GlobalCardinalityInvariant(
@@ -153,16 +155,7 @@ internal class GlobalCardinalityInvariant(
                     }
                 }
             } else {
-                for (i in xs.indices) {
-                    if (!presentGccInvFn(state, i)) continue
-                    val cur = state.assignment.intValue(xs[i])
-                    if (cur != coverVal) continue
-                    val d = state.rootDomains[xs[i]]
-                    var pick: Long? = null
-                    d.forEachCandidate(state.rng) { if (pick == null && it != coverVal) pick = it }
-                    val p = pick
-                    if (p != null) sink.addChannelingIntSet(state, xs[i], p)
-                }
+                proposeOverCountRepairs(state, s.counts, k, sink)
             }
         }
         if (closed) {
@@ -179,6 +172,63 @@ internal class GlobalCardinalityInvariant(
                 }
             }
         }
+    }
+
+    // When the upper bounds are tight, moving a holder of the over-count value onto a value that is
+    // already at its bound only shifts the excess, so the holder is offered the values with slack.
+    private fun proposeOverCountRepairs(state: LocalSearchState, counts: IntArray, over: Int, sink: MoveSink) {
+        val coverVal = cover[over]
+        val slack = LongArrayList()
+        for (j in cover.indices) if (j != over && counts[j] < upperCount(state, j)) slack.add(cover[j])
+        val targets = LongArray(MAX_SLACK_TARGETS)
+        for (i in xs.indices) {
+            if (!presentGccInvFn(state, i)) continue
+            if (state.assignment.intValue(xs[i]) != coverVal) continue
+            val d = state.rootDomains[xs[i]]
+            val filled = sampleAdmissible(state, slack, d, targets)
+            if (filled > 0) {
+                for (t in 0 until filled) sink.addChannelingIntSet(state, xs[i], targets[t])
+                continue
+            }
+            val fallback = outsideCoverValue(state, d) ?: otherValue(state, d, coverVal)
+            if (fallback != null) sink.addChannelingIntSet(state, xs[i], fallback)
+        }
+    }
+
+    private fun sampleAdmissible(state: LocalSearchState, values: LongArrayList, d: IntDomain, out: LongArray): Int {
+        var filled = 0
+        var seen = 0
+        for (vi in 0 until values.size) {
+            val value = values[vi]
+            if (value !in d) continue
+            seen++
+            if (filled < out.size) {
+                out[filled++] = value
+                continue
+            }
+            val r = state.rng.nextInt(seen)
+            if (r < out.size) out[r] = value
+        }
+        return filled
+    }
+
+    private fun upperCount(state: LocalSearchState, k: Int): Long {
+        val cvs = countVars
+        return if (cvs != null) state.assignment.intValue(cvs[k]) else requireNotNull(countHigh)[k].toLong()
+    }
+
+    // An open cover leaves values outside it uncounted, so they absorb a holder without any bound.
+    private fun outsideCoverValue(state: LocalSearchState, d: IntDomain): Long? {
+        if (closed) return null
+        var pick: Long? = null
+        d.forEachCandidate(state.rng) { if (pick == null && !coverIndexByValue.containsKey(it)) pick = it }
+        return pick
+    }
+
+    private fun otherValue(state: LocalSearchState, d: IntDomain, value: Long): Long? {
+        var pick: Long? = null
+        d.forEachCandidate(state.rng) { if (pick == null && it != value) pick = it }
+        return pick
     }
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) = proposeRandomSwaps(
@@ -319,5 +369,6 @@ internal class GlobalCardinalityInvariant(
     companion object {
         const val STRUCTURED_SWAP_CAP: Int = 4
         const val SWAP_ATTEMPT_STRIDE: Int = 6
+        const val MAX_SLACK_TARGETS: Int = 4
     }
 }
