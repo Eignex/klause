@@ -43,26 +43,14 @@ fun JavaExec.forwardBenchProps() {
     }
 }
 
-/** Single bench entry point: `./gradlew :klause-bench:bench --args="<target-id>"`, or
- *  `--args="list"` to enumerate targets. Each target binds catalog suites to a metric. */
+/** Runs a bench command from the source tree: `./gradlew :klause-bench:bench --args="select suite=…"`. */
 tasks.register<JavaExec>("bench") {
     group = "bench"
-    description = "Run a bench target by id. Use --args=\"list\" to enumerate targets."
+    description = "Run a bench command. Use --args=\"help\" to list them."
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
     val workspaceRoot = rootDir.absolutePath
     forwardBenchProps()
-    // Opt-in CPU profiling: -PasyncProfiler=/path/to/libasyncProfiler.so [-PprofOut=...] attaches
-    // async-profiler to the forked bench JVM and writes a flat top-method list on exit. Pair with
-    // a long-running, single-engine target (e.g. diag:backtrack) for a clean CDCL hot-path view.
-    (findProperty("asyncProfiler") as String?)?.let { agent ->
-        val out = (findProperty("profOut") as String?) ?: "$workspaceRoot/build/prof.txt"
-        val event = (findProperty("profEvent") as String?) ?: "cpu" // cpu | alloc | wall
-        // -PprofFormat overrides the output mode: "flat=60" (default top-method list) or e.g.
-        // "traces=30" for the hottest call stacks (shows callers, not just self-time).
-        val format = (findProperty("profFormat") as String?) ?: "flat=60"
-        jvmArgs("-agentpath:$agent=start,event=$event,$format,file=$out")
-    }
     doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 
