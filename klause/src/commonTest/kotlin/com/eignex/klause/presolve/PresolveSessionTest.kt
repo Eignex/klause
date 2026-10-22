@@ -101,7 +101,8 @@ class PresolveSessionTest {
 
             assertTrue(reads < 64)
             assertTrue(budget.spent() > spent)
-            assertEquals(survivors, session.intDomainOf(0))
+            val actual = session.intDomainOf(0).span()
+            assertEquals(List(129) { 2L * it }, List(actual.size) { actual.valueAt(it) })
             assertEquals(IntDomain(5, 5), session.intDomainOf(1))
             assertEquals(0, session.passInput().numFactors)
             assertEquals(true, rootBool(session.materialize(), 0))
