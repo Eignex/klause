@@ -82,7 +82,9 @@ support maps those inequalities back through every paired source equation used.
 Partial states can use the same refutation after a float optimum lacks an exact
 point. Rows with unresolved Boolean inputs are excluded, and every Boolean premise
 in the retained support must be assigned. The same restricted theory scope gates
-that conflict.
+that conflict. A recovered partial point that passes every selected original row
+can guide unresolved guards through the existing point-reuse lifecycle. Complete
+source agreement still gates publication of a witness.
 
 #### Disjunctions and disequalities
 
@@ -369,7 +371,7 @@ pure-real models with an empty integer tail:
 4. Complete the free real coordinates per connected component, grouped by shared
    rows: by the difference checker where the rows form a difference graph,
    otherwise by an exact point from the [source LP owner](17-linear-programming.md).
-   Before declining the LP dimension limit, parallel residual inequalities are
+   Before the LP call, parallel residual inequalities are
    divided by the positive magnitude of their first nonzero coefficient and
    merged to the strongest bound, retaining strictness at equal endpoints.
    Opposite directions remain separate. Completion keeps the existing LP limits

@@ -64,6 +64,47 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
     @Test
+    fun `recovered partial real points should guide unresolved guards`() {
+        val source = Problem(
+            numBoolVars = 3,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 133,
+            realLower = DoubleArray(133) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(133) { Double.POSITIVE_INFINITY },
+            factors = Array<Factor>(133) { index ->
+                when (index) {
+                    0 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, -1.0, -1.0), LinearOp.EQ, 0.0)
+                    1 -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                        doubleArrayOf(1.0, 1.0), LinearOp.LE, 1e-11)
+                    2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 3),
+                        doubleArrayOf(-1.0, -1.0, -1.0), LinearOp.LE, -1e-12)
+                    3 -> ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 3),
+                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)
+                    else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index),
+                        doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
+                }
+            },
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.useMixedPointCompletion()
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(false, hints.preferredBool(2))
+            assertTrue((stats.snapshot().completeSearchStages?.get("PARTIAL_SOURCE_POINT") ?: 0L) > 0L)
+            assertNull(session.model().valueOf(component.assignmentKey))
+        }
+    }
+
+    @Test
     fun `partial real refutations should exclude undecided Boolean premises`() {
         val source = Problem(
             numBoolVars = 3,

@@ -1434,7 +1434,7 @@ class ExactLiraSearchComponent private constructor(
             if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
                 sourceEqualityConflictScope()
             ) {
-                refuteAssignedSourceRows(context)?.let { return it }
+                recoverAssignedSourceRows(context)?.let { return it }
                 if (operationStop()) return ComponentResult.Indeterminate
             }
             candidate?.let { capturePointHints(it, context) }
@@ -1463,14 +1463,19 @@ class ExactLiraSearchComponent private constructor(
         node.sourceBranches.isEmpty() && node.rowAssertions.isEmpty() && node.disequalityDirections.isEmpty() &&
         solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
-    private fun refuteAssignedSourceRows(context: SearchContext): ComponentResult.Conflict? {
-        observeCompleteStage("PARTIAL_SOURCE_REFUTATION_ATTEMPT")
+    private fun recoverAssignedSourceRows(context: SearchContext): ComponentResult.Conflict? {
+        observeCompleteStage("PARTIAL_SOURCE_RECOVERY_ATTEMPT")
         val origins = ArrayList<IntArray>()
         val rows = agreementSourceRows(context, origins) ?: return null
         val repair = prepareMixedEqualityRepair(model.numRealVars, rows, lpStop, ::observeCompleteStage,
             trackSourceRows = true) ?: return null
-        repair.completePoint(rows) { columns, residual, token, onInfeasible ->
+        val point = repair.completePoint(rows) { columns, residual, token, onInfeasible ->
             reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
+        }
+        if (point != null && MixedPointArithmetic(lpStop).satisfies(point, rows) && !operationStop()) {
+            candidate = point
+            observeCompleteStage("PARTIAL_SOURCE_POINT")
+            return null
         }
         val support = repair.lastResidualInfeasibleRows ?: return null
         if (operationStop() || !sourceEqualityConflict(context, origins, support)) return null

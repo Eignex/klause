@@ -75,12 +75,8 @@ internal fun completeMixedRealComponents(
             (result as? RealDifferenceSystem.Result.Feasible)?.point
         } else {
             onStage?.invoke("RECOVERY_REAL_COMPONENT_SHAPE_${component.size}_${localRows.size}")
-            val reduced = if (budget.admitsDimensions(component.size, localRows.size.toLong())) {
-                MixedRealRows(localRows, IntArray(localRows.size) { it })
-            } else {
-                mergeParallelRealRows(localRows, stop)
-                    ?: MixedRealRows(localRows, IntArray(localRows.size) { it })
-            }
+            val reduced = mergeParallelRealRows(localRows, stop)
+                ?: MixedRealRows(localRows, IntArray(localRows.size) { it })
             if (stop()) return null
             onStage?.invoke("RECOVERY_REAL_COMPONENT_ROWS_${localRows.size}_${reduced.rows.size}")
             if (!budget.admitsDimensions(component.size, reduced.rows.size.toLong())) {
