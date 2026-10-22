@@ -15,6 +15,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -55,6 +56,71 @@ class BlockedClauseEliminationTest {
     }
 
     private fun clauseCount(problem: Problem) = problem.factors.filterIsInstance<Clause>().size
+
+    @Test
+    fun `interrupted candidate and opposite scans should retain only completed repairs`() {
+        val scans = listOf(
+            listOf(Clause((0..300).map(::pos).toIntArray())) to (0..300).toSet(),
+            listOf(Clause((0..300).map(::pos).toIntArray()), clause(neg(0), neg(300))) to (1..300).toSet(),
+            listOf(clause(pos(0), pos(1)), Clause(intArrayOf(neg(0)) + (2..300).map(::pos) + neg(1))) to
+                (1..300).toSet(),
+            (listOf(clause(pos(0), pos(1))) + List(300) { clause(neg(0), neg(1)) }) to (1..300).toSet(),
+        )
+        for ((clauses, protected) in scans) {
+            val problem = Problem(302, 0, emptyArray(), listOf(clause(pos(301))) + clauses)
+            val setup = PresolveBudget(Long.MAX_VALUE)
+            assertNotNull(SatClauseDb.build(problem, protected, setup.orSpent(Cancellation.Never)))
+            for (finite in listOf(false, true)) {
+                val budget = PresolveBudget(setup.spent() + 1_020L)
+                val token = budget.orSpent(Cancellation.Never)
+                val delta = if (finite) {
+                    BlockedClauseElimination.eliminate(problem, protected, token).let {
+                        SourceDelta(it.droppedIndices, it.addedFactors, rebuild = it.rebuild)
+                    }
+                } else {
+                    BlockedClauseElimination.eliminateSource(problem, protected, token)
+                }
+
+                assertContentEquals(intArrayOf(0), delta.droppedIndices)
+                assertTrue(delta.addedFactors.isEmpty())
+                assertEquals(budget.allowance, budget.spent())
+                val solved = BooleanArray(302) { it == 300 }
+                val reduced = assertNotNull(problem.withSourcePassDelta(delta))
+                assertTrue(sat(reduced.factors, solved))
+                delta.rebuild.rebuildInto(solved)
+                assertTrue(sat(problem.factors, solved))
+            }
+        }
+    }
+
+    @Test
+    fun `an attempt should stop before a late pure literal when its visit cap is exhausted`() {
+        for (width in listOf(16, 257)) {
+            val clauses = listOf(Clause((0..width).map(::pos).toIntArray())) +
+                List(width) { clause(neg(it)) }
+            val problem = Problem(width + 1, 0, emptyArray(), clauses)
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val setup = PresolveBudget(Long.MAX_VALUE)
+            assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(Cancellation.Never)))
+
+            val delta = BlockedClauseElimination.eliminateSource(problem, cancellation = budget.orSpent(Cancellation.Never))
+
+            assertEquals(width == 257, delta.isEmpty)
+            assertTrue(budget.spent() <= setup.spent() + 655_360L + width * (width + 5L) * 10L)
+            val reduced = assertNotNull(problem.withSourcePassDelta(delta))
+            val solved = BooleanArray(width + 1) { it == width }
+            assertTrue(sat(reduced.factors, solved))
+            delta.rebuild.rebuildInto(solved)
+            assertTrue(sat(problem.factors, solved))
+        }
+    }
+
+    @Test
+    fun `completed blocked checks should remove clauses and reconstruct a satisfying assignment`() {
+        val reduced = checkBce(3, listOf(clause(pos(0), pos(1)), clause(neg(0), neg(1), pos(2))))
+
+        assertEquals(0, clauseCount(reduced))
+    }
 
     @Test
     fun `clauses whose only blocking variables are ineligible should be kept`() {

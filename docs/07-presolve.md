@@ -260,9 +260,14 @@ discovery publishes no merges.
 Bounded variable elimination resolves an objective-free Boolean occurring only in
 clean clauses when neither distinct clause count nor literal volume grows. Each
 pivot is bounded to 4,096 pairs, width 64 and 65,536 visits; an unfinished pivot
-publishes nothing. Blocked-clause elimination removes clauses whose resolvents on
-one literal are all tautologies. Both need witness reconstruction and can change
-source multiplicity. Their shared database construction charges and polls column,
+publishes nothing. A completed empty resolvent immediately refutes the model in
+either lane without materializing an empty factor, even if later work is cancelled.
+Blocked-clause elimination removes clauses whose resolvents on one literal are all
+tautologies. Each clause attempt is capped at 65,536 visits across candidates,
+opposite occurrences and literals; each visit charges and polls the pass token.
+Incomplete blocking checks keep their clauses, while completed removals retain
+their repairs. Both passes need witness reconstruction and can change source
+multiplicity. Their shared database construction charges and polls column,
 factor, literal and occurrence-index visits; interrupted construction publishes no
 database or rewrite. BVE also meters its stable initial degree ordering before
 attempting a pivot. Source and finite calls use the same pass token and work units.
