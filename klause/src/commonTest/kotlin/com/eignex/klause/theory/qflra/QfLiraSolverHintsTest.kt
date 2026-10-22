@@ -49,6 +49,40 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `batched indexed publications should check every changed source guard`() {
+        for (lastHead in listOf(1, 300)) {
+            val model = Problem(
+                numBoolVars = 301,
+                intBounds = openBounds(0),
+                numRealVars = 256,
+                realLower = DoubleArray(256),
+                realUpper = DoubleArray(256),
+                factors = Array<Factor>(301) { head ->
+                    if (head < 300) ReifiedRealLinear(
+                        head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                        LinearOp.LE, 0.0,
+                    ) else Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
+                        LinearOp.EQ, 0.0)
+                },
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                    defaultGraphSelections = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(true, hints.preferredBool(0))
+                assertIs<ComponentResult.Consistent>(session.publish(SearchDecision.Bool(Lit.make(0, false))))
+                assertIs<ComponentResult.Consistent>(session.publish(SearchDecision.Bool(Lit.make(lastHead, true))))
+
+                val result = session.propagate()
+
+                assertIs<ComponentResult.Conflict>(result)
+                assertNull(session.model().valueOf(component.assignmentKey))
+            }
+        }
+    }
+
+    @Test
     fun `compatible eager guards should retain point guidance without another LP capture`() {
         val model = Problem(
             numBoolVars = 4, intBounds = openBounds(0), numRealVars = 3,

@@ -86,6 +86,8 @@ Boolean premise in the retained support must be assigned. The same restricted th
 that conflict. A recovered partial point that passes every selected original row
 can guide unresolved guards through the existing point-reuse lifecycle. Complete
 source agreement still gates publication of a witness.
+An indexed point checks a single changed guard through its unique source-row index.
+Batches of changed guards and shared activators scan all pending source rows.
 Wide pure-real candidates can partition into independent blocks connected by selected rows.
 Each block uses the bounded repair path, and their summed squared dimensions must fit
 the same elimination allowance. A block's certified infeasibility support maps back to its

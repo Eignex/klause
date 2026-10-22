@@ -229,6 +229,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointReuseEnabled = false
     private var pointReusePoint: List<BigFraction>? = null
     private var pointReuseHintValues: IntArray? = null
+    private var pointReusePendingRow = FULL_POINT_ROW_SCAN
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
     private var dirty = true
@@ -490,6 +491,7 @@ class ExactLiraSearchComponent private constructor(
         }
         pointReusePoint = null
         pointReuseHintValues = null
+        pointReusePendingRow = FULL_POINT_ROW_SCAN
     }
 
     private fun checkPointReuse(comparison: ExactComparison) {
@@ -562,6 +564,7 @@ class ExactLiraSearchComponent private constructor(
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy
             ) {
                 pointReusePoint = copied
+                pointReusePendingRow = NO_POINT_ROW_CHANGES
                 observeCompleteStage("POINT_REUSE_CAPTURE")
             }
             pointHintLevel = context.decisionLevel
@@ -1091,6 +1094,14 @@ class ExactLiraSearchComponent private constructor(
                 }
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
+                if (variable in arithmeticVariables && pointReusePoint != null) {
+                    val row = pointHintIndex?.getOrNull(variable) ?: FULL_POINT_ROW_SCAN
+                    pointReusePendingRow = when {
+                        row < 0 -> FULL_POINT_ROW_SCAN
+                        pointReusePendingRow == NO_POINT_ROW_CHANGES || pointReusePendingRow == row -> row
+                        else -> FULL_POINT_ROW_SCAN
+                    }
+                }
                 node = node.copy(
                     retainedReduction = null,
                     disequalityDirections = emptyMap(),
@@ -1179,7 +1190,23 @@ class ExactLiraSearchComponent private constructor(
     private fun assertSource(context: SearchContext, deferPoint: Boolean = false): Boolean {
         if (!installSource() || (!deferPoint && !lp.atLevel(context.decisionLevel, operationStop))) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
-        for ((index, prepared) in preparedRows.withIndex()) {
+        // Reusable indexed rows read only real coordinates and their unique activator.
+        val pending = if (deferPoint && pointHintIndex != null) pointReusePendingRow else FULL_POINT_ROW_SCAN
+        val indices = when {
+            pending >= 0 -> pending..pending
+            pending == NO_POINT_ROW_CHANGES -> IntRange.EMPTY
+            else -> preparedRows.indices
+        }
+        if (deferPoint) {
+            val stage = when {
+                pending >= 0 -> "POINT_REUSE_INDEXED_SINGLE_ROW"
+                pending == NO_POINT_ROW_CHANGES -> "POINT_REUSE_INDEXED_NO_ROWS"
+                else -> "POINT_REUSE_FULL_ROW_SCAN"
+            }
+            observeCompleteStage(stage)
+        }
+        for (index in indices) {
+            val prepared = preparedRows[index]
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
             val assertedLevel = sourceAssertionLevels[index]
@@ -1209,6 +1236,7 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         if (deferPoint) {
+            pointReusePendingRow = NO_POINT_ROW_CHANGES
             nodesByLevel.put(context.decisionLevel, node)
             return true
         }
@@ -1959,6 +1987,8 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
 private const val UNASSIGNED = -1
 private const val DECLINED_HINT = -2
 private const val DEFERRED_SOURCE_ROW = -2
+private const val NO_POINT_ROW_CHANGES = -1
+private const val FULL_POINT_ROW_SCAN = -2
 private const val MAX_POINT_HINT_ENTRIES = 65_536
 private const val MAX_POINT_HINT_BITS = 4096
 private const val MAX_EQUALITY_CONFLICT_PREMISES = 4095
