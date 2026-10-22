@@ -21,6 +21,36 @@ class PolynomialEquationalProjectionTest {
     private val z = Polynomial.variable(2)
 
     @Test
+    fun `independent sections wait for an earlier dependent pivot`() {
+        val w = Polynomial.variable(3)
+        val t = Polynomial.variable(4)
+        val first = arithmetic.subtract(x, arithmetic.power(y, 2))
+        val second = arithmetic.subtract(y, arithmetic.power(z, 2))
+        val third = arithmetic.subtract(w, arithmetic.power(t, 2))
+        val equations = listOf(first, second, third)
+        val family = equations + listOf(arithmetic.power(w, 3), arithmetic.power(w, 4))
+
+        val sections = independentEquationalSections(equations, family, arithmetic)
+
+        assertEquals(listOf(0), sections.map { it.variable })
+        assertEquals(listOf(arithmetic.power(y, 2)), sections.map { it.replacement })
+    }
+
+    @Test
+    fun `independent sections retain the complete formula fill preference`() {
+        val w = Polynomial.variable(3)
+        val squared = arithmetic.power(x, 2)
+        val first = arithmetic.subtract(w, squared)
+        val second = arithmetic.subtract(y, z)
+        val family = listOf(first, second, arithmetic.power(z, 2))
+
+        val sections = independentEquationalSections(listOf(first, second), family, arithmetic)
+
+        assertEquals(listOf(3, 1), sections.map { it.variable })
+        assertEquals(listOf(squared, z), sections.map { it.replacement })
+    }
+
+    @Test
     fun `independent sections retain their shared free coordinate`() {
         val squared = arithmetic.power(y, 2)
         val shifted = arithmetic.add(squared, y)
