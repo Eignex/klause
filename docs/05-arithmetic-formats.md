@@ -212,8 +212,12 @@ Choices between integer constants `0` and `1` instead use a direct signed Boolea
 equivalence to the result's true-branch value when its finite domain lies within
 `0..1`. This retains the branch relation without a separate choice index.
 A result with an open bound instead keeps guarded exact equalities to its branches.
-Affine real conditionals use a real result and signed Boolean implications to exact
-equalities with each arm. They require no integer selector or real arm column.
+Affine real conditionals retain `RealElement`. When a cached exact comparison proves
+that the guard orders the two arms, a minimum or maximum instead uses unconditional
+bounds against both arms and a Boolean choice of the opposite bound. Strict guards,
+reversed operands and negated guards retain ties without an integer selector.
+The predicate cache and its source cancellation token govern recognition; missing
+comparison evidence keeps the native selection.
 Hard unit-weight counts of distinct Boolean indicators retain `Cardinality` when
 their threshold lies within the count's range. Signed guards and opposite `0`/`1`
 arms keep their polarity; repeated guards and other arithmetic retain exact integer

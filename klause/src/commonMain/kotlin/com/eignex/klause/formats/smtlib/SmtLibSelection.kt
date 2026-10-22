@@ -3,12 +3,14 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.toWide
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
@@ -71,10 +73,51 @@ internal fun Compiler.Builder.realSelection(condition: Int, whenTrue: RealComb, 
         if (condition == trueLitCache) return whenTrue
         if (condition == Lit.negate(trueLitCache)) return whenFalse
     }
-    val result = RealComb(emptyMap(), mapOf(nextReal++ to BigFraction.ONE), BigFraction.ZERO)
-    factors.add(Clause(intArrayOf(Lit.negate(condition), reifyRealRel("=", result, whenTrue))))
-    factors.add(Clause(intArrayOf(condition, reifyRealRel("=", result, whenFalse))))
-    return result
+    val minimum = realExtremum(condition, whenTrue, whenFalse)
+    if (minimum != null) {
+        val result = RealComb(emptyMap(), mapOf(nextReal++ to BigFraction.ONE), BigFraction.ZERO)
+        val relation = if (minimum) LinearOp.LE else LinearOp.GE
+        factors.add(realRow(result.plus(whenTrue.scaled(BigFraction.MINUS_ONE)), relation))
+        factors.add(realRow(result.plus(whenFalse.scaled(BigFraction.MINUS_ONE)), relation))
+        val opposite = if (minimum) ">=" else "<="
+        factors.add(Clause(intArrayOf(
+            reifyRealRel(opposite, result, whenTrue), reifyRealRel(opposite, result, whenFalse),
+        )))
+        return result
+    }
+    val entries = intArrayOf(selectionRealColumn(whenFalse), selectionRealColumn(whenTrue))
+    val index = selectionIndex(listOf(condition))
+    val result = nextReal++
+    factors.add(RealElement(index, result, entries, indexOffset = 0))
+    return RealComb(emptyMap(), mapOf(result to BigFraction.ONE), BigFraction.ZERO)
+}
+
+private fun Compiler.Builder.realExtremum(condition: Int, first: RealComb, second: RealComb): Boolean? {
+    sourceCancellation.charge(first.intCoeffs.size.toLong() + first.realCoeffs.size +
+        second.intCoeffs.size + second.realCoeffs.size + 1L)
+    if (sourceCancellation()) throw PolynomialSourceInterrupted()
+    val difference = first.plus(second.scaled(BigFraction.MINUS_ONE))
+    // Equal arms select the same value under either truth of a strict or closed guard.
+    for ((term, direct) in listOf(difference to true, difference.scaled(BigFraction.MINUS_ONE) to false)) {
+        for (relation in listOf(LinearOp.LE, LinearOp.GE)) for (strict in listOf(false, true)) {
+            val literal = realPredicates.cachedLiteral(term, relation, strict) ?: continue
+            val minimum = if (relation == LinearOp.LE) direct else !direct
+            if (condition == literal) return minimum
+            if (condition == Lit.negate(literal)) return !minimum
+        }
+    }
+    return null
+}
+
+private fun Compiler.Builder.selectionRealColumn(term: RealComb): Int {
+    if (term.intCoeffs.isEmpty() && term.realCoeffs.size == 1 && term.constant.isZero) {
+        val entry = term.realCoeffs.entries.single()
+        if (entry.value == BigFraction.ONE) return entry.key
+    }
+    val column = nextReal++
+    val result = RealComb(emptyMap(), mapOf(column to BigFraction.ONE), BigFraction.ZERO)
+    factors.add(realRow(result.plus(term.scaled(BigFraction.MINUS_ONE)), LinearOp.EQ))
+    return column
 }
 
 internal fun Compiler.Builder.wideIntegerSelection(

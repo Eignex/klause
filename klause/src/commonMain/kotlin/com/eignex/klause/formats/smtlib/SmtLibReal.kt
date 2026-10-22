@@ -235,6 +235,18 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
         }
         return literal
     }
+
+    fun cachedLiteral(term: RealComb, relation: LinearOp, strict: Boolean): Int? {
+        val entries = term.intCoeffs.size.toLong() + term.realCoeffs.size + 1L
+        cancellation.charge(entries)
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        if (entries > maxEntries) return null
+        return literals[Predicate(
+            term.intCoeffs.filterValues { !it.isZero },
+            term.realCoeffs.filterValues { !it.isZero },
+            term.constant, relation, strict,
+        )]
+    }
 }
 
 internal fun Compiler.Builder.realIte(cond: Int, a: RealComb, b: RealComb): RealComb = realSelection(cond, a, b)

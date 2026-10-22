@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.lowering.LinComb
@@ -28,6 +29,66 @@ import kotlin.test.assertTrue
 
 class SmtLibSelectionTest {
     @Test
+    fun `ordered real branches should preserve strict signed extrema`() {
+        for (op in listOf("<=", "<", ">=", ">")) for (negative in listOf(false, true)) {
+            for ((first, second) in listOf(1 to 2, 2 to 1, 2 to 2)) {
+                for (reverse in listOf(false, true)) {
+                    val left = if (reverse) "y" else "x"
+                    val right = if (reverse) "x" else "y"
+                    val order = "($op $left $right)"
+                    val a = if (reverse) second else first
+                    val b = if (reverse) first else second
+                    val holds = when (op) {
+                        "<=" -> a <= b
+                        "<" -> a < b
+                        ">=" -> a >= b
+                        else -> a > b
+                    }
+                    val expected = if (holds != negative) first else second
+                    val parsed = SmtLib.parse(
+                        """
+                        (declare-const x Real) (declare-const y Real) (declare-const z Real)
+                        (assert (= x (/ $first 3))) (assert (= y (/ $second 3)))
+                        (assert (= z (ite ${if (negative) "(not $order)" else order} x y)))
+                        """.trimIndent(),
+                    )
+
+                    val result = BacktrackSolver.source(parsed.model)
+                        .solve(BacktrackParams(randomSeed = 0, maxDecisions = 1000))
+
+                    assertEquals(0, parsed.model.numIntVars)
+                    assertEquals("$expected/3", assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                        .realValue(parsed.realVarNames.getValue("z")))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `unrelated real guards should retain native selection`() {
+        for (branch in listOf(false, true)) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool)
+                (declare-const x Real) (declare-const y Real) (declare-const z Real)
+                (assert (= x (/ 1 3))) (assert (= y (/ 2 3)))
+                (assert (or b (< x y)))
+                (assert (= z (ite b x y)))
+                (assert ${if (branch) "b" else "(not b)"})
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 1000))
+
+            assertEquals(1, parsed.model.factors.filterIsInstance<RealElement>().size)
+            assertEquals(if (branch) "1/3" else "2/3",
+                assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                    .realValue(parsed.realVarNames.getValue("z")))
+        }
+    }
+
+    @Test
     fun `indicator counts and affine real choices should retain source-only integer coordinates`() {
         for (positive in listOf(false, true)) for (branch in listOf(false, true)) {
             val parsed = SmtLib.parse(
@@ -36,7 +97,7 @@ class SmtLibSelectionTest {
                 (declare-const x Real) (declare-const y Real) (declare-const z Real)
                 (assert (= x (/ 1 3))) (assert (= y (/ 2 3)))
                 (assert (<= (+ (ite b 1 0) (ite (< x y) 1 0)) 1))
-                (assert (= z (ite ${if (positive) "b" else "(not b)"}
+                (assert (= z (ite (${if (positive) "<=" else ">"} (+ x (/ 1 3)) (- y (/ 1 3)))
                     (+ x (/ 1 3)) (- y (/ 1 3)))))
                 (assert ${if (branch) "b" else "(not b)"})
                 """.trimIndent(),
@@ -589,7 +650,7 @@ class SmtLibSelectionTest {
                 assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
                     .realValue(parsed.realVarNames.getValue("y")),
             )
-            assertEquals(0, parsed.model.numIntVars)
+            assertEquals(1, parsed.model.factors.filterIsInstance<RealElement>().size)
         }
     }
 
