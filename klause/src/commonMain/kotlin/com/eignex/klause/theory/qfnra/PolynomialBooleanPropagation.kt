@@ -12,6 +12,9 @@ internal class PolynomialBooleanPropagation(
     private val skipConfirmedParents: Boolean = false,
 ) {
     private val values = IntArray(nodes.size) { UNASSIGNED }
+    private val unassignedChildren = IntArray(nodes.size)
+    private val unassignedChildXor = IntArray(nodes.size)
+    private val falseChildren = IntArray(nodes.size)
     private val parents = List(nodes.size) {
         arithmetic.step()
         ArrayList<Int>()
@@ -39,7 +42,14 @@ internal class PolynomialBooleanPropagation(
             arithmetic.step()
             when (node) {
                 is FormulaNode.Not -> addParent(node.child, index)
-                is FormulaNode.Junction -> for (child in node.children) addParent(child, index)
+                is FormulaNode.Junction -> {
+                    unassignedChildren[index] = node.children.size
+                    for (child in node.children) {
+                        addParent(child, index)
+                        arithmetic.step()
+                        unassignedChildXor[index] = unassignedChildXor[index] xor child
+                    }
+                }
                 is FormulaNode.BooleanVariable -> leaves.add(index)
                 else -> Unit
             }
@@ -73,6 +83,7 @@ internal class PolynomialBooleanPropagation(
         trail.add(index)
         enqueue(index)
         for (parent in parents[index]) {
+            updateChild(parent, index, value, assigned = true)
             if (skipConfirmedParents) {
                 arithmetic.step()
                 val parentValue = values[parent]
@@ -88,6 +99,15 @@ internal class PolynomialBooleanPropagation(
             enqueue(parent)
         }
         return true
+    }
+
+    private fun updateChild(parent: Int, child: Int, value: Int, assigned: Boolean) {
+        arithmetic.step()
+        if (nodes[parent] !is FormulaNode.Junction) return
+        val direction = if (assigned) 1 else -1
+        unassignedChildren[parent] -= direction
+        unassignedChildXor[parent] = unassignedChildXor[parent] xor child
+        if (value == FALSE) falseChildren[parent] += direction
     }
 
     fun propagate(): Boolean {
@@ -110,27 +130,19 @@ internal class PolynomialBooleanPropagation(
     }
 
     private fun propagate(index: Int, node: FormulaNode.Junction): Boolean {
+        arithmetic.step()
         val decisive = if (node.conjunction) FALSE else TRUE
         val identity = TRUE - decisive
-        var unknowns = 0
-        var lastUnknown = -1
-        var decided = false
-        for (child in node.children) {
-            arithmetic.step()
-            when (values[child]) {
-                decisive -> decided = true
-                UNASSIGNED -> {
-                    unknowns++
-                    lastUnknown = child
-                }
-            }
-        }
+        val unknowns = unassignedChildren[index]
+        val decisiveCount = if (node.conjunction) falseChildren[index]
+        else node.children.size - unknowns - falseChildren[index]
+        val decided = decisiveCount > 0
         if (decided && !assign(index, decisive)) return false
         if (!decided && unknowns == 0 && !assign(index, identity)) return false
         if (values[index] == identity) {
             for (child in node.children) if (!assign(child, identity)) return false
         } else if (values[index] == decisive && !decided && unknowns == 1) {
-            if (!assign(lastUnknown, decisive)) return false
+            if (!assign(unassignedChildXor[index], decisive)) return false
         }
         return true
     }
@@ -153,7 +165,10 @@ internal class PolynomialBooleanPropagation(
             }
             while (trail.size > choice.mark) {
                 arithmetic.step()
-                values[trail.removeAt(trail.lastIndex)] = UNASSIGNED
+                val index = trail.removeAt(trail.lastIndex)
+                val value = values[index]
+                values[index] = UNASSIGNED
+                for (parent in parents[index]) updateChild(parent, index, value, assigned = false)
             }
             if (!choice.triedTrue) {
                 choice.triedTrue = true

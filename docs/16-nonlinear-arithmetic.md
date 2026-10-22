@@ -293,6 +293,10 @@ enumerates source implicants: assignments of Boolean leaves and signed numeric
 predicates that make the formula true. Propagation treats numeric predicates as
 opaque leaves, a proof scan keeps only supporting literals, and private exclusion
 clauses prevent revisiting a region without entering shared learning.
+Each query retains junction child-assignment counts through its Boolean trail.
+Counts include repeated child edges and retract with their assignments; a unit
+junction identifies its remaining child without a full child scan. Propagation
+and retraction charge the containing work scope.
 
 **3. Regional reduction and projection.** Each region's signed predicates form a
 conjunction. Ordered polynomial remainders simplify other predicates modulo the
