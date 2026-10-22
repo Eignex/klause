@@ -267,9 +267,10 @@ Mandatory numeric predicates are
 extracted with Boolean propagation. Their exact total graph equalities are
 substituted into every atom, including optional branches. Opposite weak bounds may
 supply such an equality; an unforced guarded equation or an equation with a
-variable-dependent leading coefficient cannot eliminate a coordinate. Completed
-sections with independent targets share a formula rewrite: no replacement reads
-another selected target. Substitutions retain reverse fibres. Existing arithmetic
+variable-dependent leading coefficient cannot eliminate a coordinate. Sections are
+ordered by fill across the complete formula, coefficient size and coordinate. An
+independent prefix shares a rewrite: no replacement reads another selected target.
+Substitutions retain reverse fibres. Existing arithmetic
 representation limits can decline a substitution while preserving its completed
 prefix; cancellation and work exhaustion withhold the result. Expansion uses the
 caller's remaining work and representation limits.
