@@ -20,13 +20,21 @@ internal class PolynomialPredicateSharing(
     private val representatives = HashMap<PredicateKey, PredicateRepresentative>()
     private val negations = HashMap<Int, Int>()
     private val constants = HashMap<Boolean, Int>()
+    private val definitionPredicates = HashMap<PolynomialAtom, Int>()
 
     fun rewrite(root: Int): Int {
+        val predicates = if (definitions.isEmpty()) null else IntArray(originalAtoms.size) { index ->
+            arithmetic.step()
+            val atom = originalAtoms[index]
+            val nodeIndex = predicate(atom)
+            if (atom !in definitionPredicates) definitionPredicates[atom] = nodeIndex
+            nodeIndex
+        }
         val indices = IntArray(originalNodes.size)
         for ((index, node) in originalNodes.withIndex()) {
             arithmetic.step()
             indices[index] = when (node) {
-                is FormulaNode.Atom -> predicate(originalAtoms[node.atom])
+                is FormulaNode.Atom -> predicates?.get(node.atom) ?: predicate(originalAtoms[node.atom])
                 is FormulaNode.Not -> negate(indices[node.child])
                 is FormulaNode.Constant -> constant(node.value)
                 is FormulaNode.BooleanVariable -> boolean(node)
@@ -47,7 +55,7 @@ internal class PolynomialPredicateSharing(
     private fun boolean(node: FormulaNode.BooleanVariable): Int {
         arithmetic.step()
         val definition = definitions[node.variable] ?: return append(node)
-        val index = predicate(definition.atom)
+        val index = definitionPredicates.getValue(definition.atom)
         return if (definition.sameTruth) index else negate(index)
     }
 

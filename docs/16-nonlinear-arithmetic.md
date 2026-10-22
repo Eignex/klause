@@ -256,7 +256,8 @@ their exact polynomials; Boolean propagation evaluates their truth.
 Before probing or Boolean search, required equivalences defining Boolean variables
 by numeric predicates are substituted throughout the formula. Their tautologies
 are removed, so a source implicant need not choose truth values for unused
-definitions. An equivalence in an optional guarded branch cannot define a global
+definitions. Numeric predicates retain their input order through this rewrite.
+An equivalence in an optional guarded branch cannot define a global
 substitution. Remaining constraints, including other definitions of the same
 Boolean variable and condition pins, keep their numeric consequences. Reduced
 witnesses recover original Boolean values through the original normalized formula
