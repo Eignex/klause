@@ -41,6 +41,7 @@ internal object Xcsp3Mode : CliMode {
                 render,
                 { assignment -> renderInstantiation(names, assignment::intValue) },
                 definedVars = parsed.definedVars,
+                definitionHints = parsed.definitionHints,
             )
         }
 

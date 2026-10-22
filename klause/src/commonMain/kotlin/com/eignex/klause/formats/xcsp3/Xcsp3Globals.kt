@@ -26,6 +26,7 @@ import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableLongIntMap
 
 // XCSP3 global-constraint family emitters.
 
@@ -855,16 +856,27 @@ internal fun Compiler.Builder.minMax(e: XmlElement, max: Boolean) {
     val vars = requireNotNull(e.child("list")).textContent.splitWs()
         .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
     requireAnySelectionRank(e)
-    val m = newAuxVar(domainMin(vars), domainMin(vars) + domainSpan(vars) - 1)
-    factors.add(ArrayMinMax(result = m, xs = vars, max = max))
     val index = e.child("index")
+    val condition = e.child("condition")?.textContent?.trim()
+    if (condition == null && index == null) throw UnsupportedXcsp3Exception("extremum: missing <condition> or <index>")
+    // `(eq, v)` makes v the extremum itself; posting onto it avoids an alias row that presolve could
+    // collapse onto the auxiliary and thereby drop the result's definition.
+    val target = condition?.let { equalityTarget(it) }?.takeIf { it !in vars }
+    val m = target ?: newAuxVar(domainMin(vars), domainMin(vars) + domainSpan(vars) - 1)
+    factors.add(ArrayMinMax(result = m, xs = vars, max = max))
+    definedVars.add(m)
+    defineExtreme(m, vars, max)
     if (index != null) {
         factors.add(Element(singleTermVar(index.textContent), m, vars.widenToLong(),
             arrIsVars = true, indexOffset = selectionOffset(e)))
     }
-    val condition = e.child("condition")
-    if (condition != null) postCondition(intArrayOf(1), intArrayOf(m), condition.textContent.trim())
-    else if (index == null) throw UnsupportedXcsp3Exception("extremum: missing <condition> or <index>")
+    if (condition != null && target == null) postCondition(intArrayOf(1), intArrayOf(m), condition)
+}
+
+/** The variable an `(eq, v)` condition equates its expression to, or null for any other condition. */
+internal fun Compiler.Builder.equalityTarget(condText: String): Int? {
+    val (opTok, rhs) = splitCondition(condText)
+    return if (opTok == "eq" && rhs.toLongOrNull() == null) ref(rhs) else null
 }
 
 /** Global cardinality: each value in `<values>` occurs a fixed count, an interval, or a
@@ -915,11 +927,14 @@ internal fun Compiler.Builder.cardinality(e: XmlElement) {
     }
 }
 
-/** Reify `x == value` onto a fresh 0/1 int var. */
+/** Reify `x == value` onto a 0/1 int var shared by every occurrence of the pair. */
 internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
+    val byValue = valueIndicators.getOrPut(x) { MutableLongIntMap() }
+    val existing = byValue.getOrDefault(value, -1)
+    if (existing >= 0) return existing
     val eq = newBool()
     factors.add(ReifiedLinear(eq, longArrayOf(1), intArrayOf(x), LinearOp.EQ, value))
-    return litTo01(Lit.make(eq, true))
+    return litTo01(Lit.make(eq, true)).also { byValue.put(value, it) }
 }
 
 /** `binPacking`: item `i` goes to bin `list(i)`; each bin's total item size meets the condition. */
@@ -936,11 +951,15 @@ internal fun Compiler.Builder.binPacking(e: XmlElement) {
         // `<loads>`: each bin's total size equals its load variable — `Σ size[i]·[list[i]=b] = loads[b]`.
         loadsEl != null -> {
             // Load entries may be plain variables or expressions (e.g. `sub(y,37)`).
-            val loadVars = loadsEl.textContent.splitWs()
-                .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
+            val loadNames = loadsEl.textContent.splitWs().flatMap { expandNames(it) }
+            val loadVars = IntArray(loadNames.size) { termVar(loadNames[it]) }
+            val coefficients = LongArray(sizes.size + 1) { if (it < sizes.size) sizes[it].toLong() else -1L }
             for (b in loadVars.indices) {
                 val ind = IntArray(items.size) { i -> eqValue01(items[i], (b + offset).toLong()) }
-                factors.add(Linear(sizes + -1, ind + loadVars[b], LinearOp.EQ, 0))
+                val terms = ind + loadVars[b]
+                factors.add(Linear(sizes + -1, terms, LinearOp.EQ, 0))
+                // A materialized load expression already has its own definer; only a declared load is oriented.
+                if (varIds[loadNames[b]] == loadVars[b]) defineLinear(loadVars[b], coefficients, terms, 0L)
             }
         }
 

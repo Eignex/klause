@@ -3151,17 +3151,19 @@ public final class com/eignex/klause/formats/xcsp3/Xcsp3Kt {
 }
 
 public final class com/eignex/klause/formats/xcsp3/Xcsp3Problem : com/eignex/klause/ir/SourceSemanticsOwner {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[ILjava/util/List;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[ILjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
 	public final fun component2 ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun component5 ()[I
-	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public final fun component6 ()Ljava/util/List;
+	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[ILjava/util/List;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[ILjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDefinedVars ()[I
+	public final fun getDefinitionHints ()Ljava/util/List;
 	public final fun getIntVarNames ()Ljava/util/Map;
 	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;

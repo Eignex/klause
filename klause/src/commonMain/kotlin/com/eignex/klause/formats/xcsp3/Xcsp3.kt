@@ -2,6 +2,7 @@ package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.ObjectiveSense
@@ -32,6 +33,8 @@ data class Xcsp3Problem(
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     /** Int vars the front-end knows are functionally defined (sound local-search `defines_var` hints). */
     val definedVars: IntArray = IntArray(0),
+    /** Typed source orientations in compiled coordinates; the source factors remain authoritative. */
+    val definitionHints: List<DefinitionHint> = emptyList(),
 ) : SourceSemanticsOwner {
     /** Effective interpretation captured by the lowered source. */
     override val semantics: EffectiveSourceSemantics get() = problem.semantics

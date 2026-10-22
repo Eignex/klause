@@ -114,9 +114,10 @@ relation data, with operand order, constants, multiplicity, strictness and
 polarity. Reference hints retain annotations whose functional form is unavailable.
 Source factors remain the authority for all constraints. `DefinitionHint.remap`
 renumbers every role; a removed required coordinate declines the hint rather than
-inventing a value. [FlatZinc](04-finite-formats.md#source-definitions) produces these
-records, and [local search](10-local-search.md#source-definition-materialization)
-materializes its private view only when requested.
+inventing a value. [FlatZinc](04-finite-formats.md#source-definitions) and
+[XCSP3](04-finite-formats.md#expressions-and-selection) produce these records, and
+[local search](10-local-search.md#source-definition-materialization) materializes its
+private view only when requested.
 
 ### Distinct integer positions
 

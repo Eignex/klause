@@ -245,8 +245,8 @@ and the definition sweep before costs are initialized.
 ### Source definition materialization
 
 Definitions come from two places. A source can supply neutral `DefinitionHint`
-relations, as FlatZinc does through `SourceSetup`, and the consumer can infer
-native definitions from its working factors. `DefinitionalSweep.fromSource` reads the
+relations, as FlatZinc and XCSP3 do through `SourceSetup`, and the consumer can
+infer native definitions from its working factors. `DefinitionalSweep.fromSource` reads the
 hints from the unchanged source and builds the dependency graph with separate
 integer and Boolean namespaces. Without hints, absolute-value, product, power,
 quotient and remainder outputs are still maintained.
