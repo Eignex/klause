@@ -145,6 +145,8 @@ class CliModePublicationTest {
             engine = "cp"
             parallel = 1
             randomSeed = 17
+            presolve = "off"
+            engineParams += listOf("var-selector=input-order", "val-selector=max")
         }
         val session = SmtLibMode.newSession()
         val expected = CancellationException("consumer cancelled")
