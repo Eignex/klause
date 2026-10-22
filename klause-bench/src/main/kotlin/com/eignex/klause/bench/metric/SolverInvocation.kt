@@ -5,7 +5,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.bench.tools.Profiler
+import com.eignex.klause.bench.tools.CliProfile
 import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -353,7 +353,7 @@ internal object SolverInvocation {
         if (cmd.first().substringAfterLast('/') == "klause-cli") {
             System.getenv("KLAUSE_LAB_PROFILE_DIR")?.let { directory ->
                 val recording = File(directory, "cli.jfr")
-                runCatching { Profiler.summarizeCli(recording) }
+                runCatching { CliProfile.summarizeCli(recording) }
                     .onFailure { System.err.println("CLI profile summary failed: ${it.message}") }
             }
         }
