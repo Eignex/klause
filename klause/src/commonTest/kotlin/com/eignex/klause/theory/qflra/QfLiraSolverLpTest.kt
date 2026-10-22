@@ -68,10 +68,10 @@ class QfLiraSolverLpTest {
         val source = Problem(
             numBoolVars = 3,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            numRealVars = 129,
-            realLower = DoubleArray(129) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(129) { Double.POSITIVE_INFINITY },
-            factors = Array<Factor>(128) { index ->
+            numRealVars = 133,
+            realLower = DoubleArray(133) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(133) { Double.POSITIVE_INFINITY },
+            factors = Array<Factor>(132) { index ->
                 when (index) {
                     0 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
                         doubleArrayOf(1.0, -1.0, -1.0), LinearOp.EQ, 0.0)
