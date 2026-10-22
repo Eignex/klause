@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
@@ -15,6 +16,41 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialFormulaReductionTest {
+    @Test
+    fun `independent required graphs reconstruct an algebraic source witness`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const z Real) " +
+                "(declare-const b Bool) (assert (and (= x (* y y)) (= z (+ (* y y y) 1)) " +
+                "(= (* y y) 2) (> y 0) (or b (> x z))))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 500_000))
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+        val y = point.realValue(1)
+        val squared = algebraic.multiply(y, y)
+        assertEquals(0, algebraic.compare(point.realValue(0), squared))
+        assertEquals(0, algebraic.compare(point.realValue(2),
+            algebraic.add(algebraic.multiply(squared, y), algebraic.rational(BigFraction.ONE))))
+        assertEquals(0, algebraic.compare(point.realValue(0), algebraic.rational(BigFraction.ofLong(2))))
+        assertTrue(algebraic.sign(y) > 0)
+        assertTrue(point.boolValue(0))
+    }
+
+    @Test
+    fun `independent required graphs retain incompatible source bounds`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const z Real) " +
+                "(assert (and (= x (* y y)) (= z (+ (* y y) 1)) (>= x z)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
     @Test
     fun `a reduced probe reconstructs every original coordinate before publication`() {
         val source = SmtLibPolynomial.parse(
