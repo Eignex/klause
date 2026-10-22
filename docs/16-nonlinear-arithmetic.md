@@ -268,10 +268,11 @@ extracted with Boolean propagation. Their exact total graph equalities are
 substituted into every atom, including optional branches. Opposite weak bounds may
 supply such an equality; an unforced guarded equation or an equation with a
 variable-dependent leading coefficient cannot eliminate a coordinate. Completed
-substitutions retain reverse fibres. Existing arithmetic representation limits can
-decline a substitution while preserving its completed prefix; cancellation and
-work exhaustion withhold the result. Expansion uses the caller's remaining work
-and representation limits.
+sections with independent targets share a formula rewrite: no replacement reads
+another selected target. Substitutions retain reverse fibres. Existing arithmetic
+representation limits can decline a substitution while preserving its completed
+prefix; cancellation and work exhaustion withhold the result. Expansion uses the
+caller's remaining work and representation limits.
 
 The procedure then runs in four stages; only the last two are needed for
 completeness.
