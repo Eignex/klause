@@ -67,8 +67,8 @@ internal class PresolveSession(
     // Refilled in place by [reseedFromDelta] (a domain-widening pass the incremental path can't express).
     private val factors: ArrayList<Factor?> = ArrayList<Factor?>(base.factors.size).apply { addAll(base.factors) }
 
-    // The problem the current [state] is baked over: [base] initially, a widening pass's output after a
-    // [reseedFromDelta]. Its factor count is the stable-id boundary between base and mid-life factors.
+    // The ordinary bake used as the template for probing-enabled materialization. A trusted root from
+    // interrupted domain installation must not turn that final rebuild into an already-folded view.
     private var stateProblem: BakedProblem = base
 
     // Seeded from the base's already-computed root fixpoint rather than re-propagating every factor
@@ -309,7 +309,13 @@ internal class PresolveSession(
             accounting.flush()
             return false
         }
-        var ok = pushDomainNarrowings(delta.domains)
+        val narrowed = pushDomainNarrowings(delta.domains)
+        // Factor rewrites can rely on the entire domain delta. If its incremental installation stops,
+        // reseed from the compact target domains so no required restriction is lost with a dropped row.
+        if (narrowed == null) {
+            return reseedFromDelta(EmptyIntArray, emptyList(), requireNotNull(delta.domains), interrupted = true)
+        }
+        var ok = narrowed
         if (ok && propagate(allFactors = false, initialFactors = addedIds.toIntArray()) != null) ok = false
         accounting.flush()
         if (!ok) infeasible = true
@@ -317,30 +323,50 @@ internal class PresolveSession(
     }
 
     /** Push the per-variable diff of [domains] against the live state through the state's mutation API so
-     *  dependent factors re-wake. Returns false on a conflict. */
-    private fun pushDomainNarrowings(domains: Array<IntDomain>?): Boolean {
+     *  dependent factors re-wake. Returns false on a conflict, null on interruption. */
+    private fun pushDomainNarrowings(domains: Array<IntDomain>?): Boolean? {
         if (domains == null) return true
         for (v in domains.indices) {
+            cancellation.charge(1L)
+            if (accounting()) return null
             val target = domains[v]
             val cur = state.intDomains[v]
-            if (target.min == cur.min && target.max == cur.max && target.valueCount == cur.valueCount) continue
+            if (unchangedNarrowing(cur, target)) continue
             if (!state.tightenIntMin(v, target.min)) return false
             if (!state.tightenIntMax(v, target.max)) return false
-            if (!pushInteriorHoles(v, target)) return false
+            val holes = pushInteriorHoles(v, target)
+            if (holes != true) return holes
         }
         return true
     }
 
-    /** Remove from int var [v] the interior values present on the state but absent from [target]. Returns
-     *  false on a conflict; skips the value scan when the value counts already agree. */
-    private fun pushInteriorHoles(v: Int, target: IntDomain): Boolean {
-        if (target.valueCount == state.intDomains[v].valueCount) return true
-        for (value in target.min..target.max) {
-            if (value in target || value !in state.intDomains[v]) continue
-            if (!state.excludeIntValue(v, value)) return false
+    /** Remove current members absent from [target]. Returns false on conflict, null on interruption. */
+    private fun pushInteriorHoles(v: Int, target: IntDomain): Boolean? {
+        val current = state.intDomains[v]
+        if (unchangedNarrowing(current, target)) return true
+        var value = current.min
+        var pending = 0L
+        try {
+            while (true) {
+                pending++
+                if (pending == 64L) {
+                    cancellation.charge(pending)
+                    pending = 0L
+                    if (accounting()) return null
+                }
+                if (value in state.intDomains[v] && value !in target && !state.excludeIntValue(v, value)) return false
+                if (value == current.max) return true
+                value = current.higher(value)
+            }
+        } finally {
+            cancellation.charge(pending)
         }
-        return true
     }
+
+    // Under a monotone narrowing, equal endpoints and exact hole counts mean no new exclusions.
+    private fun unchangedNarrowing(current: IntDomain, target: IntDomain): Boolean =
+        current === target || (current.min == target.min && current.max == target.max &&
+            current.holeCount != Long.MAX_VALUE && current.holeCount == target.holeCount)
 
     /**
      * A cheap [BakedProblem] for a pass to read: the live factors and the state's current folded domains,
@@ -439,11 +465,15 @@ internal class PresolveSession(
         return false
     }
 
-    /** Rebuild the persistent state from scratch over the delta's output factor set + [domains] (a fresh
-     *  eager bake). Used only when a pass widens a domain; correct because it reproduces the exact
-     *  from-scratch problem for that transition. The output factor set is the live factors minus
-     *  [stableDropped], in stable-id order, followed by [added] — the same set [apply] would land on. */
-    private fun reseedFromDelta(stableDropped: IntArray, added: List<Factor>, domains: Array<IntDomain>): Boolean {
+    /** Rebuild the persistent state over the complete delta domains. A widening runs an eager bake;
+     *  an interrupted installation adopts the sound target restrictions without another bake.
+     *  The output factors are the live factors minus [stableDropped], followed by [added]. */
+    private fun reseedFromDelta(
+        stableDropped: IntArray,
+        added: List<Factor>,
+        domains: Array<IntDomain>,
+        interrupted: Boolean = false,
+    ): Boolean {
         updateEntryUnits(stableDropped, added)
         val dropped = if (stableDropped.isEmpty()) null else stableDropped.toHashSet()
         val out = ArrayList<Factor>(factors.size)
@@ -453,22 +483,28 @@ internal class PresolveSession(
         }
         out.addAll(added)
         val fixings = boolFixings()
-        val eager = PresolveShared.rebuildProblem(
-            base,
-            out,
-            Array(base.numIntVars) { domains[it] },
-            bakeConfig,
-            seedDeductions = fixings,
-            cancellation = cancellation,
-        )
-        stateProblem = eager
+        val root = if (interrupted) {
+            BakedProblem.fromPresolvedRoot(base, domains.copyOf(), out, fixings, cancellation)
+        } else {
+            PresolveShared.rebuildProblem(
+                base,
+                out,
+                Array(base.numIntVars) { domains[it] },
+                bakeConfig,
+                seedDeductions = fixings,
+                cancellation = cancellation,
+            )
+        }
+        // Probing-enabled materialization needs an ordinary bake, even after an interrupted installation
+        // used a trusted root to avoid extracting every target hole under a fired token.
+        if (!interrupted) stateProblem = root
         factors.clear()
-        factors.addAll(eager.factors)
-        liveFactorCount = eager.factors.size
+        factors.addAll(root.factors)
+        liveFactorCount = root.factors.size
         // The stable-id space was rebuilt from scratch, so the occurrence lists — and any pass's replayable
         // change history — must be too; bumping the epoch forces a stale-marked pass to rescan.
         for (v in 0 until base.numIntVars) intOcc[v]?.clear()
-        for (id in eager.factors.indices) recordOccurrences(id, eager.factors[id])
+        for (id in root.factors.indices) recordOccurrences(id, root.factors[id])
         addedLog.clear()
         droppedFactorLog.clear()
         droppedIdLog.clear()
@@ -476,12 +512,12 @@ internal class PresolveSession(
         occDirty = true
         accounting.flush()
         state = PropagationState(
-            PropagationProblem(eager),
+            PropagationProblem(root),
             (fixings as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None,
             incremental = true,
         )
         accounting = RootWorkAccounting(cancellation, state)
-        if (propagate(allFactors = true) != null) {
+        if (!state.seeded || propagate(allFactors = true) != null) {
             infeasible = true
             return false
         }

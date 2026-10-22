@@ -8,6 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
@@ -27,6 +28,138 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolveSessionTest {
+    @Test
+    fun `interior exclusions should visit sparse members independently of their gaps`() {
+        for (gap in listOf(100L, 100_000L, 1_000_000_000_000L)) {
+            val original = intDomainFromSurvivors(longArrayOf(0, gap / 2, gap))
+            val survivors = intDomainFromSurvivors(longArrayOf(0, gap))
+            var reads = 0
+            val target = object : IntDomain by survivors {
+                override fun contains(value: Long): Boolean {
+                    reads++
+                    return value in survivors
+                }
+            }
+            val session = PresolveSession(
+                Problem(
+                    0, 1, arrayOf(original),
+                    listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, gap)),
+                ).bake(),
+            )
+
+            assertTrue(session.apply(PresolveDelta(domains = arrayOf(target))))
+
+            assertEquals(3, reads)
+            assertEquals(survivors, session.intDomainOf(0))
+        }
+    }
+
+    @Test
+    fun `interior exclusions should retain dense and extreme endpoint domains`() {
+        for (start in listOf(0L, Long.MIN_VALUE, Long.MAX_VALUE - 8)) {
+            val original = IntDomain(start, start + 8)
+            val targets = listOf(
+                original.excludeValue(start + 4),
+                original.withMinAtLeast(start + 1).withMaxAtMost(start + 7)
+                    .excludeValue(start + 2).excludeValue(start + 4).excludeValue(start + 6),
+            )
+            for (target in targets) {
+                val session = PresolveSession(Problem(0, 1, arrayOf(original), emptyList()).bake())
+
+                assertTrue(session.apply(PresolveDelta(domains = arrayOf(target))))
+
+                assertEquals(target, session.intDomainOf(0))
+                assertEquals(target, session.materialize().rootIntDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `interrupted exclusions should retain complete domain deltas after factor drops`() {
+        for (stopAfter in listOf(0, 10)) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            var reads = 0
+            var applying = false
+            val token = budget.orSpent(Cancellation { applying && reads >= stopAfter })
+            val original = IntDomain(0, 256)
+            val survivors = intDomainFromSurvivors(LongArray(129) { 2L * it })
+            val target = object : IntDomain by survivors {
+                override fun contains(value: Long): Boolean {
+                    reads++
+                    return value in survivors
+                }
+            }
+            val base = Problem(
+                1, 2, arrayOf(original, IntDomain(0, 10)), listOf(Clause(intArrayOf(Lit.make(0, true)))),
+            ).bake()
+            val session = PresolveSession(base, cancellation = token)
+            val spent = budget.spent()
+            val delta = PresolveDelta(droppedIds = intArrayOf(0), domains = arrayOf(target, IntDomain(5, 5)))
+            applying = true
+
+            assertTrue(session.apply(delta))
+
+            assertTrue(reads < 64)
+            assertTrue(budget.spent() > spent)
+            assertEquals(survivors, session.intDomainOf(0))
+            assertEquals(IntDomain(5, 5), session.intDomainOf(1))
+            assertEquals(0, session.passInput().numFactors)
+            assertEquals(true, rootBool(session.materialize(), 0))
+            assertFalse(session.infeasible)
+        }
+    }
+
+    @Test
+    fun `a metered stop should not enumerate or lose a wide domain exclusion`() {
+        val original = IntDomain(0, Long.MAX_VALUE)
+        val target = original.excludeValue(1)
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val session = PresolveSession(
+            Problem(0, 1, arrayOf(original), emptyList()).bake(),
+            cancellation = budget.orSpent(Cancellation { budget.spent() >= 100 }),
+        )
+
+        assertTrue(session.apply(PresolveDelta(domains = arrayOf(target))))
+
+        assertFalse(1L in session.intDomainOf(0))
+        assertEquals(0L, session.intDomainOf(0).min)
+        assertEquals(Long.MAX_VALUE, session.intDomainOf(0).max)
+        assertFalse(session.infeasible)
+    }
+
+    @Test
+    fun `an interrupted installation should allow probing when cancellation is released`() {
+        val base = Problem(
+            2, 1, arrayOf(IntDomain(0, 10)),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            ),
+        ).bake()
+        var stopped = false
+        val session = PresolveSession(
+            base, BakeConfig(probeFailedLiterals = true), Cancellation { stopped },
+        )
+        stopped = true
+        assertTrue(session.apply(PresolveDelta(domains = arrayOf(IntDomain(0, 10).excludeValue(3)))))
+        stopped = false
+
+        assertEquals(false, rootBool(session.materialize(), 0))
+    }
+
+    @Test
+    fun `conflicting exclusions should retain preconflict domains and latch infeasibility`() {
+        val original = IntDomain(1, 3)
+        val target = intDomainFromSurvivors(longArrayOf(0, 4))
+        val session = PresolveSession(Problem(0, 1, arrayOf(original), emptyList()).bake())
+
+        assertFalse(session.apply(PresolveDelta(domains = arrayOf(target))))
+
+        assertTrue(session.infeasible)
+        assertEquals(original, session.passInput().rootIntDomain(0))
+        assertIs<PropagationResult.Unsat>(session.materialize().baked)
+    }
+
     @Test
     fun `root views should add no propagation or construction work after a drop`() {
         for (size in listOf(1, 16, 64)) {
