@@ -4,7 +4,10 @@ import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagate
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -12,6 +15,34 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class Xcsp3CompilerTest {
+    @Test
+    fun `n-ary equality implications should preserve every source truth value`() {
+        for ((constraint, roles) in listOf(
+            "<intension>imp(eq(x[0],x[1],x[2]),ne(x[0],x[3]))</intension>" to listOf(0, 1, 2, 3),
+            """<group><intension>imp(eq(%0,%1,%2),ne(%0,%3))</intension>
+                <args>x[0..3]</args></group>""" to listOf(0, 1, 2, 3),
+            """<group><intension>imp(eq(%0,%1,%2),ne(%0,%3))</intension>
+                <args>x[3] x[0..2]</args></group>""" to listOf(3, 0, 1, 2),
+        )) {
+            val baked = Xcsp3.parse(
+                """<instance><variables><array id="x" size="[4]">0..3</array></variables>
+                    <constraints>$constraint</constraints></instance>""",
+            ).problem.bake()
+
+            for (nonzero in listOf(1L, 3L)) {
+                for (mask in 0 until 16) {
+                    val values = List(4) { if (mask and (1 shl it) == 0) 0L else nonzero }
+                    val antecedent = roles.take(3).map { values[it] }.distinct().size == 1
+                    val consequent = values[roles[0]] != values[roles[3]]
+
+                    val result = baked.propagate(Assumptions(ints = values.indices.associateWith { values[it] }))
+
+                    assertEquals(!antecedent || consequent, result is PropagationResult.Implied, "$constraint: $values")
+                }
+            }
+        }
+    }
+
     @Test
     fun `Boolean product terms should preserve their source truth values`() {
         for ((expression, trueInputs) in listOf(
