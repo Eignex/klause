@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
@@ -295,6 +296,44 @@ class ProbingTest {
         assertEquals(5L, delta.bounds!!.upper(0))
         assertEquals(10L, delta.bounds.upper(1))
         assertEquals(220L, budget.spent())
+    }
+
+    @Test
+    fun `a completed failed source probe should retain its unit when root propagation is interrupted`() {
+        val problem = Problem(
+            3, 0, emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            ) + List(128) { Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))) },
+        )
+        for (allowance in listOf(20_000L, 20_500L, 21_000L)) {
+            val budget = PresolveBudget(allowance)
+
+            val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
+
+            assertTrue(Lit.make(0, false) in sourceUnits(delta), "allowance=$allowance")
+            assertFalse(delta.infeasible)
+            assertEquals(feasibleAssignments(problem), feasibleAssignments(problem.withSourcePassDelta(delta)!!))
+            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+        }
+    }
+
+    @Test
+    fun `source probing should refute when both Boolean polarities conflict`() {
+        val problem = Problem(
+            3, 0, emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, false))),
+            ),
+        )
+
+        val delta = Presolve.probeSource(problem, 1, Cancellation.Never)
+
+        assertTrue(delta.infeasible)
     }
 
     @Test

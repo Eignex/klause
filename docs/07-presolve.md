@@ -285,6 +285,11 @@ row and graph visits charge and poll the pass token. An interruption retains com
 unconditional deductions and retracts the active hypothetical branch. Candidate,
 entry and representation limits bound optional analysis, not solve time.
 
+A completed failed source probe commits its forcing unit after restoring the root,
+then propagates that unit under the remaining allowance. Interruption during those
+entailed root consequences retains the unit; no opposite hypothetical branch is
+needed to justify it. A conflicting root propagation refutes the source.
+
 Source probing and symmetry defer to finite preparation for closed discrete-only
 models. With real columns they may run in the source lane even when integer
 columns are closed or absent; generator lex and value-precedence chains remain

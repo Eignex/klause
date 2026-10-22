@@ -463,18 +463,17 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         val trueHolds = propagate()
         if (trueHolds && !stopped) recordTouched(mark)
         undoTo(mark)
+        if (!trueHolds) {
+            setHi(col, 0L)
+            return !crossed && propagate()
+        }
         if (stopped) return true
         setHi(col, 0L)
         val falseHolds = propagate()
-        if (trueHolds && falseHolds && !stopped) collectCommon(mark)
+        if (falseHolds && !stopped) collectCommon(mark)
         undoTo(mark)
         if (stopped) return true
-        when {
-            !trueHolds && !falseHolds -> return false
-            !trueHolds -> setHi(col, 0L)
-            !falseHolds -> setLo(col, 1L)
-            else -> applyPending()
-        }
+        if (!falseHolds) setLo(col, 1L) else applyPending()
         return !crossed && propagate()
     }
 
