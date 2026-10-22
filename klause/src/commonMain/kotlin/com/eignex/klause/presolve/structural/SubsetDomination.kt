@@ -191,7 +191,7 @@ internal class SubsetDomination {
 
     private fun normalized(row: LinearRow, factor: Int, droppable: Boolean): Row? {
         if (!row.isIntegerOnly || !row.isLongUnconditional || row.bound == Long.MIN_VALUE ||
-            row.relation != LinearOp.LE && row.relation != LinearOp.GE ||
+            (row.relation != LinearOp.LE && row.relation != LinearOp.GE) ||
             (0 until row.size).any { row.coeff(it) == Long.MIN_VALUE }
         ) return null
         val coefficients = LongArray(row.size) { row.coeff(it) }
@@ -216,7 +216,7 @@ internal class SubsetDomination {
             val cb = b.coefficients[v] ?: return false
             if (cb % ca != 0L) return false
             val ratio = cb / ca
-            if (ratio <= 0L || scale != 0L && scale != ratio) return false
+            if (ratio <= 0L || (scale != 0L && scale != ratio)) return false
             scale = ratio
         }
         var extra = 0L

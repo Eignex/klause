@@ -72,7 +72,9 @@ class SubsetDominationTest {
         val token = budget.orSpent(Cancellation.Never)
 
         val first = state.removeDominated(problem, ColumnRanges.of(problem.intBounds), problem.factors.asList(), token)
-        val second = state.removeDominated(unrelated, ColumnRanges.of(unrelated.intBounds), unrelated.factors.asList(), token)
+        val second = state.removeDominated(
+            unrelated, ColumnRanges.of(unrelated.intBounds), unrelated.factors.asList(), token,
+        )
 
         assertEquals(problem.factors.toList(), first)
         assertEquals(unrelated.factors.toList(), second)
@@ -99,7 +101,9 @@ class SubsetDominationTest {
             val token = budget.orSpent(Cancellation.Never)
             state.removeDominated(source, ColumnRanges.of(source.intBounds), source.factors.asList(), token)
 
-            val reduced = state.removeDominated(changed, ColumnRanges.of(changed.intBounds), changed.factors.asList(), token)
+            val reduced = state.removeDominated(
+                changed, ColumnRanges.of(changed.intBounds), changed.factors.asList(), token,
+            )
 
             assertEquals(if (index == 2) changed.factors.toList() else listOf(small), reduced)
             assertEquals(if (index == 2) PresolveInvocationOutcome.COMPLETE_MISS else PresolveInvocationOutcome.CHANGED,
@@ -176,7 +180,9 @@ class SubsetDominationTest {
         val token = budget.orSpent(Cancellation.Never)
         state.removeDominated(source, ColumnRanges.of(source.intBounds), source.factors.asList(), token)
 
-        val reduced = state.removeDominated(changed, ColumnRanges.of(changed.intBounds), changed.factors.asList(), token)
+        val reduced = state.removeDominated(
+            changed, ColumnRanges.of(changed.intBounds), changed.factors.asList(), token,
+        )
 
         assertEquals(rows, reduced)
         assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, budget.invocations.last().outcome)
@@ -249,7 +255,8 @@ class SubsetDominationTest {
             assertEquals(listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.ELIGIBILITY_SKIP),
                 calls.map { it.outcome })
             assertTrue(calls.all { it.lane == lane && it.input.factors == it.output.factors })
-            assertEquals(budget.spent(), budget.invocations.sumOf { it.work } + budget.preparationStages.sumOf { it.work })
+            assertEquals(budget.spent(),
+                budget.invocations.sumOf { it.work } + budget.preparationStages.sumOf { it.work })
         }
     }
 }
