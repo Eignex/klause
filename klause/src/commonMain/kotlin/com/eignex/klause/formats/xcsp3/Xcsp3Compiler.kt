@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -116,6 +117,25 @@ internal object Compiler {
         // sum makes v its value). These are the sound `defines_var` hints local search uses to derive
         // them instead of searching them; the factor IR alone cannot tell an equality's output apart.
         internal val definedVars = IntArrayList()
+
+        // Typed orientations carry the defining relation itself, so local search maintains outputs such as
+        // binPacking loads and extremum results whose rows the bare-reference guards decline to orient.
+        internal val definitionHints = ArrayList<DefinitionHint>()
+
+        // One 0/1 indicator per `(variable, value)`: binPacking rows and `eq` terms over the same pair read
+        // one channel, so a value change moves one literal instead of one per occurrence.
+        internal val valueIndicators = HashMap<Int, MutableLongIntMap>()
+
+        internal fun defineLinear(output: Int, coefficients: LongArray, vars: IntArray, bound: Long) {
+            definitionHints.add(DefinitionHint.Linear(output, coefficients.copyOf(), operands(vars), bound))
+        }
+
+        internal fun defineExtreme(output: Int, vars: IntArray, max: Boolean) {
+            definitionHints.add(DefinitionHint.Extreme(output, operands(vars), max))
+        }
+
+        private fun operands(vars: IntArray): Array<DefinitionHint.Operand> =
+            Array(vars.size) { DefinitionHint.Operand.Variable(vars[it]) }
 
         // A fixed var for an integer constant is shared across its occurrences: an Element/sum `<list>`
         // can repeat a constant tens of thousands of times, and a fresh var each time would multiply the
@@ -335,7 +355,8 @@ internal object Compiler {
             // Terms may be plain variables or expressions (e.g. `ne(x,0)` counting occurrences);
             // each expression is reified/linearized into an int var carrying its value.
             val tokens = requireNotNull(e.child("list")).textContent.splitWs()
-            val termVars = tokens.flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
+            val termVars = tokens.flatMap { tok -> expandNames(tok).map { termVar(it, shareIndicators = true) } }
+                .toIntArray()
             if (termVars.isEmpty()) throw UnsupportedXcsp3Exception("sum: empty <list>")
             val condText = requireNotNull(e.child("condition")).textContent.trim()
             val coeffsText = e.child("coeffs")?.textContent
@@ -360,8 +381,10 @@ internal object Compiler {
         }
 
         /** Resolve a `<sum>` term to an int var: a declared variable, a constant, a reified
-         *  relation (0/1), or an arithmetic expression bound to a fresh auxiliary. */
-        internal fun termVar(tok: String): Int {
+         *  relation (0/1), or an arithmetic expression bound to a fresh auxiliary. With [shareIndicators],
+         *  a unit equality reads the [eqValue01] indicator of its pair; callers that keep positions distinct
+         *  (`allDifferent`, `circuit`, channels) leave it off. */
+        internal fun termVar(tok: String, shareIndicators: Boolean = false): Int {
             varIds[tok]?.let { return it }
             val node = FExpr.parse(tok)
             return when {
@@ -390,7 +413,8 @@ internal object Compiler {
                         newAuxVar(v, v)
                     } else {
                         // Reify the relation (wide or narrow) onto a fresh bool, then channel it to a 0/1 int.
-                        litTo01(reifyRelationFactor(r))
+                        val shared = if (shareIndicators) unitEquality(r) else null
+                        if (shared != null) eqValue01(shared.first, shared.second) else litTo01(reifyRelationFactor(r))
                     }
                 }
 
@@ -548,6 +572,17 @@ internal object Compiler {
                     } else if (!wideConstHolds(r.op, rel.bound)) {
                         factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
                     }
+            }
+        }
+
+        /** The `(variable, value)` of a unit equality `x = value`, whose indicator [eqValue01] shares. */
+        private fun unitEquality(r: RelParts): Pair<Int, Long>? {
+            val rel = r.rel as? LinRelation.LongRel ?: return null
+            if (r.op != LinearOp.EQ || rel.vars.size != 1) return null
+            return when (rel.coeffs[0]) {
+                1L -> rel.vars[0] to rel.bound
+                -1L -> if (rel.bound == Long.MIN_VALUE) null else rel.vars[0] to -rel.bound
+                else -> null
             }
         }
 
@@ -747,7 +782,7 @@ internal object Compiler {
             // Terms may be plain variables or expressions (e.g. `gt(x,0)`), each resolved to an int var.
             val listText = e.child("list")?.textContent ?: e.textContent
             val termVars = listText.splitWs()
-                .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
+                .flatMap { tok -> expandNames(tok).map { termVar(it, shareIndicators = type == "sum") } }.toIntArray()
             if (termVars.isEmpty()) throw UnsupportedXcsp3Exception("objective: empty <list>")
             when (type) {
                 "sum" -> {
@@ -761,6 +796,8 @@ internal object Compiler {
                 "maximum", "minimum" -> {
                     val m = newAuxVar(domainMin(termVars), domainMin(termVars) + domainSpan(termVars) - 1)
                     factors.add(ArrayMinMax(result = m, xs = termVars, max = type == "maximum"))
+                    definedVars.add(m)
+                    defineExtreme(m, termVars, type == "maximum")
                     objective = singleVarObjective(m, maximize)
                 }
 
@@ -938,12 +975,12 @@ internal object Compiler {
             }
             val (lo, hi) = linBounds(narrow)
             val v = newAuxVar(lo, hi)
-            definedVars.add(v)
             val vars = narrow.coeffs.keys.toList()
             val cs = LongArray(vars.size + 1) { if (it < vars.size) -narrow.coeffs.getValue(vars[it]) else 1L }
             val ids = IntArray(vars.size + 1) { if (it < vars.size) vars[it] else v }
             factors.add(Linear(cs, ids, LinearOp.EQ, narrow.constant)) // v − expr = 0
             definedVars.add(v)
+            defineLinear(v, cs, ids, narrow.constant)
             return v
         }
 
@@ -1251,6 +1288,7 @@ internal object Compiler {
             intVarNames = LinkedHashMap(varIds),
             sense = if (objectiveMaximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
             definedVars = definedVars.toIntArray(),
+            definitionHints = definitionHints.toList(),
         )
 
         companion object {

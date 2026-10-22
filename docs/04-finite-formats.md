@@ -124,12 +124,18 @@ extrema read `list@startIndex`; conflicting offsets and `rank="first"`/`"last"`
 selection decline.
 
 Boolean-valued arithmetic terms use fresh 0/1 integers tied to their source literal
-by a reified equality; direct products of a Boolean and an integer use their
-declared equality output instead. The frontend records which auxiliaries,
-selection results and affine outputs are functionally defined, so
+by a reified equality. Unit equality terms `x = v` of sums and sum objectives and
+`binPacking` memberships share one such indicator per `(x, v)` within a compile.
+Direct products of a Boolean and an integer use their declared equality output
+instead, and an extremum whose condition is `(eq, v)` posts its `ArrayMinMax`
+onto `v`. The frontend records which auxiliaries, selection results and affine
+outputs are functionally defined, so
 [local search](10-local-search.md#maintained-literal-channels) can derive them
-from their inputs instead of searching them. Source factors remain the authority
-for every constraint.
+from their inputs instead of searching them. `Xcsp3Problem.definitionHints` adds
+[typed relations](02-model.md#source-definition-hints) for materialized affine
+terms, declared `binPacking` loads and extremum results, which local search
+materializes without the factor-shape guards that bare references need. Source
+factors remain the authority for every constraint.
 
 ### Arithmetic relations
 

@@ -17,6 +17,8 @@ import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.BinaryColumnSubstitution
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.Cancellation
+import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -253,6 +255,63 @@ class Xcsp3GlobalsTest {
             assertEquals(expectedCost, state.cost)
             assertEquals(expectedCost, predicted)
         }
+    }
+
+    @Test
+    fun `bin packing loads and extremum deviations should follow item moves without violations`() {
+        val parsed = parse(
+            """
+            <binPacking><list>x y</list><sizes>2 3</sizes><loads>l[]</loads></binPacking>
+            <maximum><list>sub(l[0],2) sub(2,l[0])</list><condition>(eq,d)</condition></maximum>
+            """.trimIndent(),
+            """
+            <var id="x">0..1</var><var id="y">0..1</var>
+            <array id="l" size="[2]">0..5</array><var id="d">0..5</var>
+            """.trimIndent(),
+        )
+        val problem = parsed.problem
+        val inferred = DefinitionalSweep.infer(problem, parsed.definedVars)
+        val sweep = assertNotNull(
+            DefinitionalSweep.withSource(problem, inferred, parsed.definitionHints, Cancellation.Never),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+        state.recompute()
+        val names = parsed.intVarNames
+
+        for ((item, period) in listOf("x" to 1L, "y" to 1L, "x" to 0L)) {
+            val move = Move.IntSet(names.getValue(item), period)
+            val predicted = state.netDelta(move)
+
+            state.apply(move)
+
+            val load = state.assignment.intValue(names.getValue("l[0]"))
+            assertEquals(5L - load, state.assignment.intValue(names.getValue("l[1]")))
+            assertEquals(abs(load - 2L), state.assignment.intValue(names.getValue("d")))
+            assertEquals(0L, predicted)
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `bin packing and equality terms should share one indicator per variable value`() {
+        val parsed = Xcsp3.parse(
+            """
+            <instance><variables><var id="x">0..1</var><var id="y">0..1</var>
+            <array id="a" size="[2]">0..5</array><array id="b" size="[2]">0..4</array></variables><constraints>
+            <binPacking><list>x y</list><sizes>2 3</sizes><loads>a[]</loads></binPacking>
+            <binPacking><list>x</list><sizes>4</sizes><loads>b[]</loads></binPacking>
+            </constraints><objectives><minimize type="sum">eq(x,1) eq(1,y)</minimize></objectives></instance>
+            """.trimIndent(),
+        )
+
+        assertEquals(4, parsed.problem.numBoolVars)
+        assertEquals(
+            setOf(listOf(0L, 0L, 5L, 0L, 4L, 0L), listOf(0L, 1L, 2L, 3L, 4L, 0L),
+                listOf(1L, 0L, 3L, 2L, 0L, 4L), listOf(1L, 1L, 0L, 5L, 0L, 4L)),
+            solutions(parsed, 6),
+        )
     }
 
     @Test

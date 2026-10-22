@@ -7951,10 +7951,12 @@ final class com.eignex.klause.formats.xcsp3/UnsupportedXcsp3Exception : com.eign
 }
 
 final class com.eignex.klause.formats.xcsp3/Xcsp3Problem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.formats.xcsp3/Xcsp3Problem|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...) // com.eignex.klause.formats.xcsp3/Xcsp3Problem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.ir/DefinitionHint> = ...) // com.eignex.klause.formats.xcsp3/Xcsp3Problem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.ir.DefinitionHint>){}[0]
 
     final val definedVars // com.eignex.klause.formats.xcsp3/Xcsp3Problem.definedVars|{}definedVars[0]
         final fun <get-definedVars>(): kotlin/IntArray // com.eignex.klause.formats.xcsp3/Xcsp3Problem.definedVars.<get-definedVars>|<get-definedVars>(){}[0]
+    final val definitionHints // com.eignex.klause.formats.xcsp3/Xcsp3Problem.definitionHints|{}definitionHints[0]
+        final fun <get-definitionHints>(): kotlin.collections/List<com.eignex.klause.ir/DefinitionHint> // com.eignex.klause.formats.xcsp3/Xcsp3Problem.definitionHints.<get-definitionHints>|<get-definitionHints>(){}[0]
     final val intVarNames // com.eignex.klause.formats.xcsp3/Xcsp3Problem.intVarNames|{}intVarNames[0]
         final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.xcsp3/Xcsp3Problem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
     final val objective // com.eignex.klause.formats.xcsp3/Xcsp3Problem.objective|{}objective[0]
@@ -7971,7 +7973,8 @@ final class com.eignex.klause.formats.xcsp3/Xcsp3Problem : com.eignex.klause.ir/
     final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component3|component3(){}[0]
     final fun component4(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component4|component4(){}[0]
     final fun component5(): kotlin/IntArray // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component5|component5(){}[0]
-    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
+    final fun component6(): kotlin.collections/List<com.eignex.klause.ir/DefinitionHint> // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component6|component6(){}[0]
+    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.ir/DefinitionHint> = ...): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.ir.DefinitionHint>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.xcsp3/Xcsp3Problem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.xcsp3/Xcsp3Problem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.xcsp3/Xcsp3Problem.toString|toString(){}[0]
