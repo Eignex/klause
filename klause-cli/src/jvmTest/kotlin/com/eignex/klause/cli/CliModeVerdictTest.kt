@@ -315,7 +315,7 @@ class CliModeVerdictTest {
                     run = RunStats(backend = "backtrack"),
                     search = SearchStats(learnedClauses = SumResult(5.0)),
                     ca = ConflictAnalysisStats(notApplicable = SumResult(3.0), nonAsserting = SumResult(2.0)),
-                    openTheoryClauses = OpenTheoryClauseStats(learned = 7),
+                    openTheoryClauses = OpenTheoryClauseStats(learned = 7, blockedWatchVisits = 11),
                 ),
                 solveTimeMs = 0,
                 solutions = 0,
@@ -326,6 +326,7 @@ class CliModeVerdictTest {
         assertTrue("; caNotApplicable=3" in out, out)
         assertTrue("; caNonAsserting=2" in out, out)
         assertTrue("; openLearned=7" in out, out)
+        assertTrue("; openLearnedBlockedWatchVisits=11" in out, out)
     }
 
     @Test

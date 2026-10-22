@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 
 /**
@@ -38,10 +39,12 @@ internal class WatchedClauseStore {
     /** Watch entries inspected by [propagate]. */
     var watchVisits: Long = 0
         private set
+    var blockedWatchVisits: Long = 0
+        private set
     private val clauses = ArrayList<IntArray>()
     private val lbds = IntArrayList()
     private val used = ArrayList<Boolean>()
-    private val watchers = MutableIntObjectMap<IntArrayList>()
+    private val watchers = MutableIntObjectMap<LongArrayList>()
     private val signatures = MutableIntObjectMap<IntArrayList>()
     private val unitClauses = IntArrayList()
 
@@ -65,12 +68,11 @@ internal class WatchedClauseStore {
         used[index] = true
     }
 
-    /** Clauses watching [literal], or null when no clause does. */
-    fun watchersOf(literal: Int): IntArrayList? = watchers[literal]
-
     /** Start watching [literal] in clause [index]. */
     fun addWatcher(literal: Int, index: Int) {
-        watchers.getOrPut(literal) { IntArrayList() }.add(index)
+        val literals = clauses[index]
+        val blocker = if (literals[0] == literal && literals.size > 1) literals[1] else literals[0]
+        watchers.getOrPut(literal) { LongArrayList() }.add(watchEntry(index, blocker))
     }
 
     /**
@@ -217,7 +219,13 @@ internal class WatchedClauseStore {
         var outcome: ComponentResult = ComponentResult.Consistent
         while (source < watching.size) {
             watchVisits++
-            val index = watching[source++]
+            val entry = watching[source++]
+            if (host.truth(entry.toInt()) == true) {
+                blockedWatchVisits++
+                watching[target++] = entry
+                continue
+            }
+            val index = (entry ushr WATCH_INDEX_SHIFT).toInt()
             val literals = clauses[index]
             if (literals[0] == falsified && literals.size > 1) {
                 literals[0] = literals[1]
@@ -225,7 +233,7 @@ internal class WatchedClauseStore {
             }
             val other = literals[0]
             if (host.truth(other) == true) {
-                watching[target++] = index
+                watching[target++] = watchEntry(index, other)
                 continue
             }
             val replacement = replacementWatch(literals, host)
@@ -235,7 +243,7 @@ internal class WatchedClauseStore {
                 addWatcher(literals[1], index)
                 continue
             }
-            watching[target++] = index
+            watching[target++] = watchEntry(index, other)
             outcome = if (host.truth(other) == false) {
                 conflictOn(index, host)
             } else {
@@ -247,6 +255,10 @@ internal class WatchedClauseStore {
         watching.truncateTo(target)
         return outcome
     }
+
+    // Clause membership survives watch moves and undo; both complete Int values fit in one entry.
+    private fun watchEntry(index: Int, blocker: Int): Long =
+        (index.toLong() shl WATCH_INDEX_SHIFT) or (blocker.toLong() and WATCH_LITERAL_MASK)
 
     /** The clause-form explanation of clause [index], safe for the caller to retain. */
     fun explanationOf(index: Int): SearchExplanation = SearchExplanation(clauses[index].copyOf())
@@ -300,6 +312,8 @@ internal class WatchedClauseStore {
         /** Watch preference for a satisfied literal, which never needs replacing. */
         const val SATISFIED_WATCH_RANK = Int.MAX_VALUE
         const val SIGNATURE_SIZE_FACTOR = 31
+        const val WATCH_INDEX_SHIFT = 32
+        const val WATCH_LITERAL_MASK = 0xffffffffL
         const val SHIFT_HIGH = 16
         const val SHIFT_MID = 13
         const val MIX_FIRST = -2048144789

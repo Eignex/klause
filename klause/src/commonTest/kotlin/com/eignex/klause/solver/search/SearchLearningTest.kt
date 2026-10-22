@@ -6,6 +6,42 @@ import kotlin.test.assertIs
 
 class SearchLearningTest {
     @Test
+    fun `satisfied learned watches should retain their implication after retraction`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        session.popTo(0)
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
+
+        assertEquals(true, session.boolValue(0))
+        assertEquals(1L, session.learnedClauseStats().blockedWatchVisits)
+    }
+
+    @Test
+    fun `renumbered learned watches should retain the surviving clause implication`() {
+        val session = SearchSession(
+            emptyList(), learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
+        )
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(4, 6, 8)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(7)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(9)))
+        session.popTo(0)
+        assertIs<ComponentResult.Consistent>(session.restart())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(7)))
+
+        assertEquals(1, session.learnedClauseCount)
+        assertEquals(true, session.boolValue(4))
+    }
+
+    @Test
     fun `learned clause should imply its last unfalsified literal`() {
         val session = SearchSession(emptyList())
         session.learn(SearchExplanation(intArrayOf(0, 2, 4)))

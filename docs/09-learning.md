@@ -130,6 +130,13 @@ then lower LBD first. See
 and
 [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ClauseDb.kt).
 
+Each shared watch entry caches one member of its clause. A true cached member
+satisfies the clause, so propagation can skip reading its literal array. An
+unassigned or false member takes the ordinary watch path. Clause membership
+survives watch relocation and backtracking; reduction rebuilds entries with the
+surviving clause identifiers. Watch-visit counts include these skips, and the
+learned-store statistics count them separately.
+
 ## Restarts, phases and inprocessing
 
 A `RestartSchedule` decides when a run pops back to its root; the restart action

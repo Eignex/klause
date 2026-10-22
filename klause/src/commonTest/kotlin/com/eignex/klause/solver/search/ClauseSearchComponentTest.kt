@@ -8,6 +8,54 @@ import kotlin.test.assertIs
 class ClauseSearchComponentTest {
 
     @Test
+    fun `a satisfied clause should imply again after its satisfying literal is retracted`() {
+        val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, 2, 4))))))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        session.popTo(0)
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
+
+        assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
+    fun `relocated watches should imply after a satisfying branch is retracted`() {
+        val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, 2, 4, 6))))))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        session.popTo(0)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
+        session.popTo(0)
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(7)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `a satisfied high identifier should not mask a unit consequence in a sibling`() {
+        for (variable in listOf(1, 65_537, (1 shl 30) - 1)) {
+            val literal = variable shl 1
+            val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, literal))))))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(literal)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(literal xor 1)))
+
+            assertEquals(true, session.boolValue(0))
+        }
+    }
+
+    @Test
     fun `widely separated watched identifiers should retain their implications`() {
         for (variable in listOf(1, 257, 65_537, (1 shl 30) - 1)) {
             val literal = variable shl 1

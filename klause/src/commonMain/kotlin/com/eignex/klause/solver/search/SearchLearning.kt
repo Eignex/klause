@@ -56,6 +56,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         assertingConflicts,
         nonAssertingConflicts,
         reductionNanos,
+        learned.blockedWatchVisits,
     )
 
     fun learn(literals: IntArray, host: ClauseWatchHost) {

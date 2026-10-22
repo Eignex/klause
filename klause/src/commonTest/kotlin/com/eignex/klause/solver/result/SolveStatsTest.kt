@@ -274,6 +274,16 @@ class SolveStatsTest {
         assertEquals(3L, merged.nonAssertingConflicts)
     }
 
+    @Test
+    fun `merge should add blocked learned watch visits`() {
+        val left = SolveStats(openTheoryClauses = OpenTheoryClauseStats(blockedWatchVisits = 3))
+        val right = SolveStats(openTheoryClauses = OpenTheoryClauseStats(blockedWatchVisits = 7))
+
+        val merged = left.mergedWith(right).openTheoryClauses
+
+        assertEquals(10L, merged.blockedWatchVisits)
+    }
+
     private fun stats(backend: String, nodes: Double, peak: Double, weights: Double, mean: Double, wallMs: Long) =
         SolveStats(
             run = RunStats(backend = backend, wallMs = wallMs),

@@ -24,6 +24,8 @@ data class OpenTheoryClauseStats(
     val nonAssertingConflicts: Long = 0,
     /** Wall time spent selecting retained clauses and rebuilding their watch lists, in nanoseconds. */
     val reductionNanos: Long = 0,
+    /** Learned-clause watch visits skipped because a cached clause member was true. */
+    val blockedWatchVisits: Long = 0,
 ) {
     /** Combine counters from independent solve slices. */
     fun mergedWith(other: OpenTheoryClauseStats): OpenTheoryClauseStats = OpenTheoryClauseStats(
@@ -38,5 +40,6 @@ data class OpenTheoryClauseStats(
         assertingConflicts + other.assertingConflicts,
         nonAssertingConflicts + other.nonAssertingConflicts,
         reductionNanos + other.reductionNanos,
+        blockedWatchVisits + other.blockedWatchVisits,
     )
 }

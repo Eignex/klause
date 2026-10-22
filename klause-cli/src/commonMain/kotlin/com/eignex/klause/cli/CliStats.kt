@@ -426,6 +426,7 @@ internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pai
                 "openRetained" to "$retained",
                 "openPeakRetained" to "$peakRetained",
                 "openLearnedWatchVisits" to "$watchVisits",
+                "openLearnedBlockedWatchVisits" to "$blockedWatchVisits",
                 "openAssertingConflicts" to "$assertingConflicts",
                 "openNonAssertingConflicts" to "$nonAssertingConflicts",
                 "openReductionNs" to "$reductionNanos",
