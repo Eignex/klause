@@ -1432,7 +1432,7 @@ class ExactLiraSearchComponent private constructor(
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
         if (bools.any { it == UNASSIGNED }) {
             if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
-                sourcePointRecoveryScope()
+                sourceRecoveryScope()
             ) {
                 recoverAssignedSourceRows(context, result.float.primal)?.let { return it }
                 if (operationStop()) return ComponentResult.Indeterminate
@@ -1458,17 +1458,14 @@ class ExactLiraSearchComponent private constructor(
         if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage)
     }
 
-    private fun sourcePointRecoveryScope(): Boolean = model.numIntVars == 0 && !hasSourceDisjunctions &&
+    private fun sourceRecoveryScope(): Boolean = model.numIntVars == 0 && !hasSourceDisjunctions &&
         model.numRealVars in 1..10000 &&
         node.sourceBranches.isEmpty() && node.rowAssertions.isEmpty() && node.disequalityDirections.isEmpty() &&
         solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
-    private fun sourceEqualityConflictScope(): Boolean =
-        sourcePointRecoveryScope() && admitsMixedEqualityRepair(model.numRealVars)
-
     private fun recoverAssignedSourceRows(context: SearchContext, primal: DoubleArray): ComponentResult.Conflict? {
         observeCompleteStage("PARTIAL_SOURCE_RECOVERY_ATTEMPT")
-        val origins = if (sourceEqualityConflictScope()) ArrayList<IntArray>() else null
+        val origins = if (sourceRecoveryScope()) ArrayList<IntArray>() else null
         val rows = agreementSourceRows(context, origins) ?: return null
         lpStop.charge(rows.size.toLong())
         if (operationStop() || rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
@@ -1499,7 +1496,7 @@ class ExactLiraSearchComponent private constructor(
         support: IntArray,
     ): Boolean {
         lpStop.charge(model.numBoolVars.toLong() + support.size + 1L)
-        if (!sourceEqualityConflictScope() || support.isEmpty() || operationStop()) return false
+        if (!sourceRecoveryScope() || support.isEmpty() || operationStop()) return false
         val variables = LinkedHashSet<Int>()
         for (row in support) {
             val booleans = origins.getOrNull(row) ?: return false
@@ -1596,7 +1593,7 @@ class ExactLiraSearchComponent private constructor(
             val retained = floatCandidate
             floatCandidate = null
             if (retained != null) {
-                val origins = if (sourceEqualityConflictScope()) ArrayList<IntArray>() else null
+                val origins = if (sourceRecoveryScope()) ArrayList<IntArray>() else null
                 val rows = agreementSourceRows(context, origins)
                 if (rows != null) {
                     var sourceInfeasible: IntArray? = null

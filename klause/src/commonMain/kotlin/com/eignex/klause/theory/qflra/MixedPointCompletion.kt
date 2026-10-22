@@ -103,9 +103,15 @@ internal fun completeMixedPoint(
     }
     if (residual.any { it.columns.size > 2 }) {
         onStage?.invoke("RECOVERY_EQUALITY_REPAIR_ATTEMPT")
+        val reportSourceInfeasible: ((IntArray) -> Unit)? = if (residualSources == null) null else { support ->
+            stop.charge(support.size.toLong() + 1L)
+            if (!stop() && support.isNotEmpty() && support.all { it in residualSources.indices }) {
+                onSourceInfeasible?.invoke(IntArray(support.size) { residualSources[support[it]] })
+            }
+        }
         if (integerColumns == 0 && !admitsMixedEqualityRepair(realColumns)) {
             val point = completeIndependentRealBlocks(realColumns, primal, realGuess, residual, stop,
-                onStage, realCompletion)
+                onStage, reportSourceInfeasible, realCompletion)
             stop.charge(rowWork)
             if (stop()) return declined("RECOVERY_STOPPED")
             if (point != null && arithmetic.satisfies(point, rows) && !stop()) {
@@ -123,12 +129,7 @@ internal fun completeMixedPoint(
             if (stop()) return declined("RECOVERY_STOPPED")
             // Guessed integer coordinates cannot supply a refutation of the source model.
             val support = repair?.lastResidualInfeasibleRows
-            if (integerColumns == 0 && support != null && residualSources != null) {
-                stop.charge(support.size.toLong() + 1L)
-                if (stop()) return declined("RECOVERY_STOPPED")
-                if (support.any { it !in residualSources.indices }) return declined("RECOVERY_SOURCE_INPUT")
-                onSourceInfeasible?.invoke(IntArray(support.size) { residualSources[support[it]] })
-            }
+            if (support != null) reportSourceInfeasible?.invoke(support)
             if (stop()) return declined("RECOVERY_STOPPED")
             if (reals == null) continue
             val point = reals + integers
@@ -165,6 +166,7 @@ private fun completeIndependentRealBlocks(
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
     onStage: ((String) -> Unit)?,
+    onInfeasible: ((IntArray) -> Unit)?,
     realCompletion: MixedRealCompletion?,
 ): List<BigFraction>? {
     if (rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
@@ -209,9 +211,16 @@ private fun completeIndependentRealBlocks(
             localRows += ExactRationalInequality(IntArray(row.columns.size) { local[row.columns[it]] },
                 row.coefficients, row.rhs, row.strict)
         }
-        // Wide recovery supplies a candidate only; its local proofs have no source authority.
+        val reportInfeasible: ((IntArray) -> Unit)? = if (onInfeasible == null) null else { support ->
+            stop.charge(support.size.toLong() + 1L)
+            if (!stop() && support.isNotEmpty() && support.all { it in selected.indices }) {
+                val original = IntArray(support.size) { selected[support[it]] }
+                onStage?.invoke("RECOVERY_SOURCE_COMPONENT_CONFLICT")
+                if (!stop()) onInfeasible(original)
+            }
+        }
         val values = completeMixedPoint(component.size, 0, DoubleArray(component.size) { primal[component[it]] },
-            localRows, stop, onStage = onStage, realCompletion = realCompletion) ?: return null
+            localRows, stop, onStage, reportInfeasible, realCompletion) ?: return null
         if (stop()) return null
         for (index in component.indices) point[component[index]] = values[index]
     }

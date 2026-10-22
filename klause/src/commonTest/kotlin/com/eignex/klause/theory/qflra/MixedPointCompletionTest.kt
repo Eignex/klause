@@ -19,6 +19,50 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `independent source conflicts should retain their original row support`() {
+        val rows = listOf(
+            exactColumnUpper(424, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+            exactColumnLower(2, BigFraction.ZERO), exactColumnUpper(2, BigFraction.ZERO),
+            exactColumnLower(0, BigFraction.ONE),
+        )
+        var support: IntArray? = null
+
+        val point = completeMixedPoint(425, 0, DoubleArray(425), rows, Cancellation.Never,
+            onSourceInfeasible = { support = it })
+
+        assertNull(point)
+        assertEquals((1..7).toSet(), assertNotNull(support).toSet())
+    }
+
+    @Test
+    fun `cancelled independent source conflicts should withhold support`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+            exactColumnLower(2, BigFraction.ZERO), exactColumnUpper(2, BigFraction.ZERO),
+            exactColumnLower(0, BigFraction.ONE),
+        )
+        var stopped = false
+        var sourceInfeasible = false
+
+        val point = completeMixedPoint(425, 0, DoubleArray(425), rows, Cancellation { stopped },
+            onStage = { if (it == "RECOVERY_SOURCE_COMPONENT_CONFLICT") stopped = true },
+            onSourceInfeasible = { sourceInfeasible = true })
+
+        assertTrue(stopped)
+        assertNull(point)
+        assertFalse(sourceInfeasible)
+    }
+
+    @Test
     fun `independent real blocks should share the equality repair allowance`() {
         for (size in listOf(3, 140)) {
             val columns = 3 * size + 5
@@ -117,15 +161,23 @@ class MixedPointCompletionTest {
 
     @Test
     fun `large real contradictions should withhold equality repair refutations`() {
-        val rows = listOf(
-            ExactRationalInequality(intArrayOf(0, 1, 2),
-                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
-            ExactRationalInequality(intArrayOf(0, 1, 2),
-                listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
-            exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
-            exactColumnLower(2, BigFraction.ZERO), exactColumnUpper(2, BigFraction.ZERO),
-            exactColumnLower(0, BigFraction.ONE),
-        )
+        val rows = buildList {
+            addAll(listOf(
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+                exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+                exactColumnLower(2, BigFraction.ZERO), exactColumnUpper(2, BigFraction.ZERO),
+                exactColumnLower(0, BigFraction.ONE),
+            ))
+            for (column in 2 until 424) {
+                add(ExactRationalInequality(intArrayOf(column, column + 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO))
+                add(ExactRationalInequality(intArrayOf(column, column + 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO))
+            }
+        }
         var sourceInfeasible = false
 
         val point = completeMixedPoint(425, 0, DoubleArray(425), rows, Cancellation.Never,
