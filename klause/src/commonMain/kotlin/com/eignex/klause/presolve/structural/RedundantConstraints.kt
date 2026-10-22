@@ -656,7 +656,7 @@ internal object RedundantConstraints {
         return true
     }
 
-    private fun negated(xs: LongArray, cancellation: Cancellation): LongArray =
+    private fun negated(xs: LongArray, cancellation: Cancellation = Cancellation.Never): LongArray =
         LongArray(xs.size) {
             visit(cancellation)
             -xs[it]
