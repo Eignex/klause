@@ -74,6 +74,10 @@ Ordered multivariate remainder division retains irreducible terms while reducing
 the remaining terms by the supplied divisors. The input differs from its remainder
 by a polynomial combination of those divisors. Prepared cursors retain this work
 across suspension and expose only the completed remainder.
+One caller-owned divisor index serves multiple dividends. Leading coordinates
+exclude impossible monomial divisions; a merge of the retained buckets preserves
+the supplied divisor order, including constant divisors. Index construction,
+lookups and division charge the containing arithmetic token.
 
 Bareiss elimination computes Sylvester determinants with exact division.
 Resultants handle zero, shared-factor and constant cases; principal subresultant

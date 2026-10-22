@@ -3,8 +3,8 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialRemainder
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
-import com.eignex.klause.arithmetic.polynomial.preparePolynomialRemainder
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.theory.qfnra.PolynomialSigns.NEGATIVE_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.NONZERO_SIGNS
@@ -79,6 +79,7 @@ private fun prepareEqualityRemainders(
     }
     val result = ArrayList<PolynomialAtom>()
     var changed = false
+    val remainders = PolynomialRemainder(equations, arithmetic)
     for (atom in atoms) {
         arithmetic.step()
         if (atom.relation == PolynomialRelation.EQ) {
@@ -87,7 +88,7 @@ private fun prepareEqualityRemainders(
         }
         var polynomial: Polynomial? = null
         try {
-            val reducing = preparePolynomialRemainder(atom.polynomial, equations, arithmetic)
+            val reducing = remainders.prepare(atom.polynomial)
             while (polynomial == null) {
                 polynomial = reducing.next()
                 if (polynomial == null) yield(null)
