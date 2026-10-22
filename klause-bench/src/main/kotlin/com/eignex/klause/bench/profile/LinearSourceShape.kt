@@ -273,6 +273,7 @@ internal object LinearSourceShape {
 
     private fun booleanGateShapes(model: Problem, declaredBooleans: Collection<Int>): JsonObject {
         val clauses = model.factors.filterIsInstance<Clause>()
+        val units = clauses.filter { it.literals.size == 1 }.map { it.literals.single() }.toSet()
         val binary = clauses.filter { it.literals.size == 2 }.map { it.literals.sorted() }.toSet()
         val ternary = clauses.filter { it.literals.size == 3 }.map { it.literals.sorted() }
             .filter { row -> row.map(Lit::variable).distinct().size == 3 }.toSet()
@@ -315,6 +316,7 @@ internal object LinearSourceShape {
                 val groups = definitions.filterKeys { it.first == operator }.values
                 val privateGroups = groups.map { heads -> heads.filter { it !in externalHeads } }
                     .filter { it.isNotEmpty() }
+                val privateHeads = privateGroups.flatten().toSet()
                 put(operator, buildJsonObject {
                     put("completeDefinitionEntries", groups.sumOf { it.size })
                     put("distinctOutputHeads", groups.flatten().toSet().size)
@@ -324,6 +326,8 @@ internal object LinearSourceShape {
                     put("purePrivateDefinitionEntries", privateGroups.sumOf { it.size })
                     put("purePrivateInputSignatures", privateGroups.size)
                     put("purePrivateDuplicateHeadEntries", privateGroups.sumOf { it.size - 1 })
+                    put("privateUnitTrueHeads", privateHeads.count { Lit.make(it, true) in units })
+                    put("privateUnitFalseHeads", privateHeads.count { Lit.make(it, false) in units })
                 })
             }
         }

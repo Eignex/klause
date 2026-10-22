@@ -345,6 +345,8 @@ For binary integer indexes bounded within `0..1`, it also resolves fixed integer
 entries and counts constant tables with equal entries or a unit signed step.
 Tables with the two Boolean values `0` and `1` have a separate count.
 Boolean gate counts recognize complete two-input AND/OR and IFF clause families.
+Private gate heads directly forced by positive or negative source unit clauses
+are counted separately; these counts do not run Boolean propagation.
 Signatures preserve signed inputs; IFF also folds simultaneous input negation.
 Private counts exclude declared Booleans and heads read by non-clause factors.
 These are inferred functional definitions in the inspected model, not compiler
