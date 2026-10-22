@@ -21,6 +21,82 @@ import kotlin.test.assertTrue
 class PortfolioCompositionTest {
 
     @Test
+    fun `finite satisfaction should retain classical branching in the existing complete slots`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile) { false }
+        for (count in listOf(6, 12)) {
+            val scenario = PortfolioScenario.sequential(Kind.CSP, arms = count)
+            val baseline = PortfolioComposition.compose(scenario.copy(btEdit = { it }), facts)
+
+            val plan = PortfolioComposition.plan(scenario, facts)
+            val complete = plan.arms.filterIsInstance<BacktrackWorkerConfig>()
+
+            assertEquals(
+                listOf("satOptimized", "conflictDriven", "domwdeg", "first-fail"),
+                complete.take(4).map { it.label },
+            )
+            assertEquals(1, complete.count { it.label == "domwdeg" })
+            assertEquals(1, complete.count { it.label == "first-fail" })
+            assertEquals(baseline.size, plan.arms.size)
+            assertEquals(
+                baseline.filterIsInstance<LocalSearchWorkerConfig>().map { it.label },
+                plan.arms.filterIsInstance<LocalSearchWorkerConfig>().map { it.label },
+            )
+            assertEquals(plan.arms.size, plan.firstSolutionCount)
+        }
+    }
+
+    @Test
+    fun `finite satisfaction diversity should preserve explicit parallel and small pools`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile) { false }
+        val other = ProblemFacts(ProblemFacts.assumed(Kind.CSP, ProblemClass.MixedInteger).profile) { false }
+        for (control in listOf(
+            scenario.copy(cores = 2),
+            scenario.copy(arms = 5),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(btEdit = { it }),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("free") }),
+            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
+            scenario.copy(annotationArm = BacktrackParams()),
+        )) {
+            val expected = PortfolioComposition.compose(control, other).filterIsInstance<BacktrackWorkerConfig>()
+
+            val selected = PortfolioComposition.compose(control, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+            assertEquals(expected.map { it.label }, selected.map { it.label }, control.toString())
+        }
+    }
+
+    @Test
+    fun `satisfaction diversity should preserve LP recipes and other model classes`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP)
+        val cases = ProblemClass.entries.flatMap { problemClass ->
+            listOf(false, true).map { problemClass to it }
+        }.filter { (problemClass, relaxation) -> problemClass != ProblemClass.FiniteCp || relaxation }
+        for ((problemClass, relaxation) in cases) {
+            val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP, problemClass).profile) { relaxation }
+
+            val selected = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+            assertEquals(BacktrackCatalog.ranked(Kind.CSP, facts).take(4).map { it.label }, selected.map { it.label })
+        }
+    }
+
+    @Test
+    fun `finite satisfaction diversity should spend the containing node allowance`() {
+        val budget = NodeBudget(limit = 100)
+        val scenario = PortfolioScenario.sequential(Kind.CSP).copy(nodeBudget = budget)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile) { false }
+
+        val selected = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+        for (label in listOf("domwdeg", "first-fail")) {
+            val arm = selected.single { it.label == label }
+            assertSame(budget, arm.recipe.build(1L, null).nodeBudget)
+        }
+    }
+
+    @Test
     fun `annotated finite optimization should admit unrestricted first fail beside source search`() {
         val annotation = SearchHints(
             listOf(

@@ -337,6 +337,12 @@ annotated, or execution is parallel or single-engine. See
 
 #### Satisfaction pools
 
+Curated sequential mixed finite-CP satisfaction pools of at least six slots keep
+dom/wdeg and first-fail in the free and selector-switch slots when the selected
+complete workers contain no LP recipe. Wider pools swap an existing matching
+recipe into each slot. Pool size, local-search positions and containing allowances
+stay fixed; explicit, annotated and parallel pools keep their selected palettes.
+
 The satisfaction backtrack palette includes conservative LP after default and
 aggressive LP; applicability, model class and LP ceilings order and filter it. Root
 variable shaving and hull pruning remain explicit plan options, and curated
