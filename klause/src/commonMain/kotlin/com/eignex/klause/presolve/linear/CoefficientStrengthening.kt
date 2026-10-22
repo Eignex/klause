@@ -201,62 +201,51 @@ internal object CoefficientStrengthening {
     private fun liftLinearExact(l: Linear, ranges: ColumnRanges): Factor? {
         val row = l.integerConstants ?: return l
         // Only ≤ / ≥ lift by clamping; complement ≥ to ≤ by negating coeffs and bound.
-        val coeffs: LongArray
-        val bound: Long
-        when (l.op) {
-            LinearOp.LE -> {
-                coeffs = LongArray(l.vars.size) { row.coeff(it) }
-                bound = row.bound
-            }
-
-            LinearOp.GE -> {
-                coeffs = LongArray(l.vars.size) { subExact(0L, row.coeff(it)) }
-                bound = subExact(0L, row.bound)
-            }
-
+        val negate = when (l.op) {
+            LinearOp.LE -> false
+            LinearOp.GE -> true
             else -> return l
         }
-        val n = coeffs.size
+        val bound = if (negate) subExact(0L, row.bound) else row.bound
+        val n = l.vars.size
         // Normalise to a positive-coefficient bounded knapsack Σ a̅ⱼzⱼ ≤ B, zⱼ ∈ [0, cⱼ].
-        val absA = LongArray(n)
-        val cap = LongArray(n)
         var b = bound
+        var amax = 0L
+        var maxUnfixedMagnitude = 0L
         for (i in 0 until n) {
-            val a = coeffs[i]
+            val a = if (negate) subExact(0L, row.coeff(i)) else row.coeff(i)
             val v = l.vars[i]
-            cap[i] = subExact(ranges.max(v), ranges.min(v))
-            absA[i] = if (a < 0) subExact(0L, a) else a
+            val cap = subExact(ranges.max(v), ranges.min(v))
+            val magnitude = if (a < 0) subExact(0L, a) else a
             // Fold the variable's contribution at its zero-of-zⱼ end into the bound:
             // aⱼ>0 shifts by aⱼ·lⱼ, aⱼ<0 (complemented) shifts by aⱼ·uⱼ.
             val zeroEnd = if (a >= 0) ranges.min(v) else ranges.max(v)
             b = subExact(b, mulExact(a, zeroEnd))
+            amax = addExact(amax, mulExact(magnitude, cap))
+            if (cap > 0L) maxUnfixedMagnitude = maxOf(maxUnfixedMagnitude, magnitude)
         }
-        var amax = 0L
-        for (i in 0 until n) amax = addExact(amax, mulExact(absA[i], cap[i]))
         val d = subExact(amax, b)
         if (d <= 0L) return null // maximal activity within bound ⇒ always satisfied
-        var changed = false
-        val lifted = LongArray(n) { i ->
-            if (cap[i] > 0L && absA[i] > d) {
-                changed = true
-                d
-            } else {
-                absA[i]
-            }
-        }
-        if (!changed) return l
+        if (maxUnfixedMagnitude <= d) return l
         // New bound in z-space: Σ a̅'ⱼcⱼ − d, then de-shift each variable back to xⱼ.
-        var newBound = -d
-        for (i in 0 until n) newBound = addExact(newBound, mulExact(lifted[i], cap[i]))
         val newCoeffs = LongArray(n)
+        var newBound = -d
+        for (i in 0 until n) {
+            val a = if (negate) subExact(0L, row.coeff(i)) else row.coeff(i)
+            val v = l.vars[i]
+            val cap = subExact(ranges.max(v), ranges.min(v))
+            val magnitude = if (a < 0) subExact(0L, a) else a
+            val lifted = if (cap > 0L) minOf(magnitude, d) else magnitude
+            newCoeffs[i] = if (a >= 0) lifted else -lifted
+            newBound = addExact(newBound, mulExact(lifted, cap))
+        }
         for (i in 0 until n) {
             val v = l.vars[i]
-            if (coeffs[i] >= 0) {
-                newCoeffs[i] = lifted[i]
-                newBound = addExact(newBound, mulExact(lifted[i], ranges.min(v)))
+            val a = newCoeffs[i]
+            if (a >= 0) {
+                newBound = addExact(newBound, mulExact(a, ranges.min(v)))
             } else {
-                newCoeffs[i] = -lifted[i]
-                newBound = subExact(newBound, mulExact(lifted[i], ranges.max(v)))
+                newBound = subExact(newBound, mulExact(-a, ranges.max(v)))
             }
         }
         return Linear(newCoeffs, l.vars.copyOf(), LinearOp.LE, newBound)

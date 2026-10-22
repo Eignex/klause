@@ -207,7 +207,9 @@ Coefficient strengthening divides an integral row by its coefficient gcd and rou
 the bound inward; an indivisible equality refutes the source. Bounded integer
 inequalities can also clamp coefficient magnitudes against the complementary cover
 threshold. Magnitudes, shifts, widths and activities use checked arithmetic; an
-overflow declines the lift and retains any completed gcd reduction. Diophantine tightening
+overflow declines the lift and retains any completed gcd reduction. Activity and
+clamp eligibility are scanned without term-sized scratch; output arrays are allocated
+only when a nonfixed coefficient exceeds the threshold. Diophantine tightening
 restricts each coordinate of `sum(a_i * x_i) = b` to its implied residue class,
 narrowing bounds and, in finite state, carving off-class values.
 
