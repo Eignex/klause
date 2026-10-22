@@ -204,6 +204,9 @@ comparisons keep exact denominator-cleared thresholds.
 
 Integer conditionals (`ite` and decision lists) retain native `Element` relations
 over branch values when finite, sharing one choice index across wide digit columns.
+Choices between integer constants `0` and `1` instead use a direct signed Boolean
+equivalence to the result's true-branch value when its finite domain lies within
+`0..1`. This retains the branch relation without a separate choice index.
 A result with an open bound instead keeps guarded exact equalities to its branches.
 Affine real conditionals retain `RealElement`. Comparisons against a conditional
 can lower to Boolean tests of its branches when the branch images are small, and
