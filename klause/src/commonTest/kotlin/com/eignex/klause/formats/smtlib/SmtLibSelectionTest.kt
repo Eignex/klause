@@ -2,10 +2,12 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -86,8 +88,94 @@ class SmtLibSelectionTest {
 
         val result = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0))
 
-        assertEquals(2, parsed.model.factors.filterIsInstance<Element>().size)
+        assertEquals(0, parsed.model.factors.filterIsInstance<Element>().size)
         assertIs<SolveResult.Unsat>(result)
+    }
+
+    @Test
+    fun `adjacent constant conditionals should channel both signed guard branches`() {
+        for (lower in listOf(-2, 0)) for (positive in listOf(false, true)) for (reversed in listOf(false, true)) {
+            for (branch in listOf(false, true)) {
+                val whenTrue = if (reversed) lower + 1 else lower
+                val whenFalse = if (reversed) lower else lower + 1
+                val trueTerm = if (whenTrue < 0) "(- ${-whenTrue})" else "$whenTrue"
+                val falseTerm = if (whenFalse < 0) "(- ${-whenFalse})" else "$whenFalse"
+                val parsed = SmtLib.parse(
+                    """
+                    (declare-const b Bool) (declare-const r Real)
+                    (assert (= r (to_real (ite ${if (positive) "b" else "(not b)"}
+                        $trueTerm $falseTerm))))
+                    (assert ${if (branch) "b" else "(not b)"})
+                    """.trimIndent(),
+                )
+
+                val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0))
+
+                val assignment = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                assertEquals(branch, assignment.boolValue(parsed.boolVarNames.getValue("b")))
+                assertEquals(if (branch == positive) "$whenTrue" else "$whenFalse",
+                    assignment.realValue(parsed.realVarNames.getValue("r")))
+            }
+        }
+    }
+
+    @Test
+    fun `adjacent constant selections should retain only their value column`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const r Real)
+            (assert (= r (to_real (ite b 0 1))))
+            """.trimIndent(),
+        )
+
+        assertEquals(1, parsed.model.numIntVars)
+        assertTrue(parsed.model.factors.none { it is Element })
+    }
+
+    @Test
+    fun `nonadjacent constant selections should exclude values between their arms`() {
+        for ((whenTrue, whenFalse, between) in listOf(Triple(0, 2, 1), Triple(2, 0, 1),
+            Triple(-3, 0, -1), Triple(0, -3, -1))) {
+            val trueTerm = if (whenTrue < 0) "(- ${-whenTrue})" else "$whenTrue"
+            val falseTerm = if (whenFalse < 0) "(- ${-whenFalse})" else "$whenFalse"
+            val betweenTerm = if (between < 0) "(- ${-between})" else "$between"
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool) (declare-const r Real)
+                (assert (= r (to_real (ite b $trueTerm $falseTerm))))
+                (assert (= r $betweenTerm))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0))
+
+            assertIs<OpenTheoryResult.Unsat>(result, result.toString())
+        }
+    }
+
+    @Test
+    fun `adjacent extreme constant selections should preserve exact endpoints`() {
+        for (lower in listOf(Long.MIN_VALUE, Long.MAX_VALUE - 1L)) for (reversed in listOf(false, true)) {
+            for (branch in listOf(false, true)) {
+                val whenTrue = if (reversed) lower + 1L else lower
+                val whenFalse = if (reversed) lower else lower + 1L
+                val builder = Compiler.Builder(Long.MIN_VALUE, Long.MAX_VALUE, false)
+                val guard = builder.newBool()
+                val selected = builder.newInt(lower, lower + 1L)
+                builder.exclusiveIntegerSelection(selected, listOf(Lit.make(guard, true)),
+                    listOf(LinComb(emptyMap(), whenTrue)), LinComb(emptyMap(), whenFalse))
+                builder.factors.add(Clause(intArrayOf(Lit.make(guard, branch))))
+                val parsed = builder.build()
+
+                val result = BacktrackSolver(parsed.model.bake()).solve(
+                    BacktrackParams(randomSeed = 0),
+                )
+
+                val assignment = assertIs<SolveResult.Sat>(result, result.toString()).assignment
+                assertTrue(parsed.model.factors.any { it is Element })
+                assertEquals(if (branch) whenTrue else whenFalse, assignment.intValue(selected))
+            }
+        }
     }
 
     @Test
@@ -145,7 +233,7 @@ class SmtLibSelectionTest {
                     ${if (branch) "g" else "(not g)"}
             """.trimIndent()
             val live = SmtLib.parse("$source\n)))")
-            val parsed = SmtLib.parse("$source\n(= (ite g 7 8) ${if (branch) 7 else 8})\n)))")
+            val parsed = SmtLib.parse("$source\n(= (ite (and c b) 7 8) ${if (branch) 7 else 8})\n)))")
 
             val result = BacktrackSolver.source(parsed.model)
                 .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))

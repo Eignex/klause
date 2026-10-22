@@ -52,6 +52,7 @@ internal object Compiler {
         internal val intDomains = ArrayList<PresolveDomain>()
         internal val divModTerms = HashMap<SmtDivModKey, Pair<IntComb, IntComb>>()
         internal val realPredicates = SmtRealPredicates(sourceCancellation)
+        internal val booleanGates = SmtBooleanGates(sourceCancellation)
         internal val affineRealTables = SmtLibAffineRealTables(sourceCancellation)
 
         /** Open `ite`-on-equality chains and the equality atoms their conditions are read from. */
