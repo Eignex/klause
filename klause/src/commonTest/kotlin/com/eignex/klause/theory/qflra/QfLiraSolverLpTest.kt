@@ -67,6 +67,7 @@ class QfLiraSolverLpTest {
     @Test
     fun `recovered partial real points should guide unresolved guards`() {
         for (repairable in listOf(false, true)) {
+            val scale = 1.0 / (1L shl 40).toDouble()
             val source = Problem(
                 numBoolVars = 3,
                 intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
@@ -76,13 +77,13 @@ class QfLiraSolverLpTest {
                 factors = Array<Factor>(133) { index ->
                     when (index) {
                         0 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
-                            doubleArrayOf(1.0, -1.0, -1.0), LinearOp.EQ, 0.0)
+                            doubleArrayOf(1.0, -scale, -1.0), LinearOp.EQ, 0.0)
                         1 -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
-                            doubleArrayOf(1.0, 1.0), LinearOp.LE, 0.5)
-                        2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 3),
-                            doubleArrayOf(-1.0, -1.0, -1.0), LinearOp.LE, -0.25)
-                        3 -> ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 3),
-                            doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)
+                            doubleArrayOf(1.0, 1.0), LinearOp.LE, scale / 2.0)
+                        2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                            doubleArrayOf(-1.0, -1.0), LinearOp.LE, -scale / 4.0)
+                        3 -> ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                            doubleArrayOf(1.0, 1.0), LinearOp.LE, 0.0)
                         else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index),
                             doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
                     }
@@ -116,7 +117,7 @@ class QfLiraSolverLpTest {
                 assertTrue(withheld > 0)
                 assertEquals(false, hints.preferredBool(2))
                 assertTrue((stats.snapshot().completeSearchStages?.get("PARTIAL_SOURCE_POINT") ?: 0L) > 0L,
-                    stats.snapshot().completeSearchStages.toString())
+                    "repairable=$repairable ${stats.snapshot().completeSearchStages}")
                 if (repairable) assertEquals(0L, stats.snapshot().sourceLp.operations)
                 assertNull(session.model().valueOf(component.assignmentKey))
             }
