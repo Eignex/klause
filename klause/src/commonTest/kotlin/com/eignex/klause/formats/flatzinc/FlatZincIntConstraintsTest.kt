@@ -17,6 +17,29 @@ import kotlin.test.assertNotNull
 
 class FlatZincIntConstraintsTest {
     @Test
+    fun `equal pipe lengths should retain independent scaled cost slack`() {
+        val program = parseFlatZinc(
+            """
+            var 12811..12811: length_a;
+            var 12811..12811: length_b;
+            var 0..1000000000: scaled_a;
+            var 0..1000000000: scaled_b;
+            var 910..910: cost_a;
+            var 1050..1050: cost_b;
+            constraint int_lin_le([1,-1000], [length_a,scaled_a], 0);
+            constraint int_lin_eq([1,-70], [cost_a,scaled_a], 0);
+            constraint int_lin_le([1,-1000], [length_b,scaled_b], 0);
+            constraint int_lin_eq([1,-70], [cost_b,scaled_b], 0);
+            solve satisfy;
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+        assertIs<SolveResult.Sat>(result)
+    }
+
+    @Test
     fun `wide all different predicates should retain their global relation`() {
         for (predicate in listOf("all_different_int", "alldifferent_except_0")) {
             val program = parseFlatZinc(
