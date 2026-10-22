@@ -151,6 +151,7 @@ object Presolver {
         if (passes.isEmpty() || config.maxRounds == 0) return SourcePresolved(problem)
         val ctx = context.withCancellation(cancellation)
             .withPresolveBudget(context.presolveBudget)
+            .withSubsumeIncremental(SubsumeMemo())
         val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
 
