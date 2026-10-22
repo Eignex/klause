@@ -148,6 +148,11 @@ A complete Boolean state still runs the full source-point validator before model
 acceptance. Eager guidance retains its existing preference array and owned numerical
 point; indexed guidance reuses its bounded snapshot. Both keep the same storage
 envelope.
+When that envelope has room for another real vector, a recovered point can remain
+as an untrusted numerical guess across retraction and restart. After a float optimum
+without an exact point, every currently selected original row must accept the guess
+under the current operation allowance before it can supply fresh guidance. Releasing
+the hint workspace discards the guess.
 
 ### Results and proof authority
 

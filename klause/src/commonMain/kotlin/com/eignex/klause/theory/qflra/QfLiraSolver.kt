@@ -226,6 +226,8 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintValues: IntArray? = null
     private var pointHintIndex: IntArray? = null
     private var pointHintPoint: List<BigFraction>? = null
+    private var recoveryGuessEnabled = false
+    private var recoveryGuess: List<BigFraction>? = null
     private var pointReuseEnabled = false
     private var pointReusePoint: List<BigFraction>? = null
     private var pointReuseHintValues: IntArray? = null
@@ -380,6 +382,7 @@ class ExactLiraSearchComponent private constructor(
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
         pointReuseEnabled = reusable
+        recoveryGuessEnabled = reusable && entries + model.numRealVars <= MAX_POINT_HINT_ENTRIES
         pointHintIndex = null
         pointHintPoint = null
         pointHintStop = stop
@@ -444,6 +447,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintPoint = null
         pointHintIndex = index
         pointReuseEnabled = reusable
+        recoveryGuessEnabled = reusable && 2L * model.numBoolVars + 2L * model.numRealVars <= MAX_POINT_HINT_ENTRIES
         pointHintStop = stop
         return variables to pointHintProvider(defaultOpening = true, defaultGraphSelections)
     }
@@ -537,6 +541,8 @@ class ExactLiraSearchComponent private constructor(
     internal fun releasePartialPointHints() {
         retirePointReuse()
         pointReuseEnabled = false
+        recoveryGuessEnabled = false
+        recoveryGuess = null
         defaultDisjunctionHints = false
         pointHintRows = null
         pointHintValues = null
@@ -1497,6 +1503,14 @@ class ExactLiraSearchComponent private constructor(
         val rows = agreementSourceRows(context, origins) ?: return null
         lpStop.charge(rows.size.toLong())
         if (operationStop() || rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
+        val guess = recoveryGuess
+        if (recoveryGuessEnabled && !pointHintStop() && guess != null && guess.size == model.numRealVars &&
+            MixedPointArithmetic(lpStop).satisfies(guess, rows) && !pointHintStop()
+        ) {
+            candidate = guess
+            observeCompleteStage("RECOVERY_GUESS_ACCEPTED")
+            return null
+        }
         var sourceInfeasible: IntArray? = null
         val reportInfeasible: ((IntArray) -> Unit)? = if (origins == null) null else { support ->
             sourceInfeasible = support
@@ -1509,6 +1523,7 @@ class ExactLiraSearchComponent private constructor(
             })
         if (point != null && !operationStop()) {
             candidate = point
+            if (recoveryGuessEnabled && !pointHintStop()) recoveryGuess = point
             observeCompleteStage("PARTIAL_SOURCE_POINT")
             return null
         }

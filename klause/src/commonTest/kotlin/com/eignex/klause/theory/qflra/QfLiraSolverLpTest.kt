@@ -120,6 +120,25 @@ class QfLiraSolverLpTest {
                     "repairable=$repairable ${stats.snapshot().completeSearchStages}")
                 if (repairable) assertEquals(0L, stats.snapshot().sourceLp.operations)
                 assertNull(session.model().valueOf(component.assignmentKey))
+                val operations = stats.snapshot().sourceLp.operations
+                val reused = stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED") ?: 0L
+                session.popTo(1)
+                assertNull(hints.preferredBool(2))
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+                assertEquals(false, hints.preferredBool(2))
+                assertEquals(operations, stats.snapshot().sourceLp.operations)
+                assertEquals(reused + 1L, stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED"))
+                session.popTo(1)
+                assertNull(hints.preferredBool(2))
+                repairableGuess = false
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+                assertEquals(true, hints.preferredBool(2))
+                assertEquals(reused + 1L, stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED"))
+                assertNull(session.model().valueOf(component.assignmentKey))
             }
         }
     }
