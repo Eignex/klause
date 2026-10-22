@@ -387,7 +387,9 @@ pure-real models with an empty integer tail:
    Before the LP call, parallel residual inequalities are
    divided by the positive magnitude of their first nonzero coefficient and
    merged to the strongest bound, retaining strictness at equal endpoints.
-   Opposite directions remain separate. Completion keeps the existing LP limits
+   Opposite bounds with an empty interval certify a conflict from their two
+   original rows before an LP call. Other opposite directions remain separate.
+   Completion keeps the existing LP limits
    and is attempted only up to 65,536 row entries; every original residual row
    checks the assembled point.
 

@@ -78,6 +78,14 @@ internal fun completeMixedRealComponents(
             val reduced = mergeParallelRealRows(localRows, stop)
                 ?: MixedRealRows(localRows, IntArray(localRows.size) { it })
             if (stop()) return null
+            val conflict = reduced.infeasibleRows
+            if (conflict != null) {
+                stop.charge(conflict.size.toLong())
+                if (stop()) return null
+                onStage?.invoke("RECOVERY_REAL_COMPONENT_PARALLEL_CONFLICT")
+                if (!stop()) onInfeasible?.invoke(IntArray(conflict.size) { selected[conflict[it]] })
+                return null
+            }
             onStage?.invoke("RECOVERY_REAL_COMPONENT_ROWS_${localRows.size}_${reduced.rows.size}")
             if (!budget.admitsDimensions(component.size, reduced.rows.size.toLong())) {
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_DIMENSION")
@@ -109,7 +117,11 @@ internal fun completeMixedRealComponents(
         ?.also { onStage?.invoke("RECOVERY_REAL_COMPONENTS_POINT") }
 }
 
-private class MixedRealRows(val rows: List<ExactRationalInequality>, val origins: IntArray)
+private class MixedRealRows(
+    val rows: List<ExactRationalInequality>,
+    val origins: IntArray,
+    val infeasibleRows: IntArray? = null,
+)
 
 private fun mergeParallelRealRows(
     rows: List<ExactRationalInequality>,
@@ -141,6 +153,18 @@ private fun mergeParallelRealRows(
             strongest[activity] = IndexedValue(rowIndex, ExactRationalInequality(
                 activity.map { it.first }.toIntArray(), activity.map { it.second }, rhs, row.strict,
             ))
+        }
+        stop.charge(activity.size.toLong() + 1L)
+        if (stop()) return null
+        val opposite = strongest[activity.map { (column, coefficient) -> column to coefficient.negated() }]
+        if (opposite != null) {
+            val upper = strongest.getValue(activity)
+            if (!arithmetic.preflight(upper.value.rhs, opposite.value.rhs)) return null
+            val gap = upper.value.rhs + opposite.value.rhs
+            if (!arithmetic.admitted(gap)) return null
+            if (gap < BigFraction.ZERO || (gap.isZero && (upper.value.strict || opposite.value.strict))) {
+                return MixedRealRows(emptyList(), intArrayOf(), intArrayOf(upper.index, opposite.index))
+            }
         }
     }
     stop.charge(2L * strongest.size)

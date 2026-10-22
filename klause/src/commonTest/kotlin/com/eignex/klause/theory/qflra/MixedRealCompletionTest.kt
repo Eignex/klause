@@ -13,6 +13,28 @@ import kotlin.test.assertTrue
 
 class MixedRealCompletionTest {
     @Test
+    fun `parallel residual conflicts should avoid recovery LP operations`() {
+        for (strict in listOf(false, true)) {
+            for (reverse in listOf(false, true)) {
+                val upper = ExactRationalInequality(intArrayOf(0, 1, 2),
+                    List(3) { BigFraction.ofLong(2) }, if (strict) BigFraction.ofLong(2) else BigFraction.ZERO, strict)
+                val lower = ExactRationalInequality(intArrayOf(0, 1, 2),
+                    List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE)
+                val rows = if (reverse) listOf(lower, upper) else listOf(upper, lower)
+                val budget = SourceLpBudget(maxOperations = 0)
+                var support: IntArray? = null
+
+                val point = completeMixedRealComponents(3, rows, budget, Cancellation.Never,
+                    onInfeasible = { support = it })
+
+                assertNull(point)
+                assertEquals(setOf(0, 1), assertNotNull(support).toSet())
+                assertEquals(0, budget.operations)
+            }
+        }
+    }
+
+    @Test
     fun `certified residual conflicts should cite their original strongest rows`() {
         for (strict in listOf(false, true)) {
             val rows = List(127) {
@@ -21,7 +43,8 @@ class MixedRealCompletionTest {
                 ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ONE),
                 ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ofLong(2) },
                     if (strict) BigFraction.ofLong(2) else BigFraction.ZERO, strict),
-                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+                ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+                ExactRationalInequality(intArrayOf(2), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
             )
             var support: IntArray? = null
 
@@ -29,26 +52,32 @@ class MixedRealCompletionTest {
                 onInfeasible = { support = it })
 
             assertNull(point)
-            assertEquals(setOf(128, 129), assertNotNull(support).toSet())
+            assertEquals(setOf(128, 129, 130), assertNotNull(support).toSet())
         }
     }
 
     @Test
     fun `cancelled residual conflicts should withhold support`() {
-        val rows = listOf(
-            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
-            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
-        )
-        var stopped = false
-        var support: IntArray? = null
+        for (parallel in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+                ExactRationalInequality(if (parallel) intArrayOf(0, 1, 2) else intArrayOf(0, 1),
+                    List(if (parallel) 3 else 2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+                ExactRationalInequality(intArrayOf(2), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            )
+            var stopped = false
+            var support: IntArray? = null
+            val cancelledStage = if (parallel) "RECOVERY_REAL_COMPONENT_PARALLEL_CONFLICT"
+                else "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE"
 
-        val point = completeMixedRealComponents(3, rows, SourceLpBudget(), Cancellation { stopped },
-            onStage = { if (it == "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE") stopped = true },
-            onInfeasible = { support = it })
+            val point = completeMixedRealComponents(3, rows, SourceLpBudget(), Cancellation { stopped },
+                onStage = { if (it == cancelledStage) stopped = true },
+                onInfeasible = { support = it })
 
-        assertTrue(stopped)
-        assertNull(point)
-        assertNull(support)
+            assertTrue(stopped)
+            assertNull(point)
+            assertNull(support)
+        }
     }
 
     @Test

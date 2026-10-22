@@ -190,57 +190,69 @@ class MixedPointCompletionTest {
     @Test
     fun `residual LP conflicts should retain equality derivation premises`() {
         for (strict in listOf(false, true)) {
-            val rows = listOf(
-                exactColumnUpper(4, BigFraction.ONE),
-                ExactRationalInequality(intArrayOf(0, 1, 2),
-                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
-                ExactRationalInequality(intArrayOf(0, 1, 2),
-                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
-                ExactRationalInequality(intArrayOf(0, 3), List(2) { BigFraction.ONE },
-                    if (strict) BigFraction.ONE else BigFraction.ZERO, strict),
-                ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
-            )
-            val budget = SourceLpBudget()
-            var support: IntArray? = null
+            for (parallel in listOf(false, true)) {
+                val lower = if (parallel) intArrayOf(1, 2, 3) else intArrayOf(1, 2)
+                val rows = listOf(
+                    exactColumnUpper(4, BigFraction.ONE),
+                    ExactRationalInequality(intArrayOf(0, 1, 2),
+                        listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                    ExactRationalInequality(intArrayOf(0, 1, 2),
+                        listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+                    ExactRationalInequality(intArrayOf(0, 3), List(2) { BigFraction.ONE },
+                        if (strict) BigFraction.ONE else BigFraction.ZERO, strict),
+                    ExactRationalInequality(lower, List(lower.size) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+                    exactColumnLower(3, BigFraction.ZERO),
+                )
+                val budget = SourceLpBudget()
+                var support: IntArray? = null
 
-            val point = completeMixedPoint(5, 0, DoubleArray(5), rows, Cancellation.Never,
-                onSourceInfeasible = { support = it },
-                realCompletion = { columns, residual, stop, onInfeasible ->
-                    completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
-                })
+                val point = completeMixedPoint(5, 0, DoubleArray(5), rows, Cancellation.Never,
+                    onSourceInfeasible = { support = it },
+                    realCompletion = { columns, residual, stop, onInfeasible ->
+                        completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
+                    })
 
-            assertNull(point)
-            assertEquals(setOf(1, 2, 3, 4), assertNotNull(support).toSet())
+                assertNull(point)
+                assertEquals((1..if (parallel) 4 else 5).toSet(), assertNotNull(support).toSet())
+                assertEquals(parallel, budget.operations == 0)
+            }
         }
     }
 
     @Test
     fun `residual LP conflicts after integer guesses should withhold source refutation`() {
-        val rows = listOf(
-            ExactRationalInequality(intArrayOf(0, 1, 2),
-                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
-            ExactRationalInequality(intArrayOf(0, 1, 2),
-                listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
-            ExactRationalInequality(intArrayOf(0, 3), List(2) { BigFraction.ONE }, BigFraction.ZERO),
-            ExactRationalInequality(intArrayOf(1, 2, 3, 4), List(4) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
-        )
-        val budget = SourceLpBudget()
-        var sourceInfeasible = false
-        var residualInfeasible = false
+        for (parallel in listOf(false, true)) {
+            val lower = if (parallel) intArrayOf(1, 2, 3, 4) else intArrayOf(1, 2, 4)
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 3), List(2) { BigFraction.ONE }, BigFraction.ZERO),
+                ExactRationalInequality(lower, List(lower.size) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+                exactColumnLower(3, BigFraction.ZERO),
+            )
+            val budget = SourceLpBudget()
+            var sourceInfeasible = false
+            var residualInfeasible = false
+            val infeasibleStage = if (parallel) "RECOVERY_REAL_COMPONENT_PARALLEL_CONFLICT"
+                else "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE"
 
-        val point = completeMixedPoint(4, 1, DoubleArray(5), rows, Cancellation.Never,
-            onSourceInfeasible = { sourceInfeasible = true },
-            realCompletion = { columns, residual, stop, onInfeasible ->
-                completeMixedRealComponents(columns, residual, budget, stop,
-                    onStage = { if (it == "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE") residualInfeasible = true },
-                    onInfeasible = onInfeasible)
-            })
+            val point = completeMixedPoint(4, 1, DoubleArray(5), rows, Cancellation.Never,
+                onSourceInfeasible = { sourceInfeasible = true },
+                realCompletion = { columns, residual, stop, onInfeasible ->
+                    completeMixedRealComponents(columns, residual, budget, stop,
+                        onStage = { if (it == infeasibleStage) residualInfeasible = true },
+                        onInfeasible = onInfeasible)
+                })
 
-        assertTrue(residualInfeasible)
-        assertNull(point)
-        assertFalse(sourceInfeasible)
-        assertTrue(listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE)
-            .satisfiesSourceRows(rows))
+            assertTrue(residualInfeasible)
+            assertNull(point)
+            assertFalse(sourceInfeasible)
+            assertEquals(parallel, budget.operations == 0)
+            assertTrue(listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE)
+                .satisfiesSourceRows(rows))
+        }
     }
 
     @Test
