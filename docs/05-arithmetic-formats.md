@@ -212,7 +212,13 @@ Choices between integer constants `0` and `1` instead use a direct signed Boolea
 equivalence to the result's true-branch value when its finite domain lies within
 `0..1`. This retains the branch relation without a separate choice index.
 A result with an open bound instead keeps guarded exact equalities to its branches.
-Affine real conditionals retain `RealElement`. Comparisons against a conditional
+Affine real conditionals use a real result and signed Boolean implications to exact
+equalities with each arm. They require no integer selector or real arm column.
+Hard unit-weight counts of distinct Boolean indicators retain `Cardinality` when
+their threshold lies within the count's range. Signed guards and opposite `0`/`1`
+arms keep their polarity; repeated guards and other arithmetic retain exact integer
+rows. Numeric observations keep any conditional definitions they still need.
+Comparisons against a conditional
 can lower to Boolean tests of its branches when the branch images are small, and
 definitions no surviving constraint needs are dropped after a dependency fixpoint.
 For up to eight Boolean inputs, a scalar defined by consistent, complete cases also

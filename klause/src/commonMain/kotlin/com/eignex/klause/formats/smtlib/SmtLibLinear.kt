@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
@@ -8,6 +9,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.LinRelation
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.addExact
 import com.eignex.klause.lowering.constRelationHolds
 import com.eignex.klause.lowering.intCombDiff
@@ -62,9 +64,34 @@ private fun Compiler.Builder.postOrderChain(op: String, terms: List<IntComb>): B
 internal fun Compiler.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) {
     if (vars.isEmpty()) {
         if (!constRelationHolds(op, bound)) forceTrue(Lit.negate(trueLit()))
-    } else {
+    } else if (!assertIndicatorCardinality(coeffs, vars, op, bound)) {
         factors.add(Linear(coeffs, vars, op, bound))
     }
+}
+
+private fun Compiler.Builder.assertIndicatorCardinality(
+    coeffs: LongArray,
+    vars: IntArray,
+    op: LinearOp,
+    bound: Long,
+): Boolean {
+    if ((op != LinearOp.LE && op != LinearOp.GE && op != LinearOp.EQ) || bound !in 0L..vars.size.toLong()) {
+        return false
+    }
+    val literals = IntArray(vars.size)
+    val variables = HashSet<Int>()
+    for (index in vars.indices) {
+        sourceCancellation.charge(1L)
+        if (sourceCancellation()) throw PolynomialSourceInterrupted()
+        if (coeffs[index] != 1L) return false
+        val literal = conditionalEqualities.indicatorLiteral(vars[index]) ?: return false
+        if (!variables.add(Lit.variable(literal))) return false
+        literals[index] = literal
+    }
+    if (sourceCancellation()) throw PolynomialSourceInterrupted()
+    factors.add(Cardinality(literals, if (op == LinearOp.LE) 0 else bound.toInt(),
+        if (op == LinearOp.GE) vars.size else bound.toInt()))
+    return true
 }
 
 /** Assert `a ⟨op⟩ b` (an SMT relation operator) as a hard linear row, lowering to a wide [Linear]

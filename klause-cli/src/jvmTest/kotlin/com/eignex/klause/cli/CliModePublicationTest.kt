@@ -1,6 +1,10 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -13,6 +17,8 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
@@ -145,6 +151,7 @@ class CliModePublicationTest {
             engine = "cp"
             parallel = 1
             randomSeed = 17
+            presolve = "off"
         }
         val session = SmtLibMode.newSession()
         val expected = CancellationException("consumer cancelled")
@@ -160,14 +167,24 @@ class CliModePublicationTest {
             override fun onVerdictContext(context: VerdictContext) {
                 terminal = true
             }
-            override fun onComplete(verdict: Verdict) = error("cancelled publication cannot emit a terminal claim")
+            override fun onComplete(verdict: Verdict) = error("unexpected terminal $verdict after $values")
         }
 
         try {
+            val solvable = session.load(source.absolutePath, common)
+            val controls = SourceExecutionRequest(
+                assertNotNull(solvable.sourceInvocation),
+                polynomial = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+                    backtrack = BacktrackParams(randomSeed = 17, variableSelector = InputOrder,
+                        valueSelector = IndomainMax),
+                )),
+                presolveConfig = PresolveConfig.parse("off"),
+            )
             assertSame(
                 expected,
                 assertFailsWith<CancellationException> {
-                    SolveCore.solve(session.load(source.absolutePath, common), common, output)
+                    solveCapturedSource(solvable, assertIs<SourceRendering.ExactSource>(solvable.rendering),
+                        common, output, ArithmeticPublication(output), controls) { false }
                 },
             )
         } finally {

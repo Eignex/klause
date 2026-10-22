@@ -3,7 +3,6 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
-import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -72,22 +71,10 @@ internal fun Compiler.Builder.realSelection(condition: Int, whenTrue: RealComb, 
         if (condition == trueLitCache) return whenTrue
         if (condition == Lit.negate(trueLitCache)) return whenFalse
     }
-    val entries = intArrayOf(selectionRealColumn(whenFalse), selectionRealColumn(whenTrue))
-    val index = selectionIndex(listOf(condition))
-    val result = nextReal++
-    factors.add(RealElement(index, result, entries, indexOffset = 0))
-    return RealComb(emptyMap(), mapOf(result to BigFraction.ONE), BigFraction.ZERO)
-}
-
-private fun Compiler.Builder.selectionRealColumn(term: RealComb): Int {
-    if (term.intCoeffs.isEmpty() && term.realCoeffs.size == 1 && term.constant.isZero) {
-        val entry = term.realCoeffs.entries.single()
-        if (entry.value == BigFraction.ONE) return entry.key
-    }
-    val column = nextReal++
-    val result = RealComb(emptyMap(), mapOf(column to BigFraction.ONE), BigFraction.ZERO)
-    factors.add(realRow(result.plus(term.scaled(BigFraction.MINUS_ONE)), LinearOp.EQ))
-    return column
+    val result = RealComb(emptyMap(), mapOf(nextReal++ to BigFraction.ONE), BigFraction.ZERO)
+    factors.add(Clause(intArrayOf(Lit.negate(condition), reifyRealRel("=", result, whenTrue))))
+    factors.add(Clause(intArrayOf(condition, reifyRealRel("=", result, whenFalse))))
+    return result
 }
 
 internal fun Compiler.Builder.wideIntegerSelection(
