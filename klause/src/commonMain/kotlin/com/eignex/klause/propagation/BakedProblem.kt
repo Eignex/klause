@@ -18,7 +18,7 @@ import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 /**
- * A `Problem` whose root bake is guaranteed to have run, and the only problem type that owns finite
+ * A `Problem` whose root deductions are established by propagation or presolve, and the only type that owns finite
  * search domains: [rootIntDomain] carries the root-propagation fold for every integer column, which is what
  * the finite engines, the model counter, sampling and the LP engine branch and propagate over. Produced
  * only by `Problem.bake` (or the presolve pipeline). A raw `Problem` is the supertype, so handing an
@@ -61,6 +61,7 @@ class BakedProblem private constructor(
     internal val projectionProviders: FactorProjectionProviders?,
     private val projectionSelection: ((Problem) -> PreparedFactorProjections)?,
     semantics: EffectiveSourceSemantics,
+    trustedRootDeductions: PropagationResult? = null,
 ) : Problem(
     settings = settings,
     semantics = semantics,
@@ -87,7 +88,7 @@ class BakedProblem private constructor(
     }
 
     /** Deductions established while constructing this propagation projection. */
-    internal val rootDeductions: PropagationResult = rootBake(this, seedDeductions, cancellation)
+    internal val rootDeductions: PropagationResult = trustedRootDeductions ?: rootBake(this, seedDeductions, cancellation)
 
     /** Time spent building and folding this propagation projection. */
     val bakeElapsed: Duration
@@ -226,4 +227,41 @@ class BakedProblem private constructor(
         projectionProviders = projectionProviders,
         projectionSelection = projectionSelection,
     )
+
+    internal companion object {
+        // Only for presolve's established root state: domains carry integer deductions and the result
+        // carries captured Boolean pins or a root conflict, including after their defining factors drop.
+        fun fromPresolvedRoot(
+            base: BakedProblem,
+            domains: Array<IntDomain>,
+            factors: List<Factor>,
+            deductions: PropagationResult,
+            cancellation: Cancellation,
+        ): BakedProblem = BakedProblem(
+            numBoolVars = base.numBoolVars,
+            numIntVars = base.numIntVars,
+            foldedIntDomains = domains,
+            alreadyFolded = true,
+            factors = factors.toTypedArray(),
+            seedDeductions = PropagationResult.Implied.EMPTY,
+            impliedFactorMask = null,
+            hasSymmetryBreaking = base.hasSymmetryBreaking,
+            numRealVars = base.numRealVars,
+            realLower = base.realLower,
+            realUpper = base.realUpper,
+            openIntLo = null,
+            openIntHi = null,
+            packedOpenIntLo = base.intBounds.openLowerBits,
+            packedOpenIntHi = base.intBounds.openUpperBits,
+            modelBounds = null,
+            cancellation = cancellation,
+            settings = base.settings,
+            projectionProviders = base.projectionProviders,
+            projectionSelection = base.factorProjections?.let { captured ->
+                { view -> captured.forEngineView(view) }
+            },
+            semantics = base.semantics,
+            trustedRootDeductions = deductions,
+        )
+    }
 }

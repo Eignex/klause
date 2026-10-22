@@ -130,6 +130,11 @@ fresh `BakedProblem`, so deadlines, meters and the pre-bake span gate keep their
 scope across rebuilds and reseeds. A fired token skips root-probe phases and stops
 propagation at its polling boundaries; partial propagation is sound but can forgo
 deductions. Cancellation is cooperative, and probe caps do not bound wall time.
+Incremental finite sessions expose their established domains, captured Boolean pins
+and root conflicts through a trusted root view, without another propagation bake.
+Every nonempty delta invalidates that view's captured deductions. Final materialization uses
+the same path unless optional probing requires a fresh bake over the live factors;
+an established conflict needs no probing.
 Finite probing and implication harvesting retain the pass token, including its
 native-work meter. Value precedence uses that token throughout value-orbit
 discovery and stops posting chains when it fires.

@@ -277,6 +277,7 @@ internal class PresolveSession(
      * (a conflict on a pushed narrowing or during re-propagation); the session latches [infeasible].
      */
     fun apply(delta: PresolveDelta): Boolean {
+        if (!delta.isEmpty) inputDirty = true
         updateEntryUnits(delta.droppedIds, delta.addedFactors)
         if (!infeasible) snapshotFeasibleDomains()
         if (delta.droppedIds.isNotEmpty() || delta.addedFactors.isNotEmpty()) occDirty = true
@@ -358,30 +359,16 @@ internal class PresolveSession(
             }
         }
         liveIds = ids.toIntArray()
-        val input = BakedProblem(
-            settings = base.settings,
-            semantics = base.semantics,
-            numBoolVars = base.numBoolVars,
-            numIntVars = base.numIntVars,
+        val input = BakedProblem.fromPresolvedRoot(
+            base = base,
             // Once infeasible, expose the pre-conflict domains, not the partially-tightened live ones a
             // conflicted re-propagation left, as a from-scratch rebuild (fold skipped on an Unsat bake) would.
             // While feasible, share the state's live domain array directly: an alreadyFolded view never
             // copies it, and a pass reads it only within one firing.
-            intDomains = if (infeasible) lastFeasibleDomains else state.intDomains,
+            domains = if (infeasible) lastFeasibleDomains else state.intDomains,
             factors = live,
-            seedDeductions = boolFixings(),
-            alreadyFolded = true,
+            deductions = if (infeasible) PropagationResult.Unsat() else boolFixings(),
             cancellation = cancellation,
-            numRealVars = base.numRealVars,
-            realLower = base.realLower,
-            realUpper = base.realUpper,
-            // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
-            packedOpenIntLo = base.intBounds.openLowerBits,
-            packedOpenIntHi = base.intBounds.openUpperBits,
-            projectionProviders = base.projectionProviders,
-            projectionSelection = base.factorProjections?.let { captured ->
-                { view -> captured.forEngineView(view) }
-            },
         )
         cachedInput = input
         inputDirty = false
@@ -438,16 +425,7 @@ internal class PresolveSession(
             inputDirty = true
             return reseedFromDelta(stableDropped, delta.addedFactors, delta.domains)
         }
-        val wasInfeasible = infeasible
-        val result = apply(PresolveDelta(stableDropped, delta.addedFactors, delta.domains))
-        // The cached [passInput] view aliases the live factor list and the shared [state.intDomains] array,
-        // so a domains-only narrowing (which mutates that array in place) leaves it valid. Invalidate only
-        // when the factor set changed — the live list and [liveIds] must be rebuilt — or when feasibility
-        // flipped, since [passInput] then swaps to [lastFeasibleDomains].
-        if (delta.droppedIndices.isNotEmpty() || delta.addedFactors.isNotEmpty() || infeasible != wasInfeasible) {
-            inputDirty = true
-        }
-        return result
+        return apply(PresolveDelta(stableDropped, delta.addedFactors, delta.domains))
     }
 
     /** Whether [domains] widens any variable past the live state — a value the state currently excludes
@@ -519,14 +497,12 @@ internal class PresolveSession(
     /** Materialize the final solver problem once: the live factors and the tightened int domains. On
      *  infeasibility the pre-conflict [lastFeasibleDomains] are used; otherwise the state's folded domains.
      *
-     *  With no root-bake probing enabled the state domains are already the greatest fixpoint, so the result
-     *  is an already-folded [BakedProblem] whose `baked` stays lazy until solve time; the session's own
-     *  [infeasible] flag surfaces infeasibility without forcing that bake. When probing is enabled it must be
-     *  re-derived over the final factor set (a [RootBaker.reseed] the already-folded view would skip), so the
-     *  eager rebuild path is taken. */
+     *  With no root-bake probing enabled the result carries the established domains, Boolean fixings
+     *  and infeasibility without another root bake. Probing requires an eager rebuild over the final
+     *  factor set (a [RootBaker.reseed] the already-folded view would skip), unless already infeasible. */
     fun materialize(): BakedProblem {
         val domains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] }
-        if (bakeConfig.anyEnabled) {
+        if (bakeConfig.anyEnabled && !infeasible) {
             return PresolveShared.rebuildProblem(
                 stateProblem,
                 liveFactors(),
@@ -536,26 +512,12 @@ internal class PresolveSession(
                 cancellation = cancellation,
             )
         }
-        return BakedProblem(
-            settings = base.settings,
-            semantics = base.semantics,
-            numBoolVars = base.numBoolVars,
-            numIntVars = base.numIntVars,
-            intDomains = domains,
+        return BakedProblem.fromPresolvedRoot(
+            base = base,
+            domains = domains,
             factors = liveFactors(),
-            seedDeductions = boolFixings(),
-            alreadyFolded = true,
+            deductions = if (infeasible) PropagationResult.Unsat() else boolFixings(),
             cancellation = cancellation,
-            numRealVars = base.numRealVars,
-            realLower = base.realLower,
-            realUpper = base.realUpper,
-            // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
-            packedOpenIntLo = base.intBounds.openLowerBits,
-            packedOpenIntHi = base.intBounds.openUpperBits,
-            projectionProviders = base.projectionProviders,
-            projectionSelection = base.factorProjections?.let { captured ->
-                { view -> captured.forEngineView(view) }
-            },
         )
     }
 }
