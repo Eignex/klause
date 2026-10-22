@@ -239,8 +239,8 @@ enum class PresolvePass(
      *  indicators — into one [com.eignex.klause.factor.arithmetic.ComparisonClause], dropping the
      *  indicator definitions and rebuilding their truth from the comparisons. The XCSP3 front-end emits
      *  the clause directly; this catches the reified form other front-ends produce. Finite preparation
-     *  leaves clauses over `{0, 1}` columns to the Boolean lane unless the pass is enabled explicitly; see
-     *  [PresolveConfig.keepsBinaryComparisons].
+     *  leaves clauses over the `{0, 1}` columns binary-column substitution converts to the Boolean lane
+     *  unless the pass is enabled explicitly; see [PresolveConfig.keepsBinaryComparisons].
      *  Not solution-set preserving (the dropped indicators are left
      *  unconstrained, like affine elimination), so it is gated off under `-a` / `-n N>1`. */
     FOLD_COMPARISON_CLAUSES(
@@ -252,13 +252,13 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.foldSourceComparisonClauses(
-            problem, ctx.objectiveBoolVars, ctx.cancellation, ctx.keepBinaryComparisons,
+            problem, ctx.objectiveBoolVars, ctx.cancellation, ctx.keepBinaryComparisons, ctx.objectiveIntVars,
         )
 
         // Root propagation fixes columns the declarations leave free, and a fixed column is what lets a
         // multi-term row reduce to a single-variable comparison.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.foldComparisonClauses(
-            problem, ctx.objectiveBoolVars, ctx.cancellation, ctx.keepBinaryComparisons,
+            problem, ctx.objectiveBoolVars, ctx.cancellation, ctx.keepBinaryComparisons, ctx.objectiveIntVars,
         )
     },
 

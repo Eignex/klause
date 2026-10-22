@@ -9,7 +9,6 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
@@ -73,29 +72,14 @@ internal object BinaryColumnSubstitution {
      */
     fun substitute(problem: BakedProblem, objectiveIntVars: Set<Int>, bakeConfig: BakeConfig): Substitution? {
         val numInts = problem.numIntVars
-        if (numInts == 0) return null
         val factors = problem.factors
-        val substitutable = BooleanArray(numInts)
-        var anyColumn = false
-        for (v in 0 until numInts) {
-            if (!problem.rootIntDomain(v).isBinary() || v in objectiveIntVars) continue
-            substitutable[v] = true
-            anyColumn = true
-        }
-        if (!anyColumn) return null
-
-        // The `≥`-form right-hand side of each row after positive-weight normalisation, computed once here
-        // and reused by the rewrite; `null` marks a factor that cannot become a pseudo-Boolean relation.
-        val rows = Array(factors.size) { factors[it].equivalentLinear() }
-        val channels = IntArray(factors.size) { factors[it].binaryChannelLiteral() }
-        val normalizedBound = arrayOfNulls<Long>(factors.size)
-        for (i in factors.indices) {
-            val row = rows[i]
-            if (row != null) normalizedBound[i] = normalizedBound(row)
-            if (channels[i] != Lit.NONE) normalizedBound[i] = 0L
-        }
-        val occurrence = intOccurrence(problem)
-        disqualifyToFixpoint(problem, substitutable, normalizedBound, occurrence)
+        val eligibility = eligibility(factors, numInts, ColumnRanges.of(problem.rootIntDomainsInPlace), objectiveIntVars)
+            ?: return null
+        val substitutable = eligibility.substitutable
+        val rows = eligibility.rows
+        val channels = eligibility.channels
+        val normalizedBound = eligibility.normalizedBound
+        val occurrence = eligibility.occurrence
 
         // A column no factor mentions gains nothing from a literal (and would leave the Boolean free), so
         // only the columns some surviving row still reads are substituted.
@@ -147,6 +131,49 @@ internal object BinaryColumnSubstitution {
         return Substitution(rebuilt, rebuild, substituted.size)
     }
 
+    /**
+     * The columns [substitute] turns into literals when it meets [factors] with [ranges]: `{0, 1}`, outside
+     * [objectiveIntVars], and read only by rows it can rewrite. `null` when no column qualifies.
+     */
+    fun substitutableColumns(
+        factors: Array<Factor>,
+        numIntVars: Int,
+        ranges: ColumnRanges,
+        objectiveIntVars: Set<Int>,
+    ): BooleanArray? = eligibility(factors, numIntVars, ranges, objectiveIntVars)?.substitutable
+
+    private class Eligibility(
+        val substitutable: BooleanArray,
+        val rows: Array<Linear?>,
+        val channels: IntArray,
+        val normalizedBound: Array<Long?>,
+        val occurrence: IntOccurrence,
+    )
+
+    private fun eligibility(
+        factors: Array<Factor>,
+        numIntVars: Int,
+        ranges: ColumnRanges,
+        objectiveIntVars: Set<Int>,
+    ): Eligibility? {
+        val substitutable = BooleanArray(numIntVars) { ranges.isBinary(it) && it !in objectiveIntVars }
+        if (substitutable.none { it }) return null
+
+        // The `≥`-form right-hand side of each row after positive-weight normalisation, computed once here
+        // and reused by the rewrite; `null` marks a factor that cannot become a pseudo-Boolean relation.
+        val rows = Array(factors.size) { factors[it].equivalentLinear() }
+        val channels = IntArray(factors.size) { factors[it].binaryChannelLiteral() }
+        val normalizedBound = arrayOfNulls<Long>(factors.size)
+        for (i in factors.indices) {
+            val row = rows[i]
+            if (row != null) normalizedBound[i] = normalizedBound(row)
+            if (channels[i] != Lit.NONE) normalizedBound[i] = 0L
+        }
+        val occurrence = intOccurrence(factors, numIntVars)
+        disqualifyToFixpoint(factors, substitutable, normalizedBound, occurrence)
+        return Eligibility(substitutable, rows, channels, normalizedBound, occurrence)
+    }
+
     private fun Factor.binaryChannelLiteral(): Int {
         val channel = this as? ReifiedLinear ?: return Lit.NONE
         val row = channel.integerConstants ?: return Lit.NONE
@@ -166,7 +193,7 @@ internal object BinaryColumnSubstitution {
      *  for the columns of the rows that lose a column with it. A row whose columns are not all substitutable
      *  is itself not rewritable, which is recorded by clearing its [normalizedBound] slot. */
     private fun disqualifyToFixpoint(
-        problem: Problem,
+        factors: Array<Factor>,
         substitutable: BooleanArray,
         normalizedBound: Array<Long?>,
         occurrence: IntOccurrence,
@@ -177,8 +204,8 @@ internal object BinaryColumnSubstitution {
             substitutable[v] = false
             pending.add(v)
         }
-        for (i in problem.factors.indices) {
-            val f = problem.factors[i]
+        for (i in factors.indices) {
+            val f = factors[i]
             if (normalizedBound[i] != null && f.intVars.all { substitutable[it] }) continue
             normalizedBound[i] = null
             for (v in f.intVars) disqualify(v)
@@ -189,7 +216,7 @@ internal object BinaryColumnSubstitution {
             occurrence.forEach(v) { fid ->
                 if (normalizedBound[fid] != null) {
                     normalizedBound[fid] = null
-                    for (u in problem.factors[fid].intVars) disqualify(u)
+                    for (u in factors[fid].intVars) disqualify(u)
                 }
             }
         }
@@ -262,14 +289,14 @@ internal object BinaryColumnSubstitution {
         return bound
     }
 
-    /** Int-variable occurrence index over [problem]'s factors, as a CSR of factor indices per variable. */
-    private fun intOccurrence(problem: Problem): IntOccurrence {
-        val offsets = IntArray(problem.numIntVars + 1)
-        for (f in problem.factors) for (v in f.intVars) offsets[v + 1]++
-        for (v in 0 until problem.numIntVars) offsets[v + 1] += offsets[v]
+    /** Int-variable occurrence index over [factors], as a CSR of factor indices per variable. */
+    private fun intOccurrence(factors: Array<Factor>, numIntVars: Int): IntOccurrence {
+        val offsets = IntArray(numIntVars + 1)
+        for (f in factors) for (v in f.intVars) offsets[v + 1]++
+        for (v in 0 until numIntVars) offsets[v + 1] += offsets[v]
         val cursor = offsets.copyOf()
-        val flat = IntArray(offsets[problem.numIntVars])
-        for (i in problem.factors.indices) for (v in problem.factors[i].intVars) flat[cursor[v]++] = i
+        val flat = IntArray(offsets[numIntVars])
+        for (i in factors.indices) for (v in factors[i].intVars) flat[cursor[v]++] = i
         return IntOccurrence(offsets, flat)
     }
 
@@ -280,8 +307,6 @@ internal object BinaryColumnSubstitution {
             for (i in offsets[v] until offsets[v + 1]) action(flat[i])
         }
     }
-
-    private fun IntDomain.isBinary(): Boolean = min == 0L && max == 1L && holeCount == 0L
 
     private fun negateOrNull(a: Long): Long? = if (a == Long.MIN_VALUE) null else -a
 
