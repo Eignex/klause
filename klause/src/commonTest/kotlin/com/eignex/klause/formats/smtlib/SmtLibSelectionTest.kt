@@ -42,7 +42,8 @@ class SmtLibSelectionTest {
                 """.trimIndent(),
             )
 
-            val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 1000))
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 1000))
 
             assertEquals(0, parsed.model.numIntVars)
             assertEquals(1, parsed.model.factors.filterIsInstance<Cardinality>().size)
