@@ -1431,6 +1431,12 @@ class ExactLiraSearchComponent private constructor(
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
         if (bools.any { it == UNASSIGNED }) {
+            if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
+                sourceEqualityConflictScope()
+            ) {
+                refuteAssignedSourceRows(context)?.let { return it }
+                if (operationStop()) return ComponentResult.Indeterminate
+            }
             candidate?.let { capturePointHints(it, context) }
         } else if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
             model.numRealVars > 0 &&
@@ -1457,20 +1463,35 @@ class ExactLiraSearchComponent private constructor(
         node.sourceBranches.isEmpty() && node.rowAssertions.isEmpty() && node.disequalityDirections.isEmpty() &&
         solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
+    private fun refuteAssignedSourceRows(context: SearchContext): ComponentResult.Conflict? {
+        observeCompleteStage("PARTIAL_SOURCE_REFUTATION_ATTEMPT")
+        val origins = ArrayList<IntArray>()
+        val rows = agreementSourceRows(context, origins) ?: return null
+        val repair = prepareMixedEqualityRepair(model.numRealVars, rows, lpStop, ::observeCompleteStage,
+            trackSourceRows = true) ?: return null
+        repair.completePoint(rows) { columns, residual, token, onInfeasible ->
+            reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
+        }
+        val support = repair.lastResidualInfeasibleRows ?: return null
+        if (operationStop() || !sourceEqualityConflict(context, origins, support)) return null
+        observeCompleteStage("PARTIAL_SOURCE_REFUTATION")
+        return ComponentResult.Conflict((outcome as ComponentCheck.Infeasible).explanation)
+    }
+
     private fun sourceEqualityConflict(
         context: SearchContext,
         origins: List<IntArray>,
         support: IntArray,
     ): Boolean {
         lpStop.charge(model.numBoolVars.toLong() + support.size + 1L)
-        if (!sourceEqualityConflictScope() || support.isEmpty() || operationStop() || bools.any { it == UNASSIGNED }
-        ) return false
+        if (!sourceEqualityConflictScope() || support.isEmpty() || operationStop()) return false
         val variables = LinkedHashSet<Int>()
         for (row in support) {
             val booleans = origins.getOrNull(row) ?: return false
             lpStop.charge(4L * booleans.size + 1L)
             if (operationStop()) return false
             for (variable in booleans) {
+                if (variable !in bools.indices || bools[variable] == UNASSIGNED) return false
                 variables += variable
                 if (variables.size > MAX_EQUALITY_CONFLICT_PREMISES) return false
             }

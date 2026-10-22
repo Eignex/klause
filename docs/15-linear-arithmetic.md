@@ -71,7 +71,7 @@ When an optimal float point has no exact primal package, a complete pure-real
 state can use [witness recovery](#witness-recovery) with an empty integer tail.
 The recovered point must pass every selected exact source row before publication.
 Paired source equations can also reduce an inequality to a false constant, proving
-the selected real rows infeasible. A complete pure-real state with no additional
+the selected real rows infeasible. A pure-real state with no additional
 theory branches can explain that contradiction using the Boolean premises of the
 rows used in the equality derivation and false inequality. Pivot and substitution
 support retain original row identities within the repair-entry and search
@@ -79,7 +79,9 @@ explanation limits. Cancellation withholds the conflict.
 An exact residual LP refutation follows the same path: its certified row and root
 slack-bound support selects the retained parallel inequalities, and substitution
 support maps those inequalities back through every paired source equation used.
-Only complete pure-real states in the same restricted theory scope can publish
+Partial states can use the same refutation after a float optimum lacks an exact
+point. Rows with unresolved Boolean inputs are excluded, and every Boolean premise
+in the retained support must be assigned. The same restricted theory scope gates
 that conflict.
 
 #### Disjunctions and disequalities

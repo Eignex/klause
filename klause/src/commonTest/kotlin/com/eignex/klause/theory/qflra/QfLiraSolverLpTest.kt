@@ -64,6 +64,45 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
     @Test
+    fun `partial real refutations should exclude undecided Boolean premises`() {
+        val source = Problem(
+            numBoolVars = 3,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 129,
+            realLower = DoubleArray(129) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(129) { Double.POSITIVE_INFINITY },
+            factors = Array<Factor>(128) { index ->
+                when (index) {
+                    0 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, -1.0, -1.0), LinearOp.EQ, 0.0)
+                    1 -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                        doubleArrayOf(1.0, 1.0), LinearOp.LE, 0.0)
+                    2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 3),
+                        doubleArrayOf(-1.0, -1.0, -1.0), LinearOp.LE, -1e-12)
+                    else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index + 1),
+                        doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
+                }
+            },
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.useMixedPointCompletion()
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)), conflict.explanation?.literals?.toSet())
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("PARTIAL_SOURCE_REFUTATION"))
+            session.popTo(1)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+        }
+    }
+
+    @Test
     fun `LP cancellation should retain its parent meter and distinct session stop`() {
         var stopped = false
         var charged = 0L
