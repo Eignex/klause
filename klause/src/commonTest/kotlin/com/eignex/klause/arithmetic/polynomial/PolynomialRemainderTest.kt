@@ -56,6 +56,20 @@ class PolynomialRemainderTest {
     }
 
     @Test
+    fun `cancelled lower monomials retain priority when they return`() {
+        val square = arithmetic.power(x, 2)
+        val first = arithmetic.subtract(arithmetic.power(y, 2), arithmetic.add(square, x))
+        val polynomial = arithmetic.add(arithmetic.multiply(first, arithmetic.add(y, x)),
+            arithmetic.add(arithmetic.power(y, 2), x))
+        val divisors = listOf(first, arithmetic.subtract(square, Polynomial.ONE))
+
+        val remainder = preparePolynomialRemainder(polynomial, divisors, arithmetic)
+            .asSequence().filterNotNull().single()
+
+        assertEquals(arithmetic.add(arithmetic.scale(x, BigFraction.ofLong(2)), Polynomial.ONE), remainder)
+    }
+
+    @Test
     fun `cancelled remainder preparation withholds its unfinished value`() {
         val polynomial = arithmetic.add(y, arithmetic.power(x, 2))
         val divisor = arithmetic.subtract(arithmetic.power(x, 2), Polynomial.ONE)
