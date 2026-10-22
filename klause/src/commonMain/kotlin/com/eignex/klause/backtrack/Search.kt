@@ -891,12 +891,7 @@ private class ResidualRealComponent(
             val integers = if (integerPhaseTracking) {
                 integerPointHints(problem, point, cp.session::intDomain, stop)
             } else LongArray(0)
-            val hints = realPointHints(
-                problem, point, cp.session::boolValue, stop, pointHints.retainedEntries,
-            ) { changed ->
-                sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "ROUNDED_BINARY_CHANNEL", 0L)
-                if (changed) sink?.lp?.observePrimalPhase("PREFIX_REAL_HINT", "ROUNDED_BINARY_PREFERENCE_CHANGED", 0L)
-            }
+            val hints = realPointHints(problem, point, cp.session::boolValue, stop, pointHints.retainedEntries)
             val usable = hints != null && integers != null &&
                 (integers.isNotEmpty() || hints.any { it == 0 || it == 1 }) && !stop()
             if (usable && hints != null) {

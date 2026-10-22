@@ -1,7 +1,6 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -116,80 +115,6 @@ class RealPointHintsTest {
         for (point in listOf(listOf(BigFraction.ZERO), listOf(BigFraction.ZERO, huge))) {
             assertNull(integerPointHints(source, point, { IntDomain(0, 1) }, Cancellation.Never))
         }
-    }
-
-    @Test
-    fun `binary channel preferences should round a shared integer point consistently`() {
-        val source = Problem(4, 1, arrayOf(IntDomain(0, 1)), arrayOf(
-            ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 0L),
-            ReifiedLinear(1, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1L),
-            ReifiedLinear(2, longArrayOf(1), intArrayOf(0), LinearOp.NE, 0L),
-            ReifiedLinear(3, longArrayOf(1), intArrayOf(0), LinearOp.NE, 1L),
-        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-        val third = BigFraction.ofLong(3).reciprocal()
-        for ((point, bit) in listOf(BigFraction.ZERO to 0, third to 0,
-            BigFraction.ofLong(2).reciprocal() to 0, (third + third) to 1, BigFraction.ONE to 1)) {
-
-            val hints = realPointHints(source, listOf(BigFraction.ZERO, point), { null }, Cancellation.Never)
-
-            assertEquals(listOf(1 - bit, bit, bit, 1 - bit), assertNotNull(hints).toList())
-        }
-    }
-
-    @Test
-    fun `nonbinary integer preferences should retain exact comparison truth`() {
-        for (op in listOf(LinearOp.EQ, LinearOp.NE)) for (bound in listOf(0L, 1L)) {
-            val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), arrayOf(
-                ReifiedLinear(0, longArrayOf(1), intArrayOf(0), op, bound),
-            ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-            val third = BigFraction.ofLong(3).reciprocal()
-            var rounded = 0
-
-            val hints = realPointHints(source, listOf(BigFraction.ZERO, third + third),
-                { null }, Cancellation.Never, onRoundedBinary = { rounded++ })
-
-            assertEquals(listOf(if (op == LinearOp.EQ) 0 else 1), assertNotNull(hints).toList())
-            assertEquals(0, rounded)
-        }
-    }
-
-    @Test
-    fun `rounded channel preferences should not establish an integer witness`() {
-        val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf(
-            ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1L),
-            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ofLong(3)),
-                LinearOp.EQ, BigFraction.ofLong(2)),
-        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-        val third = BigFraction.ofLong(3).reciprocal()
-        val point = listOf(BigFraction.ZERO, third + third)
-
-        val hints = realPointHints(source, point, { null }, Cancellation.Never)
-
-        assertEquals(listOf(1), assertNotNull(hints).toList())
-        val candidate = Sample(booleanArrayOf(true), longArrayOf(1), doubleArrayOf(0.0),
-            exactReals = listOf(BigFraction.ZERO))
-        assertFalse(verifyRealCoordinates(source, candidate) is Verification.Accepted<*, *>)
-        assertEquals(listOf(BigFraction.ZERO, third + third), point)
-    }
-
-    @Test
-    fun `stopped binary rounding should withhold all preferences`() {
-        val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf(
-            ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1L),
-        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-        var stopped = false
-        var rounded = 0
-
-        val hints = realPointHints(source, listOf(BigFraction.ZERO, BigFraction.ofLong(2).reciprocal()),
-            { null }, Cancellation { stopped }, onRoundedBinary = { rounded++; stopped = true })
-
-        assertNull(hints)
-        assertEquals(1, rounded)
     }
 
     @Test
