@@ -24,6 +24,7 @@ import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.PollStride
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.subExact
@@ -96,9 +97,9 @@ internal object Probing {
      * the factors that declare no rows weakens propagation but never invents a conflict.
      *
      * The root fixpoint comes first; what it proves is kept. Probing then pins each free Boolean both
-     * ways on top of it, with the same harvest as [probe]: a failed literal forces the other polarity, a
-     * bound implied under both is the union of the two. Every deduction lands as a unit clause or a
-     * proved range, so the result is idempotent once re-read.
+     * ways on top of it: a failed literal forces the other polarity, and a bound implied under both is
+     * the union of the two. A Boolean fixed by a completed consistent branch contributes a binary
+     * clause guarded by the pinned literal. Existing clauses and contrapositives are deduplicated.
      *
      * Bounded by [maxCandidates] probes and metered through [cancellation]; stopping early keeps whatever
      * was proved, since a partial propagation still only derives implied bounds.
@@ -185,6 +186,8 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val queued = BooleanArray(numCols)
     private val poll = PollStride()
     private var stopped = false
+    private val binaryClauses = LongHashSet()
+    private val addedFactors = ArrayList<Factor>()
 
     private var conflict = false
     override val crossed: Boolean get() = conflict
@@ -217,6 +220,12 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         }
         for (factor in problem.factors) {
             if (!visit()) return
+            if (factor is Clause && factor.literals.size == 2 && binaryClauses.size < PROBE_SOURCE_BINARY_LIMIT) {
+                if (!visit()) return
+                if (factor.allLiteralsBool(problem.numBoolVars)) {
+                    binaryClauses.add(binaryKey(factor.literals[0], factor.literals[1]))
+                }
+            }
             for (row in factor.impliedLinearRows) {
                 if (!visit()) return
                 compile(row)
@@ -461,12 +470,12 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         val mark = trail.size
         setLo(col, 1L)
         val trueHolds = propagate()
-        if (trueHolds && !stopped) recordTouched(mark)
+        if (trueHolds && !stopped) recordTouched(mark, col)
         undoTo(mark)
         if (stopped) return true
         setHi(col, 0L)
         val falseHolds = propagate()
-        if (trueHolds && falseHolds && !stopped) collectCommon(mark)
+        if (trueHolds && falseHolds && !stopped) collectCommon(mark, col)
         undoTo(mark)
         if (stopped) return true
         when {
@@ -486,7 +495,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         }
     }
 
-    private fun recordTouched(mark: Int) {
+    private fun recordTouched(mark: Int, pinnedCol: Int) {
         probeId++
         touchedLo.clear()
         touchedHi.clear()
@@ -502,18 +511,20 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
             touchedHi.add(hi[col])
             touchedLoOpen.add(loOpen[col])
             touchedHiOpen.add(hiOpen[col])
+            retainImplication(pinnedCol, true, col)
         }
     }
 
     // A column narrowed under both polarities is narrowed in every solution, to the union of the two.
     // Read off the `false` branch's trail before it is undone; applied once the root is restored.
-    private fun collectCommon(mark: Int) {
+    private fun collectCommon(mark: Int, pinnedCol: Int) {
         pending.clear()
         pendingValue.clear()
         for (k in mark until trail.size) {
             if (!visit()) return
             val entry = trail[k]
             val col = entry ushr 2
+            retainImplication(pinnedCol, false, col)
             if (stamp[col] != probeId) continue
             val s = slot[col]
             if ((entry and 1) == 0) {
@@ -528,22 +539,33 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         }
     }
 
+    private fun retainImplication(pinnedCol: Int, pinnedValue: Boolean, col: Int) {
+        if (col < numInts || col == pinnedCol || !fixed(col) || binaryClauses.size >= PROBE_SOURCE_BINARY_LIMIT) return
+        if (!visit()) return
+        val premise = Lit.make(pinnedCol - numInts, !pinnedValue)
+        val consequence = Lit.make(col - numInts, lo[col] == 1L)
+        if (binaryClauses.add(binaryKey(premise, consequence))) {
+            addedFactors.add(Clause(intArrayOf(premise, consequence)))
+        }
+    }
+
+    private fun binaryKey(a: Int, b: Int): Long = (minOf(a, b).toLong() shl 32) or maxOf(a, b).toLong()
+
     fun delta(): SourceDelta {
         val present = IntHashSet()
         for (f in problem.factors) if (f is Clause && f.literals.size == 1) present.add(f.literals[0])
-        val units = ArrayList<Factor>()
         for (b in 0 until problem.numBoolVars) {
             val col = numInts + b
             if (!fixed(col)) continue
             val literal = Lit.make(b, lo[col] == 1L)
-            if (literal !in present) units.add(Clause(intArrayOf(literal)))
+            if (literal !in present) addedFactors.add(Clause(intArrayOf(literal)))
         }
         val tightening = problem.intBounds.tightening()
         for (v in 0 until numInts) {
             if (!loOpen[v]) tightening.atLeast(v, lo[v])
             if (!hiOpen[v]) tightening.atMost(v, hi[v])
         }
-        return SourceDelta(addedFactors = units, bounds = tightening.build())
+        return SourceDelta(addedFactors = addedFactors, bounds = tightening.build())
     }
 }
 
@@ -552,3 +574,6 @@ private const val PROBE_SOURCE_WORK_WEIGHT = 10L
 
 // Row visits one fixpoint may spend, per row of the model.
 private const val PROBE_SOURCE_VISITS_PER_ROW = 8L
+
+// Bound optional implication storage without limiting failed-literal or common-bound probing.
+private const val PROBE_SOURCE_BINARY_LIMIT = 65_536

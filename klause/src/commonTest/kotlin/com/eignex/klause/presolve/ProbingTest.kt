@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
@@ -16,6 +17,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ProbingTest {
@@ -145,7 +147,107 @@ class ProbingTest {
     }
 
     private fun sourceUnits(delta: SourceDelta): Set<Int> =
-        delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() }.toSet()
+        delta.addedFactors.filterIsInstance<Clause>()
+            .filter { it.literals.size == 1 }.map { it.literals.single() }.toSet()
+
+    @Test
+    fun `source probing should retain conditional Boolean consequences without fixing either column`() {
+        val problem = Problem(
+            2, 1, arrayOf(IntDomain(0, 0)),
+            listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 7),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+
+        val clauses = delta.addedFactors.filterIsInstance<Clause>()
+        val accepted = (0..3).filter { mask ->
+            clauses.all { clause ->
+                clause.literals.any { Lit.evaluate(it, mask and (1 shl Lit.variable(it)) != 0) }
+            }
+        }
+        assertEquals(listOf(0, 2, 3), accepted)
+        assertTrue(sourceUnits(delta).isEmpty())
+        assertNull(delta.bounds)
+        assertFalse(delta.infeasible)
+    }
+
+    @Test
+    fun `source implication clauses should be idempotent after rebuilding`() {
+        val problem = Problem(
+            2, 1, arrayOf(IntDomain(0, 0)),
+            listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 7),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+        val reduced = problem.withSourcePassDelta(delta)!!
+
+        assertEquals(1, delta.addedFactors.size)
+        assertTrue(Presolve.probeSource(reduced, cap, Cancellation.Never).isEmpty)
+    }
+
+    @Test
+    fun `source probing should recognize an existing implication in either literal order`() {
+        for (literals in listOf(
+            intArrayOf(Lit.make(0, false), Lit.make(1, true)),
+            intArrayOf(Lit.make(1, true), Lit.make(0, false)),
+        )) {
+            val problem = Problem(
+                2, 1, arrayOf(IntDomain(0, 0)),
+                listOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 7),
+                    Clause(literals),
+                ),
+                openIntLo = booleanArrayOf(true),
+                openIntHi = booleanArrayOf(true),
+            )
+
+            val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+
+            assertTrue(delta.isEmpty)
+        }
+    }
+
+    @Test
+    fun `interrupted source probing should retain only entailed guarded consequences`() {
+        val problem = Problem(
+            2, 1, arrayOf(IntDomain(0, 0)),
+            listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 7),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+        var retainedOnInterruption = false
+        for (allowance in 0L..3_000L step 10L) {
+            val budget = PresolveBudget(allowance)
+
+            val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+
+            assertFalse(delta.infeasible, "allowance=$allowance")
+            assertTrue(sourceUnits(delta).isEmpty(), "allowance=$allowance")
+            assertNull(delta.bounds, "allowance=$allowance")
+            for (mask in listOf(0, 2, 3)) {
+                assertTrue(delta.addedFactors.filterIsInstance<Clause>().all { clause ->
+                    clause.literals.any { Lit.evaluate(it, mask and (1 shl Lit.variable(it)) != 0) }
+                }, "allowance=$allowance mask=$mask")
+            }
+            assertTrue(budget.spent() <= allowance + 9, "spent=${budget.spent()} allowance=$allowance")
+            if (budget.spent() >= allowance && delta.addedFactors.isNotEmpty()) retainedOnInterruption = true
+        }
+        assertTrue(retainedOnInterruption)
+    }
 
     @Test
     fun `source probing should fix the activator of a row the declared range rules out`() {

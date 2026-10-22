@@ -285,6 +285,13 @@ row and graph visits charge and poll the pass token. An interruption retains com
 unconditional deductions and retracts the active hypothetical branch. Candidate,
 entry and representation limits bound optional analysis, not solve time.
 
+Source open-range probing also retains Boolean implications from completed consistent
+branches as mandatory binary clauses guarded by the pinned literal. This preserves
+every source assignment without changing column IDs or reconstruction. Existing
+binaries and contrapositives share a bounded deduplication index; filling it stops
+only implication retention. Harvesting charges the containing allowance, and an
+interruption keeps completed guarded deductions while retracting hypothetical bounds.
+
 Source probing and symmetry defer to finite preparation for closed discrete-only
 models. With real columns they may run in the source lane even when integer
 columns are closed or absent; generator lex and value-precedence chains remain
