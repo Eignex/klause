@@ -4,6 +4,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.flatzinc.linearObjective
+import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -86,6 +88,50 @@ class LocalSearchStateTest {
         assertFalse(state.assignment.boolValue(0))
         assertTrue(state.assignment.boolValue(1))
         assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `feasible objective grades should rebalance defined bin packing loads through a board swap`() {
+        val indicators = (1..4).flatMap { p -> (1..2).map { t -> p to t } }
+        val ratings = longArrayOf(5, 3, 4, 2)
+        val source = buildString {
+            append("var 1..2: p1; var 1..2: p2; var 1..2: p3; var 1..2: p4; ")
+            for ((p, t) in indicators) append("var bool: in${p}_$t; var 0..1: w${p}_$t; ")
+            append("var 0..10: load1; var 0..10: load2; var 0..10: hi; var 0..10: lo; var 0..10: balance; ")
+            append("constraint all_different_int([p1, p2]); constraint all_different_int([p3, p4]); ")
+            append("constraint int_lin_eq([1, 1], [load1, load2], 14); ")
+            for ((p, t) in indicators) {
+                append("constraint int_eq_reif(p$p, $t, in${p}_$t) :: defines_var(in${p}_$t); ")
+                append("constraint bool2int(in${p}_$t, w${p}_$t) :: defines_var(w${p}_$t); ")
+            }
+            for (t in 1..2) {
+                append("constraint int_lin_eq([1, ${ratings.joinToString { "-$it" }}], ")
+                append("[load$t, ${(1..4).joinToString { "w${it}_$t" }}], 0) :: defines_var(load$t); ")
+                append("constraint bool_lin_le([${ratings.joinToString()}], ")
+                append("[${(1..4).joinToString { "in${it}_$t" }}], 10); ")
+            }
+            append("constraint array_int_maximum(hi, [load1, load2]) :: defines_var(hi); ")
+            append("constraint array_int_minimum(lo, [load1, load2]) :: defines_var(lo); ")
+            append("constraint int_lin_eq([1, -1, 1], [balance, hi, lo], 0) :: defines_var(balance); ")
+            append("solve minimize balance;")
+        }
+        val execution = parseFlatZincExecution(source)
+        val program = execution.program
+        val problem = program.problem.bake()
+        val sweep = assertNotNull(execution.definitionalSweep)
+        val state = LocalSearchState(problem, Random(0))
+        for (v in 0 until problem.numIntVars) state.assignment.setInt(v, state.rootDomains[v].min)
+        val team = IntArray(4) { program.intVarsByName.getValue("p${it + 1}") }
+        for ((player, value) in longArrayOf(1, 2, 1, 2).withIndex()) state.assignment.setInt(team[player], value)
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        sweep.sweep(state.assignment, state.rootDomains)
+        state.recompute()
+        assertEquals(0L, state.cost)
+        val swap = Move.Compound(listOf(Move.IntSet(team[2], 2), Move.IntSet(team[3], 1)))
+
+        val delta = state.feasibleObjectiveDelta(assertNotNull(program.linearObjective()), swap)
+
+        assertEquals(-4.0, delta)
     }
 
     @Test

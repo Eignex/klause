@@ -239,6 +239,9 @@ natively; everything else arrives as MiniZinc's standard decomposition. Its
 float linear predicates and the supported globals. Every declaration needs a
 matching parser and lowering path. Fixed nonnegative integer `pow` emits
 `klause_int_pow`, and its reification reifies only the equality to the result.
+The `bin_packing_load` decomposition annotates each bin's load equality as the
+`defines_var` of that load, so local search derives loads from the assignment
+instead of searching them.
 
 Extending native coverage means implementing the factor and its lowering,
 declaring the predicate, and adding focused and end-to-end tests.
