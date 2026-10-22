@@ -19,6 +19,62 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `residual LP conflicts should retain equality derivation premises`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                exactColumnUpper(4, BigFraction.ONE),
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 3), List(2) { BigFraction.ONE },
+                    if (strict) BigFraction.ONE else BigFraction.ZERO, strict),
+                ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            )
+            val budget = SourceLpBudget()
+            var support: IntArray? = null
+
+            val point = completeMixedPoint(5, 0, DoubleArray(5), rows, Cancellation.Never,
+                onSourceInfeasible = { support = it },
+                realCompletion = { columns, residual, stop, onInfeasible ->
+                    completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
+                })
+
+            assertNull(point)
+            assertEquals(setOf(1, 2, 3, 4), assertNotNull(support).toSet())
+        }
+    }
+
+    @Test
+    fun `residual LP conflicts after integer guesses should withhold source refutation`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 3), List(2) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1, 2, 3, 4), List(4) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget()
+        var sourceInfeasible = false
+        var residualInfeasible = false
+
+        val point = completeMixedPoint(4, 1, DoubleArray(5), rows, Cancellation.Never,
+            onSourceInfeasible = { sourceInfeasible = true },
+            realCompletion = { columns, residual, stop, onInfeasible ->
+                completeMixedRealComponents(columns, residual, budget, stop,
+                    onStage = { if (it == "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE") residualInfeasible = true },
+                    onInfeasible = onInfeasible)
+            })
+
+        assertTrue(residualInfeasible)
+        assertNull(point)
+        assertFalse(sourceInfeasible)
+        assertTrue(listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE)
+            .satisfiesSourceRows(rows))
+    }
+
+    @Test
     fun `source contradictions should exclude unused original rows from their support`() {
         val rows = listOf(
             exactColumnUpper(3, BigFraction.ONE),
@@ -284,8 +340,8 @@ class MixedPointCompletionTest {
                 doubleArrayOf(0.0, 0.0, 0.0, 0.0, 1.0),
                 rows,
                 Cancellation.Never,
-                realCompletion = { columns, residual, stop ->
-                    completeMixedRealComponents(columns, residual, budget, stop)
+                realCompletion = { columns, residual, stop, onInfeasible ->
+                    completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
                 },
             ),
         )

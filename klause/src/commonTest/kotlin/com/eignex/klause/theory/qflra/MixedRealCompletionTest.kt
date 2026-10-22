@@ -6,11 +6,51 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MixedRealCompletionTest {
+    @Test
+    fun `certified residual conflicts should cite their original strongest rows`() {
+        for (strict in listOf(false, true)) {
+            val rows = List(127) {
+                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ofLong(2))
+            } + listOf(
+                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ONE),
+                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ofLong(2) },
+                    if (strict) BigFraction.ofLong(2) else BigFraction.ZERO, strict),
+                ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            )
+            var support: IntArray? = null
+
+            val point = completeMixedRealComponents(3, rows, SourceLpBudget(), Cancellation.Never,
+                onInfeasible = { support = it })
+
+            assertNull(point)
+            assertEquals(setOf(128, 129), assertNotNull(support).toSet())
+        }
+    }
+
+    @Test
+    fun `cancelled residual conflicts should withhold support`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        var stopped = false
+        var support: IntArray? = null
+
+        val point = completeMixedRealComponents(3, rows, SourceLpBudget(), Cancellation { stopped },
+            onStage = { if (it == "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE") stopped = true },
+            onInfeasible = { support = it })
+
+        assertTrue(stopped)
+        assertNull(point)
+        assertNull(support)
+    }
+
     @Test
     fun `scaled parallel rows should fit the existing source dimension allowance`() {
         for (sign in listOf(-1L, 1L)) {

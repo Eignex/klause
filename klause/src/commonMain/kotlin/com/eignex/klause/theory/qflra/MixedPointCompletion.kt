@@ -16,7 +16,7 @@ internal fun completeMixedPoint(
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
     onSourceInfeasible: ((IntArray) -> Unit)? = null,
-    realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)? = null,
+    realCompletion: MixedRealCompletion? = null,
 ): List<BigFraction>? {
     onStage?.invoke("RECOVERY_ATTEMPT")
     fun declined(stage: String): List<BigFraction>? {

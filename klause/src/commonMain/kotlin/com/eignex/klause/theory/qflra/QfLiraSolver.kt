@@ -1570,8 +1570,8 @@ class ExactLiraSearchComponent private constructor(
                     candidate = completeMixedPoint(model.numRealVars, model.numIntVars, retained, rows, lpStop,
                         onStage = ::observeCompleteStage,
                         onSourceInfeasible = reportInfeasible,
-                        realCompletion = { columns, residual, token ->
-                            reduction.completeReals(columns, residual, token, ::observeCompleteStage)
+                        realCompletion = { columns, residual, token, onInfeasible ->
+                            reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
                         })
                     val support = sourceInfeasible
                     if (candidate == null && support != null && origins != null &&
@@ -2006,7 +2006,8 @@ private class ExactLiraReductionCache(
         rows: List<ExactRationalInequality>,
         stop: Cancellation,
         onStage: (String) -> Unit,
-    ): List<BigFraction>? = completeMixedRealComponents(columns, rows, budget, stop, onStage)
+        onInfeasible: ((IntArray) -> Unit)?,
+    ): List<BigFraction>? = completeMixedRealComponents(columns, rows, budget, stop, onStage, onInfeasible)
 
     fun reduce(
         bools: IntArray,

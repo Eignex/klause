@@ -76,6 +76,11 @@ theory branches can explain that contradiction using the Boolean premises of the
 rows used in the equality derivation and false inequality. Pivot and substitution
 support retain original row identities within the repair-entry and search
 explanation limits. Cancellation withholds the conflict.
+An exact residual LP refutation follows the same path: its certified row and root
+slack-bound support selects the retained parallel inequalities, and substitution
+support maps those inequalities back through every paired source equation used.
+Only complete pure-real states in the same restricted theory scope can publish
+that conflict.
 
 #### Disjunctions and disequalities
 

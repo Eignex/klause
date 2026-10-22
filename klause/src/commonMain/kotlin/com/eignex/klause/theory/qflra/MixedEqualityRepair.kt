@@ -143,15 +143,17 @@ internal class MixedEqualityRepair(
 
     fun completePoint(
         rows: List<ExactRationalInequality>,
-        realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)?,
+        realCompletion: MixedRealCompletion?,
     ): List<BigFraction>? {
         lastResidualInfeasibleRows = null
         val residual = ArrayList<ExactRationalInequality>()
+        val residualSources = pivotSources?.let { ArrayList<IntArray>() }
         var entries = 0L
+        var sourceEntries = 0L
         for (rowIndex in rows.indices) {
             val row = rows[rowIndex]
             val sources = pivotSources?.let { linkedSetOf(rowIndex) }
-            if (sources != null && entries + sources.size > sourceSupportAllowance) {
+            if (sources != null && entries + sourceEntries + sources.size > sourceSupportAllowance) {
                 onStage?.invoke("RECOVERY_EQUALITY_SUPPORT_LIMIT")
                 return null
             }
@@ -168,7 +170,7 @@ internal class MixedEqualityRepair(
                     stop.charge(inherited.size.toLong() + 1L)
                     if (stop()) return null
                     for (source in inherited) sources += source
-                    if (entries + sources.size > sourceSupportAllowance) {
+                    if (entries + sourceEntries + sources.size > sourceSupportAllowance) {
                         onStage?.invoke("RECOVERY_EQUALITY_SUPPORT_LIMIT")
                         return null
                     }
@@ -199,7 +201,7 @@ internal class MixedEqualityRepair(
                 onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
                 return null
             }
-            if (sources != null && entries + sources.size > sourceSupportAllowance) {
+            if (sources != null && entries + sourceEntries + sources.size > sourceSupportAllowance) {
                 onStage?.invoke("RECOVERY_EQUALITY_SUPPORT_LIMIT")
                 return null
             }
@@ -208,12 +210,30 @@ internal class MixedEqualityRepair(
             val ordered = coefficients.keys.sorted()
             residual += ExactRationalInequality(ordered.toIntArray(), ordered.map(coefficients::getValue), bound,
                 row.strict)
+            if (sources != null) {
+                stop.charge(sources.size.toLong())
+                if (stop()) return null
+                requireNotNull(residualSources) += sources.toIntArray()
+                sourceEntries += sources.size
+            }
         }
         val graph = RealDifferenceSystem.prepareRows(pivots.size, residual, stop)
         if (stop()) return null
         val free = if (graph == null) {
             onStage?.invoke("RECOVERY_EQUALITY_GRAPH_UNAVAILABLE")
-            realCompletion?.invoke(pivots.size, residual, stop) ?: return null
+            val reportInfeasible: ((IntArray) -> Unit)? = if (residualSources == null) null else { support ->
+                val sources = LinkedHashSet<Int>()
+                for (index in support) {
+                    if (index !in residualSources.indices) break
+                    stop.charge(residualSources[index].size.toLong() + 1L)
+                    if (stop()) break
+                    sources.addAll(residualSources[index].toList())
+                }
+                if (!stop() && support.isNotEmpty() && support.all { it in residualSources.indices }) {
+                    lastResidualInfeasibleRows = sources.toIntArray()
+                }
+            }
+            realCompletion?.invoke(pivots.size, residual, stop, reportInfeasible) ?: return null
         } else {
             onStage?.invoke("RECOVERY_EQUALITY_GRAPH_ATTEMPT")
             val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
