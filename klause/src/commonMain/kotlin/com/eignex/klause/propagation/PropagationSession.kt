@@ -340,6 +340,22 @@ class PropagationSession private constructor(
     /** Current int domain after propagation. Always non-empty unless the session is Unsat. */
     fun intDomain(v: Int): IntDomain = state.intDomains[v]
 
+    private var leafColumns: LeafColumns? = null
+
+    /**
+     * Leave [columns] to leaf completion: [needsBoolDecision] and [needsIntDecision] stop offering them, and a
+     * leaf reads `false` or the domain minimum for each one still free. Null decides every column again.
+     */
+    internal fun completeAtLeaves(columns: LeafColumns?) {
+        leafColumns = columns
+    }
+
+    /** True while Boolean column [v] is free and a traversal still has to decide it. */
+    internal fun needsBoolDecision(v: Int): Boolean = state.boolValues[v] == null && leafColumns?.bool(v) != true
+
+    /** True while integer column [v] admits more than one value and a traversal still has to decide it. */
+    internal fun needsIntDecision(v: Int): Boolean = !state.intDomains[v].isFixed && leafColumns?.int(v) != true
+
     internal val explanationState: PropagationState get() = state
 
     /**

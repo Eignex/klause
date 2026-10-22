@@ -375,6 +375,7 @@ internal class ResumableMinimize(
         yield(Unit)
         brancher = BacktrackBrancher(
             session, params, sink, restart, LpGuidedBranching(), nativeConflict = { cp.lastConflict },
+            leafColumns = params.leafColumns(session, objective),
         ).also {
             cp.propagationObserver = it::onPropagation
             cp.cascadeConflictObserver = it::onCascadeConflict

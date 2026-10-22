@@ -537,6 +537,73 @@ class BacktrackSolverTest {
         val viaImprovements = solver.improvements(obj, params).last()
         assertEquals(viaMinimize.withoutStats(), viaImprovements.withoutStats())
     }
+
+    @Test
+    fun `solve should complete columns no factor reads without branching on them`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 3)),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
+        ).bake()
+        val tiered = TieredVariableSelector(
+            listOf(SearchTier(intArrayOf(1, 2), intArrayOf(0), TierVarSelect.InputOrder, IndomainMax)),
+            SmallestDomain,
+        )
+        for (selector in listOf(InputOrder, SmallestDomain, RandomVariable, Vsids(), DomWdeg(), Chb(), tiered)) {
+            val result = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
+
+            assertIs<SolveResult.Sat>(result)
+            assertEquals(0.0, result.stats.search.nodes.sum)
+        }
+    }
+
+    @Test
+    fun `enumerate should tell models apart by columns no factor reads`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 3)),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+
+        val models = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
+
+        assertEquals(16, models.toSet().size)
+    }
+
+    @Test
+    fun `minimize should decide columns only the objective reads`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 3)),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+        val objective = LinearObjective(boolWeights = longArrayOf(0L, -2L), intCoefficients = longArrayOf(-1L))
+
+        val result = BacktrackSolver(problem.bake())
+            .minimize(objective, BacktrackParams(valueSelector = IndomainMin, randomSeed = 0L))
+
+        assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(-5.0, result.objective)
+    }
+
+    @Test
+    fun `solve should keep assumptions on columns no factor reads`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 3)),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+        val params = BacktrackParams(assumptions = Assumptions(bools = mapOf(2 to true), ints = mapOf(0 to 3L)))
+
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(problem.bake()).solve(params))
+
+        assertEquals(true, sat.assignment.bools[2])
+        assertEquals(3L, sat.assignment.ints[0])
+    }
 }
 
 private fun MinimizeResult.withoutStats(): MinimizeResult = when (this) {

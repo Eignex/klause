@@ -33,8 +33,8 @@ class LastConflict(private val base: VariableSelector) : VariableSelector {
         val candidate = pending
         if (candidate != null) {
             val stillFree = when (candidate) {
-                is VarRef.Bool -> session.boolValue(candidate.varId) == null
-                is VarRef.IntVar -> !session.intDomain(candidate.varId).isFixed
+                is VarRef.Bool -> session.needsBoolDecision(candidate.varId)
+                is VarRef.IntVar -> session.needsIntDecision(candidate.varId)
             }
             if (stillFree) return candidate
             pending = null

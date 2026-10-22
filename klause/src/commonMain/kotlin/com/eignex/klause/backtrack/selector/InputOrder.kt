@@ -11,10 +11,10 @@ object InputOrder : VariableSelector {
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         val problem = session.problem
         for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) == null) return VarRef.Bool(v)
+            if (session.needsBoolDecision(v)) return VarRef.Bool(v)
         }
         for (v in 0 until problem.numIntVars) {
-            if (!session.intDomain(v).isFixed) return VarRef.IntVar(v)
+            if (session.needsIntDecision(v)) return VarRef.IntVar(v)
         }
         return null
     }

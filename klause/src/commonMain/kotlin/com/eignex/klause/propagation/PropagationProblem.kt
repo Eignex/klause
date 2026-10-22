@@ -126,6 +126,9 @@ class PropagationProblem private constructor(
         }
     }
 
+    /** Columns no factor of [problem] declares, or null when every column has one; see [LeafColumns]. */
+    internal val unreadColumns: LeafColumns? by lazy { unreadColumnsOf(problem) }
+
     internal val clauseArena: ClauseArena by lazy { ClauseArena.of(problem) }
 
     internal companion object {

@@ -19,6 +19,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.LeafColumns
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -151,6 +152,9 @@ internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () ->
  * cancellation that [TraversalSlice.pauses] reports as the slice's own makes [next] return null at decision
  * granularity, and the next [next] resumes mid-tree. Propagation polls [propagationCancellation] alone, since a
  * fixpoint a slice cut would leave the session under-propagated for the arm that resumes it.
+ *
+ * A [singleModel] caller takes one model, so the columns [leafColumns] admits are completed at leaves rather than
+ * decided; an enumeration, a sampler or a counter tells models apart by those columns and keeps deciding them.
  */
 @Suppress("TooGenericExceptionCaught") // ownership boundaries must preserve arbitrary primary and cleanup failures
 internal class CpSatisfactionTraversal(
@@ -162,6 +166,7 @@ internal class CpSatisfactionTraversal(
     private val slice: TraversalSlice? = null,
     projection: PropagationProblem = PropagationProblem(problem),
     private val deferredInitialization: Boolean = false,
+    singleModel: Boolean = false,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
@@ -188,6 +193,7 @@ internal class CpSatisfactionTraversal(
         params,
         sink,
         slice,
+        if (singleModel) params.leafColumns(cp.session) else null,
     )
     private val completion: BacktrackCompletion
     private var run: SearchRun? = null
@@ -405,6 +411,7 @@ private class CpSatisfactionTraversalPolicy(
     private val params: BacktrackParams,
     sink: SolveStatsSink?,
     private val slice: TraversalSlice?,
+    leafColumns: LeafColumns?,
 ) : SearchTraversalPolicy,
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
@@ -413,6 +420,7 @@ private class CpSatisfactionTraversalPolicy(
     val brancher = BacktrackBrancher(
         session, params, sink, restart,
         nativeConflict = { cp.lastConflict },
+        leafColumns = leafColumns,
     ).also {
         cp.propagationObserver = it::onPropagation
         cp.cascadeConflictObserver = it::onCascadeConflict
@@ -462,6 +470,22 @@ private class CpSatisfactionTraversalPolicy(
     }
 }
 
+/**
+ * The columns a one-model search over [session] completes at leaves, or null when it decides every column.
+ *
+ * These are the columns no factor declares and [objective] gives no term. Only CP factors declare what they
+ * read, while a [BacktrackParams.componentFactory] component may read any column through the shared trail,
+ * so a search with such components decides every column.
+ */
+internal fun BacktrackParams.leafColumns(
+    session: PropagationSession,
+    objective: LinearObjective? = null,
+): LeafColumns? {
+    val unread = (if (componentFactory == null) session.projection.unreadColumns else null) ?: return null
+    return if (objective == null) unread
+    else unread.withoutTerms(objective.boolWeightValues, objective.intCoefficientValues)
+}
+
 internal class BacktrackBrancher(
     private val session: PropagationSession,
     params: BacktrackParams,
@@ -469,6 +493,7 @@ internal class BacktrackBrancher(
     private val restart: RestartSchedule,
     private val branching: BacktrackBranching = BacktrackBranching.Selectors,
     private val nativeConflict: () -> PropagationResult.Unsat? = { null },
+    leafColumns: LeafColumns? = null,
 ) : SearchBrancher,
     SearchRunObserver {
     // Node count from which the next restart may count root fixings. The count visits every variable, so it runs
@@ -483,6 +508,7 @@ internal class BacktrackBrancher(
     private var preferImportedSolution = false
 
     init {
+        session.completeAtLeaves(leafColumns)
         if (params.phaseSaving || params.targetPhasing) {
             session.retractingListener = { phase.capture(it, session) }
         }
@@ -526,8 +552,8 @@ internal class BacktrackBrancher(
     }
 
     private fun isOpen(variable: VarRef): Boolean = when (variable) {
-        is VarRef.Bool -> session.boolValue(variable.varId) == null
-        is VarRef.IntVar -> !session.intDomain(variable.varId).isFixed
+        is VarRef.Bool -> session.needsBoolDecision(variable.varId)
+        is VarRef.IntVar -> session.needsIntDecision(variable.varId)
     }
 
     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {

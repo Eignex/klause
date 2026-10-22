@@ -33,7 +33,7 @@ internal class MaxRegret(private val objective: LinearObjective, private val bas
         var best: VarRef? = null
         var bestRegret = 0L
         for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) != null) continue
+            if (!session.needsBoolDecision(v)) continue
             val w = if (v < objective.boolWeightValues.size) objective.boolWeightValues[v] else 0L
             val r = abs(w)
             if (r > bestRegret) {
@@ -43,7 +43,7 @@ internal class MaxRegret(private val objective: LinearObjective, private val bas
         }
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
-            if (d.isFixed) continue
+            if (!session.needsIntDecision(v)) continue
             val c = if (v < objective.intCoefficientValues.size) objective.intCoefficientValues[v] else 0L
             val r = saturatingMul(abs(c), saturatingSpan(d))
             if (r > bestRegret) {

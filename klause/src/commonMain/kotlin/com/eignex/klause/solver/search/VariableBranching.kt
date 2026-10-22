@@ -20,11 +20,11 @@ interface BranchingState {
     /** Number of integer variables this branching may choose between. */
     val numIntVars: Int
 
-    /** Current value of Boolean variable [variable], or null when it is still free. */
-    fun boolValue(variable: Int): Boolean?
+    /** True while Boolean variable [variable] is free and this branching still has to decide it. */
+    fun needsBoolDecision(variable: Int): Boolean
 
-    /** True when integer variable [variable] admits exactly one value and cannot be branched on. */
-    fun intFixed(variable: Int): Boolean
+    /** True while integer variable [variable] admits more than one value and this branching still has to decide it. */
+    fun needsIntDecision(variable: Int): Boolean
 }
 
 /**
@@ -48,8 +48,8 @@ class BranchingConflict(
 }
 
 /**
- * Picks the next variable to branch on over a substrate exposing [S]. Returns `null` when every
- * variable it can see is determined.
+ * Picks the next variable to branch on over a substrate exposing [S]. Returns `null` when no
+ * variable it can see still needs a decision.
  *
  * The notification hooks let activity-, conflict-, or weight-driven heuristics accumulate state across
  * a search without smuggling listeners through the engine. Pure heuristics ignore them via the

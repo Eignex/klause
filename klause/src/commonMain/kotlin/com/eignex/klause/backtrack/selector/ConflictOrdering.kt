@@ -46,7 +46,7 @@ internal class ConflictOrdering(private val base: VariableSelector) : VariableSe
         var best: VarRef? = null
         var bestStamp: Long = 0
         for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) != null) continue
+            if (!session.needsBoolDecision(v)) continue
             val s = boolStamp[v]
             if (s > bestStamp) {
                 bestStamp = s
@@ -54,7 +54,7 @@ internal class ConflictOrdering(private val base: VariableSelector) : VariableSe
             }
         }
         for (v in 0 until problem.numIntVars) {
-            if (session.intDomain(v).isFixed) continue
+            if (!session.needsIntDecision(v)) continue
             val s = intStamp[v]
             if (s > bestStamp) {
                 bestStamp = s

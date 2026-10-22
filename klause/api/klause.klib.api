@@ -1588,8 +1588,8 @@ abstract interface com.eignex.klause.solver.search/BranchingState { // com.eigne
     abstract val numIntVars // com.eignex.klause.solver.search/BranchingState.numIntVars|{}numIntVars[0]
         abstract fun <get-numIntVars>(): kotlin/Int // com.eignex.klause.solver.search/BranchingState.numIntVars.<get-numIntVars>|<get-numIntVars>(){}[0]
 
-    abstract fun boolValue(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/BranchingState.boolValue|boolValue(kotlin.Int){}[0]
-    abstract fun intFixed(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.search/BranchingState.intFixed|intFixed(kotlin.Int){}[0]
+    abstract fun needsBoolDecision(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.search/BranchingState.needsBoolDecision|needsBoolDecision(kotlin.Int){}[0]
+    abstract fun needsIntDecision(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.search/BranchingState.needsIntDecision|needsIntDecision(kotlin.Int){}[0]
 }
 
 abstract interface com.eignex.klause.solver.search/SearchBranchProposal { // com.eignex.klause.solver.search/SearchBranchProposal|null[0]

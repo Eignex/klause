@@ -12,10 +12,10 @@ object RandomVariable : VariableSelector {
         val problem = session.problem
         val candidates = ArrayList<VarRef>()
         for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) == null) candidates.add(VarRef.Bool(v))
+            if (session.needsBoolDecision(v)) candidates.add(VarRef.Bool(v))
         }
         for (v in 0 until problem.numIntVars) {
-            if (!session.intDomain(v).isFixed) candidates.add(VarRef.IntVar(v))
+            if (session.needsIntDecision(v)) candidates.add(VarRef.IntVar(v))
         }
         if (candidates.isEmpty()) return null
         return candidates[rng.nextInt(candidates.size)]
