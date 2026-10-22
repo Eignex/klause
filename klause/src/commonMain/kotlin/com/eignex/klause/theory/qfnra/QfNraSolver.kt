@@ -1597,6 +1597,7 @@ private fun searchCells(
             activeLevels.add(level)
         } else {
             coordinates[variable] = algebraic.rational(fixed[variable] ?: algebraic.sampleBetween(null, null))
+            if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
         }
     }
     if (activeLevels.isEmpty()) {
