@@ -8,19 +8,26 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -28,6 +35,131 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class RootBakerTest {
+    @Test
+    fun `SAC ordering should read live memberships once and skip incidence when all columns are fixed`() {
+        for (size in listOf(1, 4, 16, 64)) {
+            for (fixed in listOf(false, true)) {
+                var reads = 0
+                val factors = List(size) { v ->
+                    val row = Linear(intArrayOf(1), intArrayOf(v), LinearOp.GE, 0)
+                    object : Factor by row, Propagator by row.propagatorProjection() {
+                        override val intVars: IntArray get() {
+                            reads++
+                            return row.intVars
+                        }
+                    }
+                }
+                val problem = Problem(0, size, Array(size) { IntDomain(0, if (fixed) 0 else 3) }, factors).bake()
+                reads = 0
+
+                val result = RootBaker.bake(problem, BakeConfig(probeIntBounds = true, probeTotalBudget = 0))
+
+                assertEquals(if (fixed) 0 else 2 * size, reads, "size=$size fixed=$fixed")
+                assertEquals(problem.baked, result)
+            }
+        }
+    }
+
+    @Test
+    fun `SAC ordering should retain filtered degrees accumulated bounds and seeded ties`() {
+        val pins = mutableListOf<Pair<Int, Long>>()
+        val factors = List(4) { v ->
+            val row = Linear(intArrayOf(1), intArrayOf(v), LinearOp.GE, 0)
+            object : Factor by row, Propagator by row.propagatorProjection() {
+                override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                    val domain = state.intDomains[v]
+                    if (v != 3 && domain.isFixed) pins.add(v to domain.min)
+                    return true
+                }
+            }
+        } + List(8) {
+            object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0) {}
+        }
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val seed = PropagationResult.Implied(emptyMap(), mapOf(3 to 1L)).withMin(1, 2)
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider { factor ->
+                if (factor is Propagator) {
+                    BuiltInPropagationProjectionProvider.select(factor)
+                } else {
+                    PropagationProjection(
+                        PropagationCapability.INERT,
+                        AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                        "Original finite factors are checked at complete points.",
+                    ) { NoPropagator }
+                }
+            },
+        )
+        val problem = BakedProblem(
+            0, 4, Array(4) { IntDomain(0, 3) }, factors,
+            seedDeductions = seed,
+            alreadyFolded = true,
+            cancellation = budget.orSpent(Cancellation.Never),
+            projectionProviders = providers,
+        )
+        val rng = Random(42L)
+        val ties = IntArray(4) { rng.nextInt() }
+        val order = listOf(1) + listOf(0, 2).sortedBy { ties[it] }
+
+        val result = RootBaker.bake(problem, BakeConfig(probeIntBounds = true, probeSeed = 42L))
+
+        assertEquals(order.flatMap { listOf(it to if (it == 1) 2L else 0L, it to 3L) }, pins)
+        assertEquals(problem.baked, result)
+        assertEquals(6L, budget.probeCalls)
+        assertTrue(budget.rootPropagationWork > 0L)
+    }
+
+    @Test
+    fun `interior probes should visit present members in order across gaps exclusions and long endpoints`() {
+        val cases = listOf(
+            IntDomain(-2, 2) to listOf(-2L, 2L, -1L, 0L, 1L),
+            intDomainFromSurvivors(longArrayOf(0, 50_000, 100_000)) to listOf(0L, 100_000L, 50_000L),
+            IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 2) to
+                listOf(Long.MIN_VALUE, Long.MIN_VALUE + 2, Long.MIN_VALUE + 1),
+            IntDomain(Long.MAX_VALUE - 2, Long.MAX_VALUE) to
+                listOf(Long.MAX_VALUE - 2, Long.MAX_VALUE, Long.MAX_VALUE - 1),
+            IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) to
+                listOf(Long.MIN_VALUE, Long.MAX_VALUE) + (1L..5L).map { Long.MIN_VALUE + it },
+        )
+        for ((domain, expected) in cases) {
+            for (excluded in listOf(false, true)) {
+                val pins = mutableListOf<Long>()
+                var polls = 0
+                val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, Long.MIN_VALUE)
+                val factor = object : Factor by row, Propagator {
+                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                        val current = state.intDomains[0]
+                        if (current.isFixed) pins.add(current.min)
+                        return true
+                    }
+                }
+                val budget = PresolveBudget(Long.MAX_VALUE)
+                val seed = if (excluded) {
+                    PropagationResult.Implied.EMPTY.withHole(0, expected[2])
+                } else {
+                    PropagationResult.Implied.EMPTY
+                }
+                val problem = BakedProblem(
+                    0, 1, arrayOf(domain), listOf(factor),
+                    seedDeductions = seed,
+                    alreadyFolded = true,
+                    cancellation = budget.orSpent(Cancellation { ++polls > 200 }),
+                )
+                polls = 0
+
+                val result = RootBaker.bake(
+                    problem, BakeConfig(probeIntHoles = true, probeBudgetPerVar = 4),
+                )
+
+                val expectedPins = expected.filter { !excluded || it != expected[2] }.take(6)
+                assertEquals(expectedPins, pins, "domain=${domain.min}..${domain.max} excluded=$excluded")
+                assertEquals(expectedPins.size.toLong(), budget.probeCalls)
+                assertEquals(problem.baked, result)
+                assertTrue(polls <= 200)
+            }
+        }
+    }
+
     @Test
     fun `SAC observations should count tightened columns without requiring fixings`() {
         val budget = PresolveBudget(Long.MAX_VALUE)

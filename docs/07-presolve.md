@@ -324,6 +324,10 @@ integer and open-range probing extend this to bounds and holes. Compilation, inc
 row and graph visits charge and poll the pass token. An interruption retains completed
 unconditional deductions and retracts the active hypothetical branch. Candidate,
 entry and representation limits bound optional analysis, not solve time.
+Finite SAC ordering shares one lazy propagator-filtered integer incidence index per
+ordering call; fixed columns require no incidence. Interior-hole candidates follow
+present domain successors in ascending order, skipping accumulated exclusions without
+enumerating numeric gaps or materializing wide domains.
 
 Source probing and symmetry defer to finite preparation for closed discrete-only
 models. With real columns they may run in the source lane even when integer
