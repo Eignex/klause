@@ -350,6 +350,12 @@ exact scalar images when those bounds establish the sign. Eliminated coordinates
 are reconstructed and the full assignment passes the original formula before
 capture. Exhausting every cell of the complete projection refutes the region.
 
+Every root-level cell checks all region predicates. A deeper cell changes one
+coordinate of an accepted parent prefix, so it rechecks only predicates reading
+that coordinate, in their original order. The index includes every coordinate a
+predicate reads, including coordinates below its final level. Retraction returns
+to the accepted ancestor prefix before another child is checked.
+
 #### Objective-image traversal
 
 The image service adds an objective coordinate `t = f(source)` below all source
