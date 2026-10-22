@@ -22,6 +22,19 @@ import kotlin.test.assertTrue
 class BakedProblemTest {
 
     @Test
+    fun `ordinary already folded construction should still propagate its factors`() {
+        val problem = BakedProblem(
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = listOf(Clause(intArrayOf(Lit.make(0, true)))),
+            alreadyFolded = true,
+        )
+
+        assertEquals(true, assertIs<PropagationResult.Implied>(problem.baked).boolValueOrNull(0))
+    }
+
+    @Test
     fun `a conditioned root should intersect bounds holes and survivor sets with the source`() {
         val source = Problem(0, 1, arrayOf(holey()), emptyArray()).bake()
         val cases = listOf(
