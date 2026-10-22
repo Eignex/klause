@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
@@ -105,17 +106,38 @@ class PortfolioProofCoverageTest {
     }
 
     @Test
+    fun `retained proof coverage should wait for one base time allowance of stagnation`() {
+        val clock = TestTimeSource()
+        val visits = IntArray(2)
+        var elapsed = 0L
+        val workers = List(2) { arm ->
+            trackingWorker("worker$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) {
+                visits[arm]++
+                elapsed += 100L
+                clock += 100.milliseconds
+            }).also { it.restartingSearch = arm == 0 }
+        }
+
+        Portfolio(workers, fixedBandit(2, 0), reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+        }.use { it.minimize(Cancellation { elapsed >= 2_000L }) }
+
+        assertEquals(1, visits[1])
+    }
+
+    @Test
     fun `workers without retained exhaustive traversal should not receive proof coverage`() {
-        for (role in listOf("restarting", "improvement")) {
+        for (role in listOf("restarting", "improvement", "witness")) {
             val clock = TestTimeSource()
             val visits = IntArray(2)
             var elapsed = 0L
+            val model = ModelIdentity.of(Any())
             val workers = List(2) { arm ->
                 trackingWorker("worker$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) {
                     visits[arm]++
                     elapsed += 500L
                     clock += 500.milliseconds
-                }).also {
+                }).bindEvidence(model, provesResults = arm == 0 || role != "witness").also {
                     it.restartingSearch = arm == 0 || role == "restarting"
                     if (arm == 1 && role == "improvement") it.improvementOnly = true
                 }

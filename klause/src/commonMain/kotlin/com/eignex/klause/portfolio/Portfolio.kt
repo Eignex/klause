@@ -827,9 +827,7 @@ class Portfolio(
                 eligible.filter { preparationRevisits[it] && !busy[it] && !retired[it] }
                     .minByOrNull { (it - nextPreparationArm + workers.size) % workers.size }
             }
-            val owed = if (dedicated || probe != null) null else {
-                owedArm(eligible) ?: owedProofArm(eligible) ?: owedCompleteArm(eligible)
-            }
+            val owed = if (dedicated || probe != null) null else owedArm(eligible) ?: owedCompleteArm(eligible)
             val arm = when {
                 dedicated -> lane
 
@@ -886,7 +884,6 @@ class Portfolio(
         // within local search's feasibility share; a neighborhood needs an incumbent unless it is all that is left.
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
-            owedProofArm(eligibleArms)?.let { return it }
             owedCompleteArm(eligibleArms)?.let { return it }
             eligibleArms.firstOrNull {
                 workers[it].auxiliaryProof && !busy[it] && !retired[it]
@@ -896,6 +893,7 @@ class Portfolio(
                     it in incumbentProbeArms && trialStarted[it] && !productive[it] && !busy[it] && !retired[it]
                 }?.let { return it }
             }
+            owedProofArm(eligibleArms)?.let { return it }
             val preparing = continuingPreparation
             if (preparing >= 0 && !busy[preparing]) {
                 if (!retired[preparing] && preparing in eligibleArms &&
