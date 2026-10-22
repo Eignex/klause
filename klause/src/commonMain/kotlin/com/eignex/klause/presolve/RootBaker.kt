@@ -189,7 +189,8 @@ object RootBaker {
                 for (i in 0 until acc.intHoleVarIds.size) {
                     if (acc.intHoleVarIds[i] == v) existingHoles.add(acc.intHoleValues[i])
                 }
-                for (k in (curMin + 1) until curMax) {
+                var candidate = orig.higher(curMin)
+                while (candidate < curMax) {
                     if (cancellation()) return acc
                     if (perVarCalls[v] >= config.probeBudgetPerVar) {
                         cancellation.interruptPresolveInvocation()
@@ -199,7 +200,8 @@ object RootBaker {
                         cancellation.interruptPresolveInvocation()
                         return acc
                     }
-                    if (k !in orig) continue
+                    val k = candidate
+                    candidate = orig.higher(k)
                     if (k in existingHoles) continue
                     perVarCalls[v]++
                     totalCalls++
@@ -235,6 +237,7 @@ object RootBaker {
         rng: Random,
     ): IntArray {
         val numIntVars = problem.numIntVars
+        val intOccurrences by lazy { PropagationProblem(problem).intOccurrences }
         val scores = DoubleArray(numIntVars) { v ->
             if (acc.intValueOrNull(v) != null) return@DoubleArray Double.NEGATIVE_INFINITY
             val orig = problem.rootIntDomain(v)
@@ -242,7 +245,7 @@ object RootBaker {
             val hi = acc.intMaxOrNullCompat(v) ?: orig.max
             val dom = (hi - lo + 1).coerceAtLeast(1)
             var wdeg = 0.0
-            val occ = PropagationProblem(problem).intOccurrences[v]
+            val occ = intOccurrences[v]
             for (i in occ.indices) wdeg += factorWeights[occ[i]]
             wdeg / dom
         }
