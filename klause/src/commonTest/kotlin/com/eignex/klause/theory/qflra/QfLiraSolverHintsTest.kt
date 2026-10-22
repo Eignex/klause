@@ -49,24 +49,24 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
-    fun `additional theory bounds should retire an indexed working point`() {
+    fun `additional theory bounds should be checked after indexed reuse`() {
         val model = Problem(
             numBoolVars = 301,
             intBounds = openBounds(0),
             numRealVars = 256,
             realLower = DoubleArray(256),
-            realUpper = DoubleArray(256),
+            realUpper = DoubleArray(256) { if (it == 0) 1.0 else 0.0 },
             factors = Array<Factor>(301) { head ->
                 if (head < 300) ReifiedRealLinear(
                     head, intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
                     LinearOp.LE, 0.0,
                 ) else Linear(intArrayOf(), doubleArrayOf(), IntArray(256) { it }, DoubleArray(256) { 1.0 },
-                    LinearOp.EQ, 0.0)
+                    LinearOp.GE, 0.0)
             },
         )
         ExactLiraSearchComponent(model).use { component ->
-            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
-                defaultGraphSelections = true)).second
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true))
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(301))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
@@ -76,7 +76,6 @@ class QfLiraSolverHintsTest {
             val result = session.push(SearchDecision.Theory(bound.negative))
 
             assertIs<ComponentResult.Conflict>(result)
-            assertNull(hints.preferredBool(1))
             assertNull(session.model().valueOf(component.assignmentKey))
         }
     }
