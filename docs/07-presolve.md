@@ -229,7 +229,13 @@ factor retain one representative. Clique-implied subsumption admits
 only unconditional positive Boolean knapsacks and derives activity bounds from
 retained clauses/cardinalities, so a dropped row cannot justify its own removal.
 Strict-subset domination uses checked arithmetic for extra activity and scaled
-bounds; an overflowing attempt supplies no reduction.
+bounds; an overflowing attempt supplies no reduction. Its independent `subsume-subset`
+observation excludes cheap duplicate drops. Equal support widths skip comparisons;
+an anchor-incidence index selects smaller rows. Source and finite rounds retain
+completed comparisons and resume interrupted scans. Changed rows or activities
+invalidate affected comparisons; unrelated changes leave them cached.
+Each call admits widths up to 128 and at most 65,536 entry and term visits, retaining
+at most 65,536 failed pairs. Completed drops survive interruption.
 
 Comparison-clause folding combines sole-use reified indicators into one comparison
 disjunction. Reconstruction restores their truth after integer reconstruction and

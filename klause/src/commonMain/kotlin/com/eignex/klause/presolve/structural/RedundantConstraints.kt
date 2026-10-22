@@ -31,7 +31,6 @@ import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.MutableLongObjectMap
 import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
 import com.eignex.kumulant.math.splitmix64
 
 /** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
@@ -44,7 +43,7 @@ internal object RedundantConstraints {
      * Subsumption entry point. Without [incremental] it recomputes from scratch. Given a
      * [SubsumeIncremental] it maintains the phase-1/2 indices across rounds in [SubsumeIncremental.memo],
      * reprocessing only the factors added / dropped since the pass last ran, so a fruitless re-run costs
-     * O(delta). The later phases run over the phase-2 survivor list either way.
+     * O(delta). Strict-subset analysis retains its own bounded continuation in the same memo.
      *
      * [ranges] is how wide each column is to the activity-based phases: a finite projection's folded
      * domains, or what a source model states (see [removeRedundantSourceConstraints]).
@@ -57,7 +56,7 @@ internal object RedundantConstraints {
     ): PassDelta {
         if (incremental == null) return computeFull(problem, ranges, cancellation)
         val out = incremental.memo.reconcile(problem, incremental, cancellation)
-        val delta = finishAfterPhase2(problem, ranges, out, cancellation)
+        val delta = finishAfterPhase2(problem, ranges, out, cancellation, incremental.memo.subsets)
         // Phases 3–5 drop factors [reconcile] never saw; feed the full drop set back so the memo retracts
         // every dropped factor's index entry before the next firing.
         incremental.memo.setPendingSelfDrops(
@@ -76,8 +75,11 @@ internal object RedundantConstraints {
      * they run here over what the source states and decline the individual row or global that mentions a
      * column with an open side. The model being open somewhere else costs them nothing.
      */
-    fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta =
-        computeFull(problem, ColumnRanges.of(problem.intBounds), cancellation).asSourceDelta()
+    fun removeRedundantSourceConstraints(
+        problem: Problem,
+        cancellation: Cancellation,
+        memo: SubsumeMemo? = null,
+    ): SourceDelta = computeFull(problem, ColumnRanges.of(problem.intBounds), cancellation, memo?.subsets).asSourceDelta()
 
     // Debug switch: every incremental firing also recomputes the full delta and asserts the two agree, so a
     // divergence throws on the exact instance/round. Off in production (the full recompute defeats the point).
@@ -103,7 +105,7 @@ internal object RedundantConstraints {
      *     a reduced coefficient vector are comparable: the tightest (smallest `≤` bound) implies the
      *     rest, so only it is kept. An `=` over the same vector contributes its bound to *both*
      *     directions and implies (drops) any looser `≤` / `≥`, but is itself never dropped here.
-     *  3. **Variable-subset / proportional domination** ([dropSubsetDominated]) — a `≤`-row whose
+     *  3. **Variable-subset / proportional domination** ([SubsetDomination]) — a `≤`-row whose
      *     support is a strict subset of another's, with coefficients a positive multiple of it on the
      *     shared variables and a bound that implies the larger row's (after charging the extra terms
      *     their maximal activity), drops the larger row across *different* supports.
@@ -119,6 +121,7 @@ internal object RedundantConstraints {
         problem: Problem,
         ranges: ColumnRanges,
         cancellation: Cancellation = Cancellation.Never,
+        subsets: SubsetDomination? = null,
     ): PassDelta {
         val factors = problem.factors
         // Phase 1: exact-duplicate removal by structural key, two-tier so the full key (which for a
@@ -141,7 +144,7 @@ internal object RedundantConstraints {
             if (keys.add(f.structuralKey())) deduped.add(f)
         }
         // Unit-coefficient clause rows have the same bound; their duplicates were removed by keys.
-        if (deduped.all { it is Clause }) return finishAfterPhase2(problem, ranges, deduped, cancellation)
+        if (deduped.all { it is Clause }) return finishAfterPhase2(problem, ranges, deduped, cancellation, subsets)
         // Phase 2: bucket the ≤-normalised Linear inequalities by coefficient vector; the bucket's
         // tightest bound (and whether an `=` provides it) decides which inequalities are implied.
         val bucketMin = HashMap<TermKey, Long>()
@@ -183,7 +186,7 @@ internal object RedundantConstraints {
             }
             if (keep) out.add(f)
         }
-        return finishAfterPhase2(problem, ranges, out, cancellation)
+        return finishAfterPhase2(problem, ranges, out, cancellation, subsets)
     }
 
     /** Phases 3–5 over the phase-1/2 survivor list [out] (in `Problem.factors` order), recovering the
@@ -193,9 +196,10 @@ internal object RedundantConstraints {
         ranges: ColumnRanges,
         out: List<Factor>,
         cancellation: Cancellation = Cancellation.Never,
+        subsets: SubsetDomination? = null,
     ): PassDelta {
         val factors = problem.factors
-        val out3 = dropSubsetDominated(ranges, out, cancellation)
+        val out3 = (subsets ?: SubsetDomination()).removeDominated(problem, ranges, out, cancellation)
         val out4 = dropCliqueImpliedKnapsacks(out3, cancellation)
         // Phase 5: drop globals the current ranges make vacuously satisfied; removing one frees
         // a variable contained only in it, which the affine pass then projects out (implied-free).
@@ -235,7 +239,8 @@ internal object RedundantConstraints {
      * other passes' drops arrive via [SubsumeIncremental.droppedIds]; subsume's own drops fall before
      * the next change-mark and are carried over to the next firing internally.
      */
-    internal class SubsumeMemo {
+    internal class SubsumeMemo : SubsumeState {
+        val subsets = SubsetDomination()
         // Long-keyed to avoid boxing the shallow key on every factor: a clause-heavy model registers
         // hundreds of thousands of factors, and a `HashMap<Long, …>` would box the key on each lookup.
         private val shallowSingle = MutableLongObjectMap<SubsumeFactor>()
@@ -460,134 +465,8 @@ internal object RedundantConstraints {
         return true
     }
 
-    /** Cap on the `≤`-rows Phase 3 compares pairwise, to keep the domination scan from going quadratic
-     *  on a huge linear system; above it the scan is skipped (sound — it only means fewer drops). */
-    private const val SUBSET_DOMINATION_ROW_CAP = 1500
-
-    /** Poll the cancellation once per this many drop-candidates in the pairwise domination scan. */
-    private const val SUBSET_CANCEL_POLL_MASK = 0xFF
-
     /** Poll the cancellation once per this many factors while rebuilding the subsume memo from scratch. */
     private const val REBUILD_CANCEL_POLL_MASK = 0x3FF
-
-    /** A `Σ coeffs·x ≤ bound` row as a GCD-reduced coefficient map keyed by variable id. */
-    private class LeRow(val factorIndex: Int, val coeffByVar: MutableIntLongMap, val bound: Long)
-
-    /** A `≤`-normalised, GCD-reduced [LeRow] for an exact [LinearRow] (from any factor's
-     *  `Factor.linearRows`); `null` for a non-(`≤`/`≥`) row. Coalesced terms have distinct vars, so a
-     *  plain put per index is faithful; zero coefficients carry no support (and would divide by zero in
-     *  the dominance ratio check), so skip them. */
-    private fun leRowOf(row: LinearRow, factorIndex: Int): LeRow? {
-        if (!row.isLongUnconditional || row.bound == Long.MIN_VALUE ||
-            (0 until row.size).any { row.coeff(it) == Long.MIN_VALUE }
-        ) {
-            return null
-        }
-        if ((0 until row.size).map(row::ref).toSet().size != row.size) return null
-        val raw = LongArray(row.size) { row.coeff(it) }
-        val (coeffs, bound) = when (row.relation) {
-            LinearOp.LE -> raw to row.bound
-            LinearOp.GE -> negated(raw) to -row.bound
-            else -> return null
-        }
-        val g = PresolveShared.gcdOf(coeffs)
-        val map = MutableIntLongMap(row.size)
-        for (i in 0 until row.size) {
-            if (coeffs[i] == 0L) continue
-            map.put(Term.intVar(row.ref(i)), if (g <= 1L) coeffs[i] else coeffs[i] / g)
-        }
-        return LeRow(factorIndex, map, if (g <= 1L) bound else bound.floorDiv(g))
-    }
-
-    /**
-     * Variable-subset / proportional constraint domination. Drop a `≤`-row `B` when another
-     * `≤`-row `A` has a support that is a strict subset of `B`'s with coefficients a positive integer
-     * multiple `k` of `B`'s on the shared variables, and `k·boundA + maxActivity(B-only terms) ≤
-     * boundB`. Then `A ⟹ B`: from `Σ_S a·x ≤ boundA` we get `Σ_S k·a·x ≤ k·boundA`, and adding the
-     * maximal activity of `B`'s extra terms still stays within `boundB`, so `B` is redundant.
-     *
-     * Sound even when the dominator `A` is itself dropped by a yet-smaller row: domination by strictly
-     * smaller support is transitive, so every dropped row is implied by a surviving minimal one. Only
-     * `≤`/`≥` [Linear] rows take part; equalities and globals are untouched. Bounded by
-     * [SUBSET_DOMINATION_ROW_CAP] so the pairwise scan can't blow up.
-     */
-    private fun dropSubsetDominated(
-        ranges: ColumnRanges,
-        factors: List<Factor>,
-        cancellation: Cancellation = Cancellation.Never,
-    ): List<Factor> {
-        // Dominators: every exact `≤`-row in the model (so an increasing chain's pairs can dominate
-        // too). Drop candidates: only single-row factors — a multi-row factor (an increasing chain) is
-        // never dropped here, since one dominated pair does not make the whole chain redundant.
-        val dominators = ArrayList<LeRow>()
-        val candidates = ArrayList<LeRow>()
-        for (i in factors.indices) {
-            val f = factors[i]
-            if (f is Clause) continue
-            val fRows = f.impliedLinearRows
-            // This monotone-domination scan reads the integer side; skip Boolean-literal rows.
-            if (fRows.isEmpty() || fRows.any { !it.isIntegerOnly }) continue
-            val droppable = f.linearForm is LinearForm.Conjunction && f.linearRows.size == 1
-            for (row in fRows) {
-                val le = leRowOf(row, i) ?: continue
-                dominators.add(le)
-                if (droppable) candidates.add(le)
-            }
-        }
-        if (candidates.isEmpty() || dominators.size > SUBSET_DOMINATION_ROW_CAP) return factors
-        val dropped = IntHashSet()
-        for ((bi, b) in candidates.withIndex()) {
-            // This pairwise scan is O(candidates · dominators). Bailing keeps the drops found so far, each
-            // an independently valid domination.
-            if ((bi and SUBSET_CANCEL_POLL_MASK) == 0 && cancellation()) break
-            cancellation.charge(SUBSUME_WORK_WEIGHT * dominators.size)
-            for (a in dominators) {
-                if (a.factorIndex == b.factorIndex || a.coeffByVar.size >= b.coeffByVar.size) continue
-                if (dominates(ranges, a, b)) {
-                    dropped.add(b.factorIndex)
-                    break
-                }
-            }
-        }
-        if (dropped.isEmpty()) return factors
-        return factors.filterIndexed { i, _ -> i !in dropped }
-    }
-
-    /** Whether `≤`-row [a] (strict-subset support) dominates [b]: matching coefficients up to a single
-     *  positive integer multiple `k` on the shared variables, and `k·boundA + maxExtra ≤ boundB`. */
-    private fun dominates(ranges: ColumnRanges, a: LeRow, b: LeRow): Boolean = try {
-        dominationWithinBound(ranges, a, b)
-    } catch (_: CheckedLongOverflowException) {
-        false
-    }
-
-    private fun dominationWithinBound(ranges: ColumnRanges, a: LeRow, b: LeRow): Boolean {
-        var k = 0L
-        a.coeffByVar.forEach { v, ca ->
-            if (!b.coeffByVar.containsKey(v)) return false
-            val cb = b.coeffByVar.getOrDefault(v, 0L)
-            if (cb % ca != 0L) return false
-            val ratio = cb / ca
-            if (ratio <= 0L) return false
-            if (k == 0L) {
-                k = ratio
-            } else if (k != ratio) {
-                return false
-            }
-        }
-        if (k == 0L) return false
-        var maxExtra = 0L
-        b.coeffByVar.forEach { v, cb ->
-            if (!a.coeffByVar.containsKey(v)) {
-                // An extra term over a column the model leaves open has unbounded activity, so no
-                // domination can be claimed from it.
-                if (!ranges.isClosed(v)) return false
-                val endpoint = if (cb >= 0) ranges.max(v) else ranges.min(v)
-                maxExtra = addExact(maxExtra, mulExact(cb, endpoint))
-            }
-        }
-        return addExact(mulExact(k, a.bound), maxExtra) <= b.bound
-    }
 
     /**
      * Clique-aware redundancy. An at-most-one (AMO) clique over a set of literals — at most one

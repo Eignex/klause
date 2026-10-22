@@ -32,6 +32,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -209,7 +210,7 @@ class RedundantConstraintsTest {
         Linear(IntArray(vc.size / 2) { vc[2 * it + 1] }, IntArray(vc.size / 2) { vc[2 * it] }, LinearOp.LE, b)
 
     @Test
-    fun `an exclusion triangle without an eligible knapsack should spend no clique work`() {
+    fun `an exclusion triangle without an eligible knapsack should only spend entry work`() {
         val exclusions = listOf(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
@@ -230,7 +231,8 @@ class RedundantConstraintsTest {
             val delta = Presolve.removeRedundantSourceConstraints(model, budget.orSpent(Cancellation.Never))
 
             assertTrue(delta.isEmpty, "unexpected reduction with $extra")
-            assertEquals(0L, budget.spent(), "unexpected clique work with $extra")
+            assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, budget.invocations.single().outcome)
+            assertTrue(budget.spent() < 2_000L, "unexpected analysis work with $extra")
         }
     }
 

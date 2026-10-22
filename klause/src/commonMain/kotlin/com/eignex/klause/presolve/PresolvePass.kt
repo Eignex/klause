@@ -181,7 +181,9 @@ enum class PresolvePass(
      *  already GCD-normalised. */
     REMOVE_REDUNDANT("subsume", Stage.PROBLEM, Capability.SOURCE, PresolveTiming.FAST, true, autoEligible = true) {
         override fun applySource(problem: Problem, ctx: PresolveContext) =
-            Presolve.removeRedundantSourceConstraints(problem, ctx.cancellation)
+            RedundantConstraints.removeRedundantSourceConstraints(
+                problem, ctx.cancellation, ctx.subsumeIncremental as? RedundantConstraints.SubsumeMemo,
+            )
 
         // The finite lane charges the same phases over root-propagated domains, which are narrower than
         // the source states, and carries the round engine's persistent phase-1/2 indices.
