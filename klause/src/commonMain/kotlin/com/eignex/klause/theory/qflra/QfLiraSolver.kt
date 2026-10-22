@@ -1434,7 +1434,7 @@ class ExactLiraSearchComponent private constructor(
             if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
                 sourceEqualityConflictScope()
             ) {
-                recoverAssignedSourceRows(context)?.let { return it }
+                recoverAssignedSourceRows(context, result.float.primal)?.let { return it }
                 if (operationStop()) return ComponentResult.Indeterminate
             }
             candidate?.let { capturePointHints(it, context) }
@@ -1463,21 +1463,25 @@ class ExactLiraSearchComponent private constructor(
         node.sourceBranches.isEmpty() && node.rowAssertions.isEmpty() && node.disequalityDirections.isEmpty() &&
         solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
-    private fun recoverAssignedSourceRows(context: SearchContext): ComponentResult.Conflict? {
+    private fun recoverAssignedSourceRows(context: SearchContext, primal: DoubleArray): ComponentResult.Conflict? {
         observeCompleteStage("PARTIAL_SOURCE_RECOVERY_ATTEMPT")
         val origins = ArrayList<IntArray>()
         val rows = agreementSourceRows(context, origins) ?: return null
-        val repair = prepareMixedEqualityRepair(model.numRealVars, rows, lpStop, ::observeCompleteStage,
-            trackSourceRows = true) ?: return null
-        val point = repair.completePoint(rows) { columns, residual, token, onInfeasible ->
-            reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
-        }
-        if (point != null && MixedPointArithmetic(lpStop).satisfies(point, rows) && !operationStop()) {
+        lpStop.charge(rows.size.toLong())
+        if (operationStop() || rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
+        var sourceInfeasible: IntArray? = null
+        val point = completeMixedPoint(model.numRealVars, 0, primal, rows, lpStop,
+            onStage = ::observeCompleteStage,
+            onSourceInfeasible = { sourceInfeasible = it },
+            realCompletion = { columns, residual, token, onInfeasible ->
+                reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
+            })
+        if (point != null && !operationStop()) {
             candidate = point
             observeCompleteStage("PARTIAL_SOURCE_POINT")
             return null
         }
-        val support = repair.lastResidualInfeasibleRows ?: return null
+        val support = sourceInfeasible ?: return null
         if (operationStop() || !sourceEqualityConflict(context, origins, support)) return null
         observeCompleteStage("PARTIAL_SOURCE_REFUTATION")
         return ComponentResult.Conflict((outcome as ComponentCheck.Infeasible).explanation)

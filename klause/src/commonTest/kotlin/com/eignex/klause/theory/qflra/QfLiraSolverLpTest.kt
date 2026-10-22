@@ -66,55 +66,60 @@ import kotlin.test.assertTrue
 class QfLiraSolverLpTest {
     @Test
     fun `recovered partial real points should guide unresolved guards`() {
-        val source = Problem(
-            numBoolVars = 3,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            numRealVars = 133,
-            realLower = DoubleArray(133) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(133) { Double.POSITIVE_INFINITY },
-            factors = Array<Factor>(133) { index ->
-                when (index) {
-                    0 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
-                        doubleArrayOf(1.0, -1.0, -1.0), LinearOp.EQ, 0.0)
-                    1 -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
-                        doubleArrayOf(1.0, 1.0), LinearOp.LE, 1e-11)
-                    2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 3),
-                        doubleArrayOf(-1.0, -1.0, -1.0), LinearOp.LE, -1e-12)
-                    3 -> ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 3),
-                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)
-                    else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index),
-                        doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
+        for (repairable in listOf(false, true)) {
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+                numRealVars = 133,
+                realLower = DoubleArray(133) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(133) { Double.POSITIVE_INFINITY },
+                factors = Array<Factor>(133) { index ->
+                    when (index) {
+                        0 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                            doubleArrayOf(1.0, -1.0, -1.0), LinearOp.EQ, 0.0)
+                        1 -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                            doubleArrayOf(1.0, 1.0), LinearOp.LE, 0.5)
+                        2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 3),
+                            doubleArrayOf(-1.0, -1.0, -1.0), LinearOp.LE, -0.25)
+                        3 -> ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 3),
+                            doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)
+                        else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index),
+                            doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
+                    }
+                },
+            )
+            val stats = SmtStatsSink()
+            var withheld = 0
+            var repairableGuess = false
+            val factory = TrackingLpFactory(transform = { result ->
+                if (result.primal.size <= 128) result else {
+                    withheld++
+                    val primal = DoubleArray(result.primal.size)
+                    if (repairableGuess) primal[1] = 0.25
+                    FloatLpResult(result.basis, result.objective, result.duals, primal,
+                        optimal = result.optimal, exactState = result.exactState)
                 }
-            },
-        )
-        val stats = SmtStatsSink()
-        var withheld = 0
-        val factory = TrackingLpFactory(transform = { result ->
-            if (result.primal.size <= 128) result else {
-                withheld++
-                FloatLpResult(
-                    result.basis, result.objective, result.duals, DoubleArray(result.primal.size),
-                    optimal = result.optimal, exactState = result.exactState,
-                )
+            })
+            ExactLiraSearchComponent(source).use { component ->
+                component.solveWith(LpSolveContext(factory))
+                component.useMixedPointCompletion()
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                repairableGuess = repairable
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+                assertTrue(withheld > 0)
+                assertEquals(false, hints.preferredBool(2))
+                assertTrue((stats.snapshot().completeSearchStages?.get("PARTIAL_SOURCE_POINT") ?: 0L) > 0L,
+                    stats.snapshot().completeSearchStages.toString())
+                if (repairable) assertEquals(0L, stats.snapshot().sourceLp.operations)
+                assertNull(session.model().valueOf(component.assignmentKey))
             }
-        })
-        ExactLiraSearchComponent(source).use { component ->
-            component.solveWith(LpSolveContext(factory))
-            component.useMixedPointCompletion()
-            component.observeWith(stats)
-            component.observeCompleteTraversal()
-            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
-
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
-
-            assertTrue(withheld > 0)
-            assertEquals(false, hints.preferredBool(2))
-            assertTrue((stats.snapshot().completeSearchStages?.get("PARTIAL_SOURCE_POINT") ?: 0L) > 0L,
-                stats.snapshot().completeSearchStages.toString())
-            assertNull(session.model().valueOf(component.assignmentKey))
         }
     }
 

@@ -79,9 +79,10 @@ explanation limits. Cancellation withholds the conflict.
 An exact residual LP refutation follows the same path: its certified row and root
 slack-bound support selects the retained parallel inequalities, and substitution
 support maps those inequalities back through every paired source equation used.
-Partial states can use the same refutation after a float optimum lacks an exact
-point. Rows with unresolved Boolean inputs are excluded, and every Boolean premise
-in the retained support must be assigned. The same restricted theory scope gates
+Partial states can use the same recovery and refutation after a float optimum lacks
+an exact point, including the float-prefix and equality-repair attempts before a
+component LP call. Rows with unresolved Boolean inputs are excluded, and every
+Boolean premise in the retained support must be assigned. The same restricted theory scope gates
 that conflict. A recovered partial point that passes every selected original row
 can guide unresolved guards through the existing point-reuse lifecycle. Complete
 source agreement still gates publication of a witness.
