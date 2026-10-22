@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchCandidateHints
@@ -214,6 +215,7 @@ internal class PreparedSearchRegistrations(
                 opening.candidateHints(source, theory.takeIf {
                     arithmetic.size == 1 && (source.numRealVars > 0 || source.numIntVars > 0)
                 }),
+                components.filterIsInstance<ClauseSearchComponent>().firstOrNull(),
             )
         } catch (failure: Throwable) {
             resources.closeAfter(failure)
