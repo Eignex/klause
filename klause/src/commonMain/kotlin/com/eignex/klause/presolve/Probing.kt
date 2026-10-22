@@ -175,6 +175,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val rowGuardValue = LongArrayList()
     private var incidenceStart = IntArray(0)
     private var incidence = IntArray(0)
+    private var incidenceSides = IntArray(0)
     private var prepared = false
 
     // Each entry packs `(col shl 2) | (wasOpen shl 1) | side`, side 0 for the lower bound; the value is the
@@ -182,7 +183,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val trail = IntArrayList()
     private val trailValue = LongArrayList()
     private val queue = IntArrayDeque()
-    private val queued = BooleanArray(numCols)
+    private val queuedSides = IntArray(numCols)
     private val poll = PollStride()
     private var stopped = false
 
@@ -223,27 +224,38 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
             }
         }
         val counts = IntArray(numCols + 1)
-        if (!forEachIncidence { col, _ -> counts[col + 1]++ }) return
+        if (!forEachIncidence { col, _, _ -> counts[col + 1]++ }) return
         for (c in 0 until numCols) {
             if (!visit()) return
             counts[c + 1] += counts[c]
         }
         incidenceStart = counts.copyOf()
         incidence = IntArray(counts[numCols])
-        prepared = forEachIncidence { col, row -> incidence[counts[col]++] = row }
+        incidenceSides = IntArray(incidence.size)
+        prepared = forEachIncidence { col, row, sides ->
+            val index = counts[col]++
+            incidence[index] = row
+            incidenceSides[index] = sides
+        }
     }
 
-    private inline fun forEachIncidence(action: (col: Int, row: Int) -> Unit): Boolean {
+    private inline fun forEachIncidence(action: (col: Int, row: Int, sides: Int) -> Unit): Boolean {
         for (h in rowCols.indices) {
             if (!visit()) return false
-            for (col in rowCols[h]) {
+            for (k in rowCols[h].indices) {
                 if (!visit()) return false
-                action(col, h)
+                val coefficient = rowCoeffs[h][k]
+                val sides = when {
+                    coefficient == 0L -> BOTH_SIDES
+                    (rowSign[h] > 0L) == (coefficient > 0L) -> LOWER_SIDE
+                    else -> UPPER_SIDE
+                }
+                action(rowCols[h][k], h, sides)
             }
             val guard = rowGuard[h]
             if (guard >= 0) {
                 if (!visit()) return false
-                action(guard, h)
+                action(guard, h, BOTH_SIDES)
             }
         }
         return true
@@ -331,7 +343,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         trailValue.add(lo[i])
         lo[i] = v
         loOpen[i] = false
-        enqueue(i)
+        enqueue(i, LOWER_SIDE)
     }
 
     override fun setHi(i: Int, v: Long) {
@@ -344,13 +356,12 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         trailValue.add(hi[i])
         hi[i] = v
         hiOpen[i] = false
-        enqueue(i)
+        enqueue(i, UPPER_SIDE)
     }
 
-    private fun enqueue(col: Int) {
-        if (queued[col]) return
-        queued[col] = true
-        queue.addLast(col)
+    private fun enqueue(col: Int, side: Int) {
+        if (queuedSides[col] == 0) queue.addLast(col)
+        queuedSides[col] = queuedSides[col] or side
     }
 
     private fun fixed(col: Int): Boolean = !loOpen[col] && !hiOpen[col] && lo[col] == hi[col]
@@ -372,7 +383,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
             trail.truncateTo(last)
             trailValue.truncateTo(last)
         }
-        while (queue.isNotEmpty()) queued[queue.removeFirst()] = false
+        while (queue.isNotEmpty()) queuedSides[queue.removeFirst()] = 0
         conflict = false
     }
 
@@ -405,7 +416,8 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         val cap = PROBE_SOURCE_VISITS_PER_ROW * (1L + rowCols.size)
         while (!crossed && !stopped && queue.isNotEmpty()) {
             val col = queue.removeFirst()
-            queued[col] = false
+            val sides = queuedSides[col]
+            queuedSides[col] = 0
             for (k in incidenceStart[col] until incidenceStart[col + 1]) {
                 if (!visit()) break
                 visits++
@@ -413,11 +425,12 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
                     stopped = true
                     break
                 }
-                process(incidence[k])
+                // An output-side change leaves this row's minimum activity and guard unchanged.
+                if (incidenceSides[k] and sides != 0) process(incidence[k])
                 if (crossed || stopped) break
             }
         }
-        while (queue.isNotEmpty()) queued[queue.removeFirst()] = false
+        while (queue.isNotEmpty()) queuedSides[queue.removeFirst()] = 0
         return !crossed
     }
 
@@ -552,3 +565,7 @@ private const val PROBE_SOURCE_WORK_WEIGHT = 10L
 
 // Row visits one fixpoint may spend, per row of the model.
 private const val PROBE_SOURCE_VISITS_PER_ROW = 8L
+
+private const val LOWER_SIDE = 1
+private const val UPPER_SIDE = 2
+private const val BOTH_SIDES = LOWER_SIDE or UPPER_SIDE

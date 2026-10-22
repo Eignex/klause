@@ -3,11 +3,14 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
@@ -366,5 +369,131 @@ class ProbingTest {
             assertFalse(delta.infeasible)
             assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
         }
+    }
+
+    @Test
+    fun `source minimum side changes should propagate through either coefficient sign`() {
+        for (sign in listOf(1, -1)) {
+            val problem = Problem(
+                0, 2, Array(2) { IntDomain(0, 0) },
+                listOf(
+                    Linear(intArrayOf(sign, -sign), intArrayOf(0, 1), LinearOp.LE, 0),
+                    Linear(intArrayOf(sign), intArrayOf(1), LinearOp.LE, sign * 5),
+                ),
+                openIntLo = booleanArrayOf(true, true),
+                openIntHi = booleanArrayOf(true, true),
+            )
+
+            val bounds = Presolve.probeSource(problem, 0, Cancellation.Never).bounds!!
+
+            if (sign > 0) {
+                assertEquals(5L, bounds.upper(0))
+                assertTrue(bounds.isOpenLower(0))
+            } else {
+                assertEquals(5L, bounds.lower(0))
+                assertTrue(bounds.isOpenUpper(0))
+            }
+        }
+    }
+
+    @Test
+    fun `either source guard pin should activate its integer relation`() {
+        for (truth in listOf(false, true)) {
+            val problem = Problem(
+                1, 1, arrayOf(IntDomain(0, 0)),
+                listOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
+                    Clause(intArrayOf(Lit.make(0, truth))),
+                ),
+                openIntLo = booleanArrayOf(true),
+                openIntHi = booleanArrayOf(true),
+            )
+
+            val bounds = Presolve.probeSource(problem, 0, Cancellation.Never).bounds!!
+
+            if (truth) assertEquals(5L, bounds.upper(0)) else assertEquals(6L, bounds.lower(0))
+        }
+    }
+
+    @Test
+    fun `source signed literal chains should retain every satisfying assignment`() {
+        for (truth in listOf(false, true)) {
+            val problem = Problem(
+                3, 0, emptyArray(),
+                listOf(
+                    Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+                    Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                    Clause(intArrayOf(Lit.make(0, truth))),
+                ),
+            )
+
+            val out = problem.withSourcePassDelta(Presolve.probeSource(problem, 0, Cancellation.Never))!!
+
+            assertTrue(Lit.make(1, truth) in units(out))
+            assertTrue(Lit.make(2, truth) in units(out))
+            assertEquals(feasibleAssignments(problem), feasibleAssignments(out))
+        }
+    }
+
+    @Test
+    fun `coalesced source side changes should propagate both equality halves`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 0) },
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 7),
+            ),
+            openIntLo = booleanArrayOf(true, true),
+            openIntHi = booleanArrayOf(true, true),
+        )
+
+        val bounds = Presolve.probeSource(problem, 0, Cancellation.Never).bounds!!
+
+        assertEquals(7L, bounds.lower(0))
+        assertEquals(7L, bounds.upper(0))
+    }
+
+    @Test
+    fun `irrelevant source output sides should leave work for a dependent bound`() {
+        val problem = Problem(
+            0, 64, Array(64) { IntDomain(0, 0) },
+            List(64) {
+                Linear(IntArray(63) { 1 }, IntArray(63) { if (it == 0) 0 else it + 1 }, LinearOp.LE, 1_000)
+            } + listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
+            ),
+            openIntHi = BooleanArray(64) { it < 2 },
+        )
+        val budget = PresolveBudget(240_000)
+
+        val delta = Presolve.probeSource(problem, 0, budget.orSpent(Cancellation.Never))
+
+        assertFalse(delta.infeasible)
+        assertEquals(5L, delta.bounds!!.upper(1))
+        assertTrue(budget.spent() < 240_000, "spent=${budget.spent()}")
+    }
+
+    @Test
+    fun `zero weight source occurrences should retain their probe candidate position`() {
+        val problem = Problem(
+            3, 0, emptyArray(),
+            listOf(
+                PseudoBoolean(longArrayOf(0), intArrayOf(Lit.make(0, true)), PbOp.LE, 0),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+            ),
+        )
+
+        val first = Presolve.probeSource(problem, 1, Cancellation.Never)
+        val second = Presolve.probeSource(problem, 2, Cancellation.Never)
+
+        assertTrue(first.isEmpty)
+        assertEquals(
+            listOf(Lit.make(1, false)),
+            second.addedFactors.filterIsInstance<Clause>().map { it.literals.single() },
+        )
     }
 }

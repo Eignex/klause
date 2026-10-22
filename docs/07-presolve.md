@@ -285,6 +285,11 @@ row and graph visits charge and poll the pass token. An interruption retains com
 unconditional deductions and retracts the active hypothetical branch. Candidate,
 entry and representation limits bound optional analysis, not solve time.
 
+Open-range propagation indexes each row occurrence by the bound side contributing to
+its minimum activity; guard occurrences depend on both sides. Queued columns merge
+their changed sides, so a row with unchanged inputs needs no activity scan. Every
+incidence edge still charges and counts against the same fixpoint visit limit.
+
 Source probing and symmetry defer to finite preparation for closed discrete-only
 models. With real columns they may run in the source lane even when integer
 columns are closed or absent; generator lex and value-precedence chains remain
