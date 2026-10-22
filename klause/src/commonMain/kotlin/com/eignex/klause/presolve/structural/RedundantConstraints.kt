@@ -40,9 +40,9 @@ private const val BOOL_VAR_MARK = 1L shl 40
 internal object RedundantConstraints {
     private class Interrupted : RuntimeException()
 
-    private fun visit(cancellation: Cancellation) {
+    private fun visit(cancellation: Cancellation, units: Long = SUBSUME_WORK_WEIGHT) {
         if (cancellation()) throw Interrupted()
-        cancellation.charge(SUBSUME_WORK_WEIGHT)
+        cancellation.charge(units)
         if (cancellation()) throw Interrupted()
     }
 
@@ -724,9 +724,7 @@ internal object RedundantConstraints {
     }
 
     private fun fullKey(factor: Factor, cancellation: Cancellation): StructuralKey {
-        if (cancellation()) throw Interrupted()
-        cancellation.charge(SUBSUME_WORK_WEIGHT * factor.structuralKeyWeight)
-        if (cancellation()) throw Interrupted()
+        visit(cancellation, SUBSUME_WORK_WEIGHT * factor.structuralKeyWeight)
         val key = factor.structuralKey()
         if (cancellation()) throw Interrupted()
         return key

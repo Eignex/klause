@@ -62,7 +62,7 @@ class PresolveInvocationTest {
                 val source = Problem(0, 2, Array(2) { IntDomain(0, 10) }, List(8) { factor })
                 val problem = if (lane == PresolveLane.FINITE) source.bake() else source
                 reads = 0
-                val budget = PresolveBudget(1L)
+                val budget = PresolveBudget(if (lane == PresolveLane.FINITE) 2L else 1L)
                 val token = budget.orSpent(Cancellation.Never)
                 val context = PresolveContext(presolveBudget = budget)
                 val config = PresolveConfig.parse("off,+$id,+bce")
@@ -88,7 +88,7 @@ class PresolveInvocationTest {
             for (lane in PresolveLane.entries) {
                 var reads = 0
                 val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)
-                val factor = object : Factor by row {
+                val factor = object : Factor by row, Propagator by row.propagatorProjection() {
                     override val structuralKeyWeight: Int get() = 2
                     override val intVars: IntArray get() {
                         reads++
@@ -103,7 +103,9 @@ class PresolveInvocationTest {
                         return FactorReduction.Unchanged
                     }
                 }
-                val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 10) }, List(128) { factor }, alreadyFolded = true)
+                val problem = BakedProblem(
+                    0, 2, Array(2) { IntDomain(0, 10) }, List(128) { factor }, alreadyFolded = true,
+                )
                 reads = 0
                 val budget = PresolveBudget(200L)
                 val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
@@ -133,7 +135,7 @@ class PresolveInvocationTest {
                         return linear.ref(k)
                     }
                 }
-                val factor = object : Factor by linear {
+                val factor = object : Factor by linear, Propagator by linear.propagatorProjection() {
                     override val structuralKeyWeight: Int get() = 64
                     override val linearForm = LinearForm.Conjunction(listOf(row))
                 }
