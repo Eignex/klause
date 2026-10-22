@@ -19,6 +19,54 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `retained free coordinates should satisfy current equations before LP completion`() {
+        for (free in listOf(1L, 2L)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0, 1, 2, 3),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
+                    BigFraction.ONE),
+                ExactRationalInequality(intArrayOf(0, 1, 2, 3),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE, BigFraction.ONE),
+                    BigFraction.MINUS_ONE),
+                ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            )
+            val guess = listOf(BigFraction.ofLong(free), BigFraction.ofLong(free), BigFraction.ZERO, BigFraction.ZERO)
+            val budget = SourceLpBudget(maxOperations = 0)
+            assertFalse(guess.satisfiesSourceRows(rows))
+
+            val point = assertNotNull(completeMixedPoint(4, 0, DoubleArray(4), rows, Cancellation.Never,
+                realCompletion = { columns, residual, stop, onInfeasible ->
+                    completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
+                }, recoveryGuess = guess))
+
+            assertTrue(point.satisfiesSourceRows(rows))
+            assertEquals(BigFraction.ofLong(free + 1L), point[0])
+            assertEquals(0, budget.operations)
+        }
+    }
+
+    @Test
+    fun `cancelled retained coordinate repairs should withhold their point`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2, 3),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
+                BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1, 2, 3),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE, BigFraction.ONE),
+                BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val guess = listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ZERO, BigFraction.ZERO)
+        var stopped = false
+
+        val point = completeMixedPoint(4, 0, DoubleArray(4), rows, Cancellation { stopped },
+            onStage = { if (it == "RECOVERY_RETAINED_EQUALITY_POINT") stopped = true }, recoveryGuess = guess)
+
+        assertTrue(stopped)
+        assertNull(point)
+    }
+
+    @Test
     fun `independent source conflicts should retain their original row support`() {
         val rows = listOf(
             exactColumnUpper(424, BigFraction.ONE),

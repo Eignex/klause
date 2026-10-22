@@ -1520,7 +1520,7 @@ class ExactLiraSearchComponent private constructor(
             onSourceInfeasible = reportInfeasible,
             realCompletion = { columns, residual, token, onInfeasible ->
                 reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
-            })
+            }, recoveryGuess = guess.takeIf { recoveryGuessEnabled && !pointHintStop() })
         if (point != null && !operationStop()) {
             candidate = point
             if (recoveryGuessEnabled && !pointHintStop()) recoveryGuess = point

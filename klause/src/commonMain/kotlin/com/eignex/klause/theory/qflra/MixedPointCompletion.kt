@@ -18,6 +18,7 @@ internal fun completeMixedPoint(
     onStage: ((String) -> Unit)? = null,
     onSourceInfeasible: ((IntArray) -> Unit)? = null,
     realCompletion: MixedRealCompletion? = null,
+    recoveryGuess: List<BigFraction>? = null,
 ): List<BigFraction>? {
     onStage?.invoke("RECOVERY_ATTEMPT")
     fun declined(stage: String): List<BigFraction>? {
@@ -122,9 +123,22 @@ internal fun completeMixedPoint(
         }
         val repair = prepareMixedEqualityRepair(realColumns, residual, stop, onStage,
             trackSourceRows = residualSources != null)
-        val repaired = realGuess?.let { repair?.point(it) }
+        var repaired = realGuess?.let { repair?.point(it) }
         if (stop()) return declined("RECOVERY_STOPPED")
         for (difference in listOf(false, true)) {
+            // Repair attempts share one temporary point slot.
+            if (difference) repaired = null
+            if (difference && repair != null && integerColumns == 0 &&
+                recoveryGuess != null && recoveryGuess.size == realColumns
+            ) {
+                val retained = repair.point(recoveryGuess)
+                stop.charge(rowWork)
+                if (stop()) return declined("RECOVERY_STOPPED")
+                if (retained != null && arithmetic.satisfies(retained, rows) && !stop()) {
+                    onStage?.invoke("RECOVERY_RETAINED_EQUALITY_POINT")
+                    return retained.takeUnless { stop() }
+                }
+            }
             val reals = if (difference) repair?.completePoint(residual, realCompletion) else repaired
             if (stop()) return declined("RECOVERY_STOPPED")
             // Guessed integer coordinates cannot supply a refutation of the source model.
