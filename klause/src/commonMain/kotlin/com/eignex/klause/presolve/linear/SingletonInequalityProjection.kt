@@ -173,9 +173,10 @@ internal object SingletonInequalityProjection {
             if ((f.op != LinearOp.LE && f.op != LinearOp.GE) || f.vars.size < 2) return@forEachIndexed
             val row = f.integerConstants ?: return@forEachIndexed
             if (!fitsHalfLong(row.bound) || f.vars.indices.any {
-                visit(scan)
-                !fitsHalfLong(row.coeff(it))
-            }) {
+                    visit(scan)
+                    !fitsHalfLong(row.coeff(it))
+                }
+            ) {
                 return@forEachIndexed
             }
             val j = f.vars.indices.firstOrNull { k ->
