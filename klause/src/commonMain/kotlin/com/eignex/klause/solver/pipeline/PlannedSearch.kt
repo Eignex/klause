@@ -30,7 +30,6 @@ class PlannedSearch internal constructor(
     val theory: TheoryComponent?,
     private val resources: SearchInvocationResources,
     internal val candidateHints: SearchCandidateHints = SearchCandidateHints.None,
-    internal val sourceClauses: ClauseSearchComponent? = null,
 ) : AutoCloseable {
     override fun close() = resources.close()
 

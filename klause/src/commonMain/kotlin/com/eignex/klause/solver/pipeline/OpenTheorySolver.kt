@@ -464,14 +464,7 @@ class OpenTheoryEngine internal constructor(
             }
             val branching = when (selectedBranching) {
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
-                OpenBranching.SourceOrder, OpenBranching.Automatic -> {
-                    val focused = if (savedPhases !== SearchCandidateHints.None) {
-                        planned.sourceClauses?.booleanBranching(model.numBoolVars) {
-                            state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_FRONTIER_ALL_SATISFIED")
-                        }?.also { state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_FRONTIER_INSTALLED") }
-                    } else null
-                    focused ?: SourceOrderBooleanBranching(model.numBoolVars)
-                }
+                OpenBranching.SourceOrder, OpenBranching.Automatic -> SourceOrderBooleanBranching(model.numBoolVars)
             }
             if (planned.theory is ExactLiraSearchComponent) {
                 state.smt.observeCompleteSearchStage("BRANCHING_BOOLEANS_${model.numBoolVars}")

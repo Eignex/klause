@@ -90,16 +90,6 @@ source variable, preserving source order across backjumps and restarts without
 rescanning an assigned prefix on every decision. Candidate hints still only order
 the selected variable's two polarities.
 
-Automatic linear-real traversal retaining Boolean phases instead selects the first
-unassigned literal of the first unsatisfied source clause. Its cursor skips satisfied
-clauses until retraction frees a source variable, then returns to the first clause.
-The clause component lends its immutable literal arrays; scanning shares the opening's
-work and cancellation controls. A stopped or declined scan, or satisfaction of every
-source clause, falls back to source order. Clause satisfaction is only a traversal
-observation: propagation and required arithmetic checks retain their authority.
-The chosen literal precedes its complement unless an existing polarity hint overrides
-that order; both alternatives remain available.
-
 For an entirely theory-owned integer difference graph, source-proved relative
 interval proposals precede Boolean choices through arithmetic category priority,
 registering exact complementary difference predicates; see
