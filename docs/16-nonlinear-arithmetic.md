@@ -250,7 +250,8 @@ relations use opposite truth values. Exact rational scaling accounts for order
 reversal under a negative coefficient. Strict and weak comparisons retain their
 different zero boundaries, and variable factors retain singular fibres. The
 Boolean DAG retains original Boolean identities and the first numeric
-representative, including after graph substitution.
+representative, including after graph substitution. Constant numeric atoms retain
+their exact polynomials; Boolean propagation evaluates their truth.
 
 Before probing or Boolean search, mandatory numeric predicates are
 extracted with Boolean propagation. Their exact total graph equalities are
