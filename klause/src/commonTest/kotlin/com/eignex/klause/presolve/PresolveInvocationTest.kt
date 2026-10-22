@@ -65,7 +65,7 @@ class PresolveInvocationTest {
                 val budget = PresolveBudget(if (lane == PresolveLane.FINITE) 2L else 1L)
                 val token = budget.orSpent(Cancellation.Never)
                 val context = PresolveContext(presolveBudget = budget)
-                val config = PresolveConfig.parse("off,+$id,+bce")
+                val config = PresolveConfig.parse(if (lane == PresolveLane.SOURCE) "off,+$id" else "off,+$id,+bce")
 
                 when (lane) {
                     PresolveLane.SOURCE -> Presolver.runSource(problem, config, context, token)
