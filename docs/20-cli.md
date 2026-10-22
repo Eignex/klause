@@ -166,6 +166,10 @@ prefix (`open*`, `nra*`, `quadratic*`, `transcendental*`) and, on a resource sto
 the limit that stopped them. The [search statistics](09-learning.md#statistics)
 define the conflict counters.
 
+`openLearnedWatchVisits` counts inspected shared learned-clause watch entries,
+including those skipped by a true cached member. `openLearnedBlockedWatchVisits`
+counts those skips; it does not include the source-clause store.
+
 `frontendLoadMs` covers parsing, lowering, routing and solvable construction; the
 nested `frontendRoutingMs` must not be added to it. An omitted native work block is
 not a zero. `armFailure.<label>` reports a caught arm exception as one-line JSON; a

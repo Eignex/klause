@@ -238,7 +238,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
             "openBoolDecisions", "openIntDecisions", "openTheoryDecisions", "openTheoryChecks",
             "openWork", "openLearned", "openRelearned",
             "openRestarts", "openReductions", "openDropped", "openRetained", "openPeakRetained",
-            "openLearnedWatchVisits",
+            "openLearnedWatchVisits", "openLearnedBlockedWatchVisits",
             "openAssertingConflicts", "openNonAssertingConflicts", "openReductionNs",
             "openHintDraws", "openHintProduced", "openHintVars", "openHintSteered", "openHintMoves",
             "openHintNoProvider",
