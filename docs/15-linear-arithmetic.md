@@ -88,6 +88,10 @@ can guide unresolved guards through the existing point-reuse lifecycle. Complete
 source agreement still gates publication of a witness.
 Point checks admit wider real prefixes than quadratic equality elimination;
 refutations retain the elimination dimension limit.
+Wide pure-real candidates can partition into independent blocks connected by selected rows.
+Each block uses the bounded repair path, and their summed squared dimensions must fit
+the same elimination allowance. Local repairs supply no source refutation; every selected
+original row checks the assembled point.
 
 #### Disjunctions and disequalities
 

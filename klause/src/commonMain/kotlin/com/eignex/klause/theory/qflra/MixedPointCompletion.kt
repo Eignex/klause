@@ -5,6 +5,7 @@ import com.eignex.klause.lp.engine.reconstructRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntDisjointSet
 import com.eignex.klause.util.bigIntOf
 import kotlin.math.round
 
@@ -102,6 +103,17 @@ internal fun completeMixedPoint(
     }
     if (residual.any { it.columns.size > 2 }) {
         onStage?.invoke("RECOVERY_EQUALITY_REPAIR_ATTEMPT")
+        if (integerColumns == 0 && !admitsMixedEqualityRepair(realColumns)) {
+            val point = completeIndependentRealBlocks(realColumns, primal, realGuess, residual, stop,
+                onStage, realCompletion)
+            stop.charge(rowWork)
+            if (stop()) return declined("RECOVERY_STOPPED")
+            if (point != null && arithmetic.satisfies(point, rows) && !stop()) {
+                onStage?.invoke("RECOVERY_SOURCE_COMPONENTS_POINT")
+                return point
+            }
+            return declined("RECOVERY_NON_DIFFERENCE")
+        }
         val repair = prepareMixedEqualityRepair(realColumns, residual, stop, onStage,
             trackSourceRows = residualSources != null)
         val repaired = realGuess?.let { repair?.point(it) }
@@ -144,4 +156,64 @@ internal fun completeMixedPoint(
     val valid = !stop() && arithmetic.satisfies(point, rows) && !stop()
     onStage?.invoke(if (valid) "RECOVERY_GRAPH_POINT" else "RECOVERY_GRAPH_NO_POINT")
     return point.takeIf { valid }
+}
+
+private fun completeIndependentRealBlocks(
+    columns: Int,
+    primal: DoubleArray,
+    guess: List<BigFraction>?,
+    rows: List<ExactRationalInequality>,
+    stop: Cancellation,
+    onStage: ((String) -> Unit)?,
+    realCompletion: MixedRealCompletion?,
+): List<BigFraction>? {
+    if (rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
+    // Path compression bounds the union walks by this batch plus the per-row visits.
+    stop.charge(8L * columns * columns + columns)
+    if (stop()) return null
+    val groups = IntDisjointSet(columns)
+    for (row in rows) {
+        stop.charge(8L * (row.columns.size + 1L))
+        if (stop()) return null
+        val first = row.columns.firstOrNull() ?: continue
+        for (column in row.columns) groups.union(first, column)
+    }
+    stop.charge(4L * columns + 4L * rows.size)
+    if (stop()) return null
+    val members = groups.groups()
+    val byRoot = rows.indices.groupBy { groups.find(rows[it].columns.first()) }
+    var dimensions = 0L
+    for (component in members) {
+        val selected = byRoot[groups.find(component.first())] ?: continue
+        dimensions += component.size.toLong() * component.size
+        onStage?.invoke("RECOVERY_SOURCE_COMPONENT_SHAPE_${component.size}_${selected.size}")
+        if (dimensions > 65536L) {
+            onStage?.invoke("RECOVERY_SOURCE_COMPONENT_DIMENSION")
+            return null
+        }
+    }
+    stop.charge(3L * columns)
+    if (stop()) return null
+    val point = guess?.toMutableList() ?: MutableList(columns) { BigFraction.ZERO }
+    val local = IntArray(columns) { -1 }
+    for (component in members) {
+        val selected = byRoot[groups.find(component.first())] ?: continue
+        stop.charge(3L * component.size + selected.size)
+        if (stop()) return null
+        for (index in component.indices) local[component[index]] = index
+        val localRows = ArrayList<ExactRationalInequality>(selected.size)
+        for (rowIndex in selected) {
+            val row = rows[rowIndex]
+            stop.charge(row.columns.size.toLong() + 1L)
+            if (stop()) return null
+            localRows += ExactRationalInequality(IntArray(row.columns.size) { local[row.columns[it]] },
+                row.coefficients, row.rhs, row.strict)
+        }
+        // Wide recovery supplies a candidate only; its local proofs have no source authority.
+        val values = completeMixedPoint(component.size, 0, DoubleArray(component.size) { primal[component[it]] },
+            localRows, stop, onStage = onStage, realCompletion = realCompletion) ?: return null
+        if (stop()) return null
+        for (index in component.indices) point[component[index]] = values[index]
+    }
+    return point.takeUnless { stop() }
 }

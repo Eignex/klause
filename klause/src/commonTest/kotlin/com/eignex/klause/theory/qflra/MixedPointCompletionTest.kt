@@ -19,6 +19,83 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `independent real blocks should share the equality repair allowance`() {
+        for (size in listOf(3, 140)) {
+            val columns = 3 * size + 5
+            val rows = buildList {
+                for (start in 0 until 3 * size step size) {
+                    val equation = ExactRationalInequality(intArrayOf(start, start + 1, start + 2),
+                        listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO)
+                    add(equation)
+                    add(ExactRationalInequality(equation.columns, equation.coefficients.map { it.negated() },
+                        BigFraction.ZERO))
+                    for (column in start + 2 until start + size - 1) {
+                        add(ExactRationalInequality(intArrayOf(column, column + 1),
+                            listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO))
+                        add(ExactRationalInequality(intArrayOf(column, column + 1),
+                            listOf(BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO))
+                    }
+                    add(ExactRationalInequality(intArrayOf(start), listOf(BigFraction.MINUS_ONE),
+                        BigFraction.ZERO, strict = true))
+                }
+            }
+            val primal = DoubleArray(columns).also {
+                for (start in 0 until 3 * size step size) it[start + size - 1] = 0.5
+                it[columns - 1] = 0.75
+            }
+
+            val point = assertNotNull(completeMixedPoint(columns, 0, primal, rows, Cancellation.Never))
+
+            assertTrue(point.satisfiesSourceRows(rows))
+            assertEquals(BigFraction.ofLong(4).reciprocal() * BigFraction.ofLong(3), point.last())
+        }
+    }
+
+    @Test
+    fun `independent real blocks should retain the combined repair limit`() {
+        val rows = buildList {
+            for (start in 0 until 450 step 150) {
+                for (column in start until start + 148) {
+                    add(ExactRationalInequality(intArrayOf(column, column + 1, column + 2),
+                        listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO))
+                    add(ExactRationalInequality(intArrayOf(column, column + 1, column + 2),
+                        listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO))
+                }
+                add(exactColumnLower(start + 149, BigFraction.ONE))
+            }
+        }
+        var sourceInfeasible = false
+
+        val point = completeMixedPoint(450, 0, DoubleArray(450), rows, Cancellation.Never,
+            onSourceInfeasible = { sourceInfeasible = true })
+
+        assertNull(point)
+        assertFalse(sourceInfeasible)
+    }
+
+    @Test
+    fun `cancelled independent real repairs should withhold their point`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 211, 424),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 211, 424),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(424, BigFraction.ofLong(2).reciprocal()),
+        )
+        val primal = DoubleArray(425).also { it[424] = 0.5 }
+        var stopped = false
+        var sourceInfeasible = false
+
+        val point = completeMixedPoint(425, 0, primal, rows, Cancellation { stopped },
+            onStage = { if (it == "RECOVERY_EQUALITY_RECONSTRUCTED") stopped = true },
+            onSourceInfeasible = { sourceInfeasible = true })
+
+        assertTrue(stopped)
+        assertNull(point)
+        assertFalse(sourceInfeasible)
+    }
+
+    @Test
     fun `large real prefixes should retain checked point candidates`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 424), List(2) { BigFraction.ONE }, BigFraction.ONE, strict = true),
