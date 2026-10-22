@@ -13,6 +13,7 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
@@ -87,14 +88,16 @@ class QfLiraSolverLpTest {
             },
         )
         val stats = SmtStatsSink()
-        val factory = TrackingLpFactory { solver, allowance ->
-            solver.resolveBounds(allowance)?.let { result ->
-                if (result.primal.size <= 128) result else FloatLpResult(
+        var withheld = 0
+        val factory = TrackingLpFactory(transform = { result ->
+            if (result.primal.size <= 128) result else {
+                withheld++
+                FloatLpResult(
                     result.basis, result.objective, result.duals, DoubleArray(result.primal.size),
                     optimal = result.optimal, exactState = result.exactState,
                 )
             }
-        }
+        })
         ExactLiraSearchComponent(source).use { component ->
             component.solveWith(LpSolveContext(factory))
             component.useMixedPointCompletion()
@@ -107,8 +110,10 @@ class QfLiraSolverLpTest {
 
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
+            assertTrue(withheld > 0)
             assertEquals(false, hints.preferredBool(2))
-            assertTrue((stats.snapshot().completeSearchStages?.get("PARTIAL_SOURCE_POINT") ?: 0L) > 0L)
+            assertTrue((stats.snapshot().completeSearchStages?.get("PARTIAL_SOURCE_POINT") ?: 0L) > 0L,
+                stats.snapshot().completeSearchStages.toString())
             assertNull(session.model().valueOf(component.assignmentKey))
         }
     }
@@ -742,6 +747,7 @@ class QfLiraSolverLpTest {
     )
 
     private class TrackingLpFactory(
+        private val transform: (FloatLpResult) -> FloatLpResult = { it },
         private val resolve: (PersistentLpSolver, LpFloatAllowance?) -> FloatLpResult? = { solver, allowance ->
             solver.resolveBounds(allowance)
         },
@@ -771,7 +777,10 @@ class QfLiraSolverLpTest {
                 pricing,
             )
             return object : PersistentLpSolver by delegate {
-                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = resolve(delegate, allowance)
+                override fun solve(warm: Basis?): FloatLpResult? = delegate.solve(warm)?.let(transform)
+
+                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                    resolve(delegate, allowance)?.let(transform)
 
                 override fun close() {
                     closed++
