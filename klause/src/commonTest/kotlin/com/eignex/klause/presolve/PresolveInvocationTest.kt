@@ -75,7 +75,7 @@ class PresolveInvocationTest {
                 assertEquals(0, reads, "$id $lane")
                 val call = budget.invocations.first { it.pass == id }
                 assertEquals(PresolveInvocationOutcome.INTERRUPTED, call.outcome)
-                assertEquals(24L * PresolvePass.entries.single { it.id == id }.baseWorkWeight, call.work)
+                assertEquals(8L + 24L * PresolvePass.entries.single { it.id == id }.baseWorkWeight, call.work)
             }
         }
     }
