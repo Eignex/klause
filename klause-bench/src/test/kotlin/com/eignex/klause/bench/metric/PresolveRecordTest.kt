@@ -49,7 +49,8 @@ class PresolveRecordTest {
         )
         val ref = ProblemRef("php4", Format.DIMACS, corpus("dimacs/php4.cnf"), Category.CSP, Expected.Unknown)
         val (record, _) = SolveMetric.solve(
-            ResolvedProblem(ref, lazy { error("subprocess input stays lazy") }), SolverInvocation.Settings(engine = "fixed"), Budget(1000),
+            ResolvedProblem(ref, lazy { error("subprocess input stays lazy") }),
+            SolverInvocation.Settings(engine = "fixed"), Budget(1000),
             "time", "revision",
             installedBuild = { null }, invoke = { _, _, _, _ -> result },
         )

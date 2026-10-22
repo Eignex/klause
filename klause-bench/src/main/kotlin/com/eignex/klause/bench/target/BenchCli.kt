@@ -155,7 +155,8 @@ object BenchCli {
         val suite = requireNotNull(f["suite"]) { "solve-one needs suite=<id>" }
         val name = requireNotNull(f["problem"]) { "solve-one needs problem=<name>" }
         val out = requireNotNull(f["out"]) { "solve-one needs out=<dir>" }
-        f["backend"]?.let { require(it.equals(SolverInvocation.KLAUSE, ignoreCase = true)) { "solve-one runs klause only, not backend=$it" } }
+        val backend = f["backend"] ?: SolverInvocation.KLAUSE
+        require(backend.equals(SolverInvocation.KLAUSE, ignoreCase = true)) { "solve-one runs klause only: $backend" }
         val ref = Catalog.uncapped(suite).problems.singleOrNull { it.name == name }
             ?: error("no problem '$name' in suite '$suite'")
         val settings = SolverInvocation.Settings(

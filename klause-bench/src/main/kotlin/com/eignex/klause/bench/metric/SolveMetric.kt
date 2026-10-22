@@ -42,8 +42,8 @@ internal data class SolveRecord(
     val proven: Boolean,
     val stats: Map<String, String> = emptyMap(),
     /**
-     * Per-arm portfolio improvement records in arrival order; empty for single-engine solves. Discrete objectives are exact decimal text, with a continuous
-     * objective when needed.
+     * Per-arm portfolio improvement records in arrival order; empty for single-engine solves.
+     * Discrete objectives are exact decimal text, with a continuous objective when needed.
      */
     val attribution: List<Attribution> = emptyList(),
     val gitSha: String?,
