@@ -1473,7 +1473,9 @@ class ExactLiraSearchComponent private constructor(
         lpStop.charge(rows.size.toLong())
         if (operationStop() || rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
         var sourceInfeasible: IntArray? = null
-        val reportInfeasible: ((IntArray) -> Unit)? = if (origins == null) null else { sourceInfeasible = it }
+        val reportInfeasible: ((IntArray) -> Unit)? = if (origins == null) null else { support ->
+            sourceInfeasible = support
+        }
         val point = completeMixedPoint(model.numRealVars, 0, primal, rows, lpStop,
             onStage = ::observeCompleteStage,
             onSourceInfeasible = reportInfeasible,
