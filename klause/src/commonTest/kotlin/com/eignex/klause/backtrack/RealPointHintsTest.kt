@@ -159,7 +159,8 @@ class RealPointHintsTest {
     fun `rounded channel preferences should not establish an integer witness`() {
         val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf(
             ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1L),
-            ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ofLong(3)),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ofLong(3)),
                 LinearOp.EQ, BigFraction.ofLong(2)),
         ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))

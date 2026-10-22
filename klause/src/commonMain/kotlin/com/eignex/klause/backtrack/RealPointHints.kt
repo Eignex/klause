@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qflra.MixedPointArithmetic
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.toLongExact
@@ -184,7 +185,7 @@ private fun binaryPointPreference(
         bounds.upper(variable) != 1L
     ) return null
     val value = point[problem.numRealVars + variable]
-    if (value.isInteger()) return null
+    if (value.den == BIG_ONE) return null
     val halfSlack = work.subtractProduct(BigFraction.ONE, BigFraction.ofLong(2), value) ?: return null
     val bit = if (halfSlack.signum() < 0) 1L else 0L
     val equal = bit == constants.bound
