@@ -125,11 +125,12 @@ class PresolveConfig(
         (!context.solutionSetSensitive || pass.guarantees.bijection) && (overrides[pass] ?: auto(pass, context))
 
     /**
-     * Whether comparison-clause folding leaves the clauses comparing a `{0, 1}` column reified, on a
-     * [finiteLane] preparation. A comparison over such a column is one of its Boolean literals: left reified,
-     * binary-column substitution carries it into the Boolean lane, where search branches on it and conflict
-     * analysis learns from it, while a folded clause holds the column in the integer lane. Explicitly
-     * enabling the pass folds them as well; the open lane substitutes no columns, so it always folds them.
+     * Whether comparison-clause folding leaves a clause reified when binary-column substitution would turn one
+     * of its comparisons into a literal, on a [finiteLane] preparation. Such a comparison is a Boolean literal
+     * of its `{0, 1}` column: left reified, substitution carries it into the Boolean lane, where search
+     * branches on it and conflict analysis learns from it, while a folded clause holds the column in the
+     * integer lane. Explicitly enabling the pass folds them as well; the open lane substitutes no columns, so
+     * it always folds them.
      */
     internal fun keepsBinaryComparisons(finiteLane: Boolean): Boolean =
         finiteLane && overrides[PresolvePass.FOLD_COMPARISON_CLAUSES] != true

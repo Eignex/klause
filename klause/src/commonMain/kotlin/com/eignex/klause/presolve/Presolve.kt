@@ -164,13 +164,15 @@ object Presolve {
     fun foldComparisonClauses(problem: BakedProblem): PassDelta = ComparisonClauseFold.fold(problem)
 
     /** [foldComparisonClauses] keeping every indicator in [objectiveBoolVars], which the objective prices,
-     *  and with [keepBinary] every clause that compares a `{0, 1}` column. */
+     *  and with [keepBinary] every clause comparing a `{0, 1}` column that binary-column substitution would
+     *  turn into a literal, which [objectiveIntVars] never are. */
     internal fun foldComparisonClauses(
         problem: BakedProblem,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
         keepBinary: Boolean,
-    ): PassDelta = ComparisonClauseFold.fold(problem, objectiveBoolVars, cancellation, keepBinary)
+        objectiveIntVars: Set<Int>,
+    ): PassDelta = ComparisonClauseFold.fold(problem, objectiveBoolVars, cancellation, keepBinary, objectiveIntVars)
 
     /** [foldComparisonClauses] over declared ranges, before a finite projection exists. */
     internal fun foldSourceComparisonClauses(
@@ -178,7 +180,9 @@ object Presolve {
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
         keepBinary: Boolean,
-    ): SourceDelta = ComparisonClauseFold.foldSource(problem, objectiveBoolVars, cancellation, keepBinary)
+        objectiveIntVars: Set<Int>,
+    ): SourceDelta =
+        ComparisonClauseFold.foldSource(problem, objectiveBoolVars, cancellation, keepBinary, objectiveIntVars)
 
     /** Maximal at-most-one cliques (Lit-encoded, at most one satisfied) recognised from [problem]'s
      *  factors — including those implied by pseudo-Boolean knapsacks — and grown into maximal cliques,

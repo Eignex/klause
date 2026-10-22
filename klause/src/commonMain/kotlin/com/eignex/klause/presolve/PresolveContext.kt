@@ -33,7 +33,8 @@ data class PresolveContext(
     val affineTouchedVars: IntArray? = null,
     /** Integer variables changed since duplicate-column merging last ran. */
     val dupColumnsTouchedVars: IntArray? = null,
-    /** Whether comparison-clause folding leaves every clause that compares a `{0, 1}` column reified. */
+    /** Whether comparison-clause folding leaves a clause reified when binary-column substitution would turn
+     *  one of its comparisons into a literal. */
     val keepBinaryComparisons: Boolean = false,
 ) {
     /** Integer variables read by the objective. */

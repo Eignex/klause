@@ -136,7 +136,7 @@ class ComparisonClauseFoldTest {
     }
 
     @Test
-    fun `kept binary comparisons should leave a clause over a 0-1 column reified in either lane`() {
+    fun `kept binary comparisons should leave a clause over a convertible 0-1 column reified in either lane`() {
         val model = problemOf(
             2,
             arrayOf(IntDomain(0, 1), IntDomain(0, 3)),
@@ -152,6 +152,28 @@ class ComparisonClauseFoldTest {
 
         assertTrue(source.isEmpty)
         assertTrue(finite.isEmpty)
+    }
+
+    @Test
+    fun `kept binary comparisons should still fold a 0-1 column that substitution cannot convert in either lane`() {
+        val model = problemOf(
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 3), IntDomain(0, 3)),
+            listOf(
+                reif(0, 0, LinearOp.GE, 1),
+                reif(1, 1, LinearOp.LE, 1),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 2),
+            ),
+        )
+
+        val source = ComparisonClauseFold.foldSource(model, keepBinary = true)
+        val finite = ComparisonClauseFold.fold(model.bake(), keepBinary = true)
+
+        for (folded in listOf(source.addedFactors, finite.addedFactors)) {
+            val clause = assertIs<ComparisonClause>(folded.single())
+            assertContentEquals(intArrayOf(0, 1), clause.vars)
+        }
     }
 
     @Test

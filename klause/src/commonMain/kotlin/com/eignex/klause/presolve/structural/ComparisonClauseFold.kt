@@ -10,6 +10,7 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.presolve.BinaryColumnSubstitution
 import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.RebuildStep
@@ -35,11 +36,12 @@ import com.eignex.klause.util.subExact
  * (XCSP3 intension) already emit [ComparisonClause]; this pass catches the reified form (FlatZinc, SMT-LIB)
  * produces after Tseitin lowering.
  *
- * With `keepBinary`, a clause comparing any `{0, 1}` column is left alone. Such a comparison is a Boolean
- * literal of its column: kept reified, binary-column substitution turns it into that literal and the clause
- * stays a Boolean clause, which finite search branches on and conflict analysis learns from. Folded, the
- * [ComparisonClause] reads the column value-wise and holds it, and every row it shares, in the integer
- * lane.
+ * With `keepBinary`, a clause is left alone when one of its comparisons reads a `{0, 1}` column that
+ * [BinaryColumnSubstitution] would turn into a literal. That comparison is a Boolean literal of its column:
+ * kept reified, substitution makes it that literal and the clause stays a Boolean clause, which finite search
+ * branches on and conflict analysis learns from. Folded, the [ComparisonClause] reads the column value-wise
+ * and holds it, and every row it shares, in the integer lane. A column substitution leaves in that lane
+ * anyway gains nothing from the indicator, so comparisons over it still fold.
  *
  * Not solution-set preserving: the dropped indicators are left unconstrained (like affine elimination /
  * duplicate-column merging), so a complete enumerator would over-count — hence gated off under `-a` /
@@ -53,11 +55,13 @@ internal object ComparisonClauseFold {
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
         keepBinary: Boolean = false,
+        objectiveIntVars: Set<Int> = emptySet(),
     ): PassDelta {
         val occ = PropagationProblem(problem).boolOccurrences
         val uses = IntArray(problem.numBoolVars) { occ[it].size }
         val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
-        return foldAll(problem.factors, ranges, uses, objectiveBoolVars, cancellation, keepBinary)
+        val substitutable = if (keepBinary) problem.substitutableColumns(ranges, objectiveIntVars) else null
+        return foldAll(problem.factors, ranges, uses, objectiveBoolVars, cancellation, substitutable)
             .asPassDelta(problem.rootIntDomainsInPlace)
     }
 
@@ -71,12 +75,20 @@ internal object ComparisonClauseFold {
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
         keepBinary: Boolean = false,
+        objectiveIntVars: Set<Int> = emptySet(),
     ): SourceDelta {
         val uses = IntArray(problem.numBoolVars)
         for (f in problem.factors) for (b in f.boolVars) uses[b]++
         val ranges = ColumnRanges.of(problem.intBounds)
-        return foldAll(problem.factors, ranges, uses, objectiveBoolVars, cancellation, keepBinary)
+        val substitutable = if (keepBinary) problem.substitutableColumns(ranges, objectiveIntVars) else null
+        return foldAll(problem.factors, ranges, uses, objectiveBoolVars, cancellation, substitutable)
     }
+
+    /** Substitution's eligibility over [ranges], analysed only once a binary comparison asks for it. */
+    private fun Problem.substitutableColumns(ranges: ColumnRanges, objectiveIntVars: Set<Int>): Lazy<BooleanArray?> =
+        lazy(LazyThreadSafetyMode.NONE) {
+            BinaryColumnSubstitution.substitutableColumns(factors, numIntVars, ranges, objectiveIntVars)
+        }
 
     private fun foldAll(
         factors: Array<Factor>,
@@ -84,7 +96,7 @@ internal object ComparisonClauseFold {
         uses: IntArray,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
-        keepBinary: Boolean,
+        substitutable: Lazy<BooleanArray?>?,
     ): SourceDelta {
         // A consumed definition must be equivalent to its single reified row.
         val defByAux = MutableIntObjectMap<Pair<Int, LinearRow>>()
@@ -102,7 +114,7 @@ internal object ComparisonClauseFold {
             val f = factors[i]
             if (f !is Clause || f.literals.size < 2) continue
             cancellation.charge(FOLD_WORK_WEIGHT * (1L + f.literals.size))
-            foldClause(f, defByAux, uses, objectiveBoolVars, ranges, keepBinary)?.let { (clause, consumed, steps) ->
+            foldClause(f, defByAux, uses, objectiveBoolVars, ranges, substitutable)?.let { (clause, consumed, steps) ->
                 dropped.add(i)
                 for (c in consumed) dropped.add(c)
                 added.add(clause)
@@ -114,14 +126,14 @@ internal object ComparisonClauseFold {
 
     /** The [ComparisonClause] equivalent of [clause] and the reified-factor indices it consumes, or
      *  `null` when any literal is not a sole-use single-variable reified comparison, or compares a
-     *  `{0, 1}` column under [keepBinary]. */
+     *  `{0, 1}` column marked [substitutable]. */
     private fun foldClause(
         clause: Clause,
         defByAux: MutableIntObjectMap<Pair<Int, LinearRow>>,
         uses: IntArray,
         objectiveBoolVars: Set<Int>,
         ranges: ColumnRanges,
-        keepBinary: Boolean,
+        substitutable: Lazy<BooleanArray?>?,
     ): Triple<ComparisonClause, IntArray, List<RebuildStep>>? {
         val vars = IntArrayList()
         val ops = ArrayList<LinearOp>()
@@ -138,7 +150,7 @@ internal object ComparisonClauseFold {
             if (v in objectiveBoolVars) return null
             val def = defByAux[v] ?: return null
             val comp = singleVarComparison(def.second, ranges) ?: return null
-            if (keepBinary && ranges.isBinary(comp.first)) return null
+            if (ranges.isBinary(comp.first) && substitutable?.value?.get(comp.first) == true) return null
             rebuilds.add(RebuildStep.ComparisonValue(v, comp.first, comp.second, comp.third))
             val lifted = if (Lit.isPositive(lit)) comp else negate(comp) ?: return null
             vars.add(lifted.first)
