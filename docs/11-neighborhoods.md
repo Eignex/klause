@@ -100,15 +100,27 @@ infeasibility, ranking adds a fraction below one grade unit per overloaded facto
 so moves that shrink an overload rank ahead at equal integer cost, and the weight
 schedule treats a lower fraction as progress.
 
+A satisfied resource offers compaction and reorder moves for tasks of any duration.
+Its latest-ending task and one sampled task move to the earliest start that every
+Cumulative sharing the start coordinate admits, read from each timeline without the
+task's own load. When a demand or presence is a defined channel of `x = v`, up to
+three other values of `x` are tried with the start, so a task can change machine
+and start in one move. The sampled task also swaps order with its successor. Each
+compound is replayed on every timeline it reaches and kept only when none gains
+overload. Moves are declined when their definitions recompute another scheduling
+coordinate or the start is shared with a Diffn. A call stops after 32,768 timeline
+reads or four moves. An admitted move can reconcile up to two scalar envelopes
+outside the resource, such as a makespan bound fed by task ends.
+
 ## Diffn neighborhoods
 
 A satisfied Diffn layout offers up to four adjacency, boundary-compaction and paired
 reorder or translation moves, alongside equal-footprint swaps. Relocations sample at
 most eight rectangles and check at most 24 targets, reading aliased positions and
 sizes at their final values and declining moves that affect more than eight
-rectangles. An admitted relocation can reconcile up to two scalar envelopes outside
-its scope, such as a makespan bound fed by rectangle ends. Geometry checks establish
-only the Diffn's own satisfaction; complete scoring covers the rest.
+rectangles. Admitted relocations reconcile scalar envelopes as Cumulative moves do.
+Geometry checks establish only the Diffn's own satisfaction; complete scoring covers
+the rest.
 
 ## Completion, restarts and ownership
 

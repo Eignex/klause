@@ -18,7 +18,7 @@ internal class DiffnRelocations(
 ) {
     private var emitted = 0
     private var probes = 0
-    private val boundCompletion = DiffnBoundCompletion(state, sink, factorId)
+    private val boundCompletion = EnvelopeCompletion(state, sink, factorId)
 
     fun propose() {
         val start = state.rng.nextInt(xs.size)

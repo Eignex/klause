@@ -20,7 +20,7 @@ import com.eignex.klause.util.subExact
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
-internal class DiffnBoundCompletion(
+internal class EnvelopeCompletion(
     private val state: LocalSearchState,
     private val sink: MoveSink,
     private val factorId: Int,

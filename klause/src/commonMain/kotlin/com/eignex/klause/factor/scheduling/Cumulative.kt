@@ -9,6 +9,7 @@ import com.eignex.klause.ir.FactorReduction.Rewrite
 import com.eignex.klause.ir.FactorReduction.Unchanged
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
@@ -17,6 +18,7 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -204,6 +206,23 @@ class Cumulative(
 
     /** Index of [varId] in `resourceVars`, or `-1` if it is not a resource variable. */
     fun resPosOf(varId: Int): Int = resPos[varId]
+
+    // Coordinates filling more than one slot: a write to one of them moves several footprints at once.
+    internal val repeatedIntVars: IntHashSet by lazy {
+        val capacity = if (capacityVar >= 0) intArrayOf(capacityVar) else EmptyIntArray
+        repeated(arrayOf(starts, durationVars, resourceVars, capacity))
+    }
+
+    internal val repeatedPresenceVars: IntHashSet by lazy {
+        repeated(arrayOf(IntArray(presents.size) { Lit.variable(presents[it]) }))
+    }
+
+    private fun repeated(roles: Array<IntArray>): IntHashSet {
+        val seen = IntHashSet()
+        val out = IntHashSet()
+        for (role in roles) for (v in role) if (!seen.add(v)) out.add(v)
+        return out
+    }
 
     /** Factories for the [Cumulative] special cases. */
     companion object {
