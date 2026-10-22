@@ -138,10 +138,13 @@ object Presolve {
 
     /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the
      *  objective). See [SingletonInequalityProjection]. */
-    fun projectSingletonInequalities(
+    fun projectSingletonInequalities(problem: BakedProblem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
+        projectSingletonInequalities(problem, objectiveIntVars, Cancellation.Never)
+
+    internal fun projectSingletonInequalities(
         problem: BakedProblem,
-        objectiveIntVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        objectiveIntVars: Set<Int>,
+        cancellation: Cancellation,
     ): PassDelta = SingletonInequalityProjection.project(problem, objectiveIntVars, cancellation)
 
     /** Singleton Fourier-Motzkin over declared ranges, dropping the row outright for a free column. */
