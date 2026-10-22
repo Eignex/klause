@@ -13,7 +13,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class PolynomialBooleanDefinitionsTest {
+class PolynomialBooleanDefinitionTest {
     @Test
     fun `numeric regions omit definitions outside the supporting source implicant`() {
         val source = SmtLibPolynomial.parse(
