@@ -127,7 +127,7 @@ class CoefficientStrengtheningTest {
     private fun assertLinearEquivalent(numVars: Int, domain: Int, original: Linear) =
         assertLinearEquivalent(Array(numVars) { 0..domain }, original)
 
-    private fun assertLinearEquivalent(domains: Array<IntRange>, original: Linear) {
+    private fun assertLinearEquivalent(domains: Array<IntRange>, original: Linear): List<Factor> {
         val numVars = domains.size
         val problem =
             Problem(
@@ -149,6 +149,7 @@ class CoefficientStrengtheningTest {
             val newSat = !delta.infeasible && rewritten.all { evalLinear(assertIs<Linear>(it), assign) }
             assertEquals(origSat, newSat, "linear disagrees at ${assign.toList()}: $original -> $rewritten")
         }
+        return rewritten
     }
 
     private fun enumerateMixed(values: Array<IntArray>, body: (IntArray) -> Unit) {
@@ -221,14 +222,19 @@ class CoefficientStrengtheningTest {
 
     @Test
     fun `a row mentioning an open column should not be lifted`() {
-        val openHi = Bits(2).also { it.set(1) }
-        val problem = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 0), null, openHi),
-            factors = arrayOf(Linear(intArrayOf(7, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
-        )
+        for (openLower in listOf(false, true)) {
+            val open = Bits(2).also { it.set(1) }
+            val problem = Problem(
+                numBoolVars = 0,
+                intBounds = IntBounds.fromModelBounds(
+                    longArrayOf(0, 0), longArrayOf(1, 1),
+                    if (openLower) open else null, if (openLower) null else open,
+                ),
+                factors = arrayOf(Linear(intArrayOf(7, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+            )
 
-        assertTrue(Presolve.strengthenSourceCoefficients(problem, Cancellation.Never).isEmpty)
+            assertTrue(Presolve.strengthenSourceCoefficients(problem, Cancellation.Never).isEmpty)
+        }
     }
 
     @Test
@@ -256,10 +262,15 @@ class CoefficientStrengtheningTest {
     @Test
     fun `signed lifting should preserve shifted and fixed column assignments`() {
         for (op in listOf(LinearOp.LE, LinearOp.GE)) {
-            val bound = if (op == LinearOp.LE) 15 else 9
-            val row = Linear(intArrayOf(-7, 3, 1), intArrayOf(0, 1, 2), op, bound)
+            val bound = if (op == LinearOp.LE) 49 else 43
+            val row = Linear(intArrayOf(-7, 3, 11, -13), intArrayOf(0, 1, 2, 3), op, bound)
 
-            assertLinearEquivalent(arrayOf(-1..0, 2..3, 1..1), row)
+            val rewritten = assertLinearEquivalent(arrayOf(-1..0, 2..3, 2..2, -1..-1), row)
+
+            val lifted = checkNotNull(assertIs<Linear>(rewritten.single()).integerConstants)
+            val sign = if (op == LinearOp.LE) 1L else -1L
+            assertEquals(listOf(-2L, 2L, 11L, -13L).map { sign * it }, lifted.coeffs.toList())
+            assertEquals(sign * 41L, lifted.bound)
         }
     }
 
@@ -269,6 +280,76 @@ class CoefficientStrengtheningTest {
             val row = Linear(coeffs, intArrayOf(0, 1), LinearOp.LE, -1)
 
             assertLinearEquivalent(arrayOf(-1..1, 0..1), row)
+        }
+    }
+
+    @Test
+    fun `lifting should preserve domains with interior holes`() {
+        val row = Linear(intArrayOf(7, 3), intArrayOf(0, 1), LinearOp.LE, 22)
+        val domains = arrayOf(IntDomain(0, 3).excludeValue(1), IntDomain(0, 1))
+        val problem = Problem(0, 2, domains, listOf(row))
+
+        val delta = Presolve.strengthenCoefficients(problem, Cancellation.Never, domains)
+
+        val lifted = assertIs<Linear>(delta.addedFactors.single())
+        for (x in listOf(0, 2, 3)) {
+            for (y in 0..1) {
+                val assignment = intArrayOf(x, y)
+                assertEquals(evalLinear(row, assignment), evalLinear(lifted, assignment))
+            }
+        }
+    }
+
+    @Test
+    fun `a maximum long magnitude should lift when its activity fits`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) {
+            val sign = if (op == LinearOp.LE) 1L else -1L
+            val row = Linear(
+                longArrayOf(sign * Long.MAX_VALUE, sign), intArrayOf(0, 1), op, sign * (Long.MAX_VALUE - 1),
+            )
+
+            val rewritten = assertLinearEquivalent(arrayOf(0..1, 0..0), row)
+
+            val lifted = checkNotNull(assertIs<Linear>(rewritten.single()).integerConstants)
+            assertEquals(listOf(1L, 1L), lifted.coeffs.toList())
+            assertEquals(0L, lifted.bound)
+        }
+    }
+
+    @Test
+    fun `an overflowing lift should retain a completed gcd rewrite`() {
+        val row = Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.LE, 5)
+        val domains = Array(2) { IntDomain(0, Long.MAX_VALUE) }
+        val problem = Problem(0, 2, domains, listOf(row))
+
+        val delta = Presolve.strengthenCoefficients(problem, Cancellation.Never, domains)
+
+        val reduced = checkNotNull(assertIs<Linear>(delta.addedFactors.single()).integerConstants)
+        assertEquals(listOf(1L, 2L), reduced.coeffs.toList())
+        assertEquals(2L, reduced.bound)
+    }
+
+    @Test
+    fun `an overflowing column width should decline lifting`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(Long.MIN_VALUE, 0), longArrayOf(Long.MAX_VALUE, 0), null, null,
+            ),
+            factors = arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0)),
+        )
+
+        val delta = Presolve.strengthenSourceCoefficients(problem, Cancellation.Never)
+
+        assertTrue(delta.isEmpty)
+    }
+
+    @Test
+    fun `fixed columns alone should not trigger a coefficient clamp`() {
+        for (bound in listOf(6, 7)) {
+            val row = Linear(intArrayOf(7, 1), intArrayOf(0, 1), LinearOp.LE, bound)
+
+            assertLinearEquivalent(arrayOf(1..1, 0..0), row)
         }
     }
 }
