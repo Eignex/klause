@@ -99,9 +99,10 @@ complementary alternative. Propagation and complete component checks keep their
 authority, and a hypothetical value supplies no arithmetic fact or feasibility claim.
 
 Automatic pure-real linear traversal with default steering chooses an unknown literal
-from the first unsatisfied shared source clause and prefers its satisfying polarity
-before arithmetic point guidance. Source-order variables and point preferences remain
-the fallback when the clauses are satisfied or scanning declines. The scan borrows
+from the first unsatisfied shared source clause, preferring one whose satisfying
+polarity agrees with the live arithmetic point. If none agrees, it uses the first
+unknown literal and prefers its satisfying polarity. Source-order variables and point
+preferences remain the fallback when the clauses are satisfied or scanning declines. The scan borrows
 the clause owner's immutable arrays, charges the traversal cancellation token and
 rewinds its cursor on retraction. Explicit branching and steering settings keep their
 selected policy. Clause satisfaction does not replace complete component checks.

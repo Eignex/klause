@@ -467,7 +467,11 @@ class OpenTheoryEngine internal constructor(
                 params.openHintFlips == null
             ) planned.sourceClauses?.booleanBranching(
                 model.numBoolVars,
-                onPreferred = { state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_PHASE_PREFERRED") },
+                pointHints = planned.candidateHints,
+                onPreferred = { pointMatched ->
+                    state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_PHASE_PREFERRED")
+                    if (pointMatched) state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_POINT_MATCHED")
+                },
                 onAllSatisfied = { state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_PHASE_ALL_SATISFIED") },
             )?.also { state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_PHASE_INSTALLED") } else null
             val branching = sourceBranching ?: when (selectedBranching) {

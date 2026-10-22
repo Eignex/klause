@@ -12,16 +12,48 @@ import kotlin.test.assertNull
 
 class SourceClauseBooleanBranchingTest {
     @Test
+    fun `clause choices should retain a compatible point when another literal can satisfy the clause`() {
+        for (positive in listOf(false, true)) {
+            val component = ClauseSearchComponent(listOf(
+                Clause(intArrayOf(Lit.make(2, positive), Lit.make(3, positive))),
+            ))
+            val pointHints = SearchCandidateHints { variable ->
+                when (variable) {
+                    2 -> !positive
+                    3 -> positive
+                    else -> null
+                }
+            }
+            val branching = assertNotNull(component.booleanBranching(5, pointHints = pointHints))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(5))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val choices = branching.preferring(branching.followedBy(pointHints)).alternatives(session)
+
+            assertEquals(listOf(SearchDecision.Bool(Lit.make(3, positive)),
+                SearchDecision.Bool(Lit.make(3, !positive))), choices)
+            assertNull(session.boolValue(3))
+        }
+    }
+
+    @Test
     fun `clause phase choices should precede point hints while preserving caller preferences`() {
         for (positive in listOf(false, true)) for (caller in listOf(null, false, true)) {
             val component = ClauseSearchComponent(listOf(
                 Clause(intArrayOf(Lit.make(2, positive), Lit.make(3, true))),
             ))
-            val branching = assertNotNull(component.booleanBranching(5))
+            val pointHints = SearchCandidateHints { variable ->
+                when (variable) {
+                    2 -> !positive
+                    3 -> false
+                    else -> null
+                }
+            }
+            val branching = assertNotNull(component.booleanBranching(5, pointHints = pointHints))
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(5))
             assertIs<ComponentResult.Consistent>(session.initialize())
             val callerHints = if (caller == null) SearchCandidateHints.None else SearchCandidateHints { caller }
-            val hints = callerHints.followedBy(branching.followedBy(SearchCandidateHints { !positive }))
+            val hints = callerHints.followedBy(branching.followedBy(pointHints))
 
             val choices = branching.preferring(hints).alternatives(session)
 
@@ -88,9 +120,10 @@ class SourceClauseBooleanBranchingTest {
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(2, false))),
                 ))
-                val sourceBranching = if (focused) assertNotNull(component.booleanBranching(4)) else null
-                val branching = sourceBranching ?: BooleanBranching.SourceOrder(4)
                 val pointHints = SearchCandidateHints { preferred }
+                val sourceBranching = if (focused) assertNotNull(component.booleanBranching(4,
+                    pointHints = pointHints)) else null
+                val branching = sourceBranching ?: BooleanBranching.SourceOrder(4)
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 val run = session.openRun(numBoolVars = 4, booleanBranching = branching,

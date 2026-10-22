@@ -24,10 +24,11 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
 
     internal fun booleanBranching(
         numBoolVars: Int,
-        onPreferred: (() -> Unit)? = null,
+        pointHints: SearchCandidateHints = SearchCandidateHints.None,
+        onPreferred: ((Boolean) -> Unit)? = null,
         onAllSatisfied: (() -> Unit)? = null,
     ): SourceClauseBooleanBranching? = sourceClauses.takeIf { it.isNotEmpty() }?.let {
-        SourceClauseBooleanBranching(numBoolVars, it, onPreferred, onAllSatisfied)
+        SourceClauseBooleanBranching(numBoolVars, it, pointHints, onPreferred, onAllSatisfied)
     }
 
     override fun initialize(context: SearchContext): ComponentResult = withContext(context) {

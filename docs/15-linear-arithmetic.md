@@ -135,7 +135,7 @@ sharing an activator must agree, or that activator receives no preference. These
 guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
-Automatic source-clause choices take precedence over these point preferences as
+Automatic source-clause choices seek a literal that agrees with these point preferences as
 described in [search](08-search.md#polarity-hints).
 Default pure-real guidance uses a bounded index of immutable prepared rows to
 evaluate primitive comparisons on demand when their heads have unique owners.
