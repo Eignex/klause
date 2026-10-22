@@ -378,7 +378,11 @@ internal object PortfolioComposition {
             emptyList()
         }
         val backtrack = if (btCount > 0) {
-            finiteDescentArms(scenario, facts, btArms(scenario, btCount, facts))
+            val selected = btArms(scenario, btCount, facts)
+            when (scenario.kind) {
+                Kind.COP -> finiteDescentArms(scenario, facts, selected)
+                Kind.CSP -> finiteSatisfactionArms(scenario, facts, selected)
+            }
         } else {
             emptyList()
         }
@@ -401,6 +405,35 @@ internal object PortfolioComposition {
             arms.none { it.label == BacktrackArm.CoreGuided.label }
         ) {
             arms += CoreGuidedWorkerConfig(scenario.nodeBudget, edit = scenario.btEdit)
+        }
+        return arms
+    }
+
+    private fun finiteSatisfactionArms(
+        scenario: PortfolioScenario,
+        facts: ProblemFacts,
+        selected: List<BacktrackWorkerConfig>,
+    ): List<BacktrackWorkerConfig> {
+        if (scenario.cores != 1 || scenario.kind != Kind.CSP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
+            facts.profile.problemClass != ProblemClass.FiniteCp || scenario.btPool != null || scenario.lsPool != null ||
+            scenario.btEdit != null || scenario.annotationArm != null || selected.any { it.label.startsWith("lp-") }
+        ) {
+            return selected
+        }
+        val arms = selected.toMutableList()
+        for ((original, replacement) in listOf(
+            BacktrackArm.Free to BacktrackArm.DomWdeg,
+            BacktrackArm.SelectorSwitch to BacktrackArm.FirstFail,
+        )) {
+            val slot = arms.indexOfFirst { it.label == original.label }
+            if (slot < 0) continue
+            val existing = arms.indexOfFirst { it.label == replacement.label }
+            val displaced = arms[slot]
+            arms[slot] = if (existing >= 0) arms[existing] else BacktrackWorkerConfig(
+                BacktrackCatalog.byLabel(replacement.label).capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+                scenario.zeroObjectivePricing,
+            )
+            if (existing >= 0) arms[existing] = displaced
         }
         return arms
     }
