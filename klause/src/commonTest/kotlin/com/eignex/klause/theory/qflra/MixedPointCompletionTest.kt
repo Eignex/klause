@@ -19,6 +19,46 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `large real prefixes should retain checked point candidates`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 424), List(2) { BigFraction.ONE }, BigFraction.ONE, strict = true),
+            exactColumnLower(424, BigFraction.ofLong(4).reciprocal()),
+        )
+        val primal = DoubleArray(425).also {
+            it[0] = 0.25
+            it[424] = 0.5
+        }
+        var sourceInfeasible = false
+
+        val point = assertNotNull(completeMixedPoint(425, 0, primal, rows, Cancellation.Never,
+            onSourceInfeasible = { sourceInfeasible = true }))
+
+        assertEquals(425, point.size)
+        assertTrue(point.satisfiesSourceRows(rows))
+        assertFalse(sourceInfeasible)
+    }
+
+    @Test
+    fun `large real contradictions should withhold equality repair refutations`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+            exactColumnLower(2, BigFraction.ZERO), exactColumnUpper(2, BigFraction.ZERO),
+            exactColumnLower(0, BigFraction.ONE),
+        )
+        var sourceInfeasible = false
+
+        val point = completeMixedPoint(425, 0, DoubleArray(425), rows, Cancellation.Never,
+            onSourceInfeasible = { sourceInfeasible = true })
+
+        assertNull(point)
+        assertFalse(sourceInfeasible)
+    }
+
+    @Test
     fun `residual LP conflicts should retain equality derivation premises`() {
         for (strict in listOf(false, true)) {
             val rows = listOf(

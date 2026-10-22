@@ -1432,7 +1432,7 @@ class ExactLiraSearchComponent private constructor(
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
         if (bools.any { it == UNASSIGNED }) {
             if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
-                sourceEqualityConflictScope()
+                sourcePointRecoveryScope()
             ) {
                 recoverAssignedSourceRows(context, result.float.primal)?.let { return it }
                 if (operationStop()) return ComponentResult.Indeterminate
@@ -1458,21 +1458,25 @@ class ExactLiraSearchComponent private constructor(
         if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage)
     }
 
-    private fun sourceEqualityConflictScope(): Boolean = model.numIntVars == 0 && !hasSourceDisjunctions &&
-        admitsMixedEqualityRepair(model.numRealVars) &&
+    private fun sourcePointRecoveryScope(): Boolean = model.numIntVars == 0 && !hasSourceDisjunctions &&
+        model.numRealVars in 1..10000 &&
         node.sourceBranches.isEmpty() && node.rowAssertions.isEmpty() && node.disequalityDirections.isEmpty() &&
         solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
+    private fun sourceEqualityConflictScope(): Boolean =
+        sourcePointRecoveryScope() && admitsMixedEqualityRepair(model.numRealVars)
+
     private fun recoverAssignedSourceRows(context: SearchContext, primal: DoubleArray): ComponentResult.Conflict? {
         observeCompleteStage("PARTIAL_SOURCE_RECOVERY_ATTEMPT")
-        val origins = ArrayList<IntArray>()
+        val origins = if (sourceEqualityConflictScope()) ArrayList<IntArray>() else null
         val rows = agreementSourceRows(context, origins) ?: return null
         lpStop.charge(rows.size.toLong())
         if (operationStop() || rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
         var sourceInfeasible: IntArray? = null
+        val reportInfeasible: ((IntArray) -> Unit)? = if (origins == null) null else { sourceInfeasible = it }
         val point = completeMixedPoint(model.numRealVars, 0, primal, rows, lpStop,
             onStage = ::observeCompleteStage,
-            onSourceInfeasible = { sourceInfeasible = it },
+            onSourceInfeasible = reportInfeasible,
             realCompletion = { columns, residual, token, onInfeasible ->
                 reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
             })
@@ -1482,7 +1486,7 @@ class ExactLiraSearchComponent private constructor(
             return null
         }
         val support = sourceInfeasible ?: return null
-        if (operationStop() || !sourceEqualityConflict(context, origins, support)) return null
+        if (origins == null || operationStop() || !sourceEqualityConflict(context, origins, support)) return null
         observeCompleteStage("PARTIAL_SOURCE_REFUTATION")
         return ComponentResult.Conflict((outcome as ComponentCheck.Infeasible).explanation)
     }

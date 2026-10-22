@@ -86,6 +86,8 @@ Boolean premise in the retained support must be assigned. The same restricted th
 that conflict. A recovered partial point that passes every selected original row
 can guide unresolved guards through the existing point-reuse lifecycle. Complete
 source agreement still gates publication of a witness.
+Point checks admit wider real prefixes than quadratic equality elimination;
+refutations retain the elimination dimension limit.
 
 #### Disjunctions and disequalities
 
