@@ -17,6 +17,7 @@ import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LayeredMddData
@@ -934,7 +935,15 @@ internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
     if (existing >= 0) return existing
     val eq = newBool()
     factors.add(ReifiedLinear(eq, longArrayOf(1), intArrayOf(x), LinearOp.EQ, value))
-    return litTo01(Lit.make(eq, true)).also { byValue.put(value, it) }
+    val literal = Lit.make(eq, true)
+    val indicator = litTo01(literal)
+    // Typed like FlatZinc's `int_eq_reif`/`bool2int`, so local search maintains the indicator from its variable
+    // without depending on the factor-shape inference recognising the reified rows.
+    definitionHints.add(DefinitionHint.Comparison(
+        eq, longArrayOf(1), arrayOf(DefinitionHint.Operand.Variable(x)), value, LinearOp.EQ,
+    ))
+    definitionHints.add(DefinitionHint.BooleanValue(indicator, literal))
+    return indicator.also { byValue.put(value, it) }
 }
 
 /** `binPacking`: item `i` goes to bin `list(i)`; each bin's total item size meets the condition. */

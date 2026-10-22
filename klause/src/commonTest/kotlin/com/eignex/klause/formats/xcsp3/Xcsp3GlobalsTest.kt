@@ -271,26 +271,28 @@ class Xcsp3GlobalsTest {
         )
         val problem = parsed.problem
         val inferred = DefinitionalSweep.infer(problem, parsed.definedVars)
-        val sweep = assertNotNull(
+        for (sweep in listOf(
             DefinitionalSweep.withSource(problem, inferred, parsed.definitionHints, Cancellation.Never),
-        )
-        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
-        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
-        sweep.sweep(state.assignment, state.rootDomains, problem.factors)
-        state.recompute()
-        val names = parsed.intVarNames
+            DefinitionalSweep.fromSource(problem, parsed.definitionHints),
+        ).map { assertNotNull(it) }) {
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+            state.recompute()
+            val names = parsed.intVarNames
 
-        for ((item, period) in listOf("x" to 1L, "y" to 1L, "x" to 0L)) {
-            val move = Move.IntSet(names.getValue(item), period)
-            val predicted = state.netDelta(move)
+            for ((item, period) in listOf("x" to 1L, "y" to 1L, "x" to 0L)) {
+                val move = Move.IntSet(names.getValue(item), period)
+                val predicted = state.netDelta(move)
 
-            state.apply(move)
+                state.apply(move)
 
-            val load = state.assignment.intValue(names.getValue("l[0]"))
-            assertEquals(5L - load, state.assignment.intValue(names.getValue("l[1]")))
-            assertEquals(abs(load - 2L), state.assignment.intValue(names.getValue("d")))
-            assertEquals(0L, predicted)
-            assertEquals(0L, state.cost)
+                val load = state.assignment.intValue(names.getValue("l[0]"))
+                assertEquals(5L - load, state.assignment.intValue(names.getValue("l[1]")))
+                assertEquals(abs(load - 2L), state.assignment.intValue(names.getValue("d")))
+                assertEquals(0L, predicted)
+                assertEquals(0L, state.cost)
+            }
         }
     }
 
