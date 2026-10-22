@@ -82,6 +82,44 @@ class GlobalCardinalityInvariantTest {
     }
 
     @Test
+    fun `over-count repair should target only values below their upper bound when the bounds are tight`() {
+        val p = problem(
+            xs = intArrayOf(0, 1, 2, 3, 4, 5),
+            cover = intArrayOf(1, 2, 3),
+            countLow = intArrayOf(1, 1, 1),
+            countHigh = intArrayOf(2, 2, 2),
+            domainHi = 3,
+        )
+        val state = LocalSearchState(p.bake(), Random(0))
+        for ((x, v) in longArrayOf(1, 1, 1, 2, 2, 3).withIndex()) state.assignment.setInt(x, v)
+        state.recompute()
+        val sink = MoveSink()
+
+        state.factors[0].proposeRepairMoves(state, 0, sink)
+
+        assertEquals(setOf<Move>(Move.IntSet(0, 3), Move.IntSet(1, 3), Move.IntSet(2, 3)), sink.list.toSet())
+    }
+
+    @Test
+    fun `over-count repair should fall back to a value outside the cover when every cover value is full`() {
+        val p = problem(
+            xs = intArrayOf(0, 1, 2),
+            cover = intArrayOf(0, 1),
+            countLow = intArrayOf(0, 0),
+            countHigh = intArrayOf(1, 1),
+            domainHi = 3,
+        )
+        val state = LocalSearchState(p.bake(), Random(0))
+        for ((x, v) in longArrayOf(0, 0, 1).withIndex()) state.assignment.setInt(x, v)
+        state.recompute()
+        val sink = MoveSink()
+
+        state.factors[0].proposeRepairMoves(state, 0, sink)
+
+        assertEquals(setOf<Move>(Move.IntSet(0, 2), Move.IntSet(1, 2)), sink.list.toSet())
+    }
+
+    @Test
     fun `delta should predict degree change when reassigning to a cover value`() {
         val p = problem(intArrayOf(0, 1, 2), intArrayOf(1), intArrayOf(2), intArrayOf(2))
         val state = LocalSearchState(p.bake(), Random(0))
