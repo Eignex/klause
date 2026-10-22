@@ -70,4 +70,88 @@ class PolynomialRemainderTest {
 
         assertEquals(PolynomialResource.DEGREE_OVERFLOW, failure.resource)
     }
+
+    @Test
+    fun `remainder division retains supplied priority across leading coordinates`() {
+        val product = arithmetic.multiply(x, y)
+        val square = arithmetic.power(x, 2)
+        val first = arithmetic.subtract(product, Polynomial.ONE)
+        val second = arithmetic.subtract(square, Polynomial.ONE)
+        val polynomial = arithmetic.multiply(square, y)
+
+        for ((divisors, expected) in listOf(listOf(first, second) to x, listOf(second, first) to y)) {
+            val remainder = PolynomialRemainder(divisors, arithmetic).prepare(polynomial)
+                .asSequence().filterNotNull().single()
+
+            assertEquals(expected, remainder)
+        }
+    }
+
+    @Test
+    fun `a shared leading coordinate cannot replace missing divisor coordinates`() {
+        val product = arithmetic.subtract(arithmetic.multiply(x, y), Polynomial.ONE)
+        val square = arithmetic.power(y, 2)
+        val divisor = arithmetic.subtract(square, Polynomial.constant(BigFraction.ofLong(3)))
+
+        val remainder = PolynomialRemainder(listOf(product, divisor), arithmetic).prepare(square)
+            .asSequence().filterNotNull().single()
+
+        assertEquals(Polynomial.constant(BigFraction.ofLong(3)), remainder)
+    }
+
+    @Test
+    fun `constant divisors reduce dividends without a shared variable`() {
+        val divisors = listOf(Polynomial.ZERO, Polynomial.constant(BigFraction.ofLong(2)))
+        val polynomial = arithmetic.add(arithmetic.multiply(x, y), Polynomial.ONE)
+
+        val remainder = PolynomialRemainder(divisors, arithmetic).prepare(polynomial)
+            .asSequence().filterNotNull().single()
+
+        assertEquals(Polynomial.ZERO, remainder)
+    }
+
+    @Test
+    fun `remainder division captures the supplied divisor list`() {
+        val square = arithmetic.power(x, 2)
+        val divisors = mutableListOf(arithmetic.subtract(square, Polynomial.ONE))
+        val remainders = PolynomialRemainder(divisors, arithmetic)
+
+        divisors.clear()
+        val remainder = remainders.prepare(square).asSequence().filterNotNull().single()
+
+        assertEquals(Polynomial.ONE, remainder)
+    }
+
+    @Test
+    fun `shared divisors retain independent suspended dividend reductions`() {
+        val squareX = arithmetic.power(x, 2)
+        val squareY = arithmetic.power(y, 2)
+        val remainders = PolynomialRemainder(listOf(arithmetic.subtract(squareX, Polynomial.ONE),
+            arithmetic.subtract(squareY, Polynomial.constant(BigFraction.ofLong(2)))), arithmetic)
+        val first = remainders.prepare(arithmetic.add(squareX, y))
+        val second = remainders.prepare(arithmetic.add(x, squareY))
+        assertNull(first.next())
+        assertNull(second.next())
+
+        val secondResult = second.asSequence().filterNotNull().single()
+        val firstResult = first.asSequence().filterNotNull().single()
+
+        assertEquals(arithmetic.add(y, Polynomial.ONE), firstResult)
+        assertEquals(arithmetic.add(x, Polynomial.constant(BigFraction.ofLong(2))), secondResult)
+    }
+
+    @Test
+    fun `shared divisors honor cancellation between dividend reductions`() {
+        val square = arithmetic.power(x, 2)
+        val divisor = arithmetic.subtract(square, Polynomial.ONE)
+        var stopped = false
+        val remainders = PolynomialRemainder(listOf(divisor), PolynomialArithmetic(Cancellation { stopped }))
+        assertEquals(Polynomial.ONE, remainders.prepare(square).asSequence().filterNotNull().single())
+
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> {
+            remainders.prepare(square).asSequence().filterNotNull().single()
+        }
+    }
 }
