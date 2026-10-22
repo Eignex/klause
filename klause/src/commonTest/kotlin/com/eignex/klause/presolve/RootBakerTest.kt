@@ -65,10 +65,14 @@ class RootBakerTest {
         val pins = mutableListOf<Pair<Int, Long>>()
         val factors = List(4) { v ->
             val row = Linear(intArrayOf(1), intArrayOf(v), LinearOp.GE, 0)
+            var lastState: PropagationState? = null
             object : Factor by row, Propagator by row.propagatorProjection() {
                 override fun propagate(state: PropagationState, factorId: Int): Boolean {
                     val domain = state.intDomains[v]
-                    if (v != 3 && domain.isFixed) pins.add(v to domain.min)
+                    if (v != 3 && domain.isFixed && state !== lastState) {
+                        pins.add(v to domain.min)
+                        lastState = state
+                    }
                     return true
                 }
             }
@@ -125,11 +129,15 @@ class RootBakerTest {
             for (excluded in listOf(false, true)) {
                 val pins = mutableListOf<Long>()
                 var polls = 0
+                var lastState: PropagationState? = null
                 val row = Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, Long.MIN_VALUE)
                 val factor = object : Factor by row, Propagator {
                     override fun propagate(state: PropagationState, factorId: Int): Boolean {
                         val current = state.intDomains[0]
-                        if (current.isFixed) pins.add(current.min)
+                        if (current.isFixed && state !== lastState) {
+                            pins.add(current.min)
+                            lastState = state
+                        }
                         return true
                     }
                 }
