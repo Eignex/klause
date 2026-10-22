@@ -356,6 +356,14 @@ that coordinate, in their original order. The index includes every coordinate a
 predicate reads, including coordinates below its final level. Retraction returns
 to the accepted ancestor prefix before another child is checked.
 
+A coordinate absent from every region predicate and with no boundary or section
+at its projection level has one unrestricted sector. Its fixed value or the
+canonical sector sample is assigned once, and traversal keeps frames for the
+remaining levels.
+Predicate readiness follows the current projection level rather than the number
+of assigned coordinates. Witnesses retain every original real coordinate,
+including those removed from the reduced constraints.
+
 #### Objective-image traversal
 
 The image service adds an objective coordinate `t = f(source)` below all source

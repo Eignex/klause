@@ -120,6 +120,62 @@ class QfNraSolverTest {
     }
 
     @Test
+    fun `sparse active coordinates retain complete source assignments`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (+ (* x10 x10) (* x20 x20)) 1) (> x10 0) (> x20 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertEquals(33, point.realCount)
+        assertTrue(algebraic.sign(point.realValue(10)) > 0)
+        assertTrue(algebraic.sign(point.realValue(20)) > 0)
+        val norm = algebraic.add(algebraic.power(point.realValue(10), 2), algebraic.power(point.realValue(20), 2))
+        assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
+        for (variable in 0..32) {
+            if (variable != 10 && variable != 20) assertEquals(BigFraction.ZERO, point.realValue(variable).rational)
+        }
+    }
+
+    @Test
+    fun `fixed unused coordinates survive changes to numeric conditions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (+ (* x10 x10) (* x20 x20)) 1) (> x10 0) (> x20 0)))",
+        )
+        val fixed = BigFraction.ofLong(7)
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount,
+            fixedReals = mapOf(32 to fixed))
+
+        service.invocation().use { invocation ->
+            for (value in listOf(BigFraction.ofLong(3), BigFraction.ofLong(-2), BigFraction.ofLong(3))) {
+                val condition = PolynomialCondition(lower = mapOf(0 to value), upper = mapOf(0 to value))
+                val result = invocation.check(condition)
+
+                val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+                assertEquals(33, point.realCount)
+                assertEquals(value, point.realValue(0).rational)
+                assertEquals(fixed, point.realValue(32).rational)
+            }
+        }
+    }
+
+    @Test
+    fun `Boolean only regions retain every unconstrained real coordinate`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse("$declarations (declare-const b Bool) (assert b)")
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        assertTrue(point.boolValue(0))
+        assertEquals(33, point.realCount)
+        for (variable in 0..32) assertEquals(BigFraction.ZERO, point.realValue(variable).rational)
+    }
+
+    @Test
     fun `nested cell backtracking rechecks shared coordinate predicates`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
