@@ -155,6 +155,11 @@ under the current operation allowance before it can supply fresh guidance. Relea
 the hint workspace discards the guesses. Eager providers can retain older numerical
 vectors in unused entries of the same envelope, including one entry per ring slot;
 indexed providers retain one guess. Candidates are tried in recency order.
+In a partial pure-real production scope, checking every selected original row can
+replace the primary LP solve when the conjunctive rows contain only inequalities
+and unconditional equalities, without Boolean coefficients or added theory assertions.
+The check uses the current operation and search-check allowances; complete source
+witness checking remains mandatory.
 When the ordinary float-based equality repair
 fails, the bounded repair can also reconstruct the retained free coordinates against
 the current source equations before component LP completion. Every selected original

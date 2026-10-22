@@ -139,6 +139,7 @@ class QfLiraSolverLpTest {
                 assertEquals(true, hints.preferredBool(2))
                 val siblingOperations = stats.snapshot().sourceLp.operations
                 assertTrue(siblingOperations > operations)
+                val siblingPrimarySolves = withheld
                 session.popTo(1)
                 assertNull(hints.preferredBool(2))
 
@@ -146,6 +147,7 @@ class QfLiraSolverLpTest {
 
                 assertEquals(false, hints.preferredBool(2))
                 assertEquals(siblingOperations, stats.snapshot().sourceLp.operations)
+                assertEquals(siblingPrimarySolves, withheld)
                 assertNull(session.model().valueOf(component.assignmentKey))
             }
         }

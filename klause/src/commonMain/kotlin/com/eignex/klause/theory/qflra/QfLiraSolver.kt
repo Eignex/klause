@@ -227,6 +227,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintIndex: IntArray? = null
     private var pointHintPoint: List<BigFraction>? = null
     private var recoveryGuessEnabled = false
+    private var retainedPointCanReplaceLp = false
     private var recoveryGuess: List<BigFraction>? = null
     private var recoveryGuessHistoryCapacity = 0
     private var recoveryGuessHistory: Array<List<BigFraction>?>? = null
@@ -360,10 +361,14 @@ class ExactLiraSearchComponent private constructor(
         val rows = ArrayList<PreparedSourceRow>()
         val variables = LinkedHashSet<Int>()
         var reusable = defaultOpening && model.numIntVars == 0
+        var convex = true
         for (prepared in preparedRows) {
             stop.charge(1)
             if (stop()) return null
             if (reusable) {
+                if (prepared.row.relation == LinearOp.NE ||
+                    (prepared.row.relation == LinearOp.EQ && prepared.row.activator != LinearRow.ALWAYS)
+                ) convex = false
                 for (term in 0 until prepared.row.size) {
                     stop.charge(1L)
                     if (stop()) return null
@@ -386,6 +391,7 @@ class ExactLiraSearchComponent private constructor(
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
         pointReuseEnabled = reusable
+        retainedPointCanReplaceLp = reusable && convex
         recoveryGuessEnabled = reusable && entries + model.numRealVars <= MAX_POINT_HINT_ENTRIES
         recoveryGuessHistoryCapacity = if (recoveryGuessEnabled) {
             ((MAX_POINT_HINT_ENTRIES - entries - model.numRealVars) / (model.numRealVars + 1L)).toInt()
@@ -427,9 +433,13 @@ class ExactLiraSearchComponent private constructor(
         if (stop()) return null
         val index = IntArray(model.numBoolVars) { UNASSIGNED }
         var reusable = true
+        var convex = true
         for ((row, prepared) in preparedRows.withIndex()) {
             stop.charge(1L)
             if (stop()) return null
+            if (prepared.row.relation == LinearOp.NE ||
+                (prepared.row.relation == LinearOp.EQ && prepared.row.activator != LinearRow.ALWAYS)
+            ) convex = false
             for (term in 0 until prepared.row.size) {
                 stop.charge(1L)
                 if (stop()) return null
@@ -454,6 +464,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintPoint = null
         pointHintIndex = index
         pointReuseEnabled = reusable
+        retainedPointCanReplaceLp = reusable && convex
         recoveryGuessEnabled = reusable && 2L * model.numBoolVars + 2L * model.numRealVars <= MAX_POINT_HINT_ENTRIES
         recoveryGuessHistoryCapacity = 0
         pointHintStop = stop
@@ -550,6 +561,7 @@ class ExactLiraSearchComponent private constructor(
         retirePointReuse()
         pointReuseEnabled = false
         recoveryGuessEnabled = false
+        retainedPointCanReplaceLp = false
         recoveryGuess = null
         recoveryGuessHistoryCapacity = 0
         recoveryGuessHistory = null
@@ -1447,6 +1459,27 @@ class ExactLiraSearchComponent private constructor(
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
+        var directGuessesChecked = false
+        if (mixedPointCompletion && retainedPointCanReplaceLp && recoveryGuess != null &&
+            bools.any { it == UNASSIGNED } && sourceRecoveryScope() && !pointHintStop()
+        ) {
+            val rows = agreementSourceRows(context)
+            if (rows != null) {
+                lpStop.charge(rows.size.toLong())
+                if (!operationStop() && rows.sumOf { it.columns.size.toLong() + 1L } <= 65536L) {
+                    directGuessesChecked = true
+                    checkedRetainedRecoveryPoint(rows, retainedRecoveryGuesses())?.let { point ->
+                        candidate = point
+                        dirty = false
+                        capturePointHints(point, context)
+                        if (operationStop()) return ComponentResult.Indeterminate
+                        observeCompleteStage("RECOVERY_GUESS_BEFORE_LP")
+                        return ComponentResult.Consistent
+                    }
+                }
+            }
+            if (operationStop()) return ComponentResult.Indeterminate
+        }
         val result = lp.solve(sparsePointRecovery = true)
         if (complete) {
             val key = if (result == null) "NO_RESULT" else listOf(
@@ -1480,7 +1513,7 @@ class ExactLiraSearchComponent private constructor(
             if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
                 sourceRecoveryScope()
             ) {
-                recoverAssignedSourceRows(context, result.float.primal)?.let { return it }
+                recoverAssignedSourceRows(context, result.float.primal, !directGuessesChecked)?.let { return it }
                 if (operationStop()) return ComponentResult.Indeterminate
             }
             candidate?.let { capturePointHints(it, context) }
@@ -1509,24 +1542,24 @@ class ExactLiraSearchComponent private constructor(
         node.sourceBranches.isEmpty() && node.rowAssertions.isEmpty() && node.disequalityDirections.isEmpty() &&
         solveContext.certificationPolicy === ProductionLpCertificationPolicy
 
-    private fun recoverAssignedSourceRows(context: SearchContext, primal: DoubleArray): ComponentResult.Conflict? {
+    private fun recoverAssignedSourceRows(
+        context: SearchContext,
+        primal: DoubleArray,
+        checkDirectGuesses: Boolean,
+    ): ComponentResult.Conflict? {
         observeCompleteStage("PARTIAL_SOURCE_RECOVERY_ATTEMPT")
         val origins = if (sourceRecoveryScope()) ArrayList<IntArray>() else null
         val rows = agreementSourceRows(context, origins) ?: return null
         lpStop.charge(rows.size.toLong())
         if (operationStop() || rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
         val guesses = retainedRecoveryGuesses().takeWhile { !pointHintStop() }
-        for (guess in guesses) {
-            lpStop.charge(1L)
-            if (operationStop()) return null
-            if (guess.size == model.numRealVars && MixedPointArithmetic(lpStop).satisfies(guess, rows) &&
-                !pointHintStop()
-            ) {
-                candidate = guess
-                observeCompleteStage("RECOVERY_GUESS_ACCEPTED")
+        if (checkDirectGuesses) {
+            checkedRetainedRecoveryPoint(rows, guesses)?.let {
+                candidate = it
                 return null
             }
         }
+        if (operationStop()) return null
         var sourceInfeasible: IntArray? = null
         val reportInfeasible: ((IntArray) -> Unit)? = if (origins == null) null else { support ->
             sourceInfeasible = support
@@ -1547,6 +1580,22 @@ class ExactLiraSearchComponent private constructor(
         if (origins == null || operationStop() || !sourceEqualityConflict(context, origins, support)) return null
         observeCompleteStage("PARTIAL_SOURCE_REFUTATION")
         return ComponentResult.Conflict((outcome as ComponentCheck.Infeasible).explanation)
+    }
+
+    private fun checkedRetainedRecoveryPoint(
+        rows: List<ExactRationalInequality>,
+        guesses: Sequence<List<BigFraction>>,
+    ): List<BigFraction>? {
+        val arithmetic = MixedPointArithmetic(lpStop)
+        for (guess in guesses) {
+            lpStop.charge(1L)
+            if (operationStop() || pointHintStop()) return null
+            if (guess.size == model.numRealVars && arithmetic.satisfies(guess, rows) && !pointHintStop()) {
+                observeCompleteStage("RECOVERY_GUESS_ACCEPTED")
+                return guess
+            }
+        }
+        return null
     }
 
     private fun retainedRecoveryGuesses(): Sequence<List<BigFraction>> {
