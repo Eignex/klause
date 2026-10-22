@@ -208,7 +208,7 @@ class QfLiraSolverHintsTest {
                         numBoolVars = 1,
                         intBounds = openBounds(2),
                         factors = arrayOf(
-                            Linear(intArrayOf(1, 1), intArrayOf(0, 1), relation, 1),
+                            Linear(intArrayOf(1, 2), intArrayOf(0, 1), relation, 1),
                             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                             Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
                             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),

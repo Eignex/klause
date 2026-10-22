@@ -393,7 +393,7 @@ class OpenTheorySolverHintTest {
                 (declare-const p Bool) (declare-const q Bool)
                 (declare-const x Int) (declare-const y Int)
                 (assert (or p q))
-                (assert (=> p (= (+ (* 2 x) (* 4 y)) 1)))
+                (assert (=> p (= (+ (* 3 x) (* 6 y)) 1)))
             """.trimIndent(),
         )
         val p = parsed.boolVarNames.getValue("p")

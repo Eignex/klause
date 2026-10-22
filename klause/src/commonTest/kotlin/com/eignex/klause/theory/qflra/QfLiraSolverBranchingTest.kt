@@ -631,7 +631,7 @@ class QfLiraSolverBranchingTest {
         val model = Problem(
             2,
             intBounds = openBounds(),
-            factors = arrayOf(ReifiedLinear(0, intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(3), intArrayOf(0), LinearOp.EQ, 1)),
         )
         val session = SearchSession(listOf(ExactLiraSearchComponent(model)))
         assertIs<ComponentResult.Consistent>(session.initialize())

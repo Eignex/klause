@@ -24,6 +24,7 @@ internal class IntegerParityPropagation private constructor(
     val retainedBytes: Long,
 ) {
     private class SourceRow(val parity: BinaryParityRow, val guard: Int, val equationWhen: Boolean)
+    private class SourceProof(val explanation: SearchExplanation, val coupled: Boolean)
 
     @Suppress("ReturnCount", "CyclomaticComplexMethod")
     fun propagate(
@@ -45,7 +46,8 @@ internal class IntegerParityPropagation private constructor(
             val reason = reason(reduced, null, context, work) ?: return stopped(work)
             if (!work.visit() || context.cancelled()) return ComponentResult.Indeterminate
             observe("PARITY_PREFIX_CONFLICT")
-            return ComponentResult.Conflict(reason)
+            if (reason.coupled) observe("PARITY_PREFIX_COUPLED_SUPPORT_CONFLICT")
+            return ComponentResult.Conflict(reason.explanation)
         }
         var implied = false
         for (row in rows) {
@@ -56,18 +58,19 @@ internal class IntegerParityPropagation private constructor(
                 ?: return if (implied && !work.cancelled) ComponentResult.Consistent else stopped(work)
             if (!reduced.impossible) continue
             val literal = Lit.make(row.guard, !row.equationWhen)
-            val reason = reason(reduced, literal, context, work)
+            val reason = reason(reduced, row, context, work)
             if (reason == null) {
                 if (work.cancelled || context.cancelled()) return ComponentResult.Indeterminate
                 continue
             }
             if (!work.visit() || context.cancelled()) return ComponentResult.Indeterminate
             if (context.boolValue(row.guard) != null) continue
-            val result = context.imply(literal, reason)
+            val result = context.imply(literal, reason.explanation)
             if (result !is ComponentResult.Consistent) return result
             val delivered = receive(literal)
             if (delivered !is ComponentResult.Consistent) return delivered
             observe("PARITY_PREFIX_IMPLIED")
+            if (reason.coupled) observe("PARITY_PREFIX_COUPLED_SUPPORT_IMPLIED")
             implied = true
         }
         return if (work.cancelled) ComponentResult.Indeterminate else if (implied) ComponentResult.Consistent else null
@@ -79,15 +82,18 @@ internal class IntegerParityPropagation private constructor(
     @Suppress("ReturnCount")
     private fun reason(
         reduction: BinaryParityReduction,
-        conclusion: Int?,
+        target: SourceRow?,
         context: SearchContext,
         work: BinaryParityWork,
-    ): SearchExplanation? {
+    ): SourceProof? {
         if (reduction.supportSize >= MAX_PARITY_ROW || !work.allocate(reduction.supportSize.toLong() + 8L)) return null
+        val conclusion = target?.let { Lit.make(it.guard, !it.equationWhen) }
+        var coupled = target?.parity?.size?.let { it >= 3 } == true
         val premises = ArrayList<SearchAtomPremise>(reduction.supportSize)
         for (index in 0 until reduction.supportSize) {
             if (!work.visit()) return null
             val source = rows.getOrNull(reduction.supportAt(index)) ?: return null
+            coupled = coupled || source.parity.size >= 3
             if (source.guard < 0) continue
             if (context.boolValue(source.guard) != source.equationWhen) return null
             val literal = Lit.make(source.guard, source.equationWhen)
@@ -98,7 +104,10 @@ internal class IntegerParityPropagation private constructor(
         // Flat source facts bound the existing explanation builder's complete traversal and storage.
         if (!work.allocate(32L * premises.size + 32L) || !work.visit(premises.size.toLong() + 1L)) return null
         val result = context.explainAtoms(SearchAtomPremise.All(premises), conclusion?.let { SearchDecision.Bool(it) })
-        return result.takeIf { work.visit() && !context.cancelled() }
+            ?: return null
+        if (!work.allocate(8L) || !work.visit() || context.cancelled()) return null
+        val equations = reduction.supportSize + if (target == null) 0 else 1
+        return SourceProof(result, coupled && equations >= 2)
     }
 
     companion object {

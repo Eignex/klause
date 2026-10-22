@@ -28,26 +28,31 @@ import kotlin.test.assertTrue
 class IntegerParityPropagationTest {
     @Test
     fun `an integer prefix conflict should cite both active equality guards`() {
-        val model = Problem(
-            3, 3, Array(3) { IntDomain(0, 0) },
-            listOf(
-                ReifiedLinear(0, intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
-                ReifiedLinear(1, intArrayOf(1, -1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
-            ),
-            openIntLo = BooleanArray(3) { true }, openIntHi = BooleanArray(3) { true },
-        )
-        val propagation = assertNotNull(IntegerParityPropagation.capture(model, BinaryParityWork(Cancellation.Never)))
-        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(3))
-        session.initialize()
-        session.push(SearchDecision.Bool(Lit.make(0, true)))
-        session.push(SearchDecision.Bool(Lit.make(1, true)))
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            val model = Problem(
+                3, 3, Array(3) { IntDomain(0, 0) },
+                listOf(
+                    ReifiedLinear(0, intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                    ReifiedLinear(1, intArrayOf(1, -1, 1), intArrayOf(0, 1, 2), op, 1),
+                ),
+                openIntLo = BooleanArray(3) { true }, openIntHi = BooleanArray(3) { true },
+            )
+            val propagation = assertNotNull(
+                IntegerParityPropagation.capture(model, BinaryParityWork(Cancellation.Never)),
+            )
+            val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(3))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            session.push(SearchDecision.Bool(Lit.make(1, op == LinearOp.EQ)))
 
-        val result = propagation.propagate(session::boolValue, session,
-            BinaryParityWork(Cancellation.Never, propagation.retainedBytes), { error("Unexpected implication") }, {})
+            val result = propagation.propagate(session::boolValue, session,
+                BinaryParityWork(Cancellation.Never, propagation.retainedBytes),
+                { error("Unexpected implication") }, {})
 
-        val reason = assertNotNull(assertIs<ComponentResult.Conflict>(result).explanation)
-        assertEquals(listOf(Lit.make(0, false), Lit.make(1, false)), reason.literals.sorted())
-        assertNull(session.boolValue(2))
+            val reason = assertNotNull(assertIs<ComponentResult.Conflict>(result).explanation)
+            assertEquals(listOf(Lit.make(0, false), Lit.make(1, op == LinearOp.NE)), reason.literals.sorted())
+            assertNull(session.boolValue(2))
+        }
     }
 
     @Test
