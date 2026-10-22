@@ -103,7 +103,9 @@ class BlockedClauseEliminationTest {
             val setup = PresolveBudget(Long.MAX_VALUE)
             assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(Cancellation.Never)))
 
-            val delta = BlockedClauseElimination.eliminateSource(problem, cancellation = budget.orSpent(Cancellation.Never))
+            val delta = BlockedClauseElimination.eliminateSource(
+                problem, cancellation = budget.orSpent(Cancellation.Never),
+            )
 
             assertEquals(width == 257, delta.isEmpty)
             assertTrue(budget.spent() <= setup.spent() + 655_360L + width * (width + 5L) * 10L)
