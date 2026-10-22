@@ -137,7 +137,8 @@ class CoefficientStrengtheningTest {
                 listOf(original),
             )
         val delta = Presolve.strengthenCoefficients(problem, Cancellation.Never, problem.finiteIntDomains())
-        val rewritten = problem.factors.filterIndexed { index, _ -> index !in delta.droppedIndices } + delta.addedFactors
+        val rewritten =
+            problem.factors.filterIndexed { index, _ -> index !in delta.droppedIndices } + delta.addedFactors
         val values = Array(numVars) { v ->
             domains[v].toList().toIntArray()
         }
