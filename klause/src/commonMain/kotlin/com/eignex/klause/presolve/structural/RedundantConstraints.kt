@@ -31,6 +31,7 @@ import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.MutableLongObjectMap
 import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 import com.eignex.kumulant.math.splitmix64
 
 /** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
@@ -469,10 +470,6 @@ internal object RedundantConstraints {
     /** Poll the cancellation once per this many factors while rebuilding the subsume memo from scratch. */
     private const val REBUILD_CANCEL_POLL_MASK = 0x3FF
 
-    /** Magnitude past which a Phase-3 activity sum is treated as non-dominating, so the `Long`
-     *  comparison can't wrap (real bounds are far below this). */
-    private const val OVERFLOW_GUARD = 1_000_000_000_000_000L
-
     /** A `Σ coeffs·x ≤ bound` row as a GCD-reduced coefficient map keyed by variable id. */
     private class LeRow(val factorIndex: Int, val coeffByVar: MutableIntLongMap, val bound: Long)
 
@@ -558,7 +555,13 @@ internal object RedundantConstraints {
 
     /** Whether `≤`-row [a] (strict-subset support) dominates [b]: matching coefficients up to a single
      *  positive integer multiple `k` on the shared variables, and `k·boundA + maxExtra ≤ boundB`. */
-    private fun dominates(ranges: ColumnRanges, a: LeRow, b: LeRow): Boolean {
+    private fun dominates(ranges: ColumnRanges, a: LeRow, b: LeRow): Boolean = try {
+        dominationWithinBound(ranges, a, b)
+    } catch (_: CheckedLongOverflowException) {
+        false
+    }
+
+    private fun dominationWithinBound(ranges: ColumnRanges, a: LeRow, b: LeRow): Boolean {
         var k = 0L
         a.coeffByVar.forEach { v, ca ->
             if (!b.coeffByVar.containsKey(v)) return false
@@ -579,13 +582,11 @@ internal object RedundantConstraints {
                 // An extra term over a column the model leaves open has unbounded activity, so no
                 // domination can be claimed from it.
                 if (!ranges.isClosed(v)) return false
-                maxExtra += if (cb >= 0) cb * ranges.max(v) else cb * ranges.min(v)
-                // Conservative overflow guard: an extra activity this large can't be dominated by a
-                // small-bound row anyway, so bail rather than risk a wrapped Long comparison.
-                if (maxExtra > OVERFLOW_GUARD || maxExtra < -OVERFLOW_GUARD) return false
+                val endpoint = if (cb >= 0) ranges.max(v) else ranges.min(v)
+                maxExtra = addExact(maxExtra, mulExact(cb, endpoint))
             }
         }
-        return k * a.bound + maxExtra <= b.bound
+        return addExact(mulExact(k, a.bound), maxExtra) <= b.bound
     }
 
     /**
