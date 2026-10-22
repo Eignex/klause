@@ -146,7 +146,7 @@ internal class QfNraQuery(
             probeCompleted = true
             if (refuted || witness != null) {
                 val checked = witness?.let {
-                    if (formulaReduction.eliminatedCount == 0) it else {
+                    if (!formulaReduction.requiresOriginalCheck) it else {
                         val point = formulaReduction.reconstruct(it, arithmetic, algebraic)
                         checkNotNull(checkSample(normalized, point, boolCount, arithmetic, algebraic))
                     }
@@ -267,9 +267,9 @@ internal class QfNraQuery(
                                     val point = reduction.reconstruct(assignment, arithmetic, algebraic)
                                     checkRegionSample(reducedFormula, region, point, boolCount, arithmetic, algebraic)
                                 }
-                                val checked = if (formulaReduction.eliminatedCount == 0) regionChecked else {
+                                val checked = if (!formulaReduction.requiresOriginalCheck) regionChecked else {
                                     val point = formulaReduction.reconstruct(regionChecked, arithmetic, algebraic)
-                                    checkRegionSample(normalized, region, point, boolCount, arithmetic, algebraic)
+                                    checkNotNull(checkSample(normalized, point, boolCount, arithmetic, algebraic))
                                 }
                                 arithmetic.step()
                                 yield(QfNraResult.Satisfiable(checked, work.snapshot()))
