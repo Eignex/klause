@@ -342,7 +342,9 @@ private class PolynomialPredicateSharing(
         arithmetic.step()
         val terms = atom.polynomial.terms
         if (terms.isEmpty() || terms.singleOrNull()?.monomial == Monomial.ONE) {
-            return constant(atom.holds(terms.firstOrNull()?.coefficient?.signum() ?: 0))
+            arithmetic.step()
+            atoms.add(atom)
+            return append(FormulaNode.Atom(atoms.lastIndex))
         }
         val scaled = normalized.getOrPut(atom.polynomial) {
             val coefficient = terms.first().coefficient
