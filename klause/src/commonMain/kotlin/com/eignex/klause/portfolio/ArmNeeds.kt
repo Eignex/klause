@@ -1,6 +1,5 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
@@ -79,7 +78,8 @@ internal class ProblemFacts(
                 binaryEqualityObjective = binary && problem.hasBinaryEqualityObjective(objective),
                 continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
                 integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
-                    it is Linear && it.integerConstants != null
+                    val form = it.linearForm as? LinearForm.Conjunction ?: return@all false
+                    form.rows.isNotEmpty() && form.rows.all { row -> row.isLongUnconditional && row.isIntegerOnly }
                 },
                 booleanObjective = objective?.let {
                     CoreGuidedSearch.eligible(problem, it) &&

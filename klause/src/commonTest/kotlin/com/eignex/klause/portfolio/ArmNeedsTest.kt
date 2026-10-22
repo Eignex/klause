@@ -93,6 +93,55 @@ class ArmNeedsTest {
     }
 
     @Test
+    fun `integer linear recipes should recognize ordinary and exact row views`() {
+        val refs = intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1))
+        val rows = listOf(
+            Linear(longArrayOf(1, -2), intArrayOf(0, 1), LinearOp.LE, -1),
+            ExactLinear.of(
+                refs, listOf(BigFraction.ONE, BigFraction.ofLong(-2)), LinearOp.LE, BigFraction.ofLong(-1),
+            ),
+            ExactLinear.of(
+                refs, listOf(BigFraction.ofLong(2).reciprocal(), BigFraction.ofLong(-1)),
+                LinearOp.LE, BigFraction.ofLong(-2).reciprocal(),
+            ),
+        )
+        for (row in rows) {
+            val model = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(row)).bake()
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO)
+
+            val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
+
+            assertTrue(arms.any { it.label == "lp-aggressive" })
+        }
+    }
+
+    @Test
+    fun `integer linear recipes should exclude conditional real and wide rows`() {
+        val refs = intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1))
+        val wide = BigFraction.of(parseBigInt("18446744073709551617"), BIG_ONE)
+        val rows = listOf(
+            ExactLinear.of(
+                refs, listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE, activator = 0,
+            ),
+            ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE,
+            ),
+            ExactLinear.of(refs, listOf(wide, BigFraction.ONE), LinearOp.LE, BigFraction.ONE),
+        )
+        for (row in rows) {
+            val model = Problem(
+                1, 2, Array(2) { IntDomain(0, 1) }, listOf(row),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            ).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO)
+
+            assertFalse(facts.integerLinear)
+        }
+    }
+
+    @Test
     fun `disabled LP should omit the integer linear companion`() {
         val model = linearModel()
         val facts = ProblemFacts.of(model, ProblemProfile.of(model, optimizing = true), LpConfig.OFF)

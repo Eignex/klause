@@ -325,7 +325,8 @@ annotated, or execution is parallel or single-engine. See
   guard.
 - **Integer linear models.** Pools of at least six slots over pure integer linear
   rows with an integer objective append an aggressive LP companion, which also runs
-  under a cuts-off ceiling.
+  under a cuts-off ceiling. Eligibility reads complete unconditional row conjunctions
+  with 64-bit integer constants, including normalized exact source rows.
 - **Continuous columns.** The default LP arm ranks after the SAT guard and
   conflict-driven core and joins first-solution search under the ordinary bounded
   slices for both finite and continuous objectives. Single-core pools reserve half the
