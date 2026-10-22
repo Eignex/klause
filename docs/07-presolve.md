@@ -185,8 +185,11 @@ and term visits charge and poll the pass token under bounded scans. Interruption
 retains completed sound reductions and discards unfinished analysis. The following
 families describe the premises and preservation guarantees of those reductions.
 Both lanes poll after entry charging and meter factor, column, term, signature
-and rewrite visits. Duplicate-column aggregation, bound fusion and source
-duplicate/domination indexing discard unfinished transactions. Structural reduction
+and rewrite visits. Bound fusion, duplicate-column and subsumption scans accumulate
+those charges and flush them and poll the pass token every 64 visits or 4,096 units,
+and immediately at entry and before publishing, so a stop overruns by at most one
+stride. Duplicate-column aggregation, bound fusion and source duplicate/domination
+indexing discard unfinished transactions. Structural reduction
 retains only fully collected factor rewrites and their bound tightenings; factor
 hooks and structural-key construction remain atomic.
 
@@ -239,8 +242,11 @@ observation excludes cheap duplicate drops. Equal support widths skip comparison
 an anchor-incidence index selects smaller rows. Source and finite rounds retain
 completed comparisons and resume interrupted scans. Changed rows or activities
 invalidate affected comparisons; unrelated changes leave them cached.
-Each call admits widths up to 128 and at most 65,536 entry and term visits, retaining
-at most 65,536 failed pairs. Completed drops survive interruption.
+Normalized rows are kept per factor occurrence across calls. Each call admits widths
+up to 128 and at most 65,536 normalization and comparison visits, retaining at most
+65,536 failed pairs; upkeep linear in the current rows and candidates is charged
+outside that cap, so bounded calls over an unchanged model reach their comparisons.
+Completed drops survive interruption.
 
 Comparison-clause folding combines sole-use reified indicators into one comparison
 disjunction. It requires both Boolean and integer columns before entry accounting;
@@ -248,8 +254,10 @@ unrelated real or open columns do not exclude integer comparisons.
 Reconstruction restores their truth after integer reconstruction and
 before source checking, and excludes them from direct search/definition hints.
 Duplicate-column merging replaces matching linear columns by their representable
-sum. Reconstruction computes the feasible split interval and difference exactly,
-including at extreme source endpoints, and undoes successive folds last first.
+sum; an unrepresentable sum declines the merge, and a call that declines every
+merge leaves the model unchanged. Reconstruction computes the feasible split
+interval and difference exactly, including at extreme source endpoints, and undoes
+successive folds last first.
 Dual fixing selects a bound when neither occurrences
 nor the objective prefer the opposite direction. These change the solution set.
 

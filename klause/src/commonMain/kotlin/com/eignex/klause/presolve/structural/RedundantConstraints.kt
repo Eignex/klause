@@ -30,6 +30,7 @@ import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.MutableLongObjectMap
+import com.eignex.klause.util.ScanMeter
 import com.eignex.klause.util.addExact
 import com.eignex.kumulant.math.splitmix64
 
@@ -40,10 +41,8 @@ private const val BOOL_VAR_MARK = 1L shl 40
 internal object RedundantConstraints {
     private class Interrupted : RuntimeException()
 
-    private fun visit(cancellation: Cancellation, units: Long = SUBSUME_WORK_WEIGHT) {
-        if (cancellation()) throw Interrupted()
-        cancellation.charge(units)
-        if (cancellation()) throw Interrupted()
+    private fun visit(scan: ScanMeter?, units: Long = SUBSUME_WORK_WEIGHT) {
+        if (scan != null && !scan.visit(units)) throw Interrupted()
     }
 
     /**
@@ -131,19 +130,20 @@ internal object RedundantConstraints {
         ranges: ColumnRanges,
         cancellation: Cancellation = Cancellation.Never,
         subsets: SubsetDomination? = null,
-    ): PassDelta = try {
-        computePhases1And2(problem, ranges, cancellation, subsets)
-    } catch (_: Interrupted) {
-        PassDelta()
+    ): PassDelta {
+        val scan = ScanMeter(cancellation)
+        val survivors = try {
+            survivorsOfPhases1And2(problem, scan)
+        } catch (_: Interrupted) {
+            return PassDelta()
+        } finally {
+            scan.flush()
+        }
+        return finishAfterPhase2(problem, ranges, survivors, cancellation, subsets)
     }
 
-    private fun computePhases1And2(
-        problem: Problem,
-        ranges: ColumnRanges,
-        cancellation: Cancellation,
-        subsets: SubsetDomination?,
-    ): PassDelta {
-        if (cancellation()) return PassDelta()
+    private fun survivorsOfPhases1And2(problem: Problem, scan: ScanMeter): List<Factor> {
+        if (!scan.check()) throw Interrupted()
         val factors = problem.factors
         // Phase 1: exact-duplicate removal by structural key, two-tier so the full key (which for a
         // Table embeds its entire sorted tuple set) is built only when it can matter. A cheap
@@ -153,8 +153,8 @@ internal object RedundantConstraints {
         val firstByShallow = HashMap<Long, Factor>()
         val keysByShallow = HashMap<Long, HashSet<StructuralKey>>()
         for (f in factors) {
-            visit(cancellation)
-            val sk = shallowKey(f, cancellation)
+            visit(scan)
+            val sk = shallowKey(f, scan)
             val first = firstByShallow[sk]
             if (first == null) {
                 firstByShallow[sk] = f
@@ -162,15 +162,15 @@ internal object RedundantConstraints {
                 continue
             }
             // Shallow collision: the full keys decide. The first factor's key is built once, here.
-            val keys = keysByShallow.getOrPut(sk) { hashSetOf(fullKey(first, cancellation)) }
-            if (keys.add(fullKey(f, cancellation))) deduped.add(f)
+            val keys = keysByShallow.getOrPut(sk) { hashSetOf(fullKey(first, scan)) }
+            if (keys.add(fullKey(f, scan))) deduped.add(f)
         }
         // Unit-coefficient clause rows have the same bound; their duplicates were removed by keys.
         if (deduped.all {
-            visit(cancellation)
+            visit(scan)
             it is Clause
         }) {
-            return finishAfterPhase2(problem, ranges, deduped, cancellation, subsets)
+            return deduped
         }
         // Phase 2: bucket the ≤-normalised Linear inequalities by coefficient vector; the bucket's
         // tightest bound (and whether an `=` provides it) decides which inequalities are implied.
@@ -186,11 +186,11 @@ internal object RedundantConstraints {
             }
         }
         for (f in deduped) {
-            visit(cancellation)
+            visit(scan)
             // Every exact row (integer-linear or Boolean-literal, over any factor) feeds the dominator
             // buckets through the uniform [offerForms] view; a `≥`/`=` also offers its opposite direction.
-            for (n in offerForms(f, cancellation)) {
-                visit(cancellation)
+            for (n in offerForms(f, scan)) {
+                visit(scan)
                 offer(n.key, n.bound, fromEq = n.fromEq)
                 if (n.opposite != null) offer(n.opposite.key, n.opposite.bound, fromEq = true)
             }
@@ -198,8 +198,8 @@ internal object RedundantConstraints {
         val keptRep = HashSet<TermKey>()
         val out = ArrayList<Factor>(deduped.size)
         for (f in deduped) {
-            visit(cancellation)
-            val n = dropForm(f, cancellation)
+            visit(scan)
+            val n = dropForm(f, scan)
             // Keep equalities, ≠, and non-(Linear/PseudoBoolean) factors; they are never dropped here.
             if (n == null || n.fromEq) {
                 out.add(f)
@@ -216,8 +216,8 @@ internal object RedundantConstraints {
             }
             if (keep) out.add(f)
         }
-        if (cancellation()) throw Interrupted()
-        return finishAfterPhase2(problem, ranges, out, cancellation, subsets)
+        if (!scan.check()) throw Interrupted()
+        return out
     }
 
     /** Phases 3–5 over the phase-1/2 survivor list [out] (in `Problem.factors` order), recovering the
@@ -584,18 +584,18 @@ internal object RedundantConstraints {
 
     /** Every exact [LinearRow] of [f] as `≤`-normalised [IneqForm]s (each `=` row carries its opposite
      *  direction), for offering into the dominator buckets. Clause-shaped rows are skipped (see [rowForm]). */
-    private fun offerForms(f: Factor, cancellation: Cancellation = Cancellation.Never): List<IneqForm> =
+    private fun offerForms(f: Factor, scan: ScanMeter? = null): List<IneqForm> =
         f.impliedLinearRows.mapNotNull {
-            visit(cancellation)
-            rowForm(it, cancellation)
+            visit(scan)
+            rowForm(it, scan)
         }
 
     /** The `≤`-normalised [IneqForm] of [f] when it is a single-row inequality (the only shape this pass
      *  drops as dominated), else `null` — a multi-row factor (cardinality, increasing chain) offers its
      *  rows but is never itself dropped here. */
-    private fun dropForm(f: Factor, cancellation: Cancellation = Cancellation.Never): IneqForm? =
+    private fun dropForm(f: Factor, scan: ScanMeter? = null): IneqForm? =
         if (f.linearForm is LinearForm.Conjunction) {
-            f.impliedLinearRows.singleOrNull()?.let { rowForm(it, cancellation) }
+            f.impliedLinearRows.singleOrNull()?.let { rowForm(it, scan) }
         } else {
             null
         }
@@ -608,37 +608,37 @@ internal object RedundantConstraints {
      * `Σ literals ≥ 1` — the clause is kept out of the buckets so a clause-heavy SAT model stays a
      * phase-2 no-op (clause subsumption is BVE's job).
      */
-    private fun rowForm(row: LinearRow, cancellation: Cancellation): IneqForm? {
-        visit(cancellation)
+    private fun rowForm(row: LinearRow, scan: ScanMeter?): IneqForm? {
+        visit(scan)
         if (row.constants !is IntegerConstants) return null
-        if (isPureClause(row, cancellation)) return null
+        if (isPureClause(row, scan)) return null
         if (row.activator != LinearRow.ALWAYS || row.strict || row.bound == Long.MIN_VALUE ||
             (0 until row.size).any {
-                visit(cancellation)
+                visit(scan)
                 Term.isReal(row.ref(it))
             } ||
             (0 until row.size).any {
-                visit(cancellation)
+                visit(scan)
                 row.coeff(it) == Long.MIN_VALUE
             }
         ) {
             return null
         }
         val refs = IntArray(row.size) {
-            visit(cancellation)
+            visit(scan)
             row.ref(it)
         }
         val coeffs = LongArray(row.size) {
-            visit(cancellation)
+            visit(scan)
             row.coeff(it)
         }
         return when (row.relation) {
-            LinearOp.LE -> reducedIneq(refs, coeffs, row.bound, fromEq = false, cancellation)
+            LinearOp.LE -> reducedIneq(refs, coeffs, row.bound, fromEq = false, scan)
 
-            LinearOp.GE -> reducedIneq(refs, negated(coeffs, cancellation), -row.bound, fromEq = false, cancellation)
+            LinearOp.GE -> reducedIneq(refs, negated(coeffs, scan), -row.bound, fromEq = false, scan)
 
-            LinearOp.EQ -> reducedIneq(refs, coeffs, row.bound, fromEq = true, cancellation).copyWithOpposite(
-                reducedIneq(refs, negated(coeffs, cancellation), -row.bound, fromEq = true, cancellation),
+            LinearOp.EQ -> reducedIneq(refs, coeffs, row.bound, fromEq = true, scan).copyWithOpposite(
+                reducedIneq(refs, negated(coeffs, scan), -row.bound, fromEq = true, scan),
             )
 
             LinearOp.NE -> null
@@ -647,18 +647,18 @@ internal object RedundantConstraints {
 
     /** A pure clause `Σ literals ≥ 1` (all-Boolean terms, unit coefficients) — skipped by [rowForm]
      *  without materialising its terms, so a clause-heavy model pays nothing here. */
-    private fun isPureClause(row: LinearRow, cancellation: Cancellation): Boolean {
+    private fun isPureClause(row: LinearRow, scan: ScanMeter?): Boolean {
         if (row.relation != LinearOp.GE || row.bound != 1L) return false
         for (k in 0 until row.size) {
-            visit(cancellation)
+            visit(scan)
             if (!Term.isBool(row.ref(k)) || row.coeff(k) != 1L) return false
         }
         return true
     }
 
-    private fun negated(xs: LongArray, cancellation: Cancellation = Cancellation.Never): LongArray =
+    private fun negated(xs: LongArray, scan: ScanMeter? = null): LongArray =
         LongArray(xs.size) {
-            visit(cancellation)
+            visit(scan)
             -xs[it]
         }
 
@@ -671,17 +671,17 @@ internal object RedundantConstraints {
         coeffs: LongArray,
         bound: Long,
         fromEq: Boolean,
-        cancellation: Cancellation,
+        scan: ScanMeter?,
     ): IneqForm {
-        val g = PresolveShared.gcdOf(coeffs) { visit(cancellation) }
+        val g = PresolveShared.gcdOf(coeffs) { visit(scan) }
         return if (g <= 1L) {
-            IneqForm(refKey(refs, coeffs, cancellation), bound, fromEq)
+            IneqForm(refKey(refs, coeffs, scan), bound, fromEq)
         } else {
             val reduced = LongArray(coeffs.size) {
-                visit(cancellation)
+                visit(scan)
                 coeffs[it] / g
             }
-            IneqForm(refKey(refs, reduced, cancellation), bound.floorDiv(g), fromEq)
+            IneqForm(refKey(refs, reduced, scan), bound.floorDiv(g), fromEq)
         }
     }
 
@@ -690,13 +690,13 @@ internal object RedundantConstraints {
      *  and `¬x` never share a term. */
     private data class TermKey(val terms: List<Long>)
 
-    private fun refKey(refs: IntArray, coeffs: LongArray, cancellation: Cancellation): TermKey {
+    private fun refKey(refs: IntArray, coeffs: LongArray, scan: ScanMeter?): TermKey {
         val terms = ArrayList<Long>(refs.size * 2)
         for (i in refs.indices.sortedBy {
-            visit(cancellation)
+            visit(scan)
             refs[it]
         }) {
-            visit(cancellation)
+            visit(scan)
             terms.add(refs[i].toLong())
             terms.add(coeffs[i])
         }
@@ -710,24 +710,22 @@ internal object RedundantConstraints {
      *  map, not positionally, so an order-sensitive hash would split genuine duplicates into different
      *  buckets and miss them). True duplicates therefore always share it; unrelated collisions are
      *  harmless — they only fall through to the exact full-key comparison. */
-    private fun shallowKey(f: Factor, cancellation: Cancellation = Cancellation.Never): Long {
+    private fun shallowKey(f: Factor, scan: ScanMeter? = null): Long {
         var vsum = 0L
         for (v in f.intVars) {
-            visit(cancellation)
+            visit(scan)
             vsum += splitmix64(v.toLong())
         }
         for (v in f.boolVars) {
-            visit(cancellation)
+            visit(scan)
             vsum += splitmix64(v.toLong() or BOOL_VAR_MARK)
         }
         return vsum * 31 + f.structuralKeyWeight
     }
 
-    private fun fullKey(factor: Factor, cancellation: Cancellation): StructuralKey {
-        visit(cancellation, SUBSUME_WORK_WEIGHT * factor.structuralKeyWeight)
-        val key = factor.structuralKey()
-        if (cancellation()) throw Interrupted()
-        return key
+    private fun fullKey(factor: Factor, scan: ScanMeter): StructuralKey {
+        visit(scan, SUBSUME_WORK_WEIGHT * factor.structuralKeyWeight)
+        return factor.structuralKey()
     }
 }
 
