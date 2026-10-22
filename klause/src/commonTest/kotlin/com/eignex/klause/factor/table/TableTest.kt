@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -18,6 +19,7 @@ import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -27,21 +29,66 @@ class TableTest {
     private val allPairs = Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 1, 1, 0, 1, 1))
 
     @Test
-    fun `reduction should drop tuples with a cell outside the current domain`() {
-        val r = allPairs.structuralReduce(arrayOf(IntDomain(0, 0), IntDomain(0, 1)))
-        assertTrue(r is FactorReduction.Rewrite)
-        val table = r.replacement.single() as Table
-        assertEquals(2, table.numTuples)
-        assertTrue(table.tuples.toList() == listOf(0L, 0L, 0L, 1L))
+    fun `reduction should preserve survivor order duplicates and repeated columns`() {
+        val expected = longArrayOf(2, 1, 2, 0, 2, 0, 2, 1, 2, 1, 0, 1)
+        val xs = intArrayOf(1, 0, 1)
+        val domains = arrayOf(IntDomain(0, 2), IntDomain(0, 2))
+        for (rejectedRow in 0..4) {
+            val split = rejectedRow * xs.size
+            val tuples = LongArray(expected.size + 2 * xs.size)
+            expected.copyInto(tuples, endIndex = split)
+            longArrayOf(0, 3, 0).copyInto(tuples, split)
+            expected.copyInto(tuples, split + xs.size, split)
+            longArrayOf(0, 3, 0).copyInto(tuples, expected.size + xs.size)
+            val table = Table(xs, tuples)
+
+            val r = table.structuralReduce(domains)
+
+            assertTrue(r is FactorReduction.Rewrite)
+            val reduced = r.replacement.single() as Table
+            assertContentEquals(xs, reduced.xs)
+            assertContentEquals(expected, reduced.tuples)
+        }
+    }
+
+    @Test
+    fun `feasible tuples should leave the table unchanged`() {
+        val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 1))
+        for (table in listOf(allPairs, Table(intArrayOf(0, 1), longArrayOf(0, 1)))) {
+            assertEquals(FactorReduction.Unchanged, table.structuralReduce(domains))
+        }
+    }
+
+    @Test
+    fun `no surviving tuple should leave the contradiction to propagation`() {
+        val domains = arrayOf(IntDomain(2, 2), IntDomain(0, 1))
+
+        assertEquals(FactorReduction.Unchanged, allPairs.structuralReduce(domains))
+    }
+
+    @Test
+    fun `tables above the reduction cap should be left unchanged`() {
+        val table = Table(intArrayOf(0), LongArray(4097) { it.toLong() })
+
+        assertEquals(FactorReduction.Unchanged, table.structuralReduce(arrayOf(IntDomain(0, 1))))
     }
 
     @Test
     fun `a single surviving tuple should become equalities and drop the table`() {
-        val r = allPairs.structuralReduce(arrayOf(IntDomain(1, 1), IntDomain(0, 0)))
-        assertTrue(r is FactorReduction.Rewrite)
-        val repl = r.replacement
-        assertTrue(repl.all { it is Linear }, "$repl")
-        assertEquals(2, repl.size)
+        for (x in 0L..1L) {
+            for (y in 0L..1L) {
+                val domains = arrayOf(IntDomain(x, x), IntDomain(y, y))
+
+                val r = allPairs.structuralReduce(domains)
+
+                assertTrue(r is FactorReduction.Rewrite)
+                val expected = listOf(
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, x),
+                    Linear(longArrayOf(1), intArrayOf(1), LinearOp.EQ, y),
+                )
+                assertEquals(expected.map { it.structuralKey() }, r.replacement.map { it.structuralKey() })
+            }
+        }
     }
 
     @Test
