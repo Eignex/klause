@@ -1708,8 +1708,8 @@ private fun rejectedRegionAtom(
     for ((index, required) in region.atoms) {
         arithmetic.step()
         val atom = formula.atoms[index]
-        val variable = atom.polynomial.mainVariable
-        if (variable != null && (atomLevels?.getValue(index) ?: variable) >= coordinates.size) {
+        val level = atomLevels?.getValue(index) ?: atom.polynomial.mainVariable
+        if (level != null && level >= coordinates.size) {
             if (atomLevels != null) {
                 val signs = try {
                     partialRegionSigns(atom.polynomial, coordinates, arithmetic, algebraic)
