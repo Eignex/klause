@@ -17,6 +17,7 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -106,6 +107,7 @@ internal object LinearSourceShape {
             put("compiledReals", model.numRealVars)
             put("compiledFactors", model.factors.size)
             put("booleanGateShapes", booleanGateShapes(model, parsed.boolVarNames.values))
+            put("exactPredicateFamilies", exactPredicateShapes(model, parsed.boolVarNames.values))
             put("realSelections", realSelections.size)
             put("integerSelections", integerSelections.size)
             put("constantIntegerSelections", integerSelections.count { !it.arrIsVars })
@@ -201,6 +203,69 @@ internal object LinearSourceShape {
                     .forEach { (fanout, count) -> put(fanout.toString(), count) }
             })
         }
+    }
+
+    private fun exactPredicateShapes(model: Problem, declaredBooleans: Collection<Int>): JsonObject {
+        val active = model.factors.filterIsInstance<ExactLinear>().filter { it.activator != LinearRow.ALWAYS }
+        val owners = active.groupingBy { it.activator }.eachCount()
+        val declared = declaredBooleans.toHashSet()
+        val eligible = active.filter {
+            owners[it.activator] == 1 && it.activator !in declared && it.variables.reals.isNotEmpty()
+        }
+        val groups = List(3) { HashMap<List<String>, MutableSet<Int>>() }
+        for (row in eligible) for (mode in groups.indices) {
+            val (key, negated) = predicateShape(row, primitive = mode > 0, complement = mode == 2)
+            val head = if (mode == 2) Lit.make(row.activator, positive = !negated) else row.activator
+            groups[mode].getOrPut(key) { HashSet() }.add(head)
+        }
+        return buildJsonObject {
+            put("scope", "Private single-row active real comparisons; inferred families, not compiler cache hits")
+            put("activatedRows", active.size)
+            put("eligiblePrivateHeads", eligible.size)
+            put("rawDistinctFunctions", groups[0].size)
+            put("scaledDistinctFunctions", groups[1].size)
+            put("complementFoldedFunctions", groups[2].size)
+            put("rawDuplicateHeads", eligible.size - groups[0].size)
+            put("additionalScaledDuplicates", groups[0].size - groups[1].size)
+            put("additionalComplementDuplicates", groups[1].size - groups[2].size)
+            put("maxScaledHeads", groups[1].values.maxOfOrNull { it.size } ?: 0)
+            put("maxEquivalentOrComplementHeads", groups[2].values.maxOfOrNull { it.size } ?: 0)
+            put("identity", "Exact coefficient/rhs gcd and vector orientation; inequality complements flip strictness")
+        }
+    }
+
+    private fun predicateShape(row: ExactLinear, primitive: Boolean, complement: Boolean): Pair<List<String>, Boolean> {
+        val constants = row.constants
+        val ordered = (0 until row.size).map { row.ref(it) to constants.exactCoeff(it) }.sortedBy { it.first }
+        require(ordered.isNotEmpty() && ordered.any { Term.isReal(it.first) })
+        var divisor = if (primitive) constants.exactBound.abs() else BIG_ONE
+        if (primitive) for ((_, coefficient) in ordered) divisor = divisor.gcd(coefficient)
+        var relation = row.relation
+        if (ordered.first().second.signum() < 0) {
+            divisor = divisor.negate()
+            relation = when (relation) {
+                LinearOp.LE -> LinearOp.GE
+                LinearOp.GE -> LinearOp.LE
+                else -> relation
+            }
+        }
+        var strict = row.strict
+        var negated = false
+        if (complement) when (relation) {
+            LinearOp.GE -> {
+                relation = LinearOp.LE
+                strict = !strict
+                negated = true
+            }
+            LinearOp.NE -> {
+                relation = LinearOp.EQ
+                negated = true
+            }
+            else -> Unit
+        }
+        val key = listOf(relation.name, strict.toString(), constants.exactBound.divide(divisor).toString()) +
+            ordered.map { (reference, coefficient) -> "$reference:${coefficient.divide(divisor)}" }
+        return key to negated
     }
 
     private fun booleanGateShapes(model: Problem, declaredBooleans: Collection<Int>): JsonObject {

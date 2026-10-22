@@ -349,6 +349,11 @@ Signatures preserve signed inputs; IFF also folds simultaneous input negation.
 Private counts exclude declared Booleans and heads read by non-clause factors.
 These are inferred functional definitions in the inspected model, not compiler
 cache hits or evidence that a default solve retains those columns.
+Exact predicate families count private Boolean heads defined by one active real
+row. They separate raw orientation signatures, primitive coefficient/right-side
+GCD normalization, and complement folding. Reversing an inequality complements its
+strictness, preserving the distinction between `<` and `<=`. Declared Boolean heads,
+multi-row definitions and integer-only rows are excluded from this estimate.
 Predicate identity removes only the
 activator before using `ExactLinear` structural keys; it does not reason about
 signs, implications or source satisfiability. Raw coordinate/activated-row entry
