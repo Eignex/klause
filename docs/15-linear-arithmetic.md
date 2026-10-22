@@ -55,8 +55,8 @@ A check proceeds in four steps:
    Each asserted bound carries the literals that justify it. Disjunction rows stay
    out until search selects a disjunct.
 2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
-   the LP solves the asserted system with exact certification. Non-strict
-   zero-objective checks can use its primary sparse exact feasibility kernel;
+   the LP solves the asserted system with exact certification. Zero-objective
+   checks can use its primary sparse exact feasibility kernel;
    a resource decline keeps the query indeterminate. Partial Boolean
    states are checked once at least one arithmetic row is determined.
 3. **Explain.** An infeasible system produces a conflict from the certified
@@ -84,10 +84,12 @@ Boolean state, it registers the split `t < b` against `t > b`.
 
 #### Strict inequalities
 
-The floating simplex solves the closure, where strict and non-strict bounds
-coincide. Certification decides strictness with a margin auxiliary: it maximizes a
-slack `t` added to every strict row and accepts only an exact witness with positive
-`t`, or refutes only with an exact bound `t <= 0`.
+Primary exact feasibility carries strict sides as symbolic infinitesimal offsets
+and materializes a rational interior point before publication. Floating requests
+solve the closure, where strict and non-strict bounds coincide. Their certification
+decides strictness with a margin auxiliary: it maximizes a slack `t` added to every
+strict row and accepts only an exact witness with positive `t`, or refutes only with
+an exact bound `t <= 0`.
 [LP certification](17-linear-programming.md#refinement-and-strict-inequalities)
 defines that check.
 

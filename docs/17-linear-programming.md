@@ -4,7 +4,7 @@ Part V describes the numerical mechanisms that search and the theories of Part I
 call on. The linear programming engine comes first because it has the most
 consumers: finite CP/COP relaxations, mixed-integer models and the
 [open linear theories](15-linear-arithmetic.md) share one engine surface. Open
-non-strict feasibility checks can use a sparse exact simplex; other requests use
+feasibility checks can use a sparse exact simplex; other requests use
 the floating revised simplex with exact certification. Shared search owns
 integer, comparison and disequality branches; LP feasibility alone does not
 establish integrality.
@@ -153,7 +153,7 @@ completion returns indeterminate.
 
 ## Sparse exact feasibility
 
-Open linear checks with a zero objective and no strict sides can request a primary
+Open linear checks with a zero objective can request a primary
 sparse exact solve. The production factory and default continuation, refinement and pricing controls
 admit it; explicit engine replacements and other requests retain their configured
 path. The floating owner prepares the shared model representation, while the exact
@@ -180,6 +180,13 @@ allowance. Sparse storage is admitted by its accounted bytes; dense continuation
 dimension guards remain separate. An admitted primary decline returns indeterminate
 without another floating or recovery allowance. Matrix, layout, origin or objective
 replacement discards its retained state; bound-only scopes can reuse it.
+
+Strict sides use lexicographically ordered rational pairs, with one infinitesimal
+coefficient beside each rational coordinate. Matrix and proof coefficients remain
+rational. A feasible symbolic assignment is materialized using a positive rational
+small enough for every finite bound, then checked against the complete original
+model. Equality in a Farkas bound minimum proves a conflict only when a cited side
+is strict. Symbolic work, materialization and verification share the same allowance.
 
 ## Floating simplex and basis factors
 

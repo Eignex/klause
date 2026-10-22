@@ -220,7 +220,9 @@ internal class LpScopedSolver(
             lastFloatTermination = null
             if (!prepare(primaryToken)) return null
             val primary = try {
-                primaryFeasibility.solve(state, primaryToken, context.certificationPolicy, observer, workLimit, iterationLimit)
+                primaryFeasibility.solve(
+                    state, primaryToken, context.certificationPolicy, observer, workLimit, iterationLimit,
+                )
             } finally {
                 lastMetrics = primaryFeasibility.lastMetrics
             }
@@ -236,6 +238,18 @@ internal class LpScopedSolver(
         } finally {
             lastMetrics += primaryMetrics
         } ?: return null
+        val certificationObserver = if (observer != null && primaryMetrics.workOps > 0L) {
+            var eligibilityObserved = false
+            object : LpCertificationObserver by observer {
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
+                    val total = if (eligibilityObserved) metrics else metrics + primaryMetrics
+                    eligibilityObserved = true
+                    observer.observeSolve(total, component)
+                }
+            }
+        } else {
+            observer
+        }
         val certified = certifyLpResult(
             requireNotNull(state.ownerWorkingModel()),
             attempt.first,
@@ -246,7 +260,7 @@ internal class LpScopedSolver(
             continuationCache = continuationCache,
             continuationLimits = continuationLimits,
             fullContinuation = fullContinuation,
-            observer = observer,
+            observer = certificationObserver,
             sparsePointRecovery = sparsePointRecovery,
             refinement = LpRefinementRequest(
                 this,

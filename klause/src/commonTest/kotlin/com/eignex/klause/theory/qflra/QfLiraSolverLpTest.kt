@@ -30,6 +30,8 @@ import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -500,6 +502,30 @@ class QfLiraSolverLpTest {
     }
 
     @Test
+    fun `complemented integer predicates should use primary exact feasibility`() {
+        val source = Problem(
+            1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(-2L, -2L), longArrayOf(2L, 2L), null, null),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 0)),
+        )
+        val stats = LpStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observePrimaryLpWith(stats.certificationObserver(LpRoute.STANDALONE))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val phase = "PRIMARY_EXACT_FEASIBILITY_STANDALONE"
+            val before = stats.snapshot().phases[phase]?.outcomes?.get("FEASIBLE") ?: 0L
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+            val point = assertNotNull(result.model.valueOf(component.assignmentKey))
+            assertEquals(false, point.bools.single())
+            assertTrue((stats.snapshot().phases[phase]?.outcomes?.get("FEASIBLE") ?: 0L) > before)
+        }
+    }
+
+    @Test
     fun `closed real and integer leaves should not bypass withheld shared proofs`() {
         for (integer in listOf(false, true)) {
             val source = if (integer) {
@@ -522,7 +548,11 @@ class QfLiraSolverLpTest {
             }
             val stats = SmtStatsSink()
             ExactLiraSearchComponent(source).use { component ->
-                component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false }))
+                var successfulProofs = 0
+                component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, successful ->
+                    if (successful) successfulProofs++
+                    false
+                }))
                 component.observeWith(stats)
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
                 assertIs<ComponentResult.Consistent>(session.initialize())
@@ -531,7 +561,7 @@ class QfLiraSolverLpTest {
                 assertIs<SearchResult.Indeterminate>(session.solve(0))
                 assertNull(session.model().valueOf(component.assignmentKey))
                 assertEquals(0L, stats.snapshot().sourceLp.operations)
-                assertTrue(stats.snapshot().continuation.calls > 0L)
+                assertTrue(successfulProofs > 0)
             }
         }
     }

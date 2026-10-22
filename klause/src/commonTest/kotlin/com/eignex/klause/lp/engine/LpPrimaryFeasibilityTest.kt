@@ -23,7 +23,9 @@ class LpPrimaryFeasibilityTest {
             val result = assertNotNull(owner.solve(primaryExactFeasibility = true))
 
             assertEquals(listOf(BigFraction.ofLong(2L), BigFraction.MINUS_ONE), result.exactPrimal)
-            assertNotNull(checkedLpWitness(assertNotNull(owner.state.toWorkingModel()), assertNotNull(result.exactPrimal)))
+            assertNotNull(checkedLpWitness(
+                assertNotNull(owner.state.toWorkingModel()), assertNotNull(result.exactPrimal),
+            ))
         }
     }
 
@@ -38,7 +40,9 @@ class LpPrimaryFeasibilityTest {
                 val result = assertNotNull(owner.solve(primaryExactFeasibility = true))
 
                 assertEquals(LpVerdict.INFEASIBLE, result.verdict)
-                assertTrue(checkedLpConflict(assertNotNull(owner.state.toWorkingModel()), assertNotNull(result.rationalConflict)))
+                assertTrue(checkedLpConflict(
+                    assertNotNull(owner.state.toWorkingModel()), assertNotNull(result.rationalConflict),
+                ))
             }
         }
     }
@@ -55,7 +59,9 @@ class LpPrimaryFeasibilityTest {
             val result = assertNotNull(owner.solve(primaryExactFeasibility = true))
 
             assertEquals(LpVerdict.INFEASIBLE, result.verdict)
-            assertTrue(checkedLpConflict(assertNotNull(owner.state.toWorkingModel()), assertNotNull(result.rationalConflict)))
+            assertTrue(checkedLpConflict(
+                assertNotNull(owner.state.toWorkingModel()), assertNotNull(result.rationalConflict),
+            ))
             assertNotNull(result.conflictSupport)
         }
     }
@@ -119,7 +125,9 @@ class LpPrimaryFeasibilityTest {
             val result = assertNotNull(owner.solve(primaryExactFeasibility = true))
 
             assertEquals(listOf(BigFraction.ofLong(2L)), result.exactPrimal)
-            assertNotNull(checkedLpWitness(assertNotNull(owner.state.toWorkingModel()), assertNotNull(result.exactPrimal)))
+            assertNotNull(checkedLpWitness(
+                assertNotNull(owner.state.toWorkingModel()), assertNotNull(result.exactPrimal),
+            ))
         }
     }
 
@@ -144,7 +152,9 @@ class LpPrimaryFeasibilityTest {
             val x = addVar(0L, 1L)
             addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
         }.build(Sense.MINIMIZE)
-        val policy = LpCertificationPolicy { certifier, successful -> successful && certifier != LpCertifier.EXACT_FARKAS }
+        val policy = LpCertificationPolicy { certifier, successful ->
+            successful && certifier != LpCertifier.EXACT_FARKAS
+        }
         val context = LpSolveContext(certificationPolicy = policy)
         LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel())), context = context).use { owner ->
             val result = assertNotNull(owner.solve(primaryExactFeasibility = true))
@@ -156,16 +166,65 @@ class LpPrimaryFeasibilityTest {
 
     @Test
     fun `strict sides should retain an interior feasibility witness`() {
+        for (ceiling in listOf(BigFraction.ONE, BigFraction.ofLong(100L).reciprocal())) {
+            val zero = ExactLpNumber.of(0L)
+            val upper = ExactLpNumber.of(ceiling)
+            val source = ExactLpModel(
+                listOf(emptyList()), emptyList(),
+                listOf(ExactLpColumn(
+                    ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(upper)), integral = false,
+                )),
+                emptyList(), ExactLpObjective(listOf(zero)),
+            )
+            LpScopedSolver(LpExactState(source)).use { owner ->
+                val result = assertNotNull(owner.solve(primaryExactFeasibility = true))
+
+                val coordinate = assertNotNull(result.exactPrimal).single()
+                assertTrue(coordinate > BigFraction.ZERO && coordinate <= ceiling)
+            }
+        }
+    }
+
+    @Test
+    fun `strict coupled rows should materialize a complete rational interior point`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(one)), integral = false)),
-            emptyList(), ExactLpObjective(listOf(zero)))
+        val bounds = ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(one, strict = true))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one)), listOf(ExactLpEntry(0, one))), listOf(one),
+            listOf(ExactLpColumn(bounds, integral = false), ExactLpColumn(bounds, integral = false),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false)),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero, zero)),
+        )
         LpScopedSolver(LpExactState(source)).use { owner ->
             val result = assertNotNull(owner.solve(primaryExactFeasibility = true))
 
-            val coordinate = assertNotNull(result.exactPrimal).single()
-            assertTrue(coordinate > BigFraction.ZERO && coordinate <= BigFraction.ONE)
+            val point = assertNotNull(result.exactPrimal)
+            assertEquals(BigFraction.ONE, point[0] + point[1])
+            assertTrue(point.all { it > BigFraction.ZERO && it < BigFraction.ONE })
+            assertNotNull(checkedLpWitness(assertNotNull(owner.state.toWorkingModel()), point))
+        }
+    }
+
+    @Test
+    fun `a strict zero margin conflict should retain its strict bound support`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)), ExactLpEntry(1, ExactLpNumber.of(-1L)))),
+            listOf(zero, zero),
+            listOf(ExactLpColumn(ExactLpBounds(), integral = false),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)), integral = false),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)), integral = false)),
+            listOf(ExactLpRow(strict = true), ExactLpRow()), ExactLpObjective(listOf(zero, zero, zero)),
+        )
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            val result = assertNotNull(owner.solve(primaryExactFeasibility = true))
+
+            assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+            assertTrue(checkedLpConflict(
+                assertNotNull(owner.state.toWorkingModel()), assertNotNull(result.rationalConflict),
+            ))
+            assertTrue(assertNotNull(result.conflictSupport).sides.any { it.side.strict })
         }
     }
 

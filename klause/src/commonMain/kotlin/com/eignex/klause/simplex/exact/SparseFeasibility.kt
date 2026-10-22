@@ -7,6 +7,8 @@ internal interface SparseFeasibilityBounds {
     val size: Int
     fun lower(column: Int): BigFraction?
     fun upper(column: Int): BigFraction?
+    fun lowerStrict(column: Int): Boolean = false
+    fun upperStrict(column: Int): Boolean = false
 }
 
 internal interface SparseFeasibilityModel {
@@ -86,6 +88,49 @@ internal class SparseFeasibilityResult(
 private fun fractionBytes(value: BigFraction): Long =
     64L + (maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength()).toLong() + 7L) / 4L
 
+private class FeasibilityValue(val real: BigFraction, val epsilon: BigFraction = BigFraction.ZERO) {
+    val bytes get() = 32L + fractionBytes(real) + fractionBytes(epsilon)
+
+    companion object {
+        val ZERO = FeasibilityValue(BigFraction.ZERO)
+    }
+}
+
+private fun SparseFeasibilityBudget.addValue(a: FeasibilityValue, b: FeasibilityValue): FeasibilityValue {
+    step(bytes = 32L)
+    return FeasibilityValue(add(a.real, b.real), add(a.epsilon, b.epsilon))
+}
+
+private fun SparseFeasibilityBudget.subtractValue(a: FeasibilityValue, b: FeasibilityValue): FeasibilityValue {
+    step(bytes = 32L)
+    return FeasibilityValue(subtract(a.real, b.real), subtract(a.epsilon, b.epsilon))
+}
+
+private fun SparseFeasibilityBudget.multiplyValue(coefficient: BigFraction, value: FeasibilityValue): FeasibilityValue {
+    step(bytes = 32L)
+    return FeasibilityValue(multiply(coefficient, value.real), multiply(coefficient, value.epsilon))
+}
+
+private fun SparseFeasibilityBudget.compareValue(a: FeasibilityValue, b: FeasibilityValue): Int {
+    val real = compare(a.real, b.real)
+    return if (real != 0) real else compare(a.epsilon, b.epsilon)
+}
+
+private fun SparseFeasibilityBounds.endpoint(
+    column: Int,
+    upper: Boolean,
+    budget: SparseFeasibilityBudget,
+): FeasibilityValue? {
+    val value = (if (upper) this.upper(column) else lower(column)) ?: return null
+    budget.step(bytes = 32L)
+    val strict = if (upper) upperStrict(column) else lowerStrict(column)
+    return FeasibilityValue(budget.number(value), when {
+        !strict -> BigFraction.ZERO
+        upper -> BigFraction.MINUS_ONE
+        else -> BigFraction.ONE
+    })
+}
+
 private class FeasibilityRow(
     val basic: Int,
     val constant: BigFraction,
@@ -108,7 +153,7 @@ private class FeasibilityProof(
 internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
     private var rows = emptyArray<FeasibilityRow>()
     private var incidence = emptyArray<IntArray>()
-    private var values = emptyArray<BigFraction>()
+    private var values = emptyArray<FeasibilityValue>()
     private var basicRow = IntArray(0)
     private val proofs = ArrayList<FeasibilityProof>()
     private var initialized = false
@@ -130,8 +175,7 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
             while (true) {
                 val violated = violated(bounds, budget)
                 if (violated == null) {
-                    budget.step(values.size.toLong(), values.size.toLong() * 8L)
-                    return SparseFeasibilityResult(values = values.toList(), pivots = pivots)
+                    return SparseFeasibilityResult(values = materialize(bounds, budget), pivots = pivots)
                 }
                 val (row, upper) = violated
                 val entering = entering(rows[row], upper, bounds, budget)
@@ -139,7 +183,7 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
                     return SparseFeasibilityResult(ray = ray(rows[row], upper, budget), pivots = pivots)
                 }
                 if (pivots >= pivotLimit) throw ContinuationStop(ContinuationDecline.PIVOTS)
-                val target = if (upper) bounds.upper(rows[row].basic) else bounds.lower(rows[row].basic)
+                val target = bounds.endpoint(rows[row].basic, upper, budget)
                 pivot(row, entering, requireNotNull(target), budget)
                 pivots++
             }
@@ -151,11 +195,11 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
     private fun initialize(bounds: SparseFeasibilityBounds, budget: SparseFeasibilityBudget) {
         val total = bounds.size
         budget.step(total.toLong() + model.m, total.toLong() * 64L + model.m.toLong() * 96L)
-        val nextValues = Array(total) { BigFraction.ZERO }
+        val nextValues = Array(total) { FeasibilityValue.ZERO }
         val nextBasic = IntArray(total) { -1 }
         val terms = Array(model.m) { ArrayList<Pair<Int, BigFraction>>() }
         val links = Array(total) { ArrayList<Int>() }
-        for (column in 0 until total) nextValues[column] = clamp(BigFraction.ZERO, column, bounds, budget)
+        for (column in 0 until total) nextValues[column] = clamp(FeasibilityValue.ZERO, column, bounds, budget)
         for (column in 0 until model.n) {
             var previous = -1
             model.column(column) { row, coefficient ->
@@ -173,9 +217,10 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
         val nextProofs = ArrayList<FeasibilityProof>()
         val nextRows = Array(model.m) { row ->
             val constant = budget.number(model.rhs(row))
-            var value = constant
+            budget.step(bytes = 32L)
+            var value = FeasibilityValue(constant)
             for ((column, coefficient) in terms[row]) {
-                value = budget.add(value, budget.multiply(coefficient, nextValues[column]))
+                value = budget.addValue(value, budget.multiplyValue(coefficient, nextValues[column]))
             }
             val basic = model.n + row
             nextBasic[basic] = row
@@ -191,7 +236,7 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
         var bytes = total.toLong() * 36L + model.m.toLong() * 8L
         for (value in nextValues) {
             budget.step()
-            bytes += fractionBytes(value)
+            bytes += value.bytes
         }
         for (row in nextRows) {
             budget.step(row.terms.size.toLong() + 1L)
@@ -214,43 +259,43 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
     }
 
     private fun clamp(
-        value: BigFraction,
+        value: FeasibilityValue,
         column: Int,
         bounds: SparseFeasibilityBounds,
         budget: SparseFeasibilityBudget,
-    ): BigFraction {
-        val lower = bounds.lower(column)?.let(budget::number)
-        val upper = bounds.upper(column)?.let(budget::number)
-        if (lower != null && upper != null && budget.compare(lower, upper) > 0) {
+    ): FeasibilityValue {
+        val lower = bounds.endpoint(column, false, budget)
+        val upper = bounds.endpoint(column, true, budget)
+        if (lower != null && upper != null && budget.compareValue(lower, upper) > 0) {
             throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
         }
         return when {
-            lower != null && budget.compare(value, lower) < 0 -> lower
-            upper != null && budget.compare(value, upper) > 0 -> upper
+            lower != null && budget.compareValue(value, lower) < 0 -> lower
+            upper != null && budget.compareValue(value, upper) > 0 -> upper
             else -> value
         }
     }
 
     private fun reseat(bounds: SparseFeasibilityBounds, budget: SparseFeasibilityBudget) {
-        var next: Array<BigFraction>? = null
+        var next: Array<FeasibilityValue>? = null
         var bytes = retainedBytes
         for (column in values.indices) {
             budget.step()
             if (basicRow[column] >= 0) continue
             val value = clamp(values[column], column, bounds, budget)
-            if (value == values[column]) continue
+            if (budget.compareValue(value, values[column]) == 0) continue
             val current = next ?: run {
                 budget.step(values.size.toLong(), values.size.toLong() * 8L)
                 values.copyOf().also { next = it }
             }
-            val delta = budget.subtract(value, values[column])
-            bytes += fractionBytes(value) - fractionBytes(current[column])
+            val delta = budget.subtractValue(value, values[column])
+            bytes += value.bytes - current[column].bytes
             current[column] = value
             for (row in incidence[column]) {
                 val basic = rows[row].basic
                 val coefficient = coefficient(rows[row], column, budget)
-                val updated = budget.add(current[basic], budget.multiply(coefficient, delta))
-                bytes += fractionBytes(updated) - fractionBytes(current[basic])
+                val updated = budget.addValue(current[basic], budget.multiplyValue(coefficient, delta))
+                bytes += updated.bytes - current[basic].bytes
                 current[basic] = updated
             }
         }
@@ -266,10 +311,10 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
             budget.step()
             val row = basicRow[column]
             if (row < 0) continue
-            val lower = bounds.lower(column)
-            if (lower != null && budget.compare(values[column], lower) < 0) return row to false
-            val upper = bounds.upper(column)
-            if (upper != null && budget.compare(values[column], upper) > 0) return row to true
+            val lower = bounds.endpoint(column, false, budget)
+            if (lower != null && budget.compareValue(values[column], lower) < 0) return row to false
+            val upper = bounds.endpoint(column, true, budget)
+            if (upper != null && budget.compareValue(values[column], upper) > 0) return row to true
         }
         return null
     }
@@ -283,11 +328,11 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
         for ((column, coefficient) in row.terms) {
             budget.step()
             val increase = (coefficient.signum() > 0) != upper
-            val endpoint = if (increase) bounds.upper(column) else bounds.lower(column)
+            val endpoint = bounds.endpoint(column, increase, budget)
             if (endpoint == null || (if (increase) {
-                    budget.compare(values[column], endpoint) < 0
+                    budget.compareValue(values[column], endpoint) < 0
                 } else {
-                    budget.compare(values[column], endpoint) > 0
+                    budget.compareValue(values[column], endpoint) > 0
                 })
             ) return column
         }
@@ -310,10 +355,10 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
         return BigFraction.ZERO
     }
 
-    private fun pivot(row: Int, entering: Int, target: BigFraction, budget: SparseFeasibilityBudget) {
+    private fun pivot(row: Int, entering: Int, target: FeasibilityValue, budget: SparseFeasibilityBudget) {
         val old = rows[row]
         val reciprocal = budget.reciprocal(coefficient(old, entering, budget))
-        val delta = budget.multiply(budget.subtract(target, values[old.basic]), reciprocal)
+        val delta = budget.multiplyValue(reciprocal, budget.subtractValue(target, values[old.basic]))
         budget.step(rows.size.toLong() + values.size + incidence.size,
             rows.size.toLong() * 8L + values.size.toLong() * 8L + incidence.size.toLong() * 8L)
         val nextRows = rows.copyOf()
@@ -331,7 +376,9 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
         val pivotProof = proofs.size
         nextProofs += FeasibilityProof(left = old.proof, scale = budget.negate(reciprocal))
         budget.step(pivotTerms.size.toLong() + 1L, 64L)
-        val pivotRow = FeasibilityRow(entering, budget.negate(budget.multiply(old.constant, reciprocal)), pivotTerms, pivotProof)
+        val pivotRow = FeasibilityRow(
+            entering, budget.negate(budget.multiply(old.constant, reciprocal)), pivotTerms, pivotProof,
+        )
         val affected = incidence[entering]
         var bytes = retainedBytes
         val changes = HashMap<Int, MutableList<Pair<Int, Boolean>>>()
@@ -347,21 +394,23 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
                 nextProofs += FeasibilityProof(left = source.proof, right = pivotProof, scale = scale)
                 val terms = combine(source, entering, pivotRow, scale, budget)
                 budget.step(terms.size.toLong() + 1L, 64L)
-                FeasibilityRow(source.basic, budget.add(source.constant, budget.multiply(scale, pivotRow.constant)), terms, proof)
+                FeasibilityRow(
+                    source.basic, budget.add(source.constant, budget.multiply(scale, pivotRow.constant)), terms, proof,
+                )
             }
             nextRows[affectedRow] = replacement
             bytes += replacement.bytes - source.bytes
             val basic = replacement.basic
             val value = if (affectedRow == row) {
-                budget.add(values[entering], delta)
+                budget.addValue(values[entering], delta)
             } else {
-                budget.add(values[basic], budget.multiply(coefficient(source, entering, budget), delta))
+                budget.addValue(values[basic], budget.multiplyValue(coefficient(source, entering, budget), delta))
             }
-            bytes += fractionBytes(value) - fractionBytes(nextValues[basic])
+            bytes += value.bytes - nextValues[basic].bytes
             nextValues[basic] = value
             incidenceChanges(source.terms, replacement.terms, affectedRow, changes, budget)
         }
-        bytes += fractionBytes(target) - fractionBytes(nextValues[old.basic])
+        bytes += target.bytes - nextValues[old.basic].bytes
         nextValues[old.basic] = target
         budget.step(changes.size.toLong() * (33 - changes.size.countLeadingZeroBits()), changes.size.toLong() * 8L)
         for (column in changes.keys.sorted()) {
@@ -452,7 +501,11 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
         }
     }
 
-    private fun updateIncidence(before: IntArray, changes: List<Pair<Int, Boolean>>, budget: SparseFeasibilityBudget): IntArray {
+    private fun updateIncidence(
+        before: IntArray,
+        changes: List<Pair<Int, Boolean>>,
+        budget: SparseFeasibilityBudget,
+    ): IntArray {
         budget.step(before.size.toLong() + changes.size.toLong() * 3L, 32L + (before.size.toLong() + changes.size) * 8L)
         val after = IntArray(before.size + changes.count { it.second } - changes.count { !it.second })
         var left = 0
@@ -500,5 +553,30 @@ internal class SparseFeasibility(private val model: SparseFeasibilityModel) {
             }
         }
         return ray
+    }
+
+    private fun materialize(bounds: SparseFeasibilityBounds, budget: SparseFeasibilityBudget): List<BigFraction> {
+        var epsilon = BigFraction.ONE
+        val half = budget.reciprocal(BigFraction.ofLong(2L))
+        for (column in values.indices) {
+            budget.step()
+            val value = values[column]
+            val lower = bounds.lower(column)
+            if (lower != null && value.epsilon.signum() < 0 && budget.compare(value.real, lower) > 0) {
+                val gap = budget.subtract(value.real, lower)
+                val crossing = budget.multiply(gap, budget.reciprocal(budget.negate(value.epsilon)))
+                val cap = budget.multiply(crossing, half)
+                if (budget.compare(cap, epsilon) < 0) epsilon = cap
+            }
+            val upper = bounds.upper(column)
+            if (upper != null && value.epsilon.signum() > 0 && budget.compare(value.real, upper) < 0) {
+                val gap = budget.subtract(upper, value.real)
+                val crossing = budget.multiply(gap, budget.reciprocal(value.epsilon))
+                val cap = budget.multiply(crossing, half)
+                if (budget.compare(cap, epsilon) < 0) epsilon = cap
+            }
+        }
+        budget.step(values.size.toLong(), values.size.toLong() * 8L)
+        return values.map { budget.add(it.real, budget.multiply(it.epsilon, epsilon)) }
     }
 }

@@ -11,7 +11,11 @@ import com.eignex.klause.simplex.exact.SparseFeasibilityBudget
 import com.eignex.klause.simplex.exact.SparseFeasibilityModel
 import com.eignex.klause.util.Cancellation
 
-internal class LpPrimaryFeasibilityAttempt(val admitted: Boolean, val result: CertifiedLpResult?, val metrics: LpSolveMetrics)
+internal class LpPrimaryFeasibilityAttempt(
+    val admitted: Boolean,
+    val result: CertifiedLpResult?,
+    val metrics: LpSolveMetrics,
+)
 
 private class PrimaryFeasibilityModel(private val source: ExactLpModel) : SparseFeasibilityModel {
     override val n get() = source.n
@@ -26,6 +30,8 @@ private class PrimaryFeasibilityBounds(private val source: ExactLpModel) : Spars
     override val size get() = source.numVars
     override fun lower(column: Int) = source.column(column).bounds.lower?.number?.value
     override fun upper(column: Int) = source.column(column).bounds.upper?.number?.value
+    override fun lowerStrict(column: Int) = source.column(column).bounds.lower?.strict == true
+    override fun upperStrict(column: Int) = source.column(column).bounds.upper?.strict == true
 }
 
 private class PrimaryFeasibilityEvidence(
@@ -127,7 +133,7 @@ internal class LpPrimaryFeasibilityCache {
             timer.finish(outcome, budget.work, pivots)
         }
         val metrics = lastMetrics
-        observer?.observeSolve(metrics, false)
+        if (admitted) observer?.observeSolve(metrics, false)
         return LpPrimaryFeasibilityAttempt(admitted,
             if (admitted) publish(evidence, token, policy, observer) else null, metrics)
     }
@@ -136,14 +142,7 @@ internal class LpPrimaryFeasibilityCache {
         if (state.conflict != null) return false
         for (column in 0 until state.model.numVars) {
             budget.step()
-            val bounds = state.model.column(column).bounds
-            if (!state.model.objective.cost(column).value.isZero || bounds.lower?.strict == true || bounds.upper?.strict == true) {
-                return false
-            }
-        }
-        for (row in 0 until state.model.m) {
-            budget.step()
-            if (state.model.row(row).strict) return false
+            if (!state.model.objective.cost(column).value.isZero) return false
         }
         return true
     }
@@ -177,7 +176,12 @@ internal class LpPrimaryFeasibilityCache {
     }
 }
 
-private fun withinPrimaryBounds(model: ExactLpModel, column: Int, value: BigFraction, budget: SparseFeasibilityBudget): Boolean {
+private fun withinPrimaryBounds(
+    model: ExactLpModel,
+    column: Int,
+    value: BigFraction,
+    budget: SparseFeasibilityBudget,
+): Boolean {
     budget.step()
     val bounds = model.column(column).bounds
     val lower = bounds.lower
@@ -193,7 +197,11 @@ private fun withinPrimaryBounds(model: ExactLpModel, column: Int, value: BigFrac
     return true
 }
 
-private fun checkedPoint(state: LpExactState, point: List<BigFraction>, budget: SparseFeasibilityBudget): ExactLpWitness? {
+private fun checkedPoint(
+    state: LpExactState,
+    point: List<BigFraction>,
+    budget: SparseFeasibilityBudget,
+): ExactLpWitness? {
     val model = state.model
     if (point.size != model.numVars) return null
     budget.step(model.m.toLong() + model.n, model.m.toLong() * 8L + model.n.toLong() * 16L)
@@ -243,6 +251,7 @@ private fun checkedConflict(
         }
     }
     var minimum = BigFraction.ZERO
+    var strict = false
     val bounds = ArrayList<ExactSimplexBound>()
     val sides = ArrayList<LpExactCitedSide>()
     for (column in 0 until model.numVars) {
@@ -258,11 +267,13 @@ private fun checkedConflict(
         side ?: return null
         val assertion = state.activeSide(column, upper)?.takeIf { it.side == side } ?: return null
         minimum = budget.add(minimum, budget.multiply(coefficient, side.number.value))
+        strict = strict || side.strict
         budget.step(bytes = 128L)
         bounds += ExactSimplexBound(column, upper)
         sides += LpExactCitedSide(column, upper, side, assertion.witness)
     }
-    if (budget.compare(rhs, minimum) >= 0) return null
+    val separation = budget.compare(rhs, minimum)
+    if (separation > 0 || (separation == 0 && !strict)) return null
     budget.step(rows.size.toLong(), rows.size.toLong() * 48L)
     val conflict = BigRationalConflict(rows.toIntArray(), multipliers.toList(), bounds.toList())
     return PrimaryFeasibilityEvidence(conflict = conflict,

@@ -11,7 +11,8 @@ class SparseFeasibilityTest {
     @Test
     fun `interrupted repairs should preserve a resumable algebraic checkpoint`() {
         var interrupted = false
-        for (cut in listOf(1, 16, 64, 256, 1024)) {
+        val cases = listOf(1, 16, 64, 256, 1024).flatMap { cut -> listOf(false, true).map { cut to it } }
+        for ((cut, strict) in cases) {
             val model = object : SparseFeasibilityModel {
                 override val n = 2
                 override val m = 1
@@ -27,19 +28,27 @@ class SparseFeasibilityTest {
                     1 -> BigFraction.ofLong(4L)
                     else -> BigFraction.ZERO
                 }
+                override fun lowerStrict(column: Int) = strict && column < 2
+                override fun upperStrict(column: Int) = strict && column < 2
             }
             val kernel = SparseFeasibility(model)
-            assertNotNull(kernel.resume(bounds, SparseFeasibilityBudget(ExactContinuationLimits(), Cancellation.Never), 100).values)
+            val initialBudget = SparseFeasibilityBudget(ExactContinuationLimits(), Cancellation.Never)
+            assertNotNull(kernel.resume(bounds, initialBudget, 100).values)
             tightened = true
             var polls = 0
             val token = Cancellation { polls++ >= cut }
             val partial = kernel.resume(bounds, SparseFeasibilityBudget(ExactContinuationLimits(), token), 100)
             interrupted = interrupted || partial.decline == ContinuationDecline.CANCELLED
 
-            val result = kernel.resume(bounds, SparseFeasibilityBudget(ExactContinuationLimits(), Cancellation.Never), 100)
+            val recoveryBudget = SparseFeasibilityBudget(ExactContinuationLimits(), Cancellation.Never)
+            val result = kernel.resume(bounds, recoveryBudget, 100)
 
             val point = assertNotNull(result.values)
             assertTrue(point[0] >= BigFraction.ZERO && point[0] <= BigFraction.ONE)
+            if (strict) {
+                assertTrue(point[0] > BigFraction.ZERO && point[0] < BigFraction.ONE)
+                assertTrue(point[1] > BigFraction.ZERO && point[1] < BigFraction.ofLong(4L))
+            }
             assertEquals(BigFraction.ofLong(4L), point[0] + point[1])
             assertEquals(BigFraction.ZERO, point[2])
             assertNull(result.ray)
