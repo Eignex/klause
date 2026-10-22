@@ -104,6 +104,11 @@ sharing an activator must agree, or that activator receives no preference. These
 guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
+When default pure-real guidance exceeds the eager row envelope, a bounded index
+can refer to immutable prepared rows and evaluate one primitive comparison on demand.
+Shared activators and disjunctions receive no indexed preference. The index,
+selected heads and retained rational point share the same storage envelope, and
+retraction, restart or a changed arithmetic assertion discards the point.
 
 ### Results and proof authority
 

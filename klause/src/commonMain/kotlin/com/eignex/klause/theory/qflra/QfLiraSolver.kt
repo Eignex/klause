@@ -224,6 +224,8 @@ class ExactLiraSearchComponent private constructor(
     private var floatCandidate: DoubleArray? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
+    private var pointHintIndex: IntArray? = null
+    private var pointHintPoint: List<BigFraction>? = null
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
     private var dirty = true
@@ -353,15 +355,25 @@ class ExactLiraSearchComponent private constructor(
             if (prepared.row.activator == LinearRow.ALWAYS) continue
             if (prepared.row.activator !in bools.indices) return null
             entries += prepared.row.size.toLong() + 1L
-            if (entries > MAX_POINT_HINT_ENTRIES) return null
+            if (entries > MAX_POINT_HINT_ENTRIES) {
+                return if (defaultOpening && model.numIntVars == 0) {
+                    indexedPointHints(stop, defaultGraphSelections)
+                } else null
+            }
             rows += prepared
             variables += prepared.row.activator
         }
         stop.charge(rows.size.toLong() + variables.size + 1L)
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
+        pointHintIndex = null
+        pointHintPoint = null
         pointHintStop = stop
-        return variables.toIntArray() to SearchCandidateHints { variable ->
+        return variables.toIntArray() to pointHintProvider(defaultOpening, defaultGraphSelections)
+    }
+
+    private fun pointHintProvider(defaultOpening: Boolean, defaultGraphSelections: Boolean): SearchCandidateHints =
+        SearchCandidateHints { variable ->
             observeCompleteStage("POINT_HINT_CONSULTED")
             if (!partialPointHintAvailable()) {
                 observeCompleteStage("POINT_HINT_UNAVAILABLE")
@@ -371,20 +383,79 @@ class ExactLiraSearchComponent private constructor(
                 releasePartialPointHints()
                 null
             } else {
-                val preference = when (pointHintValues?.getOrNull(variable)) {
-                    TRUE -> true
-                    FALSE -> false
-                    else -> null
-                }
+                val preference = if (pointHintIndex != null) indexedPointPreference(variable) else
+                    when (pointHintValues?.getOrNull(variable)) {
+                        TRUE -> true
+                        FALSE -> false
+                        else -> null
+                    }
                 observeCompleteStage(if (preference == null) "POINT_HINT_NO_PREFERENCE" else "POINT_HINT_PREFERRED")
                 preference
             }
+        }
+
+    private fun indexedPointHints(
+        stop: Cancellation,
+        defaultGraphSelections: Boolean,
+    ): Pair<IntArray, SearchCandidateHints>? {
+        if (2L * model.numBoolVars + model.numRealVars > MAX_POINT_HINT_ENTRIES) return null
+        stop.charge(model.numBoolVars.toLong())
+        if (stop()) return null
+        val index = IntArray(model.numBoolVars) { UNASSIGNED }
+        for ((row, prepared) in preparedRows.withIndex()) {
+            stop.charge(1L)
+            if (stop()) return null
+            val head = prepared.row.activator
+            if (head == LinearRow.ALWAYS) continue
+            if (head !in index.indices) return null
+            index[head] = if (prepared.disjunction || index[head] != UNASSIGNED) DECLINED_HINT else row
+        }
+        stop.charge(model.numBoolVars.toLong())
+        if (stop()) return null
+        val count = index.count { it >= 0 }
+        stop.charge(model.numBoolVars.toLong() + count + 1L)
+        if (stop() || count == 0) return null
+        val variables = IntArray(count)
+        var at = 0
+        for (head in index.indices) if (index[head] >= 0) variables[at++] = head
+        pointHintRows = null
+        pointHintValues = null
+        pointHintPoint = null
+        pointHintIndex = index
+        pointHintStop = stop
+        return variables to pointHintProvider(defaultOpening = true, defaultGraphSelections)
+    }
+
+    private fun indexedPointPreference(variable: Int): Boolean? {
+        val row = pointHintIndex?.getOrNull(variable)?.takeIf { it >= 0 } ?: return null
+        val point = pointHintPoint ?: return null
+        val work = MixedPointArithmetic(pointHintStop)
+        pointHintStop.charge(1L)
+        if (pointHintStop()) return null
+        val comparison = preparedRows[row].form.hintComparison(
+            { head -> bools[head].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
+            work::admitted, work::preflight,
+        ) ?: return null
+        var slack = comparison.bound
+        if (!work.admitted(slack)) return null
+        for ((column, coefficient) in comparison.terms) {
+            if (!work.admitted(coefficient)) return null
+            slack = work.subtractProduct(slack, coefficient, point.getOrNull(column) ?: return null) ?: return null
+        }
+        if (!partialPointHintAvailable()) return null
+        observeCompleteStage("POINT_HINT_INDEXED_CONSULTED")
+        return when (comparison.op) {
+            LinearOp.LE -> if (comparison.strict) slack.signum() > 0 else slack.signum() >= 0
+            LinearOp.GE -> if (comparison.strict) slack.signum() < 0 else slack.signum() <= 0
+            LinearOp.EQ -> slack.isZero
+            LinearOp.NE -> !slack.isZero
         }
     }
 
     internal fun partialPointHintAvailable(): Boolean {
         val current = context ?: return false
-        return pointHintValues != null && !dirty && current.decisionLevel == pointHintLevel &&
+        return (pointHintValues != null || pointHintPoint != null) && !dirty &&
+            current.decisionLevel == pointHintLevel &&
             !current.cancelled() && !pointHintStop() && !parentStop()
     }
 
@@ -395,18 +466,31 @@ class ExactLiraSearchComponent private constructor(
         defaultDisjunctionHints = false
         pointHintRows = null
         pointHintValues = null
+        pointHintIndex = null
+        pointHintPoint = null
         pointHintLevel = -1
         pointHintStop = Cancellation.Never
     }
 
     private fun capturePointHints(point: List<BigFraction>, context: SearchContext, graph: Boolean = false) {
         pointHintValues = null
-        val rows = pointHintRows ?: return
+        pointHintPoint = null
+        val rows = pointHintRows
+        if (rows == null && pointHintIndex == null) return
         if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
         operationStop.charge(model.numBoolVars.toLong() + point.size + 1L)
         if (operationStop() || point.any { !hintScalar(it) }) return
+        if (pointHintIndex != null) {
+            val copied = point.toList()
+            if (operationStop() || pointHintStop()) return
+            pointHintPoint = copied
+            pointHintLevel = context.decisionLevel
+            smtStats?.observePointHintCapture(graph)
+            observeCompleteStage("POINT_HINT_INDEXED_CAPTURE")
+            return
+        }
         val values = IntArray(model.numBoolVars) { UNASSIGNED }
-        for (prepared in rows) {
+        for (prepared in requireNotNull(rows)) {
             operationStop.charge(1)
             if (operationStop() || pointHintStop()) return
             val variable = prepared.row.activator
@@ -631,6 +715,7 @@ class ExactLiraSearchComponent private constructor(
     override fun onRestart(context: SearchContext) {
         floatCandidate = null
         pointHintValues = null
+        pointHintPoint = null
         lp.onRestart(context)
     }
     override fun close() {
@@ -892,7 +977,9 @@ class ExactLiraSearchComponent private constructor(
         candidate = null
         floatCandidate = null
         val priorHints = pointHintValues
+        val priorPoint = pointHintPoint
         pointHintValues = null
+        pointHintPoint = null
         val wasDirty = dirty
         dirty = true
         when (decision) {
@@ -914,6 +1001,7 @@ class ExactLiraSearchComponent private constructor(
                     dirty = wasDirty
                     if (!dirty) {
                         pointHintValues = priorHints
+                        pointHintPoint = priorPoint
                         pointHintLevel = context.decisionLevel
                     }
                     return ComponentResult.Consistent
@@ -1123,6 +1211,7 @@ class ExactLiraSearchComponent private constructor(
         candidate = null
         assignment = null
         pointHintValues = null
+        pointHintPoint = null
         smtStats?.observeConflict(explanation)
         outcome = ComponentCheck.Infeasible(explanation)
         return ComponentResult.Conflict(explanation)
@@ -1133,6 +1222,7 @@ class ExactLiraSearchComponent private constructor(
         if (!dirty) return ComponentResult.Consistent
         floatCandidate = null
         pointHintValues = null
+        pointHintPoint = null
         // Root publications precede their delivery to components during shared initialization.
         if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
             bools.indices.all { context.boolValue(it) != null }
@@ -1507,6 +1597,7 @@ class ExactLiraSearchComponent private constructor(
         candidate = null
         floatCandidate = null
         pointHintValues = null
+        pointHintPoint = null
         dirty = true
     }
 

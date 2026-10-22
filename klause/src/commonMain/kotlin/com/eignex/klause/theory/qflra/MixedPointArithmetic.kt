@@ -25,7 +25,7 @@ internal class MixedPointArithmetic(private val stop: Cancellation) {
         return !stop()
     }
 
-    private fun preflight(left: BigFraction, right: BigFraction): Boolean {
+    fun preflight(left: BigFraction, right: BigFraction): Boolean {
         val bits = maxOf(left.num.magnitudeBitLength(), left.den.magnitudeBitLength()).toLong() +
             maxOf(right.num.magnitudeBitLength(), right.den.magnitudeBitLength()) + 2L
         if (bits > MAX_POINT_BITS * 2L + 2L) return false
