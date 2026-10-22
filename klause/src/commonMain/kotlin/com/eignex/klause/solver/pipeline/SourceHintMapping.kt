@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.ValueSelection
@@ -10,6 +11,10 @@ import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 
 internal fun PreparedSourcePlan.sourceCoordinates(cancellation: Cancellation): VarRemap? {
     if (cancellation()) return null
@@ -116,4 +121,97 @@ private fun mappedRoles(ids: IntArray, count: Int, rename: (Int) -> Int, cancell
         if (target >= 0) result += target
     }
     return result.toIntArray()
+}
+
+/** Exact integer reconstruction `(constTerm + Σ coefficients·terms) / divisor` over retained columns. */
+internal class AffineReconstruction(
+    val constTerm: Long,
+    val terms: IntArray,
+    val coefficients: LongArray,
+    val divisor: Long,
+)
+
+/**
+ * Integer columns [this] rebuilds by a single affine step that reads only columns it retains, keyed in its
+ * source coordinates. Presolve preserves column slots, so the terms are direct target coordinates; a column
+ * written by any other step, or rebuilt from a rebuilt column, has no direct reconstruction.
+ */
+internal fun SourceMapping.affineReconstructions(cancellation: Cancellation): Map<Int, AffineReconstruction>? {
+    val retained = retainedCoordinates(cancellation) ?: return null
+    val writes = HashMap<Int, Int>()
+    val affine = HashMap<Int, RebuildStep.AffineValue>()
+    for (stage in stages) {
+        for (step in stage.rebuild.steps) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            val written = when (step) {
+                is RebuildStep.AffineValue -> step.variable.also { affine[it] = step }
+                is RebuildStep.IntegerFromLiteral -> step.variable
+                is RebuildStep.QuotientValue -> step.variable
+                else -> continue
+            }
+            writes[written] = (writes[written] ?: 0) + 1
+        }
+    }
+    val reconstructions = HashMap<Int, AffineReconstruction>()
+    for ((variable, step) in affine) {
+        cancellation.charge(1)
+        if (cancellation()) return null
+        if (writes[variable] != 1) continue
+        if (step.termVars.any { it == variable || it !in 0 until retained.intCount || retained.int(it) < 0 }) continue
+        reconstructions[variable] = AffineReconstruction(step.constTerm, step.termVars, step.termCoeffs, step.divisor)
+    }
+    return if (cancellation()) null else reconstructions
+}
+
+/** [this] with every reconstructed column that equals one retained column exactly renamed onto it. */
+internal fun VarRemap.withAliases(reconstructions: Map<Int, AffineReconstruction>): VarRemap {
+    val ints = IntArray(intCount) { int(it) }
+    for ((variable, reconstruction) in reconstructions) {
+        if (variable !in ints.indices || reconstruction.constTerm != 0L || reconstruction.terms.size != 1) continue
+        if (reconstruction.coefficients[0] == reconstruction.divisor) ints[variable] = int(reconstruction.terms[0])
+    }
+    return VarRemap(IntArray(boolCount) { bool(it) }, ints)
+}
+
+/**
+ * The source row with each reconstructed column replaced by its reconstruction, the row scaled by that
+ * reconstruction's divisor so every coefficient stays exact. A reconstructed output passes to its
+ * reconstruction's single term, the column presolve kept in its place. A row whose output cancels, an
+ * output reconstructed from several terms, or an overflowing coefficient declines.
+ */
+internal fun DefinitionHint.Linear.reconstructed(
+    reconstructions: Map<Int, AffineReconstruction>,
+): DefinitionHint.Linear? = try {
+    val terms = LinkedHashMap<Int, Long>()
+    var rhs = bound
+    for (k in inputs.indices) {
+        when (val operand = inputs[k]) {
+            is DefinitionHint.Operand.Constant -> rhs = subExact(rhs, mulExact(coefficients[k], operand.value))
+            is DefinitionHint.Operand.Variable -> terms[operand.id] = addExact(terms[operand.id] ?: 0L, coefficients[k])
+        }
+    }
+    for (variable in terms.keys.filter { it in reconstructions }) {
+        val reconstruction = reconstructions.getValue(variable)
+        val coefficient = terms.getValue(variable)
+        terms.remove(variable)
+        for (entry in terms.entries) entry.setValue(mulExact(entry.value, reconstruction.divisor))
+        rhs = subExact(mulExact(rhs, reconstruction.divisor), mulExact(coefficient, reconstruction.constTerm))
+        for (j in reconstruction.terms.indices) {
+            val term = reconstruction.terms[j]
+            terms[term] = addExact(terms[term] ?: 0L, mulExact(coefficient, reconstruction.coefficients[j]))
+        }
+    }
+    val target = reconstructions[output]?.terms?.singleOrNull() ?: output.takeIf { it !in reconstructions }
+    val kept = terms.filterValues { it != 0L }
+    if (target == null || target !in kept) {
+        null
+    } else {
+        DefinitionHint.Linear(
+            target, kept.values.toLongArray(),
+            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(), rhs,
+        )
+    }
+} catch (_: CheckedLongOverflowException) {
+    null
 }

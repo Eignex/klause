@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
@@ -78,6 +79,38 @@ class SourceHintMappingTest {
         val projected = assertNotNull(SearchHints(tiers).remapped(mapping, Cancellation.Never))
 
         assertEquals(List(tiers.size) { listOf(1) }, projected.tiers.map { it.intVars.toList() })
+    }
+
+    @Test
+    fun `linear definitions should substitute divided reconstructions and pass a rebuilt output to its partner`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(-10, 10) }, emptyArray())
+        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.AffineValue(1, 1, intArrayOf(2), longArrayOf(3), 2))))
+        val reconstructions = assertNotNull(mapping.affineReconstructions(Cancellation.Never))
+        val row = arrayOf<DefinitionHint.Operand>(
+            DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1),
+        )
+        for ((output, expected) in listOf(0 to 0, 1 to 2)) {
+            val hint = DefinitionHint.Linear(output, longArrayOf(1, -1), row, 3)
+
+            val rebuilt = assertNotNull(hint.reconstructed(reconstructions))
+
+            assertEquals(expected, rebuilt.output)
+            assertEquals(listOf(0, 2), rebuilt.inputs.map { (it as DefinitionHint.Operand.Variable).id })
+            assertEquals(listOf(2L, -3L), rebuilt.coefficients.toList())
+            assertEquals(7L, rebuilt.bound)
+        }
+    }
+
+    @Test
+    fun `linear definitions should decline an output the reconstruction cancels`() {
+        val source = Problem(0, 2, Array(2) { IntDomain(-10, 10) }, emptyArray())
+        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.AffineValue(1, 2, intArrayOf(0), longArrayOf(1), 1))))
+        val hint = DefinitionHint.Linear(0, longArrayOf(1, -1),
+            arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)), -2)
+
+        assertNull(hint.reconstructed(assertNotNull(mapping.affineReconstructions(Cancellation.Never))))
     }
 
     @Test
