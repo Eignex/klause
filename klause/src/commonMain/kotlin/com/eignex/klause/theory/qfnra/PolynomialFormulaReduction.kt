@@ -102,15 +102,18 @@ internal class PolynomialFormulaReduction private constructor(
                     if (inconsistent) break
                     if (replacements.isEmpty()) {
                         val family = current.atoms.map { arithmetic.step(); it.polynomial }
-                        val graph = equationalSection(equations, family, arithmetic)
-                        if (graph == null) {
+                        val graphs = independentEquationalSections(equations, family, arithmetic)
+                        if (graphs.isEmpty()) {
                             if (reducedBooleans != null) {
                                 yield(null)
                                 continue
                             }
                             break
                         }
-                        replacements[graph.variable] = graph.replacement
+                        for (graph in graphs) {
+                            arithmetic.step()
+                            replacements[graph.variable] = graph.replacement
+                        }
                     }
                     val rewritten = ArrayList<PolynomialAtom>()
                     val cache = HashMap<Polynomial, Polynomial>()
