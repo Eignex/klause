@@ -78,6 +78,10 @@ One caller-owned divisor index serves multiple dividends. Leading coordinates
 exclude impossible monomial divisions; a merge of the retained buckets preserves
 the supplied divisor order, including constant divisors. Index construction,
 lookups and division charge the containing arithmetic token.
+Each dividend cursor retains its own sparse coefficient map. A reduction updates
+only the product's terms, removes exact zeros and selects the greatest remaining
+monomial. Irreducible terms enter the remainder in that order; suspended cursors
+share no dividend state.
 
 Bareiss elimination computes Sylvester determinants with exact division.
 Resultants handle zero, shared-factor and constant cases; principal subresultant
