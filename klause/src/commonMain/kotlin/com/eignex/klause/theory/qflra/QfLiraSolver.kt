@@ -1190,7 +1190,7 @@ class ExactLiraSearchComponent private constructor(
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = lp.solve(sparsePointRecovery = true)
-        if (complete) {
+        if (completeTraversalObserved) {
             val key = if (result == null) "NO_RESULT" else listOf(
                 result.verdict.name,
                 when (result.float?.optimal) {
@@ -1205,7 +1205,16 @@ class ExactLiraSearchComponent private constructor(
                 result.refinement?.let { "REFINEMENT_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_REFINEMENT",
                 result.continuation?.let { "CONTINUATION_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_CONTINUATION",
             ).joinToString("_")
-            smtStats?.observeCompleteSearchLinearOutcome(key)
+            if (complete) {
+                smtStats?.observeCompleteSearchLinearOutcome(key)
+            } else {
+                val basis = result?.basisVerification?.let {
+                    "BASIS_${it.phase.name}_${it.decline?.name ?: "NO_DECLINE"}"
+                } ?: "NO_BASIS"
+                val reconstruction = result?.reconstruction?.let { "RECONSTRUCTION_PHASE_${it.phase.name}" }
+                    ?: "NO_RECONSTRUCTION_PHASE"
+                observeCompleteStage("PARTIAL_LINEAR_${key}_${basis}_$reconstruction")
+            }
         }
         if (result == null) return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate

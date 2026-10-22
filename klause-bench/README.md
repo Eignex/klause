@@ -390,6 +390,12 @@ can contain only declined preferences. Release counts a live default consultatio
 not avoided registration or capture work. These observations add no numerical
 invocation and establish neither a timing cause nor a whole-source witness gain.
 
+Primary exact-linear traversal records returned partial-check outcomes under
+`smtCompleteSearchStage_PARTIAL_LINEAR_`, including available certificate decline
+categories and exact-basis verification phase. These labels read an existing result;
+they add no numerical query. Boolean-complete checks retain their separate outcome
+counts. Missing labels do not establish that a check ran or why it took time.
+
 ### Subprocess exit records
 
 Each returned subprocess record retains the actual child exit in `stats.exit`,

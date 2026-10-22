@@ -756,6 +756,10 @@ class QfLiraSolverHintsTest {
                     stats.snapshot().completeSearchMinUnassignedBooleans,
                 )
                 assertEquals(if (complete) 0L else null, stats.snapshot().completeSearchLinearChecks)
+                assertEquals(
+                    complete,
+                    stats.snapshot().completeSearchStages?.keys?.any { it.startsWith("PARTIAL_LINEAR_") } == true,
+                )
 
                 repeat(2) {
                     assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
@@ -769,6 +773,7 @@ class QfLiraSolverHintsTest {
                 assertEquals(complete, (observed.completeSearchLinearChecks ?: 0L) > 0L)
                 assertEquals(complete, (observed.completeSearchLinearPoints ?: 0L) > 0L)
                 assertEquals(observed.completeSearchLinearChecks, observed.completeSearchLinearOutcomes?.values?.sum())
+                assertTrue(observed.completeSearchLinearOutcomes.orEmpty().keys.none { it.startsWith("PARTIAL_") })
                 assertEquals(complete, observed.completeSearchStages != null)
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_UNAVAILABLE"))
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_PREFERRED"))
