@@ -79,7 +79,9 @@ internal object RedundantConstraints {
         problem: Problem,
         cancellation: Cancellation,
         memo: SubsumeMemo? = null,
-    ): SourceDelta = computeFull(problem, ColumnRanges.of(problem.intBounds), cancellation, memo?.subsets).asSourceDelta()
+    ): SourceDelta = computeFull(
+        problem, ColumnRanges.of(problem.intBounds), cancellation, memo?.subsets,
+    ).asSourceDelta()
 
     // Debug switch: every incremental firing also recomputes the full delta and asserts the two agree, so a
     // divergence throws on the exact instance/round. Off in production (the full recompute defeats the point).
