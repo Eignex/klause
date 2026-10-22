@@ -50,6 +50,7 @@ internal object SolveCore {
         val invocationStats = cliInvocationStats(common, rawSolvable.rendering)
         val output = object : OutputProtocol by protocol {
             override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                protocol.onAllowanceStatistics(common.debugStats?.pairs().orEmpty())
                 protocol.onAllowanceStatistics(nodeBudgetStatPairs(common.nodeBudget))
                 protocol.onAllowanceStatistics(invocationStats.pairs(stats))
                 protocol.onStatistics(stats, solveTimeMs, solutions)

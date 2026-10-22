@@ -26,6 +26,8 @@ import platform.posix.stdout
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun cliProp(name: String): String? = getenv(name.uppercase().replace('.', '_'))?.toKString()
 
+internal actual fun platformDebugStats(): CliDebugStats = CliDebugStats { null }
+
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun errPrintln(message: String) {
     fprintf(stderr, "%s\n", message)

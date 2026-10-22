@@ -13,6 +13,8 @@ import kotlin.time.TimeSource
  *  `KLAUSE_ENGINE`). Native: that env var only (no system properties). */
 internal expect fun cliProp(name: String): String?
 
+internal expect fun platformDebugStats(): CliDebugStats
+
 /** Load core [KlauseConfig] from the process environment via [cliProp] and install it as the
  *  ambient config consulted by the compiler/solver. Call once at startup, before loading a model. */
 internal fun installCliConfig(): KlauseConfig =
