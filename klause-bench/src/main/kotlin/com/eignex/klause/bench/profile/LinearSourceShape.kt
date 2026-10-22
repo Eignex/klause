@@ -77,6 +77,7 @@ internal object LinearSourceShape {
         val integerSelections = model.factors.filterIsInstance<Element>()
         val binaryIntegerSelectionIndexes = integerSelections.filter { it.indexOffset == 0 && it.arr.size == 2 }
             .map { it.idx }.toSet()
+        val constantBinaryTables = integerSelections.mapNotNull { constantBinaryTable(model, it) }
         val guardSelectors = selectionGuards(model, binarySelectionIndexes)
         val predicates = HashSet<StructuralKey>()
         for (row in exactRows) {
@@ -108,6 +109,12 @@ internal object LinearSourceShape {
             put("realSelections", realSelections.size)
             put("integerSelections", integerSelections.size)
             put("constantIntegerSelections", integerSelections.count { !it.arrIsVars })
+            put("resolvedConstantBinaryIntegerSelections", constantBinaryTables.size)
+            put("equalEntryBinaryIntegerSelections", constantBinaryTables.count { it[0] == it[1] })
+            put("unitStepBinaryIntegerSelections", constantBinaryTables.count {
+                (it[0] != Long.MAX_VALUE && it[1] == it[0] + 1L) ||
+                    (it[1] != Long.MAX_VALUE && it[0] == it[1] + 1L)
+            })
             put("integerSelectionSelectors", selectionShape(model, binaryIntegerSelectionIndexes))
             put("combinedSelectionSelectors",
                 selectionShape(model, binarySelectionIndexes + binaryIntegerSelectionIndexes))
@@ -161,6 +168,21 @@ internal object LinearSourceShape {
             column to Lit.make(row.auxBoolVar, positive = row.op == LinearOp.EQ)
         }.groupBy({ it.first }, { it.second })
         return definitions.filterValues { it.size == 1 }.entries.groupBy({ it.value.single() }, { it.key })
+    }
+
+    private fun constantBinaryTable(model: Problem, selection: Element): LongArray? {
+        val bounds = model.intBounds
+        if (selection.indexOffset != 0 || selection.arr.size != 2 || !bounds.hasLower(selection.idx) ||
+            !bounds.hasUpper(selection.idx) || bounds.lower(selection.idx) < 0L || bounds.upper(selection.idx) > 1L
+        ) return null
+        if (!selection.arrIsVars) return selection.arr
+        return LongArray(2) { position ->
+            val column = selection.arr[position].toInt()
+            if (!bounds.hasLower(column) || !bounds.hasUpper(column) || bounds.lower(column) != bounds.upper(column)) {
+                return null
+            }
+            bounds.lower(column)
+        }
     }
 
     private fun selectionShape(model: Problem, indexes: Set<Int>): JsonObject {
