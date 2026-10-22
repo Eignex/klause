@@ -10,7 +10,6 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
-import com.eignex.klause.ir.values
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
@@ -20,8 +19,13 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -96,13 +100,15 @@ class CoefficientStrengtheningTest {
         problem.withPassDelta(Presolve.strengthenCoefficients(problem), BakeConfig.NONE)
 
     private fun evalLinear(f: Linear, assign: IntArray): Boolean {
-        var sum = 0L
-        for (i in f.vars.indices) sum += checkNotNull(f.integerConstants).coeffs[i] * assign[f.vars[i]]
+        val row = checkNotNull(f.integerConstants)
+        var sum = BIG_ZERO
+        for (i in f.vars.indices) sum += bigIntOf(row.coeff(i)) * bigIntOf(assign[f.vars[i]])
+        val bound = bigIntOf(row.bound)
         return when (f.op) {
-            LinearOp.LE -> sum <= checkNotNull(f.integerConstants).bound
-            LinearOp.GE -> sum >= checkNotNull(f.integerConstants).bound
-            LinearOp.EQ -> sum == checkNotNull(f.integerConstants).bound
-            LinearOp.NE -> sum != checkNotNull(f.integerConstants).bound
+            LinearOp.LE -> sum <= bound
+            LinearOp.GE -> sum >= bound
+            LinearOp.EQ -> sum == bound
+            LinearOp.NE -> sum != bound
         }
     }
 
@@ -129,17 +135,17 @@ class CoefficientStrengtheningTest {
                 numVars,
                 Array(numVars) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
                 listOf(original),
-            ).bake()
-        val rewritten = strengthened(problem).factors.filterIsInstance<Linear>()
+            )
+        val delta = Presolve.strengthenCoefficients(problem, Cancellation.Never, problem.finiteIntDomains())
+        val rewritten = problem.factors.filterIndexed { index, _ -> index !in delta.droppedIndices } + delta.addedFactors
         val values = Array(numVars) { v ->
-            val d = problem.rootIntDomain(v)
-            IntArray(d.values.size) { d.values.valueAt(it).toInt() }
+            domains[v].toList().toIntArray()
         }
         val assign = IntArray(numVars)
         enumerateMixed(values) { idx ->
             for (v in 0 until numVars) assign[v] = values[v][idx[v]]
             val origSat = evalLinear(original, assign)
-            val newSat = rewritten.all { evalLinear(it, assign) }
+            val newSat = !delta.infeasible && rewritten.all { evalLinear(assertIs<Linear>(it), assign) }
             assertEquals(origSat, newSat, "linear disagrees at ${assign.toList()}: $original -> $rewritten")
         }
     }
@@ -234,6 +240,34 @@ class CoefficientStrengtheningTest {
             intDomains = arrayOf(open, open, open),
             factors = listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 10)),
         )
-        assertTrue(Presolve.strengthenCoefficients(problem.bake()).isEmpty)
+        assertTrue(Presolve.strengthenCoefficients(problem, Cancellation.Never, problem.finiteIntDomains()).isEmpty)
+    }
+
+    @Test
+    fun `a minimum long coefficient should preserve every original assignment`() {
+        for ((domain, bound) in listOf((-1..0) to -1L, (0..1) to Long.MIN_VALUE)) {
+            val row = Linear(longArrayOf(Long.MIN_VALUE, 1L), intArrayOf(0, 1), LinearOp.LE, bound)
+
+            assertLinearEquivalent(arrayOf(domain, 0..0), row)
+        }
+    }
+
+    @Test
+    fun `signed lifting should preserve shifted and fixed column assignments`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) {
+            val bound = if (op == LinearOp.LE) 15 else 9
+            val row = Linear(intArrayOf(-7, 3, 1), intArrayOf(0, 1, 2), op, bound)
+
+            assertLinearEquivalent(arrayOf(-1..0, 2..3, 1..1), row)
+        }
+    }
+
+    @Test
+    fun `overflow declines should preserve every original assignment`() {
+        for (coeffs in listOf(longArrayOf(Long.MAX_VALUE, 1), longArrayOf(Long.MIN_VALUE + 1, 1))) {
+            val row = Linear(coeffs, intArrayOf(0, 1), LinearOp.LE, -1)
+
+            assertLinearEquivalent(arrayOf(-1..1, 0..1), row)
+        }
     }
 }

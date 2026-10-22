@@ -210,8 +210,8 @@ internal object CoefficientStrengthening {
             }
 
             LinearOp.GE -> {
-                coeffs = LongArray(l.vars.size) { -row.coeff(it) }
-                bound = -row.bound
+                coeffs = LongArray(l.vars.size) { subExact(0L, row.coeff(it)) }
+                bound = subExact(0L, row.bound)
             }
 
             else -> return l
@@ -225,7 +225,7 @@ internal object CoefficientStrengthening {
             val a = coeffs[i]
             val v = l.vars[i]
             cap[i] = subExact(ranges.max(v), ranges.min(v))
-            absA[i] = if (a < 0) -a else a
+            absA[i] = if (a < 0) subExact(0L, a) else a
             // Fold the variable's contribution at its zero-of-zⱼ end into the bound:
             // aⱼ>0 shifts by aⱼ·lⱼ, aⱼ<0 (complemented) shifts by aⱼ·uⱼ.
             val zeroEnd = if (a >= 0) ranges.min(v) else ranges.max(v)
