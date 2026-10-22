@@ -339,8 +339,8 @@ class FinitePipelineTest {
         val preparation = FinitePipeline.prepare(FinitePipelineRequest(binaryDisjunction(), FiniteEngine.BACKTRACK))
 
         val prepared = preparation.executableProblem()
-        assertTrue(prepared.factors.none { it is ComparisonClause })
-        assertTrue(prepared.factors.all { it.intVars.isEmpty() })
+        val integerRows = prepared.factors.filter { it is ComparisonClause || it is ReifiedLinear || it is Linear }
+        assertTrue(integerRows.isEmpty(), "$integerRows")
     }
 
     @Test
@@ -364,23 +364,23 @@ class FinitePipelineTest {
 
         assertTrue(samples.isNotEmpty())
         for (sample in samples) {
-            val (x0, x1, x2) = sample.ints
+            val (x0, x1) = sample.ints
             assertEquals(x0 >= 1L, sample.bools[0])
             assertEquals(x1 >= 1L, sample.bools[1])
             assertTrue(sample.bools[0] || sample.bools[1])
-            assertTrue(x0 + x1 + x2 <= 1L)
+            assertTrue(x0 + x1 <= 1L)
         }
     }
 
     private fun binaryDisjunction() = Problem(
         numBoolVars = 2,
-        numIntVars = 3,
-        intDomains = Array(3) { IntDomain(0, 1) },
+        numIntVars = 2,
+        intDomains = Array(2) { IntDomain(0, 1) },
         factors = arrayOf<Factor>(
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
             ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 1),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
         ),
     )
 

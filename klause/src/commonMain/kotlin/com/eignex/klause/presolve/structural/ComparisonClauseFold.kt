@@ -211,7 +211,5 @@ internal object ComparisonClauseFold {
 
     private fun ColumnRanges.isFixed(v: Int): Boolean = hasLower(v) && hasUpper(v) && min(v) == max(v)
 
-    private fun ColumnRanges.isBinary(v: Int): Boolean = hasLower(v) && hasUpper(v) && min(v) == 0L && max(v) == 1L
-
     private const val FOLD_WORK_WEIGHT = 10L
 }
