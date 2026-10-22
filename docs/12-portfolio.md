@@ -252,8 +252,9 @@ single lane and seed do not make the schedule reproducible.
 After an accepted incumbent stops improving for one base time allowance of active
 work, retained non-restarting complete workers share half the active time since that
 improvement. The least-funded free worker runs before ordinary reward selection;
-each accepted improvement resets the accounting. Initial sibling probes and explicit
-minimum shares retain precedence. Segment overruns can delay coverage.
+each accepted improvement resets the accounting. Initial sibling probes, explicit
+minimum shares and bounded auxiliary trials retain precedence. Segment overruns can
+delay coverage.
 
 This share protects exhaustive traversal whose progress can stay invisible until a
 proof completes. Only live resumable backtrack workers with source-proof authority
