@@ -14,6 +14,40 @@ import kotlin.test.assertIs
 
 class SmtLibRealTest {
     @Test
+    fun `scaled and complementary real predicates should preserve named boundary truth`() {
+        for ((value, closed) in listOf("(- 1.0)" to true, "0.0" to true, "0.5" to false, "1.0" to false)) {
+            for (contradiction in listOf(false, true)) {
+                val source = SmtLib.parse(
+                    """
+                        (declare-const x Real)
+                        (declare-const a Bool)
+                        (declare-const b Bool)
+                        (declare-const c Bool)
+                        (declare-const z Bool)
+                        (assert (= x $value))
+                        (assert (= a (<= x 0.0)))
+                        (assert (= b (> (* 3.0 x) 0.0)))
+                        (assert (= c (>= (* (- 2.0) x) 0.0)))
+                        (assert (= z (= x 0.0)))
+                        (assert (= a ${if (contradiction) !closed else closed}))
+                        (assert (= b ${!closed}))
+                        (assert (= c $closed))
+                        (assert (= z ${value == "0.0"}))
+                    """.trimIndent(),
+                )
+
+                val result = BacktrackSolver.source(source.model).solve()
+
+                if (contradiction) {
+                    assertIs<OpenTheoryResult.Unsat>(result)
+                } else {
+                    assertIs<OpenTheoryResult.Sat>(result)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `identical folded real comparisons should share one predicate literal`() {
         val source = SmtLib.parse(
             """

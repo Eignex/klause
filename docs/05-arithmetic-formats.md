@@ -194,8 +194,12 @@ of operand order. IFF also shares simultaneous input negation. The table belongs
 to one parser builder, retains the first definition's ownership and uses at most
 65,536 key entries, charging each gate's arity plus one. Lookup and normalization
 use the source cancellation token; a declined cache entry still emits its definition.
-Comparison literals are shared within a parse only when their folded exact rows
-agree completely.
+Comparison literals share exact proportional rows within a parse, using a signed
+nonzero coefficient to normalize both tagged coordinates and the constant. Reversing
+an inequality reverses its direction; complementary inequalities share opposite
+literal polarities with strictness flipped. Closed and strict boundaries remain distinct.
+The first emitted row is retained, and the comparison table has the same entry bound
+and source cancellation token as the Boolean gate table.
 
 Real and mixed comparisons retain `ExactLinear` rows with exact coefficients,
 strictness and Boolean reification, without frontend digit columns; numerical
