@@ -685,6 +685,13 @@ does not change the CLI recording configuration.
 
 ### Table profiling
 
+`TableReductionProfile` measures current-thread allocated bytes around the production
+`Table.structuralReduce` hook after warmup. Run it as a lab profile job; its
+`table-reduction.csv` separates unchanged and half-pruned ground tables at arities
+4 and 64, with 64/4096 rows and a 4097-row cap control. Input construction and
+result inspection are outside allocation accounting. These hook measurements do
+not establish whole-solve performance.
+
 ```sh
 KLAUSE_CLI_OPTS="-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:StartFlightRecording=filename=table.jfr,settings=profile" \
   klause-cli/build/install/klause-cli-jvm/bin/klause-cli \
