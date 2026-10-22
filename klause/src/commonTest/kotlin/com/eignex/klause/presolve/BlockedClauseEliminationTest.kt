@@ -84,7 +84,7 @@ class BlockedClauseEliminationTest {
                 assertContentEquals(intArrayOf(0), delta.droppedIndices)
                 assertTrue(delta.addedFactors.isEmpty())
                 assertEquals(budget.allowance, budget.spent())
-                val solved = BooleanArray(302) { it == 300 }
+                val solved = BooleanArray(302) { it == 1 || it == 300 }
                 val reduced = assertNotNull(problem.withSourcePassDelta(delta))
                 assertTrue(sat(reduced.factors, solved))
                 delta.rebuild.rebuildInto(solved)
