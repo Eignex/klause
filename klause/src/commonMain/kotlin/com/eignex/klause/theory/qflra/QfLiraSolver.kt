@@ -1449,6 +1449,40 @@ class ExactLiraSearchComponent private constructor(
         if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage)
     }
 
+    private fun sourceEqualityConflict(context: SearchContext): Boolean {
+        lpStop.charge(model.numBoolVars.toLong() + 1L)
+        if (model.numIntVars != 0 || hasSourceDisjunctions || node.sourceBranches.isNotEmpty() ||
+            node.rowAssertions.isNotEmpty() || node.disequalityDirections.isNotEmpty() ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy || operationStop() ||
+            bools.any { it == UNASSIGNED }
+        ) return false
+        val variables = LinkedHashSet<Int>()
+        for (prepared in preparedRows) {
+            lpStop.charge(4L * prepared.booleans.size + 1L)
+            if (operationStop()) return false
+            for (variable in prepared.booleans) {
+                variables += variable
+                if (variables.size > MAX_EQUALITY_CONFLICT_PREMISES) return false
+            }
+        }
+        lpStop.charge(8L * variables.size + 1L)
+        if (operationStop()) return false
+        val explanation = context.explainAtoms(SearchAtomPremise.All(variables.map { variable ->
+            SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
+        })) ?: return false
+        if (operationStop()) return false
+        retirePointReuse()
+        candidate = null
+        assignment = null
+        pointHintValues = null
+        pointHintPoint = null
+        dirty = false
+        outcome = ComponentCheck.Infeasible(explanation)
+        smtStats?.observeConflict(explanation)
+        observeCompleteStage("SOURCE_EQUALITY_CONFLICT")
+        return true
+    }
+
     private fun branch(context: SearchContext): List<SearchDecision>? {
         observeCompleteStage("BRANCH")
         val finite = finiteIntVars.firstOrNull { variable ->
@@ -1517,11 +1551,14 @@ class ExactLiraSearchComponent private constructor(
             if (retained != null) {
                 val rows = agreementSourceRows(context)
                 if (rows != null) {
+                    var sourceInfeasible = false
                     candidate = completeMixedPoint(model.numRealVars, model.numIntVars, retained, rows, lpStop,
                         onStage = ::observeCompleteStage,
+                        onSourceInfeasible = { sourceInfeasible = true },
                         realCompletion = { columns, residual, token ->
                             reduction.completeReals(columns, residual, token, ::observeCompleteStage)
                         })
+                    if (candidate == null && sourceInfeasible && sourceEqualityConflict(context)) return null
                 } else {
                     observeCompleteStage("RECOVERY_ROWS_UNAVAILABLE")
                 }
@@ -1873,6 +1910,7 @@ private const val DECLINED_HINT = -2
 private const val DEFERRED_SOURCE_ROW = -2
 private const val MAX_POINT_HINT_ENTRIES = 65_536
 private const val MAX_POINT_HINT_BITS = 4096
+private const val MAX_EQUALITY_CONFLICT_PREMISES = 4095
 private const val FALSE = 0
 private const val TRUE = 1
 

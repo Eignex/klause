@@ -15,6 +15,7 @@ internal fun completeMixedPoint(
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
+    onSourceInfeasible: (() -> Unit)? = null,
     realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)? = null,
 ): List<BigFraction>? {
     onStage?.invoke("RECOVERY_ATTEMPT")
@@ -103,6 +104,9 @@ internal fun completeMixedPoint(
         if (stop()) return declined("RECOVERY_STOPPED")
         for (difference in listOf(false, true)) {
             val reals = if (difference) repair?.completePoint(residual, realCompletion) else repaired
+            if (stop()) return declined("RECOVERY_STOPPED")
+            // Guessed integer coordinates cannot supply a refutation of the source model.
+            if (integerColumns == 0 && repair?.lastResidualInfeasible == true) onSourceInfeasible?.invoke()
             if (stop()) return declined("RECOVERY_STOPPED")
             if (reals == null) continue
             val point = reals + integers

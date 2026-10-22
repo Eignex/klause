@@ -92,6 +92,8 @@ internal class MixedEqualityRepair(
     private val onStage: ((String) -> Unit)?,
 ) {
     private val work = MixedPointArithmetic(stop)
+    var lastResidualInfeasible: Boolean = false
+        private set
 
     fun point(guess: List<BigFraction>): List<BigFraction>? {
         stop.charge(2L * guess.size)
@@ -115,6 +117,7 @@ internal class MixedEqualityRepair(
         rows: List<ExactRationalInequality>,
         realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)?,
     ): List<BigFraction>? {
+        lastResidualInfeasible = false
         val residual = ArrayList<ExactRationalInequality>()
         var entries = 0L
         for (row in rows) {
@@ -139,6 +142,7 @@ internal class MixedEqualityRepair(
             if (coefficients.isEmpty()) {
                 if (if (row.strict) BigFraction.ZERO >= bound else BigFraction.ZERO > bound) {
                     onStage?.invoke("RECOVERY_EQUALITY_RESIDUAL_FALSE")
+                    if (!stop()) lastResidualInfeasible = true
                     return null
                 }
                 continue

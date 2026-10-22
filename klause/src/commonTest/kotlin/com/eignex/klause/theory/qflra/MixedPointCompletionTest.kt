@@ -12,11 +12,80 @@ import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
+    @Test
+    fun `pure source equality contradictions should report infeasibility`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+                exactColumnLower(0, BigFraction.ZERO), exactColumnUpper(0, BigFraction.ZERO),
+                exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(2), listOf(BigFraction.MINUS_ONE),
+                    if (strict) BigFraction.ZERO else BigFraction.MINUS_ONE, strict),
+            )
+            var sourceInfeasible = false
+
+            val point = completeMixedPoint(3, 0, DoubleArray(3), rows, Cancellation.Never,
+                onSourceInfeasible = { sourceInfeasible = true })
+
+            assertNull(point)
+            assertTrue(sourceInfeasible)
+        }
+    }
+
+    @Test
+    fun `a failed integer guess should not refute the source model`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(0, BigFraction.ZERO), exactColumnUpper(0, BigFraction.ZERO),
+            exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(2, 3), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        var sourceInfeasible = false
+
+        val point = completeMixedPoint(3, 1, DoubleArray(4), rows, Cancellation.Never,
+            onSourceInfeasible = { sourceInfeasible = true })
+
+        assertNull(point)
+        assertFalse(sourceInfeasible)
+        assertTrue(listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE)
+            .satisfiesSourceRows(rows))
+    }
+
+    @Test
+    fun `cancelled equality contradictions should withhold source infeasibility`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(0, BigFraction.ZERO), exactColumnUpper(0, BigFraction.ZERO),
+            exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(2), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+        )
+        var stopped = false
+        var sourceInfeasible = false
+
+        val point = completeMixedPoint(3, 0, DoubleArray(3), rows, Cancellation { stopped },
+            onStage = { if (it == "RECOVERY_EQUALITY_RESIDUAL_FALSE") stopped = true },
+            onSourceInfeasible = { sourceInfeasible = true })
+
+        assertTrue(stopped)
+        assertNull(point)
+        assertFalse(sourceInfeasible)
+    }
+
     @Test
     fun `pure real strict residual completion should replace a boundary guess`() {
         val rows = listOf(
@@ -24,8 +93,12 @@ class MixedPointCompletionTest {
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE, strict = true),
         )
 
-        val point = assertNotNull(completeMixedPoint(1, 0, doubleArrayOf(0.0), rows, Cancellation.Never))
+        var sourceInfeasible = false
 
+        val point = assertNotNull(completeMixedPoint(1, 0, doubleArrayOf(0.0), rows, Cancellation.Never,
+            onSourceInfeasible = { sourceInfeasible = true }))
+
+        assertFalse(sourceInfeasible)
         assertTrue(point[0] > BigFraction.ZERO && point[0] < BigFraction.ONE)
         assertTrue(point.satisfiesSourceRows(rows))
     }

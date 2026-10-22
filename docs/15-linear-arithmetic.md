@@ -70,6 +70,10 @@ rows and discards candidates, so a witness never outlives its premises.
 When an optimal float point has no exact primal package, a complete pure-real
 state can use [witness recovery](#witness-recovery) with an empty integer tail.
 The recovered point must pass every selected exact source row before publication.
+Paired source equations can also reduce an inequality to a false constant, proving
+the selected real rows infeasible. A complete pure-real state with no additional
+theory branches can explain that contradiction using all source-row Boolean
+premises, within the search explanation limit. Cancellation withholds the conflict.
 
 #### Disjunctions and disequalities
 
@@ -361,6 +365,9 @@ pure-real models with an empty integer tail:
 The full rows, strictness, integrality and source reconstruction still gate
 acceptance. A failed guess supplies no conflict or bound; the component returns to
 ordinary branching.
+An equality residual contradiction without guessed integers can certify selected
+pure-real rows; a contradiction after guessing integer coordinates cannot refute
+the source model.
 
 Complete workers and open local search can share checked incumbents under the same
 source and objective through [portfolios](12-portfolio.md). Candidate integer
