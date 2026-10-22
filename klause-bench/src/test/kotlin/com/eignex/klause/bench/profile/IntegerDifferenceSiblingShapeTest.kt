@@ -22,13 +22,13 @@ import kotlinx.serialization.json.jsonPrimitive
 class IntegerDifferenceSiblingShapeTest {
     @Test
     fun `parsed difference equality siblings should retain their uncovered gate identity`() {
-        for (relation in listOf("=", "distinct")) {
+        for (relation in listOf("(= x y)", "(not (= x y))")) {
             val parsed = SmtLib.parse("""
                 (set-logic QF_LIA)
                 (declare-const x Int)
                 (declare-const y Int)
                 (declare-const p Bool)
-                (assert (or p ($relation x y)))
+                (assert (or p $relation))
             """.trimIndent())
             val model = parsed.source.originalSource as Problem
 
@@ -115,18 +115,20 @@ class IntegerDifferenceSiblingShapeTest {
 
     @Test
     fun `unrelated order disjunctions should not be counted as equality gates`() {
-        val parsed = SmtLib.parse("""
-            (set-logic QF_LIA)
-            (declare-const x Int)
-            (declare-const y Int)
-            (declare-const p Bool)
-            (assert (or p (<= x y) (>= x y)))
-        """.trimIndent())
-        val model = parsed.source.originalSource as Problem
+        for (body in listOf("(or p (<= x y) (>= x y))", "(or p (distinct x y))")) {
+            val parsed = SmtLib.parse("""
+                (set-logic QF_LIA)
+                (declare-const x Int)
+                (declare-const y Int)
+                (declare-const p Bool)
+                (assert $body)
+            """.trimIndent())
+            val model = parsed.source.originalSource as Problem
 
-        val shape = IntegerDifferenceSiblingShape.inspect(model, Cancellation.Never)
+            val shape = IntegerDifferenceSiblingShape.inspect(model, Cancellation.Never)
 
-        assertEquals(0, shape.getValue("matchedSplits").jsonPrimitive.int)
+            assertEquals(0, shape.getValue("matchedSplits").jsonPrimitive.int)
+        }
     }
 
     @Test
