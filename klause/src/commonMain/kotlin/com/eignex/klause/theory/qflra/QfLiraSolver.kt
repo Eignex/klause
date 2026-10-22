@@ -478,7 +478,8 @@ class ExactLiraSearchComponent private constructor(
         val rows = pointHintRows
         if (rows == null && pointHintIndex == null) return
         if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
-        operationStop.charge(model.numBoolVars.toLong() + point.size + 1L)
+        val booleanEntries = if (pointHintIndex == null) model.numBoolVars else 0
+        operationStop.charge(booleanEntries.toLong() + point.size + 1L)
         if (operationStop() || point.any { !hintScalar(it) }) return
         if (pointHintIndex != null) {
             val copied = point.toList()
