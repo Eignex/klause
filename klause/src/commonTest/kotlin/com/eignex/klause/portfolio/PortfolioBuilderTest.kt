@@ -418,7 +418,7 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `an auxiliary LP worker should wait for a finite objective incumbent`() {
+    fun `a retained LP worker should search before a finite objective incumbent`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val workers = PortfolioBuilder.build(
             continuous,
@@ -427,7 +427,8 @@ class PortfolioBuilderTest {
         )
 
         try {
-            assertEquals(listOf("bt/lp-default"), workers.filter { it.improvementOnly }.map { it.label })
+            assertEquals("bt/lp-default", workers.last().label)
+            assertFalse(workers.last().improvementOnly)
         } finally {
             workers.forEach { it.close() }
         }

@@ -425,7 +425,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `auxiliary LP should join finite objectives after the incumbent and continuous objectives before it`() {
+    fun `retained LP should join first solution search for finite and continuous objectives`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP, ProblemClass.MixedInteger).profile
 
@@ -435,7 +435,7 @@ class PortfolioCompositionTest {
             val plan = PortfolioComposition.plan(scenario, facts)
 
             assertEquals("lp-default", plan.arms.last().label)
-            assertEquals(plan.arms.size - if (continuousObjective) 0 else 1, plan.firstSolutionCount)
+            assertEquals(plan.arms.size, plan.firstSolutionCount)
         }
     }
 

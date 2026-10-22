@@ -256,21 +256,10 @@ internal object PortfolioComposition {
             return PortfolioArmPlan(composed, composed.size)
         }
         if (scenario.arms == PortfolioScenario.DEFAULT_ARMS) {
-            val stagedLp = !facts.continuousObjective && composed.size > scenario.arms &&
-                composed.last().label == "lp-default"
-            return PortfolioArmPlan(composed, composed.size - if (stagedLp) 1 else 0)
+            return PortfolioArmPlan(composed, composed.size)
         }
         // Keep the small pool's positions: materialization derives each arm's seed from its position.
-        val small = compose(scenario.copy(arms = PortfolioScenario.DEFAULT_ARMS), facts).let { arms ->
-            // A finite objective can seed through incumbent workers without reserving continuous descent.
-            if (!facts.continuousObjective && arms.size > PortfolioScenario.DEFAULT_ARMS &&
-                arms.last().label == "lp-default"
-            ) {
-                arms.dropLast(1)
-            } else {
-                arms
-            }
-        }
+        val small = compose(scenario.copy(arms = PortfolioScenario.DEFAULT_ARMS), facts)
         val remaining = composed.toMutableList()
         val first = small.mapNotNull { arm ->
             val index = remaining.indexOfFirst { it::class == arm::class && it.label == arm.label }

@@ -327,8 +327,8 @@ annotated, or execution is parallel or single-engine. See
   rows with an integer objective append an aggressive LP companion, which also runs
   under a cuts-off ceiling.
 - **Continuous columns.** The default LP arm ranks after the SAT guard and
-  conflict-driven core, joining before the first incumbent when the objective has a
-  continuous coefficient and after it otherwise. Single-core pools reserve half the
+  conflict-driven core and joins first-solution search under the ordinary bounded
+  slices for both finite and continuous objectives. Single-core pools reserve half the
   scheduled time for it until the first incumbent when the objective is continuous.
   An auxiliary LP arm without progress then receives a
   [bounded evaluation](#auxiliary-incumbent-evaluation),
