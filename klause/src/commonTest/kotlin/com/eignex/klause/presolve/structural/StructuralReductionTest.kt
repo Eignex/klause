@@ -2,19 +2,30 @@ package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagate
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class StructuralReductionTest {
@@ -44,6 +55,162 @@ class StructuralReductionTest {
         val delta = StructuralReduction.reduceSource(fixedElement(openResult = true))
 
         assertTrue(delta.isEmpty)
+    }
+
+    @Test
+    fun `unit specialization should preserve all integer and Boolean assignments`() {
+        for (op in LinearOp.entries) {
+            for (truth in listOf(false, true)) {
+                val unit = Clause(intArrayOf(Lit.make(0, truth)))
+                val problem = Problem(
+                    1, 1, arrayOf(IntDomain(-2, 2)),
+                    listOf(unit, ReifiedLinear(0, intArrayOf(1), intArrayOf(0), op, 0)),
+                )
+
+                val out = problem.withSourcePassDelta(StructuralReduction.reduceSource(problem))!!
+
+                assertTrue(out.factors.none { it is ReifiedLinear })
+                assertSame(unit, out.factors.filterIsInstance<Clause>().single())
+                for (value in -2L..2L) {
+                    for (boolean in listOf(false, true)) {
+                        val assumptions = Assumptions.None.withInt(0, value).withBool(0, boolean)
+                        assertEquals(
+                            problem.propagate(assumptions) !is PropagationResult.Unsat,
+                            out.propagate(assumptions) !is PropagationResult.Unsat,
+                            "op=$op truth=$truth value=$value boolean=$boolean",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `unit specialization should keep source declarations and namespaces open`() {
+        val unit = Clause(intArrayOf(Lit.make(0, true)))
+        val problem = Problem(
+            1, 2, Array(2) { IntDomain(0, 0) },
+            listOf(unit, ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 0)),
+            openIntLo = booleanArrayOf(true, true),
+            openIntHi = booleanArrayOf(true, true),
+        )
+
+        val out = problem.withSourcePassDelta(StructuralReduction.reduceSource(problem))!!
+
+        assertEquals(1, out.numBoolVars)
+        assertEquals(2, out.numIntVars)
+        assertSame(unit, out.factors.filterIsInstance<Clause>().single())
+        assertEquals(LinearOp.EQ, theLinear(out).op)
+        for (variable in 0..1) {
+            assertTrue(out.intBounds.isOpenLower(variable))
+            assertTrue(out.intBounds.isOpenUpper(variable))
+        }
+    }
+
+    @Test
+    fun `undecided or contradictory units should not specialize a reification`() {
+        for (units in listOf(
+            emptyList(),
+            listOf(Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, false)))),
+        )) {
+            val problem = Problem(
+                1, 1, arrayOf(IntDomain(0, 0)),
+                units + ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                openIntLo = booleanArrayOf(true),
+                openIntHi = booleanArrayOf(true),
+            )
+
+            val delta = StructuralReduction.reduceSource(problem)
+
+            assertTrue(delta.isEmpty)
+        }
+    }
+
+    @Test
+    fun `unit specialization should expose dependent equalities without repeating its rewrite`() {
+        val problem = Problem(
+            3, 2, Array(2) { IntDomain(0, 0) },
+            List(3) { Clause(intArrayOf(Lit.make(it, true))) } + listOf(
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 2),
+                ReifiedLinear(2, intArrayOf(3), intArrayOf(0), LinearOp.EQ, 3),
+            ),
+            openIntLo = booleanArrayOf(true, true),
+            openIntHi = booleanArrayOf(true, true),
+        )
+
+        val out = problem.withSourcePassDelta(StructuralReduction.reduceSource(problem))!!
+        val dependent = Presolve.dropSourceDependentEqualities(out, Cancellation.Never)
+
+        assertFalse(dependent.infeasible)
+        assertEquals(1, dependent.droppedIndices.size)
+        assertTrue(StructuralReduction.reduceSource(out).isEmpty)
+    }
+
+    @Test
+    fun `interrupted unit collection should not authorize a partial specialization`() {
+        val problem = Problem(
+            3, 1, arrayOf(IntDomain(0, 0)),
+            listOf(Clause(intArrayOf(Lit.make(0, true)))) +
+                List(128) { Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))) } + listOf(
+                    Clause(intArrayOf(Lit.make(0, false))),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+        for (allowance in listOf(1L, 51L, 1_001L)) {
+            val budget = PresolveBudget(allowance)
+
+            val delta = StructuralReduction.reduceSource(problem, budget.orSpent(Cancellation.Never))
+
+            assertTrue(delta.isEmpty, "allowance=$allowance")
+            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+        }
+    }
+
+    @Test
+    fun `interrupted construction should retain prior rewrites and the unfinished original factor`() {
+        val unfinished = ReifiedLinear(1, IntArray(128) { 1 }, IntArray(128) { it }, LinearOp.LE, 0)
+        val problem = Problem(
+            2, 128, Array(128) { IntDomain(0, 0) },
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, false))),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                unfinished,
+            ),
+            openIntLo = BooleanArray(128) { true },
+            openIntHi = BooleanArray(128) { true },
+        )
+        for (allowance in listOf(1_600L, 2_000L, 2_400L)) {
+            val budget = PresolveBudget(allowance)
+
+            val delta = StructuralReduction.reduceSource(problem, budget.orSpent(Cancellation.Never))
+            val out = problem.withSourcePassDelta(delta)!!
+
+            assertEquals(listOf(2), delta.droppedIndices.toList(), "allowance=$allowance")
+            assertSame(unfinished, out.factors.filterIsInstance<ReifiedLinear>().single())
+            assertTrue(budget.spent() in allowance..allowance + 79, "spent=${budget.spent()}")
+        }
+    }
+
+    @Test
+    fun `source specialization should preserve a complement outside Long bounds`() {
+        val problem = Problem(
+            1, 1, arrayOf(IntDomain(0, 0)),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, false))),
+                ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.GE, Long.MIN_VALUE),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val out = problem.withSourcePassDelta(StructuralReduction.reduceSource(problem))!!
+
+        assertEquals(LinearOp.LE, theLinear(out).op)
+        assertEquals("-9223372036854775809", checkNotNull(theLinear(out).wideConstants).bound.toString())
     }
 
     @Test

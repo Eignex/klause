@@ -152,7 +152,7 @@ object Presolve {
      *  See [StructuralReduction]. */
     fun reduceStructural(problem: BakedProblem): PassDelta = StructuralReduction.reduce(problem)
 
-    /** Per-factor structural self-reduction over declared domains, for factors over closed columns. */
+    /** Source structural reductions over declared domains and unconditional Boolean units. */
     internal fun reduceSourceStructural(problem: Problem, cancellation: Cancellation): SourceDelta =
         StructuralReduction.reduceSource(problem, cancellation)
 

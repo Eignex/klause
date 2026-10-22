@@ -222,8 +222,14 @@ solution-set-sensitive queries.
 ### Structural reductions
 
 Structural reduction calls each factor's `structuralReduce` hook under current
-domains; source execution restricts this to closed integer columns. Redundancy and
-subsumption use indexes maintained across rounds. Duplicate removal and index
+domains; source execution restricts this hook to closed integer columns. Before
+the hook, an unambiguous Boolean unit can replace a native integer reification by
+its exact body or complement, retaining the unit and original variable namespace.
+This source specialization also works over open integers and exposes complete
+linear factors to later reductions. Unit collection and bounded construction
+charge and poll the containing allowance; incomplete replacements keep their
+original factors. Redundancy and subsumption use indexes maintained across rounds.
+Duplicate removal and index
 retraction identify stable factor occurrences, so repeated references to one immutable
 factor retain one representative. Clique-implied subsumption admits
 only unconditional positive Boolean knapsacks and derives activity bounds from
