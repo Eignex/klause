@@ -88,7 +88,8 @@ class BakedProblem private constructor(
     }
 
     /** Deductions established while constructing this propagation projection. */
-    internal val rootDeductions: PropagationResult = trustedRootDeductions ?: rootBake(this, seedDeductions, cancellation)
+    internal val rootDeductions: PropagationResult =
+        trustedRootDeductions ?: rootBake(this, seedDeductions, cancellation)
 
     /** Time spent building and folding this propagation projection. */
     val bakeElapsed: Duration
