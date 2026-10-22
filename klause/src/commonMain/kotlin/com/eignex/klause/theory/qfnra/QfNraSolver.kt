@@ -1577,11 +1577,13 @@ private fun searchCells(
     }
     val independent = if (family == null) emptySet()
     else independentRegionAtoms(formula, region, family, fixed, arithmetic)
+    val atomsByVariable = HashMap<Int, MutableList<Int>>()
     val atomLevels = region.atoms.keys.associateWith { index ->
         var level = -1
         for (variable in formula.atoms[index].polynomial.variables) {
             arithmetic.step()
             level = maxOf(level, projection.level(variable))
+            atomsByVariable.getOrPut(variable) { ArrayList() }.add(index)
         }
         level
     }
@@ -1603,7 +1605,9 @@ private fun searchCells(
         }
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
-        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels)
+        // The parent prefix passed every predicate; only this coordinate changes its inputs.
+        val changedAtoms = if (frame.level == 0) null else atomsByVariable[frame.variable].orEmpty()
+        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels, changedAtoms)
         if (rejected != null) {
             // Unprojected coordinates have one fixed sector sample throughout this family's CAD.
             if (rejected in independent) return null
@@ -1704,9 +1708,11 @@ private fun rejectedRegionAtom(
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     atomLevels: Map<Int, Int>? = null,
+    indices: List<Int>? = null,
 ): Int? {
-    for ((index, required) in region.atoms) {
+    for (index in indices ?: region.atoms.keys) {
         arithmetic.step()
+        val required = region.atoms.getValue(index)
         val atom = formula.atoms[index]
         val level = atomLevels?.getValue(index) ?: atom.polynomial.mainVariable
         if (level != null && level >= coordinates.size) {
