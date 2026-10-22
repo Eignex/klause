@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
@@ -30,6 +31,34 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DuplicateColumnsTest {
+    @Test
+    fun `interrupted signature and rewrite scans should discard the whole column merge`() {
+        for (source in listOf(true, false)) {
+            for (stopAt in listOf(5, 9)) {
+                var forms = 0
+                val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)
+                val factor = object : Factor by row {
+                    override val linearForm: LinearForm
+                        get() {
+                            forms++
+                            return row.linearForm
+                        }
+                }
+                val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 2) }, List(4) { factor },
+                    openIntHi = booleanArrayOf(true, false), alreadyFolded = true)
+                forms = 0
+                val token = Cancellation { forms >= stopAt }
+
+                val empty = if (source) DuplicateColumns.mergeSourceDuplicateColumns(problem, emptySet(), token).isEmpty
+                else DuplicateColumns.mergeDuplicateColumns(problem, cancellation = token).isEmpty
+
+                assertTrue(empty, "$source $stopAt")
+                assertEquals(stopAt, forms)
+                assertEquals(2L, problem.rootIntDomain(0).max)
+            }
+        }
+    }
+
     @Test
     fun `merging extreme columns in successive batches should round trip every aggregate`() {
         val domains = arrayOf(

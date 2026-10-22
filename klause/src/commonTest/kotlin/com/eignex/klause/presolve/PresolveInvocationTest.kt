@@ -6,11 +6,16 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
@@ -29,6 +34,161 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolveInvocationTest {
+    @Test
+    fun `full model passes should stop before analysis when entry charging exhausts the allowance`() {
+        for (id in listOf("dup-columns", "fuse-bounds", "subsume", "structural")) {
+            for (lane in PresolveLane.entries) {
+                var reads = 0
+                val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)
+                val factor = object : Factor by row, Propagator by row.propagatorProjection() {
+                    override val structuralKeyWeight: Int get() = 2
+                    override val intVars: IntArray get() {
+                        reads++
+                        return intArrayOf(0, 1)
+                    }
+                    override val linearForm: LinearForm get() {
+                        reads++
+                        return row.linearForm
+                    }
+                    override fun structuralKey(): StructuralKey {
+                        reads++
+                        return row.structuralKey()
+                    }
+                    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+                        reads++
+                        return FactorReduction.Unchanged
+                    }
+                }
+                val source = Problem(0, 2, Array(2) { IntDomain(0, 10) }, List(8) { factor })
+                val problem = if (lane == PresolveLane.FINITE) source.bake() else source
+                reads = 0
+                val budget = PresolveBudget(1L)
+                val token = budget.orSpent(Cancellation.Never)
+                val context = PresolveContext(presolveBudget = budget)
+                val config = PresolveConfig.parse("off,+$id,+bce")
+
+                when (lane) {
+                    PresolveLane.SOURCE -> Presolver.runSource(problem, config, context, token)
+                    PresolveLane.FINITE -> Presolver.run(assertIs<BakedProblem>(problem), config, context, token)
+                }
+
+                assertEquals(0, reads, "$id $lane")
+                val call = budget.invocations.first { it.pass == id }
+                assertEquals(PresolveInvocationOutcome.INTERRUPTED, call.outcome)
+                assertEquals(24L * PresolvePass.entries.single { it.id == id }.baseWorkWeight, call.work)
+            }
+        }
+    }
+
+    @Test
+    fun `full model passes should bound factor reads after a midscan stop in either lane`() {
+        val passes = listOf(PresolvePass.MERGE_DUPLICATE_COLUMNS, PresolvePass.FUSE_LINEAR_BOUNDS,
+            PresolvePass.REMOVE_REDUNDANT, PresolvePass.REDUCE_STRUCTURAL)
+        for (pass in passes) {
+            for (lane in PresolveLane.entries) {
+                var reads = 0
+                val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)
+                val factor = object : Factor by row {
+                    override val structuralKeyWeight: Int get() = 2
+                    override val intVars: IntArray get() {
+                        reads++
+                        return intArrayOf(0, 1)
+                    }
+                    override val linearForm: LinearForm get() {
+                        reads++
+                        return row.linearForm
+                    }
+                    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+                        reads++
+                        return FactorReduction.Unchanged
+                    }
+                }
+                val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 10) }, List(128) { factor }, alreadyFolded = true)
+                reads = 0
+                val budget = PresolveBudget(200L)
+                val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
+
+                val empty = when (lane) {
+                    PresolveLane.SOURCE -> pass.applySource(problem, context).isEmpty
+                    PresolveLane.FINITE -> pass.applyFinite(problem, context).isEmpty
+                }
+
+                assertTrue(empty, "$pass $lane")
+                assertTrue(reads in 1..32, "$pass $lane: $reads reads")
+                assertTrue(budget.spent() in 200L..215L, "$pass $lane: ${budget.spent()} work")
+            }
+        }
+    }
+
+    @Test
+    fun `row analyses should stop inside a long term scan in either lane`() {
+        for (pass in listOf(PresolvePass.MERGE_DUPLICATE_COLUMNS, PresolvePass.FUSE_LINEAR_BOUNDS,
+            PresolvePass.REMOVE_REDUNDANT)) {
+            for (lane in PresolveLane.entries) {
+                var refs = 0
+                val linear = Linear(IntArray(64) { 1 }, IntArray(64) { it }, LinearOp.LE, 100)
+                val row = object : LinearRow by linear {
+                    override fun ref(k: Int): Int {
+                        refs++
+                        return linear.ref(k)
+                    }
+                }
+                val factor = object : Factor by linear {
+                    override val structuralKeyWeight: Int get() = 64
+                    override val linearForm = LinearForm.Conjunction(listOf(row))
+                }
+                val problem = BakedProblem(0, 64, Array(64) { IntDomain(0, 2) }, listOf(factor), alreadyFolded = true)
+                val allowance = when (pass) {
+                    PresolvePass.FUSE_LINEAR_BOUNDS -> 200L
+                    PresolvePass.MERGE_DUPLICATE_COLUMNS -> if (lane == PresolveLane.FINITE) 1_440L else 800L
+                    else -> 800L
+                }
+                val budget = PresolveBudget(allowance)
+                val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
+                refs = 0
+
+                val empty = when (lane) {
+                    PresolveLane.SOURCE -> pass.applySource(problem, context).isEmpty
+                    PresolveLane.FINITE -> pass.applyFinite(problem, context).isEmpty
+                }
+
+                assertTrue(empty, "$pass $lane")
+                assertTrue(refs in 1..63, "$pass $lane: $refs term reads")
+                assertTrue(budget.spent() in allowance..allowance + 15L)
+            }
+        }
+    }
+
+    @Test
+    fun `full model passes should retain productive metered controls in either lane`() {
+        val upper = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)
+        val cases = listOf(
+            PresolvePass.MERGE_DUPLICATE_COLUMNS to BakedProblem(0, 2, Array(2) { IntDomain(0, 2) },
+                listOf(upper), openIntHi = booleanArrayOf(true, false), alreadyFolded = true),
+            PresolvePass.FUSE_LINEAR_BOUNDS to BakedProblem(0, 2, Array(2) { IntDomain(0, 2) },
+                listOf(upper, Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)), alreadyFolded = true),
+            PresolvePass.REMOVE_REDUNDANT to BakedProblem(0, 2, Array(2) { IntDomain(0, 2) },
+                listOf(upper, upper), alreadyFolded = true),
+            PresolvePass.REDUCE_STRUCTURAL to BakedProblem(0, 2, arrayOf(IntDomain(2, 2), IntDomain(0, 100)),
+                listOf(Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false)),
+                alreadyFolded = true),
+        )
+        for ((pass, problem) in cases) {
+            for (lane in PresolveLane.entries) {
+                val budget = PresolveBudget(Long.MAX_VALUE)
+                val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
+
+                val empty = when (lane) {
+                    PresolveLane.SOURCE -> pass.applySource(problem, context).isEmpty
+                    PresolveLane.FINITE -> pass.applyFinite(problem, context).isEmpty
+                }
+
+                assertFalse(empty, "$pass $lane")
+                assertTrue(budget.spent() > 0L, "$pass $lane")
+            }
+        }
+    }
+
     @Test
     fun `Boolean cover pins should count as fixed columns in source and both finite hosts`() {
         val pairs = 8

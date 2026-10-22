@@ -17,6 +17,7 @@ import com.eignex.klause.presolve.integralLinear
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.addExact
@@ -36,6 +37,16 @@ import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 
 internal object LinearBoundFusion {
+    private const val FUSION_WORK_WEIGHT = 16L
+
+    private class Interrupted : RuntimeException()
+
+    private fun visit(cancellation: Cancellation) {
+        if (cancellation()) throw Interrupted()
+        cancellation.charge(FUSION_WORK_WEIGHT)
+        if (cancellation()) throw Interrupted()
+    }
+
     private class Group(val terms: Terms) {
         var upper: BigInt? = null
         var lower: BigInt? = null
@@ -43,12 +54,22 @@ internal object LinearBoundFusion {
         val droppable = ArrayList<Int>()
     }
 
-    fun fuseLinearBounds(problem: Problem): PassDelta {
+    fun fuseLinearBounds(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta = try {
+        fuse(problem, cancellation)
+    } catch (_: Interrupted) {
+        PassDelta()
+    }
+
+    private fun fuse(problem: Problem, cancellation: Cancellation): PassDelta {
+        if (cancellation()) return PassDelta()
         val groups = HashMap<Terms, Group>()
         for ((index, factor) in problem.factors.withIndex()) {
+            visit(cancellation)
             if (factor is Clause) continue
             for (row in factor.impliedLinearRows) {
-                val canonical = canonicalize(row) ?: continue
+                visit(cancellation)
+                val canonical = canonicalize(row, cancellation) ?: continue
+                for (variable in canonical.terms.vars) visit(cancellation)
                 val group = groups.getOrPut(canonical.terms) {
                     Group(canonical.terms)
                 }
@@ -68,14 +89,20 @@ internal object LinearBoundFusion {
         val dropped = ArrayList<Int>()
         val added = ArrayList<Factor>()
         for (group in groups.values) {
+            visit(cancellation)
             val lower = group.lower ?: continue
             val upper = group.upper ?: continue
             if (lower > upper) return PassDelta(infeasible = true)
             if (lower == upper && !group.hasEquality) {
+                for (index in group.droppable) visit(cancellation)
+                for (variable in group.terms.vars) visit(cancellation)
                 dropped.addAll(group.droppable)
-                added.add(integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.EQ, upper))
+                added.add(integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.EQ, upper) {
+                    visit(cancellation)
+                })
             }
         }
+        if (cancellation()) throw Interrupted()
         return PassDelta(droppedIndices = dropped.toIntArray(), addedFactors = added)
     }
 
@@ -99,25 +126,33 @@ internal object LinearBoundFusion {
 
     private class Canonical(val terms: Terms, val bound: BigInt, val upper: Boolean)
 
-    private fun canonicalize(row: LinearRow): Canonical? {
+    private fun canonicalize(row: LinearRow, cancellation: Cancellation): Canonical? {
         val constants = row.constants as? IntegralConstants ?: return null
-        if (!row.isIntegerOnly || row.activator != LinearRow.ALWAYS || row.relation == LinearOp.NE) return null
+        if (row.activator != LinearRow.ALWAYS || row.relation == LinearOp.NE) return null
+        if ((0 until row.size).any {
+            visit(cancellation)
+            !Term.isInt(row.ref(it))
+        }) return null
         if (constants is IntegerConstants) {
             try {
-                return canonicalizeLong(row, constants)
+                return canonicalizeLong(row, constants, cancellation)
             } catch (_: CheckedLongOverflowException) {
                 // Coalescing, strictness and orientation must preserve values outside Long as well.
             }
         }
-        return canonicalizeWide(row, constants)
+        return canonicalizeWide(row, constants, cancellation)
     }
 
-    private fun canonicalizeLong(row: LinearRow, constants: IntegerConstants): Canonical? {
-        val order = (0 until row.size).sortedBy { Term.intVar(row.ref(it)) }
+    private fun canonicalizeLong(row: LinearRow, constants: IntegerConstants, cancellation: Cancellation): Canonical? {
+        val order = (0 until row.size).sortedBy {
+            visit(cancellation)
+            Term.intVar(row.ref(it))
+        }
         val vars = IntArray(row.size)
         val coefficients = LongArray(row.size)
         var count = 0
         for (k in order) {
+            visit(cancellation)
             val variable = Term.intVar(row.ref(k))
             if (count > 0 && vars[count - 1] == variable) {
                 coefficients[count - 1] = addExact(coefficients[count - 1], constants.coeff(k))
@@ -128,6 +163,7 @@ internal object LinearBoundFusion {
         }
         var nonzero = 0
         for (k in 0 until count) {
+            visit(cancellation)
             if (coefficients[k] == 0L) continue
             if (coefficients[k] == Long.MIN_VALUE) {
                 throw CheckedLongOverflowException("coefficient magnitude exceeds Long")
@@ -137,7 +173,7 @@ internal object LinearBoundFusion {
         }
         if (nonzero == 0) return null
         val compact = coefficients.copyOf(nonzero)
-        val gcd = PresolveShared.gcdOf(compact)
+        val gcd = PresolveShared.gcdOf(compact) { visit(cancellation) }
         var bound = constants.bound
         if (row.strict && row.relation == LinearOp.LE) bound = subExact(bound, 1L)
         if (row.strict && row.relation == LinearOp.GE) bound = addExact(bound, 1L)
@@ -147,6 +183,7 @@ internal object LinearBoundFusion {
         val reducedBound = bound.floorDiv(gcd)
         val flip = (compact[0] < 0L) != negate
         for (k in compact.indices) {
+            visit(cancellation)
             compact[k] /= gcd
             if (flip != negate) compact[k] = -compact[k]
         }
@@ -157,15 +194,25 @@ internal object LinearBoundFusion {
         )
     }
 
-    private fun canonicalizeWide(row: LinearRow, constants: IntegralConstants): Canonical? {
+    private fun canonicalizeWide(row: LinearRow, constants: IntegralConstants, cancellation: Cancellation): Canonical? {
         val terms = HashMap<Int, BigInt>()
         for (k in 0 until row.size) {
+            visit(cancellation)
             val variable = Term.intVar(row.ref(k))
             terms[variable] = (terms[variable] ?: BIG_ZERO) + constants.exactCoeff(k)
         }
-        val ordered = terms.entries.filter { it.value != BIG_ZERO }.sortedBy { it.key }
+        val ordered = terms.entries.filter {
+            visit(cancellation)
+            it.value != BIG_ZERO
+        }.sortedBy {
+            visit(cancellation)
+            it.key
+        }
         if (ordered.isEmpty()) return null
-        val gcd = ordered.fold(BIG_ZERO) { value, term -> value.gcd(term.value.abs()) }
+        val gcd = ordered.fold(BIG_ZERO) { value, term ->
+            visit(cancellation)
+            value.gcd(term.value.abs())
+        }
         var bound = constants.exactBound
         if (row.strict && row.relation == LinearOp.LE) bound -= BIG_ONE
         if (row.strict && row.relation == LinearOp.GE) bound += BIG_ONE
@@ -180,10 +227,22 @@ internal object LinearBoundFusion {
         }
         val flip = ordered.first().value * sign < BIG_ZERO
         val orientation = if (flip) -sign else sign
-        val coefficients = ordered.map { it.value / gcd * orientation }.toTypedArray()
-        val vars = ordered.map { it.key }.toIntArray()
-        val key = if (coefficients.all { it.fitsLong() }) {
-            Terms(vars, LongArray(coefficients.size) { coefficients[it].toLongExact() })
+        val coefficients = ordered.map {
+            visit(cancellation)
+            it.value / gcd * orientation
+        }.toTypedArray()
+        val vars = ordered.map {
+            visit(cancellation)
+            it.key
+        }.toIntArray()
+        val key = if (coefficients.all {
+            visit(cancellation)
+            it.fitsLong()
+        }) {
+            Terms(vars, LongArray(coefficients.size) {
+                visit(cancellation)
+                coefficients[it].toLongExact()
+            })
         } else {
             Terms(vars, null, coefficients)
         }

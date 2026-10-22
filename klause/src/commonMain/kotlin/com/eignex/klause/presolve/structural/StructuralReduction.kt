@@ -18,16 +18,25 @@ internal object StructuralReduction {
      * solution-set exact (the hook's contract), so the pass preserves the solution set; the driver only
      * collects the replacements, intersects any returned bound narrowings into the domains, and rebuilds.
      */
-    fun reduce(problem: BakedProblem): PassDelta {
+    fun reduce(problem: BakedProblem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+        if (cancellation()) return PassDelta()
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         val root = problem.rootIntDomainsInPlace
         var domains: Array<IntDomain>? = null
-        problem.factors.forEachIndexed { i, f ->
+        for ((i, f) in problem.factors.withIndex()) {
+            if (!visit(cancellation)) break
+            for (v in f.intVars) if (!visit(cancellation)) {
+                return PassDelta(dropped.toIntArray(), added, domains)
+            }
+            for (v in f.boolVars) if (!visit(cancellation)) {
+                return PassDelta(dropped.toIntArray(), added, domains)
+            }
             when (val reduction = f.structuralReduce(root)) {
                 FactorReduction.Unchanged -> {}
 
                 is FactorReduction.Rewrite -> {
+                    if (!completeRewrite(reduction, cancellation)) break
                     dropped.add(i)
                     added.addAll(reduction.replacement)
                     for ((v, range) in reduction.tightenedBounds) {
@@ -51,11 +60,14 @@ internal object StructuralReduction {
      * is stated as a range, which is all a source pass may carry.
      */
     fun reduceSource(problem: Problem, cancellation: Cancellation = Cancellation.Never): SourceDelta {
+        if (cancellation()) return SourceDelta()
         val declared = problem.declaredIntDomains
         val bounds = problem.intBounds
-        val closed = BooleanArray(problem.numIntVars) { bounds.hasLower(it) && bounds.hasUpper(it) }
+        val closed = BooleanArray(problem.numIntVars)
         // Entries for open columns are never read: only factors over closed columns reach the hook.
         val domains = Array(problem.numIntVars) { v ->
+            if (!visit(cancellation)) return SourceDelta()
+            closed[v] = bounds.hasLower(v) && bounds.hasUpper(v)
             if (!closed[v]) {
                 OPEN_PLACEHOLDER
             } else {
@@ -65,10 +77,19 @@ internal object StructuralReduction {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         val tightening = bounds.tightening()
-        problem.factors.forEachIndexed { i, f ->
-            cancellation.charge(STRUCTURAL_WORK_WEIGHT * (1L + f.intVars.size))
-            if (f.intVars.any { !closed[it] }) return@forEachIndexed
-            val reduction = f.structuralReduce(domains) as? FactorReduction.Rewrite ?: return@forEachIndexed
+        for ((i, f) in problem.factors.withIndex()) {
+            if (!visit(cancellation)) break
+            var allClosed = true
+            for (v in f.intVars) {
+                if (!visit(cancellation)) return SourceDelta(dropped.toIntArray(), added, tightening.build())
+                if (!closed[v]) allClosed = false
+            }
+            for (v in f.boolVars) if (!visit(cancellation)) {
+                return SourceDelta(dropped.toIntArray(), added, tightening.build())
+            }
+            if (!allClosed) continue
+            val reduction = f.structuralReduce(domains) as? FactorReduction.Rewrite ?: continue
+            if (!completeRewrite(reduction, cancellation)) break
             dropped.add(i)
             added.addAll(reduction.replacement)
             for ((v, range) in reduction.tightenedBounds) {
@@ -81,6 +102,22 @@ internal object StructuralReduction {
     }
 
     private val OPEN_PLACEHOLDER = IntDomain(0, 0)
+
+    private fun completeRewrite(reduction: FactorReduction.Rewrite, cancellation: Cancellation): Boolean {
+        for (factor in reduction.replacement) {
+            if (!visit(cancellation)) return false
+            for (v in factor.intVars) if (!visit(cancellation)) return false
+            for (v in factor.boolVars) if (!visit(cancellation)) return false
+        }
+        for (bound in reduction.tightenedBounds) if (!visit(cancellation)) return false
+        return !cancellation()
+    }
+
+    private fun visit(cancellation: Cancellation): Boolean {
+        if (cancellation()) return false
+        cancellation.charge(STRUCTURAL_WORK_WEIGHT)
+        return !cancellation()
+    }
 
     // Work charged per factor offered the hook, scaled by its arity: most hooks read each column once.
     private const val STRUCTURAL_WORK_WEIGHT = 10L

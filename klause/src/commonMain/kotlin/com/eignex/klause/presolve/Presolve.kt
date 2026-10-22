@@ -119,11 +119,12 @@ object Presolve {
 
     /** Cross-direction linear bound fusion (`≤`/`≥` over one vector → `=`, or infeasible when they
      *  cross). See [LinearBoundFusion]. */
-    fun fuseLinearBounds(problem: Problem): PassDelta = LinearBoundFusion.fuseLinearBounds(problem)
+    fun fuseLinearBounds(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
+        LinearBoundFusion.fuseLinearBounds(problem, cancellation)
 
     /** [fuseLinearBounds] in the source lane's change form. */
-    internal fun fuseSourceLinearBounds(problem: Problem): SourceDelta =
-        LinearBoundFusion.fuseLinearBounds(problem).asSourceDelta()
+    internal fun fuseSourceLinearBounds(problem: Problem, cancellation: Cancellation): SourceDelta =
+        LinearBoundFusion.fuseLinearBounds(problem, cancellation).asSourceDelta()
 
     /** Common linear sub-sum extraction — fold a sub-sum an equality defines as one variable back into
      *  the rows that contain it. See [LinearSubSumAggregation]. */
@@ -150,7 +151,8 @@ object Presolve {
 
     /** Per-factor structural self-reduction via `Factor.structuralReduce`.
      *  See [StructuralReduction]. */
-    fun reduceStructural(problem: BakedProblem): PassDelta = StructuralReduction.reduce(problem)
+    fun reduceStructural(problem: BakedProblem, cancellation: Cancellation = Cancellation.Never): PassDelta =
+        StructuralReduction.reduce(problem, cancellation)
 
     /** Per-factor structural self-reduction over declared domains, for factors over closed columns. */
     internal fun reduceSourceStructural(problem: Problem, cancellation: Cancellation): SourceDelta =
@@ -189,8 +191,9 @@ object Presolve {
         objectiveIntVars: Set<Int> = emptySet(),
         sharedIntOcc: SharedIntOccurrence? = null,
         incrementalTouchedVars: IntArray? = null,
+        cancellation: Cancellation = Cancellation.Never,
     ): PassDelta =
-        DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars, sharedIntOcc, incrementalTouchedVars)
+        DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars, sharedIntOcc, incrementalTouchedVars, cancellation)
 
     /** Duplicate-column aggregation over declared ranges, into a representative the aggregate fits. */
     internal fun mergeSourceDuplicateColumns(

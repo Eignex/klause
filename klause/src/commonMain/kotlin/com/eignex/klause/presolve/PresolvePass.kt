@@ -108,7 +108,8 @@ enum class PresolvePass(
         true,
         autoEligible = true,
     ) {
-        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.fuseSourceLinearBounds(problem)
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.fuseSourceLinearBounds(problem, ctx.cancellation)
     },
 
     /** Affine singleton elimination — reconstructs the eliminated variable. The eliminated
@@ -230,7 +231,8 @@ enum class PresolvePass(
 
         // Root-propagated domains are narrower than the declarations, so the finite lane hands every factor
         // the tighter view rather than offering it only to factors over closed columns.
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.reduceStructural(problem)
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            Presolve.reduceStructural(problem, ctx.cancellation)
     },
 
     /** Fold a reified comparison disjunction — a clause over sole-use single-variable reified-comparison
@@ -274,7 +276,9 @@ enum class PresolvePass(
 
         // A finite delta can widen the representative to the Minkowski sum, which a source range cannot.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
-            Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars, ctx.sharedIntOcc, ctx.dupColumnsTouchedVars)
+            Presolve.mergeDuplicateColumns(
+                problem, ctx.objectiveIntVars, ctx.sharedIntOcc, ctx.dupColumnsTouchedVars, ctx.cancellation,
+            )
     },
 
     /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the

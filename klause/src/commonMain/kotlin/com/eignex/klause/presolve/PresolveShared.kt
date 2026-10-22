@@ -170,9 +170,12 @@ internal object PresolveShared {
         return RootBaker.reseed(base, bakeConfig)
     }
 
-    fun gcdOf(xs: LongArray): Long {
+    fun gcdOf(xs: LongArray, visit: () -> Unit = {}): Long {
         var g = 0L
-        for (x in xs) g = gcd(g, x)
+        for (x in xs) {
+            visit()
+            g = gcd(g, x)
+        }
         return g
     }
 
