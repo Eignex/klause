@@ -362,7 +362,12 @@ pure-real models with an empty integer tail:
 4. Complete the free real coordinates per connected component, grouped by shared
    rows: by the difference checker where the rows form a difference graph,
    otherwise by an exact point from the [source LP owner](17-linear-programming.md).
-   Completion is attempted only up to 65,536 row entries.
+   Before declining the LP dimension limit, parallel residual inequalities are
+   divided by the positive magnitude of their first nonzero coefficient and
+   merged to the strongest bound, retaining strictness at equal endpoints.
+   Opposite directions remain separate. Completion keeps the existing LP limits
+   and is attempted only up to 65,536 row entries; every original residual row
+   checks the assembled point.
 
 The full rows, strictness, integrality and source reconstruction still gate
 acceptance. A failed guess supplies no conflict or bound; the component returns to
