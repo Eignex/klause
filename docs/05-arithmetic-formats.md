@@ -201,6 +201,10 @@ strictness and Boolean reification, without frontend digit columns; numerical
 projections may decline values they cannot represent. Integer-only rational
 comparisons keep exact denominator-cleared thresholds.
 
+An integer equality or disequality over a signed unit difference lowers to two weak comparison
+predicates. Their Boolean encoding requires at least one weak side to hold, so
+excluding one side selects the other before arithmetic checking.
+
 Integer conditionals (`ite` and decision lists) retain native `Element` relations
 over branch values when finite, sharing one choice index across wide digit columns.
 A result with an open bound instead keeps guarded exact equalities to its branches.

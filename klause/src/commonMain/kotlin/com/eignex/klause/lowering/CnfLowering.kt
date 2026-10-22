@@ -111,13 +111,16 @@ internal fun CnfLowering.reifyDifferenceLinear(coeffs: LongArray, vars: IntArray
     }
     val rowConstants = requireNotNull(constants)
     // Splitting both meanings keeps guarded disequalities within signed difference coverage.
+    val sides = listOf(
+        reifyLinear(rowConstants.coeffs, factor.vars, LinearOp.LE, rowConstants.bound),
+        reifyLinear(rowConstants.coeffs, factor.vars, LinearOp.GE, rowConstants.bound),
+    )
     tseitinAnd(
-        listOf(
-            reifyLinear(rowConstants.coeffs, factor.vars, LinearOp.LE, rowConstants.bound),
-            reifyLinear(rowConstants.coeffs, factor.vars, LinearOp.GE, rowConstants.bound),
-        ),
+        sides,
         if (factor.op == LinearOp.EQ) literal else Lit.negate(literal),
     )
+    // One weak side always holds, even when the equality is false.
+    factors.add(Clause(sides.toIntArray()))
     return literal
 }
 

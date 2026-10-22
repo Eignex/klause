@@ -1,6 +1,7 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -12,6 +13,11 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.sourceRoute
+import com.eignex.klause.solver.search.ClauseSearchComponent
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchRunEvent
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
@@ -46,6 +52,112 @@ class CnfLoweringTest {
 
         val clause = sink.factors.first() as Clause
         assertContentEquals(intArrayOf(Lit.make(1, true), Lit.make(2, false), Lit.make(0, false)), clause.literals)
+    }
+
+    @Test
+    fun `excluding one weak side should imply its sibling in the clause projection`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            for (sign in listOf(1L, -1L)) {
+                for (bound in listOf(Long.MIN_VALUE, 3L, Long.MAX_VALUE)) {
+                    for (excluded in listOf(LinearOp.LE, LinearOp.GE)) {
+                        val sink = Sink()
+                        val target = sink.reifyDifferenceLinear(longArrayOf(sign, -sign), intArrayOf(0, 1), op, bound)
+                        val sides = sink.factors.filterIsInstance<ReifiedLinear>()
+                        val side = sides.single { it.op == excluded }
+                        val sibling = sides.single { it.op != excluded }
+                        val clauses = sink.factors.filterIsInstance<Clause>()
+                        val session = SearchSession(listOf(ClauseSearchComponent(clauses)))
+                        assertIs<ComponentResult.Consistent>(session.initialize())
+
+                        val result = session.push(SearchDecision.Bool(Lit.make(side.auxBoolVar, false)))
+
+                        assertIs<ComponentResult.Consistent>(result)
+                        assertEquals(true, session.boolValue(sibling.auxBoolVar))
+                        assertEquals(op == LinearOp.NE, session.boolValue(Lit.variable(target)))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `excluding both weak sides should refute the clause projection`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            for (sign in listOf(1L, -1L)) {
+                val sink = Sink()
+                sink.reifyDifferenceLinear(longArrayOf(sign, -sign), intArrayOf(0, 1), op, 3L)
+                val sides = sink.factors.filterIsInstance<ReifiedLinear>()
+                val session = SearchSession(listOf(ClauseSearchComponent(sink.factors.filterIsInstance<Clause>())))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val firstExclusion = SearchDecision.Bool(Lit.make(sides[0].auxBoolVar, false))
+                assertIs<ComponentResult.Consistent>(session.push(firstExclusion))
+
+                val result = session.push(SearchDecision.Bool(Lit.make(sides[1].auxBoolVar, false)))
+
+                assertIs<ComponentResult.Conflict>(result)
+            }
+        }
+    }
+
+    @Test
+    fun `an excluded equality should retain both strict side assignments`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            val sink = Sink()
+            val target = sink.reifyDifferenceLinear(longArrayOf(1, -1), intArrayOf(0, 1), op, 3L)
+            val sides = sink.factors.filterIsInstance<ReifiedLinear>()
+            val atMost = sides.single { it.op == LinearOp.LE }.auxBoolVar
+            val atLeast = sides.single { it.op == LinearOp.GE }.auxBoolVar
+            val clauses = sink.factors.filterIsInstance<Clause>() +
+                Clause(intArrayOf(if (op == LinearOp.NE) target else Lit.negate(target)))
+            val session = SearchSession(listOf(ClauseSearchComponent(clauses)))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val run = session.openRun(sink.numBoolVars)
+            val assignments = mutableSetOf<List<Boolean?>>()
+
+            var event = run.next()
+            while (event is SearchRunEvent.Satisfied) {
+                assignments.add(listOf(session.boolValue(atMost), session.boolValue(atLeast)))
+                event = run.next()
+            }
+
+            assertIs<SearchRunEvent.Exhausted>(event)
+            assertEquals(setOf(listOf(false, true), listOf(true, false)), assignments)
+        }
+    }
+
+    @Test
+    fun `an asserted equality should retain both weak sides`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            val sink = Sink()
+            val target = sink.reifyDifferenceLinear(longArrayOf(1, -1), intArrayOf(0, 1), op, 3L)
+            val sides = sink.factors.filterIsInstance<ReifiedLinear>()
+            val clauses = sink.factors.filterIsInstance<Clause>() +
+                Clause(intArrayOf(if (op == LinearOp.EQ) target else Lit.negate(target)))
+            val session = SearchSession(listOf(ClauseSearchComponent(clauses)))
+
+            val result = session.initialize()
+
+            assertIs<ComponentResult.Consistent>(result)
+            assertEquals(listOf(true, true), sides.map { session.boolValue(it.auxBoolVar) })
+        }
+    }
+
+    @Test
+    fun `unsupported split shapes should retain their existing Boolean namespace`() {
+        for ((coeffs, op) in listOf(
+            longArrayOf(1) to LinearOp.EQ,
+            longArrayOf(2, -1) to LinearOp.EQ,
+            longArrayOf(1, -1, 1) to LinearOp.NE,
+            longArrayOf(1, -1) to LinearOp.LE,
+            longArrayOf(1, -1) to LinearOp.GE,
+        )) {
+            val sink = Sink()
+
+            val target = sink.reifyDifferenceLinear(coeffs, IntArray(coeffs.size) { it }, op, 3L)
+
+            assertEquals(1, sink.numBoolVars)
+            assertEquals(0, Lit.variable(target))
+        }
     }
 
     @Test
