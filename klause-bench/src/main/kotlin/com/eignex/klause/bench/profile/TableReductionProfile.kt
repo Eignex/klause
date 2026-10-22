@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
+import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 
@@ -15,7 +16,7 @@ object TableReductionProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.isEmpty()) { "TableReductionProfile takes no arguments" }
-        val bean = ManagementFactory.getThreadMXBean() as com.sun.management.ThreadMXBean
+        val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         check(bean.isThreadAllocatedMemorySupported)
         bean.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
