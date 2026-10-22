@@ -120,6 +120,38 @@ class QfNraSolverTest {
     }
 
     @Test
+    fun `nested cell backtracking rechecks shared coordinate predicates`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (* x0 x0) 1) (= (* x1 x1) 1) (= (* x2 x2) 1) " +
+                "(> (* x0 x1) 0) (> (* x1 x2) 0) (> (+ x0 x1 x2) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
+        for (variable in 0..2) {
+            assertEquals(0, algebraic.compare(point.realValue(variable), algebraic.rational(BigFraction.ONE)))
+        }
+        assertEquals(33, point.realCount)
+        assertTrue(result.stats.liftedCells > 0)
+    }
+
+    @Test
+    fun `incompatible shared coordinate signs exhaust every cell branch`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (* x0 x0) 1) (= (* x1 x1) 1) (= (* x2 x2) 1) " +
+                "(> (* x0 x1) 0) (> (* x1 x2) 0) (< (* x0 x2) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertIs<QfNraResult.Unsatisfiable>(result, result.toString())
+        assertTrue(result.stats.liftedCells > 0)
+    }
+
+    @Test
     fun `partial odd powers retain sign changing completions`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
