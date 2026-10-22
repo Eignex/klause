@@ -83,7 +83,9 @@ class QfLiraSolverLpTest {
                         2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
                             doubleArrayOf(-1.0, -1.0), LinearOp.LE, -scale / 4.0)
                         3 -> ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
-                            doubleArrayOf(1.0, 1.0), LinearOp.LE, 0.0)
+                            doubleArrayOf(1.0, 1.0), LinearOp.LE, scale / 4.0, strict = true)
+                        4 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                            doubleArrayOf(-1.0, -1.0), LinearOp.LE, 0.0, strict = true)
                         else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index),
                             doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
                     }
@@ -91,7 +93,7 @@ class QfLiraSolverLpTest {
             )
             val stats = SmtStatsSink()
             var withheld = 0
-            var repairableGuess = false
+            var repairableGuess = repairable
             val factory = TrackingLpFactory(transform = { result ->
                 if (result.primal.size <= 128) result else {
                     withheld++
@@ -110,7 +112,6 @@ class QfLiraSolverLpTest {
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
-                repairableGuess = repairable
 
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
@@ -119,9 +120,9 @@ class QfLiraSolverLpTest {
                 assertTrue((stats.snapshot().completeSearchStages?.get("PARTIAL_SOURCE_POINT") ?: 0L) > 0L,
                     "repairable=$repairable ${stats.snapshot().completeSearchStages}")
                 if (repairable) assertEquals(0L, stats.snapshot().sourceLp.operations)
+                else assertTrue(stats.snapshot().sourceLp.operations > 0L)
                 assertNull(session.model().valueOf(component.assignmentKey))
                 val operations = stats.snapshot().sourceLp.operations
-                val reused = stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED") ?: 0L
                 session.popTo(1)
                 assertNull(hints.preferredBool(2))
 
@@ -129,7 +130,6 @@ class QfLiraSolverLpTest {
 
                 assertEquals(false, hints.preferredBool(2))
                 assertEquals(operations, stats.snapshot().sourceLp.operations)
-                assertEquals(reused + 1L, stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED"))
                 session.popTo(1)
                 assertNull(hints.preferredBool(2))
                 repairableGuess = false
@@ -137,16 +137,15 @@ class QfLiraSolverLpTest {
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
 
                 assertEquals(true, hints.preferredBool(2))
-                assertEquals(reused + 2L, stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED"))
-                assertEquals(operations, stats.snapshot().sourceLp.operations)
+                val siblingOperations = stats.snapshot().sourceLp.operations
+                assertTrue(siblingOperations > operations)
                 session.popTo(1)
                 assertNull(hints.preferredBool(2))
 
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
                 assertEquals(false, hints.preferredBool(2))
-                assertEquals(operations, stats.snapshot().sourceLp.operations)
-                assertEquals(reused + 3L, stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED"))
+                assertEquals(siblingOperations, stats.snapshot().sourceLp.operations)
                 assertNull(session.model().valueOf(component.assignmentKey))
             }
         }
