@@ -852,7 +852,7 @@ internal object ExternalCollections {
         url = "https://miplib.zib.de/downloads/collection.zip",
         license = "MIPLIB 2017 (academic; freely available for research)",
         reason = "1065-instance MIP library; the full collection.zip (~3.5GB) is fetched once, then " +
-            "filtered to the <=16MB instances (SCIP references all, klause solves the bounded/integer subset)",
+            "filtered to the <=16MB instances (klause solves the bounded/integer subset)",
         fetch = FetchMethod.Zip,
         maxFileMb = 16,
     )

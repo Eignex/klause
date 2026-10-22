@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Problem
 
 /*
  * The benchmark catalog groups [ProblemRef] entries into named [Suite]s by [Category].
- * References bind format and source; targets select the solver and runner.
+ * References bind format and source.
  */
 
 /** Encoding of a problem instance. Drives which parser / pipeline turns it into a [Problem]. */

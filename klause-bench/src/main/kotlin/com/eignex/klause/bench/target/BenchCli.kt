@@ -149,14 +149,12 @@ object BenchCli {
     /** Solve exactly one problem, `suite=<id> problem=<name>` as `select` prints it, writing its record to
      *  `out=<dir>`. The suite resolves uncapped, so any instance a selection could name is found. Exits non-zero
      *  only when the problem is unknown; one that fails to load or to solve still writes its record, saying why.
-     *  Keys it does not know, such as the lab's `label` and `fixed`, are ignored. */
+     *  Keys it does not know are ignored. */
     private fun solveOne(args: List<String>) {
         val f = args.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val suite = requireNotNull(f["suite"]) { "solve-one needs suite=<id>" }
         val name = requireNotNull(f["problem"]) { "solve-one needs problem=<name>" }
         val out = requireNotNull(f["out"]) { "solve-one needs out=<dir>" }
-        val backend = f["backend"] ?: SolverInvocation.KLAUSE
-        require(backend.equals(SolverInvocation.KLAUSE, ignoreCase = true)) { "solve-one runs klause only: $backend" }
         val ref = Catalog.uncapped(suite).problems.singleOrNull { it.name == name }
             ?: error("no problem '$name' in suite '$suite'")
         val settings = SolverInvocation.Settings(
