@@ -1,8 +1,11 @@
 package com.eignex.klause.count
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
@@ -130,7 +133,11 @@ class AnytimeCounterTest {
 
     @Test
     fun `undecided feasibility should retain the whole projected space`() {
-        val solver = BacktrackSolver(Problem(3, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake())
+        val readers = listOf(
+            Cardinality(IntArray(3) { Lit.make(it, true) }, min = 0, max = 3),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+        )
+        val solver = BacktrackSolver(Problem(3, 1, arrayOf(IntDomain(0, 2)), readers).bake())
         val projections = listOf(
             ExactCountConfig(samplingSet = intArrayOf(0)),
             ExactCountConfig(intSamplingSet = intArrayOf(0)),

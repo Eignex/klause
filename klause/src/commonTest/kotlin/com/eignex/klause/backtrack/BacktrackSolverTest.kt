@@ -268,7 +268,7 @@ class BacktrackSolverTest {
             numBoolVars = 10,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = emptyArray(),
+            factors = arrayOf<Factor>(Cardinality(IntArray(10) { Lit.make(it, true) }, min = 0, max = 10)),
         )
         val tight = BacktrackSolver(p.bake()).solve(
             BacktrackParams(

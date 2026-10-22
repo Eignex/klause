@@ -455,7 +455,8 @@ class CoreGuidedSearchTest {
 
     @Test
     fun `decision quota should be retained when the objective stratum changes`() {
-        val problem = Problem(4, 0, emptyArray(), emptyArray()).bake()
+        val reader = Cardinality(IntArray(4) { Lit.make(it, true) }, min = 0, max = 4)
+        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(reader)).bake()
         val objective = LinearObjective(longArrayOf(-5, -1, -1, 0), constant = 7)
         val search = CoreGuidedSearch(
             problem,
