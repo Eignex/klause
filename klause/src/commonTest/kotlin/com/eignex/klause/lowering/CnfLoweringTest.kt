@@ -112,11 +112,13 @@ class CnfLoweringTest {
             val session = SearchSession(listOf(ClauseSearchComponent(clauses)))
             assertIs<ComponentResult.Consistent>(session.initialize())
             val run = session.openRun(sink.numBoolVars)
-            val assignments = mutableSetOf<List<Boolean?>>()
+            val assignments = mutableSetOf<List<Boolean>>()
 
             var event = run.next()
             while (event is SearchRunEvent.Satisfied) {
-                assignments.add(listOf(session.boolValue(atMost), session.boolValue(atLeast)))
+                assignments.add(
+                    listOf(requireNotNull(session.boolValue(atMost)), requireNotNull(session.boolValue(atLeast))),
+                )
                 event = run.next()
             }
 
