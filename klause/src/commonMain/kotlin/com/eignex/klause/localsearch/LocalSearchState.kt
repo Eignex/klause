@@ -23,6 +23,8 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -409,6 +411,7 @@ class LocalSearchState private constructor(
     }
 
     internal fun finishRecompute() {
+        assignmentRevision++
         // Initialize break/make vectors from factor deltas (payloads are current after initialize()).
         if (boolScoresInitialized) addAllBreakMake()
         if (cost < bestCostSeen) bestCostSeen = cost
@@ -614,20 +617,56 @@ class LocalSearchState private constructor(
      */
     fun objectiveDelta(obj: Objective, move: Move): Double? {
         check(!probeActive && !moveActive) { "local-search scoring cannot be nested in a move" }
-        if (feedsDefinitions(move)) return evaluateMove(move, obj).objectiveDelta
-        return when (obj) {
-            is LinearObjective -> linearObjectiveDelta(move, obj)
-            is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
+        val scored = scoringView(obj)
+        if (feedsDefinitions(move)) return evaluateMove(move, scored).objectiveDelta
+        return when (scored) {
+            is LinearObjective -> linearObjectiveDelta(move, scored)
+            is IncrementalObjective -> scored.deltaIfApplied(assignment, move)
             else -> null
         }
     }
 
     internal fun feasibleObjectiveDelta(obj: Objective?, move: Move): Double {
         if (feedsDefinitions(move) && (obj is LinearObjective || obj is FunctionalObjective)) {
-            return evaluateMove(move, obj, feasibleObjective = true).objectiveDelta
+            return evaluateMove(move, scoringView(obj), feasibleObjective = true).objectiveDelta
         }
         if (netDelta(move) > 0L) return Double.POSITIVE_INFINITY
         return obj?.let { objectiveDelta(it, move) } ?: 0.0
+    }
+
+    // A functional objective whose every cone definition is a live network node reads its cone variables off the
+    // propagated assignment, so it scores as the linear form of its terms: only probed terms change.
+    private fun scoringView(objective: Objective): Objective {
+        if (objective !is FunctionalObjective) return objective
+        val net = invariants ?: return objective
+        if (termViewOf !== objective || termViewNetwork !== net) {
+            termViewOf = objective
+            termViewNetwork = net
+            termView = objective.termForm?.takeIf { objective.conesMaintained(net::maintains) }
+        }
+        return termView ?: objective
+    }
+
+    private var termViewOf: FunctionalObjective? = null
+    private var termViewNetwork: InvariantNetwork? = null
+    private var termView: LinearObjective? = null
+
+    // Pre-probe value of a functional objective the network does not maintain, valid while the assignment is
+    // unchanged since [committedObjectiveRevision]; every candidate of one pick shares it.
+    private var committedObjectiveOf: FunctionalObjective? = null
+    private var committedObjective: BigInt = BIG_ZERO
+    private var committedObjectiveRevision = -1L
+
+    // Counts assignment changes through this state and recomputes after external writes.
+    private var assignmentRevision = 0L
+
+    private fun committedValue(objective: FunctionalObjective): BigInt {
+        if (committedObjectiveOf !== objective || committedObjectiveRevision != assignmentRevision) {
+            committedObjective = objective.evaluateExact(assignment)
+            committedObjectiveOf = objective
+            committedObjectiveRevision = assignmentRevision
+        }
+        return committedObjective
     }
 
     private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double {
@@ -905,6 +944,7 @@ class LocalSearchState private constructor(
         markMovedVar: () -> Unit,
     ) {
         retract()
+        assignmentRevision++
         commit()
         refresh()
         settle()
@@ -1219,7 +1259,7 @@ class LocalSearchState private constructor(
         val oldCost = cost
         val oldBestCost = bestCostSeen
         val oldTracking = activityTracking
-        val oldExactObjective = (objective as? FunctionalObjective)?.evaluateExact(assignment)
+        val oldExactObjective = (objective as? FunctionalObjective)?.let(::committedValue)
         val oldObjective = if (
             objective != null && objective !is LinearObjective && objective !is FunctionalObjective
         ) {
@@ -1277,6 +1317,8 @@ class LocalSearchState private constructor(
         } finally {
             breakProbeActive = false
             restoreProbeCoordinates()
+            // Restoration returns every probed coordinate to its committed value, so the cached value stands.
+            if (oldExactObjective != null) committedObjectiveRevision = assignmentRevision
             for (i in 0 until probeTouchedList.size) probeTouched[probeTouchedList[i]] = false
             probeActive = false
             activityTracking = oldTracking

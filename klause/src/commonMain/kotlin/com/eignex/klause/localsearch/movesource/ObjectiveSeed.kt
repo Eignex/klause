@@ -11,7 +11,7 @@ import com.eignex.klause.solver.objective.LinearObjective
  * seeds single-variable moves directly on the objective's decision variables:
  *  - [LinearObjective]: a step to the adjacent domain value of each nonzero-weight int var in the
  *    direction its coefficient says reduces the objective, plus a flip on each nonzero-weight bool.
- *  - [FunctionalObjective]: Boolean leaf flips and geometric integer steps
+ *  - [FunctionalObjective]: Boolean leaf flips and geometric integer steps on the searchable leaves
  *    (±1, ±2, ±4, … up to ±4096, plus the domain endpoints). Its gradient lives in `deltaIfApplied`,
  *    so a spread of jump sizes is seeded and the scoring keeps the best.
  *  - other objective shapes: nothing (no per-var direction without inspecting the shape).
@@ -48,6 +48,8 @@ class ObjectiveSeed : MoveSource {
                 for (v in obj.boolLeafVars) sink.addBoolFlip(v)
                 // Pure ±1 steps descend a wide-domain coordinate objective far too slowly.
                 for (v in obj.leafVars) {
+                    // The sink would drop a frozen, defined or foreign-owned target only after synthesis.
+                    if (!sink.allowsInt(v)) continue
                     val cur = state.assignment.intValue(v)
                     val d = state.rootDomains[v]
                     var step = 1

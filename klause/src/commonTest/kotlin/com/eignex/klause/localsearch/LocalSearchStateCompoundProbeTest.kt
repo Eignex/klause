@@ -282,6 +282,56 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
+    fun `maintained functional objective deltas should follow the propagated term values`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 2), IntDomain(3, 3), IntDomain(0, 5)),
+            arrayOf<Factor>(Product(0, 1, 2)),
+        )
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem))
+        val objective = assertNotNull(sweep.functionalObjective(intArrayOf(2), longArrayOf(1), 0, true))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = sweep.network(3, 0)
+        state.assignment.setInt(1, 3)
+        sweep.sweep(state.assignment, state.rootDomains)
+        state.recompute()
+        val before = state.assignment.intValue(2)
+        val move = Move.IntSet(0, 2)
+
+        val delta = state.objectiveDelta(objective, move)
+        state.apply(move)
+
+        assertEquals((state.assignment.intValue(2) - before).toDouble(), delta)
+    }
+
+    @Test
+    fun `unmaintained functional objective probes should value moves from the committed assignment`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 2), IntDomain(3, 3), IntDomain(0, 6)),
+            arrayOf<Factor>(Product(0, 1, 2)),
+        )
+        val objective = assertNotNull(
+            assertNotNull(DefinitionalSweep.infer(problem)).functionalObjective(intArrayOf(2), longArrayOf(1), 0, true),
+        )
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = sweep.network(3, 0)
+        state.assignment.setInt(1, 3)
+        sweep.sweep(state.assignment, state.rootDomains)
+        state.recompute()
+        val probe = Move.IntSet(0, 1)
+        val first = state.objectiveDelta(objective, probe)
+
+        state.apply(Move.IntSet(0, 2))
+
+        assertEquals(3.0, first)
+        assertEquals(-3.0, state.objectiveDelta(objective, probe))
+    }
+
+    @Test
     fun `defined functional objective probes should retain unit improvements beyond double precision`() {
         val half = 1L shl 62
         val problem = Problem(

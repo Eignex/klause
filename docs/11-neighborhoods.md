@@ -24,6 +24,12 @@ objective from the same probe, rejecting a hard violation before valuing the
 objective. Probes record no activity or best-cost observations, and weighted probes
 rescan only factors whose degrees change, in the order a full scan would use.
 
+A functional objective whose every cone definition is a node of the live network
+scores as the linear form of its terms: the probe has already propagated the cone, so
+its delta comes from the probed and restored term values. A gradient view built from
+other definitions evaluates its cones after the probe against the committed value,
+which the state evaluates once per assignment change.
+
 `ArgminJump` builds coordinated integer targets and maintained-Boolean inverse
 repairs through the generic move sink before comparing their complete weighted
 deltas. Each sampled coordinate contributes at most one strict improvement over
