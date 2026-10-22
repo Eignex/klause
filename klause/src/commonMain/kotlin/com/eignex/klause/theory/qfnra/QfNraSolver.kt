@@ -1587,8 +1587,24 @@ private fun searchCells(
         }
         level
     }
+    val activeLevels = ArrayList<Int>()
+    for (level in 0 until projection.variableCount) {
+        arithmetic.step()
+        val variable = projection.variable(level)
+        if (variable in atomsByVariable || projection.section(level) != null ||
+            projection.rootSection(level) != null || projection.polynomials(level).isNotEmpty()
+        ) {
+            activeLevels.add(level)
+        } else {
+            coordinates[variable] = algebraic.rational(fixed[variable] ?: algebraic.sampleBetween(null, null))
+        }
+    }
+    if (activeLevels.isEmpty()) {
+        if (rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels) != null) return null
+        return checkRegionSample(formula, region, coordinates, boolCount, arithmetic, algebraic)
+    }
     val frames = ArrayDeque<CadFrame>()
-    frames.addLast(liftFrame(projection, 0, coordinates, arithmetic, algebraic, fixed))
+    frames.addLast(liftFrame(projection, activeLevels.first(), coordinates, arithmetic, algebraic, fixed))
     while (frames.isNotEmpty()) {
         arithmetic.step()
         val frame = frames.last()
@@ -1606,15 +1622,16 @@ private fun searchCells(
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
         // The parent prefix passed every predicate; only this coordinate changes its inputs.
-        val changedAtoms = if (frame.level == 0) null else atomsByVariable[frame.variable].orEmpty()
-        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels, changedAtoms)
+        val changedAtoms = if (frames.size == 1) null else atomsByVariable[frame.variable].orEmpty()
+        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic,
+            atomLevels, changedAtoms, frame.level + 1)
         if (rejected != null) {
             // Unprojected coordinates have one fixed sector sample throughout this family's CAD.
             if (rejected in independent) return null
             continue
         }
-        if (frame.level + 1 < projection.variableCount) {
-            frames.addLast(liftFrame(projection, frame.level + 1, coordinates, arithmetic, algebraic, fixed))
+        if (frames.size < activeLevels.size) {
+            frames.addLast(liftFrame(projection, activeLevels[frames.size], coordinates, arithmetic, algebraic, fixed))
         } else {
             return checkRegionSample(formula, region, coordinates, boolCount, arithmetic, algebraic)
         }
@@ -1709,13 +1726,14 @@ private fun rejectedRegionAtom(
     algebraic: AlgebraicArithmetic,
     atomLevels: Map<Int, Int>? = null,
     indices: List<Int>? = null,
+    assignedLevels: Int = coordinates.size,
 ): Int? {
     for (index in indices ?: region.atoms.keys) {
         arithmetic.step()
         val required = region.atoms.getValue(index)
         val atom = formula.atoms[index]
         val level = atomLevels?.getValue(index) ?: atom.polynomial.mainVariable
-        if (level != null && level >= coordinates.size) {
+        if (level != null && level >= assignedLevels) {
             if (atomLevels != null) {
                 val signs = try {
                     partialRegionSigns(atom.polynomial, coordinates, arithmetic, algebraic)
