@@ -87,7 +87,16 @@ class QfLiraSolverLpTest {
             },
         )
         val stats = SmtStatsSink()
+        val factory = TrackingLpFactory { solver, allowance ->
+            solver.resolveBounds(allowance)?.let { result ->
+                if (result.primal.size <= 128) result else FloatLpResult(
+                    result.basis, result.objective, result.duals, DoubleArray(result.primal.size),
+                    optimal = result.optimal, exactState = result.exactState,
+                )
+            }
+        }
         ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
             component.useMixedPointCompletion()
             component.observeWith(stats)
             component.observeCompleteTraversal()
