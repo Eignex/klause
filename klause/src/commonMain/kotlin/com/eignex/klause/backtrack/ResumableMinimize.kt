@@ -1000,6 +1000,15 @@ internal class ResumableMinimize(
                 session.implyIntAtMost(sb.varId, sb.hi)
             }
         }
+        // Strip-energy floor: the tasks proven to end by the objective need room for their energy.
+        // The reason keeps the raise sound under the live bounds it reads.
+        singleObj?.let { obj ->
+            lpEngine.stripEnergyFloor(session)?.let { floor ->
+                if (floor.value > session.intDomain(obj.varId).min) {
+                    session.implyIntAtLeastWithReason(obj.varId, floor.value, floor.reason)
+                }
+            }
+        }
         boundExchange.applySharedFloor()
         // Publish the root floor (post-shaving) so peers see the bound this arm proved up front.
         boundExchange.publishFloor()

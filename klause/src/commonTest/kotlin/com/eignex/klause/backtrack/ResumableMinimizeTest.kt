@@ -3,9 +3,11 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -612,6 +614,31 @@ class ResumableMinimizeTest {
         )
 
         assertIs<MinimizeResult.Unknown>(result)
+    }
+
+    @Test
+    fun `optimization should publish the strip energy floor at the root`() {
+        val factors = arrayOf<Factor>(
+            Diffn(IntArray(6) { it }, IntArray(6) { 6 + it }, LongArray(6) { 1L }, LongArray(6) { 1L }),
+            Linear(longArrayOf(1, -1), intArrayOf(4, 0), LinearOp.GE, 1L),
+            Linear(longArrayOf(1, -1), intArrayOf(4, 2), LinearOp.GE, 1L),
+            Linear(longArrayOf(1, -1), intArrayOf(5, 1), LinearOp.GE, 1L),
+            Linear(longArrayOf(1, -1), intArrayOf(5, 3), LinearOp.GE, 1L),
+            Linear(longArrayOf(1, -1), intArrayOf(12, 4), LinearOp.EQ, 1L),
+            Linear(longArrayOf(1, -1), intArrayOf(13, 5), LinearOp.EQ, 1L),
+            ArrayMinMax(result = 14, xs = intArrayOf(12, 13), max = true),
+        )
+        val domains = Array(15) { if (it in 6 until 12) IntDomain(1L, 1L) else IntDomain(0L, 100L) }
+        val problem = Problem(0, 15, domains, factors)
+        val published = ArrayList<Double>()
+
+        val result = BacktrackSolver(problem.bake()).minimize(
+            LinearObjective(intCoefficients = LongArray(15) { if (it == 14) 1L else 0L }),
+            BacktrackParams(randomSeed = 1L, objectiveLowerBoundSink = { published.add(it) }),
+        )
+
+        assertEquals(6.0, published.firstOrNull())
+        assertEquals(6.0, result.objectiveValue)
     }
 }
 

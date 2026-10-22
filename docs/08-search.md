@@ -250,6 +250,15 @@ with a zero dimension also receive the pairwise separation check, so the sweep's
 empty-area shortcut cannot admit an invalid complete assignment. Non-strict boxes
 with a zero dimension impose no overlap restriction.
 
+Minimizing a single integer variable over scheduling globals raises its root lower
+bound by a strip-energy floor. Chains of two-variable unit-coefficient rows and
+maximum results prove which tasks end by the objective. Their energy from the
+strongest left edge, divided by the capacity, bounds it: a Cumulative uses its
+declared capacity, and a constant-size Diffn projects onto either axis with the
+counted rectangles' perpendicular extent. The raise cites the live start and
+perpendicular bounds it reads; starts or coordinates the model leaves open are
+skipped.
+
 ### Complete finite checks
 
 Complete finite checks pin the full assignment and run a completed CP fixpoint;

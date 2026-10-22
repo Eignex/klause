@@ -6,6 +6,8 @@ import com.eignex.klause.bound.KnapsackLagrangianBound
 import com.eignex.klause.bound.LagrangianBound
 import com.eignex.klause.bound.LagrangianDualBound
 import com.eignex.klause.bound.SchedulingFeasibilityBound
+import com.eignex.klause.bound.StripEnergyFloor
+import com.eignex.klause.bound.StripEnergyMakespanBound
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -354,6 +356,11 @@ internal class LpEngine(
     private var knapsackLagBound: KnapsackLagrangianBound? = null
     private var energeticBound: CumulativeEnergeticBound? = null
     private var cumulativeFlowBound: CumulativeFlowBound? = null
+    private var stripEnergyBound: StripEnergyMakespanBound? = null
+
+    /** The strip-energy floor on the minimized single objective variable under [session]'s live bounds, or
+     *  null when the objective is not one minimized variable or no scheduling task provably ends by it. */
+    internal fun stripEnergyFloor(session: PropagationSession): StripEnergyFloor? = stripEnergyBound?.floor(session)
 
     /** The single objective variable's modular residue, when it is defined by a linear equality
      *  `a·v + Σ cⱼ·xⱼ = b` with `|a| = 1` and `g = gcd(cⱼ) > 1`: then `v ≡ r (mod g)` in every solution
@@ -1038,6 +1045,11 @@ internal class LpEngine(
         )
         lpNogoods = if (params.lpPlan.learn) LpNogoodPool() else null
         yield(Unit)
+        objective.singleIntObjective()?.takeIf { it.ascending }?.let { single ->
+            val owner = StripEnergyMakespanBound(problem, single.varId, deferred = true)
+            owner.preparation().forEach { yield(Unit) }
+            stripEnergyBound = owner.takeIf { it.applicable }
+        }
         if (params.lpPlan.lagrangian) {
             val owner = LagrangianBound(problem, objective, deferred = true)
             owner.preparation().forEach { yield(Unit) }

@@ -1,11 +1,8 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.bound.CumulativeEnergeticBound
-import com.eignex.klause.factor.arithmetic.ArrayMinMax
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.constructionIntArray
 import com.eignex.klause.util.constructionLongArray
@@ -16,9 +13,7 @@ import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.addExact
@@ -53,7 +48,7 @@ import com.eignex.klause.util.subExact
  *
  * ## Soundness
  * A missing or loose scheduling relaxation only loosens the objective bound; an over-tight one
- * silently corrupts optima. So the makespan variable is never *guessed*: [makespanLinks] verifies
+ * silently corrupts optima. So the makespan variable is never *guessed*: [MakespanLinks] verifies
  * `M ≥ startᵢ + durᵢ` from the actual `Linear` rows (`M − startᵢ ≥ durᵢ`, any orientation) and from
  * `ArrayMinMax(max)` whose operands are the task ends — a task contributes to `M`'s row only when the
  * link is proven. Energy uses each task's **minimum** resource and its (constant) duration, capacity
@@ -145,63 +140,6 @@ internal class CumulativeRelaxation(
         return RowSpec(energetic, global = allDeclared, premises = premises)
     }
 
-    /**
-     * `max over t1 of cap·t1 + Σ rᵢ·clamp(ectᵢ − t1, 0, durᵢ)`. The maximand is piecewise-linear in
-     * `t1` with `+` → `−` slope changes only at the earliest-starts, so its maximum over the valid
-     * range `t1 ≤ max ectᵢ` is attained at some `estᵢ` (or the right endpoint `max ectᵢ`). The sweep
-     * visits the earliest-starts in ascending order, maintaining the full-energy / partial-energy
-     * partition incrementally in `O(n log n)`. Throws [CheckedLongOverflowException] on any product overflow.
-     */
-    private fun energeticRhs(cap: Long, est: LongArray, dur: LongArray, res: LongArray): Long {
-        val n = est.size
-        val ect = LongArray(n) { addExact(est[it], dur[it]) }
-        // A = {est ≥ t1}: full energy rᵢ·durᵢ. B = {est < t1 < ect}: rᵢ·(ectᵢ − t1). C = {ect ≤ t1}: 0.
-        var fullEnergy = 0L // Σ_A rᵢ·durᵢ
-        var bSumREct = 0L // Σ_B rᵢ·ectᵢ
-        var bSumR = 0L // Σ_B rᵢ
-        for (k in 0 until n) fullEnergy = addExact(fullEnergy, mulExact(res[k], dur[k]))
-
-        val estOrder = (0 until n).sortedBy { est[it] }
-        val ectOrder = (0 until n).sortedBy { ect[it] }
-        var ei = 0 // next est event (task entering B)
-        var ci = 0 // next ect event (task leaving B for C)
-        var maxEct = Long.MIN_VALUE
-        for (k in 0 until n) if (ect[k] > maxEct) maxEct = ect[k]
-
-        // Candidate left edges: the distinct earliest-starts, then the right endpoint max ectᵢ.
-        var best = Long.MIN_VALUE
-        var idx = 0
-        while (idx <= n) {
-            val t1 = if (idx < n) est[estOrder[idx]] else maxEct
-            if (idx < n && idx > 0 && est[estOrder[idx]] == est[estOrder[idx - 1]]) {
-                idx++
-                continue // dedupe equal earliest-starts
-            }
-            // Advance events strictly below / at t1: est_k < t1 enters B; ect_k ≤ t1 leaves to C.
-            while (ei < n && est[estOrder[ei]] < t1) {
-                val k = estOrder[ei]
-                fullEnergy = subExact(fullEnergy, mulExact(res[k], dur[k]))
-                bSumREct = addExact(bSumREct, mulExact(res[k], ect[k]))
-                bSumR = addExact(bSumR, res[k])
-                ei++
-            }
-            while (ci < n && ect[ectOrder[ci]] <= t1) {
-                val k = ectOrder[ci]
-                if (est[k] < t1) { // only tasks that had entered B leave to C
-                    bSumREct = subExact(bSumREct, mulExact(res[k], ect[k]))
-                    bSumR = subExact(bSumR, res[k])
-                }
-                ci++
-            }
-            // energy(t1) = Σ_A rᵢ·durᵢ + Σ_B rᵢ·ectᵢ − t1·Σ_B rᵢ.
-            val energy = addExact(fullEnergy, subExact(bSumREct, mulExact(t1, bSumR)))
-            val f = addExact(mulExact(cap, t1), energy)
-            if (f > best) best = f
-            idx++
-        }
-        return best
-    }
-
     /** Records the tightened (live) earliest-starts the row leaned on as `startᵢ ≥ estLiveᵢ` atoms. */
     private fun livePremises(startVars: IntArray, estLive: LongArray, estDecl: LongArray): LpRowPremises {
         val pv = IntArrayList()
@@ -222,7 +160,7 @@ internal class CumulativeRelaxation(
     private suspend fun SequenceScope<Unit>.buildPlans(): List<AreaPlan> {
         val scheds = schedulingFactors()
         if (scheds.isEmpty()) return emptyList()
-        val links = makespanLinks()
+        val links = prepareMakespanLinks(problem)
         val out = ArrayList<AreaPlan>()
         for (s in scheds) {
             out.addAll(plansFor(s, links))
@@ -242,7 +180,7 @@ internal class CumulativeRelaxation(
             // open below that edge is the search box's invented endpoint, not the model's, so the row
             // would claim energy no solution outside the box has to spend.
             if (!problem.statesLowerBound(s.starts[i])) continue
-            endUpperBoundsOf(links, s.starts[i], s.dur[i]).forEach { m ->
+            with(links) { endUpperBoundsOf(s.starts[i], s.dur[i]) }.forEach { m ->
                 cover.getOrPut(m) { IntArrayList() }.add(i)
                 if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             }
@@ -350,84 +288,6 @@ internal class CumulativeRelaxation(
         }
     }
 
-    /**
-     * Verified "`w ≥ v + c`" links harvested once from the problem: two-variable `Linear` rows that
-     * imply it directly, plus `ArrayMinMax(max)` reverse edges (`result ≥ operand`). For a task with
-     * start `s` and duration `d`, [endUpperBoundsOf] returns every variable provably ≥ `s + d` — i.e.
-     * provably ≥ the task's end — by closing the direct links through the max edges.
-     */
-    private inner class MakespanLinks {
-        /** `geFrom[v]` = pairs `(w, c)` with a proven `w ≥ v + c`, from two-variable Linear rows. */
-        val geFrom = MutableIntObjectMap<ArrayList<LongArray>>() // value: [w, c]
-
-        /** `maxResultsOf[operand]` = `ArrayMinMax(max)` results, each ≥ that operand. */
-        val maxResultsOf = MutableIntObjectMap<IntArrayList>()
-
-        /** Record every `w ≥ v + c` implied by a two-variable [Linear] `coeffA·a + coeffB·b op bound`. */
-        fun addLinearLinks(f: Linear) {
-            // Only ±1-coefficient rows produce a link; a coefficient outside ±1 (including any beyond
-            // Int range) matches neither pattern below and adds nothing.
-            val row = f.integerConstants ?: return
-            val a = f.vars[0]
-            val b = f.vars[1]
-            val ca = row.coeff(0)
-            val cb = row.coeff(1)
-            val bound = row.bound
-            // "≥ bound" holds for GE/EQ; "≤ bound" (⇔ "≥ −bound" after negating) holds for LE/EQ.
-            if (f.op == LinearOp.GE || f.op == LinearOp.EQ) addGeForm(a, ca, b, cb, bound)
-            if (f.op == LinearOp.LE || f.op == LinearOp.EQ) addGeForm(a, -ca, b, -cb, -bound)
-        }
-
-        /** From `ca·a + cb·b ≥ rhs`, record `w ≥ v + rhs` when the coefficients are a `(+1, −1)` pair. */
-        private fun addGeForm(a: Int, ca: Long, b: Int, cb: Long, rhs: Long) {
-            if (ca == 1L && cb == -1L) add(w = a, v = b, c = rhs)
-            if (ca == -1L && cb == 1L) add(w = b, v = a, c = rhs)
-        }
-
-        private fun add(w: Int, v: Int, c: Long) {
-            geFrom.getOrPut(v) { ArrayList() }.add(longArrayOf(w.toLong(), c))
-        }
-
-    }
-
-    private suspend fun SequenceScope<Unit>.makespanLinks(): MakespanLinks {
-        val links = MakespanLinks()
-        for (f in problem.factors) {
-            when (f) {
-                is Linear -> if (f.integerConstants != null && f.vars.size == 2) links.addLinearLinks(f)
-                is ArrayMinMax -> if (f.max) for (x in f.xs) {
-                    links.maxResultsOf.getOrPut(x) { IntArrayList() }.add(f.result)
-                    if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-                }
-                else -> Unit
-            }
-            if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-        }
-        return links
-    }
-
-    private suspend fun SequenceScope<Unit>.endUpperBoundsOf(links: MakespanLinks, start: Int, dur: Long): IntHashSet {
-        val result = IntHashSet()
-        val queue = IntArrayDeque()
-        // Seed: vars directly proven ≥ start + c with c ≥ dur are ≥ the task end.
-        links.geFrom[start]?.forEach { wc ->
-            if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-            if (wc[1] >= dur) {
-                val w = wc[0].toInt()
-                if (result.add(w)) queue.addLast(w)
-            }
-        }
-        // Close through max edges: result = max(...) ≥ operand ≥ end ⇒ result ≥ end too.
-        while (queue.isNotEmpty()) {
-            val v = queue.removeFirst()
-            links.maxResultsOf[v]?.forEach { m ->
-                if (result.add(m)) queue.addLast(m)
-                if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-            }
-        }
-        return result
-    }
-
     internal companion object {
         /** Per-factor task cap: above it the `O(n log n)` row build is skipped (sound loosening). */
         internal const val MAX_TASKS: Int = 1024
@@ -438,4 +298,61 @@ internal class CumulativeRelaxation(
         /** Most rows emitted per scheduling factor (the highest-coverage makespan variables). */
         internal const val MAX_MAKESPAN_VARS: Int = 4
     }
+}
+
+/**
+ * `max over t1 of cap·t1 + Σ rᵢ·clamp(ectᵢ − t1, 0, durᵢ)`. The maximand is piecewise-linear in
+ * `t1` with `+` → `−` slope changes only at the earliest-starts, so its maximum over the valid
+ * range `t1 ≤ max ectᵢ` is attained at some `estᵢ` (or the right endpoint `max ectᵢ`). The sweep
+ * visits the earliest-starts in ascending order, maintaining the full-energy / partial-energy
+ * partition incrementally in `O(n log n)`. Throws [CheckedLongOverflowException] on any product overflow.
+ */
+internal fun energeticRhs(cap: Long, est: LongArray, dur: LongArray, res: LongArray): Long {
+    val n = est.size
+    val ect = LongArray(n) { addExact(est[it], dur[it]) }
+    // A = {est ≥ t1}: full energy rᵢ·durᵢ. B = {est < t1 < ect}: rᵢ·(ectᵢ − t1). C = {ect ≤ t1}: 0.
+    var fullEnergy = 0L // Σ_A rᵢ·durᵢ
+    var bSumREct = 0L // Σ_B rᵢ·ectᵢ
+    var bSumR = 0L // Σ_B rᵢ
+    for (k in 0 until n) fullEnergy = addExact(fullEnergy, mulExact(res[k], dur[k]))
+
+    val estOrder = (0 until n).sortedBy { est[it] }
+    val ectOrder = (0 until n).sortedBy { ect[it] }
+    var ei = 0 // next est event (task entering B)
+    var ci = 0 // next ect event (task leaving B for C)
+    var maxEct = Long.MIN_VALUE
+    for (k in 0 until n) if (ect[k] > maxEct) maxEct = ect[k]
+
+    // Candidate left edges: the distinct earliest-starts, then the right endpoint max ectᵢ.
+    var best = Long.MIN_VALUE
+    var idx = 0
+    while (idx <= n) {
+        val t1 = if (idx < n) est[estOrder[idx]] else maxEct
+        if (idx < n && idx > 0 && est[estOrder[idx]] == est[estOrder[idx - 1]]) {
+            idx++
+            continue // dedupe equal earliest-starts
+        }
+        // Advance events strictly below / at t1: est_k < t1 enters B; ect_k ≤ t1 leaves to C.
+        while (ei < n && est[estOrder[ei]] < t1) {
+            val k = estOrder[ei]
+            fullEnergy = subExact(fullEnergy, mulExact(res[k], dur[k]))
+            bSumREct = addExact(bSumREct, mulExact(res[k], ect[k]))
+            bSumR = addExact(bSumR, res[k])
+            ei++
+        }
+        while (ci < n && ect[ectOrder[ci]] <= t1) {
+            val k = ectOrder[ci]
+            if (est[k] < t1) { // only tasks that had entered B leave to C
+                bSumREct = subExact(bSumREct, mulExact(res[k], ect[k]))
+                bSumR = subExact(bSumR, res[k])
+            }
+            ci++
+        }
+        // energy(t1) = Σ_A rᵢ·durᵢ + Σ_B rᵢ·ectᵢ − t1·Σ_B rᵢ.
+        val energy = addExact(fullEnergy, subExact(bSumREct, mulExact(t1, bSumR)))
+        val f = addExact(mulExact(cap, t1), energy)
+        if (f > best) best = f
+        idx++
+    }
+    return best
 }
