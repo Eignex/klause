@@ -1,9 +1,8 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.report.Reports
-import java.io.File
-import java.lang.management.CompilationMXBean
-import java.lang.management.ManagementFactory
+import jdk.jfr.FlightRecorder
+import jdk.jfr.RecordingState
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -11,6 +10,9 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.CompilationMXBean
+import java.lang.management.ManagementFactory
 
 /** Compilation-counter observations and read costs in fresh JVMs without flight recording. */
 object JvmCompilationCounterProfile {
@@ -48,8 +50,11 @@ object JvmCompilationCounterProfile {
     private fun launch(args: List<String>, out: File) {
         val command = arrayListOf(
             File(System.getProperty("java.home"), "bin/java").path,
-            "-Xmx1g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
-            "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
+            "-Xmx1g",
+            "-XX:+UseSerialGC",
+            "-XX:ActiveProcessorCount=1",
+            "--enable-native-access=ALL-UNNAMED",
+            "--add-modules=jdk.incubator.vector",
         )
         for (name in listOf("klause.workspace.root", "klause.bench.corpusCache")) {
             System.getProperty(name)?.let { command += "-D$name=$it" }
@@ -86,18 +91,30 @@ object JvmCompilationCounterProfile {
         val report = buildJsonObject {
             put("javaVersion", System.getProperty("java.version"))
             put("vmName", System.getProperty("java.vm.name"))
-            put("vmArguments", buildJsonArray {
-                ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-            })
-            put("flightRecordingRunning", jdk.jfr.FlightRecorder.isInitialized() &&
-                jdk.jfr.FlightRecorder.getFlightRecorder().recordings.any { it.state == jdk.jfr.RecordingState.RUNNING })
+            put(
+                "vmArguments",
+                buildJsonArray {
+                    ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
+                },
+            )
+            put(
+                "flightRecordingRunning",
+                FlightRecorder.isInitialized() &&
+                    FlightRecorder.getFlightRecorder().recordings.any { it.state == RecordingState.RUNNING },
+            )
             put("supported", counter != null)
             put("counterSetupNanos", setupNanos)
             put("firstReadNanos", if (counter == null) JsonNull else JsonPrimitive(firstReadNanos))
             put("initialCompilerMs", initialMs?.let(::JsonPrimitive) ?: JsonNull)
             put("finalCompilerMs", finalMs?.let(::JsonPrimitive) ?: JsonNull)
-            put("windowCompilerMs", if (initialMs == null || finalMs == null) JsonNull
-                else JsonPrimitive(finalMs - initialMs))
+            put(
+                "windowCompilerMs",
+                if (initialMs == null || finalMs == null) {
+                    JsonNull
+                } else {
+                    JsonPrimitive(finalMs - initialMs)
+                },
+            )
             put("windowWallNanos", windowNanos)
             put("window", "catalog resolution, preparation, solve and SolveTiming report writing")
             put("solve", Reports.json.encodeToJsonElement(timings))
