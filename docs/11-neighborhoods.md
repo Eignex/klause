@@ -151,7 +151,9 @@ Models whose coordinates are all decided by an exact theory use a different move
 owner. The retained exact-coordinate driver proposes rational coordinate windows and
 Boolean pins to a source-bound completion adapter. A coordinate repair relaxes one
 pin; compound repairs relax a block, and adaptive neighborhood search weights block
-sizes by accepted improvements. Centers, radii, random state, weights and incumbents
+sizes by accepted improvements. A single-coordinate repair draws its coordinate
+uniformly without constructing a full coordinate permutation.
+Centers, radii, random state, weights and incumbents
 survive slices. A rejected repair widens the windows without changing the source
 domain or establishing infeasibility.
 

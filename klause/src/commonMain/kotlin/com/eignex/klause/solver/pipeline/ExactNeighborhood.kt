@@ -115,7 +115,11 @@ internal class ExactNeighborhood(
             val total = centers.size + boolCount
             val operator = operator()
             val count = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
-            val selected = if (moves == 0L) emptySet() else (0 until total).shuffled(random).take(count).toSet()
+            val selected = when {
+                moves == 0L || total == 0 -> emptySet()
+                count == 1 -> setOf(random.nextInt(total))
+                else -> (0 until total).shuffled(random).take(count).toSet()
+            }
             val lower = centers.indices.associateWith { if (it in selected) centers[it] - radius else centers[it] }
             val upper = centers.indices.associateWith { if (it in selected) centers[it] + radius else centers[it] }
             val pins = (0 until boolCount).filter { centers.size + it !in selected }.associateWith { bools[it] }
