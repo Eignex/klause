@@ -133,6 +133,10 @@ index premises. In every case the original source rows decide publication.
 intersects assertions exactly and keeps a source premise for each accepted side.
 Batches publish witnesses only for a committed prefix; crossed bounds cite both
 sides, and pop restores bounds and deactivates scoped rows.
+Consecutive empty scopes can share one snapshot while retaining every backjump
+mark and the modeled work of each crossed level. Cancellation keeps the predecessor.
+Source comparison batches append neutral definitions together and assert individual
+premised bounds; a crossed-bound prefix retains both contradictory sides.
 Row appends retain validation of identical assertion prefixes when column addresses,
 scope marks and existing row identities are unchanged. New assertions still check
 their scope, active row and witness uniqueness against the retained prefix.

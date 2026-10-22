@@ -211,9 +211,10 @@ internal class LpPropagator(
             if (!current.pop(depth, token)) return invalidate()
             retainWitnesses()
         }
-        while (current.state.depth < depth) {
-            onEdit(current.state.model.numVars.toLong())
-            if (!current.push(token)) return invalidate()
+        val levels = depth - current.state.depth
+        if (levels > 0) {
+            onEdit(current.state.model.numVars.toLong() * levels)
+            if (!current.pushTo(depth, token)) return invalidate()
         }
         return true
     }
@@ -318,6 +319,7 @@ internal class LpPropagator(
     }
 
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
+    fun append(rows: List<LpScopedRow>, scoped: Boolean): Boolean = owner?.append(emptyList(), rows, scoped) == true
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
 
     fun compact(

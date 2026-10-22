@@ -27,15 +27,101 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QfLraSystemTest {
+    @Test
+    fun `batched normalized comparisons should preserve both bound premises`() {
+        val upper = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0),
+            LinearOp.LE, 3.0).linearRows.single().exactForm(2).comparison(true) { false }
+        val lower = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, 4.0),
+            LinearOp.GE, 6.0).linearRows.single().exactForm(2).comparison(true) { false }
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            assertTrue(system.assertComparisons(listOf(upper to premise(0), lower to premise(1)), Cancellation.Never))
+
+            assertEquals(1, assertNotNull(lp.state).model.m)
+            for ((upperSide, variable) in listOf(true to 0, false to 1)) {
+                val active = assertNotNull(lp.state?.activeSide(2, upperSide))
+                assertEquals(BigFraction.ofLong(3), active.side.number.value)
+                assertEquals(listOf(Lit.make(variable, false)),
+                    assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.toList())
+            }
+        }
+    }
+
+    @Test
+    fun `root comparison batches should preserve sequential fixing premises`() {
+        val factors = listOf(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 2.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 2.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0),
+        )
+        val comparisons = factors.mapIndexed { index, factor ->
+            factor.linearRows.single().exactForm(2).comparison(true) { false } to premise(index)
+        }
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (variable in 0..2) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
+
+            assertTrue(system.assertComparisons(comparisons, Cancellation.Never))
+
+            val active = assertNotNull(lp.state?.activeSide(1, true))
+            assertEquals(BigFraction.ONE, active.side.number.value)
+            assertEquals((0..2).map { Lit.make(it, false) }.toSet(),
+                assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.toSet())
+            assertEquals(0, assertNotNull(lp.state).model.m)
+        }
+    }
+
+    @Test
+    fun `interrupted source batches should keep definition slots retryable`() {
+        val factors = listOf(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, 1.0), LinearOp.LE, 3.0),
+        )
+        val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } to axiom }
+        var stopped = false
+        var haltOnCharge = true
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = stopped
+            override fun workMeter(): WorkMeter = WorkMeter { if (haltOnCharge) stopped = true }
+        }
+        LpPropagator(object : LpSearchPolicy {}, cancellation = stop).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            val before = lp.state
+
+            assertFalse(system.assertComparisons(comparisons, stop))
+
+            assertSame(before, lp.state)
+            stopped = false
+            haltOnCharge = false
+            assertTrue(system.assertComparisons(comparisons, stop))
+            assertEquals(2, assertNotNull(lp.state).model.m)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, assertNotNull(lp.solve()).verdict)
+        }
+    }
+
     @Test
     fun `sparse shared definitions should preserve exact source equalities`() {
         val factors = arrayOf<Factor>(

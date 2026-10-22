@@ -144,6 +144,12 @@ For default eager or indexed rows containing only real coordinates, a retained
 certified point can serve compatible Boolean prefixes. Every newly resolved
 comparison is checked exactly before its LP assertion is deferred. Retirement replays deferred rows;
 incompatible comparisons, theory updates, retraction and restart retire the point.
+Point-proved Boolean updates also defer empty numerical scopes. Before a theory
+bound or a required LP check, scope synchronization retains every crossed level.
+Resolved non-root comparisons enter the LP in batches of at most 64, sharing neutral
+definition appends while keeping each bound's source premise and modeled work.
+Root comparisons remain sequential because later normalization can use earlier
+root-fixed columns; disequalities keep their directed assertion path.
 A complete Boolean state still runs the full source-point validator before model
 acceptance. Eager guidance retains its existing preference array and owned numerical
 point; indexed guidance reuses its bounded snapshot. Both keep the same storage

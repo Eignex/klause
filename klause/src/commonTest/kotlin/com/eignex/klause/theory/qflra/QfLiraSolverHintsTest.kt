@@ -49,6 +49,81 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `registered bounds should expire after delayed Boolean scopes retract`() {
+        val model = Problem(
+            numBoolVars = 5,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = doubleArrayOf(1.0, 0.0, 0.0),
+            factors = Array<Factor>(5) { head ->
+                when {
+                    head < 3 -> ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), IntArray(3) { it },
+                        DoubleArray(3) { 1.0 }, LinearOp.GE, 0.0)
+                    head == 3 -> ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.GE, 0.5)
+                    else -> Linear(intArrayOf(), doubleArrayOf(), IntArray(3) { it }, DoubleArray(3) { 1.0 },
+                        LinearOp.GE, 0.0)
+                }
+            },
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(5))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(false, hints.preferredBool(3))
+            repeat(3) { head ->
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(head, true))))
+            }
+            val atom = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(atom.positive)))
+            session.popTo(0)
+
+            val result = session.push(SearchDecision.Bool(Lit.make(3, true)))
+
+            assertIs<ComponentResult.Consistent>(result)
+        }
+    }
+
+    @Test
+    fun `deferred source batches should preserve conflicts and feasible backjump siblings`() {
+        val heads = 130
+        val model = Problem(
+            numBoolVars = heads + 2,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3) { 1.0 },
+            factors = Array<Factor>(heads + 2) { head ->
+                when {
+                    head < heads -> ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, head + 1.0, head + 2.0), LinearOp.LE, 0.0)
+                    head == heads -> ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.GE, 0.5)
+                    else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.GE, 0.0)
+                }
+            },
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(heads + 2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            repeat(heads) { head ->
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(head, true))))
+            }
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(heads, true))))
+
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(heads, true))))
+        }
+    }
+
+    @Test
     fun `batched indexed publications should check every changed source guard`() {
         for (lastHead in listOf(1, 300)) {
             val model = Problem(

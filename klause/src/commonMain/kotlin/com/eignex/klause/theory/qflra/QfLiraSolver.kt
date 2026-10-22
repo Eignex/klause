@@ -260,6 +260,7 @@ class ExactLiraSearchComponent private constructor(
     private val lpDelegate: Lazy<LpPropagator> = lazy {
         LpPropagator(
             object : LpSearchPolicy {
+                override val eagerAssertionScopes: Boolean get() = false
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                     accept(decision, context)
                 override fun propagate(context: SearchContext): ComponentResult = relax(context)
@@ -1115,6 +1116,9 @@ class ExactLiraSearchComponent private constructor(
         pointHintPoint = null
         val wasDirty = dirty
         dirty = true
+        if (decision !is SearchDecision.Bool && !lp.atLevel(context.decisionLevel, operationStop)) {
+            return ComponentResult.Indeterminate
+        }
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
@@ -1220,6 +1224,7 @@ class ExactLiraSearchComponent private constructor(
     private fun assertSource(context: SearchContext, deferPoint: Boolean = false): Boolean {
         if (!installSource() || (!deferPoint && !lp.atLevel(context.decisionLevel, operationStop))) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
+        val batch = ArrayList<ResolvedSourceAssertion>()
         // Reusable indexed rows read only real coordinates and their unique activator.
         val pending = if (deferPoint && pointHintIndex != null) pointReusePendingRow else FULL_POINT_ROW_SCAN
         val indices = when {
@@ -1261,8 +1266,11 @@ class ExactLiraSearchComponent private constructor(
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
-                if (!system.assertComparison(comparison, null, premise)) return false
-                sourceAssertionLevels[index] = context.decisionLevel
+                batch += ResolvedSourceAssertion(index, comparison, premise)
+                if (batch.size == MAX_SMT_ASSERTION_BATCH) {
+                    if (!assertSourceBatch(context, batch)) return false
+                    if (lp.state?.conflict != null) return true
+                }
             }
         }
         if (deferPoint) {
@@ -1270,6 +1278,8 @@ class ExactLiraSearchComponent private constructor(
             nodesByLevel.put(context.decisionLevel, node)
             return true
         }
+        if (!assertSourceBatch(context, batch)) return false
+        if (lp.state?.conflict != null) return true
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
             if (!system.assertAtom(atom, premise)) return false
@@ -1281,6 +1291,16 @@ class ExactLiraSearchComponent private constructor(
         }
         if (!assertDisequalities(disequalities)) return false
         nodesByLevel.put(context.decisionLevel, node)
+        return true
+    }
+
+    private fun assertSourceBatch(context: SearchContext, batch: MutableList<ResolvedSourceAssertion>): Boolean {
+        if (!system.assertComparisons(batch.map { it.comparison to it.premise }, operationStop)) return false
+        // A crossed-bound batch may commit only its contradictory prefix.
+        if (lp.state?.conflict == null) {
+            for (input in batch) sourceAssertionLevels[input.index] = context.decisionLevel
+        }
+        batch.clear()
         return true
     }
 
@@ -2110,6 +2130,12 @@ private const val MAX_POINT_HINT_BITS = 4096
 private const val MAX_EQUALITY_CONFLICT_PREMISES = 4095
 private const val FALSE = 0
 private const val TRUE = 1
+
+private class ResolvedSourceAssertion(
+    val index: Int,
+    val comparison: ExactComparison,
+    val premise: SearchAtomPremise,
+)
 
 private fun BooleanArray.toStates(): IntArray = IntArray(size) { if (this[it]) TRUE else FALSE }
 

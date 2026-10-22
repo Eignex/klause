@@ -18,6 +18,42 @@ import kotlin.test.assertTrue
 
 class LpBoundTrailTest {
     @Test
+    fun `batched empty scopes should retain bounds at their original backjump levels`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 1L))
+        assertTrue(trail.pushTo(4))
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 2L))
+        assertTrue(trail.pushTo(12))
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 3L))
+
+        assertTrue(trail.pop(7))
+
+        assertEquals(7, trail.state.depth)
+        assertEquals(2L, trail.state.activeSide(0, false)?.witness)
+        assertTrue(trail.pop(3))
+        assertEquals(1L, trail.state.activeSide(0, false)?.witness)
+        assertEquals(listOf(1L), trail.state.assertions.map { it.witness })
+    }
+
+    @Test
+    fun `cancelled scope batches should preserve the complete predecessor for retry`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.push())
+        val before = trail.state
+        var polls = 0
+
+        assertFalse(trail.pushTo(10, Cancellation { ++polls >= 4 }))
+
+        assertSame(before, trail.state)
+        assertTrue(trail.pushTo(10))
+        assertEquals(10, trail.state.depth)
+        assertFalse(trail.pushTo(9))
+        assertEquals(10, trail.state.depth)
+    }
+
+    @Test
     fun `weaker active witnesses should survive arbitrary backjumps`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
