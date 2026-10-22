@@ -285,6 +285,12 @@ row and graph visits charge and poll the pass token. An interruption retains com
 unconditional deductions and retracts the active hypothetical branch. Candidate,
 entry and representation limits bound optional analysis, not solve time.
 
+For a reified integer equality, source propagation also recognizes a body whose
+nonzero terms are all fixed and sum exactly to the bound, fixing its equality
+activator true or disequality activator false. Checked multiplication and addition
+decline on overflow. Every term visit charges and polls the containing allowance;
+an interrupted sum contributes no deduction. Hypothetical fixings remain trailed.
+
 Source probing and symmetry defer to finite preparation for closed discrete-only
 models. With real columns they may run in the source lane even when integer
 columns are closed or absent; generator lex and value-precedence chains remain

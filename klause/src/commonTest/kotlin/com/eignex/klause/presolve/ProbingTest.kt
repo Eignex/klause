@@ -148,6 +148,111 @@ class ProbingTest {
         delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() }.toSet()
 
     @Test
+    fun `source probing should fix equality truth from a fixed body while another column stays open`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            for (coefficient in listOf(0, 1, -1)) {
+                val problem = Problem(
+                    1, 2, arrayOf(IntDomain(3, 3), IntDomain(0, 0)),
+                    listOf(ReifiedLinear(0, intArrayOf(coefficient), intArrayOf(if (coefficient == 0) 1 else 0),
+                        op, 3 * coefficient)),
+                    openIntLo = booleanArrayOf(false, true),
+                    openIntHi = booleanArrayOf(false, true),
+                )
+
+                val delta = Presolve.probeSource(problem, 0, Cancellation.Never)
+
+                assertEquals(setOf(Lit.make(0, op == LinearOp.EQ)), sourceUnits(delta))
+                assertFalse(delta.infeasible)
+            }
+        }
+    }
+
+    @Test
+    fun `source equality truth should use root propagated integer fixings`() {
+        val problem = Problem(
+            3, 1, arrayOf(IntDomain(0, 0)),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, true))),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val delta = Presolve.probeSource(problem, 0, Cancellation.Never)
+
+        assertEquals(setOf(Lit.make(2, true)), sourceUnits(delta))
+        assertEquals(0L, delta.bounds!!.lower(0))
+        assertEquals(0L, delta.bounds.upper(0))
+    }
+
+    @Test
+    fun `equality truth proved in one source branch should not fix its activator at the root`() {
+        val problem = Problem(
+            3, 1, arrayOf(IntDomain(0, 0)),
+            listOf(
+                Clause(intArrayOf(Lit.make(1, true))),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val delta = Presolve.probeSource(problem, 1, Cancellation.Never)
+
+        assertTrue(sourceUnits(delta).isEmpty())
+        assertFalse(delta.infeasible)
+        assertEquals(0L, delta.bounds!!.lower(0))
+        assertTrue(delta.bounds.isOpenUpper(0))
+    }
+
+    @Test
+    fun `interrupted fixed sums should never establish equality from an incomplete prefix`() {
+        val problem = Problem(
+            1, 128, Array(128) { if (it == 127) IntDomain(1, 1) else IntDomain(0, 0) },
+            listOf(ReifiedLinear(0, IntArray(128) { 1 }, IntArray(128) { it }, LinearOp.EQ, 0)),
+        )
+        var completedRejection = false
+        for (allowance in 0L..20_000L step 101L) {
+            val budget = PresolveBudget(allowance)
+
+            val delta = Presolve.probeSource(problem, 0, budget.orSpent(Cancellation.Never))
+
+            val units = sourceUnits(delta)
+            assertTrue(Lit.make(0, true) !in units, "allowance=$allowance")
+            assertFalse(delta.infeasible, "allowance=$allowance")
+            assertTrue(budget.spent() <= allowance + 9, "spent=${budget.spent()} allowance=$allowance")
+            if (Lit.make(0, false) in units) completedRejection = true
+        }
+        assertTrue(completedRejection)
+    }
+
+    @Test
+    fun `overflowed fixed sums should not establish source equality truth`() {
+        for (problem in listOf(
+            Problem(
+                1, 1, arrayOf(IntDomain(2, 2)),
+                listOf(ReifiedLinear(0, longArrayOf(Long.MAX_VALUE), intArrayOf(0), LinearOp.EQ, 0L)),
+            ),
+            Problem(
+                1, 2, Array(2) { IntDomain(1, 1) },
+                listOf(ReifiedLinear(0, longArrayOf(Long.MAX_VALUE, 1L), intArrayOf(0, 1), LinearOp.EQ, 0L)),
+            ),
+        )) {
+
+            val delta = Presolve.probeSource(problem, 0, Cancellation.Never)
+
+            assertTrue(delta.isEmpty)
+            assertFalse(delta.infeasible)
+        }
+    }
+
+    @Test
     fun `source probing should fix the activator of a row the declared range rules out`() {
         val problem = Problem(
             numBoolVars = 1,

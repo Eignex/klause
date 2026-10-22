@@ -26,6 +26,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.PollStride
 import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 
 internal object Probing {
@@ -171,6 +172,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val rowCols = ArrayList<IntArray>()
     private val rowBound = LongArrayList()
     private val rowSign = LongArrayList()
+    private val rowEquality = ArrayList<Boolean>()
     private val rowGuard = IntArrayList()
     private val rowGuardValue = LongArrayList()
     private var incidenceStart = IntArray(0)
@@ -290,15 +292,16 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     }
 
     private fun addRow(coeffs: LongArray, cols: IntArray, relation: LinearOp, bound: Long, guard: Int) {
-        fun half(rhs: Long, sign: Long, guardValue: Long) {
+        fun half(rhs: Long, sign: Long, guardValue: Long, equality: Boolean = false) {
             rowCoeffs.add(coeffs)
             rowCols.add(cols)
             rowBound.add(rhs)
             rowSign.add(sign)
+            rowEquality.add(equality)
             rowGuard.add(guard)
             rowGuardValue.add(guardValue)
         }
-        if (relation == LinearOp.LE || relation == LinearOp.EQ) half(bound, 1L, 1L)
+        if (relation == LinearOp.LE || relation == LinearOp.EQ) half(bound, 1L, 1L, relation == LinearOp.EQ)
         if (relation == LinearOp.GE || relation == LinearOp.EQ) half(bound, -1L, 1L)
         if (guard < 0) return
         // The complement of an integer `≤ b` is `≥ b + 1`, and of `≥ b` is `≤ b − 1`.
@@ -308,7 +311,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
             LinearOp.GE -> half(subExact(bound, 1L), 1L, 0L)
 
             LinearOp.NE -> {
-                half(bound, 1L, 0L)
+                half(bound, 1L, 0L, equality = true)
                 half(bound, -1L, 0L)
             }
 
@@ -384,7 +387,9 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         val bound = rowBound[h]
         val sign = rowSign[h]
         if (guard >= 0 && !fixed(guard)) {
-            if (rowRefuted(coeffs, cols, bound, sign, this, ::visit)) {
+            if (rowEquality[h] && equalityHolds(h)) {
+                if (rowGuardValue[h] == 1L) setLo(guard, 1L) else setHi(guard, 0L)
+            } else if (rowRefuted(coeffs, cols, bound, sign, this, ::visit)) {
                 if (rowGuardValue[h] == 1L) setHi(guard, 0L) else setLo(guard, 1L)
             }
         } else if (guard < 0 || lo[guard] == rowGuardValue[h]) {
@@ -394,6 +399,25 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
             } else {
                 propagateRow(coeffs, cols, bound, sign, this, ::visit)
             }
+        }
+    }
+
+    private fun equalityHolds(h: Int): Boolean {
+        val cols = rowCols[h]
+        val coeffs = rowCoeffs[h]
+        var sum = 0L
+        return try {
+            for (k in cols.indices) {
+                if (!visit()) return false
+                val coefficient = coeffs[k]
+                if (coefficient == 0L) continue
+                val col = cols[k]
+                if (!fixed(col)) return false
+                sum = addExact(sum, mulExact(coefficient, lo[col]))
+            }
+            sum == rowBound[h]
+        } catch (_: CheckedLongOverflowException) {
+            false
         }
     }
 
