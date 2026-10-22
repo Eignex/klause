@@ -212,6 +212,8 @@ internal object LinearSourceShape {
         val eligible = active.filter {
             owners[it.activator] == 1 && it.activator !in declared && it.variables.reals.isNotEmpty()
         }
+        val references = IntArray(model.numBoolVars)
+        for (factor in model.factors) for (head in factor.variables.boolVars) references[head]++
         val groups = List(3) { HashMap<List<String>, MutableSet<Int>>() }
         for (row in eligible) for (mode in groups.indices) {
             val (key, negated) = predicateShape(row, primitive = mode > 0, complement = mode == 2)
@@ -222,6 +224,7 @@ internal object LinearSourceShape {
             put("scope", "Private single-row active real comparisons; inferred families, not compiler cache hits")
             put("activatedRows", active.size)
             put("eligiblePrivateHeads", eligible.size)
+            put("soleDefinitionOccurrenceHeads", eligible.count { references[it.activator] == 1 })
             put("rawDistinctFunctions", groups[0].size)
             put("scaledDistinctFunctions", groups[1].size)
             put("complementFoldedFunctions", groups[2].size)

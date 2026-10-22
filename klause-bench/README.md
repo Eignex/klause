@@ -354,6 +354,8 @@ row. They separate raw orientation signatures, primitive coefficient/right-side
 GCD normalization, and complement folding. Reversing an inequality complements its
 strictness, preserving the distinction between `<` and `<=`. Declared Boolean heads,
 multi-row definitions and integer-only rows are excluded from this estimate.
+It separately counts heads whose defining row is their sole Boolean occurrence
+across the retained factors; this does not by itself declare a source reduction.
 Predicate identity removes only the
 activator before using `ExactLinear` structural keys; it does not reason about
 signs, implications or source satisfiability. Raw coordinate/activated-row entry
