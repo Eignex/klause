@@ -132,7 +132,9 @@ class OpenTheoryMinimizeTest {
         val result = OpenTheoryMinimizer(parsed.model, objective).minimize()
 
         assertIs<OpenTheoryOptimum.Unbounded>(result)
-        assertEquals(2.0, result.stats.lp.standalonePasses.sum)
+        val feasibility = assertNotNull(result.stats.lp.phases["PRIMARY_EXACT_FEASIBILITY_STANDALONE"])
+        assertEquals(1L, feasibility.calls)
+        assertEquals(2.0, result.stats.lp.standalonePasses.sum - feasibility.calls)
     }
 
     @Test
