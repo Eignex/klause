@@ -133,7 +133,7 @@ its selection. Use `reference=any` in lab specs to preserve frozen membership.
 | `exact=true\|false` | Forward `--exact` |
 | `param=key=value` | Repeatable CLI engine parameters; unknown/malformed keys fail at the CLI |
 
-Other keys, such as the lab's `label` and `fixed`, are ignored; `backend=` must be `klause`.
+Other keys are ignored.
 
 The `divmod` suite retains self-authored scalar, affine wide, equivalent linear and
 joint-conflict sources, plus signed MiniZinc and XCSP3 inputs. The adjacent FlatZinc

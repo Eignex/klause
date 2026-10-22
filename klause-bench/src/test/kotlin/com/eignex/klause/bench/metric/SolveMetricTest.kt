@@ -50,7 +50,7 @@ class SolveMetricTest {
 
         val record = SolveMetric.loadFailureRecord(
             ref, SolverInvocation.Settings(), Budget(1000), "now", null,
-            IllegalStateException("reference failed"), sourceHashes = hashes,
+            IllegalStateException("load failed"), sourceHashes = hashes,
         )
 
         assertEquals(hashes, record.sourceHashes)

@@ -8,7 +8,7 @@ internal data class SetEntry(val suite: String, val problem: String)
 
 /**
  * Named problem sets: fixed lists in `klause-bench/sets/<name>.txt`, so benches that name one run the same problems
- * whatever the corpus or the reference results hold. A line is `<suite>/<problem>`, `@<set>` includes another set,
+ * whatever the corpus holds. A line is `<suite>/<problem>`, `@<set>` includes another set,
  * and `#` starts a comment.
  */
 internal object ProblemSets {
