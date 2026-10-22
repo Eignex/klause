@@ -16,7 +16,9 @@ import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,11 +32,11 @@ class StructuralReductionTest {
             val first = Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)
             val second = Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0)
             val factors = listOf(
-                object : Factor by first {
+                object : Factor by first, Propagator by first.propagatorProjection() {
                     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
                         FactorReduction.Rewrite(emptyList(), mapOf(0 to 1..1))
                 },
-                object : Factor by second {
+                object : Factor by second, Propagator by second.propagatorProjection() {
                     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
                         stopped = true
                         return FactorReduction.Rewrite(emptyList(), mapOf(1 to 0..0))
@@ -49,17 +51,19 @@ class StructuralReductionTest {
 
                 assertEquals(listOf(0), delta.droppedIndices.toList())
                 assertTrue(delta.addedFactors.isEmpty())
-                assertEquals(1L, delta.bounds!!.lower(0))
-                assertEquals(1L, delta.bounds!!.upper(0))
-                assertEquals(0L, delta.bounds!!.lower(1))
-                assertEquals(3L, delta.bounds!!.upper(1))
+                val bounds = checkNotNull(delta.bounds)
+                assertEquals(1L, bounds.lower(0))
+                assertEquals(1L, bounds.upper(0))
+                assertEquals(0L, bounds.lower(1))
+                assertEquals(3L, bounds.upper(1))
             } else {
                 val delta = StructuralReduction.reduce(problem, token)
 
                 assertEquals(listOf(0), delta.droppedIndices.toList())
                 assertTrue(delta.addedFactors.isEmpty())
-                assertEquals(IntDomain(1, 1), delta.domains!![0])
-                assertEquals(IntDomain(0, 3), delta.domains!![1])
+                val domains = checkNotNull(delta.domains)
+                assertEquals(IntDomain(1, 1), domains[0])
+                assertEquals(IntDomain(0, 3), domains[1])
             }
         }
     }
@@ -76,7 +80,7 @@ class StructuralReductionTest {
                         return intArrayOf(0, 1)
                     }
             }
-            val factor = object : Factor by row {
+            val factor = object : Factor by row, Propagator by row.propagatorProjection() {
                 override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
                     FactorReduction.Rewrite(List(128) { replacement })
             }

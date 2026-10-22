@@ -37,7 +37,7 @@ class DuplicateColumnsTest {
             for (stopAt in listOf(5, 9)) {
                 var forms = 0
                 val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)
-                val factor = object : Factor by row {
+                val factor = object : Factor by row, Propagator by row.propagatorProjection() {
                     override val linearForm: LinearForm
                         get() {
                             forms++
