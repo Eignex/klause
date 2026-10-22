@@ -73,8 +73,8 @@ internal object BinaryColumnSubstitution {
     fun substitute(problem: BakedProblem, objectiveIntVars: Set<Int>, bakeConfig: BakeConfig): Substitution? {
         val numInts = problem.numIntVars
         val factors = problem.factors
-        val eligibility = eligibility(factors, numInts, ColumnRanges.of(problem.rootIntDomainsInPlace), objectiveIntVars)
-            ?: return null
+        val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
+        val eligibility = eligibility(factors, numInts, ranges, objectiveIntVars) ?: return null
         val substitutable = eligibility.substitutable
         val rows = eligibility.rows
         val channels = eligibility.channels
