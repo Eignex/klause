@@ -21,8 +21,8 @@ class MixedRealCompletionTest {
                     listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
                 ExactRationalInequality(intArrayOf(1, 2),
                     listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
-                ExactRationalInequality(intArrayOf(2, 0),
-                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                ExactRationalInequality(intArrayOf(0, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE),
                     if (strict) BigFraction.ZERO else BigFraction.MINUS_ONE, strict),
             )
             val budget = SourceLpBudget(maxOperations = 0)
