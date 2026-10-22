@@ -423,8 +423,11 @@ class ProbingTest {
                 listOf(
                     Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
                     Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
-                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                    PseudoBoolean(
+                        longArrayOf(1, 1, 1),
+                        intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, !truth)),
+                        PbOp.LE, 1,
+                    ),
                     Clause(intArrayOf(Lit.make(0, truth))),
                 ),
             )
