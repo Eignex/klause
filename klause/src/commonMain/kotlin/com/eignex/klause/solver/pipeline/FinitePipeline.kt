@@ -132,6 +132,7 @@ object FinitePipeline {
             request.solutionSetSensitive,
             request.cancellation,
             request.presolveBudget,
+            finiteLane = true,
         )
         // A source rewrite moves factor ownership with the factors, so the routing plan does not index the
         // model the engine is built from; an untouched model keeps the plan routing already built.

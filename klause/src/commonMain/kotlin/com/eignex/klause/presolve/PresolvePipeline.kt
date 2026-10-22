@@ -66,7 +66,8 @@ object PresolvePipeline {
      * This is the single phase every route is planned from, so it runs exactly once per solve: the
      * bounded lane hands its result straight to [run], and the open lane routes from it. It is
      * intentionally limited to [PresolvePass.Capability.SOURCE]. Passes that inspect finite domains or
-     * root deductions stay on the finite side of the deferred bake boundary.
+     * root deductions stay on the finite side of the deferred bake boundary. [finiteLane] marks a phase
+     * that [run] continues, so it applies the finite lane's pass policy.
      */
     internal fun prepareSource(
         problem: Problem,
@@ -75,6 +76,7 @@ object PresolvePipeline {
         solutionSetSensitive: Boolean = false,
         cancellation: Cancellation = Cancellation.Never,
         presolveBudget: PresolveBudget? = null,
+        finiteLane: Boolean = false,
     ): PreparedSource {
         // An already-baked model reached this boundary through a finite preparation that ran the phase,
         // so running it again would re-derive the same fixpoint at full cost.
@@ -82,6 +84,7 @@ object PresolvePipeline {
         val mark = TimeSource.Monotonic.markNow()
         val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
             .withPresolveBudget(presolveBudget)
+            .withKeepBinaryComparisons(config.keepsBinaryComparisons(finiteLane))
         val presolved = Presolver.runSource(problem, config, context, phaseCancellation(cancellation, presolveBudget))
         return PreparedSource(
             source = problem,
@@ -110,7 +113,9 @@ object PresolvePipeline {
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
     ): PresolveOutcome = run(
-        prepareSource(problem, config, linearObjective, solutionSetSensitive, cancellation, presolveBudget),
+        prepareSource(
+            problem, config, linearObjective, solutionSetSensitive, cancellation, presolveBudget, finiteLane = true,
+        ),
         linearObjective,
         config,
         solutionSetSensitive,
@@ -147,6 +152,7 @@ object PresolvePipeline {
         val context = PresolveContext.of(linearObjective, solutionSetSensitive, sourceProblem.hasSymmetryBreaking)
             .withBakeConfig(bakeConfig)
             .withPresolveBudget(presolveBudget)
+            .withKeepBinaryComparisons(config.keepsBinaryComparisons(finiteLane = true))
         // LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals and
         // implied equalities into the problem permanently so every backend sees them. Gated by the
         // `lp-harvest` pass; the harvest's own LP relaxation+shaving is enabled here directly.

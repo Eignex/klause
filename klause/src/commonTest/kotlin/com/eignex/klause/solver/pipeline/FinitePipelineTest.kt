@@ -1,12 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.bounding.LpConfig
@@ -330,6 +333,56 @@ class FinitePipelineTest {
         assertFalse(problem is BakedProblem)
         assertIs<BakedProblem>(preparation.executableProblem())
     }
+
+    @Test
+    fun `automatic preparation should keep a comparison disjunction over 0-1 columns in the Boolean lane`() {
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(binaryDisjunction(), FiniteEngine.BACKTRACK))
+
+        val prepared = preparation.executableProblem()
+        assertTrue(prepared.factors.none { it is ComparisonClause })
+        assertTrue(prepared.factors.all { it.intVars.isEmpty() })
+    }
+
+    @Test
+    fun `explicit comparison folding should fold a disjunction over 0-1 columns`() {
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                binaryDisjunction(), FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.parse("default,+comparison-clause"), explicitPresolveConfig = true,
+            ),
+        )
+
+        assertTrue(preparation.executableProblem().factors.any { it is ComparisonClause })
+    }
+
+    @Test
+    fun `a kept 0-1 comparison disjunction should reconstruct source indicator values`() {
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(binaryDisjunction(), FiniteEngine.BACKTRACK))
+
+        val samples = BacktrackSolver(preparation.executableProblem()).enumerate()
+            .map(preparation.reconstruct).toList()
+
+        assertTrue(samples.isNotEmpty())
+        for (sample in samples) {
+            val (x0, x1, x2) = sample.ints
+            assertEquals(x0 >= 1L, sample.bools[0])
+            assertEquals(x1 >= 1L, sample.bools[1])
+            assertTrue(sample.bools[0] || sample.bools[1])
+            assertTrue(x0 + x1 + x2 <= 1L)
+        }
+    }
+
+    private fun binaryDisjunction() = Problem(
+        numBoolVars = 2,
+        numIntVars = 3,
+        intDomains = Array(3) { IntDomain(0, 1) },
+        factors = arrayOf<Factor>(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 1),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1),
+        ),
+    )
 
     @Test
     fun `reconstruction should recover an affine eliminated variable`() {

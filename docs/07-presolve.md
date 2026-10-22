@@ -250,7 +250,13 @@ Completed drops survive interruption.
 
 Comparison-clause folding combines sole-use reified indicators into one comparison
 disjunction. It requires both Boolean and integer columns before entry accounting;
-unrelated real or open columns do not exclude integer comparisons.
+unrelated real or open columns do not exclude integer comparisons. Finite preparation
+leaves a clause that compares a 0/1 column reified in its source and finite rounds:
+that comparison is a Boolean literal of the column, which
+[binary-column substitution](#binary-integer-channels) keeps in the clause lane for
+search and learning, while the folded clause would hold the column in the integer
+lane. Explicit `+comparison-clause` folds those clauses too; open preparation
+substitutes no columns and always folds them.
 Reconstruction restores their truth after integer reconstruction and
 before source checking, and excludes them from direct search/definition hints.
 Duplicate-column merging replaces matching linear columns by their representable

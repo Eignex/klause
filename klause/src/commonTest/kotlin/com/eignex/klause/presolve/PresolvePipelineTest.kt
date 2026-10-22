@@ -4,7 +4,9 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.projectedOutcomes
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.symmetry.SymmetryHandling
@@ -364,6 +366,32 @@ class PresolvePipelineTest {
             Linear(longArrayOf(1), intArrayOf(2), LinearOp.GE, 1),
         ),
     )
+
+    @Test
+    fun `automatic source folding should keep 0-1 comparisons reified only for the finite lane`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 1) },
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 1),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ),
+        )
+        val config = PresolveConfig.parse("off,+comparison-clause")
+        val cases = listOf(
+            Triple(PresolveConfig.DEFAULT, true, false),
+            Triple(PresolveConfig.DEFAULT, false, true),
+            Triple(config, true, true),
+        )
+
+        for ((plan, finiteLane, folds) in cases) {
+            val prepared = PresolvePipeline.prepareSource(problem, plan, finiteLane = finiteLane)
+
+            assertEquals(folds, prepared.problem.factors.any { it is ComparisonClause }, "$finiteLane $folds")
+        }
+    }
 
     @Test
     fun `reconstruct should lift every solution of the transformed problem back to the original`() {

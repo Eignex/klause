@@ -33,6 +33,8 @@ data class PresolveContext(
     val affineTouchedVars: IntArray? = null,
     /** Integer variables changed since duplicate-column merging last ran. */
     val dupColumnsTouchedVars: IntArray? = null,
+    /** Whether comparison-clause folding leaves every clause that compares a `{0, 1}` column reified. */
+    val keepBinaryComparisons: Boolean = false,
 ) {
     /** Integer variables read by the objective. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
@@ -70,6 +72,10 @@ data class PresolveContext(
     /** This context with [dupColumnsTouchedVars] set. */
     fun withDupColumnsTouchedVars(dupColumnsTouchedVars: IntArray?): PresolveContext =
         copy(dupColumnsTouchedVars = dupColumnsTouchedVars)
+
+    /** This context with [keepBinaryComparisons] set. */
+    fun withKeepBinaryComparisons(keepBinaryComparisons: Boolean): PresolveContext =
+        copy(keepBinaryComparisons = keepBinaryComparisons)
 
     /** Common presolve contexts. */
     companion object {
