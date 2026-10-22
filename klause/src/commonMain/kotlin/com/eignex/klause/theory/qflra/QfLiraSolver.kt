@@ -228,6 +228,10 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintPoint: List<BigFraction>? = null
     private var recoveryGuessEnabled = false
     private var recoveryGuess: List<BigFraction>? = null
+    private var recoveryGuessHistoryCapacity = 0
+    private var recoveryGuessHistory: Array<List<BigFraction>?>? = null
+    private var recoveryGuessHistoryNext = 0
+    private var recoveryGuessHistorySize = 0
     private var pointReuseEnabled = false
     private var pointReusePoint: List<BigFraction>? = null
     private var pointReuseHintValues: IntArray? = null
@@ -383,6 +387,9 @@ class ExactLiraSearchComponent private constructor(
         pointHintRows = rows.toList()
         pointReuseEnabled = reusable
         recoveryGuessEnabled = reusable && entries + model.numRealVars <= MAX_POINT_HINT_ENTRIES
+        recoveryGuessHistoryCapacity = if (recoveryGuessEnabled) {
+            ((MAX_POINT_HINT_ENTRIES - entries - model.numRealVars) / (model.numRealVars + 1L)).toInt()
+        } else 0
         pointHintIndex = null
         pointHintPoint = null
         pointHintStop = stop
@@ -448,6 +455,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintIndex = index
         pointReuseEnabled = reusable
         recoveryGuessEnabled = reusable && 2L * model.numBoolVars + 2L * model.numRealVars <= MAX_POINT_HINT_ENTRIES
+        recoveryGuessHistoryCapacity = 0
         pointHintStop = stop
         return variables to pointHintProvider(defaultOpening = true, defaultGraphSelections)
     }
@@ -543,6 +551,10 @@ class ExactLiraSearchComponent private constructor(
         pointReuseEnabled = false
         recoveryGuessEnabled = false
         recoveryGuess = null
+        recoveryGuessHistoryCapacity = 0
+        recoveryGuessHistory = null
+        recoveryGuessHistoryNext = 0
+        recoveryGuessHistorySize = 0
         defaultDisjunctionHints = false
         pointHintRows = null
         pointHintValues = null
@@ -1503,13 +1515,17 @@ class ExactLiraSearchComponent private constructor(
         val rows = agreementSourceRows(context, origins) ?: return null
         lpStop.charge(rows.size.toLong())
         if (operationStop() || rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
-        val guess = recoveryGuess
-        if (recoveryGuessEnabled && !pointHintStop() && guess != null && guess.size == model.numRealVars &&
-            MixedPointArithmetic(lpStop).satisfies(guess, rows) && !pointHintStop()
-        ) {
-            candidate = guess
-            observeCompleteStage("RECOVERY_GUESS_ACCEPTED")
-            return null
+        val guesses = retainedRecoveryGuesses().takeWhile { !pointHintStop() }
+        for (guess in guesses) {
+            lpStop.charge(1L)
+            if (operationStop()) return null
+            if (guess.size == model.numRealVars && MixedPointArithmetic(lpStop).satisfies(guess, rows) &&
+                !pointHintStop()
+            ) {
+                candidate = guess
+                observeCompleteStage("RECOVERY_GUESS_ACCEPTED")
+                return null
+            }
         }
         var sourceInfeasible: IntArray? = null
         val reportInfeasible: ((IntArray) -> Unit)? = if (origins == null) null else { support ->
@@ -1520,10 +1536,10 @@ class ExactLiraSearchComponent private constructor(
             onSourceInfeasible = reportInfeasible,
             realCompletion = { columns, residual, token, onInfeasible ->
                 reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
-            }, recoveryGuess = guess.takeIf { recoveryGuessEnabled && !pointHintStop() })
+            }, recoveryGuesses = guesses)
         if (point != null && !operationStop()) {
             candidate = point
-            if (recoveryGuessEnabled && !pointHintStop()) recoveryGuess = point
+            rememberRecoveryGuess(point)
             observeCompleteStage("PARTIAL_SOURCE_POINT")
             return null
         }
@@ -1531,6 +1547,42 @@ class ExactLiraSearchComponent private constructor(
         if (origins == null || operationStop() || !sourceEqualityConflict(context, origins, support)) return null
         observeCompleteStage("PARTIAL_SOURCE_REFUTATION")
         return ComponentResult.Conflict((outcome as ComponentCheck.Infeasible).explanation)
+    }
+
+    private fun retainedRecoveryGuesses(): Sequence<List<BigFraction>> {
+        if (!recoveryGuessEnabled) return emptySequence()
+        val current = recoveryGuess ?: return emptySequence()
+        val history = recoveryGuessHistory
+        val next = recoveryGuessHistoryNext
+        val size = recoveryGuessHistorySize
+        return sequence {
+            yield(current)
+            if (history != null) {
+                for (offset in 1..size) {
+                    history[(next - offset + history.size) % history.size]?.let { yield(it) }
+                }
+            }
+        }
+    }
+
+    private fun rememberRecoveryGuess(point: List<BigFraction>) {
+        if (!recoveryGuessEnabled || pointHintStop()) return
+        val previous = recoveryGuess
+        if (previous != null && previous !== point && recoveryGuessHistoryCapacity > 0) {
+            var history = recoveryGuessHistory
+            if (history == null) {
+                lpStop.charge(recoveryGuessHistoryCapacity.toLong())
+                if (operationStop() || pointHintStop()) return
+                history = arrayOfNulls(recoveryGuessHistoryCapacity)
+                recoveryGuessHistory = history
+            }
+            lpStop.charge(1L)
+            if (operationStop() || pointHintStop()) return
+            history[recoveryGuessHistoryNext] = previous
+            recoveryGuessHistoryNext = (recoveryGuessHistoryNext + 1) % history.size
+            recoveryGuessHistorySize = minOf(recoveryGuessHistorySize + 1, history.size)
+        }
+        recoveryGuess = point
     }
 
     private fun sourceEqualityConflict(

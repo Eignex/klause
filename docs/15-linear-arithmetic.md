@@ -152,7 +152,10 @@ When that envelope has room for another real vector, a recovered point can remai
 as an untrusted numerical guess across retraction and restart. After a float optimum
 without an exact point, every currently selected original row must accept the guess
 under the current operation allowance before it can supply fresh guidance. Releasing
-the hint workspace discards the guess. When the ordinary float-based equality repair
+the hint workspace discards the guesses. Eager providers can retain older numerical
+vectors in unused entries of the same envelope, including one entry per ring slot;
+indexed providers retain one guess. Candidates are tried in recency order.
+When the ordinary float-based equality repair
 fails, the bounded repair can also reconstruct the retained free coordinates against
 the current source equations before component LP completion. Every selected original
 row checks that reconstructed candidate.

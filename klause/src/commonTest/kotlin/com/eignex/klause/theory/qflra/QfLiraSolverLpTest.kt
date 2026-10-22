@@ -137,7 +137,16 @@ class QfLiraSolverLpTest {
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
 
                 assertEquals(true, hints.preferredBool(2))
-                assertEquals(reused + 1L, stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED"))
+                assertEquals(reused + 2L, stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED"))
+                assertEquals(operations, stats.snapshot().sourceLp.operations)
+                session.popTo(1)
+                assertNull(hints.preferredBool(2))
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+                assertEquals(false, hints.preferredBool(2))
+                assertEquals(operations, stats.snapshot().sourceLp.operations)
+                assertEquals(reused + 3L, stats.snapshot().completeSearchStages?.get("RECOVERY_GUESS_ACCEPTED"))
                 assertNull(session.model().valueOf(component.assignmentKey))
             }
         }

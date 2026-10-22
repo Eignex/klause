@@ -31,17 +31,20 @@ class MixedPointCompletionTest {
                 ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
             )
             val guess = listOf(BigFraction.ofLong(free), BigFraction.ofLong(free), BigFraction.ZERO, BigFraction.ZERO)
-            val budget = SourceLpBudget(maxOperations = 0)
             assertFalse(guess.satisfiesSourceRows(rows))
+            for (older in listOf(false, true)) {
+                val budget = SourceLpBudget(maxOperations = 0)
+                val guesses = if (older) sequenceOf(List(4) { BigFraction.ZERO }, guess) else sequenceOf(guess)
 
-            val point = assertNotNull(completeMixedPoint(4, 0, DoubleArray(4), rows, Cancellation.Never,
-                realCompletion = { columns, residual, stop, onInfeasible ->
-                    completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
-                }, recoveryGuess = guess))
+                val point = assertNotNull(completeMixedPoint(4, 0, DoubleArray(4), rows, Cancellation.Never,
+                    realCompletion = { columns, residual, stop, onInfeasible ->
+                        completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
+                    }, recoveryGuesses = guesses))
 
-            assertTrue(point.satisfiesSourceRows(rows))
-            assertEquals(BigFraction.ofLong(free + 1L), point[0])
-            assertEquals(0, budget.operations)
+                assertTrue(point.satisfiesSourceRows(rows))
+                assertEquals(BigFraction.ofLong(free + 1L), point[0])
+                assertEquals(0, budget.operations)
+            }
         }
     }
 
@@ -60,7 +63,8 @@ class MixedPointCompletionTest {
         var stopped = false
 
         val point = completeMixedPoint(4, 0, DoubleArray(4), rows, Cancellation { stopped },
-            onStage = { if (it == "RECOVERY_RETAINED_EQUALITY_POINT") stopped = true }, recoveryGuess = guess)
+            onStage = { if (it == "RECOVERY_RETAINED_EQUALITY_POINT") stopped = true },
+            recoveryGuesses = sequenceOf(guess))
 
         assertTrue(stopped)
         assertNull(point)
