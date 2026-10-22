@@ -9,6 +9,7 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.LinearOp
@@ -73,21 +74,10 @@ internal object LinearSourceShape {
         val realSelections = model.factors.filterIsInstance<RealElement>()
         val binarySelectionIndexes = realSelections.filter { it.indexOffset == 0 && it.size == 2 }
             .map { it.idx }.toSet()
-        val selectorDefinitions = model.factors.filterIsInstance<ReifiedLinear>().mapNotNull { row ->
-            val constants = row.integerConstants ?: return@mapNotNull null
-            if (row.vars.size != 1 || constants.coeff(0) != 1L || constants.bound != 1L ||
-                row.op !in setOf(LinearOp.EQ, LinearOp.NE)
-            ) return@mapNotNull null
-            val column = row.vars[0]
-            if (column !in binarySelectionIndexes || !model.intBounds.hasLower(column) ||
-                !model.intBounds.hasUpper(column) || model.intBounds.lower(column) != 0L ||
-                model.intBounds.upper(column) != 1L
-            ) return@mapNotNull null
-            val guard = Lit.make(row.auxBoolVar, positive = row.op == LinearOp.EQ)
-            column to guard
-        }.groupBy({ it.first }, { it.second })
-        val guardSelectors = selectorDefinitions.filterValues { it.size == 1 }.entries
-            .groupBy({ it.value.single() }, { it.key })
+        val integerSelections = model.factors.filterIsInstance<Element>()
+        val binaryIntegerSelectionIndexes = integerSelections.filter { it.indexOffset == 0 && it.arr.size == 2 }
+            .map { it.idx }.toSet()
+        val guardSelectors = selectionGuards(model, binarySelectionIndexes)
         val predicates = HashSet<StructuralKey>()
         for (row in exactRows) {
             val constants = row.constants
@@ -116,6 +106,11 @@ internal object LinearSourceShape {
             put("compiledFactors", model.factors.size)
             put("booleanGateShapes", booleanGateShapes(model, parsed.boolVarNames.values))
             put("realSelections", realSelections.size)
+            put("integerSelections", integerSelections.size)
+            put("constantIntegerSelections", integerSelections.count { !it.arrIsVars })
+            put("integerSelectionSelectors", selectionShape(model, binaryIntegerSelectionIndexes))
+            put("combinedSelectionSelectors",
+                selectionShape(model, binarySelectionIndexes + binaryIntegerSelectionIndexes))
             put("binaryRealSelectionIndexes", binarySelectionIndexes.size)
             put("singleGuardBinarySelectionIndexes", guardSelectors.values.sumOf { it.size })
             put("distinctBinarySelectionGuards", guardSelectors.size)
@@ -151,6 +146,36 @@ internal object LinearSourceShape {
         }
         out.resolve("shape.json").writeText(shape.toString() + "\n")
         println(shape)
+    }
+
+    private fun selectionGuards(model: Problem, indexes: Set<Int>): Map<Int, List<Int>> {
+        val definitions = model.factors.filterIsInstance<ReifiedLinear>().mapNotNull { row ->
+            val constants = row.integerConstants ?: return@mapNotNull null
+            if (row.vars.size != 1 || constants.coeff(0) != 1L || constants.bound != 1L ||
+                row.op !in setOf(LinearOp.EQ, LinearOp.NE)
+            ) return@mapNotNull null
+            val column = row.vars[0]
+            if (column !in indexes || !model.intBounds.hasLower(column) || !model.intBounds.hasUpper(column) ||
+                model.intBounds.lower(column) != 0L || model.intBounds.upper(column) != 1L
+            ) return@mapNotNull null
+            column to Lit.make(row.auxBoolVar, positive = row.op == LinearOp.EQ)
+        }.groupBy({ it.first }, { it.second })
+        return definitions.filterValues { it.size == 1 }.entries.groupBy({ it.value.single() }, { it.key })
+    }
+
+    private fun selectionShape(model: Problem, indexes: Set<Int>): JsonObject {
+        val guards = selectionGuards(model, indexes)
+        return buildJsonObject {
+            put("binaryIndexes", indexes.size)
+            put("singleGuardIndexes", guards.values.sumOf { it.size })
+            put("distinctGuards", guards.size)
+            put("duplicateIndexes", guards.values.sumOf { it.size - 1 })
+            put("maxIndexesPerGuard", guards.values.maxOfOrNull { it.size } ?: 0)
+            put("guardFanoutHistogram", buildJsonObject {
+                guards.values.groupingBy { it.size }.eachCount().toSortedMap()
+                    .forEach { (fanout, count) -> put(fanout.toString(), count) }
+            })
+        }
     }
 
     private fun booleanGateShapes(model: Problem, declaredBooleans: Collection<Int>): JsonObject {
