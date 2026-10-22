@@ -21,6 +21,34 @@ class PolynomialEquationalProjectionTest {
     private val z = Polynomial.variable(2)
 
     @Test
+    fun `independent sections retain their shared free coordinate`() {
+        val squared = arithmetic.power(y, 2)
+        val shifted = arithmetic.add(squared, y)
+        val equations = listOf(arithmetic.subtract(x, squared), arithmetic.subtract(z, shifted))
+
+        val sections = independentEquationalSections(equations, equations, arithmetic)
+
+        assertEquals(listOf(2, 0), sections.map { it.variable })
+        assertEquals(listOf(shifted, squared), sections.map { it.replacement })
+    }
+
+    @Test
+    fun `dependent sections retain their substitution order`() {
+        val first = arithmetic.subtract(x, arithmetic.power(y, 2))
+        for ((second, variable) in listOf(
+            arithmetic.subtract(y, arithmetic.power(z, 2)) to 0,
+            arithmetic.subtract(y, arithmetic.power(x, 2)) to 1,
+        )) {
+            val equations = listOf(first, second)
+
+            val sections = independentEquationalSections(equations, equations, arithmetic)
+
+            assertEquals(1, sections.size)
+            assertEquals(variable, sections.single().variable)
+        }
+    }
+
+    @Test
     fun `a required equation can select a lower source coordinate as the final section`() {
         val equation = arithmetic.subtract(x, arithmetic.power(y, 2))
         val boundary = arithmetic.subtract(arithmetic.power(y, 2), Polynomial.constant(BigFraction.ofLong(2)))

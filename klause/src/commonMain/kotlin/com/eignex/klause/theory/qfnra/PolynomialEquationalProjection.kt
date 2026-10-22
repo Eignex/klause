@@ -7,6 +7,43 @@ import com.eignex.klause.util.magnitudeBitLength
 
 internal class PolynomialEquationalProjection(val variable: Int, val replacement: Polynomial)
 
+internal fun independentEquationalSections(
+    equations: List<Polynomial>,
+    family: List<Polynomial>,
+    arithmetic: PolynomialArithmetic,
+): List<PolynomialEquationalProjection> {
+    val first = equationalSection(equations, family, arithmetic) ?: return emptyList()
+    val sections = arrayListOf(first)
+    val variables = hashSetOf(first.variable)
+    val dependencies = HashSet<Int>()
+    for (variable in first.replacement.variables) {
+        arithmetic.step()
+        dependencies.add(variable)
+    }
+    for (equation in equations) {
+        arithmetic.step()
+        var dependent = false
+        for (variable in equation.variables) {
+            arithmetic.step()
+            if (variable in variables) {
+                dependent = true
+                break
+            }
+        }
+        if (dependent) continue
+        val section = equationalSection(listOf(equation), emptyList(), arithmetic) ?: continue
+        if (section.variable in dependencies) continue
+        sections.add(section)
+        variables.add(section.variable)
+        for (variable in section.replacement.variables) {
+            arithmetic.step()
+            dependencies.add(variable)
+        }
+    }
+    arithmetic.step()
+    return sections
+}
+
 internal fun equationalSection(
     equations: List<Polynomial>,
     family: List<Polynomial>,
