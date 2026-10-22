@@ -2,6 +2,7 @@ package com.eignex.klause.solver.objective
 
 import com.eignex.klause.factor.arithmetic.saturatedIntegerPower
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
@@ -117,12 +118,44 @@ internal class FunctionalObjective internal constructor(
     internal class Definition(
         val out: Int,
         val outIsBool: Boolean,
+        /** The sweep node this definition evaluates, when it was read from a sweep. */
+        val origin: DefinitionalSweep.SweepNode? = null,
         val compute: ((Int) -> Long, (Int) -> Boolean) -> Long,
     )
 
     private val coneMemo = ConeMemo(
         nodes, terms, termCoeffs, constant, boolNodes, boolTerms, boolTermCoeffs, definitions,
     )
+
+    /** The objective as a "lower is better" linear form over its terms, or null when a combined
+     *  coefficient leaves the `Long` range. It agrees with the cones wherever every cone variable
+     *  holds its definition's value. */
+    internal val termForm: LinearObjective? = termForm(terms, termCoeffs, constant, boolTerms, boolTermCoeffs)
+
+    /** True iff every cone definition was read from a sweep node that [maintains] accepts. */
+    internal fun conesMaintained(maintains: (DefinitionalSweep.SweepNode) -> Boolean): Boolean =
+        coneMemo.ordered.all { definition -> definition.origin?.let(maintains) == true }
+
+    private fun termForm(
+        terms: IntArray,
+        termCoeffs: LongArray,
+        constant: Long,
+        boolTerms: IntArray,
+        boolTermCoeffs: LongArray,
+    ): LinearObjective? {
+        val sign = if (minimize) 1L else -1L
+        return try {
+            val ints = LongArray((terms.maxOrNull() ?: -1) + 1)
+            for (k in terms.indices) ints[terms[k]] = addExact(ints[terms[k]], mulExact(sign, termCoeffs[k]))
+            val bools = LongArray((boolTerms.maxOrNull() ?: -1) + 1)
+            for (k in boolTerms.indices) {
+                bools[boolTerms[k]] = addExact(bools[boolTerms[k]], mulExact(sign, boolTermCoeffs[k]))
+            }
+            LinearObjective(bools, ints, mulExact(sign, constant))
+        } catch (_: CheckedLongOverflowException) {
+            null
+        }
+    }
 
     /** Evaluate the cones over base value-getters and return the "lower is better" objective. */
     private fun objValue(intBase: (Int) -> Long, boolBase: (Int) -> Boolean): BigInt {
@@ -144,7 +177,7 @@ internal class FunctionalObjective internal constructor(
         private val boolTermCoeffs: LongArray,
         definitions: List<Definition>,
     ) {
-        private val ordered = if (definitions.isNotEmpty()) definitions else
+        val ordered = if (definitions.isNotEmpty()) definitions else
             nodes.map { node -> Definition(node.out, false) { intOf, _ -> node.compute(intOf) } } +
                 boolNodes.map { node ->
                     Definition(node.out, true) { _, boolOf -> if (node.compute(boolOf)) 1L else 0L }

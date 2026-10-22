@@ -503,7 +503,7 @@ class DefinitionalSweep internal constructor(
 
                 else -> return null
             }
-            cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, compute))
+            cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, node, compute))
             for (input in node.intInputs) {
                 cancellation.charge(1)
                 if (cancellation()) return null
@@ -935,6 +935,11 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
 
     /** The node at [index] (indexes ascend in topological order). */
     fun node(index: Int): DefinitionalSweep.SweepNode = nodeArr[index]
+
+    private val members: Set<DefinitionalSweep.SweepNode> by lazy { nodeArr.toHashSet() }
+
+    /** True iff [node] is one of this network's own nodes. */
+    internal fun maintains(node: DefinitionalSweep.SweepNode): Boolean = node in members
 
     /**
      * Topologically-ordered node indexes affected by writes to the seed vars: the transitive
