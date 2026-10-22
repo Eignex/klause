@@ -43,6 +43,10 @@ Four owners divide the work:
   contains the single traversal loop and owns frames, decisions, restarts,
   cancellation cadence and resumable/terminal state.
 
+The shared clause component owns built-in Boolean source clauses. Composed
+arithmetic fragments omit those same clauses, while standalone theory inputs
+retain them because no shared component enforces them there.
+
 Retraction removes trail facts and restores integer premises before notifying
 components; a root rebuild keeps learned clauses. Components obtain their token,
 accounting and stop diagnostics from `SearchContext.executionControls`; see

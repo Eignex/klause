@@ -91,6 +91,10 @@ defines that check.
 
 #### Coordinate agreement
 
+Composed arithmetic preparation excludes source Boolean clauses owned by the
+shared clause component. Encoded rows are excluded only when their original
+factor identity matches that shared ownership; standalone inputs retain clauses.
+
 When the component shares a model with other components, it publishes its selected
 rows as exact source-bound atoms and can check a candidate assembled by others
 against the rows selected by the current Boolean state. A missing coordinate

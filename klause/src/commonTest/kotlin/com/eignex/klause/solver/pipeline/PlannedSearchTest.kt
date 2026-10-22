@@ -35,6 +35,39 @@ import kotlin.test.assertTrue
 class PlannedSearchTest {
 
     @Test
+    fun `shared clauses should constrain exact arithmetic across sibling prefixes`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 2.0),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
+        model.componentPlan().search(model, emptyMap()).use { planned ->
+            val session = planned.session
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertEquals(true, session.boolValue(0))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val result = assertIs<BooleanSearchResult.Satisfied>(session.solveBoolean(2))
+
+            assertEquals(false, session.boolValue(0))
+            assertEquals(true, session.boolValue(1))
+            assertNotNull(result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
+            assertNotNull(result.model.valueOf(SearchExactRealValue(SourceRealId(1))))
+        }
+    }
+
+    @Test
     fun `planned pure real search should use the shared Boolean engine`() {
         val model = Problem(
             numBoolVars = 1,
