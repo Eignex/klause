@@ -46,14 +46,6 @@ jobs:
       # (linuxArm64, macosArm64) are opt-in via -Ptargets.full and build on release.
 
       # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
-      - name: Verify unit-test task wiring
-        run: |
-          ./gradlew check lintDocs koverXmlReport :klause-cli:installJvmDist --dry-run > "$RUNNER_TEMP/unit-test-task-graph.txt"
-          cat "$RUNNER_TEMP/unit-test-task-graph.txt"
-          if grep -E '^:klause-bench:(installChoco) ' "$RUNNER_TEMP/unit-test-task-graph.txt"; then
-            exit 1
-          fi
-
       - name: Run JVM tests with coverage
         run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist
 

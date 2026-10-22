@@ -1,7 +1,5 @@
 package com.eignex.klause.bench.metric
 
-import com.eignex.klause.backtrack.BacktrackPresets
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
@@ -13,60 +11,21 @@ import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.ProblemKind
-import com.eignex.klause.bench.tools.ProfileConfig
-import com.eignex.klause.bench.tools.Profiler
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.formats.xcsp3.UnsupportedXcsp3Exception
-import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 
-/**
- * Runs corpus solves as subprocesses via [SolverInvocation], or in-process when profiling.
- * Each problem produces raw stdout (`.out`) and a [SolveRecord] (`.json`) under
- * `output/<config>/`; [configTag] distinguishes settings and budgets. Saved outputs
- * are compared offline with `output/compare.sh`.
- */
-internal data class KlauseSearch(
-    // fixed | cp | mixed | ls | alns — forwarded verbatim to klause-cli `-e` (the cli owns the
-    // engine model). null = unset: no `-e` is passed, so the bench follows the cli's own default
-    // engine (the bench deliberately has no engine default of its own).
-    val engine: String? = null,
-    // null = unset: no `-p` is passed, so the solver applies its own default (klause-cli's is
-    // single-core). Multi-thread tracks (parallel/open) must set `processors=` explicitly.
-    val processors: Int? = null,
-    /** References only (`-f` to `minizinc`): false ⇒ free search, true ⇒ follow the annotation. For
-     *  klause the engine value carries free/fixed, so this is ignored. */
-    val fixed: Boolean = false,
-    /** Repeatable klause-cli `--param key=value` engine knobs (e.g. `var-selector=vsids`); the way
-     *  to A/B a heuristic — run `solve` twice with different params and diff the two config dirs. */
-    val params: List<String> = emptyList(),
-    /** klause-cli `--lp CEILING`: the LP-relaxation emphasis (`off`|`conservative`|`default`|
-     *  `aggressive`, plus `+id`/`-id` per-technique deltas). null = unset (cli's own default). */
-    val lp: String? = null,
-    /** klause-cli `--presolve`: the presolve emphasis plus `+id`/`-id` per-pass deltas (e.g.
-     *  `default,+lp-harvest`). null = unset (cli's own default). */
-    val presolve: String? = null,
-    /** The solver's random seed (`-r` / `--random-seed`); null = the bench's fixed seed, so repeated runs of
-     *  one config are comparable unless seeds are swept on purpose. */
-    val seed: Long? = null,
-    val exact: Boolean = false,
-)
-
-/** One problem's result for one solver+settings+budget — the durable per-problem record. */
+/** One problem's result for one settings+budget — the durable per-problem record the lab reads. */
 @Serializable
 internal data class SolveRecord(
     val problem: String,
-    val solver: String, // solver id (klause | choco | gecode | yuck | …)
-    val engine: String?, // klause engine (cp/ls/mixed/…); null for references
+    val solver: String, // always klause; lab reference records share the shape with their own solver id
+    val engine: String?, // klause engine (cp/ls/mixed/…); null = the cli's default
     val processors: Int,
-    val search: String, // "free" | "fixed"
     val seed: Long,
     val budgetMs: Long,
     val kind: String, // "optimize" | "satisfy"
@@ -77,16 +36,13 @@ internal data class SolveRecord(
     val objective: Double?,
     /** ms to the best incumbent (optimize) or to the first solution (satisfy); null when none. */
     val timeToBestMs: Long?,
-    /** ms to the first feasible solution; null when never feasible. Drives the feasibility-speed
-     *  calibration lens (a fast-feasible specialist scores here even when another arm holds a better
-     *  final objective). */
+    /** ms to the first feasible solution; null when never feasible. */
     val timeToFirstFeasibleMs: Long? = null,
     /** optimum proved (optimize) or search closed UNSAT/exhausted. */
     val proven: Boolean,
     val stats: Map<String, String> = emptyMap(),
     /**
-     * Per-arm portfolio improvement records in arrival order; empty for reference and
-     * single-engine solves. Discrete objectives are exact decimal text, with a continuous
+     * Per-arm portfolio improvement records in arrival order; empty for single-engine solves. Discrete objectives are exact decimal text, with a continuous
      * objective when needed.
      */
     val attribution: List<Attribution> = emptyList(),
@@ -113,97 +69,36 @@ internal data class SolveRecord(
 )
 
 internal object SolveMetric {
-    private const val SOLVE_SEED = 3L
-
     /** Characters of a load failure's message kept in its record. */
     private const val REASON_CAP = 400
     private const val MAX_LOAD_CAUSE_DEPTH = 64
 
-    /** Run [solverId] (`"klause"` or a registered MiniZinc reference id) over [entries], saving one
-     *  `.out` + `.json` per problem under `output/<config>/`. [search] applies to klause; references
-     *  take only processors + free. When [profile] is set, profiles the klause engine in-process
-     *  instead (subprocess solves can't be JFR-sampled from the bench JVM). */
-    fun run(
-        entries: Sequence<ResolvedProblem>,
-        budget: Budget = Budget(),
-        solverId: String = SolverInvocation.KLAUSE,
-        search: KlauseSearch = KlauseSearch(),
-        profile: ProfileConfig? = null,
-        label: String? = null,
-    ): File? {
-        if (profile != null) {
-            profileEngine(entries.toList(), budget, solverId, search, profile)
-            return null
-        }
-        val settings = settings(solverId, search)
-        if (solverId == SolverInvocation.KLAUSE) {
-            SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
-        }
-        val tag = configTag(solverId, settings, budget, label)
-        val outDir = File("output", tag).apply { mkdirs() }
-        val timestamp = Instant.now().toString()
-        val sha = Reports.readGitSha()
-        println()
-        println("=== solve ($tag; ${budget.timeoutMillis}ms budget) -> output/$tag/ ===")
-        var feasible = 0
-        var proved = 0
-        // Feature columns (structure/format/…) are joined onto each result row from the reference
-        // tables, so `output/<tag>.csv` is analysable by structure/size out of the box.
-        val features = ReferenceStore.load()
-        val resultRows = ArrayList<ReferenceEntry>()
-        for (entry in entries) {
-            val (rec, raw) = solve(entry, solverId, settings, budget, tag, timestamp, sha)
-            raw?.let { File(outDir, flat(entry) + ".out").writeText(it) }
-            File(outDir, flat(entry) + ".json").writeText(Reports.json.encodeToString(rec))
-            val suite = ReferenceStore.suiteOf(entry.ref)
-            resultRows += resultRow(suite, rec, tag, features[suite to rec.problem])
-            if (rec.feasible == true) feasible++
-            if (rec.proven) proved++
-            val mark = if (rec.feasible == null && !rec.proven) "??" else "ok"
-            println("$mark [${rec.problem}] ${rec.kind} = ${display(rec)}")
-        }
-        // A per-run result table in the reference-table schema (solver = this config's tag) — the input
-        // `bench credit` compares, keyed by (suite, problem), sliceable by the joined feature columns.
-        ReferenceStore.writeCsv(File("output", "$tag.csv"), resultRows)
-        println("\n$feasible/${resultRows.size} feasible, $proved proved  (output/$tag/, output/$tag.csv)")
-        return outDir
-    }
-
-    /** Solve the one problem [ref] as `solve` would, writing its [SolveRecord] to `<outDir>/<problem>.json`
-     *  and the raw solver output beside it, and return the record. Unlike [run] it writes no per-run table and
-     *  loads no reference tables, so one process per problem stays cheap; the caller gathers the records. A problem
-     *  that fails to load gets a record too, its reason under `stats.unsupported` when klause declines the model
-     *  and under `stats.loadError` otherwise, where `run` skips it: one problem per process has nothing to skip to. */
+    /** Solve the one problem [ref] with klause-cli, writing its [SolveRecord] to `<outDir>/<problem>.json` and the
+     *  raw solver output beside it, and return the record. A problem that fails to load gets a record too, its reason
+     *  under `stats.unsupported` when klause declines the model and under `stats.loadError` otherwise. */
     fun solveOne(
         ref: ProblemRef,
-        budget: Budget = Budget(),
-        solverId: String = SolverInvocation.KLAUSE,
-        search: KlauseSearch = KlauseSearch(),
-        label: String? = null,
-        outDir: File? = null,
+        budget: Budget,
+        settings: SolverInvocation.Settings,
+        outDir: File,
     ): SolveRecord {
-        val settings = settings(solverId, search)
-        if (solverId == SolverInvocation.KLAUSE) {
-            SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
-        }
-        val tag = configTag(solverId, settings, budget, label)
-        val dir = (outDir ?: File("output", tag)).apply { mkdirs() }
+        SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
+        outDir.mkdirs()
         val timestamp = Instant.now().toString()
         val sha = Reports.readGitSha()
         val name = ref.name.replace('/', '_')
         val (rec, raw) = runCatching { Runners.resolve(ref, settings.exact) }.fold(
-            { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha) },
-            { failure -> loadFailureRecord(ref, solverId, settings, budget, timestamp, sha, failure) to null },
+            { entry -> solve(entry, settings, budget, timestamp, sha) },
+            { failure -> loadFailureRecord(ref, settings, budget, timestamp, sha, failure) to null },
         )
-        raw?.let { File(dir, "$name.out").writeText(it) }
-        File(dir, "$name.json").writeText(Reports.json.encodeToString(rec))
+        raw?.let { File(outDir, "$name.out").writeText(it) }
+        File(outDir, "$name.json").writeText(Reports.json.encodeToString(rec))
         return rec
     }
 
     /** The record of a problem that never reached the solver: undecided, with why under `stats`. */
     internal fun loadFailureRecord(
         ref: ProblemRef,
-        solverId: String,
         s: SolverInvocation.Settings,
         budget: Budget,
         timestamp: String,
@@ -215,10 +110,9 @@ internal object SolveMetric {
             .map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" / ").take(REASON_CAP)
         return SolveRecord(
             problem = ref.name,
-            solver = solverId,
+            solver = SolverInvocation.KLAUSE,
             engine = s.engine,
             processors = s.processors ?: 1,
-            search = if (s.free) "free" else "fixed",
             seed = s.seed,
             budgetMs = budget.timeoutMillis,
             kind = if (runCatching { ProblemKind.isCop(ref) }.getOrDefault(false)) "optimize" else "satisfy",
@@ -250,31 +144,16 @@ internal object SolveMetric {
             it is UnsupportedFlatZincException || it is UnsupportedXcsp3Exception || it is UnsupportedSmtException
         }
 
-    private fun settings(solverId: String, search: KlauseSearch) = SolverInvocation.Settings(
-        engine = if (solverId == SolverInvocation.KLAUSE) search.engine else null,
-        processors = search.processors,
-        free = !search.fixed,
-        seed = search.seed ?: SOLVE_SEED,
-        params = if (solverId == SolverInvocation.KLAUSE) search.params else emptyList(),
-        lp = if (solverId == SolverInvocation.KLAUSE) search.lp else null,
-        presolve = if (solverId == SolverInvocation.KLAUSE) search.presolve else null,
-        exact = solverId == SolverInvocation.KLAUSE && search.exact,
-    )
-
-    /** One problem's record, from the cache or a fresh subprocess solve, with the raw solver output when the
+    /** One problem's record from a subprocess solve, with the raw solver output when the
      *  solve ran; a solve that throws becomes an error record. */
     internal fun solve(
         entry: ResolvedProblem,
-        solverId: String,
         settings: SolverInvocation.Settings,
         budget: Budget,
-        tag: String,
         timestamp: String,
         sha: String?,
-        installedBuild: () -> BuildProvenance? = {
-            if (solverId == SolverInvocation.KLAUSE) InstalledBuild.current else null
-        },
-        invoke: (ResolvedProblem, String, SolverInvocation.Settings, Budget, Boolean) -> SolverInvocation.Result =
+        installedBuild: () -> BuildProvenance? = { InstalledBuild.current },
+        invoke: (ResolvedProblem, SolverInvocation.Settings, Budget, Boolean) -> SolverInvocation.Result =
             SolverInvocation::run,
         modelOutput: (ProblemRef, String) -> String = MiniZincRunner()::modelOutput,
     ): Pair<SolveRecord, String?> {
@@ -287,22 +166,19 @@ internal object SolveMetric {
             sourceHashes = SolveEvidence.sourceHashes(entry.ref)
             provenance = installedBuild()
             compiler = if (entry.ref.format == Format.MINIZINC) MiniZincCompatibility.compiler else null
-            val key = BenchCache.keyFor(entry.ref, tag, budget, provenance, settings)
-            val r = BenchCache.load(key)
-                ?: invoke(entry, solverId, settings, budget, optimize)
-                    .also { BenchCache.store(key, it) }
+            val r = invoke(entry, settings, budget, optimize)
             // A float model Klause solves on a grid is marked, so a reader knows its claims are approximations.
-            val approximation = if (solverId == SolverInvocation.KLAUSE && entry.hasFloats) {
+            val approximation = if (entry.hasFloats) {
                 mapOf("floatApproximation" to entry.floatApproximation.toString())
             } else {
                 emptyMap()
             }
             val (witness, witnessStats) = if (r.feasible == true) {
-                witness(entry.ref, solverId, r.rawOutput, modelOutput)
+                witness(entry.ref, r.rawOutput, modelOutput)
             } else {
                 null to emptyMap()
             }
-            record(entry, solverId, settings, budget, kind, timestamp, sha, r).let { reported ->
+            record(entry, settings, budget, kind, timestamp, sha, r).let { reported ->
                 reported.copy(
                     stats = reported.stats + approximation + witnessStats,
                     compilerIdentity = compiler,
@@ -311,7 +187,7 @@ internal object SolveMetric {
                 )
             } to r.rawOutput
         }.getOrElse { failure ->
-            val record = errorRecord(entry, solverId, settings, budget, kind, timestamp, sha)
+            val record = errorRecord(entry, settings, budget, kind, timestamp, sha)
                 .copy(
                     stats = SolveFailure.stats(failure),
                     compilerIdentity = compiler,
@@ -330,11 +206,10 @@ internal object SolveMetric {
      *  FlatZinc-level text (`flatzinc`), with why under `stats.finalWitnessMappingError`. */
     private fun witness(
         ref: ProblemRef,
-        solverId: String,
         raw: String,
         modelOutput: (ProblemRef, String) -> String,
     ): Pair<String?, Map<String, String>> {
-        if (ref.format != Format.MINIZINC || solverId != SolverInvocation.KLAUSE) {
+        if (ref.format != Format.MINIZINC) {
             return SolveEvidence.finalWitness(ref.format, raw) to emptyMap()
         }
         return runCatching {
@@ -347,75 +222,8 @@ internal object SolveMetric {
         }
     }
 
-    /** This run's result for one instance as a reference-table-schema row: `solver` is the config [tag],
-     *  `elapsedMs` the time-used proxy (incumbent, solve time, or wall clock when decided; budget otherwise),
-     *  matching the `compare.sh` convention, and the source-text features are joined from the reference tables
-     *  ([ref], null when the instance has no oracle entry). */
-    internal fun resultRow(suite: String, rec: SolveRecord, tag: String, ref: ReferenceEntry?): ReferenceEntry {
-        val solved = rec.feasible != null
-        val elapsed = if (solved) {
-            rec.timeToBestMs ?: solveTimeMs(rec.stats) ?: rec.elapsedMs ?: rec.budgetMs
-        } else {
-            rec.budgetMs
-        }
-        return ReferenceEntry(
-            suite = suite,
-            problem = rec.problem,
-            maximize = rec.maximize,
-            objective = rec.objective,
-            exactObjective = rec.exactObjective,
-            feasible = rec.feasible,
-            proven = rec.proven,
-            elapsedMs = elapsed,
-            solver = tag,
-            budgetMs = rec.budgetMs,
-            format = ref?.format.orEmpty(),
-            structure = ref?.structure.orEmpty(),
-            numGlobal = ref?.numGlobal,
-            numLinear = ref?.numLinear,
-            boolHeavy = ref?.boolHeavy,
-        )
-    }
-
-    /** Filesystem-safe, self-sufficient config identifier: solver + engine + processors + search mode
-     *  + budget + any `--param` knobs. Used for BOTH the `output/<config>/` dir name AND the bench
-     *  cache key (via [BenchCache.keyFor], which additionally hashes the per-instance model+data), so
-     *  a cache hit requires byte-identical settings. Two runs differing in any of these get distinct
-     *  dirs/keys (so `param=var-selector=vsids` and `param=var-selector=chb` never clobber). */
-    internal fun configTag(
-        solverId: String,
-        s: SolverInvocation.Settings,
-        budget: Budget,
-        label: String? = null,
-    ): String = buildString {
-        append(solverId)
-        s.engine?.let { append('-').append(it) }
-        if (s.exact) append("-exact")
-        append("-p").append(s.processors ?: 1) // unset ⇒ the solver default (single-core)
-        // free/fixed only for references (their `-f` toggle); klause carries it in the engine value,
-        // and a null klause engine just means "the cli's default engine" (no suffix).
-        if (s.engine == null && solverId != SolverInvocation.KLAUSE) append(if (s.free) "-free" else "-fixed")
-        append("-t").append(budget.timeoutMillis / 1000).append('s')
-        if (s.seed != SOLVE_SEED) append("-r").append(s.seed)
-        s.lp?.let { append("-lp-").append(it.replace(Regex("[^A-Za-z0-9.+-]"), "")) }
-        s.presolve?.let { append("-ps-").append(it.replace(Regex("[^A-Za-z0-9.+-]"), "")) }
-        if (s.params.isNotEmpty()) {
-            // Filesystem-safe: '=' → '-', then any other unsafe char (e.g. '/' in an arm label like
-            // `cbls/fixed`) → '_', so a param value never spills into a subdirectory.
-            append(
-                '-',
-            ).append(s.params.joinToString("_") { it.replace('=', '-').replace(Regex("[^A-Za-z0-9._-]"), "_") })
-        }
-        // Free-form run [label] (e.g. a klause version / fix name) so re-runs of the same config
-        // coexist as distinct dirs+cache namespaces instead of overwriting. Filesystem-sanitised.
-        label?.trim()?.takeIf { it.isNotEmpty() }?.let { append('-').append(it.replace(Regex("[^A-Za-z0-9._-]"), "-")) }
-    }
-
-    private fun flat(entry: ResolvedProblem): String = entry.name.replace('/', '_')
-
     private fun record(
         entry: ResolvedProblem,
-        solverId: String,
         s: SolverInvocation.Settings,
         budget: Budget,
         kind: String,
@@ -427,10 +235,9 @@ internal object SolveMetric {
         val (processFirstMs, processBestMs) = processTimings(r, entry.maximize)
         return SolveRecord(
             problem = entry.name,
-            solver = solverId,
+            solver = SolverInvocation.KLAUSE,
             engine = s.engine,
             processors = s.processors ?: 1,
-            search = if (s.free) "free" else "fixed",
             seed = s.seed,
             budgetMs = budget.timeoutMillis,
             kind = kind,
@@ -460,7 +267,7 @@ internal object SolveMetric {
      * Recovers first-feasible and best timings from portfolio attribution. MiniZinc solution
      * separators may be buffered until termination. Attribution is in arrival order: bound
      * publication and emission use separate critical sections, so every entry is compared
-     * by value. Reference solves use streamed separator timings.
+     * by value. Single-engine solves use streamed separator timings.
      */
     internal fun timings(r: SolverInvocation.Result, maximize: Boolean): Pair<Long?, Long?> {
         if (r.attribution.isEmpty()) return r.timeToFirstFeasibleMs to r.timeToBestMs
@@ -475,8 +282,7 @@ internal object SolveMetric {
             best(r.attribution, maximize).processElapsedMs
     }
 
-    /** The best-valued entry in [attribution], direction-aware — also the best-holder for per-arm credit
-     *  (see [ArmMining]), for the same reason: arrival order is not improvement order.
+    /** The best-valued entry in [attribution], direction-aware: arrival order is not improvement order.
      *  Every entry in one run shares the same objective channel ([Attribution.continuousObjective] is a
      *  property of the whole model, not the arm), so once any entry carries one, every entry does —
      *  compare on it (the whole model-oriented value). Otherwise compare on [Attribution.exactObjective]
@@ -492,7 +298,6 @@ internal object SolveMetric {
 
     private fun errorRecord(
         entry: ResolvedProblem,
-        solverId: String,
         s: SolverInvocation.Settings,
         budget: Budget,
         kind: String,
@@ -500,10 +305,9 @@ internal object SolveMetric {
         sha: String?,
     ): SolveRecord = SolveRecord(
         problem = entry.name,
-        solver = solverId,
+        solver = SolverInvocation.KLAUSE,
         engine = s.engine,
         processors = s.processors ?: 1,
-        search = if (s.free) "free" else "fixed",
         seed = s.seed,
         budgetMs = budget.timeoutMillis,
         kind = kind,
@@ -517,67 +321,4 @@ internal object SolveMetric {
         timestamp = timestamp,
         command = "ERROR",
     )
-
-    private fun display(rec: SolveRecord): String {
-        val at = "@${rec.timeToBestMs ?: "-"}ms"
-        if (rec.command == "ERROR") return "ERROR"
-        return when {
-            rec.kind != "optimize" -> when (rec.feasible) {
-                true -> "SAT$at"
-                false -> "UNSAT"
-                null -> "?"
-            }
-
-            rec.exactObjective == null && rec.objective == null -> "?"
-
-            else -> "${if (rec.proven) "opt" else "best"}=${rec.exactObjective ?: rec.objective}$at"
-        }
-    }
-
-    /** Profiling mode: run the klause engine IN-PROCESS under JFR so the profile captures the
-     *  actual solver. Only klause + a single engine (`cp` → [BacktrackSolver], `ls` →
-     *  [LocalSearchSolver]) is profilable — references are external, and the portfolio mixes
-     *  engines. Pair with one (or few) instances at a real `timeout=` for a meaningful sample set. */
-    private fun profileEngine(
-        entries: List<ResolvedProblem>,
-        budget: Budget,
-        solverId: String,
-        search: KlauseSearch,
-        profile: ProfileConfig,
-    ) {
-        if (solverId != SolverInvocation.KLAUSE) {
-            println("profile= profiles the klause engine in-process; '$solverId' is external")
-            return
-        }
-        if (search.engine !in setOf("cp", "fixed", "ls")) {
-            println("profile= needs a single-solver engine (not the '${search.engine}' portfolio)")
-            return
-        }
-        println()
-        println("=== profiling klause-${search.engine} in-process (${profile.event}); ${entries.size} instance(s) ===")
-        Profiler.record(profile) {
-            for (entry in entries) {
-                val deadline = System.currentTimeMillis() + budget.timeoutMillis
-                val cancel = Cancellation { System.currentTimeMillis() > deadline }
-                runCatching { solveInProcess(entry, search, cancel) }
-            }
-        }
-    }
-
-    /** A single in-process klause solve for the profiler: `ls` → local search; `fixed` → backtrack
-     *  on the model's annotated search; `cp` → conflict-driven backtrack. */
-    private fun solveInProcess(entry: ResolvedProblem, search: KlauseSearch, cancel: Cancellation) {
-        when (search.engine) {
-            "ls" -> LocalSearchSolver(entry.problem.bake()).solve(
-                LocalSearchParams(randomSeed = SOLVE_SEED, cancellation = cancel, lsObjective = entry.lsObjective),
-            )
-
-            else -> {
-                val params = (entry.searchParams?.takeIf { search.engine == "fixed" })?.copy(cancellation = cancel)
-                    ?: BacktrackPresets.conflictDriven(randomSeed = SOLVE_SEED, cancellation = cancel)
-                val solver = BacktrackSolver(entry.problem.bake())
-                entry.objective?.let { solver.minimize(it, params) } ?: solver.solve(params)
-            }
-        }
-    }
 }

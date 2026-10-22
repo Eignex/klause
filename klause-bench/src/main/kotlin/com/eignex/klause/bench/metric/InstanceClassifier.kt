@@ -30,7 +30,7 @@ internal data class InstanceFeatures(
 /**
  * Classifies an instance from its raw source text — a fast, memory-flat heuristic (regex counts of
  * declarations / constraint keywords), never building the klause `Problem`. Approximate by design: it
- * feeds the reference tables, selection listings and analysis, not the solver.
+ * feeds `select features=true` (and through it klause-lab's set drawing), not the solver.
  */
 internal object InstanceClassifier {
     /** MiniZinc/FlatZinc global-constraint stems (either the `.mzn` name or a flattened `_int` form). */
