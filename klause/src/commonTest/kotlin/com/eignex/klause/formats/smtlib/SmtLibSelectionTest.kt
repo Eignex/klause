@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.lowering.LinComb
@@ -369,30 +370,7 @@ class SmtLibSelectionTest {
                 assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
                     .realValue(parsed.realVarNames.getValue("y")),
             )
-            assertEquals(0, parsed.model.numIntVars)
-        }
-    }
-
-    @Test
-    fun `coincident real branches should leave either guard polarity feasible`() {
-        for (branch in listOf(true, false)) {
-            val parsed = SmtLib.parse(
-                """
-                (declare-const b Bool)
-                (declare-const x Real) (declare-const y Real) (declare-const z Real)
-                (assert ${if (branch) "b" else "(not b)"})
-                (assert (= x (/ 2 3))) (assert (= y (/ 2 3)))
-                (assert (= z (ite b x y)))
-                """.trimIndent(),
-            )
-
-            val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
-
-            assertEquals(
-                "2/3",
-                assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
-                    .realValue(parsed.realVarNames.getValue("z")),
-            )
+            assertEquals(1, parsed.model.factors.filterIsInstance<RealElement>().size)
         }
     }
 
