@@ -228,6 +228,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintPoint: List<BigFraction>? = null
     private var pointReuseEnabled = false
     private var pointReusePoint: List<BigFraction>? = null
+    private var pointReuseHintValues: IntArray? = null
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
     private var dirty = true
@@ -351,9 +352,18 @@ class ExactLiraSearchComponent private constructor(
         var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
         val rows = ArrayList<PreparedSourceRow>()
         val variables = LinkedHashSet<Int>()
+        var reusable = defaultOpening && model.numIntVars == 0
         for (prepared in preparedRows) {
             stop.charge(1)
             if (stop()) return null
+            if (reusable) {
+                for (term in 0 until prepared.row.size) {
+                    stop.charge(1L)
+                    if (stop()) return null
+                    if (!Term.isReal(prepared.row.ref(term))) reusable = false
+                }
+                if (prepared.disjunction) reusable = false
+            }
             if (prepared.row.activator == LinearRow.ALWAYS) continue
             if (prepared.row.activator !in bools.indices) return null
             entries += prepared.row.size.toLong() + 1L
@@ -368,7 +378,7 @@ class ExactLiraSearchComponent private constructor(
         stop.charge(rows.size.toLong() + variables.size + 1L)
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
-        pointReuseEnabled = false
+        pointReuseEnabled = reusable
         pointHintIndex = null
         pointHintPoint = null
         pointHintStop = stop
@@ -479,6 +489,7 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         pointReusePoint = null
+        pointReuseHintValues = null
     }
 
     private fun checkPointReuse(comparison: ExactComparison) {
@@ -505,7 +516,7 @@ class ExactLiraSearchComponent private constructor(
             return true
         }
         dirty = false
-        pointHintPoint = point
+        if (pointHintIndex == null) pointHintValues = pointReuseHintValues else pointHintPoint = point
         pointHintLevel = context.decisionLevel
         observeCompleteStage("POINT_REUSE_ACCEPTED")
         return true
@@ -581,6 +592,13 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         if (operationStop() || pointHintStop()) return
+        if (pointReuseEnabled && !graph &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+        ) {
+            pointReusePoint = point
+            pointReuseHintValues = values
+            observeCompleteStage("POINT_REUSE_CAPTURE")
+        }
         pointHintLevel = context.decisionLevel
         pointHintValues = values
         smtStats?.observePointHintCapture(graph)

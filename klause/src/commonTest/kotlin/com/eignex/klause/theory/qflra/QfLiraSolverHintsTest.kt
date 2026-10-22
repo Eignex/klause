@@ -49,6 +49,124 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `compatible eager guards should retain point guidance without another LP capture`() {
+        val model = Problem(
+            numBoolVars = 4, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = Array<Factor>(4) { head ->
+                if (head < 3) ReifiedRealLinear(head, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), if (head == 1) LinearOp.GE else LinearOp.LE, 0.0, strict = head == 1)
+                else Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0)
+            },
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val captures = stats.snapshot().lpPointHintCaptures
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertEquals(true, hints.preferredBool(2))
+            assertTrue(captures > 0L)
+            assertEquals(captures, stats.snapshot().lpPointHintCaptures)
+        }
+    }
+
+    @Test
+    fun `an incompatible eager guard should replay earlier deferred rows`() {
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val result = session.push(SearchDecision.Bool(Lit.make(1, false)))
+
+            assertIs<ComponentResult.Conflict>(result)
+            assertNull(session.model().valueOf(component.assignmentKey))
+        }
+    }
+
+    @Test
+    fun `eager reused point guidance should expire across retraction and restart`() {
+        for (restart in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 3, intBounds = openBounds(0), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                        LinearOp.LE, 0.0),
+                    ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                        LinearOp.LE, 0.0),
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                ),
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val captures = stats.snapshot().lpPointHintCaptures
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                if (restart) component.onRestart(session) else session.popTo(0)
+
+                assertNull(hints.preferredBool(1))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+                assertEquals(true, hints.preferredBool(0))
+                assertEquals(captures + 1L, stats.snapshot().lpPointHintCaptures)
+            }
+        }
+    }
+
+    @Test
+    fun `complete eager reused points should retain full source checking`() {
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 0.0, strict = true),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+
+            assertEquals(ComponentCheck.Feasible, component.check(session))
+            assertNotNull(session.model().valueOf(component.assignmentKey))
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_REUSE_COMPLETE_ACCEPTED"))
+        }
+    }
+
+    @Test
     fun `additional theory bounds should be checked after indexed reuse`() {
         val model = Problem(
             numBoolVars = 301,
@@ -1000,19 +1118,22 @@ class QfLiraSolverHintsTest {
                 ),
             ),
         )
-        ExactLiraSearchComponent(model).use { component ->
-            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
-            assertIs<ComponentResult.Consistent>(session.initialize())
+        for (defaultOpening in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never,
+                    defaultOpening = defaultOpening)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                assertIs<ComponentResult.Consistent>(session.initialize())
 
-            assertNull(hints.preferredBool(0))
-            assertNull(session.boolValue(0))
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
-            assertEquals(true, hints.preferredBool(0))
-            session.popTo(0)
-            assertNull(hints.preferredBool(0))
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
-            assertNull(hints.preferredBool(0))
+                assertNull(hints.preferredBool(0))
+                assertNull(session.boolValue(0))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+                assertEquals(true, hints.preferredBool(0))
+                session.popTo(0)
+                assertNull(hints.preferredBool(0))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+                assertNull(hints.preferredBool(0))
+            }
         }
     }
 

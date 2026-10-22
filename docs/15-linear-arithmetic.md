@@ -113,12 +113,14 @@ can refer to immutable prepared rows and evaluate one primitive comparison on de
 Shared activators and disjunctions receive no indexed preference. The index,
 selected heads and retained rational point share the same storage envelope, and
 retraction, restart or a changed arithmetic assertion discards the point.
-For indexed rows containing only real coordinates, a retained certified point can
-serve compatible Boolean prefixes. Every newly resolved comparison is checked
-exactly before its LP assertion is deferred. Retirement replays deferred rows;
+For default eager or indexed rows containing only real coordinates, a retained
+certified point can serve compatible Boolean prefixes. Every newly resolved
+comparison is checked exactly before its LP assertion is deferred. Retirement replays deferred rows;
 incompatible comparisons, theory updates, retraction and restart retire the point.
 A complete Boolean state still runs the full source-point validator before model
-acceptance. This reuses the same indexed snapshot and storage envelope.
+acceptance. Eager guidance retains its existing preference array and owned numerical
+point; indexed guidance reuses its bounded snapshot. Both keep the same storage
+envelope.
 
 ### Results and proof authority
 
