@@ -44,6 +44,12 @@ between row combinations and after bounded chunks of support entries, charging
 only visited work. An interrupted reduction returns no rows, pivots, dependency
 indices or inconsistency claim.
 
+The lattice leaf also owns a sparse modulo-two equality basis with generic input
+row supports. Coefficients and proof supports combine by symmetric difference;
+an odd constant residual certifies impossibility. It reads no factors, domains or
+search state. The integer theory maps its supports to current source facts and
+owns implication and conflict publication.
+
 ## Exact source row projections
 
 Native exact linear rows keep their rational source meaning independently of

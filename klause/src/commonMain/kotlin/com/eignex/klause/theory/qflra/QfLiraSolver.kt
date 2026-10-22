@@ -42,6 +42,7 @@ import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.lp.exactForm
+import com.eignex.klause.lp.lattice.BinaryParityWork
 import com.eignex.klause.lp.exactMixedEchelonHermite
 import com.eignex.klause.lp.exactMixedTriangularBounds
 import com.eignex.klause.lp.satisfiesSourceRows
@@ -227,6 +228,8 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
     private var dirty = true
+    private var parityPrepared = false
+    private var parity: IntegerParityPropagation? = null
     private var sourceInstalled = false
     private var graphFirst = false
     private var solveContext = LpSolveContext.Production
@@ -1088,6 +1091,21 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
+    private fun propagateParity(context: SearchContext): ComponentResult? {
+        val work = BinaryParityWork(lpStop, parity?.retainedBytes ?: 0L)
+        if (!parityPrepared) {
+            parityPrepared = true
+            parity = IntegerParityPropagation.capture(model, work)
+        }
+        if (work.cancelled) return ComponentResult.Indeterminate
+        return parity?.propagate(
+            { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
+            context, work,
+            { literal -> lp.assertWithin(SearchDecision.Bool(literal), context, operationStop) },
+            ::observeCompleteStage,
+        )
+    }
+
     private fun beginOperation() {
         operationBudgetExhausted = false
         context?.executionControls?.beginOperation()
@@ -1141,6 +1159,11 @@ class ExactLiraSearchComponent private constructor(
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
         if (impliedDisjunct) return ComponentResult.Consistent
+        if (model.numRealVars == 0 && model.numIntVars > 0 && bools.any { it == UNASSIGNED } &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+        ) {
+            propagateParity(context)?.let { return it }
+        }
         if (!graphFirst && bools.any { it == UNASSIGNED } && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }

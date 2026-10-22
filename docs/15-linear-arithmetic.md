@@ -165,8 +165,20 @@ before publishing a completed point.
 Assertion, partial checks and conflict explanations work as in the
 [linear real component](#solving-and-composition). Integer
 coordinates enter the LP as columns with their exact source bounds, including
-values beyond `Long`. Once every Boolean is assigned, the complete check decides
-the remaining integer alternatives in a fixed order:
+values beyond `Long`.
+
+During incomplete Boolean traversal, the pure-integer component reduces active
+native equality rows modulo two. A sparse basis retains the original equality
+support of every row combination. An odd constant residual refutes that prefix or
+forces an unresolved equality false, and a disequality true. Every publication
+validates its active source guards and returns to the shared fixpoint. Compatible
+parity never establishes equality truth, an integer value or a source witness.
+The basis is fresh for each callback; only immutable source parity rows persist.
+Work, sparse support and modeled allocation limits withhold optional deductions,
+and a containing stop retains its normal termination semantics.
+
+Once every Boolean is assigned, the complete check decides the remaining integer
+alternatives in a fixed order:
 
 1. **Finite integers.** An unfixed finite integer is decided first, trying its
    value in a completed point as an equality, then the lower and upper remainders.

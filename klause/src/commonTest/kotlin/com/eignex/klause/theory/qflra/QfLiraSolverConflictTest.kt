@@ -229,6 +229,51 @@ class QfLiraSolverConflictTest {
         }
     }
 
+    @Test
+    fun `a coupled integer parity should reach the shared Boolean fixpoint`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(3),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(1, intArrayOf(1, -1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+            assertIs<ComponentResult.Consistent>(result)
+            assertEquals(false, session.boolValue(1))
+            assertEquals(null, session.boolValue(2))
+        }
+    }
+
+    @Test
+    fun `a parity implication should retract with its arithmetic premise`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(3),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(1, intArrayOf(1, -1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(false, session.boolValue(1))
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertEquals(true, session.boolValue(1))
+        }
+    }
+
     private fun realSignSplit(session: SearchContext) = assertNotNull(
         SourceBoundAtom.rationalSplit(
             session,
