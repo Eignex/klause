@@ -98,15 +98,6 @@ preference only reorders the two sides of an already selected split, preserving 
 complementary alternative. Propagation and complete component checks keep their
 authority, and a hypothetical value supplies no arithmetic fact or feasibility claim.
 
-Automatic pure-real linear traversal with default steering chooses an unknown literal
-from the first unsatisfied shared source clause, preferring one whose satisfying
-polarity agrees with the live arithmetic point. If none agrees, it uses the first
-unknown literal and prefers its satisfying polarity. Source-order variables and point
-preferences remain the fallback when the clauses are satisfied or scanning declines. The scan borrows
-the clause owner's immutable arrays, charges the traversal cancellation token and
-rewinds its cursor on retraction. Explicit branching and steering settings keep their
-selected policy. Clause satisfaction does not replace complete component checks.
-
 Built-in providers derive preferences from a completed arithmetic point: a single
 linear completion owner reuses the point of its last numerical check, and the opt-in
 `openHintFlips` provider indexes source clauses and prefers the polarity that breaks

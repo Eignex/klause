@@ -135,8 +135,6 @@ sharing an activator must agree, or that activator receives no preference. These
 guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
-Automatic source-clause choices seek a literal that agrees with these point preferences as
-described in [search](08-search.md#polarity-hints).
 Default pure-real guidance uses a bounded index of immutable prepared rows to
 evaluate primitive comparisons on demand when their heads have unique owners.
 Shared heads retain eager evaluation when that row envelope fits. An oversized
@@ -170,6 +168,11 @@ replace the primary LP solve when the conjunctive rows contain only inequalities
 and unconditional equalities, without Boolean coefficients or added theory assertions.
 The check uses the current operation and search-check allowances; complete source
 witness checking remains mandatory.
+Within the existing equality-repair dimension of 256 real columns, retained free
+coordinates can be reconstructed against the current paired equations before the
+primary LP solve. Every selected original row checks the result. This path performs
+no graph or LP completion; a miss keeps the primary solve, without repeating the
+same retained-coordinate repairs afterward in that unchanged row scope.
 When the ordinary float-based equality repair
 fails, the bounded repair can also reconstruct the retained free coordinates against
 the current source equations before component LP completion. Every selected original

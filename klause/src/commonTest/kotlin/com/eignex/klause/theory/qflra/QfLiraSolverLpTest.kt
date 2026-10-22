@@ -65,6 +65,60 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
     @Test
+    fun `retained free coordinates should replace a primary relaxation after equations change`() {
+        val scale = 1.0 / (1L shl 40).toDouble()
+        val source = Problem(
+            numBoolVars = 3,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 133,
+            realLower = DoubleArray(133) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(133) { Double.POSITIVE_INFINITY },
+            factors = Array<Factor>(133) { index ->
+                when (index) {
+                    0 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, -scale, -1.0), LinearOp.EQ, 0.0)
+                    1 -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                        doubleArrayOf(1.0, 1.0), LinearOp.LE, scale / 2.0)
+                    2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                        doubleArrayOf(1.0, 1.0), LinearOp.GE, scale / 2.0)
+                    3 -> ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                        doubleArrayOf(1.0, 1.0), LinearOp.LE, scale / 2.0, strict = true)
+                    4 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                        doubleArrayOf(-1.0, -1.0), LinearOp.LE, 0.0, strict = true)
+                    else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index),
+                        doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
+                }
+            },
+        )
+        var solves = 0
+        val factory = TrackingLpFactory(transform = { result ->
+            if (result.primal.size <= 128) result else {
+                solves++
+                val primal = DoubleArray(result.primal.size).also { it[1] = 0.25 }
+                FloatLpResult(result.basis, result.objective, result.duals, primal,
+                    optimal = result.optimal, exactState = result.exactState)
+            }
+        })
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.useMixedPointCompletion()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            val previousSolves = solves
+            assertTrue(previousSolves > 0)
+
+            val result = session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            assertIs<ComponentResult.Consistent>(result)
+            assertEquals(previousSolves, solves)
+            assertEquals(false, hints.preferredBool(2))
+            assertNull(session.model().valueOf(component.assignmentKey))
+        }
+    }
+
+    @Test
     fun `recovered partial real points should guide unresolved guards`() {
         for (repairable in listOf(false, true)) {
             val scale = 1.0 / (1L shl 40).toDouble()

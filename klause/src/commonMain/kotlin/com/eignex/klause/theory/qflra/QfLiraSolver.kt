@@ -1489,6 +1489,7 @@ class ExactLiraSearchComponent private constructor(
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         var directGuessesChecked = false
+        var retainedRepairsChecked = false
         if (mixedPointCompletion && retainedPointCanReplaceLp && recoveryGuess != null &&
             bools.any { it == UNASSIGNED } && sourceRecoveryScope() && !pointHintStop()
         ) {
@@ -1497,7 +1498,10 @@ class ExactLiraSearchComponent private constructor(
                 lpStop.charge(rows.size.toLong())
                 if (!operationStop() && rows.sumOf { it.columns.size.toLong() + 1L } <= 65536L) {
                     directGuessesChecked = true
-                    checkedRetainedRecoveryPoint(rows, retainedRecoveryGuesses())?.let { point ->
+                    retainedRepairsChecked = admitsMixedEqualityRepair(model.numRealVars)
+                    checkedRetainedRecoveryPoint(
+                        rows, retainedRecoveryGuesses(), retainedRepairsChecked,
+                    )?.let { point ->
                         candidate = point
                         dirty = false
                         capturePointHints(point, context)
@@ -1542,7 +1546,8 @@ class ExactLiraSearchComponent private constructor(
             if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
                 sourceRecoveryScope()
             ) {
-                recoverAssignedSourceRows(context, result.float.primal, !directGuessesChecked)?.let { return it }
+                recoverAssignedSourceRows(context, result.float.primal, !directGuessesChecked,
+                    !retainedRepairsChecked)?.let { return it }
                 if (operationStop()) return ComponentResult.Indeterminate
             }
             candidate?.let { capturePointHints(it, context) }
@@ -1575,6 +1580,7 @@ class ExactLiraSearchComponent private constructor(
         context: SearchContext,
         primal: DoubleArray,
         checkDirectGuesses: Boolean,
+        checkRetainedRepairs: Boolean,
     ): ComponentResult.Conflict? {
         observeCompleteStage("PARTIAL_SOURCE_RECOVERY_ATTEMPT")
         val origins = if (sourceRecoveryScope()) ArrayList<IntArray>() else null
@@ -1598,7 +1604,7 @@ class ExactLiraSearchComponent private constructor(
             onSourceInfeasible = reportInfeasible,
             realCompletion = { columns, residual, token, onInfeasible ->
                 reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
-            }, recoveryGuesses = guesses)
+            }, recoveryGuesses = if (checkRetainedRepairs) guesses else emptySequence())
         if (point != null && !operationStop()) {
             candidate = point
             rememberRecoveryGuess(point)
@@ -1614,14 +1620,29 @@ class ExactLiraSearchComponent private constructor(
     private fun checkedRetainedRecoveryPoint(
         rows: List<ExactRationalInequality>,
         guesses: Sequence<List<BigFraction>>,
+        repairEqualities: Boolean = false,
     ): List<BigFraction>? {
         val arithmetic = MixedPointArithmetic(lpStop)
+        var prepared = false
+        var repair: MixedEqualityRepair? = null
         for (guess in guesses) {
             lpStop.charge(1L)
             if (operationStop() || pointHintStop()) return null
-            if (guess.size == model.numRealVars && arithmetic.satisfies(guess, rows) && !pointHintStop()) {
+            if (guess.size != model.numRealVars) continue
+            if (arithmetic.satisfies(guess, rows) && !pointHintStop()) {
                 observeCompleteStage("RECOVERY_GUESS_ACCEPTED")
                 return guess
+            }
+            if (repairEqualities && !prepared) {
+                prepared = true
+                repair = prepareMixedEqualityRepair(model.numRealVars, rows, lpStop)
+            }
+            if (operationStop() || pointHintStop()) return null
+            val repaired = repair?.point(guess)
+            if (repaired != null && arithmetic.satisfies(repaired, rows) && !pointHintStop()) {
+                rememberRecoveryGuess(repaired)
+                observeCompleteStage("RECOVERY_RETAINED_EQUALITY_BEFORE_LP")
+                return repaired
             }
         }
         return null

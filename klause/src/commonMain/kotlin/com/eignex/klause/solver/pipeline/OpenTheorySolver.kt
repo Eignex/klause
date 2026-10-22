@@ -38,7 +38,6 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.Vsids
-import com.eignex.klause.solver.search.followedBy
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
@@ -462,19 +461,7 @@ class OpenTheoryEngine internal constructor(
                 ) OpenBranching.Activity else OpenBranching.SourceOrder
                 else -> params.openBranching
             }
-            val sourceBranching = if (params.openBranching == OpenBranching.Automatic &&
-                plan.theoryPipeline == ProblemPipeline.EXACT_LRA && model.numIntVars == 0 &&
-                params.openHintFlips == null
-            ) planned.sourceClauses?.booleanBranching(
-                model.numBoolVars,
-                pointHints = planned.candidateHints,
-                onPreferred = { pointMatched ->
-                    state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_PHASE_PREFERRED")
-                    if (pointMatched) state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_POINT_MATCHED")
-                },
-                onAllSatisfied = { state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_PHASE_ALL_SATISFIED") },
-            )?.also { state.smt.observeCompleteSearchStage("SOURCE_CLAUSE_PHASE_INSTALLED") } else null
-            val branching = sourceBranching ?: when (selectedBranching) {
+            val branching = when (selectedBranching) {
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
                 OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
             }
@@ -485,8 +472,7 @@ class OpenTheoryEngine internal constructor(
                 booleanBranching = branching,
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = nodePolicy,
-                candidateHints = observedCandidateHints(hints,
-                    sourceBranching?.followedBy(planned.candidateHints) ?: planned.candidateHints, state.smt.hintUsage),
+                candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
                 branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
                     SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
                         SearchBranchKind.Finite))
