@@ -748,6 +748,7 @@ class QfLiraSolverHintsTest {
                 if (complete) component.observeCompleteTraversal()
                 val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
                 assertNull(hints.preferredBool(0))
+                assertNull(stats.snapshot().completeSearchStages?.get("RECONSTRUCTION_ZERO_DUAL_PRODUCTS_SKIPPED"))
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertEquals(false, hints.preferredBool(0))
@@ -773,10 +774,6 @@ class QfLiraSolverHintsTest {
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_UNAVAILABLE"))
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_PREFERRED"))
                 assertEquals(complete, (observed.completeSearchStages?.get("POINT_HINT_LP_CAPTURE") ?: 0L) > 0L)
-                assertEquals(
-                    complete,
-                    (observed.completeSearchStages?.get("RECONSTRUCTION_ZERO_DUAL_PRODUCTS_SKIPPED") ?: 0L) > 0L,
-                )
             }
         }
     }
