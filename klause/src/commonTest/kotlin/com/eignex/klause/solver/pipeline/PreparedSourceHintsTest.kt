@@ -11,6 +11,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
@@ -49,6 +50,39 @@ class PreparedSourceHintsTest {
         assertEquals(2, preparation.problem.numBoolVars)
         assertEquals(2L, assignment.intValue(3))
         assertEquals(-1.0, assertNotNull(view.objective).deltaIfApplied(assignment, Move.IntSet(2, 1)))
+    }
+
+    @Test
+    fun `affine elimination should keep a hinted cone through the column presolve retains`() {
+        val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 2), IntDomain(-2, 0), IntDomain(0, 2), IntDomain(0, 1))
+        val source = Problem(0, domains.size, domains, listOf(
+            Linear(longArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            Linear(longArrayOf(1, -1), intArrayOf(2, 1), LinearOp.EQ, -2), Abs(2, 3), Abs(0, 4),
+        ))
+        val variable = { id: Int -> DefinitionHint.Operand.Variable(id) }
+        val hints = listOf(
+            DefinitionHint.Linear(1, longArrayOf(2, -1), arrayOf(variable(0), variable(1)), 0),
+            DefinitionHint.Linear(2, longArrayOf(1, -1), arrayOf(variable(2), variable(1)), -2),
+            DefinitionHint.Abs(3, variable(2)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, hints),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, objective))
+        val shape = invocation.finiteShape()
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
+            shape.problem, FiniteEngine.LOCAL_SEARCH, shape.linearObjective,
+            PresolveConfig.parse("affine"), explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
+        ))
+        assertEquals(-1, assertNotNull(assertNotNull(preparation.sourceMapping).retainedCoordinates()).int(1))
+
+        val view = assertNotNull(invocation.heuristicHints(preparation.problem, preparation.objective,
+            preparation.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+            assertNotNull(preparation.executionPlan).capabilities))
+        val assignment = Assignment(preparation.problem.numBoolVars, preparation.problem.numIntVars)
+        assertNotNull(view.sweep).sweep(assignment, domains)
+
+        assertEquals(-2L, assignment.intValue(2))
+        assertEquals(2L, assignment.intValue(3))
     }
 
     @Test

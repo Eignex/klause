@@ -52,12 +52,24 @@ internal fun PreparedSourceInvocation.heuristicHints(
         return if (stop()) null else PreparedSourceHints(sweep, functional)
     }
     val projected = projection.retainedCoordinates(stop) ?: return null
-    val coordinates = plan.sourceCoordinates(stop)?.followedBy(projected, stop) ?: return null
+    val planned = plan.sourceCoordinates(stop) ?: return null
+    val coordinates = planned.followedBy(projected, stop) ?: return null
+    // Affine elimination keeps a reconstructed column's partner in its place, so a hint over that column
+    // still holds on the reduced model once the reconstruction is substituted into it.
+    val reconstructions = projection.affineReconstructions(stop) ?: return null
+    val aliased = if (reconstructions.isEmpty()) {
+        coordinates
+    } else {
+        planned.followedBy(projected.withAliases(reconstructions), stop) ?: return null
+    }
     val hints = ArrayList<DefinitionHint>()
     for (hint in definitions) {
         if (stop()) return null
         stop.charge(1)
-        hint.remap(coordinates)?.let(hints::add)
+        val mapped = hint.remap(coordinates) ?: (hint.remap(planned) as? DefinitionHint.Linear)
+            ?.takeIf { reconstructions.isNotEmpty() }?.reconstructed(reconstructions)?.remap(projected)
+            ?: hint.remap(aliased)
+        mapped?.let(hints::add)
     }
     val references = source.definitionReferences?.let { it.remapped(coordinates, stop) ?: return null }
     if (references == null) {
