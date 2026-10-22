@@ -1,7 +1,9 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -19,6 +21,7 @@ import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -169,6 +172,76 @@ class PresolveInvocationTest {
         assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, budget.invocations.single().outcome)
         assertEquals(0L, budget.spent())
         assertEquals(0L, budget.entrySizeVisits)
+    }
+
+    @Test
+    fun `comparison folding without integers should skip entry work in either lane`() {
+        for (reals in 0..1) {
+            val source = Problem(
+                3, 0, emptyArray(), List(8) { Clause(intArrayOf(0, 2, 4)) },
+                numRealVars = reals,
+                realLower = DoubleArray(reals) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(reals) { Double.POSITIVE_INFINITY },
+            )
+            for (lane in PresolveLane.entries) {
+                val budget = PresolveBudget(Long.MAX_VALUE)
+                val context = PresolveContext(presolveBudget = budget)
+                val token = budget.orSpent(Cancellation.Never)
+                val config = PresolveConfig.parse("off,+comparison-clause")
+
+                when (lane) {
+                    PresolveLane.SOURCE -> Presolver.runSource(source, config, context, token)
+                    PresolveLane.FINITE -> Presolver.run(source.bake(), config, context, token)
+                }
+
+                val invocation = budget.invocations.single()
+                assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, invocation.outcome, "$lane $reals")
+                assertEquals(0L, invocation.work)
+                assertEquals(0L, invocation.rebuildWork)
+                assertEquals(0L, invocation.nativeWork)
+                assertEquals(null, invocation.input.occurrences)
+                assertEquals(null, invocation.output.occurrences)
+                assertEquals(0L, budget.entrySizeVisits)
+            }
+        }
+    }
+
+    @Test
+    fun `integer comparison folding should remain productive beside real and open columns in either lane`() {
+        for (reals in 0..1) {
+            val integers = 2 + reals
+            val source = Problem(
+                2, integers, Array(integers) { IntDomain(0, 3) },
+                listOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 2),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                ),
+                numRealVars = reals,
+                realLower = DoubleArray(reals) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(reals) { Double.POSITIVE_INFINITY },
+                openIntHi = BooleanArray(integers) { it == 2 },
+            )
+            for (lane in PresolveLane.entries) {
+                val budget = PresolveBudget(Long.MAX_VALUE)
+                val context = PresolveContext(presolveBudget = budget)
+                val token = budget.orSpent(Cancellation.Never)
+                val config = PresolveConfig.parse("off,+comparison-clause")
+
+                val reduced = when (lane) {
+                    PresolveLane.SOURCE -> Presolver.runSource(source, config, context, token).problem
+                    PresolveLane.FINITE -> Presolver.run(source.bake(), config, context, token).problem
+                }
+
+                val invocation = budget.invocations.first()
+                assertEquals(PresolveInvocationOutcome.CHANGED, invocation.outcome, "$lane $reals")
+                assertTrue(invocation.work > 0L)
+                val folded = assertIs<ComparisonClause>(reduced.factors.single())
+                assertContentEquals(intArrayOf(0, 1), folded.vars)
+                assertContentEquals(arrayOf(LinearOp.LE, LinearOp.LE), folded.ops)
+                assertContentEquals(longArrayOf(1, 1), folded.consts)
+            }
+        }
     }
 
     @Test

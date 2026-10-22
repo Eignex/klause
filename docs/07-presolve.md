@@ -230,7 +230,9 @@ only unconditional positive Boolean knapsacks and derives activity bounds from
 retained clauses/cardinalities, so a dropped row cannot justify its own removal.
 
 Comparison-clause folding combines sole-use reified indicators into one comparison
-disjunction. Reconstruction restores their truth after integer reconstruction and
+disjunction. It requires both Boolean and integer columns before entry accounting;
+unrelated real or open columns do not exclude integer comparisons.
+Reconstruction restores their truth after integer reconstruction and
 before source checking, and excludes them from direct search/definition hints.
 Duplicate-column merging replaces matching linear columns by their sum and splits
 the value on reconstruction. Dual fixing selects a bound when neither occurrences
