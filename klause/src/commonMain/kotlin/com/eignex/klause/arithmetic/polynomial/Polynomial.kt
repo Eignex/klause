@@ -15,6 +15,7 @@ internal class Monomial private constructor(private val powers: Map<Int, Int>) :
     }
 
     val variables: List<Int> get() = List(coordinateIds.size) { coordinateIds[coordinateIds.lastIndex - it] }
+    val mainVariable: Int? get() = coordinateIds.firstOrNull()
     fun exponent(variable: Int): Int = powers[variable] ?: 0
 
     fun without(variable: Int): Monomial = of(powers.filterKeys { it != variable })
@@ -71,7 +72,7 @@ internal class Polynomial private constructor(private val coefficients: Map<Mono
         .map { PolynomialTerm(it.key, it.value) }
     val isZero: Boolean get() = coefficients.isEmpty()
     val variables: List<Int> get() = coefficients.keys.flatMap { it.variables }.distinct().sorted()
-    val mainVariable: Int? get() = variables.lastOrNull()
+    val mainVariable: Int? = coefficients.keys.mapNotNull { it.mainVariable }.maxOrNull()
     fun degree(variable: Int): Int = coefficients.keys.maxOfOrNull { it.exponent(variable) } ?: -1
     fun coefficient(monomial: Monomial): BigFraction = coefficients[monomial] ?: BigFraction.ZERO
 

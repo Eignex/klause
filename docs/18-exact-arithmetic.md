@@ -69,6 +69,7 @@ witness access.
 keys. Lexicographic comparison inspects the largest variable first, so callers remap
 IDs to choose an elimination order. Derivatives, substitution and exact division
 never convert to floating values.
+The highest variable is immutable structural metadata; constants have none.
 
 Ordered multivariate remainder division retains irreducible terms while reducing
 the remaining terms by the supplied divisors. The input differs from its remainder
