@@ -172,6 +172,7 @@ object Presolver {
                     booleanPins.seed(entrySize.booleanPins)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
+                    if (token()) return@observeRoundPass PassOutcome.UNCHANGED
                     val delta = pass.applySource(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) return@observeRoundPass PassOutcome.UNCHANGED
@@ -297,6 +298,7 @@ object Presolver {
                     val units = entrySize.units(current, token)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
+                    if (token()) return@observeRoundPass PassOutcome.UNCHANGED
                     val delta = pass.applyFinite(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) return@observeRoundPass PassOutcome.UNCHANGED
@@ -395,6 +397,7 @@ object Presolver {
                     val units = session.entryUnits(token)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
+                    if (token()) return@observeRoundPass PassOutcome.UNCHANGED
                     val base = passContext(pass)
                     val delta = pass.applyFinite(input, base.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE

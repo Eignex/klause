@@ -184,6 +184,11 @@ The passes listed under [Pipeline](#pipeline) share the guarantees above. Candid
 and term visits charge and poll the pass token under bounded scans. Interruption
 retains completed sound reductions and discards unfinished analysis. The following
 families describe the premises and preservation guarantees of those reductions.
+Both lanes poll after entry charging and meter factor, column, term, signature
+and rewrite visits. Duplicate-column aggregation, bound fusion and source
+duplicate/domination indexing discard unfinished transactions. Structural reduction
+retains only fully collected factor rewrites and their bound tightenings; factor
+hooks and structural-key construction remain atomic.
 
 ### Linear reductions
 

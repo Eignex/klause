@@ -6,18 +6,93 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class StructuralReductionTest {
+    @Test
+    fun `interruption in a later hook should retain only the complete earlier rewrite`() {
+        for (source in listOf(true, false)) {
+            var stopped = false
+            val first = Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)
+            val second = Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0)
+            val factors = listOf(
+                object : Factor by first {
+                    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
+                        FactorReduction.Rewrite(emptyList(), mapOf(0 to 1..1))
+                },
+                object : Factor by second {
+                    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+                        stopped = true
+                        return FactorReduction.Rewrite(emptyList(), mapOf(1 to 0..0))
+                    }
+                },
+            )
+            val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 3) }, factors, alreadyFolded = true)
+            val token = Cancellation { stopped }
+
+            if (source) {
+                val delta = StructuralReduction.reduceSource(problem, token)
+
+                assertEquals(listOf(0), delta.droppedIndices.toList())
+                assertTrue(delta.addedFactors.isEmpty())
+                assertEquals(1L, delta.bounds!!.lower(0))
+                assertEquals(1L, delta.bounds!!.upper(0))
+                assertEquals(0L, delta.bounds!!.lower(1))
+                assertEquals(3L, delta.bounds!!.upper(1))
+            } else {
+                val delta = StructuralReduction.reduce(problem, token)
+
+                assertEquals(listOf(0), delta.droppedIndices.toList())
+                assertTrue(delta.addedFactors.isEmpty())
+                assertEquals(IntDomain(1, 1), delta.domains!![0])
+                assertEquals(IntDomain(0, 3), delta.domains!![1])
+            }
+        }
+    }
+
+    @Test
+    fun `interrupted replacement collection should publish no partial rewrite`() {
+        for (source in listOf(true, false)) {
+            var reads = 0
+            val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)
+            val replacement = object : Factor by row {
+                override val intVars: IntArray
+                    get() {
+                        reads++
+                        return intArrayOf(0, 1)
+                    }
+            }
+            val factor = object : Factor by row {
+                override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
+                    FactorReduction.Rewrite(List(128) { replacement })
+            }
+            val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 3) }, listOf(factor), alreadyFolded = true)
+            val budget = PresolveBudget(200L)
+            val token = budget.orSpent(Cancellation.Never)
+
+            val empty = if (source) StructuralReduction.reduceSource(problem, token).isEmpty
+            else StructuralReduction.reduce(problem, token).isEmpty
+
+            assertTrue(empty)
+            assertTrue(reads in 1..10)
+            assertEquals(200L, budget.spent())
+        }
+    }
+
     private fun theLinear(problem: Problem): Linear = problem.factors.filterIsInstance<Linear>().single()
 
     private fun reduced(problem: Problem): Problem =

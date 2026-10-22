@@ -210,7 +210,7 @@ class RedundantConstraintsTest {
         Linear(IntArray(vc.size / 2) { vc[2 * it + 1] }, IntArray(vc.size / 2) { vc[2 * it] }, LinearOp.LE, b)
 
     @Test
-    fun `an exclusion triangle without an eligible knapsack should only spend entry work`() {
+    fun `an exclusion triangle without an eligible knapsack should spend bounded indexing work`() {
         val exclusions = listOf(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),

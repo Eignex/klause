@@ -25,10 +25,10 @@ import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 
 // Replacement kernels require the whole factor, rather than one of its implied rows.
-internal fun Factor.equivalentLinear(): Linear? {
+internal fun Factor.equivalentLinear(visit: () -> Unit = {}): Linear? {
     val row = (linearForm as? LinearForm.Conjunction)?.rows?.singleOrNull() ?: return null
     if (row.activator != LinearRow.ALWAYS) return null
-    return row.specializeLinear(true, emptyMap())
+    return row.specializeLinear(true, emptyMap(), visit)
 }
 
 internal fun Factor.equivalentPseudoBoolean(): PseudoBoolean? {
@@ -51,10 +51,13 @@ internal fun Factor.equivalentPseudoBoolean(): PseudoBoolean? {
     )
 }
 
-internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>): Linear? {
+internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>, visit: () -> Unit = {}): Linear? {
     val op = if (truth) relation else relation.complemented()
     if (truth && this is Linear) return this
-    if (fixed.isEmpty() && (0 until size).any { Term.isBool(ref(it)) }) return null
+    if (fixed.isEmpty() && (0 until size).any {
+        visit()
+        Term.isBool(ref(it))
+    }) return null
     val isStrict = if (truth) strict else !strict
     val variables = ArrayList<Int>()
     return when (val c = constants) {
@@ -62,6 +65,7 @@ internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>
             var rhs = c.exactBound
             val coefficients = ArrayList<BigInt>()
             for (k in 0 until size) {
+                visit()
                 val reference = ref(k)
                 if (Term.isBool(reference)) {
                     val literal = Term.lit(reference)
@@ -76,7 +80,7 @@ internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>
             if (variables.isEmpty()) return null
             if (isStrict && op == LinearOp.LE) rhs -= BIG_ONE
             if (isStrict && op == LinearOp.GE) rhs += BIG_ONE
-            integralLinear(variables.toIntArray(), coefficients.toTypedArray(), op, rhs)
+            integralLinear(variables.toIntArray(), coefficients.toTypedArray(), op, rhs, visit)
         }
 
         is RealConstants -> {
@@ -85,6 +89,7 @@ internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>
             val realCoefficients = ArrayList<Double>()
             var exactRhs = BigFraction.ofDouble(c.bound) ?: return null
             for (k in 0 until size) {
+                visit()
                 val reference = ref(k)
                 val coefficient = if (k < c.intCoefficients.size) {
                     c.intCoefficients.at(k)
@@ -127,16 +132,34 @@ internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>
     }
 }
 
-internal fun integralLinear(vars: IntArray, coefficients: Array<BigInt>, op: LinearOp, bound: BigInt): Linear {
+internal fun integralLinear(
+    vars: IntArray,
+    coefficients: Array<BigInt>,
+    op: LinearOp,
+    bound: BigInt,
+    visit: () -> Unit = {},
+): Linear {
     val terms = LinkedHashMap<Int, BigInt>()
-    for (k in vars.indices) terms[vars[k]] = (terms[vars[k]] ?: BIG_ZERO) + coefficients[k]
+    for (k in vars.indices) {
+        visit()
+        terms[vars[k]] = (terms[vars[k]] ?: BIG_ZERO) + coefficients[k]
+    }
     val negate = op == LinearOp.GE
-    val normalized = terms.values.map { if (negate) -it else it }.toTypedArray()
+    val normalized = terms.values.map {
+        visit()
+        if (negate) -it else it
+    }.toTypedArray()
     val rhs = if (negate) -bound else bound
     val relation = if (negate) LinearOp.LE else op
     val variables = terms.keys.toIntArray()
-    return if (rhs.fitsLong() && normalized.all { it.fitsLong() }) {
-        Linear(LongArray(normalized.size) { normalized[it].toLongExact() }, variables, relation, rhs.toLongExact())
+    return if (rhs.fitsLong() && normalized.all {
+        visit()
+        it.fitsLong()
+    }) {
+        Linear(LongArray(normalized.size) {
+            visit()
+            normalized[it].toLongExact()
+        }, variables, relation, rhs.toLongExact())
     } else {
         Linear(variables, normalized, relation, rhs)
     }
