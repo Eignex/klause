@@ -158,7 +158,7 @@ class SubsetDominationTest {
         val calls = budget.invocations
         assertEquals(listOf(PresolveInvocationOutcome.INTERRUPTED, PresolveInvocationOutcome.COMPLETE_MISS,
             PresolveInvocationOutcome.ELIGIBILITY_SKIP), calls.map { it.outcome })
-        assertTrue(calls.all { it.work <= 655_360L })
+        assertTrue(calls.all { it.work <= 700_000L })
         assertTrue(calls[1].work < calls[0].work)
         assertTrue(calls[2].work < calls[1].work)
         assertEquals(budget.spent(), calls.sumOf { it.work })
@@ -190,16 +190,64 @@ class SubsetDominationTest {
     }
 
     @Test
-    fun `cancellation should retain completed drops and report interruption`() {
+    fun `bounded calls should resume row normalization until the comparison drops its target`() {
+        val count = 14_000
         val small = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)
-        val first = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)
-        val second = Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 1)
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, listOf(small, first, second))
+        val large = Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 1)
+        val problem = Problem(0, count + 2, Array(count + 2) { IntDomain(0, 1) },
+            listOf(small, large) + List(count) { Linear(intArrayOf(1), intArrayOf(it + 2), LinearOp.LE, 0) })
+        val state = SubsetDomination()
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val token = budget.orSpent(Cancellation.Never)
+        val factors = problem.factors.asList()
+
+        val first = state.removeDominated(problem, ColumnRanges.of(problem.intBounds), factors, token)
+        val second = state.removeDominated(problem, ColumnRanges.of(problem.intBounds), factors, token)
+
+        val calls = budget.invocations
+        assertSame(factors, first)
+        assertEquals(factors.filter { it !== large }, second)
+        assertEquals(listOf(PresolveInvocationOutcome.INTERRUPTED, PresolveInvocationOutcome.CHANGED),
+            calls.map { it.outcome })
+        assertTrue(calls[1].work < calls[0].work)
+        assertEquals(budget.spent(), calls.sumOf { it.work })
+    }
+
+    @Test
+    fun `a dominator replaced after an interrupted normalization should not supply a drop`() {
+        val count = 14_000
+        val small = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)
+        val loose = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)
+        val large = Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 1)
+        val unary = List(count) { Linear(intArrayOf(1), intArrayOf(it + 2), LinearOp.LE, 0) }
+        val domains = Array(count + 2) { IntDomain(0, 1) }
+        val source = Problem(0, count + 2, domains, listOf(small, large) + unary)
+        val replaced = Problem(0, count + 2, domains, listOf(loose, large) + unary)
+        val state = SubsetDomination()
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val token = budget.orSpent(Cancellation.Never)
+        state.removeDominated(source, ColumnRanges.of(source.intBounds), source.factors.asList(), token)
+
+        val reduced = state.removeDominated(
+            replaced, ColumnRanges.of(replaced.intBounds), replaced.factors.asList(), token,
+        )
+
+        assertEquals(replaced.factors.toList(), reduced)
+        assertEquals(listOf(PresolveInvocationOutcome.INTERRUPTED, PresolveInvocationOutcome.COMPLETE_MISS),
+            budget.invocations.map { it.outcome })
+    }
+
+    @Test
+    fun `cancellation should retain completed drops and report interruption`() {
+        val count = 200
+        val small = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)
+        val problem = Problem(0, count + 1, Array(count + 1) { IntDomain(0, 1) },
+            listOf(small) + List(count) { Linear(intArrayOf(1, 1), intArrayOf(0, it + 1), LinearOp.LE, 1) })
         var stop = false
-        var firstEndpointReads = 0
+        var reads = 0
         val ranges = object : ColumnRanges by ColumnRanges.of(problem.intBounds) {
             override fun max(v: Int): Long {
-                if (v == 1 && ++firstEndpointReads == 2) stop = true
+                if (++reads > 2 * count) stop = true
                 return 1L
             }
         }
@@ -210,9 +258,9 @@ class SubsetDominationTest {
         )
 
         val call = budget.invocations.single()
-        assertEquals(listOf(small, second), reduced)
+        assertSame(small, reduced.first())
         assertEquals(PresolveInvocationOutcome.INTERRUPTED, call.outcome)
-        assertEquals(1, call.input.factors - call.output.factors)
+        assertTrue(call.input.factors - call.output.factors in 1 until count)
         assertEquals(budget.spent(), call.work)
     }
 

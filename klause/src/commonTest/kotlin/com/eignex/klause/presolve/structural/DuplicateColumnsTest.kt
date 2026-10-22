@@ -11,8 +11,13 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.PresolveContext
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.presolve.SharedIntOccurrence
+import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -22,12 +27,16 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class DuplicateColumnsTest {
@@ -53,10 +62,44 @@ class DuplicateColumnsTest {
                 else DuplicateColumns.mergeDuplicateColumns(problem, cancellation = token).isEmpty
 
                 assertTrue(empty, "$source $stopAt")
-                assertEquals(stopAt, forms)
                 assertEquals(2L, problem.rootIntDomain(0).max)
             }
         }
+    }
+
+    @Test
+    fun `declining every unrepresentable merge should keep the model and its coordinates`() {
+        val top = 1L shl 62
+        val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, top) },
+            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.NE, -1L)), alreadyFolded = true)
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val result = Presolver.run(problem, PresolveConfig.parse("off,+dup-columns"),
+            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+
+        assertSame(problem, result.problem)
+        assertTrue(result.passesFired.isEmpty())
+        assertEquals(PresolveInvocationOutcome.COMPLETE_MISS,
+            budget.invocations.single { it.pass == "dup-columns" }.outcome)
+        val coordinates = assertNotNull(result.mapping.retainedCoordinates())
+        assertEquals(listOf(0, 1), List(2) { coordinates.int(it) })
+    }
+
+    @Test
+    fun `a declined merge should leave its columns beside an accepted merge`() {
+        val top = 1L shl 62
+        val wide = Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.NE, -1L)
+        val narrow = Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.LE, 7)
+        val domains = arrayOf(IntDomain(0, top), IntDomain(0, top), IntDomain(0, 5), IntDomain(0, 5))
+        val problem = BakedProblem(0, 4, domains, listOf(wide, narrow), alreadyFolded = true)
+
+        val delta = DuplicateColumns.mergeDuplicateColumns(problem)
+
+        assertEquals(listOf(1), delta.droppedIndices.toList())
+        assertEquals(listOf(2), assertIs<Linear>(delta.addedFactors.single()).vars.toList())
+        assertEquals(listOf(top, top, 10L, 5L), checkNotNull(delta.domains).map { it.max })
+        val point = checkNotNull(delta.reconstruct)(Sample(BooleanArray(0), longArrayOf(top, 0, 7, 0)))
+        assertEquals(listOf(top, 0L, 2L, 5L), point.ints.toList())
     }
 
     @Test

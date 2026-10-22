@@ -116,8 +116,8 @@ class PresolveInvocationTest {
                 }
 
                 assertTrue(empty, "$pass $lane")
-                assertTrue(reads in 1..32, "$pass $lane: $reads reads")
-                assertTrue(budget.spent() in 200L..215L, "$pass $lane: ${budget.spent()} work")
+                assertTrue(reads in 1..127, "$pass $lane: $reads reads")
+                assertTrue(budget.spent() in 200L..1_300L, "$pass $lane: ${budget.spent()} work")
             }
         }
     }
@@ -128,7 +128,7 @@ class PresolveInvocationTest {
             PresolvePass.REMOVE_REDUNDANT)) {
             for (lane in PresolveLane.entries) {
                 var refs = 0
-                val linear = Linear(IntArray(64) { 1 }, IntArray(64) { it }, LinearOp.LE, 100)
+                val linear = Linear(IntArray(256) { 1 }, IntArray(256) { it }, LinearOp.LE, 100)
                 val row = object : LinearRow by linear {
                     override fun ref(k: Int): Int {
                         refs++
@@ -136,14 +136,14 @@ class PresolveInvocationTest {
                     }
                 }
                 val factor = object : Factor by linear, Propagator by linear.propagatorProjection() {
-                    override val structuralKeyWeight: Int get() = 64
+                    override val structuralKeyWeight: Int get() = 256
                     override val linearForm = LinearForm.Conjunction(listOf(row))
                 }
-                val problem = BakedProblem(0, 64, Array(64) { IntDomain(0, 2) }, listOf(factor), alreadyFolded = true)
+                val problem = BakedProblem(0, 256, Array(256) { IntDomain(0, 2) }, listOf(factor), alreadyFolded = true)
                 val allowance = when (pass) {
-                    PresolvePass.FUSE_LINEAR_BOUNDS -> 200L
-                    PresolvePass.MERGE_DUPLICATE_COLUMNS -> if (lane == PresolveLane.FINITE) 1_440L else 800L
-                    else -> 800L
+                    PresolvePass.FUSE_LINEAR_BOUNDS -> 1_500L
+                    PresolvePass.MERGE_DUPLICATE_COLUMNS -> if (lane == PresolveLane.FINITE) 6_000L else 3_500L
+                    else -> 3_500L
                 }
                 val budget = PresolveBudget(allowance)
                 val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
@@ -155,8 +155,69 @@ class PresolveInvocationTest {
                 }
 
                 assertTrue(empty, "$pass $lane")
-                assertTrue(refs in 1..63, "$pass $lane: $refs term reads")
-                assertTrue(budget.spent() in allowance..allowance + 15L)
+                assertTrue(refs in 1..255, "$pass $lane: $refs term reads")
+                assertTrue(budget.spent() in allowance..allowance + 1_024L, "$pass $lane: ${budget.spent()} work")
+            }
+        }
+    }
+
+    @Test
+    fun `row scans should poll a live token once per stride without changing their charged work`() {
+        val count = 1_000
+        val problem = BakedProblem(0, count, Array(count) { IntDomain(0, 10) },
+            List(count) { Linear(intArrayOf(1, 1), intArrayOf(it, (it + 1) % count), LinearOp.LE, 10) },
+            alreadyFolded = true)
+        for (pass in listOf(PresolvePass.MERGE_DUPLICATE_COLUMNS, PresolvePass.FUSE_LINEAR_BOUNDS,
+            PresolvePass.REMOVE_REDUNDANT)) {
+            for (lane in PresolveLane.entries) {
+                var polls = 0
+                val budgets = List(2) { PresolveBudget(Long.MAX_VALUE) }
+                val tokens = listOf(budgets[0].orSpent(Cancellation.Never), budgets[1].orSpent(Cancellation {
+                    polls++
+                    false
+                }))
+
+                val empty = tokens.map {
+                    val context = PresolveContext(cancellation = it)
+                    when (lane) {
+                        PresolveLane.SOURCE -> pass.applySource(problem, context).isEmpty
+                        PresolveLane.FINITE -> pass.applyFinite(problem, context).isEmpty
+                    }
+                }
+
+                assertEquals(listOf(true, true), empty, "$pass $lane")
+                assertEquals(budgets[0].spent(), budgets[1].spent(), "$pass $lane")
+                assertTrue(polls <= budgets[1].spent() / 512L + 6, "$pass $lane: $polls polls")
+            }
+        }
+    }
+
+    @Test
+    fun `a live stop should end row scans within one poll stride in either lane`() {
+        for (pass in listOf(PresolvePass.MERGE_DUPLICATE_COLUMNS, PresolvePass.FUSE_LINEAR_BOUNDS,
+            PresolvePass.REMOVE_REDUNDANT)) {
+            for (lane in PresolveLane.entries) {
+                var reads = 0
+                val factors = List(512) {
+                    val row = Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.LE, 10)
+                    object : Factor by row, Propagator by row.propagatorProjection() {
+                        override val linearForm: LinearForm get() {
+                            reads++
+                            return row.linearForm
+                        }
+                    }
+                }
+                val problem = BakedProblem(0, 513, Array(513) { IntDomain(0, 10) }, factors, alreadyFolded = true)
+                reads = 0
+                val context = PresolveContext(cancellation = Cancellation { reads >= 8 })
+
+                val empty = when (lane) {
+                    PresolveLane.SOURCE -> pass.applySource(problem, context).isEmpty
+                    PresolveLane.FINITE -> pass.applyFinite(problem, context).isEmpty
+                }
+
+                assertTrue(empty, "$pass $lane")
+                assertTrue(reads in 8..72, "$pass $lane: $reads reads")
             }
         }
     }

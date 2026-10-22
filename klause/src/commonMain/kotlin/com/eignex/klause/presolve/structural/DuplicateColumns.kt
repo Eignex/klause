@@ -18,6 +18,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.ScanMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.maxOf
@@ -32,10 +33,8 @@ internal object DuplicateColumns {
 
     private class Interrupted : RuntimeException()
 
-    private fun visit(cancellation: Cancellation) {
-        if (cancellation()) throw Interrupted()
-        cancellation.charge(DUPLICATE_COLUMNS_WORK_WEIGHT)
-        if (cancellation()) throw Interrupted()
+    private fun visit(scan: ScanMeter) {
+        if (!scan.visit(DUPLICATE_COLUMNS_WORK_WEIGHT)) throw Interrupted()
     }
 
     private const val OPEN_PATTERNS = 4
@@ -83,11 +82,16 @@ internal object DuplicateColumns {
         sharedIntOcc: SharedIntOccurrence? = null,
         incrementalTouchedVars: IntArray? = null,
         cancellation: Cancellation = Cancellation.Never,
-    ): PassDelta = try {
-        mergeFinite(problem, objectiveIntVars, sharedIntOcc, incrementalTouchedVars, cancellation)
-    } catch (_: Interrupted) {
-        // Aggregation changes every occurrence together with its reconstruction and widened domain.
-        PassDelta()
+    ): PassDelta {
+        val scan = ScanMeter(cancellation)
+        return try {
+            mergeFinite(problem, objectiveIntVars, sharedIntOcc, incrementalTouchedVars, scan)
+        } catch (_: Interrupted) {
+            // Aggregation changes every occurrence together with its reconstruction and widened domain.
+            PassDelta()
+        } finally {
+            scan.flush()
+        }
     }
 
     private fun mergeFinite(
@@ -95,9 +99,9 @@ internal object DuplicateColumns {
         objectiveIntVars: Set<Int>,
         sharedIntOcc: SharedIntOccurrence?,
         incrementalTouchedVars: IntArray?,
-        cancellation: Cancellation,
+        scan: ScanMeter,
     ): PassDelta {
-        if (problem.numIntVars < 2 || cancellation()) return PassDelta()
+        if (problem.numIntVars < 2 || !scan.check()) return PassDelta()
         val n = problem.numIntVars
         // Inter-round fast-bail. On a re-run the engine supplies the variables whose factors changed since
         // the pass last ran. A duplicate-column class collapses fully when the pass fires, so a new class can
@@ -105,43 +109,43 @@ internal object DuplicateColumns {
         // If no touched variable is column-eligible the full scan below would find only singleton classes.
         // A null [incrementalTouchedVars] means a full scan.
         if (incrementalTouchedVars != null && sharedIntOcc != null &&
-            !anyTouchedColumnEligible(incrementalTouchedVars, sharedIntOcc, problem, objectiveIntVars, cancellation)
+            !anyTouchedColumnEligible(incrementalTouchedVars, sharedIntOcc, problem, objectiveIntVars, scan)
         ) {
             return PassDelta()
         }
         // Folding one duplicate into its representative removes only the dropped column's own term, so no
         // surviving column's signature or eligibility changes: both are computed once over the input.
         val domains = Array(n) {
-            visit(cancellation)
+            visit(scan)
             problem.rootIntDomain(it)
         }
-        val eligible = eligibleColumns(problem.factors, n, domains, objectiveIntVars, cancellation)
-        val signatures = columnSignatures(problem.factors, n, eligible, cancellation)
+        val eligible = eligibleColumns(problem.factors, n, domains, objectiveIntVars, scan)
+        val signatures = columnSignatures(problem.factors, n, eligible, scan)
         // Ascending-id order: the first member of a class is its representative.
         val classes = LinkedHashMap<List<Long>, IntArrayList>()
         for (v in 0 until n) {
-            visit(cancellation)
+            visit(scan)
             if (!eligible[v]) continue
             val sig = signatures[v] ?: continue
-            for (entry in sig) visit(cancellation)
+            for (entry in sig) visit(scan)
             classes.getOrPut(sig) { IntArrayList() }.add(v)
         }
         val maxClassSize = classes.values.maxOfOrNull {
-            visit(cancellation)
+            visit(scan)
             it.size
         } ?: 0
         if (maxClassSize < 2) return PassDelta()
         // Batch k folds the k-th duplicate of every class into its representative, widening the aggregate's
         // domain to the running Minkowski sum. Batches undo last-first, which makes the split exact.
         val keepOf = IntArray(n) {
-            visit(cancellation)
+            visit(scan)
             it
         }
         val batches = ArrayList<List<ColumnMerge>>()
         for (k in 1 until maxClassSize) {
             val merges = ArrayList<ColumnMerge>()
             for (members in classes.values) {
-                visit(cancellation)
+                visit(scan)
                 if (members.size <= k) continue
                 val rep = members[0]
                 val drop = members[k]
@@ -156,22 +160,24 @@ internal object DuplicateColumns {
                 // The session reseeds on this widen via [PassDelta.domains].
                 domains[rep] = IntDomain(lo, hi)
             }
-            batches.add(merges)
+            if (merges.isNotEmpty()) batches.add(merges)
         }
+        // A declined merge touches no factor, domain or column, so with none accepted the model stays as it is.
+        if (batches.isEmpty()) return PassDelta()
         val workFactors = Array(problem.factors.size) {
-            visit(cancellation)
-            aggregateColumns(problem.factors[it], keepOf, cancellation)
+            visit(scan)
+            aggregateColumns(problem.factors[it], keepOf, scan)
         }
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         problem.factors.forEachIndexed { i, f ->
-            visit(cancellation)
+            visit(scan)
             if (workFactors[i] !== f) {
                 dropped.add(i)
                 added.add(workFactors[i])
             }
         }
-        if (cancellation()) throw Interrupted()
+        if (!scan.check()) throw Interrupted()
         return PassDelta(dropped.toIntArray(), added, domains, DuplicateColumnMerges(batches)::reconstruct)
     }
 
@@ -193,18 +199,23 @@ internal object DuplicateColumns {
         problem: Problem,
         objectiveIntVars: Set<Int>,
         cancellation: Cancellation = Cancellation.Never,
-    ): SourceDelta = try {
-        mergeSource(problem, objectiveIntVars, cancellation)
-    } catch (_: Interrupted) {
-        SourceDelta()
+    ): SourceDelta {
+        val scan = ScanMeter(cancellation)
+        return try {
+            mergeSource(problem, objectiveIntVars, scan)
+        } catch (_: Interrupted) {
+            SourceDelta()
+        } finally {
+            scan.flush()
+        }
     }
 
-    private fun mergeSource(problem: Problem, objectiveIntVars: Set<Int>, cancellation: Cancellation): SourceDelta {
+    private fun mergeSource(problem: Problem, objectiveIntVars: Set<Int>, scan: ScanMeter): SourceDelta {
         val n = problem.numIntVars
-        if (n < 2 || cancellation()) return SourceDelta()
+        if (n < 2 || !scan.check()) return SourceDelta()
         val bounds = problem.intBounds
         val eligible = BooleanArray(n) { v ->
-            visit(cancellation)
+            visit(scan)
             v !in objectiveIntVars &&
                 problem.declaredIntDomains.declaredOrNull(v)?.isContiguous() != false &&
                 (bounds.isOpenLower(v) || fitsSplit(bounds.lower(v))) &&
@@ -212,38 +223,38 @@ internal object DuplicateColumns {
         }
         val factors = problem.factors
         for (f in factors) {
-            visit(cancellation)
-            if (f.equivalentLinear { visit(cancellation) }?.integerConstants != null) continue
+            visit(scan)
+            if (f.equivalentLinear { visit(scan) }?.integerConstants != null) continue
             for (v in f.intVars) {
-                visit(cancellation)
+                visit(scan)
                 eligible[v] = false
             }
         }
-        val signatures = columnSignatures(factors, n, eligible, cancellation)
+        val signatures = columnSignatures(factors, n, eligible, scan)
         val classes = LinkedHashMap<List<Long>, IntArrayList>()
         for (v in 0 until n) {
-            visit(cancellation)
+            visit(scan)
             val sig = signatures[v] ?: continue
-            for (entry in sig) visit(cancellation)
+            for (entry in sig) visit(scan)
             classes.getOrPut(sig) { IntArrayList() }.add(v)
         }
         val keepOf = IntArray(n) {
-            visit(cancellation)
+            visit(scan)
             it
         }
         val steps = ArrayList<RebuildStep>()
         for (members in classes.values) {
-            visit(cancellation)
+            visit(scan)
             if (members.size < 2) continue
-            val rep = sourceRepresentative(members, bounds, cancellation) ?: continue
+            val rep = sourceRepresentative(members, bounds, scan) ?: continue
             val folded = IntArrayList()
             for (k in 0 until members.size) {
-                visit(cancellation)
+                visit(scan)
                 val y = members[k]
                 if (y != rep && absorbs(rep, y, bounds)) folded.add(y)
             }
             for (k in folded.size - 1 downTo 0) {
-                visit(cancellation)
+                visit(scan)
                 val y = folded[k]
                 keepOf[y] = rep
                 steps.add(splitStep(rep, y, bounds))
@@ -254,31 +265,31 @@ internal object DuplicateColumns {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         factors.forEachIndexed { i, f ->
-            visit(cancellation)
-            val rewritten = aggregateColumns(f, keepOf, cancellation)
+            visit(scan)
+            val rewritten = aggregateColumns(f, keepOf, scan)
             if (rewritten !== f) {
                 dropped.add(i)
                 added.add(rewritten)
             }
         }
-        if (cancellation()) throw Interrupted()
+        if (!scan.check()) throw Interrupted()
         return SourceDelta(dropped.toIntArray(), added, rebuild = SourceRebuilds(steps))
     }
 
     /** The member of [members] whose open-side pattern absorbs the most others, or null when none absorbs one. */
-    private fun sourceRepresentative(members: IntArrayList, bounds: IntBounds, cancellation: Cancellation): Int? {
+    private fun sourceRepresentative(members: IntArrayList, bounds: IntBounds, scan: ScanMeter): Int? {
         var best: Int? = null
         var bestCount = 0
         val tried = BooleanArray(OPEN_PATTERNS)
         for (k in 0 until members.size) {
-            visit(cancellation)
+            visit(scan)
             val r = members[k]
             val pattern = (if (bounds.isOpenLower(r)) 1 else 0) + (if (bounds.isOpenUpper(r)) 2 else 0)
             if (tried[pattern]) continue
             tried[pattern] = true
             var count = 0
             for (j in 0 until members.size) {
-                visit(cancellation)
+                visit(scan)
                 if (members[j] != r && absorbs(r, members[j], bounds)) count++
             }
             if (count > bestCount) {
@@ -328,17 +339,17 @@ internal object DuplicateColumns {
      *  aggregate (sound because a duplicate column carries the *same* coefficient as its representative
      *  in that row). A row mentioning no dropped variable, and every non-[Linear] factor (none mention
      *  a dropped variable — they were ineligible), is returned unchanged. */
-    private fun aggregateColumns(factor: Factor, keepOf: IntArray, cancellation: Cancellation): Factor {
-        val linear = factor.equivalentLinear { visit(cancellation) } ?: return factor
+    private fun aggregateColumns(factor: Factor, keepOf: IntArray, scan: ScanMeter): Factor {
+        val linear = factor.equivalentLinear { visit(scan) } ?: return factor
         val row = linear.integerConstants ?: return factor
         if (linear.vars.none {
-            visit(cancellation)
+            visit(scan)
             keepOf[it] != it
         }) return factor
         val keptVars = IntArrayList(linear.vars.size)
         val keptCoeffs = LongArrayList(linear.vars.size)
         for (i in linear.vars.indices) {
-            visit(cancellation)
+            visit(scan)
             val v = linear.vars[i]
             if (keepOf[v] != v) continue
             keptVars.add(v)
@@ -357,18 +368,18 @@ internal object DuplicateColumns {
         occ: SharedIntOccurrence,
         problem: BakedProblem,
         objectiveIntVars: Set<Int>,
-        cancellation: Cancellation,
+        scan: ScanMeter,
     ): Boolean {
         for (v in touched) {
-            visit(cancellation)
+            visit(scan)
             if (v in objectiveIntVars || !problem.rootIntDomain(v).isContiguous()) continue
             val start = occ.offsets[v]
             val end = occ.offsets[v + 1]
             var onlyLinear = true
             for (k in start until end) {
-                visit(cancellation)
+                visit(scan)
                 val g = problem.factors[occ.flat[k]]
-                if (g.equivalentLinear { visit(cancellation) }?.integerConstants == null) {
+                if (g.equivalentLinear { visit(scan) }?.integerConstants == null) {
                     onlyLinear = false
                     break
                 }
@@ -386,19 +397,19 @@ internal object DuplicateColumns {
         numIntVars: Int,
         domains: Array<IntDomain>,
         objectiveIntVars: Set<Int>,
-        cancellation: Cancellation,
+        scan: ScanMeter,
     ): BooleanArray {
         val eligible = BooleanArray(numIntVars) { v ->
-            visit(cancellation)
+            visit(scan)
             v !in objectiveIntVars && domains[v].isContiguous()
         }
         for (f in factors) {
-            visit(cancellation)
+            visit(scan)
             // Only integer [Linear] columns are aggregatable; a variable in any other factor — including a
             // continuous (real-bearing) Linear, whose reals the integer rewrite would drop — is ineligible.
-            if (f.equivalentLinear { visit(cancellation) }?.integerConstants != null) continue
+            if (f.equivalentLinear { visit(scan) }?.integerConstants != null) continue
             for (v in f.intVars) {
-                visit(cancellation)
+                visit(scan)
                 eligible[v] = false
             }
         }
@@ -413,23 +424,23 @@ internal object DuplicateColumns {
         factors: Array<Factor>,
         numIntVars: Int,
         eligible: BooleanArray,
-        cancellation: Cancellation,
+        scan: ScanMeter,
     ): Array<List<Long>?> {
         val entries = Array(numIntVars) {
-            visit(cancellation)
+            visit(scan)
             if (eligible[it]) ArrayList<Long>() else null
         }
         factors.forEachIndexed { fid, factor ->
-            visit(cancellation)
-            val f = factor.equivalentLinear { visit(cancellation) } ?: return@forEachIndexed
+            visit(scan)
+            val f = factor.equivalentLinear { visit(scan) } ?: return@forEachIndexed
             val row = f.integerConstants ?: return@forEachIndexed
             val coeffByVar = MutableIntLongMap(f.vars.size)
             for (i in f.vars.indices) {
-                visit(cancellation)
+                visit(scan)
                 coeffByVar.put(f.vars[i], row.coeff(i))
             }
             for (v in f.intVars) {
-                visit(cancellation)
+                visit(scan)
                 entries[v]?.apply {
                     add(fid.toLong())
                     add(coeffByVar.getOrDefault(v, 0L))
@@ -437,7 +448,7 @@ internal object DuplicateColumns {
             }
         }
         return Array(numIntVars) {
-            visit(cancellation)
+            visit(scan)
             entries[it]?.takeIf { e -> e.isNotEmpty() }
         }
     }

@@ -20,16 +20,24 @@ import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.ScanMeter
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 
 internal class SubsetDomination {
     private data class Signature(val terms: List<Pair<Int, Long>>, val bound: Long)
-    private class Row(val factor: Int, val signature: Signature, val droppable: Boolean) {
+    private class Normal(val signature: Signature, val droppable: Boolean) {
         val coefficients = signature.terms.toMap()
+    }
+    private class Row(val factor: Int, val normal: Normal) {
+        val signature get() = normal.signature
+        val coefficients get() = normal.coefficients
+        val droppable get() = normal.droppable
         val width get() = signature.terms.size
         val anchor get() = signature.terms.first().first
     }
+    // A factor is immutable, so its rows normalize once and the same occurrence reuses them in every later call.
+    private class Normalized(val rows: List<Normal>, var call: Long)
     private data class Activity(val row: Signature, val endpoints: List<Long?>)
     private class Progress {
         var version = -1L
@@ -44,6 +52,8 @@ internal class SubsetDomination {
     private var version = 0L
     private val progress = HashMap<Activity, Progress>()
     private var rememberedPairs = 0
+    private val normalized = HashMap<Factor, Normalized>()
+    private var calls = 0L
 
     fun removeDominated(
         problem: Problem,
@@ -60,7 +70,11 @@ internal class SubsetDomination {
             val scan = Scan(cancellation)
             invocation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
             if (problem.numIntVars == 0) return@observe factors
-            output = analyze(ranges, factors, scan, invocation)
+            try {
+                output = if (scan.check()) analyze(ranges, factors, scan, invocation) else factors
+            } finally {
+                scan.flush()
+            }
             if (scan.stopped) invocation?.outcome = PresolveInvocationOutcome.INTERRUPTED
             output
         }
@@ -72,17 +86,7 @@ internal class SubsetDomination {
         scan: Scan,
         invocation: PresolveInvocation?,
     ): List<Factor> {
-        val rows = ArrayList<Row>()
-        for ((i, factor) in factors.withIndex()) {
-            if (!scan.visit()) return factors
-            if (factor is Clause) continue
-            val droppable = factor.linearForm is LinearForm.Conjunction && factor.linearRows.size == 1
-            for (row in factor.impliedLinearRows) {
-                if (row.size > SUBSET_WIDTH_CAP) continue
-                if (!scan.visit(1 + 4 * row.size)) return factors
-                normalized(row, i, droppable)?.let(rows::add)
-            }
-        }
+        val rows = rows(factors, scan) ?: return factors
         val minimum = rows.minOfOrNull { it.width } ?: return factors
         val candidates = rows.filter { it.droppable && it.width > minimum }
         if (candidates.isEmpty()) return factors
@@ -92,18 +96,18 @@ internal class SubsetDomination {
         val changed = (current - previous) + (previous - current)
         version++
         for (signature in changed) {
-            if (!scan.visit()) return factors
+            if (!scan.track()) return factors
             anchorVersions.getOrPut(signature.terms.first().first) { HashMap() }[signature.terms.size] = version
         }
         previous = current
         for (row in rows.sortedBy { it.width }) {
-            if (!scan.visit()) return factors
+            if (!scan.track()) return factors
             byAnchor.getOrPut(row.anchor) { ArrayList() }.add(row)
         }
         val active = HashSet<Activity>()
         val activities = ArrayList<Pair<Row, Activity>>(candidates.size)
         for (candidate in candidates) {
-            if (!scan.visit(candidate.width)) return factors
+            if (!scan.track(candidate.width)) return factors
             val activity = Activity(candidate.signature, candidate.signature.terms.map { (v, coefficient) ->
                 if (!ranges.isClosed(v)) null else if (coefficient >= 0L) ranges.max(v) else ranges.min(v)
             })
@@ -112,7 +116,7 @@ internal class SubsetDomination {
         }
         val iterator = progress.iterator()
         while (iterator.hasNext()) {
-            if (!scan.visit()) return factors
+            if (!scan.track()) return factors
             val entry = iterator.next()
             if (entry.key !in active) {
                 rememberedPairs -= entry.value.tested.size
@@ -122,11 +126,11 @@ internal class SubsetDomination {
 
         val dropped = IntHashSet()
         for ((candidate, activity) in activities) {
-            if (!scan.visit(candidate.width)) break
+            if (!scan.track(candidate.width)) break
             var stamp = 0L
             for ((v, _) in candidate.signature.terms) {
                 for ((width, changedAt) in anchorVersions[v].orEmpty()) {
-                    if (!scan.visit()) break
+                    if (!scan.track()) break
                     if (width < candidate.width) stamp = maxOf(stamp, changedAt)
                 }
             }
@@ -169,7 +173,7 @@ internal class SubsetDomination {
                     continue
                 }
                 if (rememberedPairs >= SUBSET_PAIR_CAP) {
-                    scan.stopped = true
+                    scan.stop()
                     return
                 }
                 if (!scan.visit(candidate.width)) return
@@ -189,7 +193,36 @@ internal class SubsetDomination {
         state.complete = true
     }
 
-    private fun normalized(row: LinearRow, factor: Int, droppable: Boolean): Row? {
+    // Every current occurrence is walked each call, but only factors no earlier call finished normalizing spend capped
+    // visits, so bounded calls over one model reach their comparisons after finitely many calls.
+    private fun rows(factors: List<Factor>, scan: Scan): List<Row>? {
+        val call = ++calls
+        val rows = ArrayList<Row>()
+        var live = 0
+        for ((i, factor) in factors.withIndex()) {
+            if (!scan.track()) return null
+            if (factor is Clause) continue
+            val entry = normalized[factor] ?: normalize(factor, scan) ?: return null
+            if (entry.call != call) live++
+            entry.call = call
+            for (normal in entry.rows) rows.add(Row(i, normal))
+        }
+        if (normalized.size > live) normalized.values.removeAll { it.call != call }
+        return rows
+    }
+
+    private fun normalize(factor: Factor, scan: Scan): Normalized? {
+        val droppable = factor.linearForm is LinearForm.Conjunction && factor.linearRows.size == 1
+        val rows = ArrayList<Normal>()
+        for (row in factor.impliedLinearRows) {
+            if (row.size > SUBSET_WIDTH_CAP) continue
+            if (!scan.visit(1 + 4 * row.size)) return null
+            normalized(row, droppable)?.let(rows::add)
+        }
+        return Normalized(rows, 0L).also { normalized[factor] = it }
+    }
+
+    private fun normalized(row: LinearRow, droppable: Boolean): Normal? {
         if (!row.isIntegerOnly || !row.isLongUnconditional || row.bound == Long.MIN_VALUE ||
             (row.relation != LinearOp.LE && row.relation != LinearOp.GE) ||
             (0 until row.size).any { row.coeff(it) == Long.MIN_VALUE }
@@ -200,7 +233,7 @@ internal class SubsetDomination {
         val terms = (0 until row.size).filter { coefficients[it] != 0L }
             .map { Term.intVar(row.ref(it)) to sign * (coefficients[it] / gcd) }.sortedBy { it.first }
         if (terms.isEmpty() || terms.map { it.first }.toSet().size != terms.size) return null
-        return Row(factor, Signature(terms, (sign * row.bound).floorDiv(gcd)), droppable)
+        return Normal(Signature(terms, (sign * row.bound).floorDiv(gcd)), droppable)
     }
 
     // Strictly smaller supports make implication chains acyclic, including dropped dominators.
@@ -228,21 +261,34 @@ internal class SubsetDomination {
         return addExact(mulExact(scale, a.signature.bound), extra) <= b.signature.bound
     }
 
-    private class Scan(private val cancellation: Cancellation) {
+    private class Scan(cancellation: Cancellation) {
+        private val meter = ScanMeter(cancellation)
         private var visits = 0
-        var stopped = false
+        private var capped = false
+        val stopped get() = capped || meter.stopped
 
+        // Normalization and comparison visits, capped per call.
         fun visit(entries: Int = 1): Boolean {
             if (stopped) return false
-            if (entries > SUBSET_VISIT_CAP - visits || cancellation()) {
-                stopped = true
+            if (entries > SUBSET_VISIT_CAP - visits) {
+                capped = true
                 return false
             }
             visits += entries
-            cancellation.charge(SUBSET_WORK_WEIGHT * entries)
-            if (cancellation()) stopped = true
-            return !stopped
+            return meter.visit(SUBSET_WORK_WEIGHT * entries)
         }
+
+        // Upkeep linear in the current rows and candidates, charged outside the cap so that it cannot starve the
+        // comparisons once every row is normalized.
+        fun track(entries: Int = 1): Boolean = !stopped && meter.visit(SUBSET_WORK_WEIGHT * entries)
+
+        fun check(): Boolean = !stopped && meter.check()
+
+        fun stop() {
+            capped = true
+        }
+
+        fun flush() = meter.flush()
     }
 }
 
