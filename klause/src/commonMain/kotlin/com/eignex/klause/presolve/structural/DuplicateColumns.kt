@@ -18,6 +18,12 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.maxOf
+import com.eignex.klause.util.minOf
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.toLongExact
 
 internal object DuplicateColumns {
 
@@ -369,10 +375,15 @@ internal class DuplicateColumnMerge(private val merges: List<ColumnMerge>) {
         if (merges.isEmpty()) return sample
         val ints = sample.ints
         for (m in merges) {
-            val z = ints[m.keep]
-            val x = maxOf(m.keepDomain.min, z - m.dropDomain.max)
+            val z = bigIntOf(ints[m.keep])
+            val lower = maxOf(bigIntOf(m.keepDomain.min), z - bigIntOf(m.dropDomain.max))
+            val upper = minOf(bigIntOf(m.keepDomain.max), z - bigIntOf(m.dropDomain.min))
+            check(lower <= upper) { "Aggregate has no feasible duplicate-column split" }
+            val x = lower.toLongExact()
+            val y = (z - lower).toLongExact()
+            check(y in m.dropDomain.min..m.dropDomain.max) { "Duplicate-column split is outside its domain" }
             ints[m.keep] = x
-            ints[m.drop] = z - x
+            ints[m.drop] = y
         }
         return sample.copy(ints = ints)
     }
