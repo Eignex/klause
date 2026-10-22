@@ -80,9 +80,9 @@ class MiniZincModelWitnessTest {
 
     private fun solve(ref: ProblemRef, raw: String, modelOutput: (ProblemRef, String) -> String): SolveRecord {
         val entry = ResolvedProblem(ref, lazy { error("source parsing must stay lazy") })
-        return SolveMetric.solve(entry, SolverInvocation.KLAUSE, SolverInvocation.Settings(), Budget(),
-            UUID.randomUUID().toString(), "now", "fixture", installedBuild = { null },
-            invoke = { _, _, _, _, _ ->
+        return SolveMetric.solve(entry, SolverInvocation.Settings(), Budget(),
+            "now", "fixture", installedBuild = { null },
+            invoke = { _, _, _, _ ->
                 SolverInvocation.Result(true, null, null, proven = false, stats = emptyMap(), rawOutput = raw,
                     command = "cli")
             }, modelOutput = modelOutput).first

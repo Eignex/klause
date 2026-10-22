@@ -1,6 +1,5 @@
 package com.eignex.klause.bench.metric
 
-import com.eignex.klause.bench.report.Reports
 import java.io.File
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -11,8 +10,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 
 class SolverInvocationTest {
 
@@ -47,19 +44,6 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `legacy cached results should leave stderr diagnostics unavailable`() {
-        val legacy = """
-            {"feasible":true,"objective":1.0,"timeToBestMs":1,"proven":false,"stats":{},
-             "rawOutput":"----------\n","command":"cli"}
-        """.trimIndent()
-
-        val result = Reports.json.decodeFromString<SolverInvocation.Result>(legacy)
-
-        assertNull(result.stderr)
-        assertFalse(result.stderrComplete)
-    }
-
-    @Test
     fun `exact FlatZinc objective comments should override decimal display`() {
         val lines = "_objective = 0.3333333333333333;\n% klause-exact: _objective = 1/3;\n----------"
 
@@ -89,7 +73,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `objective precision should survive parsing and cache round trips for each protocol`() {
+    fun `objective precision should survive parsing for each protocol`() {
         val objectives = listOf("9223372036854775808", "9007199254740993", "1/3", "-1/3", "1e400")
         for (dialect in SolverInvocation.Dialect.entries) {
             for (objective in objectives) {
@@ -99,13 +83,10 @@ class SolverInvocationTest {
                     SolverInvocation.Dialect.SMT_LIB -> "; objective=$objective\nsat\n; optimizationStatus=optimal"
                 }
                 val result = SolverInvocation.invoke(listOf("sh", "-c", "printf '%s\\n' '$lines'"), dialect)
-                val decoded = Reports.json.decodeFromString<SolverInvocation.Result>(
-                    Reports.json.encodeToString(result),
-                )
 
-                assertEquals(ExactObjective.parse(objective).toString(), decoded.exactObjective)
-                assertEquals(true, decoded.feasible)
-                assertTrue(decoded.proven)
+                assertEquals(ExactObjective.parse(objective).toString(), result.exactObjective)
+                assertEquals(true, result.feasible)
+                assertTrue(result.proven)
             }
         }
     }
@@ -293,8 +274,6 @@ class SolverInvocationTest {
             assertEquals(-1.0 / 3.0, r.objective, status)
             assertFalse(r.proven, status)
             assertEquals(status, r.stats["optimizationStatus"])
-            val cached = Reports.json.decodeFromString<SolverInvocation.Result>(Reports.json.encodeToString(r))
-            assertEquals(status, cached.stats["optimizationStatus"])
         }
     }
 

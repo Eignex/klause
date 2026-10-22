@@ -8,10 +8,8 @@ import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
-import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
 class SolveMetricTest {
@@ -19,24 +17,12 @@ class SolveMetricTest {
 
     private fun stats(failure: Throwable) = SolveMetric.loadFailureRecord(
         ref,
-        SolverInvocation.KLAUSE,
         SolverInvocation.Settings(),
         Budget(1000),
         "now",
         null,
         failure,
     ).stats
-
-    @Test
-    fun `exact and default runs should use different result and cache names`() {
-        val settings = SolverInvocation.Settings()
-        val budget = Budget(1000)
-
-        val default = SolveMetric.configTag(SolverInvocation.KLAUSE, settings, budget)
-        val exact = SolveMetric.configTag(SolverInvocation.KLAUSE, settings.copy(exact = true), budget)
-
-        assertNotEquals(default, exact)
-    }
 
     @Test
     fun `a declined model should be recorded as unsupported with its reason`() {
@@ -63,7 +49,7 @@ class SolveMetricTest {
         val hashes = mapOf("model" to "captured-source-identity")
 
         val record = SolveMetric.loadFailureRecord(
-            ref, SolverInvocation.KLAUSE, SolverInvocation.Settings(), Budget(1000), "now", null,
+            ref, SolverInvocation.Settings(), Budget(1000), "now", null,
             IllegalStateException("reference failed"), sourceHashes = hashes,
         )
 
@@ -72,9 +58,9 @@ class SolveMetricTest {
 
     @Test
     fun `a solve should retain complete subprocess diagnostics`() {
-        val (result, _) = SolveMetric.solve(entry(), SolverInvocation.KLAUSE, SolverInvocation.Settings(), Budget(),
-            UUID.randomUUID().toString(), "now", "fixture", installedBuild = { null },
-            invoke = { _, _, _, _, _ ->
+        val (result, _) = SolveMetric.solve(entry(), SolverInvocation.Settings(), Budget(),
+            "now", "fixture", installedBuild = { null },
+            invoke = { _, _, _, _ ->
                 SolverInvocation.Result(null, null, null, proven = false, stats = emptyMap(), rawOutput = "",
                     command = "cli", stderr = DIAGNOSTICS, stderrComplete = true)
             })
@@ -88,9 +74,9 @@ class SolveMetricTest {
         val settings = SolverInvocation.Settings(params = listOf("source-validation=true", "bt-arm=satOptimized"))
         var invoked: SolverInvocation.Settings? = null
 
-        val (result, _) = SolveMetric.solve(entry(), SolverInvocation.KLAUSE, settings, Budget(),
-            UUID.randomUUID().toString(), "now", "fixture", installedBuild = { null },
-            invoke = { _, _, native, _, _ ->
+        val (result, _) = SolveMetric.solve(entry(), settings, Budget(),
+            "now", "fixture", installedBuild = { null },
+            invoke = { _, native, _, _ ->
                 invoked = native
                 SolverInvocation.Result(true, 0.125, 1, proven = true, stats = emptyMap(),
                     rawOutput = "o 1/8\nv I=0 X=1/10\n", command = "cli", exactObjective = "1/8")

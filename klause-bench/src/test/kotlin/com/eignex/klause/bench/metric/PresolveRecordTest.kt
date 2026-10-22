@@ -8,7 +8,6 @@ import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
-import java.util.UUID
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import org.junit.jupiter.params.ParameterizedTest
@@ -50,10 +49,9 @@ class PresolveRecordTest {
         )
         val ref = ProblemRef("php4", Format.DIMACS, corpus("dimacs/php4.cnf"), Category.CSP, Expected.Unknown)
         val (record, _) = SolveMetric.solve(
-            ResolvedProblem(ref, lazy { error("subprocess input stays lazy") }), SolverInvocation.KLAUSE,
-            SolverInvocation.Settings(engine = "fixed"), Budget(1000),
-            UUID.randomUUID().toString(), "time", "revision",
-            installedBuild = { null }, invoke = { _, _, _, _, _ -> result },
+            ResolvedProblem(ref, lazy { error("subprocess input stays lazy") }), SolverInvocation.Settings(engine = "fixed"), Budget(1000),
+            "time", "revision",
+            installedBuild = { null }, invoke = { _, _, _, _ -> result },
         )
 
         val restored = Reports.json.decodeFromString<SolveRecord>(Reports.json.encodeToString(record))

@@ -14,7 +14,7 @@ Kotlin Multiplatform constraint solver.
 
 - Kotlin for all solver, library, CLI and bench code; Gradle Kotlin DSL for builds.
 - Bash for glue scripts that chain standard tools (`curl`, `tar`, `jq`, `bc`, `sha256sum`), under
-  `klause-bench/output/` or a module's `scripts/`. Prefer a short script to a new `klause-bench`
+  a module's `scripts/`. Prefer a short script to a new `klause-bench`
   subcommand, and delete an unused tool instead of porting it.
 - MiniZinc for the `klause-mzn-lib` library and test models.
 - No Dockerfiles and no reference-solver code: klause-lab runs the reference solvers and owns their
@@ -67,11 +67,11 @@ When running the full gate locally:
 
 Read `klause-bench/README.md` before benchmarking. In short:
 
-- Rebuild the CLI binary first with `:klause-cli:installJvmDist`, since bench runs it as a subprocess. `installDist` is
-  a no-op that serves a stale binary, so suspect it when a bench run contradicts a passing test.
-- `./gradlew :klause-bench:bench --args="solve engine=... suite=..."` runs solvers as subprocesses emitting MiniZinc
-  output files.
-- Analyze the output files separately with scripts; A/B by varying CLI params across runs.
+- Experiments, A/B comparisons, reference runs, witness checks and profiling go through klause-lab (`deploy/lab`).
+- klause-bench provides what the lab calls: `select` names problems and resolves their files, `solve-one` solves one
+  problem with klause-cli and writes its record, and the `bench.profile` mains run as `lab profile` jobs.
+- `solve-one` runs the installed CLI as a subprocess, so rebuild it with `:klause-cli:installJvmDist` first.
+  `installDist` is a no-op that serves a stale binary, so suspect it when a bench result contradicts a passing test.
 
 ## Style
 

@@ -15,7 +15,6 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.File
 import java.io.IOException
-import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -30,10 +29,10 @@ class SolveMetricFailureTest {
 
     private fun persisted(failure: Throwable): SolveRecord {
         val (record, raw) = SolveMetric.solve(
-            entry, SolverInvocation.KLAUSE, settings, Budget(1000),
-            UUID.randomUUID().toString(), "timestamp", "revision",
+            entry, settings, Budget(1000),
+            "timestamp", "revision",
             installedBuild = { build },
-            invoke = { _, _, _, _, _ -> throw failure },
+            invoke = { _, _, _, _ -> throw failure },
         )
         assertNull(raw)
         val file = File.createTempFile("solve-error-", ".json")
@@ -132,9 +131,9 @@ class SolveMetricFailureTest {
     @Test
     fun `an unavailable build capture should not mask its exception or invent an identity`() {
         val (record, _) = SolveMetric.solve(
-            entry, SolverInvocation.KLAUSE, settings, Budget(1000), "capture", "timestamp", "revision",
+            entry, settings, Budget(1000), "timestamp", "revision",
             installedBuild = { throw IOException("missing installation") },
-            invoke = { _, _, _, _, _ -> error("must not launch") },
+            invoke = { _, _, _, _ -> error("must not launch") },
         )
 
         assertEquals("missing installation", record.stats["errorMessage"])
@@ -151,19 +150,13 @@ class SolveMetricFailureTest {
             objective = null, timeToBestMs = null, proven = false, stats = emptyMap(), rawOutput = "",
             command = "cli", buildProvenance = build,
         )
-        val tag = UUID.randomUUID().toString()
-        val key = BenchCache.keyFor(ref, tag, Budget(1000), build, settings)
-        try {
-            val (record, _) = SolveMetric.solve(
-                entry, SolverInvocation.KLAUSE, settings, Budget(1000), tag, "timestamp", "revision",
-                installedBuild = { build }, invoke = { _, _, _, _, _ -> result },
-            )
+        val (record, _) = SolveMetric.solve(
+            entry, settings, Budget(1000), "timestamp", "revision",
+            installedBuild = { build }, invoke = { _, _, _, _ -> result },
+        )
 
-            assertEquals(result.feasible, record.feasible)
-            assertEquals("cli", record.command)
-            assertTrue(record.stats.isEmpty())
-        } finally {
-            File("build/bench-cache", "$key.json").delete()
-        }
+        assertEquals(result.feasible, record.feasible)
+        assertEquals("cli", record.command)
+        assertTrue(record.stats.isEmpty())
     }
 }

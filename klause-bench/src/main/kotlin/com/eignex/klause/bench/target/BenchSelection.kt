@@ -1,12 +1,23 @@
 package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import kotlin.random.Random
 
 /** A selected problem and the suite it was selected from, which with [ProblemRef.name] names it exactly. */
 internal data class SelectedProblem(val suite: String, val ref: ProblemRef, val defaultPerFamily: Int? = null) {
     /** The family per-family caps count in: the provider's own grouping, kept apart per suite. */
     val family: String get() = "$suite:${ref.family ?: ref.name.substringBefore('/')}"
+}
+
+/** The source collection [ref] comes from, the `collection` klause-lab files its reference results under: the
+ *  fetched collection's id, or a path-derived label for a vendored or in-code problem. */
+internal fun collectionOf(ref: ProblemRef): String = when (val s = ref.source) {
+    is ProblemSource.External -> s.collection.id
+    is ProblemSource.ExternalIndexed -> s.collection.id
+    is ProblemSource.Vendored -> s.workspaceRelPath.substringBeforeLast('/', "vendored")
+    is ProblemSource.MpsFeasibility -> collectionOf(ref.copy(source = s.source)) + "-feasibility"
+    is ProblemSource.InCode -> "in-code"
 }
 
 internal object BenchSelection {
