@@ -43,6 +43,19 @@ class PolynomialRemainderTest {
     }
 
     @Test
+    fun `introduced remainder terms cancel against existing lower terms`() {
+        val square = arithmetic.power(x, 2)
+        val section = arithmetic.subtract(y, square)
+        val polynomial = arithmetic.add(arithmetic.power(section, 2), arithmetic.add(y, x))
+        val divisors = listOf(section, arithmetic.subtract(square, Polynomial.ONE))
+
+        val remainder = preparePolynomialRemainder(polynomial, divisors, arithmetic)
+            .asSequence().filterNotNull().single()
+
+        assertEquals(arithmetic.add(x, Polynomial.ONE), remainder)
+    }
+
+    @Test
     fun `cancelled remainder preparation withholds its unfinished value`() {
         val polynomial = arithmetic.add(y, arithmetic.power(x, 2))
         val divisor = arithmetic.subtract(arithmetic.power(x, 2), Polynomial.ONE)

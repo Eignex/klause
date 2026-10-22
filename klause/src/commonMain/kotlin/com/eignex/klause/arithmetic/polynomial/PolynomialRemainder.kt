@@ -1,5 +1,7 @@
 package com.eignex.klause.arithmetic.polynomial
 
+import com.eignex.klause.simplex.exact.BigFraction
+
 internal fun preparePolynomialRemainder(
     polynomial: Polynomial,
     divisors: List<Polynomial>,
@@ -25,11 +27,21 @@ internal class PolynomialRemainder(divisors: List<Polynomial>, private val arith
             yield(polynomial)
             return@sequence
         }
-        var pending = polynomial
-        val remainder = ArrayList<PolynomialTerm>()
-        while (!pending.isZero) {
+        val pending = HashMap<Monomial, BigFraction>()
+        for (term in polynomial.terms) {
             arithmetic.step()
-            val term = pending.terms.last()
+            pending[term.monomial] = term.coefficient
+        }
+        val remainder = ArrayList<PolynomialTerm>()
+        while (pending.isNotEmpty()) {
+            arithmetic.step()
+            var leading: Monomial? = null
+            for (monomial in pending.keys) {
+                arithmetic.step()
+                if (leading == null || monomial > leading) leading = monomial
+            }
+            val monomial = checkNotNull(leading)
+            val term = PolynomialTerm(monomial, pending.getValue(monomial))
             var cancelled = false
             for (divisor in candidates(term.monomial)) {
                 arithmetic.step()
@@ -43,13 +55,19 @@ internal class PolynomialRemainder(divisors: List<Polynomial>, private val arith
                     product = multiplying.next()
                     if (product == null) yield(null)
                 }
-                pending = arithmetic.subtract(pending, product)
+                for (reduction in product.terms) {
+                    arithmetic.step()
+                    val coefficient = (pending[reduction.monomial] ?: BigFraction.ZERO) +
+                        reduction.coefficient.negated()
+                    if (coefficient.isZero) pending.remove(reduction.monomial)
+                    else pending[reduction.monomial] = coefficient
+                }
                 cancelled = true
                 break
             }
             if (!cancelled) {
                 remainder.add(term)
-                pending = arithmetic.subtract(pending, Polynomial.of(listOf(term)))
+                pending.remove(term.monomial)
             }
             yield(null)
         }
