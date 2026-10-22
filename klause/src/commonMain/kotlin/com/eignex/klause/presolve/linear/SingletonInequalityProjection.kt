@@ -13,6 +13,7 @@ import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.ScanMeter
 
 /**
  * Project out a variable that occurs in exactly one linear **inequality** and nowhere else (nor in the
@@ -28,29 +29,76 @@ import com.eignex.klause.util.IntArrayList
  */
 internal object SingletonInequalityProjection {
 
-    // Work charged per factor scanned, scaled by its arity: the scan reads each row once.
     private const val PROJECTION_WORK_WEIGHT = 10L
+
+    private class Interrupted : RuntimeException()
+
+    private class Projection {
+        val dropped = IntArrayList()
+        val added = ArrayList<Factor>()
+        val steps = ArrayList<RebuildStep>()
+        val eliminated = HashSet<Int>()
+    }
+
+    private fun visit(scan: ScanMeter) {
+        if (!scan.visit(PROJECTION_WORK_WEIGHT)) throw Interrupted()
+    }
+
+    private fun occurrences(problem: Problem, scan: ScanMeter): IntArray {
+        val counts = IntArray(problem.numIntVars)
+        for (factor in problem.factors) {
+            visit(scan)
+            for (variable in factor.intVars) {
+                visit(scan)
+                if (variable in counts.indices) counts[variable]++
+            }
+        }
+        if (!scan.check()) throw Interrupted()
+        return counts
+    }
 
     private fun fitsHalfLong(v: Long): Boolean = v > -(1L shl 31) && v < (1L shl 31)
 
-    fun project(problem: BakedProblem, objectiveIntVars: Set<Int>): PassDelta {
-        // Occurrence count per integer variable across every factor: a projectable variable is in one.
-        val occ = IntArray(problem.numIntVars)
-        for (f in problem.factors) for (v in f.intVars) if (v in occ.indices) occ[v]++
+    fun project(
+        problem: BakedProblem,
+        objectiveIntVars: Set<Int>,
+        cancellation: Cancellation = Cancellation.Never,
+    ): PassDelta {
+        val scan = ScanMeter(cancellation)
+        val result = Projection()
+        try {
+            if (!scan.check()) return PassDelta()
+            val occ = occurrences(problem, scan)
+            result.projectRows(problem, objectiveIntVars, occ, scan)
+        } catch (_: Interrupted) {
+            // Only rows published with their reconstruction survive an interrupted scan.
+        } finally {
+            scan.flush()
+        }
+        if (result.dropped.isEmpty()) return PassDelta()
+        val rebuild = SourceRebuilds(result.steps)
+        return PassDelta(result.dropped.toIntArray(), result.added, reconstruct = rebuild.asSampleLift())
+            .also { it.rebuild = rebuild }
+    }
 
-        val dropped = IntArrayList()
-        val added = ArrayList<Factor>()
-        val pinned = HashMap<Int, Long>()
+    private fun Projection.projectRows(
+        problem: BakedProblem,
+        objectiveIntVars: Set<Int>,
+        occ: IntArray,
+        scan: ScanMeter,
+    ) {
         problem.factors.forEachIndexed { i, factor ->
-            val f = factor.equivalentLinear() ?: return@forEachIndexed
+            visit(scan)
+            val f = factor.equivalentLinear { visit(scan) } ?: return@forEachIndexed
             if ((f.op != LinearOp.LE && f.op != LinearOp.GE) || f.vars.size < 2) {
                 return@forEachIndexed
             }
             val row = f.integerConstants ?: return@forEachIndexed
             if (!fitsHalfLong(row.bound)) return@forEachIndexed
             val j = f.vars.indices.firstOrNull { k ->
+                visit(scan)
                 val x = f.vars[k]
-                occ[x] == 1 && x !in objectiveIntVars && x !in pinned &&
+                occ[x] == 1 && x !in objectiveIntVars && x !in eliminated &&
                     row.coeff(k) != 0L && fitsHalfLong(row.coeff(k))
             } ?: return@forEachIndexed
             val x = f.vars[j]
@@ -66,22 +114,22 @@ internal object SingletonInequalityProjection {
             val restCoeffs = LongArray(f.vars.size - 1)
             var w = 0
             for (k in f.vars.indices) {
+                visit(scan)
                 if (k != j) {
                     restVars[w] = f.vars[k]
                     restCoeffs[w] = row.coeff(k)
                     w++
                 }
             }
+            val replacement = Linear(restCoeffs, restVars, f.op, row.bound - a * xBest)
+            val step = RebuildStep.AffineValue(x, xBest, IntArray(0), LongArray(0), 1L)
+            if (!scan.check()) throw Interrupted()
             dropped.add(i)
-            added.add(Linear(restCoeffs, restVars, f.op, row.bound - a * xBest))
-            pinned[x] = xBest
+            added.add(replacement)
+            steps.add(step)
+            eliminated.add(x)
         }
-        if (dropped.isEmpty()) return PassDelta()
-        val rebuild = SourceRebuilds(pinned.map { (x, value) ->
-            RebuildStep.AffineValue(x, value, IntArray(0), LongArray(0), 1L)
-        })
-        return PassDelta(dropped.toIntArray(), added, reconstruct = rebuild.asSampleLift())
-            .also { it.rebuild = rebuild }
+        scan.check()
     }
 
     /**
@@ -97,22 +145,41 @@ internal object SingletonInequalityProjection {
         objectiveIntVars: Set<Int>,
         cancellation: Cancellation = Cancellation.Never,
     ): SourceDelta {
-        val occ = IntArray(problem.numIntVars)
-        for (f in problem.factors) for (v in f.intVars) if (v in occ.indices) occ[v]++
+        val scan = ScanMeter(cancellation)
+        val result = Projection()
+        try {
+            if (!scan.check()) return SourceDelta()
+            val occ = occurrences(problem, scan)
+            result.projectSourceRows(problem, objectiveIntVars, occ, scan)
+        } catch (_: Interrupted) {
+            // Only rows published with their reconstruction survive an interrupted scan.
+        } finally {
+            scan.flush()
+        }
+        if (result.dropped.isEmpty()) return SourceDelta()
+        return SourceDelta(result.dropped.toIntArray(), result.added, rebuild = SourceRebuilds(result.steps))
+    }
+
+    private fun Projection.projectSourceRows(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        occ: IntArray,
+        scan: ScanMeter,
+    ) {
         val bounds = problem.intBounds
-        val dropped = IntArrayList()
-        val added = ArrayList<Factor>()
-        val steps = ArrayList<RebuildStep>()
-        val eliminated = HashSet<Int>()
         problem.factors.forEachIndexed { i, factor ->
-            cancellation.charge(PROJECTION_WORK_WEIGHT * (1L + factor.intVars.size))
-            val f = factor.equivalentLinear() ?: return@forEachIndexed
+            visit(scan)
+            val f = factor.equivalentLinear { visit(scan) } ?: return@forEachIndexed
             if ((f.op != LinearOp.LE && f.op != LinearOp.GE) || f.vars.size < 2) return@forEachIndexed
             val row = f.integerConstants ?: return@forEachIndexed
-            if (!fitsHalfLong(row.bound) || f.vars.indices.any { !fitsHalfLong(row.coeff(it)) }) {
+            if (!fitsHalfLong(row.bound) || f.vars.indices.any {
+                visit(scan)
+                !fitsHalfLong(row.coeff(it))
+            }) {
                 return@forEachIndexed
             }
             val j = f.vars.indices.firstOrNull { k ->
+                visit(scan)
                 val x = f.vars[k]
                 occ[x] == 1 && x !in objectiveIntVars && x !in eliminated && row.coeff(k) != 0L
             } ?: return@forEachIndexed
@@ -124,6 +191,7 @@ internal object SingletonInequalityProjection {
             val restCoeffs = LongArray(f.vars.size - 1)
             var w = 0
             for (k in f.vars.indices) {
+                visit(scan)
                 if (k != j) {
                     restVars[w] = f.vars[k]
                     restCoeffs[w] = row.coeff(k)
@@ -131,13 +199,19 @@ internal object SingletonInequalityProjection {
                 }
             }
             val bestOpen = if (relaxesDown) bounds.isOpenLower(x) else bounds.isOpenUpper(x)
+            val replacement: Factor?
+            val step: RebuildStep
             if (bestOpen) {
                 val clamp = when {
                     relaxesDown -> if (bounds.hasUpper(x)) bounds.upper(x) else null
                     else -> if (bounds.hasLower(x)) bounds.lower(x) else null
                 }
-                val negated = LongArray(restCoeffs.size) { -restCoeffs[it] }
-                steps.add(RebuildStep.QuotientValue(x, row.bound, restVars, negated, a, relaxesDown, clamp))
+                val negated = LongArray(restCoeffs.size) {
+                    visit(scan)
+                    -restCoeffs[it]
+                }
+                replacement = null
+                step = RebuildStep.QuotientValue(x, row.bound, restVars, negated, a, relaxesDown, clamp)
             } else {
                 val declared = problem.declaredIntDomains.declaredOrNull(x)
                 val xBest = when {
@@ -145,13 +219,15 @@ internal object SingletonInequalityProjection {
                     else -> declared?.max ?: bounds.upper(x)
                 }
                 if (!fitsHalfLong(xBest)) return@forEachIndexed
-                added.add(Linear(restCoeffs, restVars, f.op, row.bound - a * xBest))
-                steps.add(RebuildStep.AffineValue(x, xBest, IntArray(0), LongArray(0), 1L))
+                replacement = Linear(restCoeffs, restVars, f.op, row.bound - a * xBest)
+                step = RebuildStep.AffineValue(x, xBest, IntArray(0), LongArray(0), 1L)
             }
+            if (!scan.check()) throw Interrupted()
             dropped.add(i)
+            if (replacement != null) added.add(replacement)
+            steps.add(step)
             eliminated.add(x)
         }
-        if (dropped.isEmpty()) return SourceDelta()
-        return SourceDelta(dropped.toIntArray(), added, rebuild = SourceRebuilds(steps))
+        scan.check()
     }
 }
