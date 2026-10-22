@@ -103,14 +103,14 @@ class TieredVariableSelector(
         var best: VarRef? = null
         var bestRegret = Long.MIN_VALUE
         for (v in tier.boolVars) {
-            if (session.boolValue(v) == null && 1L > bestRegret) {
+            if (session.needsBoolDecision(v) && 1L > bestRegret) {
                 best = VarRef.Bool(v)
                 bestRegret = 1L
             }
         }
         for (v in tier.intVars) {
             val d = session.intDomain(v)
-            if (d.isFixed) continue
+            if (!session.needsIntDecision(v)) continue
             val regret = d.higher(d.min) - d.min
             if (regret > bestRegret) {
                 best = VarRef.IntVar(v)
@@ -121,15 +121,15 @@ class TieredVariableSelector(
     }
 
     private fun firstFree(tier: SearchTier, session: PropagationSession): VarRef? {
-        for (v in tier.boolVars) if (session.boolValue(v) == null) return VarRef.Bool(v)
-        for (v in tier.intVars) if (!session.intDomain(v).isFixed) return VarRef.IntVar(v)
+        for (v in tier.boolVars) if (session.needsBoolDecision(v)) return VarRef.Bool(v)
+        for (v in tier.intVars) if (session.needsIntDecision(v)) return VarRef.IntVar(v)
         return null
     }
 
     private fun randomFree(tier: SearchTier, session: PropagationSession, rng: Random): VarRef? {
         val candidates = ArrayList<VarRef>(tier.boolVars.size + tier.intVars.size)
-        for (v in tier.boolVars) if (session.boolValue(v) == null) candidates.add(VarRef.Bool(v))
-        for (v in tier.intVars) if (!session.intDomain(v).isFixed) candidates.add(VarRef.IntVar(v))
+        for (v in tier.boolVars) if (session.needsBoolDecision(v)) candidates.add(VarRef.Bool(v))
+        for (v in tier.intVars) if (session.needsIntDecision(v)) candidates.add(VarRef.IntVar(v))
         return if (candidates.isEmpty()) null else candidates[rng.nextInt(candidates.size)]
     }
 
@@ -143,7 +143,7 @@ class TieredVariableSelector(
         var best: VarRef? = null
         var bestScore = Long.MIN_VALUE
         for (v in tier.boolVars) {
-            if (session.boolValue(v) != null) continue
+            if (!session.needsBoolDecision(v)) continue
             val s = score(2L, 0L, 1L)
             if (s > bestScore) {
                 bestScore = s
@@ -152,7 +152,7 @@ class TieredVariableSelector(
         }
         for (v in tier.intVars) {
             val d = session.intDomain(v)
-            if (d.isFixed) continue
+            if (!session.needsIntDecision(v)) continue
             val s = score(d.valueCount, d.min, d.max)
             if (s > bestScore) {
                 bestScore = s

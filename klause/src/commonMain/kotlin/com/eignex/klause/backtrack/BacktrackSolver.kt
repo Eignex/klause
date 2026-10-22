@@ -197,7 +197,7 @@ class BacktrackSolver internal constructor(
     override fun solve(params: BacktrackParams): SolveResult {
         val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
-        return CpSatisfactionTraversal(problem, params, sink, lpSolveContext).use { traversal ->
+        return CpSatisfactionTraversal(problem, params, sink, lpSolveContext, singleModel = true).use { traversal ->
             val outcome = checkNotNull(traversal.next()) { "an unsliced traversal never pauses" }
             verdictOf(outcome, params.assumptions, params.cancellation, sink)
         }

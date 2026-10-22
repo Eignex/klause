@@ -21,14 +21,14 @@ object DomainMaxRegret : VariableSelector {
         var bestRegret = Long.MIN_VALUE
         val problem = session.problem
         for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) == null && 1L > bestRegret) {
+            if (session.needsBoolDecision(v) && 1L > bestRegret) {
                 best = VarRef.Bool(v)
                 bestRegret = 1L
             }
         }
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
-            if (d.isFixed) continue
+            if (!session.needsIntDecision(v)) continue
             val regret = (d.higher(d.min) - d.min).let { if (it < 0L) Long.MAX_VALUE else it }
             if (regret > bestRegret) {
                 best = VarRef.IntVar(v)

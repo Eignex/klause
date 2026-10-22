@@ -34,9 +34,9 @@ private class CpBranchingState(private val session: PropagationSession) : Branch
 
     override val numIntVars: Int get() = session.problem.numIntVars
 
-    override fun boolValue(variable: Int): Boolean? = session.boolValue(variable)
+    override fun needsBoolDecision(variable: Int): Boolean = session.needsBoolDecision(variable)
 
-    override fun intFixed(variable: Int): Boolean = session.intDomain(variable).isFixed
+    override fun needsIntDecision(variable: Int): Boolean = session.needsIntDecision(variable)
 }
 
 /**

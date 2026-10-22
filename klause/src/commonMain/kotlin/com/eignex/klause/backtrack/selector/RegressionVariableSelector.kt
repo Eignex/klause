@@ -122,11 +122,11 @@ class RegressionVariableSelector private constructor(
         val problem = session.problem
         val all = ArrayList<Candidate>()
         for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) == null) all.add(Candidate(VarRef.Bool(v), 2))
+            if (session.needsBoolDecision(v)) all.add(Candidate(VarRef.Bool(v), 2))
         }
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
-            if (d.isFixed) continue
+            if (!session.needsIntDecision(v)) continue
             all.add(Candidate(VarRef.IntVar(v), d.valueCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()))
         }
         if (all.size <= scoreCap) return all

@@ -71,13 +71,13 @@ class Chb(
         while (h.size > 0) {
             val id = h.extractMax()
             if (id < numBoolCached) {
-                if (session.boolValue(id) == null) {
+                if (session.needsBoolDecision(id)) {
                     result = VarRef.Bool(id)
                     break
                 }
             } else {
                 val intId = id - numBoolCached
-                if (!session.intDomain(intId).isFixed) {
+                if (session.needsIntDecision(intId)) {
                     result = VarRef.IntVar(intId)
                     break
                 }

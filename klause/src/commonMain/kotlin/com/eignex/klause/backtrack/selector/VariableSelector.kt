@@ -10,8 +10,8 @@ import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
 /**
- * Picks the next variable to branch on over finite domains. Returns `null` when every variable is
- * determined.
+ * Picks the next variable to branch on over finite domains. Returns `null` when no variable still
+ * needs a decision: every column is determined, or is one a leaf completes because nothing reads it.
  *
  * This is [VariableBranching] over the finite substrate, plus the hooks only that substrate can
  * deliver: a CP witness at a solution, the propagation engine's reason set at a conflict, and the
@@ -20,7 +20,7 @@ import kotlin.random.Random
  * through [asSelector], so they serve theory traversals too.
  */
 interface VariableSelector : VariableBranching<PropagationSession> {
-    /** Pick the next variable to branch on, or null when all are determined. */
+    /** Pick the next variable to branch on, or null when none still needs a decision. */
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     override fun pick(session: PropagationSession, rng: Random): VarRef?
 
@@ -81,7 +81,7 @@ internal fun pickByActivityWithDomDivider(
         heap.extractMax()
         skip.add(topId)
         if (topId < numBool) {
-            if (session.boolValue(topId) == null) {
+            if (session.needsBoolDecision(topId)) {
                 val score = activity / 2.0
                 if (score > bestScore) {
                     bestScore = score
@@ -91,7 +91,7 @@ internal fun pickByActivityWithDomDivider(
         } else {
             val intId = topId - numBool
             val dom = session.intDomain(intId).valueCount
-            if (dom > 1) {
+            if (session.needsIntDecision(intId)) {
                 val score = activity / dom.toDouble()
                 if (score > bestScore) {
                     bestScore = score

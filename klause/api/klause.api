@@ -14776,10 +14776,10 @@ public final class com/eignex/klause/solver/search/BranchingConflict$Companion {
 }
 
 public abstract interface class com/eignex/klause/solver/search/BranchingState {
-	public abstract fun boolValue (I)Ljava/lang/Boolean;
 	public abstract fun getNumBoolVars ()I
 	public abstract fun getNumIntVars ()I
-	public abstract fun intFixed (I)Z
+	public abstract fun needsBoolDecision (I)Z
+	public abstract fun needsIntDecision (I)Z
 }
 
 public final class com/eignex/klause/solver/search/CardinalitySearchComponent : com/eignex/klause/solver/search/SearchComponent {

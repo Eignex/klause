@@ -55,8 +55,9 @@ until it completes; see
 
 Every pass of the traversal loop starts by choosing what to decide next. This
 section describes how branching proposals are collected and ordered, how component
-hints choose which side of a split to try first, how arithmetic splits get stable
-Boolean names, and how components are registered and assembled into one session.
+hints choose which side of a split to try first, which columns a leaf completes
+without a decision, how arithmetic splits get stable Boolean names, and how
+components are registered and assembled into one session.
 
 ### Lazy branch selection
 
@@ -101,6 +102,23 @@ fewer of them. Index construction is bounded and charged to the opening token; s
 [native arithmetic allowances](06-sessions.md#native-arithmetic-allowances).
 Solution-guided LP bounding may also order values by verified peer incumbents until
 its first local witness. Hints supply no incumbent, pruning or publication authority.
+
+### Leaf-completed columns
+
+Presolve keeps every column slot, so a column whose readers were all reduced away
+(folded comparison indicators, eliminated or substituted columns) stays a free
+column. A one-model CP search, satisfaction or optimization, leaves such columns
+undecided: [LeafColumns](../klause/src/commonMain/kotlin/com/eignex/klause/propagation/LeafColumns.kt)
+names the columns no factor declares, less every objective term, and the built-in
+selectors pass over them. A leaf then reads `false` or the domain minimum for each
+one still free. Because nothing reads these columns, that value extends every
+assignment the leaf's checks accept, and refutation is unchanged.
+
+The columns are skipped, never fixed: assumptions and neighborhood pins still
+assign them, and a later search over the same model may need either value.
+Enumeration, sampling and model counting tell solutions apart by these columns,
+and a supplied search component may read any column through the shared trail, so
+those searches decide every column.
 
 ### Source bound atoms
 

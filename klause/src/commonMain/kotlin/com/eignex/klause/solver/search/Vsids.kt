@@ -78,10 +78,10 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             while (h.size > 0) {
                 val id = h.extractMax()
                 if (id < numBoolCached) {
-                    if (state.boolValue(id) == null) return VarRef.Bool(id)
+                    if (state.needsBoolDecision(id)) return VarRef.Bool(id)
                 } else {
                     val intId = id - numBoolCached
-                    if (!state.intFixed(intId)) {
+                    if (state.needsIntDecision(intId)) {
                         h.restore(id)
                         return VarRef.IntVar(intId)
                     }
@@ -90,16 +90,16 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             // Pop-on-pick can strand an open variable out of the heap if a re-add is missed across a
             // restart or backtrack, and returning `null` then would commit an incomplete assignment
             // as a solution. Rescan and re-offer every still-open variable before giving up; this runs
-            // only when the heap empties, so `null` provably means every variable is determined.
+            // only when the heap empties, so `null` provably means no variable still needs a decision.
             var refilled = false
             for (v in 0 until numBoolCached) {
-                if (state.boolValue(v) == null && !h.contains(v)) {
+                if (state.needsBoolDecision(v) && !h.contains(v)) {
                     h.restore(v)
                     refilled = true
                 }
             }
             for (v in 0 until numIntCached) {
-                if (!state.intFixed(v) && !h.contains(numBoolCached + v)) {
+                if (state.needsIntDecision(v) && !h.contains(numBoolCached + v)) {
                     h.restore(numBoolCached + v)
                     refilled = true
                 }

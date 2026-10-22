@@ -91,7 +91,7 @@ private class SessionBranchingState(override val numBoolVars: Int) : BranchingSt
 
     override val numIntVars: Int get() = 0
 
-    override fun boolValue(variable: Int): Boolean? = checkNotNull(context).boolValue(variable)
+    override fun needsBoolDecision(variable: Int): Boolean = checkNotNull(context).boolValue(variable) == null
 
-    override fun intFixed(variable: Int): Boolean = true
+    override fun needsIntDecision(variable: Int): Boolean = false
 }

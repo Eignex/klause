@@ -47,6 +47,7 @@ internal class ResumableSatisfaction(
         propagationCancellation = Cancellation { globalToken() },
         projection = solver.propagationProjection(params.nativeSat ?: true),
         deferredInitialization = true,
+        singleModel = true,
         slice = TraversalSlice(pauses = { !globalToken() }, beforeBranch = {
             slice.charge()
             slice.workExpired()
