@@ -11,8 +11,10 @@ internal class PolynomialFormulaReduction private constructor(
     val formula: PolynomialFormula,
     private val fibres: List<FormulaFibre>,
     val inconsistent: Boolean,
+    private val booleansReduced: Boolean,
 ) {
     val eliminatedCount: Int get() = fibres.size
+    val requiresOriginalCheck: Boolean get() = booleansReduced || fibres.isNotEmpty()
 
     fun reconstruct(
         assignment: QfNraAssignment,
@@ -43,9 +45,16 @@ internal class PolynomialFormulaReduction private constructor(
             val fibres = ArrayList<FormulaFibre>()
             var inconsistent = false
             var signsChecked = false
+            var booleansReduced = false
             try {
                 while (true) {
                     arithmetic.step()
+                    val reducedBooleans = current.reduceBooleanDefinitions(arithmetic)
+                    if (reducedBooleans != null) {
+                        current = reducedBooleans
+                        booleansReduced = true
+                        yield(null)
+                    }
                     val forced = current.forcedAtoms(arithmetic)
                     if (forced == null) {
                         inconsistent = true
@@ -93,7 +102,14 @@ internal class PolynomialFormulaReduction private constructor(
                     if (inconsistent) break
                     if (replacements.isEmpty()) {
                         val family = current.atoms.map { arithmetic.step(); it.polynomial }
-                        val graph = equationalSection(equations, family, arithmetic) ?: break
+                        val graph = equationalSection(equations, family, arithmetic)
+                        if (graph == null) {
+                            if (reducedBooleans != null) {
+                                yield(null)
+                                continue
+                            }
+                            break
+                        }
                         replacements[graph.variable] = graph.replacement
                     }
                     val rewritten = ArrayList<PolynomialAtom>()
@@ -126,7 +142,7 @@ internal class PolynomialFormulaReduction private constructor(
                 // Only completed total substitutions and their reverse fibres survive a representation decline.
             }
             arithmetic.step()
-            yield(PolynomialFormulaReduction(current, fibres.toList(), inconsistent))
+            yield(PolynomialFormulaReduction(current, fibres.toList(), inconsistent, booleansReduced))
         }.iterator()
     }
 }

@@ -253,7 +253,16 @@ Boolean DAG retains original Boolean identities and the first numeric
 representative, including after graph substitution. Constant numeric atoms retain
 their exact polynomials; Boolean propagation evaluates their truth.
 
-Before probing or Boolean search, mandatory numeric predicates are
+Before probing or Boolean search, required equivalences defining Boolean variables
+by numeric predicates are substituted throughout the formula. Their tautologies
+are removed, so a source implicant need not choose truth values for unused
+definitions. An equivalence in an optional guarded branch cannot define a global
+substitution. Remaining constraints, including other definitions of the same
+Boolean variable and condition pins, keep their numeric consequences. Reduced
+witnesses recover original Boolean values through the original normalized formula
+check, even when no real coordinate was eliminated.
+
+Mandatory numeric predicates are
 extracted with Boolean propagation. Their exact total graph equalities are
 substituted into every atom, including optional branches. Opposite weak bounds may
 supply such an equality; an unforced guarded equation or an equation with a
