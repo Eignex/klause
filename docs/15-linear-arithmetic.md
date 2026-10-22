@@ -135,9 +135,10 @@ sharing an activator must agree, or that activator receives no preference. These
 guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
-When default pure-real guidance exceeds the eager row envelope, a bounded index
-can refer to immutable prepared rows and evaluate one primitive comparison on demand.
-Shared activators and disjunctions receive no indexed preference. The index,
+Default pure-real guidance uses a bounded index of immutable prepared rows to
+evaluate primitive comparisons on demand when their heads have unique owners.
+Shared heads retain eager evaluation when that row envelope fits. An oversized
+eager envelope can use the index while declining shared activators and disjunctions. The index,
 selected heads and retained rational point share the same storage envelope, and
 retraction, restart or a changed arithmetic assertion discards the point.
 For default eager or indexed rows containing only real coordinates, a retained
@@ -158,9 +159,10 @@ When that envelope has room for another real vector, a recovered point can remai
 as an untrusted numerical guess across retraction and restart. After a float optimum
 without an exact point, every currently selected original row must accept the guess
 under the current operation allowance before it can supply fresh guidance. Releasing
-the hint workspace discards the guesses. Eager providers can retain older numerical
-vectors in unused entries of the same envelope, including one entry per ring slot;
-indexed providers retain one guess. Candidates are tried in recency order.
+the hint workspace discards the guesses. Both providers can retain older numerical
+vectors in unused entries of the same envelope, including one entry per ring slot.
+Indexed storage counts the head index, selected heads, numerical point and current
+guess before reserving history coordinates and slots. Candidates are tried in recency order.
 In a partial pure-real production scope, checking every selected original row can
 replace the primary LP solve when the conjunctive rows contain only inequalities
 and unconditional equalities, without Boolean coefficients or added theory assertions.

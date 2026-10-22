@@ -49,6 +49,32 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `default real hints should preserve agreeing shared comparisons`() {
+        val model = Problem(
+            numBoolVars = 2, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 0.0, strict = true),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true,
+                defaultGraphSelections = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertEquals(true, hints.preferredBool(0))
+            assertEquals(false, hints.preferredBool(1))
+        }
+    }
+
+    @Test
     fun `registered bounds should expire after delayed Boolean scopes retract`() {
         val model = Problem(
             numBoolVars = 5,

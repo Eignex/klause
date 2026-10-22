@@ -358,6 +358,10 @@ class ExactLiraSearchComponent private constructor(
         ) {
             return null
         }
+        if (defaultOpening && model.numIntVars == 0) {
+            indexedPointHints(stop, defaultGraphSelections, requireUniqueHeads = true)?.let { return it }
+            if (stop()) return null
+        }
         var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
         val rows = ArrayList<PreparedSourceRow>()
         val variables = LinkedHashSet<Int>()
@@ -428,6 +432,7 @@ class ExactLiraSearchComponent private constructor(
     private fun indexedPointHints(
         stop: Cancellation,
         defaultGraphSelections: Boolean,
+        requireUniqueHeads: Boolean = false,
     ): Pair<IntArray, SearchCandidateHints>? {
         if (2L * model.numBoolVars + model.numRealVars > MAX_POINT_HINT_ENTRIES) return null
         stop.charge(model.numBoolVars.toLong())
@@ -450,6 +455,7 @@ class ExactLiraSearchComponent private constructor(
             val head = prepared.row.activator
             if (head == LinearRow.ALWAYS) continue
             if (head !in index.indices) return null
+            if (requireUniqueHeads && (prepared.disjunction || index[head] != UNASSIGNED)) return null
             index[head] = if (prepared.disjunction || index[head] != UNASSIGNED) DECLINED_HINT else row
         }
         stop.charge(model.numBoolVars.toLong())
@@ -467,7 +473,10 @@ class ExactLiraSearchComponent private constructor(
         pointReuseEnabled = reusable
         retainedPointCanReplaceLp = reusable && convex
         recoveryGuessEnabled = reusable && 2L * model.numBoolVars + 2L * model.numRealVars <= MAX_POINT_HINT_ENTRIES
-        recoveryGuessHistoryCapacity = 0
+        recoveryGuessHistoryCapacity = if (recoveryGuessEnabled) {
+            ((MAX_POINT_HINT_ENTRIES - 2L * model.numBoolVars - 2L * model.numRealVars) /
+                (model.numRealVars + 1L)).toInt()
+        } else 0
         pointHintStop = stop
         return variables to pointHintProvider(defaultOpening = true, defaultGraphSelections)
     }
@@ -1440,7 +1449,7 @@ class ExactLiraSearchComponent private constructor(
                 }
                 is RealDifferenceSystem.Result.Feasible -> {
                     if (bools.any { it == UNASSIGNED }) {
-                        if (pointHintRows != null) {
+                        if (pointHintRows != null || pointHintIndex != null) {
                             operationStop.charge(model.numRealVars.toLong() + 1L)
                             if (!operationStop()) capturePointHints(result.point, context, graph = true)
                         }
