@@ -116,8 +116,13 @@ class SingletonInequalityProjectionTest {
                         return row.linearForm
                     }
                 }
-                val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 10) }, List(count) { factor },
-                    alreadyFolded = true)
+                val problem = BakedProblem(
+                    0,
+                    2,
+                    Array(2) { IntDomain(0, 10) },
+                    List(count) { factor },
+                    alreadyFolded = true,
+                )
                 val containing = object : Cancellation {
                     override fun isCancelled(): Boolean = reads >= 32
                     override fun workMeter(): WorkMeter = WorkMeter { work += it }
@@ -173,6 +178,7 @@ class SingletonInequalityProjectionTest {
 
     @Test
     fun `work exhaustion should interrupt occurrence candidate and rewrite scans in both lanes`() {
+        val pass = PresolvePass.PROJECT_SINGLETON_INEQUALITIES
         val width = 512
         val row = Linear(LongArray(width) { 1 }, IntArray(width) { it }, LinearOp.LE, 100)
         val problem = BakedProblem(0, width, Array(width) { IntDomain(0, 10) }, listOf(row), alreadyFolded = true)
@@ -186,14 +192,19 @@ class SingletonInequalityProjectionTest {
                     else -> occurrenceWork + validationWork + 10L + 10L + 320L
                 }
                 val budget = PresolveBudget(allowance)
+                val objective = if (phase == "candidates") {
+                    (0 until width - 1).associateWith { 1L }
+                } else {
+                    emptyMap()
+                }
                 val context = PresolveContext(
-                    objectiveIntCoeffs = if (phase == "candidates") (0 until width - 1).associateWith { 1L } else emptyMap(),
+                    objectiveIntCoeffs = objective,
                     cancellation = budget.orSpent(Cancellation.Never),
                 )
 
                 val empty = when (lane) {
-                    PresolveLane.SOURCE -> PresolvePass.PROJECT_SINGLETON_INEQUALITIES.applySource(problem, context).isEmpty
-                    PresolveLane.FINITE -> PresolvePass.PROJECT_SINGLETON_INEQUALITIES.applyFinite(problem, context).isEmpty
+                    PresolveLane.SOURCE -> pass.applySource(problem, context).isEmpty
+                    PresolveLane.FINITE -> pass.applyFinite(problem, context).isEmpty
                 }
 
                 assertTrue(empty, "$lane $phase")
@@ -207,17 +218,24 @@ class SingletonInequalityProjectionTest {
         val pass = PresolvePass.PROJECT_SINGLETON_INEQUALITIES
         for (lane in PresolveLane.entries) {
             for (openBelow in listOf(false, true)) {
-                val problem = BakedProblem(0, 2, arrayOf(IntDomain(2, 9), IntDomain(0, 20)),
+                val problem = BakedProblem(
+                    0,
+                    2,
+                    arrayOf(IntDomain(2, 9), IntDomain(0, 20)),
                     listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)),
-                    openIntLo = booleanArrayOf(openBelow, false), alreadyFolded = true)
+                    openIntLo = booleanArrayOf(openBelow, false),
+                    alreadyFolded = true,
+                )
                 var work = 0L
                 val containing = object : Cancellation {
                     override fun isCancelled(): Boolean = false
                     override fun workMeter(): WorkMeter = WorkMeter { work += it }
                 }
                 val budget = PresolveBudget(0L)
-                val context = PresolveContext(objectiveIntCoeffs = mapOf(1 to 1L),
-                    cancellation = budget.preparationCancellation(containing))
+                val context = PresolveContext(
+                    objectiveIntCoeffs = mapOf(1 to 1L),
+                    cancellation = budget.preparationCancellation(containing),
+                )
 
                 val delta = budget.observe(pass, lane, { problem.presolveSize() }) {
                     when (lane) {
@@ -232,7 +250,12 @@ class SingletonInequalityProjectionTest {
                 assertEquals(listOf(0), delta.droppedIndices.toList(), "$lane $openBelow")
                 assertEquals(if (free) -5L else 2L, ints[0], "$lane $openBelow")
                 assertEquals(if (free) 0 else 1, delta.addedFactors.size, "$lane $openBelow")
-                assertEquals(if (lane == PresolveLane.FINITE) 70L else if (free) 100L else 90L, work)
+                val expectedWork = when {
+                    lane == PresolveLane.FINITE -> 70L
+                    free -> 100L
+                    else -> 90L
+                }
+                assertEquals(expectedWork, work)
                 assertEquals(work, budget.invocations.single().nativeWork)
                 assertEquals(0L, budget.spent())
             }
@@ -254,8 +277,14 @@ class SingletonInequalityProjectionTest {
                         }
                     }
                 }
-                val problem = BakedProblem(0, 3, arrayOf(IntDomain(2, 9), IntDomain(2, 9), IntDomain(0, 20)),
-                    factors, openIntLo = booleanArrayOf(openBelow, openBelow, false), alreadyFolded = true)
+                val problem = BakedProblem(
+                    0,
+                    3,
+                    arrayOf(IntDomain(2, 9), IntDomain(2, 9), IntDomain(0, 20)),
+                    factors,
+                    openIntLo = booleanArrayOf(openBelow, openBelow, false),
+                    alreadyFolded = true,
+                )
                 val context = PresolveContext(cancellation = Cancellation { reads >= 2 })
                 reads = 0
 
