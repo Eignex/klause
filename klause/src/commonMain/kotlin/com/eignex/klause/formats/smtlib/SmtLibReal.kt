@@ -222,63 +222,18 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
         cancellation.charge(entries)
         if (cancellation()) throw PolynomialSourceInterrupted()
         if (entries > maxEntries) return create()
-        val pivot = pivot(term.intCoeffs) ?: pivot(term.realCoeffs) ?: BigFraction.ONE
-        val scale = pivot.reciprocal()
-        val orientedRelation = if (pivot.signum() < 0) {
-            when (relation) {
-                LinearOp.LE -> LinearOp.GE
-                LinearOp.GE -> LinearOp.LE
-                else -> relation
-            }
-        } else {
-            relation
-        }
-        val complemented = orientedRelation == LinearOp.GE || orientedRelation == LinearOp.NE
         val key = Predicate(
-            normalized(term.intCoeffs, scale),
-            normalized(term.realCoeffs, scale),
-            term.constant * scale,
-            when (orientedRelation) {
-                LinearOp.GE -> LinearOp.LE
-                LinearOp.NE -> LinearOp.EQ
-                else -> orientedRelation
-            },
-            if (orientedRelation == LinearOp.GE) !strict else strict,
+            term.intCoeffs.filterValues { !it.isZero },
+            term.realCoeffs.filterValues { !it.isZero },
+            term.constant, relation, strict,
         )
-        checkpoint()
-        literals[key]?.let { return if (complemented) Lit.negate(it) else it }
+        literals[key]?.let { return it }
         val literal = create()
         if (entries <= maxEntries - retainedEntries) {
-            literals[key] = if (complemented) Lit.negate(literal) else literal
+            literals[key] = literal
             retainedEntries += entries.toInt()
         }
         return literal
-    }
-
-    private fun pivot(coefficients: Map<Int, BigFraction>): BigFraction? {
-        var first: Int? = null
-        var value: BigFraction? = null
-        for ((variable, coefficient) in coefficients) {
-            checkpoint()
-            if (!coefficient.isZero && (first == null || variable < first)) {
-                first = variable
-                value = coefficient
-            }
-        }
-        return value
-    }
-
-    private fun normalized(coefficients: Map<Int, BigFraction>, scale: BigFraction): Map<Int, BigFraction> =
-        buildMap {
-            for ((variable, coefficient) in coefficients) {
-                checkpoint()
-                if (!coefficient.isZero) put(variable, coefficient * scale)
-            }
-        }
-
-    private fun checkpoint() {
-        cancellation.charge(1)
-        if (cancellation()) throw PolynomialSourceInterrupted()
     }
 }
 
