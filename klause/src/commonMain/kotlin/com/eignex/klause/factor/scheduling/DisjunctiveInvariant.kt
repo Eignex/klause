@@ -45,7 +45,7 @@ internal class DisjunctiveInvariant(
 
     override val providesImplicitNeighbourhood: Boolean get() = true
 
-    /** Swaps of equal-duration task pairs, from the unit-capacity backing. */
+    /** Compaction, reorders and equal-duration swaps, from the unit-capacity backing. */
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) =
         cumulativeBacking.proposeStructuredMoves(state, factorId, sink)
 

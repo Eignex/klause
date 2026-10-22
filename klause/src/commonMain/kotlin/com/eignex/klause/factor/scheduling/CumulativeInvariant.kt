@@ -602,6 +602,10 @@ internal class CumulativeInvariant(
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (n < 2) return
+        val source = state.problem.factors[factorId]
+        if (state.intPayload[factorId] == 0 && source is Cumulative) {
+            ScheduleRelocations(source, factorId, state, sink).propose()
+        }
         var emitted = 0
         var attempts = 0
         while (emitted < CUMULATIVE_STRUCTURED_SWAP_CAP &&
