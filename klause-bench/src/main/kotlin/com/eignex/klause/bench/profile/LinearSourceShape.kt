@@ -274,6 +274,12 @@ internal object LinearSourceShape {
     private fun booleanGateShapes(model: Problem, declaredBooleans: Collection<Int>): JsonObject {
         val clauses = model.factors.filterIsInstance<Clause>()
         val units = clauses.filter { it.literals.size == 1 }.map { it.literals.single() }.toSet()
+        val positiveOccurrences = IntArray(model.numBoolVars)
+        val negativeOccurrences = IntArray(model.numBoolVars)
+        for (clause in clauses) for (literal in clause.literals) {
+            val counts = if (Lit.isPositive(literal)) positiveOccurrences else negativeOccurrences
+            counts[Lit.variable(literal)]++
+        }
         val binary = clauses.filter { it.literals.size == 2 }.map { it.literals.sorted() }.toSet()
         val ternary = clauses.filter { it.literals.size == 3 }.map { it.literals.sorted() }
             .filter { row -> row.map(Lit::variable).distinct().size == 3 }.toSet()
@@ -317,6 +323,13 @@ internal object LinearSourceShape {
                 val privateGroups = groups.map { heads -> heads.filter { it !in externalHeads } }
                     .filter { it.isNotEmpty() }
                 val privateHeads = privateGroups.flatten().toSet()
+                val expandableHeads = privateHeads.filter { head ->
+                    when (operator) {
+                        "and" -> positiveOccurrences[head] == 1 && negativeOccurrences[head] > 2
+                        "or" -> negativeOccurrences[head] == 1 && positiveOccurrences[head] > 2
+                        else -> false
+                    }
+                }
                 put(operator, buildJsonObject {
                     put("completeDefinitionEntries", groups.sumOf { it.size })
                     put("distinctOutputHeads", groups.flatten().toSet().size)
@@ -328,6 +341,10 @@ internal object LinearSourceShape {
                     put("purePrivateDuplicateHeadEntries", privateGroups.sumOf { it.size - 1 })
                     put("privateUnitTrueHeads", privateHeads.count { Lit.make(it, true) in units })
                     put("privateUnitFalseHeads", privateHeads.count { Lit.make(it, false) in units })
+                    put("singlePolarityExpandableHeads", expandableHeads.size)
+                    put("singlePolarityConsumerOccurrences", expandableHeads.sumOf { head ->
+                        (if (operator == "and") negativeOccurrences[head] else positiveOccurrences[head]) - 2
+                    })
                 })
             }
         }

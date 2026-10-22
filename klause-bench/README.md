@@ -347,6 +347,9 @@ Tables with the two Boolean values `0` and `1` have a separate count.
 Boolean gate counts recognize complete two-input AND/OR and IFF clause families.
 Private gate heads directly forced by positive or negative source unit clauses
 are counted separately; these counts do not run Boolean propagation.
+For private AND/OR heads, single-polarity counts subtract the complete gate's own
+clauses and identify consumers that could expand into one disjunction. They do
+not eliminate gates or estimate recursive expansion.
 Signatures preserve signed inputs; IFF also folds simultaneous input negation.
 Private counts exclude declared Booleans and heads read by non-clause factors.
 These are inferred functional definitions in the inspected model, not compiler
