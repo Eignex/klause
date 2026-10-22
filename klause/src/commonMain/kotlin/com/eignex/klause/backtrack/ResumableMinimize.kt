@@ -1001,11 +1001,13 @@ internal class ResumableMinimize(
             }
         }
         // Strip-energy floor: the tasks proven to end by the objective need room for their energy.
-        // The reason keeps the raise sound under the live bounds it reads.
+        // At the root the raise is a level-0 fact; under assumptions it keeps its reason, whose bound atoms
+        // are built only then so the root search sees no extra atoms.
         singleObj?.let { obj ->
             lpEngine.stripEnergyFloor(session)?.let { floor ->
                 if (floor.value > session.intDomain(obj.varId).min) {
-                    session.implyIntAtLeastWithReason(obj.varId, floor.value, floor.reason)
+                    if (session.decisionLevel == 0) session.implyIntAtLeast(obj.varId, floor.value)
+                    else session.implyIntAtLeastWithReason(obj.varId, floor.value, floor.reason)
                 }
             }
         }

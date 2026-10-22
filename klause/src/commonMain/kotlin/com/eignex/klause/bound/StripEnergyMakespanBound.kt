@@ -98,7 +98,7 @@ internal class StripEnergyMakespanBound(
                 bestValue = value
             }
         }
-        return best?.let { StripEnergyFloor(bestValue, reasonOf(it, session)) }
+        return best?.let { strip -> StripEnergyFloor(bestValue) { reasonOf(strip, session) } }
     }
 
     private fun floorOf(strip: Strip, session: PropagationSession): Long? {
@@ -221,6 +221,10 @@ internal class StripEnergyMakespanBound(
 
 /**
  * A floor [value] on the objective variable and its [reason]: currently-false literals negating the
- * bound atoms it rests on, so `objective ≥ value ∨ reason` holds at every solution.
+ * bound atoms it rests on, so `objective ≥ value ∨ reason` holds at every solution. The reason is built
+ * on first read from the session's bounds at that time, since building it allocates bound atoms, so a
+ * caller reads it before those bounds move.
  */
-internal class StripEnergyFloor(val value: Long, val reason: IntArray)
+internal class StripEnergyFloor(val value: Long, explain: () -> IntArray) {
+    val reason: IntArray by lazy(LazyThreadSafetyMode.NONE, explain)
+}
