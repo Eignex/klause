@@ -390,6 +390,11 @@ can contain only declined preferences. Release counts a live default consultatio
 not avoided registration or capture work. These observations add no numerical
 invocation and establish neither a timing cause nor a whole-source witness gain.
 
+`smtCompleteSearchStage_RECONSTRUCTION_ZERO_DUAL_PRODUCTS_SKIPPED` counts returned
+primary LP checks whose reconstruction omitted at least one exact zero dual
+product. It excludes private openings and does not count products or attribute CPU
+time; no extra numerical check is invoked.
+
 ### Subprocess exit records
 
 Each returned subprocess record retains the actual child exit in `stats.exit`,

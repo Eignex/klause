@@ -773,6 +773,10 @@ class QfLiraSolverHintsTest {
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_UNAVAILABLE"))
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_PREFERRED"))
                 assertEquals(complete, (observed.completeSearchStages?.get("POINT_HINT_LP_CAPTURE") ?: 0L) > 0L)
+                assertEquals(
+                    complete,
+                    (observed.completeSearchStages?.get("RECONSTRUCTION_ZERO_DUAL_PRODUCTS_SKIPPED") ?: 0L) > 0L,
+                )
             }
         }
     }

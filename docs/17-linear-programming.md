@@ -273,6 +273,11 @@ restarts the operation from authority, and every attempt is charged. Owner-local
 exact factors require the same matrix and ordered basis. An off-status feasible
 point cannot furnish a claimed warm basis.
 
+Reconstructed dual checks omit products with exact zero multipliers after the full
+input authority has been validated. Each omitted product still charges a work and
+cancellation visit; reduced costs, selected bounds and their support are checked
+from every nonzero contribution.
+
 ### Farkas and recession checks
 
 For `M = [A | I]`, a Farkas contradiction requires

@@ -66,6 +66,7 @@ internal data class ReconstructionMetrics(
     val maxBits: Int,
     val decline: ReconstructionDecline?,
     val phase: ReconstructionPhase,
+    val skippedZeroDualProducts: Long = 0L,
 )
 
 internal class ReconstructedCertificate(
@@ -96,6 +97,7 @@ internal class ReconstructionMeter(
     var raySuccesses = 0
     var vectorRestarts = 0
     var verificationRestarts = 0
+    private var skippedZeroDualProducts = 0L
     private var work = 0L
     private var allocation = 0L
     private var maxBits = 0
@@ -110,6 +112,13 @@ internal class ReconstructionMeter(
 
     fun poll() {
         if (cancellation()) throw ReconstructionStop(ReconstructionDecline.CANCELLED)
+    }
+
+    fun skipZeroDualProduct(multiplier: BigFraction): Boolean {
+        if (!multiplier.isZero) return false
+        step()
+        skippedZeroDualProducts++
+        return true
     }
 
     fun storage(bytes: Long) {
@@ -160,6 +169,7 @@ internal class ReconstructionMeter(
     fun snapshot(decline: ReconstructionDecline?) = ReconstructionMetrics(
         attempts, pointChecks, dualChecks, rayChecks, pointSuccesses, dualSuccesses, raySuccesses,
         vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase,
+        skippedZeroDualProducts,
     )
 }
 
@@ -349,13 +359,17 @@ private class FixedReconstructionVerifier(
         meter.storage((a.m.toLong() + a.size) * 48L)
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
-        for (i in y.indices) value = plus(value, times(y[i], from(a.rhs[i])))
+        for (i in y.indices) {
+            if (!meter.skipZeroDualProduct(multipliers[i])) value = plus(value, times(y[i], from(a.rhs[i])))
+        }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
         var strict = false
         for (j in 0 until a.size) {
             var d = if (ray) from(BigFraction.ZERO) else from(a.costs[j])
-            for ((row, coefficient) in a.matrix[j]) d = minus(d, times(y[row], from(coefficient)))
+            for ((row, coefficient) in a.matrix[j]) {
+                if (!meter.skipZeroDualProduct(multipliers[row])) d = minus(d, times(y[row], from(coefficient)))
+            }
             val sign = sign(d)
             if (sign != 0) {
                 val upper = sign < 0
@@ -426,13 +440,17 @@ private class BigReconstructionVerifier(
         meter.storage((a.m.toLong() + a.size) * 48L)
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
-        for (i in y.indices) value = plus(value, times(y[i], from(a.rhs[i])))
+        for (i in y.indices) {
+            if (!meter.skipZeroDualProduct(multipliers[i])) value = plus(value, times(y[i], from(a.rhs[i])))
+        }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
         var strict = false
         for (j in 0 until a.size) {
             var d = if (ray) from(BigFraction.ZERO) else from(a.costs[j])
-            for ((row, coefficient) in a.matrix[j]) d = minus(d, times(y[row], from(coefficient)))
+            for ((row, coefficient) in a.matrix[j]) {
+                if (!meter.skipZeroDualProduct(multipliers[row])) d = minus(d, times(y[row], from(coefficient)))
+            }
             val sign = sign(d)
             if (sign != 0) {
                 val upper = sign < 0

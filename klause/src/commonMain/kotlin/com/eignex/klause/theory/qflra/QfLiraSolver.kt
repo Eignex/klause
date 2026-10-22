@@ -1190,6 +1190,9 @@ class ExactLiraSearchComponent private constructor(
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = lp.solve(sparsePointRecovery = true)
+        if ((result?.reconstruction?.skippedZeroDualProducts ?: 0L) > 0L) {
+            observeCompleteStage("RECONSTRUCTION_ZERO_DUAL_PRODUCTS_SKIPPED")
+        }
         if (complete) {
             val key = if (result == null) "NO_RESULT" else listOf(
                 result.verdict.name,
