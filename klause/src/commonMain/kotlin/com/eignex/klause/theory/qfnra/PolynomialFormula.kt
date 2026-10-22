@@ -36,12 +36,21 @@ internal class PolynomialFormula private constructor(
         return PolynomialFormula(nodes, root, replacements.toList(), booleanVariables).sharePredicates(arithmetic)
     }
 
-    fun reduceBooleanDefinitions(arithmetic: PolynomialArithmetic): PolynomialFormula? {
+    fun reduceBooleanDefinitions(arithmetic: PolynomialArithmetic): PolynomialFormula? =
+        prepareBooleanDefinitions(arithmetic).formula
+
+    fun prepareBooleanDefinitions(arithmetic: PolynomialArithmetic): PolynomialBooleanPreparation {
         arithmetic.step()
-        if (booleanVariables.isEmpty() || atoms.isEmpty()) return null
-        val definitions = polynomialBooleanDefinitions(nodes, root, atoms, arithmetic)
-        if (definitions.isEmpty()) return null
-        return sharePredicates(arithmetic, definitions)
+        if (booleanVariables.isEmpty() || atoms.isEmpty()) {
+            return PolynomialBooleanPreparation(null) { forcedAtoms(arithmetic) }
+        }
+        val prepared = polynomialBooleanDefinitions(nodes, root, atoms, arithmetic)
+        if (prepared.definitions.isNotEmpty()) {
+            val rewritten = sharePredicates(arithmetic, prepared.definitions)
+            return PolynomialBooleanPreparation(rewritten) { rewritten.forcedAtoms(arithmetic) }
+        }
+        val state = prepared.state
+        return PolynomialBooleanPreparation(null) { state?.let { forcedAtoms(arithmetic, it) } }
     }
 
     private fun sharePredicates(
@@ -60,6 +69,13 @@ internal class PolynomialFormula private constructor(
     fun forcedAtoms(arithmetic: PolynomialArithmetic): List<PolynomialAtom>? {
         val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
         if (!state.initialize()) return null
+        return forcedAtoms(arithmetic, state)
+    }
+
+    private fun forcedAtoms(
+        arithmetic: PolynomialArithmetic,
+        state: PolynomialBooleanPropagation,
+    ): List<PolynomialAtom>? {
         for ((index, node) in nodes.withIndex()) {
             arithmetic.step()
             if (node !is FormulaNode.Atom) continue
@@ -315,6 +331,13 @@ internal class PolynomialFormula private constructor(
             return PolynomialFormula(nodes, indices.getValue(formula), atoms, variables).sharePredicates(arithmetic)
         }
     }
+}
+
+internal class PolynomialBooleanPreparation(
+    val formula: PolynomialFormula?,
+    private val collect: () -> List<PolynomialAtom>?,
+) {
+    fun forcedAtoms(): List<PolynomialAtom>? = collect()
 }
 
 internal sealed interface FormulaNode {

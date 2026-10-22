@@ -49,13 +49,14 @@ internal class PolynomialFormulaReduction private constructor(
             try {
                 while (true) {
                     arithmetic.step()
-                    val reducedBooleans = current.reduceBooleanDefinitions(arithmetic)
+                    val booleanPreparation = current.prepareBooleanDefinitions(arithmetic)
+                    val reducedBooleans = booleanPreparation.formula
                     if (reducedBooleans != null) {
                         current = reducedBooleans
                         booleansReduced = true
                         yield(null)
                     }
-                    val forced = current.forcedAtoms(arithmetic)
+                    val forced = booleanPreparation.forcedAtoms()
                     if (forced == null) {
                         inconsistent = true
                         break

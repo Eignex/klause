@@ -274,6 +274,9 @@ Substitutions retain reverse fibres. Existing arithmetic
 representation limits can decline a substitution while preserving its completed
 prefix; cancellation and work exhaustion withhold the result. Expansion uses the
 caller's remaining work and representation limits.
+An unchanged graph retains its definition scan's root closure for required-atom
+collection; a rewritten graph initializes fresh state. The closure belongs to one
+preparation call and keeps its containing cancellation and work meter.
 
 The procedure then runs in four stages; only the last two are needed for
 completeness.

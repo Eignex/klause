@@ -4,12 +4,17 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 
 internal data class PolynomialBooleanDefinition(val atom: PolynomialAtom, val sameTruth: Boolean)
 
+internal class PolynomialBooleanDefinitions(
+    val definitions: Map<Int, PolynomialBooleanDefinition>,
+    val state: PolynomialBooleanPropagation?,
+)
+
 internal fun polynomialBooleanDefinitions(
     nodes: List<FormulaNode>,
     root: Int,
     atoms: List<PolynomialAtom>,
     arithmetic: PolynomialArithmetic,
-): Map<Int, PolynomialBooleanDefinition> = BooleanDefinitionFinder(nodes, root, atoms, arithmetic).find()
+): PolynomialBooleanDefinitions = BooleanDefinitionFinder(nodes, root, atoms, arithmetic).find()
 
 private class BooleanDefinitionFinder(
     private val nodes: List<FormulaNode>,
@@ -20,9 +25,9 @@ private class BooleanDefinitionFinder(
     private val clauses = HashMap<DefinitionKey, Int>()
     private val definitions = LinkedHashMap<Int, PolynomialBooleanDefinition>()
 
-    fun find(): Map<Int, PolynomialBooleanDefinition> {
+    fun find(): PolynomialBooleanDefinitions {
         val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
-        if (!state.initialize() || !state.propagate()) return emptyMap()
+        if (!state.initialize() || !state.propagate()) return PolynomialBooleanDefinitions(emptyMap(), null)
         for ((index, node) in nodes.withIndex()) {
             arithmetic.step()
             if (state.value(index) != PolynomialFormula.TRUE || node !is FormulaNode.Junction ||
@@ -32,7 +37,7 @@ private class BooleanDefinitionFinder(
             if (clause != null) recordClause(clause) else recordAlternatives(node.children)
         }
         arithmetic.step()
-        return definitions
+        return PolynomialBooleanDefinitions(definitions, state)
     }
 
     private fun recordClause(term: DefinitionTerm) {

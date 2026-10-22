@@ -22,6 +22,81 @@ import kotlin.test.assertTrue
 
 class PolynomialFormulaTest {
     @Test
+    fun `required atom collection extends a prepared root closure with constant truth`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const b Bool) " +
+                "(assert (and b (or (> 0 1) (> x 0))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val prepared = formula.prepareBooleanDefinitions(arithmetic)
+
+        val atoms = assertNotNull(prepared.forcedAtoms())
+
+        assertEquals(listOf(formula.atoms.last()), atoms.filter { it.polynomial.mainVariable != null })
+    }
+
+    @Test
+    fun `constant predicates can contradict a prepared root closure`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const b Bool) " +
+                "(assert (and b (> 0 1) (> x 0)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val prepared = formula.prepareBooleanDefinitions(arithmetic)
+
+        val atoms = prepared.forcedAtoms()
+
+        assertNull(atoms)
+    }
+
+    @Test
+    fun `a contradictory Boolean root withholds required atoms`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const b Bool) " +
+                "(assert (and b (not b) (> x 0)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val prepared = formula.prepareBooleanDefinitions(arithmetic)
+
+        val atoms = prepared.forcedAtoms()
+
+        assertNull(atoms)
+    }
+
+    @Test
+    fun `required atoms follow the rewritten Boolean graph`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const b Bool) (assert (and (= b (> x 0)) b))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val prepared = formula.prepareBooleanDefinitions(arithmetic)
+        val rewritten = assertNotNull(prepared.formula)
+
+        val atoms = prepared.forcedAtoms()
+
+        assertEquals(rewritten.atoms, atoms)
+    }
+
+    @Test
+    fun `required atom collection retains its containing stop after preparation`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const b Bool) " +
+                "(assert (and b (or (> 0 1) (> x 0))))",
+        )
+        var stopped = false
+        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val prepared = formula.prepareBooleanDefinitions(arithmetic)
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { prepared.forcedAtoms() }
+    }
+
+    @Test
     fun `rational scalar equivalent comparisons preserve shared Boolean truth`() {
         val relations = listOf("=" to "=", "distinct" to "distinct", "<" to ">", "<=" to ">=",
             ">" to "<", ">=" to "<=")
