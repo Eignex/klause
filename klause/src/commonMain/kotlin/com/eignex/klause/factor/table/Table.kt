@@ -193,7 +193,7 @@ class Table private constructor(
      */
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
         if (hi != null || numTuples > REDUCE_TUPLE_CAP) return Unchanged
-        val survivors = LongArrayList()
+        var survivors: LongArrayList? = null
         for (t in 0 until numTuples) {
             var alive = true
             var c = 0
@@ -204,17 +204,25 @@ class Table private constructor(
                 }
                 c++
             }
-            if (alive) for (k in 0 until arity) survivors.add(tuples[t * arity + k])
+            if (alive) {
+                survivors?.let { kept ->
+                    for (k in 0 until arity) kept.add(tuples[t * arity + k])
+                }
+            } else if (survivors == null) {
+                survivors = LongArrayList(tuples.size - arity)
+                for (k in 0 until t * arity) survivors.add(tuples[k])
+            }
         }
-        val survivorCount = survivors.size / arity
+        val kept = survivors ?: return Unchanged
+        val survivorCount = kept.size / arity
         return when {
-            survivorCount == numTuples || survivorCount == 0 -> Unchanged
+            survivorCount == 0 -> Unchanged
 
             survivorCount == 1 -> Rewrite(
-                List(arity) { c -> Linear(longArrayOf(1L), intArrayOf(xs[c]), LinearOp.EQ, survivors[c]) },
+                List(arity) { c -> Linear(longArrayOf(1L), intArrayOf(xs[c]), LinearOp.EQ, kept[c]) },
             )
 
-            else -> Rewrite(listOf(Table(xs, survivors.toLongArray())))
+            else -> Rewrite(listOf(Table(xs, kept.toLongArray())))
         }
     }
 
