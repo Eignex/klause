@@ -212,7 +212,9 @@ Choices between integer constants `0` and `1` instead use a direct signed Boolea
 equivalence to the result's true-branch value when its finite domain lies within
 `0..1`. This retains the branch relation without a separate choice index.
 A result with an open bound instead keeps guarded exact equalities to its branches.
-Affine real conditionals retain `RealElement`. Comparisons against a conditional
+Affine real conditionals keep a real result and Boolean implications to exact branch
+equalities. Each equality is reified independently of the choice guard, so coincident
+branch values permit either guard polarity. Comparisons against a conditional
 can lower to Boolean tests of its branches when the branch images are small, and
 definitions no surviving constraint needs are dropped after a dependency fixpoint.
 For up to eight Boolean inputs, a scalar defined by consistent, complete cases also
