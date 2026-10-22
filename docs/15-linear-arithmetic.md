@@ -397,7 +397,11 @@ pure-real models with an empty integer tail:
 2. Check the exact IEEE real prefix, then rationally reconstructed reals, against
    those rows.
 3. If neither passes, repair the real prefix through paired opposite source
-   equations using bounded sparse elimination.
+   equations using bounded sparse elimination. Retained numeric guesses can supply
+   free coordinates when the float prefix fails. Wide pure-real models project
+   those guesses into independent blocks under one shared 65,536-entry allowance
+   for retained coordinates and every block's projected offer. The sequence is
+   admitted once, and each repaired block checks all its selected rows.
 4. Complete the free real coordinates per connected component, grouped by shared
    rows: by the difference checker where the rows form a difference graph,
    otherwise by an exact point from the [source LP owner](17-linear-programming.md).

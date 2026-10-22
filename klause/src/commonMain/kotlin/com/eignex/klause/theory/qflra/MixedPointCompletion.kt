@@ -112,7 +112,7 @@ internal fun completeMixedPoint(
         onStage?.invoke("RECOVERY_EQUALITY_REPAIR_ATTEMPT")
         if (integerColumns == 0 && !admitsMixedEqualityRepair(realColumns)) {
             val point = completeIndependentRealBlocks(realColumns, primal, realGuess, residual, stop,
-                onStage, reportSourceInfeasible, realCompletion)
+                onStage, reportSourceInfeasible, realCompletion, recoveryGuesses)
             stop.charge(rowWork)
             if (stop()) return declined("RECOVERY_STOPPED")
             if (point != null && arithmetic.satisfies(point, rows) && !stop()) {
@@ -193,6 +193,7 @@ private fun completeIndependentRealBlocks(
     onStage: ((String) -> Unit)?,
     onInfeasible: ((IntArray) -> Unit)?,
     realCompletion: MixedRealCompletion?,
+    recoveryGuesses: Sequence<List<BigFraction>>,
 ): List<BigFraction>? {
     if (rows.sumOf { it.columns.size.toLong() + 1L } > 65536L) return null
     // Path compression bounds the union walks by this batch plus the per-row visits.
@@ -210,14 +211,29 @@ private fun completeIndependentRealBlocks(
     val members = groups.groups()
     val byRoot = rows.indices.groupBy { groups.find(rows[it].columns.first()) }
     var dimensions = 0L
+    var projectionEntries = 0L
     for (component in members) {
         val selected = byRoot[groups.find(component.first())] ?: continue
         dimensions += component.size.toLong() * component.size
+        projectionEntries += component.size + 1L
         onStage?.invoke("RECOVERY_SOURCE_COMPONENT_SHAPE_${component.size}_${selected.size}")
         if (dimensions > 65536L) {
             onStage?.invoke("RECOVERY_SOURCE_COMPONENT_DIMENSION")
             return null
         }
+    }
+    val retainedGuesses = ArrayList<List<BigFraction>>()
+    var retainedEntries = 0L
+    for (candidate in recoveryGuesses) {
+        stop.charge(1L)
+        if (stop()) return null
+        // Reserve every block's projection so the history cannot exhaust the allowance before use.
+        val entries = candidate.size.toLong() + 1L + projectionEntries
+        if (entries > 65536L - retainedEntries) break
+        retainedEntries += entries
+        stop.charge(candidate.size.toLong())
+        if (stop()) return null
+        if (candidate.size == columns) retainedGuesses += candidate
     }
     stop.charge(3L * columns)
     if (stop()) return null
@@ -244,8 +260,15 @@ private fun completeIndependentRealBlocks(
                 if (!stop()) onInfeasible(original)
             }
         }
+        val localGuesses = sequence {
+            for (retained in retainedGuesses) {
+                stop.charge(component.size.toLong() + 1L)
+                if (stop()) break
+                yield(component.map { retained[it] })
+            }
+        }
         val values = completeMixedPoint(component.size, 0, DoubleArray(component.size) { primal[component[it]] },
-            localRows, stop, onStage, reportInfeasible, realCompletion) ?: return null
+            localRows, stop, onStage, reportInfeasible, realCompletion, localGuesses) ?: return null
         if (stop()) return null
         for (index in component.indices) point[component[index]] = values[index]
     }

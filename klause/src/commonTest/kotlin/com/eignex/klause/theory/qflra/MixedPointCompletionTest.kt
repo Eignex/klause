@@ -121,7 +121,44 @@ class MixedPointCompletionTest {
 
     @Test
     fun `retained free coordinates should satisfy current equations before LP completion`() {
-        for (free in listOf(1L, 2L)) {
+        for (columns in listOf(4, 425)) for (free in listOf(1L, 2L)) {
+            val blockRows = listOf(
+                ExactRationalInequality(intArrayOf(0, 1, 2, 3),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
+                    BigFraction.ONE),
+                ExactRationalInequality(intArrayOf(0, 1, 2, 3),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE, BigFraction.ONE),
+                    BigFraction.MINUS_ONE),
+                ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            )
+            val blocks = if (columns == 4) 1 else 2
+            val rows = if (blocks == 1) blockRows else blockRows + blockRows.map { row ->
+                ExactRationalInequality(row.columns.map { it + 4 }.toIntArray(), row.coefficients, row.rhs, row.strict)
+            }
+            val blockGuess = listOf(BigFraction.ofLong(free), BigFraction.ofLong(free),
+                BigFraction.ZERO, BigFraction.ZERO)
+            val guess = List(columns) { if (it < blocks * 4) blockGuess[it % 4] else BigFraction.ZERO }
+            assertFalse(guess.satisfiesSourceRows(rows))
+            for (older in listOf(false, true)) {
+                val budget = SourceLpBudget(maxOperations = 0)
+                val guesses = if (older) sequenceOf(List(columns) { BigFraction.ZERO }, guess) else sequenceOf(guess)
+
+                val point = assertNotNull(completeMixedPoint(columns, 0, DoubleArray(columns), rows, Cancellation.Never,
+                    realCompletion = { columns, residual, stop, onInfeasible ->
+                        completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
+                    }, recoveryGuesses = guesses.constrainOnce()))
+
+                assertTrue(point.satisfiesSourceRows(rows))
+                assertEquals(BigFraction.ofLong(free + 1L), point[0])
+                if (blocks == 2) assertEquals(BigFraction.ofLong(free + 1L), point[4])
+                assertEquals(0, budget.operations)
+            }
+        }
+    }
+
+    @Test
+    fun `cancelled retained coordinate repairs should withhold their point`() {
+        for (columns in listOf(4, 425)) {
             val rows = listOf(
                 ExactRationalInequality(intArrayOf(0, 1, 2, 3),
                     listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
@@ -131,26 +168,20 @@ class MixedPointCompletionTest {
                     BigFraction.MINUS_ONE),
                 ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
             )
-            val guess = listOf(BigFraction.ofLong(free), BigFraction.ofLong(free), BigFraction.ZERO, BigFraction.ZERO)
-            assertFalse(guess.satisfiesSourceRows(rows))
-            for (older in listOf(false, true)) {
-                val budget = SourceLpBudget(maxOperations = 0)
-                val guesses = if (older) sequenceOf(List(4) { BigFraction.ZERO }, guess) else sequenceOf(guess)
+            val guess = listOf(BigFraction.ONE, BigFraction.ONE) + List(columns - 2) { BigFraction.ZERO }
+            var stopped = false
 
-                val point = assertNotNull(completeMixedPoint(4, 0, DoubleArray(4), rows, Cancellation.Never,
-                    realCompletion = { columns, residual, stop, onInfeasible ->
-                        completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
-                    }, recoveryGuesses = guesses))
+            val point = completeMixedPoint(columns, 0, DoubleArray(columns), rows, Cancellation { stopped },
+                onStage = { if (it == "RECOVERY_RETAINED_EQUALITY_POINT") stopped = true },
+                recoveryGuesses = sequenceOf(guess).constrainOnce())
 
-                assertTrue(point.satisfiesSourceRows(rows))
-                assertEquals(BigFraction.ofLong(free + 1L), point[0])
-                assertEquals(0, budget.operations)
-            }
+            assertTrue(stopped)
+            assertNull(point)
         }
     }
 
     @Test
-    fun `cancelled retained coordinate repairs should withhold their point`() {
+    fun `wide retained guesses should retain the shared entry limit`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1, 2, 3),
                 listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
@@ -160,14 +191,17 @@ class MixedPointCompletionTest {
                 BigFraction.MINUS_ONE),
             ExactRationalInequality(intArrayOf(1, 2, 3), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
         )
-        val guess = listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ZERO, BigFraction.ZERO)
-        var stopped = false
+        val budget = SourceLpBudget(maxOperations = 0)
+        val guesses = sequence {
+            repeat(200) { yield(List(425) { BigFraction.ZERO }) }
+            yield(listOf(BigFraction.ONE, BigFraction.ONE) + List(423) { BigFraction.ZERO })
+        }
 
-        val point = completeMixedPoint(4, 0, DoubleArray(4), rows, Cancellation { stopped },
-            onStage = { if (it == "RECOVERY_RETAINED_EQUALITY_POINT") stopped = true },
-            recoveryGuesses = sequenceOf(guess))
+        val point = completeMixedPoint(425, 0, DoubleArray(425), rows, Cancellation.Never,
+            realCompletion = { columns, residual, stop, onInfeasible ->
+                completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
+            }, recoveryGuesses = guesses.constrainOnce())
 
-        assertTrue(stopped)
         assertNull(point)
     }
 
