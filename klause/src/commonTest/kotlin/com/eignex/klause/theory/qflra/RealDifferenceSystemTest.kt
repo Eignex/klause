@@ -13,6 +13,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
@@ -25,6 +26,26 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RealDifferenceSystemTest {
+    @Test
+    fun `row negative cycles should retain their input rows`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(), emptyList(), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ofLong(2)),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE),
+                    if (strict) BigFraction.ONE else BigFraction.ZERO, strict),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            )
+            val system = assertNotNull(RealDifferenceSystem.prepareRows(2, rows, Cancellation.Never))
+
+            val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(
+                system.check(intArrayOf(), Cancellation.Never))
+
+            assertEquals(setOf(2, 3), assertNotNull(conflict.cycleEdges).toSet())
+            assertContentEquals(intArrayOf(), conflict.clause)
+        }
+    }
+
     @Test
     fun `fractional strict bounds should retain an exact interior witness`() {
         val model = Problem(

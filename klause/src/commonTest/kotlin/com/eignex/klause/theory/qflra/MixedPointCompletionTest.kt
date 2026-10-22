@@ -19,6 +19,107 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `residual graph conflicts should retain equality derivation premises`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                exactColumnUpper(3, BigFraction.ofLong(2)),
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                    if (strict) BigFraction.ONE else BigFraction.ZERO, strict),
+                exactColumnLower(2, BigFraction.ONE),
+            )
+            val budget = SourceLpBudget(maxOperations = 0)
+            var support: IntArray? = null
+
+            val point = completeMixedPoint(4, 0, DoubleArray(4), rows, Cancellation.Never,
+                onSourceInfeasible = { support = it },
+                realCompletion = { columns, residual, stop, onInfeasible ->
+                    completeMixedRealComponents(columns, residual, budget, stop, onInfeasible = onInfeasible)
+                })
+
+            assertNull(point)
+            assertEquals(setOf(1, 2, 3, 4), assertNotNull(support).toSet())
+            assertEquals(0, budget.operations)
+        }
+    }
+
+    @Test
+    fun `direct graph conflicts should retain only their source rows`() {
+        val rows = listOf(
+            exactColumnUpper(1, BigFraction.ofLong(2)),
+            exactColumnUpper(0, BigFraction.ZERO),
+            exactColumnLower(0, BigFraction.ONE),
+        )
+        var support: IntArray? = null
+
+        val point = completeMixedPoint(2, 0, DoubleArray(2), rows, Cancellation.Never,
+            onSourceInfeasible = { support = it })
+
+        assertNull(point)
+        assertEquals(setOf(1, 2), assertNotNull(support).toSet())
+    }
+
+    @Test
+    fun `graph conflicts after integer guesses should withhold source refutation`() {
+        for (equality in listOf(false, true)) {
+            val reals = if (equality) 3 else 1
+            val rows = if (equality) listOf(
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(2, 3), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            ) else listOf(
+                exactColumnUpper(0, BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            )
+            var sourceInfeasible = false
+            var graphInfeasible = false
+            val conflictStage = if (equality) "RECOVERY_EQUALITY_GRAPH_CONFLICT" else "RECOVERY_GRAPH_SOURCE_CONFLICT"
+
+            val point = completeMixedPoint(reals, 1, DoubleArray(reals + 1), rows, Cancellation.Never,
+                onStage = { if (it == conflictStage) graphInfeasible = true },
+                onSourceInfeasible = { sourceInfeasible = true })
+
+            assertNull(point)
+            assertTrue(graphInfeasible)
+            assertFalse(sourceInfeasible)
+            assertTrue((List(reals) { BigFraction.ZERO } + BigFraction.ONE).satisfiesSourceRows(rows))
+        }
+    }
+
+    @Test
+    fun `cancelled graph conflicts should withhold source support`() {
+        for (equality in listOf(false, true)) {
+            val rows = if (equality) listOf(
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1, 2),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE, BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                exactColumnLower(2, BigFraction.ONE),
+            ) else listOf(exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ONE))
+            var stopped = false
+            var sourceInfeasible = false
+            val conflictStage = if (equality) "RECOVERY_EQUALITY_GRAPH_CONFLICT" else "RECOVERY_GRAPH_SOURCE_CONFLICT"
+
+            val point = completeMixedPoint(if (equality) 3 else 1, 0, DoubleArray(3), rows, Cancellation { stopped },
+                onStage = { if (it == conflictStage) stopped = true },
+                onSourceInfeasible = { sourceInfeasible = true })
+
+            assertTrue(stopped)
+            assertNull(point)
+            assertFalse(sourceInfeasible)
+        }
+    }
+
+    @Test
     fun `retained free coordinates should satisfy current equations before LP completion`() {
         for (free in listOf(1L, 2L)) {
             val rows = listOf(

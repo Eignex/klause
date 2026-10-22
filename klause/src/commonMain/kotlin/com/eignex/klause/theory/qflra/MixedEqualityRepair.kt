@@ -219,25 +219,30 @@ internal class MixedEqualityRepair(
         }
         val graph = RealDifferenceSystem.prepareRows(pivots.size, residual, stop)
         if (stop()) return null
+        val reportInfeasible: ((IntArray) -> Unit)? = if (residualSources == null) null else { support ->
+            val sources = LinkedHashSet<Int>()
+            for (index in support) {
+                if (index !in residualSources.indices) break
+                stop.charge(residualSources[index].size.toLong() + 1L)
+                if (stop()) break
+                sources.addAll(residualSources[index].toList())
+            }
+            if (!stop() && support.isNotEmpty() && support.all { it in residualSources.indices }) {
+                lastResidualInfeasibleRows = sources.toIntArray()
+            }
+        }
         val free = if (graph == null) {
             onStage?.invoke("RECOVERY_EQUALITY_GRAPH_UNAVAILABLE")
-            val reportInfeasible: ((IntArray) -> Unit)? = if (residualSources == null) null else { support ->
-                val sources = LinkedHashSet<Int>()
-                for (index in support) {
-                    if (index !in residualSources.indices) break
-                    stop.charge(residualSources[index].size.toLong() + 1L)
-                    if (stop()) break
-                    sources.addAll(residualSources[index].toList())
-                }
-                if (!stop() && support.isNotEmpty() && support.all { it in residualSources.indices }) {
-                    lastResidualInfeasibleRows = sources.toIntArray()
-                }
-            }
             realCompletion?.invoke(pivots.size, residual, stop, reportInfeasible) ?: return null
         } else {
             onStage?.invoke("RECOVERY_EQUALITY_GRAPH_ATTEMPT")
             val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
             if (stop()) return null
+            if (result is RealDifferenceSystem.Result.Infeasible) {
+                onStage?.invoke("RECOVERY_EQUALITY_GRAPH_CONFLICT")
+                if (!stop()) result.cycleEdges?.let { reportInfeasible?.invoke(it) }
+                return null
+            }
             (result as? RealDifferenceSystem.Result.Feasible)?.point ?: return null
         }
         onStage?.invoke("RECOVERY_EQUALITY_FREE_POINT")

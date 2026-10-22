@@ -206,6 +206,8 @@ from each strict edge. That preserves the sign of every simple cycle, including
 zero-weight strict cycles, and the scaled-back potentials are rational witnesses
 that pass the complete source-row check. A verified negative cycle supplies a
 conflict clause of the complements of its active guards.
+Row-only recovery graphs retain the same cycle's input row indices for their
+caller to map through source and equation-derivation support.
 
 Admitted pure-real components defer LP construction and check the graph at partial
 and complete Boolean states. Missing cycle evidence, declined source validation and

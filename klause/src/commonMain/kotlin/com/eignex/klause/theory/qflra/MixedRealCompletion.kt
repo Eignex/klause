@@ -72,6 +72,17 @@ internal fun completeMixedRealComponents(
             onStage?.invoke("RECOVERY_REAL_COMPONENT_GRAPH")
             val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
             if (stop()) return null
+            if (result is RealDifferenceSystem.Result.Infeasible) {
+                val support = result.cycleEdges
+                onStage?.invoke("RECOVERY_REAL_COMPONENT_GRAPH_CONFLICT")
+                if (support != null) {
+                    stop.charge(support.size.toLong() + 1L)
+                    if (!stop() && support.isNotEmpty() && support.all { it in selected.indices }) {
+                        onInfeasible?.invoke(IntArray(support.size) { selected[support[it]] })
+                    }
+                }
+                return null
+            }
             (result as? RealDifferenceSystem.Result.Feasible)?.point
         } else {
             onStage?.invoke("RECOVERY_REAL_COMPONENT_SHAPE_${component.size}_${localRows.size}")

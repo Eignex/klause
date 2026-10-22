@@ -410,6 +410,10 @@ ordinary branching.
 An equality residual contradiction without guessed integers can certify selected
 pure-real rows; a contradiction after guessing integer coordinates cannot refute
 the source model.
+Negative cycles in residual graphs retain their original row identities, including
+the paired equations used in substitution. Component-local rows map back to their
+selected source rows before conflict explanation; unrelated rows supply no premises.
+Cancellation withholds this support just as it withholds a recovered point.
 
 Complete workers and open local search can share checked incumbents under the same
 source and objective through [portfolios](12-portfolio.md). Candidate integer

@@ -13,6 +13,31 @@ import kotlin.test.assertTrue
 
 class MixedRealCompletionTest {
     @Test
+    fun `graph conflicts should cite their original component rows`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(3), listOf(BigFraction.ONE), BigFraction.ofLong(2)),
+                ExactRationalInequality(intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(1, 2),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(2, 0),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                    if (strict) BigFraction.ZERO else BigFraction.MINUS_ONE, strict),
+            )
+            val budget = SourceLpBudget(maxOperations = 0)
+            var support: IntArray? = null
+
+            val point = completeMixedRealComponents(4, rows, budget, Cancellation.Never,
+                onInfeasible = { support = it })
+
+            assertNull(point)
+            assertEquals(setOf(1, 2, 3), assertNotNull(support).toSet())
+            assertEquals(0, budget.operations)
+        }
+    }
+
+    @Test
     fun `parallel residual conflicts should avoid recovery LP operations`() {
         for (strict in listOf(false, true)) {
             for (reverse in listOf(false, true)) {
@@ -58,8 +83,12 @@ class MixedRealCompletionTest {
 
     @Test
     fun `cancelled residual conflicts should withhold support`() {
-        for (parallel in listOf(false, true)) {
-            val rows = listOf(
+        for (kind in listOf("graph", "parallel", "lp")) {
+            val parallel = kind == "parallel"
+            val rows = if (kind == "graph") listOf(
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            ) else listOf(
                 ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
                 ExactRationalInequality(if (parallel) intArrayOf(0, 1, 2) else intArrayOf(0, 1),
                     List(if (parallel) 3 else 2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
@@ -67,8 +96,11 @@ class MixedRealCompletionTest {
             )
             var stopped = false
             var support: IntArray? = null
-            val cancelledStage = if (parallel) "RECOVERY_REAL_COMPONENT_PARALLEL_CONFLICT"
-                else "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE"
+            val cancelledStage = when (kind) {
+                "graph" -> "RECOVERY_REAL_COMPONENT_GRAPH_CONFLICT"
+                "parallel" -> "RECOVERY_REAL_COMPONENT_PARALLEL_CONFLICT"
+                else -> "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE"
+            }
 
             val point = completeMixedRealComponents(3, rows, SourceLpBudget(), Cancellation { stopped },
                 onStage = { if (it == cancelledStage) stopped = true },

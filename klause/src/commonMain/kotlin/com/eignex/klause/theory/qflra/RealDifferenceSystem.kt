@@ -41,10 +41,11 @@ internal class RealDifferenceSystem private constructor(
             Potentials.Abandoned -> Result.Interrupted
             Potentials.Infeasible -> {
                 // ALWAYS edges are immutable source rows and declared bounds, not scoped LP assertions.
-                val clause = cycle?.takeIf { edges -> edges.all { active[it] } }?.asSequence()
+                val activeCycle = cycle?.takeIf { edges -> edges.all { active[it] } }
+                val clause = activeCycle?.asSequence()
                     ?.map { guards[it] }?.filter { it != ALWAYS }?.map(Lit::negate)
                     ?.distinct()?.sorted()?.toList()?.toIntArray()
-                if (stop()) Result.Interrupted else Result.Infeasible(clause)
+                if (stop()) Result.Interrupted else Result.Infeasible(clause, activeCycle)
             }
             is Potentials.Found -> {
                 if (stop()) return Result.Interrupted
@@ -64,7 +65,7 @@ internal class RealDifferenceSystem private constructor(
         class Feasible(point: () -> List<BigFraction>) : Result {
             val point by lazy(point)
         }
-        class Infeasible(val clause: IntArray?) : Result
+        class Infeasible(val clause: IntArray?, val cycleEdges: IntArray?) : Result
         data object Interrupted : Result
     }
 
@@ -119,6 +120,7 @@ internal class RealDifferenceSystem private constructor(
         ): RealDifferenceSystem? {
             if (realColumns !in 1..10000 || rows.size > 100000 || stop()) return null
             val edges = ArrayList<Edge>()
+            // One edge per input row preserves the caller's proof-support namespace.
             for (row in rows) {
                 if (row.columns.any { it !in 0 until realColumns } ||
                     !append(row, ALWAYS, realColumns, edges, stop)

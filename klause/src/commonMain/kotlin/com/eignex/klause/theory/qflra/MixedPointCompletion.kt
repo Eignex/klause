@@ -102,14 +102,14 @@ internal fun completeMixedPoint(
             residualSources?.add(rowIndex)
         }
     }
+    val reportSourceInfeasible: ((IntArray) -> Unit)? = if (residualSources == null) null else { support ->
+        stop.charge(support.size.toLong() + 1L)
+        if (!stop() && support.isNotEmpty() && support.all { it in residualSources.indices }) {
+            onSourceInfeasible?.invoke(IntArray(support.size) { residualSources[support[it]] })
+        }
+    }
     if (residual.any { it.columns.size > 2 }) {
         onStage?.invoke("RECOVERY_EQUALITY_REPAIR_ATTEMPT")
-        val reportSourceInfeasible: ((IntArray) -> Unit)? = if (residualSources == null) null else { support ->
-            stop.charge(support.size.toLong() + 1L)
-            if (!stop() && support.isNotEmpty() && support.all { it in residualSources.indices }) {
-                onSourceInfeasible?.invoke(IntArray(support.size) { residualSources[support[it]] })
-            }
-        }
         if (integerColumns == 0 && !admitsMixedEqualityRepair(realColumns)) {
             val point = completeIndependentRealBlocks(realColumns, primal, realGuess, residual, stop,
                 onStage, reportSourceInfeasible, realCompletion)
@@ -170,6 +170,11 @@ internal fun completeMixedPoint(
             ?: return declined("RECOVERY_GRAPH_UNAVAILABLE")
         val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
         if (stop()) return declined("RECOVERY_STOPPED")
+        if (result is RealDifferenceSystem.Result.Infeasible) {
+            onStage?.invoke("RECOVERY_GRAPH_SOURCE_CONFLICT")
+            if (!stop()) result.cycleEdges?.let { reportSourceInfeasible?.invoke(it) }
+            return declined("RECOVERY_GRAPH_NO_POINT")
+        }
         (result as? RealDifferenceSystem.Result.Feasible)?.point ?: return declined("RECOVERY_GRAPH_NO_POINT")
     }
     val point = reals + integers
