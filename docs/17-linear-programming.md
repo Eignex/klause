@@ -133,6 +133,9 @@ index premises. In every case the original source rows decide publication.
 intersects assertions exactly and keeps a source premise for each accepted side.
 Batches publish witnesses only for a committed prefix; crossed bounds cite both
 sides, and pop restores bounds and deactivates scoped rows.
+Row appends retain validation of identical assertion prefixes when column addresses,
+scope marks and existing row identities are unchanged. New assertions still check
+their scope, active row and witness uniqueness against the retained prefix.
 
 A nonbasic bound change updates the basic values by `-B^-1 A(j) delta(x(j))`; pop
 reseats nonbasics and recomputes `x(B) = B^-1 (b - N x(N))`. Compatible edits and

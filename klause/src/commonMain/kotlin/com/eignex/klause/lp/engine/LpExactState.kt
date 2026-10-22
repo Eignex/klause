@@ -112,7 +112,7 @@ internal class LpExactState internal constructor(
         if (source == null) {
             trailStorageUnits = activeAssertions.sumOf { it.storageUnits() } + scopeMarks.size
             validateRows()
-            validateAssertions(0)
+            validateAssertions(validatedAssertionPrefix(previous))
             lower = arrayOfNulls(baseModel.numVars)
             upper = arrayOfNulls(baseModel.numVars)
             for (j in 0 until baseModel.numVars) seedDeclared(j)
@@ -167,7 +167,16 @@ internal class LpExactState internal constructor(
         )
     }
 
-    // Checks the assertions from [from] on; the ones before it were checked when the state that shares them was built.
+    private fun validatedAssertionPrefix(previous: LpExactState?): Int {
+        if (previous == null || previous.baseModel.n != baseModel.n ||
+            previous.baseModel.numVars > baseModel.numVars || previous.scopeMarks != scopeMarks ||
+            previous.rows.size > rows.size ||
+            (0 until previous.rows.size).any { previous.rows.row(it) != rows.row(it) }
+        ) return 0
+        return sharedPrefix(previous.activeAssertions)
+    }
+
+    // Identical assertions retain validation while their column addresses, scopes and row authority stay fixed.
     private fun validateAssertions(from: Int) {
         val witnesses = HashSet<Long>()
         for (index in from until activeAssertions.size) {

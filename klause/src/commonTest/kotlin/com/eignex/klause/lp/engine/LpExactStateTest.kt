@@ -7,6 +7,7 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -14,6 +15,73 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpExactStateTest {
+    @Test
+    fun `row appends should preserve bound witnesses and predecessor isolation`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 7L))
+        val before = trail.state
+        val one = ExactLpNumber.of(1L)
+
+        assertTrue(trail.append(LpScopedRow(0L, listOf(0 to one), one,
+            ExactLpColumn(ExactLpBounds())), scoped = true))
+        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2L)), 8L))
+
+        val conflict = assertNotNull(trail.state.conflict)
+        assertEquals(7L, conflict.lower.witness)
+        assertEquals(8L, conflict.upper.witness)
+        assertNull(before.conflict)
+        assertEquals(7L, before.activeSide(0, false)?.witness)
+        assertTrue(trail.pop(0))
+        assertNull(trail.state.conflict)
+        assertTrue(trail.state.assertions.isEmpty())
+        assertEquals(ExactLpNumber.of(0L), trail.state.model.column(0).bounds.lower?.number)
+    }
+
+    @Test
+    fun `appended states should reject duplicate witnesses from a retained prefix`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val side = ExactLpSide(ExactLpNumber.of(1L))
+        val before = LpExactState(source, listOf(LpBoundAssertion(0, false, side, 7L, 0)))
+        val row = LpScopedRow(0L, listOf(0 to side.number), side.number, ExactLpColumn(ExactLpBounds()))
+        val appended = source.appendScopedRow(row)
+
+        assertFailsWith<IllegalArgumentException> {
+            LpExactState(appended, before.assertions + LpBoundAssertion(1, false, side, 7L, 0),
+                rows = before.rows.append(0L, null), previous = before)
+        }
+    }
+
+    @Test
+    fun `appended states should recheck assertion depths when scope marks change`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val side = ExactLpSide(ExactLpNumber.of(1L))
+        val before = LpExactState(source, listOf(LpBoundAssertion(0, false, side, 7L, 1)), scopes = listOf(0))
+        val row = LpScopedRow(0L, listOf(0 to side.number), side.number, ExactLpColumn(ExactLpBounds()))
+        val appended = source.appendScopedRow(row)
+
+        assertFailsWith<IllegalArgumentException> {
+            LpExactState(appended, before.assertions, scopes = listOf(1),
+                rows = before.rows.append(0L, null), previous = before)
+        }
+    }
+
+    @Test
+    fun `changed row authority should recheck retained slack assertions`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()), listOf(zero),
+            List(2) { ExactLpColumn(ExactLpBounds()) }, listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val before = LpExactState(source, listOf(LpBoundAssertion(1, false, ExactLpSide(zero), 7L, 0)))
+
+        assertFailsWith<IllegalArgumentException> {
+            LpExactState(source, before.assertions, rows = before.rows.deactivate(setOf(0)), previous = before)
+        }
+    }
+
     @Test
     fun `cached owner views should respect cancellation and caller projection isolation`() {
         val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
