@@ -559,6 +559,14 @@ it writes to `$OUT` (see the lab's
 [profile jobs guide](https://github.com/Eignex/klause-lab/blob/main/deploy/SETUP.md#profile-jobs)).
 The lab runs no shell scripts, so a new measurement is a class in that package.
 
+`CoefficientLiftingProfile` records Java thread allocations for the coefficient
+strengthening pass on unchanged and productive 64-, 512- and 4096-term inequalities,
+with LE and GE inputs. Model construction and root propagation precede warmup and
+measurement; the profile verifies that the root retains each declared binary range.
+Five batches of 256 calls follow 512 warmup calls per shape. Run the same profile
+at each comparison revision; its output includes installed-build and JVM identities.
+It measures pass allocations, without a complete-solve performance claim.
+
 [SolveTiming](src/main/kotlin/com/eignex/klause/bench/profile/SolveTiming.kt) is the template for
 a new profile main. It solves one catalog problem `repeats` times in-process and writes each run's
 wall time and verdict to `$OUT/timings.json`; without arguments it times `opb-core`
