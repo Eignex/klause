@@ -16,7 +16,8 @@ import com.eignex.klause.util.IntArrayList
 /**
  * Compaction and reorder moves for a satisfied [Cumulative]. A task moves to the earliest start that
  * every scheduling resource sharing its start coordinate admits, on its current or another choice of
- * a channelled demand or presence, and a task swaps order with its successor. Each compound is
+ * a channelled demand or presence, a task swaps order with its successor, and a window of tasks is
+ * left-justified in start order. Each compound is
  * replayed on the timeline of every resource it reaches before it is offered.
  */
 internal class ScheduleRelocations(
@@ -38,6 +39,8 @@ internal class ScheduleRelocations(
             if (latest < 0 || end(i) > end(latest)) latest = i
         }
         if (latest < 0) return
+        compactBlock(tasks)
+        reads = READ_CAP
         relocate(latest)
         val sampled = tasks[state.rng.nextInt(tasks.size)]
         if (sampled != latest) relocate(sampled)
@@ -175,10 +178,51 @@ internal class ScheduleRelocations(
         return Channel(predicate.input, predicate.value, Lit.isPositive(literal), 1L)
     }
 
-    /** Earliest start below the current one whose window every footprint admits, under [choice] of [choiceVar]. */
-    private fun earliestStart(task: Task, choiceVar: Int, choice: Long): Long? {
+    /**
+     * Left-justifies a window of the resource's tasks in start order as one compound, each task placed on the
+     * timelines its predecessors in the window already moved on.
+     */
+    private fun compactBlock(tasks: IntArrayList) {
+        if (tasks.size < 2) return
+        val order = tasks.toIntArray().sortedBy { state.assignment.intValue(own.starts[it]) }
+        val first = if (order.size <= BLOCK_CAP) 0 else state.rng.nextInt(order.size - BLOCK_CAP + 1)
+        val placements = ArrayList<Placement>()
+        val timelines = ArrayList<CumulativeLsState>()
+        val before = ArrayList<Long>()
+        var floor = Long.MIN_VALUE
+        var admitted = false
+        try {
+            for (i in order.subList(first, minOf(order.size, first + BLOCK_CAP))) {
+                val task = taskAt(own.starts[i]) ?: continue
+                val target = earliestStart(task, NO_CHOICE, 0L, floor)
+                floor = target ?: task.current
+                if (target == null) continue
+                val placement = Placement(task, target, NO_CHOICE, 0L)
+                val cost = task.footprints.sumOf { if (it.effective(NO_CHOICE, 0L) > 0L) 2 * it.duration else 0L }
+                if (cost > reads) break
+                reads -= cost.toInt()
+                for (footprint in task.footprints) {
+                    if (timelines.none { it === footprint.ls }) {
+                        timelines.add(footprint.ls)
+                        before.add(footprint.ls.overage)
+                    }
+                    shift(footprint, placement, true)
+                }
+                placements.add(placement)
+            }
+            admitted = timelines.indices.all { timelines[it].overage <= before[it] }
+        } finally {
+            for (placement in placements.asReversed()) {
+                for (footprint in placement.task.footprints.asReversed()) shift(footprint, placement, false)
+            }
+        }
+        if (admitted && placements.size >= 2) offer(placements, replayed = true)
+    }
+
+    /** Earliest start below the current one, from [from] on, whose window every footprint admits. */
+    private fun earliestStart(task: Task, choiceVar: Int, choice: Long, from: Long = Long.MIN_VALUE): Long? {
         val domain = state.rootDomains[task.start]
-        var t = domain.min
+        var t = maxOf(domain.min, from)
         while (reads > 0) {
             t = domain.ceilingOrNull(t) ?: return null
             if (t >= task.current) return null
@@ -215,14 +259,14 @@ internal class ScheduleRelocations(
         return NO_CONFLICT
     }
 
-    private fun offer(placements: List<Placement>) {
-        if (emitted >= MOVE_CAP || reads <= 0) return
+    private fun offer(placements: List<Placement>, replayed: Boolean = false) {
+        if (emitted >= MOVE_CAP || (!replayed && reads <= 0)) return
         val choice = placements.firstOrNull { it.choiceVar >= 0 }
         val geometry = ArrayList<Move.IntSet>(placements.size + 1)
         for (placement in placements) geometry.add(Move.IntSet(placement.task.start, placement.target))
         val channel = if (choice == null) emptyList<Move>() else channelParts(choice.choiceVar, choice.choice) ?: return
         if (choice != null) geometry.add(Move.IntSet(choice.choiceVar, choice.choice))
-        if (!reachesOnlyFootprints(placements, geometry, channel) || !admissible(placements)) return
+        if (!reachesOnlyFootprints(placements, geometry, channel) || (!replayed && !admissible(placements))) return
         val completed = envelopes.complete(geometry)
         val parts = ArrayList<Move>(completed.size + channel.size)
         val isolated = completed.subList(geometry.size, completed.size).all { isolatedEnvelope(it.varId) }
@@ -387,5 +431,6 @@ internal class ScheduleRelocations(
         const val MOVE_CAP = 4
         const val CHOICE_CAP = 3
         const val CHOICE_SPAN = 16L
+        const val BLOCK_CAP = 32
     }
 }

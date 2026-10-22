@@ -105,12 +105,14 @@ Its latest-ending task and one sampled task move to the earliest start that ever
 Cumulative sharing the start coordinate admits, read from each timeline without the
 task's own load. When a demand or presence is a defined channel of `x = v`, up to
 three other values of `x` are tried with the start, so a task can change machine
-and start in one move. The sampled task also swaps order with its successor. Each
-compound is replayed on every timeline it reaches and kept only when none gains
-overload. Moves are declined when their definitions recompute another scheduling
-coordinate or the start is shared with a Diffn. A call stops after 32,768 timeline
-reads or four moves. An admitted move can reconcile up to two scalar envelopes
-outside the resource, such as a makespan bound fed by task ends.
+and start in one move. The sampled task also swaps order with its successor, and up
+to 32 tasks are left-justified in start order as one compound, each placed on the
+timelines its predecessors already moved on. Each compound is replayed on every
+timeline it reaches and kept only when none gains overload. Moves are declined when
+their definitions recompute another scheduling coordinate or the start is shared
+with a Diffn. Single moves and the block each stop after 32,768 timeline reads, and
+a call offers at most four moves. An admitted move can reconcile up to two scalar
+envelopes outside the resource, such as a makespan bound fed by task ends.
 
 ## Diffn neighborhoods
 

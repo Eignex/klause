@@ -42,6 +42,27 @@ class ScheduleRelocationsTest {
     }
 
     @Test
+    fun `block compaction should close gaps in start order around shared resources`() {
+        val factors = arrayOf<Factor>(
+            Cumulative.unary(intArrayOf(0, 1, 2), longArrayOf(2, 2, 1)),
+            Cumulative.unary(intArrayOf(2, 3), longArrayOf(1, 1)),
+        )
+        val domains = arrayOf(IntDomain(0, 0), IntDomain(0, 10), IntDomain(0, 10), IntDomain(4, 4))
+        val state = LocalSearchState(LocalSearchModel.open(Problem(0, 4, domains, factors)), Random(17))
+        state.assign(0, 4, 8, 4)
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+
+        val block = assertNotNull(
+            state.moveSink.list.filterIsInstance<Move.Compound>().firstOrNull {
+                it.parts.toSet() == setOf(IntSet(1, 2), IntSet(2, 5))
+            },
+        )
+        assertEquals(0L, state.netDelta(block))
+        assertEquals(listOf(0L, 4L, 8L), listOf(0, 1, 2).map { state.assignment.intValue(it) })
+    }
+
+    @Test
     fun `compaction should reassign a channelled machine choice with the start`() {
         val state = machineState()
         state.assignMachines(choice = 0, start = 6)
