@@ -399,7 +399,11 @@ internal class LpPropagator(
             current.solveFloat(if (allowance != null) null else warm, token, allowance).also { solved = true }
         }
 
-    fun solve(token: Cancellation = cancellation, sparsePointRecovery: Boolean = false): CertifiedLpResult? =
+    fun solve(
+        token: Cancellation = cancellation,
+        sparsePointRecovery: Boolean = false,
+        primaryExactFeasibility: Boolean = false,
+    ): CertifiedLpResult? =
         solveOwned {
             val profile = effort()
             it.solve(
@@ -408,6 +412,7 @@ internal class LpPropagator(
                 fullContinuation = profile.fullContinuation,
                 observer = certificationObserver,
                 sparsePointRecovery = sparsePointRecovery,
+                primaryExactFeasibility = primaryExactFeasibility,
             ).also { solved = true }
         }
 

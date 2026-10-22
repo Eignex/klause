@@ -3,12 +3,13 @@
 Part V describes the numerical mechanisms that search and the theories of Part IV
 call on. The linear programming engine comes first because it has the most
 consumers: finite CP/COP relaxations, mixed-integer models and the
-[open linear theories](15-linear-arithmetic.md) all run on one production floating
-revised simplex with exact certification. Shared search owns
+[open linear theories](15-linear-arithmetic.md) share one engine surface. Open
+non-strict feasibility checks can use a sparse exact simplex; other requests use
+the floating revised simplex with exact certification. Shared search owns
 integer, comparison and disequality branches; LP feasibility alone does not
 establish integrality.
 
-The flow is to assemble a source-aware linear model, solve its floating working
+The flow is to assemble a source-aware linear model, solve its working
 representation, certify the requested result, then let the consumer reconstruct
 or apply it. Bound changes and retraction update that same numerical scope. This
 chapter follows that flow: engine boundaries, exact authority and consumer
@@ -24,7 +25,7 @@ CP / COP, mixed-integer models, open theories, shared search
                          |
            model adapters, LpPropagator, effort policy
                          |
-         exact model, bound trail, float solve, certification
+         exact model, bound trail, numerical solve, certification
                          |
        simplex.basis, simplex.exact, lp.lattice, util
 ```
@@ -149,6 +150,36 @@ fixed-dimension owner with warm headings and publish it before retiring the dono
 live factors are never resized. A projection that cannot import exact authority
 declines without a partial layout: node bounding withholds deductions and leaf
 completion returns indeterminate.
+
+## Sparse exact feasibility
+
+Open linear checks with a zero objective and no strict sides can request a primary
+sparse exact solve. The production factory and default continuation, refinement and pricing controls
+admit it; explicit engine replacements and other requests retain their configured
+path. The floating owner prepares the shared model representation, while the exact
+kernel solves feasibility without a floating solve or basis import.
+
+The kernel starts from the logical identity basis. Each tableau row expresses one
+basic coordinate in the nonbasic coordinates, with sparse column incidence for
+updates. Bound changes clamp nonbasics and update affected basic values; pop can
+retain the same algebraic basis. The least-index violated basic and eligible
+entering column select an exact pivot. A linear-combination DAG records the
+original equalities behind each row without a dense proof matrix. Row, value and
+incidence replacements publish together after all interruptible work succeeds.
+
+The engine checks every proposed point against the complete current matrix and
+bounds, restoring coordinate origins and objective units. A proposed conflict
+requires an exact row combination whose right-hand side lies below its bound
+minimum, with current row and bound witnesses. Certification policy still controls
+publication, and the source consumer checks integrality and original rows.
+
+Primary solving and verification share 100 million work units, 256 MiB of accounted
+allocation, 4,096-bit values and 10,000 pivots under the containing cancellation and
+work meter. Repeated attempts on one immutable authority retain the remaining
+allowance. Sparse storage is admitted by its accounted bytes; dense continuation
+dimension guards remain separate. An admitted primary decline returns indeterminate
+without another floating or recovery allowance. Matrix, layout, origin or objective
+replacement discards its retained state; bound-only scopes can reuse it.
 
 ## Floating simplex and basis factors
 

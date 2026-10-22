@@ -15,6 +15,7 @@ internal enum class LpSolvePhase {
     NODE_PRIMARY_FIXING,
     NODE_SECONDARY_FIXING,
     NODE_TERTIARY_FIXING,
+    PRIMARY_EXACT_FEASIBILITY,
 }
 
 internal data class LpPhaseMetrics(

@@ -55,7 +55,9 @@ A check proceeds in four steps:
    Each asserted bound carries the literals that justify it. Disjunction rows stay
    out until search selects a disjunct.
 2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
-   the LP solves the asserted system with exact certification. Partial Boolean
+   the LP solves the asserted system with exact certification. Non-strict
+   zero-objective checks can use its primary sparse exact feasibility kernel;
+   a resource decline keeps the query indeterminate. Partial Boolean
    states are checked once at least one arithmetic row is determined.
 3. **Explain.** An infeasible system produces a conflict from the certified
    infeasibility support: each cited row or bound contributes its premise literals.

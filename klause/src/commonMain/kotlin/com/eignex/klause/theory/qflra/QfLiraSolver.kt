@@ -1189,7 +1189,7 @@ class ExactLiraSearchComponent private constructor(
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
-        val result = lp.solve(sparsePointRecovery = true)
+        val result = lp.solve(sparsePointRecovery = true, primaryExactFeasibility = true)
         if (complete) {
             val key = if (result == null) "NO_RESULT" else listOf(
                 result.verdict.name,

@@ -42,6 +42,7 @@ internal class LpScopedSolver(
     private val pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
     private val continuationCache = LpExactContinuationCache()
+    private val primaryFeasibility = LpPrimaryFeasibilityCache()
     internal val refinementCache = LpRefinementCache()
     internal val pointRecoveryCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
@@ -205,8 +206,36 @@ internal class LpScopedSolver(
         observer: LpCertificationObserver? = null,
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
         sparsePointRecovery: Boolean = false,
+        primaryExactFeasibility: Boolean = false,
     ): CertifiedLpResult? {
-        val attempt = solveFloat(warm, token) ?: return null
+        var primaryMetrics = LpSolveMetrics()
+        if (primaryExactFeasibility && warm == null && context.engineFactory === ProductionLpEngineFactory &&
+            pricing == LpPricingOptions() && continuationLimits == ExactContinuationLimits() &&
+            refinementLimits == LpRefinementLimits() && fullContinuation
+        ) {
+            val primaryToken = if (token === cancellation) cancellation else cancellation or token
+            requireAvailable()
+            lastResult = null
+            lastMetrics = LpSolveMetrics()
+            lastFloatTermination = null
+            if (!prepare(primaryToken)) return null
+            val primary = try {
+                primaryFeasibility.solve(state, primaryToken, context.certificationPolicy, observer, workLimit, iterationLimit)
+            } finally {
+                lastMetrics = primaryFeasibility.lastMetrics
+            }
+            primaryMetrics = primary.metrics
+            if (primary.admitted) {
+                if (primaryToken()) return null
+                lastResult = primary.result
+                return primary.result
+            }
+        }
+        val attempt = try {
+            solveFloat(warm, token)
+        } finally {
+            lastMetrics += primaryMetrics
+        } ?: return null
         val certified = certifyLpResult(
             requireNotNull(state.ownerWorkingModel()),
             attempt.first,
@@ -376,6 +405,7 @@ internal class LpScopedSolver(
     }
 
     private fun publish(next: LpBoundTrail) {
+        if (state.baseModel !== next.state.baseModel) primaryFeasibility.clear()
         trail = next
         lastResult = null
         lastMetrics = LpSolveMetrics()
@@ -640,6 +670,7 @@ internal class LpScopedSolver(
         if (closed) return
         closed = true
         continuationCache.clear()
+        primaryFeasibility.clear()
         lastResult = null
         val current = solver
         solver = null
