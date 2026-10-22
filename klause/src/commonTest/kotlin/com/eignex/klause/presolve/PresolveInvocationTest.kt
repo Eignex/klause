@@ -550,7 +550,7 @@ class PresolveInvocationTest {
             budget.orSpent(Cancellation.Never),
         )
 
-        val changed = budget.invocations.first()
+        val changed = budget.invocations.first { it.pass == "subsume" }
         assertEquals(PresolveInvocationOutcome.CHANGED, changed.outcome)
         assertEquals(2, changed.input.factors)
         assertEquals(1, changed.output.factors)
