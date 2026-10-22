@@ -8,7 +8,9 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -41,9 +43,12 @@ internal object LinearSourceShape {
     }
 
     private fun inspect(args: Array<String>, out: File) {
-        require(args.size == 3) { "Use suite=ID problem=NAME sha256=HEX" }
+        require(args.size in 3..4) { "Use suite=ID problem=NAME sha256=HEX [inspect=integer-difference-siblings]" }
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("suite", "problem", "sha256"))
+        require(options.size == args.size)
+        val required = setOf("suite", "problem", "sha256")
+        require(options.keys == required || options.keys == required + "inspect")
+        require(options["inspect"] == null || options["inspect"] == "integer-difference-siblings")
         val expected = options.getValue("sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
         val source = Catalog.uncapped(options.getValue("suite")).problems
@@ -57,6 +62,10 @@ internal object LinearSourceShape {
         val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = Cancellation.after(10.seconds))
         val parsed = admitted
         val parsingNs = System.nanoTime() - started
+        if (options["inspect"] != null) {
+            reportIntegerSiblings(parsed, options, bytes, out, parsingNs)
+            return
+        }
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             parsed.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
         ))
@@ -112,5 +121,37 @@ internal object LinearSourceShape {
         }
         out.resolve("shape.json").writeText(shape.toString() + "\n")
         println(shape)
+    }
+
+    private fun reportIntegerSiblings(
+        parsed: SmtLibProblem,
+        options: Map<String, String>,
+        bytes: ByteArray,
+        out: File,
+        parsingNs: Long,
+    ) {
+        val model = parsed.source.originalSource as? Problem ?: error("source has no canonical factor model")
+        val siblings = IntegerDifferenceSiblingShape.inspect(model, Cancellation.after(10.seconds))
+        val result = buildJsonObject {
+            siblings.forEach { (key, value) -> put(key, value) }
+            put("revision", Reports.readGitSha())
+            put("sourceSha256", options.getValue("sha256"))
+            put("sourceBytes", bytes.size)
+            put("suite", options.getValue("suite"))
+            put("problem", options.getValue("problem"))
+            put("scope", "parsed-integer-difference-siblings-only")
+            put("parsingNs", parsingNs)
+            put("inspectionBudgetMs", 10_000)
+            put("compiledBooleans", model.numBoolVars)
+            put("compiledIntegers", model.numIntVars)
+            put("compiledFactors", model.factors.size)
+            put("sourceBooleanNames", parsed.boolVarNames.size)
+            put("sourceIntegerNames", parsed.intVarNames.size)
+            put("javaVersion", System.getProperty("java.version"))
+            put("processors", Runtime.getRuntime().availableProcessors())
+            put("cpuAttributionClaim", false)
+        }
+        out.resolve("integer-difference-siblings.json").writeText(result.toString() + "\n")
+        println(result)
     }
 }

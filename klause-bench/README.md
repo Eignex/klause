@@ -347,6 +347,14 @@ deadline. This diagnostic opens no solver and supplies no route or verdict claim
 For up to eight sources, `batch64=<base64 JSON array of argument arrays>` retains
 each inspection in a numbered directory.
 
+Add `inspect=integer-difference-siblings` to inspect the canonical parsed integer
+factor model before source setup. This mode recognizes the existing narrow signed-unit
+difference equality gates by their two comparison sides and three Tseitin clauses,
+and reports whether a sibling coverage clause is present. It performs no normalization,
+presolve or solver opening. Parsing and structural inspection each have a ten-second
+deadline; up to eight gate examples retain their source factor/clause indices. Counts
+establish syntactic exposure only, with no feasibility, runtime or source-verdict claim.
+
 `LinearRootOpeningProfile` with `inspect=disjunction-names` additionally replays predicate registration
 from the cached preparation fragment in a fresh registry, using only the original
 deadline's remaining time. It records the first refused row and any existing
