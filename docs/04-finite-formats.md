@@ -133,9 +133,9 @@ outputs are functionally defined, so
 [local search](10-local-search.md#maintained-literal-channels) can derive them
 from their inputs instead of searching them. `Xcsp3Problem.definitionHints` adds
 [typed relations](02-model.md#source-definition-hints) for materialized affine
-terms, declared `binPacking` loads, extremum results and the shared indicators, which local search
-materializes without the factor-shape guards that bare references need. Source
-factors remain the authority for every constraint.
+terms, declared `binPacking` loads, extremum results and the shared indicators,
+which local search materializes without the factor-shape guards that bare
+references need. Source factors remain the authority for every constraint.
 
 ### Arithmetic relations
 
