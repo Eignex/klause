@@ -9058,13 +9058,14 @@ public final class com/eignex/klause/presolve/PresolveConfig$Companion {
 public final class com/eignex/klause/presolve/PresolveContext {
 	public static final field Companion Lcom/eignex/klause/presolve/PresolveContext$Companion;
 	public fun <init> ()V
-	public fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[I)V
-	public synthetic fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZ)V
+	public synthetic fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component10 ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun component11 ()Lcom/eignex/klause/presolve/SubsumeState;
 	public final fun component12 ()[I
 	public final fun component13 ()[I
+	public final fun component14 ()Z
 	public final fun component2 ()Ljava/util/Map;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Z
@@ -9073,8 +9074,8 @@ public final class com/eignex/klause/presolve/PresolveContext {
 	public final fun component7 ()Lcom/eignex/klause/presolve/SharedIntOccurrence;
 	public final fun component8 ()Z
 	public final fun component9 ()Lcom/eignex/klause/presolve/AffinePivotOrder;
-	public final fun copy (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[I)Lcom/eignex/klause/presolve/PresolveContext;
-	public static synthetic fun copy$default (Lcom/eignex/klause/presolve/PresolveContext;ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveContext;
+	public final fun copy (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZ)Lcom/eignex/klause/presolve/PresolveContext;
+	public static synthetic fun copy$default (Lcom/eignex/klause/presolve/PresolveContext;ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveContext;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAffinePivotOrder ()Lcom/eignex/klause/presolve/AffinePivotOrder;
 	public final fun getAffineTouchedVars ()[I
@@ -9082,6 +9083,7 @@ public final class com/eignex/klause/presolve/PresolveContext {
 	public final fun getBakeConfig ()Lcom/eignex/klause/presolve/BakeConfig;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getDupColumnsTouchedVars ()[I
+	public final fun getKeepBinaryComparisons ()Z
 	public final fun getModelBreaksSymmetry ()Z
 	public final fun getObjectiveBoolCoeffs ()Ljava/util/Map;
 	public final fun getObjectiveBoolVars ()Ljava/util/Set;
@@ -9099,6 +9101,7 @@ public final class com/eignex/klause/presolve/PresolveContext {
 	public final fun withBakeConfig (Lcom/eignex/klause/presolve/BakeConfig;)Lcom/eignex/klause/presolve/PresolveContext;
 	public final fun withCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PresolveContext;
 	public final fun withDupColumnsTouchedVars ([I)Lcom/eignex/klause/presolve/PresolveContext;
+	public final fun withKeepBinaryComparisons (Z)Lcom/eignex/klause/presolve/PresolveContext;
 	public final fun withPresolveBudget (Lcom/eignex/klause/presolve/PresolveBudget;)Lcom/eignex/klause/presolve/PresolveContext;
 	public final fun withSharedIntOcc (Lcom/eignex/klause/presolve/SharedIntOccurrence;)Lcom/eignex/klause/presolve/PresolveContext;
 	public final fun withSubsumeIncremental (Lcom/eignex/klause/presolve/SubsumeState;)Lcom/eignex/klause/presolve/PresolveContext;

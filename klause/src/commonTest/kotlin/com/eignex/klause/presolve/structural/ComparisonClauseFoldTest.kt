@@ -135,6 +135,46 @@ class ComparisonClauseFoldTest {
         assertEquals(intSolutions(model), intSolutions(baked.withPassDelta(delta, BakeConfig.NONE)))
     }
 
+    @Test
+    fun `kept binary comparisons should leave a clause over a 0-1 column reified in either lane`() {
+        val model = problemOf(
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 3)),
+            listOf(
+                reif(0, 0, LinearOp.GE, 1),
+                reif(1, 1, LinearOp.LE, 1),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ),
+        )
+
+        val source = ComparisonClauseFold.foldSource(model, keepBinary = true)
+        val finite = ComparisonClauseFold.fold(model.bake(), keepBinary = true)
+
+        assertTrue(source.isEmpty)
+        assertTrue(finite.isEmpty)
+    }
+
+    @Test
+    fun `kept binary comparisons should still fold a clause over wider columns in either lane`() {
+        val model = problemOf(
+            2,
+            Array(2) { IntDomain(0, 3) },
+            listOf(
+                reif(0, 0, LinearOp.GE, 1),
+                reif(1, 1, LinearOp.LE, 1),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ),
+        )
+
+        val source = ComparisonClauseFold.foldSource(model, keepBinary = true)
+        val finite = ComparisonClauseFold.fold(model.bake(), keepBinary = true)
+
+        for (folded in listOf(source.addedFactors, finite.addedFactors)) {
+            val clause = assertIs<ComparisonClause>(folded.single())
+            assertContentEquals(intArrayOf(0, 1), clause.vars)
+        }
+    }
+
     private fun reif(aux: Int, v: Int, op: LinearOp, bound: Int) =
         ReifiedLinear(auxBoolVar = aux, coeffs = intArrayOf(1), vars = intArrayOf(v), op = op, bound = bound)
 

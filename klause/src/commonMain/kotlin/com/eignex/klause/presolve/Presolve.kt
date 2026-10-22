@@ -163,19 +163,22 @@ object Presolve {
      *  indicators) into one [com.eignex.klause.factor.arithmetic.ComparisonClause]. See [ComparisonClauseFold]. */
     fun foldComparisonClauses(problem: BakedProblem): PassDelta = ComparisonClauseFold.fold(problem)
 
-    /** [foldComparisonClauses] keeping every indicator in [objectiveBoolVars], which the objective prices. */
+    /** [foldComparisonClauses] keeping every indicator in [objectiveBoolVars], which the objective prices,
+     *  and with [keepBinary] every clause that compares a `{0, 1}` column. */
     internal fun foldComparisonClauses(
         problem: BakedProblem,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
-    ): PassDelta = ComparisonClauseFold.fold(problem, objectiveBoolVars, cancellation)
+        keepBinary: Boolean,
+    ): PassDelta = ComparisonClauseFold.fold(problem, objectiveBoolVars, cancellation, keepBinary)
 
     /** [foldComparisonClauses] over declared ranges, before a finite projection exists. */
     internal fun foldSourceComparisonClauses(
         problem: Problem,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
-    ): SourceDelta = ComparisonClauseFold.foldSource(problem, objectiveBoolVars, cancellation)
+        keepBinary: Boolean,
+    ): SourceDelta = ComparisonClauseFold.foldSource(problem, objectiveBoolVars, cancellation, keepBinary)
 
     /** Maximal at-most-one cliques (Lit-encoded, at most one satisfied) recognised from [problem]'s
      *  factors — including those implied by pseudo-Boolean knapsacks — and grown into maximal cliques,
