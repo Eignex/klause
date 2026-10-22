@@ -194,6 +194,11 @@ nothing outside the declared grid policy.
 
 ### Exact linear source relations
 
+`factor.arithmetic.Linear` canonicalizes integral greater-equal rows to less-equal
+by exact negation. A bound or coalesced coefficient at `Long.MIN_VALUE` promotes
+the constants to arbitrary precision before negation; representable negations
+retain word-sized constants. Canonical counterparts share a structural key.
+
 `factor.arithmetic.ExactLinear` captures rational comparisons over integer and real
 coordinates, coalescing aliases before exact denominator clearing. Strict real
 comparisons keep their open boundary; integer-only strict comparisons use the

@@ -19,6 +19,61 @@ import kotlin.test.assertTrue
 class LinearTest {
 
     @Test
+    fun `greater-equal canonicalisation should preserve exact signed word endpoints`() {
+        for (coefficient in listOf(Long.MIN_VALUE, Long.MIN_VALUE + 2, -2L, 2L)) {
+            for (bound in listOf(Long.MIN_VALUE, Long.MIN_VALUE + 2, -3L, 0L, 3L)) {
+                val row = Linear(longArrayOf(coefficient), intArrayOf(0), LinearOp.GE, bound)
+
+                val constants = checkNotNull(row.integralConstants)
+                assertEquals(LinearOp.LE, row.op)
+                assertEquals(-bigIntOf(coefficient), constants.exactCoeff(0))
+                assertEquals(-bigIntOf(bound), constants.exactBound)
+                if (coefficient == Long.MIN_VALUE || bound == Long.MIN_VALUE) {
+                    assertIs<WideConstants>(constants)
+                } else {
+                    assertIs<IntegerConstants>(constants)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `promoted greater-equal rows should share keys with their exact negated forms`() {
+        for ((coefficient, bound) in listOf(2L to Long.MIN_VALUE, Long.MIN_VALUE to 0L,
+            Long.MIN_VALUE to Long.MIN_VALUE)) {
+            val row = Linear(longArrayOf(coefficient), intArrayOf(0), LinearOp.GE, bound)
+            val negated = Linear(intArrayOf(0), arrayOf(-bigIntOf(coefficient)), LinearOp.LE, -bigIntOf(bound))
+            val mapping = VarRemap(intArrayOf(), intArrayOf(1))
+
+            assertEquals(negated.structuralKey(), row.structuralKey())
+            assertEquals(negated.remap(mapping).structuralKey(), row.remap(mapping).structuralKey())
+            assertEquals(row.remap(mapping).structuralKey().hashCode(), row.remapStructuralHash(mapping))
+        }
+    }
+
+    @Test
+    fun `rows without canonical negation should retain minimum long constants`() {
+        for (op in listOf(LinearOp.LE, LinearOp.EQ, LinearOp.NE)) {
+            val row = Linear(longArrayOf(Long.MIN_VALUE), intArrayOf(0), op, Long.MIN_VALUE)
+
+            val constants = assertIs<IntegerConstants>(row.constants)
+            assertEquals(op, row.op)
+            assertEquals(Long.MIN_VALUE, constants.coeff(0))
+            assertEquals(Long.MIN_VALUE, constants.bound)
+        }
+    }
+
+    @Test
+    fun `canonicalisation should promote a coefficient coalesced to the minimum long`() {
+        val row = Linear(longArrayOf(Long.MIN_VALUE + 2, -2, 3), intArrayOf(0, 0, 1), LinearOp.GE, 0L)
+
+        val constants = assertIs<WideConstants>(row.constants)
+        assertEquals(listOf(0, 1), row.vars.toList())
+        assertEquals(-bigIntOf(Long.MIN_VALUE), constants.exactCoeff(0))
+        assertEquals(bigIntOf(-3), constants.exactCoeff(1))
+    }
+
+    @Test
     fun `canonicalising a wide greater-equal row should negate its exact constants`() {
         val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
 

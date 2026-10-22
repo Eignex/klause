@@ -32,6 +32,7 @@ import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.unaryMinus
 
@@ -76,7 +77,6 @@ class Linear private constructor(
      */
     override val constants: LinearConstants = run {
         val negate = rawOp == LinearOp.GE
-        val canonicalBound = if (negate) -rawBound else rawBound
         when {
             wideCoeffsIn != null -> {
                 val wide = WideConsts(wideCoeffsIn)
@@ -94,11 +94,18 @@ class Linear private constructor(
                 )
             }
 
+            negate && (rawBound == Long.MIN_VALUE || terms.coeffs.any { it == Long.MIN_VALUE }) -> {
+                WideConstants(
+                    WideConsts(Array(terms.coeffs.size) { -bigIntOf(terms.coeffs[it]) }),
+                    -bigIntOf(rawBound),
+                )
+            }
+
             else -> {
                 val integerCoeffs = constsOf(terms.coeffs)
                 IntegerConstants(
                     if (negate) integerCoeffs.negated() else integerCoeffs,
-                    canonicalBound,
+                    if (negate) -rawBound else rawBound,
                 )
             }
         }
