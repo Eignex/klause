@@ -14,9 +14,12 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
@@ -63,16 +66,31 @@ internal object MpsLpAdmission {
             maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop,
         ))
         val plan = requireNotNull(invocation.preparedPlan)
-        val problem = requireNotNull(plan.model)
-        val objective = plan.objective?.let { if (plan.maximize) it.negated() else it }
+        val canonical = requireNotNull(plan.model)
+        val sourceObjective = plan.objective?.let { if (plan.maximize) it.negated() else it }
+        val budget = PresolveBudget(1_650_000_000L)
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
+            canonical, FiniteEngine.BACKTRACK, sourceObjective,
+            cancellation = stop, solveCancellation = stop, presolveBudget = budget,
+            randomSeed = 3L, preparedPlan = plan,
+        ))
+        check(preparation.presolve?.infeasible != true) { "preparation refuted source" }
+        val problem = preparation.problem
+        val objective = preparation.objective
         val report = buildJsonObject {
             put("revision", Reports.readGitSha())
             put("suite", options.getValue("suite"))
             put("problem", options.getValue("problem"))
             put("sourceSha256", sha256(bytes))
             put("scope", "prepared-root-relaxation-diagnostic")
-            put("solverExecuted", false)
+            put("searchExecuted", false)
             put("sourceVerdictClaim", false)
+            put("preparationWorkAllowance", budget.allowance)
+            put("preparationWork", budget.spent())
+            put("preparationDeadlineSeconds", 20)
+            put("preparationCancelled", stop())
+            put("preparationMaySolveBounds", true)
+            put("canonicalFactors", canonical.factors.size)
             put("sourceSemantics", original.semantics.toString())
             put("route", invocation.route::class.simpleName)
             put("compiledIntegers", problem.numIntVars)
