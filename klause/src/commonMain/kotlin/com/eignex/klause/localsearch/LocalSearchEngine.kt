@@ -145,7 +145,8 @@ internal class LocalSearchEngine(
                 val previousBest = state.bestCostSeen
                 configuredRestart.restart(state, bestSoFar)
                 val ils = configuredRestart as? IteratedLocalSearchRestart
-                val preserve = seedImplicitOnRestart && ils?.preservesImplicitOnRestart == true
+                val preserve = seedImplicitOnRestart && ils?.preservesImplicitOnRestart == true &&
+                    state.seeding.retainFeasibleOwners(state)
                 prepareAssignment(state, preserveImplicit = preserve)
                 state.recompute()
                 if (preserve && !state.seeding.retainFeasibleOwners(state)) {

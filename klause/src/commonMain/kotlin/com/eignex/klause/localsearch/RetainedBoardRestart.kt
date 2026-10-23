@@ -28,10 +28,10 @@ internal class RetainedBoardRestart private constructor(
             sink.clear()
             val scope = when (kind) {
                 PerturbationKind.BasinHopping ->
-                    state.problem.factors[state.rng.nextInt(state.problem.numFactors)].intVars
+                    state.problem.factors[state.rng.nextInt(state.problem.numFactors)].intVars.toSet()
                 PerturbationKind.Uniform -> {
                     val target = state.rng.nextInt(state.problem.numBoolVars + state.problem.numIntVars)
-                    intArrayOf(target - state.problem.numBoolVars)
+                    setOf(target - state.problem.numBoolVars)
                 }
             }
             val eligible = boards.filter { board ->
