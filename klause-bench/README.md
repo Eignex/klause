@@ -748,6 +748,23 @@ reduction, alongside its minimum model-change threshold. It reduced charged
 preparation work on the controls without a general speedup claim. See
 [presolve](../docs/07-presolve.md#pipeline).
 
+### Source preparation reuse and polling
+
+Reuse captured open plans only for the identical model and projection binding, and
+retain bounded metered probe polling with exact visit charges and transactional
+retraction; see [source preparation](../docs/07-presolve.md#source-routing-and-encoder-selection)
+and [probing](../docs/07-presolve.md#symmetry-and-probing).
+
+[Lab 7712](https://lab.eignex.com/jobs/7712) compares the merged plan-reuse baseline
+`9f40a0678c` with probe polling at `3008350cf1`: six original SMT sources, seed 3,
+three repeats, one core and 10 s. All 36 cases finished. Every same-host pair matches
+source, dependency and runtime identities, and all work ledgers reconcile. The six
+cooking witnesses passed source checking; BubbleSort and startup returned native
+UNSAT in all twelve runs, without independent proof checking. The eighteen tdf,
+broydn and skdmxa runs remained UNKNOWN. Local and cloud timings stay separate;
+changed deadline work prefixes establish neither decision recovery nor a general
+solver speedup.
+
 ### Original-clause subsumption
 
 Keep `clause-subsume` opt-in: it helped one WCNF control and made no reduction on
