@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -87,7 +88,7 @@ internal class SmtLibAffineRealTables(cancellation: Cancellation, entryLimit: In
         }
     }
 
-    fun infer(): List<Factor> {
+    fun infer(sourceReals: Collection<Int> = emptyList()): List<Factor> {
         work.poll()
         val completed = ArrayList<Factor>()
         if (!enabled) return completed
@@ -121,11 +122,42 @@ internal class SmtLibAffineRealTables(cancellation: Cancellation, entryLimit: In
                 work.spend()
                 completed.add(link)
             }
+            excludeScalarValues(sourceReals, completed)
         } catch (_: Limit) {
             enabled = false
         }
         work.poll()
         return completed
+    }
+
+    private fun excludeScalarValues(sourceReals: Collection<Int>, completed: MutableList<Factor>) {
+        if (sourceReals.isEmpty()) return
+        work.spend(sourceReals.size.toLong() + 1L)
+        val sourceVariables = sourceReals.toHashSet()
+        val byVariable = LinkedHashMap<Int, MutableMap<Int, Long>>()
+        for ((literal, identities) in scalars) for (identity in identities) {
+            work.spend()
+            if (identity.variable !in sourceVariables) continue
+            val values = byVariable.getOrPut(identity.variable) {
+                work.spend()
+                LinkedHashMap()
+            }
+            work.spend()
+            if (literal in values) continue
+            work.spend(2)
+            values[literal] = identity.value
+        }
+        val emitted = HashSet<Pair<Int, Int>>()
+        for (values in byVariable.values) {
+            for ((first, firstValue) in values) for ((second, secondValue) in values) {
+                work.spend()
+                if (first >= second || firstValue == secondValue) continue
+                work.spend(3)
+                if (!emitted.add(first to second)) continue
+                work.spend(3)
+                completed.add(Clause(intArrayOf(Lit.negate(first), Lit.negate(second))))
+            }
+        }
     }
 
     private inline fun capture(action: () -> Unit) {

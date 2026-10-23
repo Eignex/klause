@@ -241,6 +241,11 @@ can lower to Boolean tests of its branches when the branch images are small, and
 definitions no surviving constraint needs are dropped after a dependency fixpoint.
 For up to eight Boolean inputs, a scalar defined by consistent, complete cases also
 supplies a verified affine row beside the source factors.
+After affine links, captured equality literals for the same declared Real coordinate
+and different integral constants supply pairwise not-both clauses. Declared coordinate
+identities determine the scope; internal real coordinates supply no such clauses.
+Capture, pair traversal and emitted factors share the existing 65,536-unit allowance
+and source cancellation token. Exhaustion preserves completed links and clauses.
 
 The exact real component can certify supported difference fragments with a graph;
 see [real graph admission](14-theories.md#real-graph-admission-and-checks).

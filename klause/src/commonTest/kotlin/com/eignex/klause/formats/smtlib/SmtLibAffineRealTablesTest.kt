@@ -1,12 +1,20 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.search.ClauseSearchComponent
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,6 +23,124 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SmtLibAffineRealTablesTest {
+    @Test
+    fun `source Real tag exclusions propagate after conditional column compaction`() {
+        val builder = Compiler.Builder(DEFAULT_UNBOUNDED_INT_LO, DEFAULT_UNBOUNDED_INT_HI, strictBounds = false)
+        SExprReader(
+            """
+            (declare-const x Real)
+            (declare-const a Bool) (declare-const b Bool)
+            (declare-const zero Bool) (declare-const one Bool) (declare-const two Bool)
+            """.trimIndent(),
+        ).readAll().forEach(builder::command)
+        val unusedConjunction = builder.compileBool(SExprReader("(and a b)").readAll().single())
+        builder.assert(SExprReader("(let ((unused (ite (and a b) 1 0))) true)").readAll().single())
+        val firstTag = builder.compileBool(SExprReader("(= x 0)").readAll().single())
+        for (assertion in listOf("(= zero (= x 0))", "(= one (= x 1))", "(= two (= x 2))", "zero")) {
+            builder.assert(SExprReader(assertion).readAll().single())
+        }
+        val booleansBeforeCompaction = builder.nextBool
+
+        val source = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(source.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(source.model.numBoolVars),
+        )
+
+        val result = session.initialize()
+
+        assertIs<ComponentResult.Consistent>(result)
+        assertEquals(0, source.model.numIntVars)
+        assertTrue(Lit.variable(unusedConjunction) < Lit.variable(firstTag))
+        assertEquals(booleansBeforeCompaction - 1, source.model.numBoolVars)
+        assertEquals(true, session.boolValue(Lit.variable(firstTag) - 1))
+        for (name in listOf("one", "two")) assertEquals(false, session.boolValue(source.boolVarNames.getValue(name)))
+    }
+
+    @Test
+    fun `source Real tag exclusions preserve listed and unlisted witnesses`() {
+        for (value in 0..3) {
+            val source = SmtLib.parse(
+                """
+                (declare-const x Real)
+                (declare-const zero Bool) (declare-const one Bool) (declare-const two Bool)
+                (assert (= zero (= x 0))) (assert (= one (= x 1))) (assert (= two (= x 2)))
+                (assert (= x $value))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(source.model).solve()
+
+            val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+            assertEquals(value.toString(), point.realValue(source.realVarNames.getValue("x")))
+            for ((tag, name) in listOf("zero", "one", "two").withIndex()) {
+                assertEquals(value == tag, point.boolValue(source.boolVarNames.getValue(name)))
+            }
+        }
+    }
+
+    @Test
+    fun `scalar exclusions require distinct literals and values on the same declared coordinate`() {
+        val capture = SmtLibAffineRealTables(Cancellation.Never)
+        for ((literal, variable, value) in listOf(Triple(0, 7, 0), Triple(0, 7, 0), Triple(2, 7, 0),
+            Triple(4, 7, 1), Triple(4, 7, 1), Triple(6, 8, 0), Triple(8, 8, 1),
+            Triple(0, 9, 0), Triple(4, 9, 1))) {
+            capture.equality(literal,
+                RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
+        }
+
+        val clauses = capture.infer(listOf(7, 9)).filterIsInstance<Clause>()
+
+        assertEquals(setOf(setOf(1, 5), setOf(3, 5)), clauses.map { it.literals.toSet() }.toSet())
+        assertEquals(2, clauses.size)
+    }
+
+    @Test
+    fun `an exhausted scalar exclusion allowance emits no unfinished factor`() {
+        val capture = SmtLibAffineRealTables(Cancellation.Never, entryLimit = 28)
+        for (value in 0..1) {
+            capture.equality(2 * value,
+                RealComb(emptyMap(), mapOf(7 to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
+        }
+
+        val factors = capture.infer(listOf(7))
+
+        assertTrue(factors.isEmpty())
+    }
+
+    @Test
+    fun `completed scalar exclusions survive exhaustion while a later pair is visited`() {
+        val capture = SmtLibAffineRealTables(Cancellation.Never, entryLimit = 44)
+        for (value in 0..2) {
+            capture.equality(2 * value,
+                RealComb(emptyMap(), mapOf(7 to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
+        }
+
+        val clauses = capture.infer(listOf(7)).filterIsInstance<Clause>()
+
+        assertEquals(1, clauses.size)
+    }
+
+    @Test
+    fun `scalar exclusion inference forwards charges and observes containing cancellation`() {
+        var charged = 0L
+        var armed = false
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = armed && charged >= 26L
+            override fun charge(units: Long) { charged += units }
+        }
+        val capture = SmtLibAffineRealTables(stop)
+        for (value in 0..1) {
+            capture.equality(2 * value,
+                RealComb(emptyMap(), mapOf(7 to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
+        }
+        armed = true
+
+        assertFailsWith<PolynomialSourceInterrupted> { capture.infer(listOf(7)) }
+
+        assertTrue(charged >= 26L)
+    }
+
     @Test
     fun `a complete affine table links its scalar Boolean channels without rounding`() {
         val source = SmtLib.parse(
@@ -246,7 +372,7 @@ class SmtLibAffineRealTablesTest {
             capture.implication(intArrayOf(1000 + 2 * assignment, 200 + 2 * assignment.countOneBits()), -1)
         }
 
-        val row = capture.infer().filterIsInstance<ExactLinear>().single()
+        val row = capture.infer(listOf(0, 1, 2)).filterIsInstance<ExactLinear>().single()
 
         assertEquals(3, row.size)
         assertEquals(listOf("1", "-1", "-1"), (0 until row.size).map { row.constants.exactCoeff(it).toString() })

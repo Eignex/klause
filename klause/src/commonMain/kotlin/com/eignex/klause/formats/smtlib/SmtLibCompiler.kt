@@ -331,11 +331,12 @@ internal object Compiler {
             } else null
             lowerOpenIteChains() // an objective term can open chains of its own
             conditionalEqualities.expandPending(this)
+            // Captured literals need dependency retention and Boolean column remapping.
+            factors.addAll(affineRealTables.infer(realNames.values))
             val removed = conditionalEqualities.retainNeededDefinitions(
                 factors, intNames.values, boolNames.values, compiledObjective,
             )
             val objective = compactConditionalColumns(removed, compiledObjective)
-            factors.addAll(affineRealTables.infer())
             return sourceProblem(objective, factors.toTypedArray())
         }
 
