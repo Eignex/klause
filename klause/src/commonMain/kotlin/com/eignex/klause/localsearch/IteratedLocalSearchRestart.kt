@@ -13,27 +13,27 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 /**
- * Iterated Local Search restart policy. Maintains a *population* of incumbent local
- * optima and restarts by picking one at random to anchor, then applying a random
+ * Iterated Local Search restart policy. Maintains a *population* of feasible basin
+ * anchors and restarts by picking one at random to anchor, then applying a random
  * perturbation. Compared to [AdaptivePerturbationRestart], which always anchors to the
  * global best-feasible-so-far, ILS allows the search to drift through sub-optimal
- * regions: an [AcceptanceCriterion] decides whether a new local optimum joins the
+ * regions: an [AcceptanceCriterion] decides whether a feasible anchor joins the
  * population. See Lourenço, Martin and Stützle, "Iterated Local Search", Handbook of
  * Metaheuristics (2003), https://doi.org/10.1007/0-306-48056-5_11.
  *
  *  - [populationSize] — number of incumbents tracked. Default 1 = classic single-anchor
  *    ILS. Larger values give a population-based variant: each restart picks a random
- *    member, and when a new optimum is accepted it replaces the population's worst.
+ *    member, and when an anchor is accepted it replaces the population's worst.
  *
- *  - [acceptance] — when [onLocalOptimum] fires with a new local optimum, this decides
+ *  - [acceptance] — when [onLocalOptimum] or [onFeasibleStall] offers a feasible candidate, this decides
  *    whether the new sample joins the population (replacing the worst member if at
  *    capacity). Comparison is against the population's *worst* incumbent so a candidate
  *    that beats only the weakest member is admitted; under single-incumbent mode this
  *    reduces to comparing against the lone incumbent.
  *
  *  - [adaptivePerturbation] — when true, ramps [perturbationStrength] up on stalls
- *    ([adaptiveStallThreshold] consecutive rejected local optima) and decays it when an
- *    optimum is accepted. Bounded by [maxPerturbationStrength].
+ *    ([adaptiveStallThreshold] consecutive rejected anchors) and decays it when an
+ *    anchor is accepted. Bounded by [maxPerturbationStrength].
  *
  *  - Falls back to a full random restart when the population is empty — same behaviour
  *    as [AdaptivePerturbationRestart] before the first feasible.
@@ -95,7 +95,7 @@ class IteratedLocalSearchRestart(
     /** Read-only view of the population. */
     val incumbents: List<Incumbent> get() = population
 
-    /** A population incumbent: an assignment and its objective. */
+    /** A feasible population anchor and its objective, without an optimality claim. */
     data class Incumbent(
         /** The incumbent assignment. */
         val sample: Sample,
@@ -119,7 +119,13 @@ class IteratedLocalSearchRestart(
         pendingBestBefore = Double.POSITIVE_INFINITY
     }
 
-    override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
+    override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) =
+        retainAnchor(state, sample, objective)
+
+    override fun onFeasibleStall(state: LocalSearchState, sample: Sample, objective: Double) =
+        retainAnchor(state, sample, objective)
+
+    private fun retainAnchor(state: LocalSearchState, sample: Sample, objective: Double) {
         val worstObjective = if (population.size < populationSize) {
             Double.POSITIVE_INFINITY
         } else {

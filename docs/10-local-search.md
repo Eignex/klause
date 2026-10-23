@@ -98,7 +98,7 @@ Circuit 2-opt reversal, an AllDifferent 3-cycle or a DP-optimal accepting run fo
 Regular. Default arms never pay for them. Each
 configured source carries a per-pick candidate cap and an enable gate. The reserved
 feasible structural draw retains bounded [board swap coverage](11-neighborhoods.md#board-swap-coverage)
-between picks and slices after the sampled resample window stalls. The schedule
+between picks and slices within the existing resample window. The schedule
 axis gates the plateau-escape sources on its stall signal.
 
 Every source closes its candidates through the ordinary move sink, which applies

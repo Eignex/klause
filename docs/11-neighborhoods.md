@@ -79,19 +79,23 @@ whole-source validation remain required.
 
 ## Board swap coverage
 
-After the feasible walk's sampled resample window finds no accepted move, its
-reserved structural draw rotates across elected AllDifferent boards. Each board
-starts at a random unordered pair and visits cyclic pair ranks without repetition. Strict descent with a zero resample cap starts coverage directly. Each pick
-keeps the ordinary limit of four proposals and 24 pair visits. Both inputs must pass the pin, definition,
-domain and proposing-owner filters; the complete compound enters ordinary generated
-move scoring and acceptance.
+At feasibility, the reserved structural draw rotates across elected AllDifferent
+boards. Each board starts at a random unordered pair and visits cyclic pair ranks
+without repetition, using a coprime stride to spread partial passes across ranks.
+A pick keeps the ordinary limit of four proposals and 24
+visits. Both inputs pass pin, definition, domain and proposing-owner filters before
+the complete compound enters ordinary generated-move scoring and acceptance.
 
-The live state retains its board and pair cursor between picks and suspended slices.
-A cancelled selection restores its cursor before resumption, so ungraded candidates
-remain eligible. Committed assignment changes, recomputation, definition changes and
-implicit ownership reseeding discard coverage. Incomplete coverage keeps the feasible
-walk sampling within its existing work allowance instead of reporting a local optimum
-to its restart policy. Exhausting this neighborhood grants no global proof authority.
+The live state retains its board and pair cursor across picks and suspended slices.
+A cancelled selection restores uncommitted pair progress. Assignment changes,
+restarts, definition changes and ownership reseeding invalidate coverage.
+
+Coverage uses the existing resample window and never delays its restart boundary.
+An incomplete pass reports a feasible stall rather than a board local optimum.
+Configuration filtering, non-improving tabu aspiration and partial continuous
+completion also withhold that classification when they can hide an improvement.
+ILS applies the same anchor acceptance rule to feasible stalls and completed
+descents. Neither notification grants global proof authority.
 
 ## NValue neighborhoods
 

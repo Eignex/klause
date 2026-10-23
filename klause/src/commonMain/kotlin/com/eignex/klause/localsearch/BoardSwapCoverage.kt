@@ -32,7 +32,7 @@ internal class BoardSwapCoverage {
             checked = true
         }
         val live = cursor ?: return false
-        if (!requested) live.start(state)
+        if (!requested) live.start()
         requested = true
         return true
     }
@@ -82,6 +82,7 @@ internal class BoardSwapCoverage {
         private val remaining = LongArray(boards.size)
         private var epoch = 1L
         private var board = 0
+        private var started = false
         private var boardsLeft = 0
         private var savedBoard = 0
         private var savedBoardsLeft = 0
@@ -100,8 +101,8 @@ internal class BoardSwapCoverage {
             boardsLeft = 0
         }
 
-        fun start(state: LocalSearchState) {
-            board = state.rng.nextInt(boards.size)
+        fun start() {
+            started = false
             boardsLeft = boards.size
         }
 
@@ -130,6 +131,11 @@ internal class BoardSwapCoverage {
         }
 
         fun visit(state: LocalSearchState, sink: MoveSink) {
+            if (!started) {
+                board = state.rng.nextInt(boards.size)
+                started = true
+                if (picking) savedBoard = board
+            }
             val id = board
             board = (board + 1) % boards.size
             if (finished[id] == epoch) return
@@ -152,14 +158,11 @@ internal class BoardSwapCoverage {
                 val left = leftCoordinate(size, position[id])
                 val right = left + 1 + (position[id] - pairsBefore(size, left)).toInt()
                 sink.proposer = fid
-                val skipped = if (invariant.allowsSwapCoordinate(state, left, sink)) {
+                if (invariant.allowsSwapCoordinate(state, left, sink)) {
                     invariant.proposeSwap(state, left, right, sink)
-                    1L
-                } else {
-                    minOf(remaining[id], (size - right).toLong())
                 }
-                remaining[id] -= skipped
-                position[id] = (position[id] + skipped) % pairs
+                remaining[id]--
+                position[id] = (position[id] + pairStride(pairs)) % pairs
             } else {
                 remaining[id] = 0L
             }
@@ -178,6 +181,9 @@ internal class BoardSwapCoverage {
             }
             return low
         }
+
+        // Coprime steps spread bounded picks over pair ranks without storing a quadratic shuffle.
+        private fun pairStride(pairs: Long): Long = pairs / 2 + if (pairs % 4L == 2L) 2L else 1L
 
         private fun pairsBefore(size: Int, left: Int): Long = left.toLong() * (2L * size - left - 1L) / 2
     }
