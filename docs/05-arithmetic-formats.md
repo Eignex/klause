@@ -290,3 +290,13 @@ strict-feasibility refutation. Budgets can leave a solve unknown.
 ---
 
 Previous: [4. Finite formats and FlatZinc](04-finite-formats.md) · [Contents](README.md) · Next: [6. Sessions and resources](06-sessions.md)
+
+### Linear traversal diagnostics
+
+`SourceSetupRequest.linearTraversal=NUMERICAL` selects the numerical LP/MIP owner
+on the same linear source snapshot, including bounded integer declarations. The
+CLI exposes this diagnostic as `--param linear-traversal=numerical`; `automatic`
+retains normal routing. This choice is independent of the finite worker recipe
+selected by `engine`, keeps the original tolerance and objective, and supplies no
+finite or arithmetic-theory fallback. Numerical traversal retains sibling coverage
+and withholds terminals for interrupted or uncertified leaves.

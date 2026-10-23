@@ -30,6 +30,8 @@ class SourceSetupRequest private constructor(
     /** Original exact quadratic source objective, when the operation supplies one. */
     val quadraticObjective: QuadraticObjectiveSpec?,
     internal val requiresQuadraticCompletion: Boolean = false,
+    /** Numerical traversal diagnostic; automatic routing retains finite execution when supported. */
+    val linearTraversal: LinearTraversal = LinearTraversal.AUTOMATIC,
 ) {
     /** Bind an affine operation or the objective already embedded in a native formula. */
     constructor(
@@ -41,7 +43,9 @@ class SourceSetupRequest private constructor(
         providers: FactorProjectionProviders = source.providers,
         cancellation: Cancellation = Cancellation.Never,
         boundCancellation: Cancellation = cancellation,
-    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null)
+        linearTraversal: LinearTraversal = LinearTraversal.AUTOMATIC,
+    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null,
+        linearTraversal = linearTraversal)
 
     /** Bind an original exact quadratic objective and direction before native preparation. */
     constructor(
@@ -72,6 +76,9 @@ class SourceSetupRequest private constructor(
     )
 
     init {
+        require(linearTraversal == LinearTraversal.AUTOMATIC || source.formula is AttachedSourceFormula.Linear) {
+            "numerical traversal requires a linear source snapshot"
+        }
         val embedded = source.embeddedObjectiveSense
         require(embedded == null || (objective == null && quadraticObjective == null)) {
             "an embedded source objective cannot be replaced by another objective"
@@ -102,6 +109,15 @@ class SourceSetupRequest private constructor(
         }
         return selected.negated()
     }
+}
+
+/** Traversal policy over an unchanged linear source, independent of worker recipes and declarations. */
+enum class LinearTraversal {
+    /** Prefer admitted finite execution, retaining numerical execution for open sources. */
+    AUTOMATIC,
+
+    /** Use numerical LP/MIP traversal without finite bound closure or finite search. */
+    NUMERICAL,
 }
 
 /** Captures one source route and retains its operation binding for execution. */

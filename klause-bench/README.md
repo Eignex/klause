@@ -1483,3 +1483,22 @@ input-change outcomes while preserving the operator and its following walk.
 Retain typed original-source derivations separately from native engine completion;
 capture stays optional and unsupported capture withholds mathematical coverage. See
 [source evidence](../docs/13-evidence.md).
+
+### Linear traversal comparison
+
+For bounded MPS traversal diagnostics, compare `param.linear-traversal=automatic`
+with `param.linear-traversal=numerical` through the same source pipeline and pinned
+original bytes. The automatic finite arm can use `engine=cp`, `param.arms=1` and
+`param.bt-arm=lp-default`; the numerical arm can use `engine=fixed` for a single
+complete owner. Engine selection alone does not select traversal ownership.
+Retain actual routing, source tolerance, objective scale, seeds, deadlines and
+platform. Default and `exact=true` are separate comparisons.
+
+Numerical traversal's `smtCompleteSearchStage_numerical*` fields count checked nodes,
+certified bounds, strict child-bound improvements, fractional/indicator splits,
+closed leaves and missing guidance. Pending leaves include unvisited siblings and
+unresolved leaves; retained nodes include the complete coverage tree. These fields
+are observations rather than proof authority or a retained best-bound queue.
+`nativeNominalObjectiveBound` is the checked native bound in original objective
+units; it does not certify the feasible set enlarged by a positive tolerance.
+Independent source witness validation remains separate from solver proof claims.

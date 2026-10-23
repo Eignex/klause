@@ -61,7 +61,8 @@ internal class LinearAuthorityInvocation(
     val stats: SolveStats get() = SolveStats(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
-        smt = state.smt.snapshot(), openTheory = state.work.snapshot(),
+        smt = state.smt.snapshot().copy(completeSearchStages = component.observations()),
+        openTheory = state.work.snapshot(),
         search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
         SourceLpBudget(onWork = state.smt::observeSourceLp), stop, ::paused, ::offer)
