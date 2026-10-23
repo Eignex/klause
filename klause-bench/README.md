@@ -784,6 +784,24 @@ owner per run; matched comparisons showed unchanged results and work with at mos
 about 0.5% allocation change. See [LP architecture](../docs/17-linear-programming.md)
 and [local search](../docs/10-local-search.md).
 
+### Local-search definition propagation
+
+Retain state-owned evaluation caches and pending-node intersections with the full
+affected cone; [local search](../docs/10-local-search.md#definitions-and-repairs)
+owns their invalidation and reconciliation contracts.
+[Lab 7646](https://lab.eignex.com/jobs/7646), at node limit 5000 with one fixed
+CBLS arm, seed 1 and three repeats, reduced median complete-case elapsed time from
+9.59 to 4.10 s on steelmillslab `bench_2_19` and from 18.73 to 6.56 s on
+`bench_16_10`. Team-assignment and gbac retained identical source-checked witnesses;
+elapsed-driven restart differences prevent a trajectory-equivalence claim.
+
+In the two reported instances' completed pairs from
+[7647](https://lab.eignex.com/jobs/7647), both mixed arms produced 9/9 checked
+witnesses at 10 s. The historical feasibility losses also do not reproduce on the
+current-main control. `bench_16_10`'s median objective was 51 on main and 54 with
+pending propagation, so reduced definition cost does not establish a portfolio
+quality improvement.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;
