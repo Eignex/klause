@@ -293,12 +293,12 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
         if (extremumResults.isEmpty()) return null
         val entries = term.intCoeffs.size.toLong() + term.realCoeffs.size + 1L
         cancellation.charge(entries)
-        if (cancellation()) throw PolynomialSourceInterrupted()
+        checkCancellation()
         if (entries > maxEntries) return null
         var variable = -1
         for ((column, coefficient) in term.realCoeffs) {
             cancellation.charge(1)
-            if (cancellation()) throw PolynomialSourceInterrupted()
+            checkCancellation()
             if (!coefficient.isZero && column in extremumResults && (variable < 0 || column < variable)) {
                 variable = column
             }
@@ -308,13 +308,17 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
         val coefficient = term.realCoeffs.getValue(variable)
         cancellation.charge(4L * (entries + definition.first.integers.size + definition.first.reals.size +
             definition.second.integers.size + definition.second.reals.size + 2L))
-        if (cancellation()) throw PolynomialSourceInterrupted()
+        checkCancellation()
         val rest = RealComb(term.intCoeffs, term.realCoeffs.filterKeys { it != variable }, term.constant)
         val arms = listOf(definition.first, definition.second).map {
             rest.plus(RealComb(it.integers, it.reals, it.constant).scaled(coefficient))
         }
-        if (cancellation()) throw PolynomialSourceInterrupted()
+        checkCancellation()
         return Comparison(definition.minimum == (coefficient.signum() > 0), arms)
+    }
+
+    private fun checkCancellation() {
+        if (cancellation()) throw PolynomialSourceInterrupted()
     }
 
     fun literal(term: RealComb, relation: LinearOp, strict: Boolean, create: () -> Int): Int {
