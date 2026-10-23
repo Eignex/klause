@@ -69,7 +69,10 @@ class SatisfiedStructured private constructor(
             Scope.Sampled -> {
                 val elected = if (structuralFirst && sampleCount > 0) state.seeding.electedImplicit else null
                 repeat(sampleCount) { draw ->
-                    val fid = if (draw == 0 && elected != null && elected.isNotEmpty()) {
+                    val retained = if (retainCoverage && draw == 0 && elected != null && state.cost == 0L) {
+                        state.boardCoverage.nextFactor(state)
+                    } else null
+                    val fid = retained ?: if (draw == 0 && elected != null && elected.isNotEmpty()) {
                         elected[state.rng.nextInt(elected.size)]
                     } else {
                         state.rng.nextInt(total)
