@@ -589,6 +589,18 @@ cached preparation fragment in a fresh registry, within the original deadline's
 remaining time, recording the first refused row and any existing complementary names.
 That is isolated naming demand, not the opening's refusal cause.
 
+With `inspect=partial-arithmetic`, the profile pauses at the eighth nonroot
+consistent boundary and opens the source twice at seed 1. Each opening has a
+ten-second deadline; each read-only snapshot has a separate ten-second allowance.
+The snapshots retain source names and private slots, ordered reconstruction steps,
+exact rows, signed guards and reasons, private choices, bound witnesses and any
+partial point. The existing exact LP capture codec preserves matrix and scoped
+assertions in `prefix-N.exact`; decoding and encoding must preserve its bytes.
+`replay.json` compares canonical state snapshots from the two fresh openings.
+This is a direct-library diagnostic, not default CLI or source-verdict evidence.
+`batch64=<base64 JSON array of argument arrays>` handles up to four sources in
+numbered directories without changing their individual limits.
+
 `LinearSourceShape` accepts `suite=ID problem=NAME sha256=HEX` and retains the
 hash-matched original, build identity, declaration/lowered dimensions, factor kinds
 and exact-row predicate counts. Predicate identity removes only the activator before
