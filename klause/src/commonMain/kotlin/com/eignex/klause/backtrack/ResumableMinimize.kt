@@ -842,22 +842,24 @@ internal class ResumableMinimize(
     private fun recordIfImproving(
         sample: Sample,
         o: Double,
-        allowEqualCutoff: Boolean = false,
+        startingWitness: Boolean = false,
     ): MinimizeResult.WithSample? {
         val exact = exactSourceObjective(objective, sample, params.toleranceCheck)
         if (rebindable && exact == null) return null
         val cutoff = externalCutoff()
-        val matchesCutoff = allowEqualCutoff && cutoff.isFinite() &&
+        val matchesCutoff = startingWitness && cutoff.isFinite() &&
             (exact?.let { it == BigFraction.ofDouble(cutoff) } ?: (o == cutoff))
         if (cutoff.isNaN() || (!matchesCutoff && !(exact?.let { beatsCutoff(it, cutoff) } ?: (o < cutoff)))) {
             return null
         }
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
-        brancher.onSolution(sample)
         singleObj?.let { objVarBest = sample.intValue(it.varId) }
-        params.improvedSolutionSink?.invoke(sample, score.display)
-        params.onEvent?.invoke(SearchEvent.Incumbent(score.display))
+        if (!startingWitness) {
+            brancher.onSolution(sample)
+            params.improvedSolutionSink?.invoke(sample, score.display)
+            params.onEvent?.invoke(SearchEvent.Incumbent(score.display))
+        }
         // Carry the counters as they stand. A caller that consumes the improvement stream and stops when
         // it dries up holds only the last step it saw, so an incumbent without stats leaves the whole run
         // reporting nothing — search and LP alike. Snapshotting mid-search is sound: it reads elapsed time
@@ -980,11 +982,11 @@ internal class ResumableMinimize(
             completed
         }
         if (token()) return null
-        return recordIfImproving(accepted, objective.evaluate(accepted), allowEqualCutoff = !rebindable)
+        return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
     }
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
-        if (initialCandidate == null && pausable && !rebindable && externalShared) {
+        if (initialCandidate == null && pausable && !rebindable && externalShared && restart === NoRestartSchedule) {
             initialCandidate = params.pooledIncumbents?.current()?.assignment
         }
         revalidateInitialCandidate()?.let {
