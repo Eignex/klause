@@ -218,7 +218,7 @@ class BoardSwapCoverageTest {
         var optima = 0
         val policy = object : RestartPolicy {
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
-            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {}
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) = Unit
             override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
                 optima++
             }
