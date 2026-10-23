@@ -34,14 +34,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object LinearPrefixInspection {
-    fun inspect(
-        compiled: SmtLibProblem,
-        out: File,
-        sourceSha256: String,
-        probe: Boolean = false,
-        targetBoundaries: Int = 8,
-    ) {
-        require(targetBoundaries in 1..8)
+    fun inspect(compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false) {
         val captures = (0..1).map { replay ->
             val stop = Cancellation.after(10.seconds)
             val started = System.nanoTime()
@@ -57,7 +50,7 @@ internal object LinearPrefixInspection {
             val params = TheoryParams(timeout = stop, randomSeed = 1L)
             val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
-            val boundary = PrefixBoundary(targetBoundaries)
+            val boundary = PrefixBoundary()
             val begin = engine.javaClass.declaredMethods.single {
                 it.name.startsWith("begin") && it.parameterCount == 3
             }
@@ -71,7 +64,7 @@ internal object LinearPrefixInspection {
                     put("revision", Reports.readGitSha())
                     put("sourceSha256", sourceSha256)
                     put("seed", 1)
-                    put("targetNonRootBoundaries", targetBoundaries)
+                    put("targetNonRootBoundaries", 8)
                     put("visitedNonRootBoundaries", boundary.visits)
                     put("sourceVerdictClaim", false)
                     put("cliEquivalence", "unverified-direct-library-diagnostic")
@@ -149,9 +142,10 @@ internal object LinearPrefixInspection {
         check(captures[0].contentEquals(captures[1])) { "fresh prefix replay differs" }
     }
 
-    private class PrefixBoundary(private var target: Int) : SearchNodePolicy {
+    private class PrefixBoundary : SearchNodePolicy {
         var visits = 0
         var paused = false
+        private var target = 8
         fun resume() {
             target = visits + 8
             paused = false
@@ -167,8 +161,10 @@ internal object LinearPrefixInspection {
     private const val MAX_BYTES = 64 * 1024 * 1024
 }
 
-private class LinearPrefixSnapshot(private val stop: Cancellation) {
+internal class LinearPrefixSnapshot(private val stop: Cancellation) {
     private var remaining = 1_000_000
+    private val premiseIds = LinkedHashMap<SearchAtomPremise, Int>()
+    private val premises = ArrayList<SearchAtomPremise>()
 
     fun record(value: Any?): JsonElement = scalar(value)
 
@@ -192,7 +188,7 @@ private class LinearPrefixSnapshot(private val stop: Cancellation) {
         val trail = requireNotNull(field(session, "trail"))
         val atoms = field(session, "atoms")
         return buildJsonObject {
-            put("schema", "partial-linear-state-v1")
+            put("schema", "partial-linear-state-v2")
             put("decisionLevel", session.decisionLevel)
             put("exactStateSha256", sha256(exactBytes))
             put("sourceSlotContract", "presolve retains slots; ordered rebuild stages reconstruct eliminated columns")
@@ -222,10 +218,25 @@ private class LinearPrefixSnapshot(private val stop: Cancellation) {
                     add(buildJsonObject {
                         put("value", scalar(shared))
                         put("reason", scalar(session.reasonFor(variable)?.literals))
+                        put("level", scalar(shared?.let { session.levelOf(variable shl 1) }))
                     })
                 }
             })
             put("registeredAtoms", scalar(atoms?.let { field(it, "assertions") }))
+            put("registeredPins", buildJsonArray {
+                val assertions = atoms?.let { field(it, "assertions") } as? List<*> ?: emptyList<Any>()
+                for (assertion in assertions) {
+                    val literal = member(requireNotNull(assertion), "getLiteral") as Int
+                    if (literal and 1 != 0) continue
+                    add(buildJsonObject {
+                        put("literal", literal)
+                        val value = session.boolValue(literal ushr 1)
+                        put("value", scalar(value))
+                        put("level", scalar(value?.let { session.levelOf(literal) }))
+                        put("reason", scalar(session.reasonFor(literal ushr 1)?.literals))
+                    })
+                }
+            })
             put("integerBounds", buildJsonArray {
                 for (variable in 0 until model.numIntVars) {
                     tick()
@@ -264,6 +275,7 @@ private class LinearPrefixSnapshot(private val stop: Cancellation) {
             put("disequalityDirections", scalar(field(node, "disequalityDirections")))
             put("directionPremises", scalar(field(node, "directionPremises")))
             put("partialPoint", scalar(field(theory, "candidate")))
+            put("premiseGraph", premiseGraph())
             tick()
         }
     }
@@ -329,8 +341,36 @@ private class LinearPrefixSnapshot(private val stop: Cancellation) {
                     put("value", scalar(it.value, depth + 1))
                 }
             })
-            is SearchAtomPremise.Unavailable -> JsonPrimitive("unavailable")
+            is SearchAtomPremise -> premiseReference(value)
             else -> fields(value, depth)
+        }
+    }
+
+    private fun premiseReference(premise: SearchAtomPremise): JsonObject {
+        val id = premiseIds.getOrPut(premise) {
+            premises.size.also { premises += premise }
+        }
+        return buildJsonObject { put("premise", id) }
+    }
+
+    fun premiseGraph(): JsonArray = buildJsonArray {
+        var index = 0
+        while (index < premises.size) {
+            tick()
+            val premise = premises[index++]
+            add(buildJsonObject {
+                when (premise) {
+                    is SearchAtomPremise.Asserted -> {
+                        put("type", "asserted")
+                        put("decision", scalar(premise.decision))
+                    }
+                    is SearchAtomPremise.All -> {
+                        put("type", "all")
+                        put("children", scalar(field(premise, "premises")))
+                    }
+                    SearchAtomPremise.Unavailable -> put("type", "unavailable")
+                }
+            })
         }
     }
 
@@ -352,7 +392,8 @@ private class LinearPrefixSnapshot(private val stop: Cancellation) {
     }
 
     private fun tick() {
-        require(remaining-- > 0 && !stop()) { "prefix capture allowance exhausted" }
+        require(remaining-- > 0) { "prefix capture entry allowance exhausted" }
+        require(!stop()) { "prefix capture deadline exhausted" }
     }
 }
 

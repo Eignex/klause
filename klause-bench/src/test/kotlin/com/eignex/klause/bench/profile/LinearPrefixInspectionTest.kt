@@ -1,38 +1,32 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.bench.metric.sha256
-import com.eignex.klause.formats.smtlib.SmtLib
-import kotlin.io.path.createTempDirectory
+import com.eignex.klause.solver.search.SearchAtomPremise
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class LinearPrefixInspectionTest {
     @Test
-    fun `a fresh partial state replay preserves exact arithmetic and source names`() {
-        val source = """
-            (declare-const x Int)
-            (declare-const b Bool)
-            (assert (or b (<= x 0)))
-            (assert (or (not b) (>= x 2)))
-        """.trimIndent()
-        val out = createTempDirectory("linear-prefix").toFile()
-        try {
-            val compiled = SmtLib.parse(source)
+    fun `shared premise chains retain their graph size and asserted fact`() {
+        var premise: SearchAtomPremise = SearchAtomPremise.Asserted(SearchDecision.Bool(6))
+        repeat(24) { premise = SearchAtomPremise.All(listOf(premise, premise)) }
+        val snapshot = LinearPrefixSnapshot(Cancellation.Never)
 
-            LinearPrefixInspection.inspect(compiled, out, sha256(source.toByteArray()), targetBoundaries = 1)
+        val root = snapshot.record(premise)
+        val graph = snapshot.premiseGraph()
 
-            val report = Json.parseToJsonElement(out.resolve("replay.json").readText()).jsonObject
-            assertEquals("true", report.getValue("exactReplay").jsonPrimitive.content)
-            assertTrue(out.resolve("prefix-0.exact").readBytes()
-                .contentEquals(out.resolve("prefix-1.exact").readBytes()))
-            val snapshot = Json.parseToJsonElement(out.resolve("prefix-0.json").readText()).jsonObject
-            assertTrue(snapshot.getValue("sourceNames").toString().contains("x"))
-        } finally {
-            out.deleteRecursively()
+        assertEquals("0", root.jsonObject.getValue("premise").jsonPrimitive.content)
+        assertEquals(25, graph.size)
+        for (node in graph.dropLast(1)) {
+            val children = node.jsonObject.getValue("children").jsonArray
+            assertEquals(children[0], children[1])
         }
+        val leaf = graph.last().jsonObject
+        assertEquals("asserted", leaf.getValue("type").jsonPrimitive.content)
+        assertEquals("6", leaf.getValue("decision").jsonObject.getValue("literal").jsonPrimitive.content)
     }
 }
