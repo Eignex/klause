@@ -839,11 +839,19 @@ internal class ResumableMinimize(
     /** Offer [sample] (objective [o]) to [incumbents]; fires inline telemetry and returns the incumbent
      *  to surface when this call installed it, else null. Admission — a finite score, and the certified
      *  continuous values only a leaf's residual LP can attach — is [sampleAdmission]'s to decide. */
-    private fun recordIfImproving(sample: Sample, o: Double): MinimizeResult.WithSample? {
+    private fun recordIfImproving(
+        sample: Sample,
+        o: Double,
+        allowEqualCutoff: Boolean = false,
+    ): MinimizeResult.WithSample? {
         val exact = exactSourceObjective(objective, sample, params.toleranceCheck)
         if (rebindable && exact == null) return null
         val cutoff = externalCutoff()
-        if (cutoff.isNaN() || !(exact?.let { beatsCutoff(it, cutoff) } ?: (o < cutoff))) return null
+        val matchesCutoff = allowEqualCutoff && cutoff.isFinite() &&
+            (exact?.let { it == BigFraction.ofDouble(cutoff) } ?: (o == cutoff))
+        if (cutoff.isNaN() || (!matchesCutoff && !(exact?.let { beatsCutoff(it, cutoff) } ?: (o < cutoff)))) {
+            return null
+        }
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
         brancher.onSolution(sample)
@@ -972,11 +980,14 @@ internal class ResumableMinimize(
             completed
         }
         if (token()) return null
-        return recordIfImproving(accepted, objective.evaluate(accepted))
+        return recordIfImproving(accepted, objective.evaluate(accepted), allowEqualCutoff = !rebindable)
     }
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
-        revalidateInitialCandidate()?.let { return it }
+        revalidateInitialCandidate()?.let {
+            if (applyObjectiveBound() == SearchRunDisposition.Exhausted) rootIsExhausted = true
+            return it
+        }
         if (unboundedLeaf != null) return null
         val rootToken = rootLpBudget()
         if (rootLpDutyCycle.allows(lpEngine.totalSolveWork())) {
