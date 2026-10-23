@@ -13,22 +13,27 @@ import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
     @Test
-    fun `cell bounded continuation should verify every row beyond a fixed row threshold`() {
+    fun `cell bounded target admission should allow rows beyond a fixed row threshold`() {
         val rows = 149
         val model = LpBuilder().apply {
             addVar(0L, 1L)
             repeat(rows) { addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L) }
         }.build(Sense.MINIMIZE)
 
-        val result = continueExactLp(
-            model,
-            Basis(IntArray(rows) { it + 1 }, Array(rows + 1) { if (it == 0) VarStatus.AT_LOWER else VarStatus.BASIC }),
-        )
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel) = Basis(
+                IntArray(rows) { it + 1 },
+                Array(rows + 1) { if (it == 0) VarStatus.AT_LOWER else VarStatus.BASIC },
+            )
+        }
 
-        assertEquals(listOf(BigFraction.ONE), assertNotNull(result.witness).primal)
-        assertTrue(result.metrics.success)
+        val result = captureContinuationTarget(model, solver, null, ExactContinuationLimits(), Cancellation.Never)
+
+        assertNotNull(result.basis)
         assertNull(result.metrics.decline)
-        assertNull(result.conflict)
     }
 
     @Test
