@@ -109,7 +109,11 @@ internal object NumericalResidualReplay {
         val observer = recording.takeIf { observed }
         val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 2 }
             .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L)
-        fun owner(): Any = Class.forName(ENGINE + "LpScopedSolver").constructors.single { it.parameterCount == 9 }
+        val ownerType = Class.forName(ENGINE + "LpScopedSolver")
+        val constructor = ownerType.constructors.single { it.parameterCount == 9 }
+        val prepare = ownerType.methods.single { it.name == "prepare" && it.parameterCount == 1 }
+        val defaultSolve = ownerType.methods.single { it.name == "solve\$default" && it.parameterCount == 11 }
+        fun owner(): Any = constructor
             .newInstance(state, Cancellation.Never, probe.context, 64, 4096, 1_200_000_000L, false, Int.MAX_VALUE, pricing)
         val steps = ArrayList<JsonElement>()
         var current: Any? = null
@@ -126,11 +130,8 @@ internal object NumericalResidualReplay {
                 val active = requireNotNull(current)
                 val stop = Cancellation.after(2000.milliseconds)
                 val solveStarted = System.nanoTime()
-                val prepared = NumericalResidualProfile.call(active, "prepare", stop) as Boolean
+                val prepared = prepare.invoke(active, stop) as Boolean
                 val prepareNs = System.nanoTime() - solveStarted
-                val defaultSolve = active.javaClass.methods.single {
-                    it.name == "solve\$default" && it.parameterCount == 11
-                }
                 val result = if (prepared) {
                     defaultSolve.invoke(
                         null, active, null, stop, null, null, true, observer, null, false, 221, null,
