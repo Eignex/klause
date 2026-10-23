@@ -50,6 +50,52 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `partial interval propagation should publish a guard with both active bound premises`() {
+        val model = Problem(3, 0, emptyArray(), arrayOf(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, 1.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                LinearOp.GE, 2.0),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
+                LinearOp.LE, -4.0),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            val probe = component.probePartialLinearImplications()
+
+            assertEquals(1, probe.deductions.size)
+            assertEquals(true, session.boolValue(2))
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true)),
+                assertNotNull(session.reasonFor(2)).literals.toSet())
+        }
+    }
+
+    @Test
+    fun `partial interval propagation should decline after a required bound retracts`() {
+        val model = Problem(2, intBounds = openBounds(), factors = arrayOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+        ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(1, component.probePartialLinearImplications().deductions.size)
+            assertIs<ComponentResult.Consistent>(session.propagate())
+
+            session.popTo(0)
+
+            assertTrue(component.probePartialLinearImplications().deductions.isEmpty())
+            assertNull(session.boolValue(1))
+        }
+    }
+
+    @Test
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")
         val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, false)), PbOp.EQ, wide)

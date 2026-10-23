@@ -600,6 +600,11 @@ assertions in `prefix-N.exact`; decoding and encoding must preserve its bytes.
 This is a direct-library diagnostic, not default CLI or source-verdict evidence.
 `batch64=<base64 JSON array of argument arrays>` handles up to four sources in
 numbered directories without changing their individual limits.
+`inspect=partial-implication` preserves the same two initial snapshots, then
+compares eight further boundary visits with and without an explained interval
+probe. The probe uses exact active column bounds and shared reasons; it enables no
+default solver policy. Probe time, charged work, deductions and subsequent search
+progress are separate observations, not source-verdict or complete-solve speed claims.
 
 `LinearSourceShape` accepts `suite=ID problem=NAME sha256=HEX` and retains the
 hash-matched original, build identity, declaration/lowered dimensions, factor kinds

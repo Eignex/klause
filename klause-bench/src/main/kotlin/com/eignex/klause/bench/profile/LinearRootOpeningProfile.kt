@@ -21,12 +21,12 @@ import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
-import java.util.HexFormat
 import java.util.Base64
+import java.util.HexFormat
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -58,7 +58,8 @@ internal object LinearRootOpeningProfile {
         val required = setOf("suite", "problem", "sha256")
         require(options.keys == required || options.keys == required + "inspect")
         val inspection = options["inspect"]
-        require(inspection == null || inspection in setOf("disjunction-names", "partial-arithmetic"))
+        val inspections = setOf("disjunction-names", "partial-arithmetic", "partial-implication")
+        require(inspection == null || inspection in inspections)
         val expected = options.getValue("sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
         val reference = Catalog.uncapped(options.getValue("suite")).problems
@@ -71,12 +72,13 @@ internal object LinearRootOpeningProfile {
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val parsingStarted = System.nanoTime()
-        val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = Cancellation.after(OPENING_BUDGET_MS.milliseconds))
+        val parsingStop = Cancellation.after(OPENING_BUDGET_MS.milliseconds)
+        val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = parsingStop)
         val compiled = admitted
         val parsingNs = System.nanoTime() - parsingStarted
         require(compiled.objective == null) { "only satisfaction openings are supported" }
-        if (inspection == "partial-arithmetic") {
-            LinearPrefixInspection.inspect(compiled, out, actual)
+        if (inspection == "partial-arithmetic" || inspection == "partial-implication") {
+            LinearPrefixInspection.inspect(compiled, out, actual, probe = inspection == "partial-implication")
             return
         }
         val deadlineStarted = System.nanoTime()

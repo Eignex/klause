@@ -13,6 +13,7 @@ import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchNodeDisposition
@@ -32,7 +33,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object LinearPrefixInspection {
-    fun inspect(compiled: SmtLibProblem, out: File, sourceSha256: String) {
+    fun inspect(compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false) {
         val captures = (0..1).map { replay ->
             val stop = Cancellation.after(10.seconds)
             val started = System.nanoTime()
@@ -79,6 +80,46 @@ internal object LinearPrefixInspection {
                 val bytes = capture.toString().toByteArray()
                 require(bytes.size <= MAX_BYTES) { "prefix snapshot exceeds byte allowance" }
                 out.resolve("prefix-$replay.json").writeBytes(bytes)
+                if (probe && !stop()) {
+                    val probeStarted = System.nanoTime()
+                    val work = member(state, "getWork") as OpenTheoryWorkSink
+                    val before = work.snapshot()
+                    val deductions = if (replay == 1) call(requireNotNull(planned.theory),
+                        "probePartialLinearImplications") else null
+                    val propagation = planned.session.propagate()
+                    val probeElapsed = System.nanoTime() - probeStarted
+                    boundary.resume()
+                    val continuation = if (!stop()) call(run, "advance") else null
+                    val after = work.snapshot()
+                    val observation = buildJsonObject {
+                        put("treated", replay == 1)
+                        put("probeNs", probeElapsed)
+                        put("probe", LinearPrefixSnapshot(Cancellation.after(10.seconds)).record(deductions))
+                        put("propagation", propagation.javaClass.simpleName)
+                        put("continuation", continuation?.javaClass?.simpleName)
+                        put("stopped", stop())
+                        put("decisionLevel", planned.session.decisionLevel)
+                        put("checksBefore", before.openTheoryChecks)
+                        put("checksAfter", after.openTheoryChecks)
+                        put("workBefore", before.openWork)
+                        put("workAfter", after.openWork)
+                        put("booleanDecisionsBefore", before.openBoolDecisions)
+                        put("booleanDecisionsAfter", after.openBoolDecisions)
+                        put("assignedBooleans", (0 until (field(requireNotNull(planned.theory), "model") as Problem)
+                            .numBoolVars).count { planned.session.boolValue(it) != null })
+                        put("stopCause", planned.session.executionControls.stopCause?.name)
+                    }
+                    out.resolve("probe-$replay.json").writeText("$observation\n")
+                    println(observation)
+                    if (boundary.paused && continuation == null && !stop() &&
+                        planned.session.executionControls.stopCause == null
+                    ) {
+                        val afterCapture = LinearPrefixSnapshot(Cancellation.after(10.seconds)).capture(
+                            planned, run, compiled, out.resolve("after-$replay.exact"),
+                        )
+                        out.resolve("after-$replay.json").writeText("$afterCapture\n")
+                    }
+                }
                 bytes
             } finally {
                 (run as? AutoCloseable)?.close()
@@ -101,9 +142,14 @@ internal object LinearPrefixInspection {
     private class PrefixBoundary : SearchNodePolicy {
         var visits = 0
         var paused = false
+        private var target = 8
+        fun resume() {
+            target = visits + 8
+            paused = false
+        }
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
             if (context.decisionLevel > 0) visits++
-            if (visits < 8) return SearchNodeDisposition.Expand
+            if (visits < target) return SearchNodeDisposition.Expand
             paused = true
             return SearchNodeDisposition.Pause
         }
@@ -115,6 +161,8 @@ internal object LinearPrefixInspection {
 private class LinearPrefixSnapshot(private val stop: Cancellation) {
     private var remaining = 1_000_000
 
+    fun record(value: Any?): JsonElement = scalar(value)
+
     fun capture(planned: PlannedSearch, run: Any, compiled: SmtLibProblem, exactFile: File): JsonObject {
         val session = planned.session
         val theory = requireNotNull(planned.theory)
@@ -123,7 +171,7 @@ private class LinearPrefixSnapshot(private val stop: Cancellation) {
         require(planned.cp?.session?.fixpointCancelled != true)
         val model = field(theory, "model") as Problem
         require(model.numRealVars == 0 && model.numBoolVars + model.numIntVars <= 100_000)
-        val lp = (field(theory, "lpDelegate") as Lazy<*>).also { require(it.isInitialized()) }.value!!
+        val lp = requireNotNull((field(theory, "lpDelegate") as Lazy<*>).also { require(it.isInitialized()) }.value)
         val exactState = requireNotNull(member(lp, "getState"))
         val exactBytes = exactCapture(exactState)
         require(exactBytes.size <= 64 * 1024 * 1024)
@@ -138,7 +186,7 @@ private class LinearPrefixSnapshot(private val stop: Cancellation) {
             put("schema", "partial-linear-state-v1")
             put("decisionLevel", session.decisionLevel)
             put("exactStateSha256", sha256(exactBytes))
-            put("sourceSlotContract", "presolve retains slots; ordered rebuild stages reconstruct eliminated coordinates")
+            put("sourceSlotContract", "presolve retains slots; ordered rebuild stages reconstruct eliminated columns")
             put("sourceNames", buildJsonObject {
                 put("integers", scalar(compiled.intVarNames))
                 put("booleans", scalar(compiled.boolVarNames))
