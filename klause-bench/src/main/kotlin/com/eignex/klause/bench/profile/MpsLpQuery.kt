@@ -24,7 +24,7 @@ internal object MpsLpQuery {
         check(bean.isThreadAllocatedMemorySupported)
         bean.isThreadAllocatedMemoryEnabled = true
         out.resolve("queries.jsonl").bufferedWriter().use { output ->
-            for (mode in listOf("full-cold", "full-retained", "cone-cold")) {
+            for (mode in listOf("full-cold", "full-retained", "cone-cold", "prepared-cold", "prepared-retained")) {
                 queryMode(problem, objective, mode, bean) { report ->
                     output.appendLine(report.toString())
                     output.flush()
@@ -58,7 +58,9 @@ internal object MpsLpQuery {
                 val startNs = System.nanoTime()
                 val startBytes = bean.getThreadAllocatedBytes(thread)
                 val reused = owner != null
-                val active = owner ?: newOwner(problem, objective, plan, token).also { owner = it }
+                val active = owner ?: newOwner(problem, objective, plan, token, mode.startsWith("prepared-")).also {
+                    owner = it
+                }
                 val setupNs = System.nanoTime() - startNs
                 val setupBytes = bean.getThreadAllocatedBytes(thread) - startBytes
                 val before = stats(active.first, active.second)
@@ -79,7 +81,7 @@ internal object MpsLpQuery {
                 val afterPrune = stats(active.first, active.second)
                 val closeNs = System.nanoTime()
                 val closeBytes = bean.getThreadAllocatedBytes(thread)
-                if (mode != "full-retained" || repeat == 2) {
+                if (!mode.endsWith("retained") || repeat == 2) {
                     active.first.close()
                     owner = null
                 }
@@ -94,6 +96,7 @@ internal object MpsLpQuery {
                     put("repeat", repeat)
                     put("ownerReused", reused)
                     put("freshRootSession", true)
+                    put("prepareRootWithinAllowance", mode.startsWith("prepared-"))
                     put("plan", plan.toString())
                     put("containingSeconds", 30)
                     put("querySeconds", 10)
@@ -127,6 +130,7 @@ internal object MpsLpQuery {
         objective: LinearObjective,
         plan: LpPlan,
         token: Cancellation,
+        prepareWithinAllowance: Boolean,
     ): Pair<AutoCloseable, Any> {
         val routeType = Class.forName("com.eignex.klause.solver.result.LpRoute")
         val route = routeType.enumConstants.single { it.toString() == "NODE" }
@@ -134,14 +138,15 @@ internal object MpsLpQuery {
         val sink = sinkType.getConstructor(String::class.java, routeType).newInstance("mps-lp-query", route)
         val type = Class.forName("com.eignex.klause.lp.bounding.LpEngine")
         val constructor = type.constructors.single { it.parameterTypes.last().simpleName == "DefaultConstructorMarker" }
-        check(constructor.parameterCount == 11)
-        val values = arrayOfNulls<Any>(11)
+        check(constructor.parameterCount == 12)
+        val values = arrayOfNulls<Any>(12)
         values[0] = problem
         values[1] = objective
         values[2] = LpParams(plan, cancellation = token, solveBudgetMillis = 30_000, randomSeed = 3)
         values[3] = sink
         values[5] = false
-        values[9] = 15.inv()
+        values[9] = prepareWithinAllowance
+        values[10] = 527.inv()
         return (constructor.newInstance(*values) as AutoCloseable) to sink
     }
 
@@ -158,6 +163,9 @@ internal object MpsLpQuery {
         return buildJsonObject {
             put("offeredNodeWork", owner.javaClass.methods.single {
                 it.name.startsWith("nodeWorkBudget") && it.parameterCount == 0
+            }.invoke(owner) as Long)
+            put("offeredPreparationWork", owner.javaClass.methods.single {
+                it.name.startsWith("nodePreparationWorkBudget") && it.parameterCount == 0
             }.invoke(owner) as Long)
             put("scopedPreparation", scopedPreparation(owner))
             put("nodePasses", lp.nodePasses.sum)

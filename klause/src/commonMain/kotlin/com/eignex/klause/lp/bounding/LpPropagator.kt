@@ -90,6 +90,7 @@ internal class LpPropagator(
     // Each bound edit costs the scoped solver a pass over the model's columns; the engine charges it as LP work.
     private val onEdit: (Long) -> Unit = {},
     private val queryWorkAllowance: () -> Long? = { null },
+    private val onPreparation: ((LpSolveMetrics) -> Unit)? = null,
 ) : SearchComponent,
     SearchBrancher,
     SearchBranchProposal,
@@ -359,34 +360,38 @@ internal class LpPropagator(
         edit: LpSourceEdit,
         premise: (Int, Boolean) -> SearchAtomPremise = { _, _ -> SearchAtomPremise.Unavailable },
     ): Boolean = withOwner { current ->
-        val before = current.state
-        if (edit.sourceState !== before || !edit.isCurrent() ||
-            edit.bounds.size != before.model.n + edit.columns.size || cancellation()
-        ) {
-            return@withOwner false
-        }
-        val assertions = edit.boundAssertions(nextWitness, cancellation) ?: return@withOwner false
-        if (edit.retired.isEmpty() && edit.columns.isEmpty() && edit.rows.isEmpty() && edit.objective == null &&
-            assertions.isEmpty()
-        ) {
+        try {
+            val before = current.state
+            if (edit.sourceState !== before || !edit.isCurrent() ||
+                edit.bounds.size != before.model.n + edit.columns.size || cancellation()
+            ) {
+                return@withOwner false
+            }
+            val assertions = edit.boundAssertions(nextWitness, cancellation) ?: return@withOwner false
+            if (edit.retired.isEmpty() && edit.columns.isEmpty() && edit.rows.isEmpty() && edit.objective == null &&
+                assertions.isEmpty()
+            ) {
+                edit.commit()
+                return@withOwner true
+            }
+            val premises = assertions.map { premise(it.column, it.upper) }
+            onEdit((before.model.numVars + edit.columns.size + edit.rows.size).toLong())
+            if (!current.replaceRows(
+                    edit.retired, edit.columns, edit.rows, before.depth > 0,
+                    permanentRows = edit.permanentRows, objective = edit.objective, assertions = assertions,
+                )
+            ) {
+                return@withOwner false
+            }
+            val count = current.state.assertions.size - before.assertions.size
+            for (index in 0 until count) witnesses[assertions[index].witness] = premises[index]
+            nextWitness += count
+            lastMetrics = LpSolveMetrics()
             edit.commit()
-            return@withOwner true
+            true
+        } finally {
+            onPreparation?.invoke(takePreparationMetrics(current))
         }
-        val premises = assertions.map { premise(it.column, it.upper) }
-        onEdit((before.model.numVars + edit.columns.size + edit.rows.size).toLong())
-        if (!current.replaceRows(
-                edit.retired, edit.columns, edit.rows, before.depth > 0,
-                permanentRows = edit.permanentRows, objective = edit.objective, assertions = assertions,
-            )
-        ) {
-            return@withOwner false
-        }
-        val count = current.state.assertions.size - before.assertions.size
-        for (index in 0 until count) witnesses[assertions[index].witness] = premises[index]
-        nextWitness += count
-        lastMetrics = LpSolveMetrics()
-        edit.commit()
-        true
     } == true
 
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
@@ -447,13 +452,18 @@ internal class LpPropagator(
     }
 
     private fun recordWork(current: LpScopedSolver) {
+        lastMetrics = current.lastMetrics + takePreparationMetrics(current)
+    }
+
+    private fun takePreparationMetrics(current: LpScopedSolver): LpSolveMetrics {
         val metrics = current.metrics
-        lastMetrics = current.lastMetrics + LpSolveMetrics(
+        val preparation = LpSolveMetrics(
             workOps = metrics.preparationWork - preparedWork,
             initialRefactorizations = (metrics.preparationRefactorizations - preparedRefactors).toInt(),
         )
         preparedWork = metrics.preparationWork
         preparedRefactors = metrics.preparationRefactorizations
+        return preparation
     }
 
     override fun initialize(context: SearchContext): ComponentResult {

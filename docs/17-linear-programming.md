@@ -119,6 +119,13 @@ later slices, charging every retry to the remaining root and LP work allowances.
 Root rounding and pumping propose discrete assignments for mixed
 models, but a relaxation point supplies a target, never witness authority.
 
+The internal root-only preparation policy can give source projection and numerical
+owner construction the remaining cumulative LP allowance while keeping each
+floating query under its adaptive solve allowance. It requires a finite containing
+allowance. Source-edit preparation, including a declined edit, charges that same
+governor before a solve and is excluded from the solve's later work report.
+Ordinary admission and node preparation use the shared adaptive allowance.
+
 ### Leaf completion
 
 Mixed witness recovery can submit a connected real residual to `SourceLp` after

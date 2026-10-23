@@ -68,6 +68,46 @@ import kotlin.test.assertTrue
 
 class LpPropagatorTest {
     @Test
+    fun `declined source preparation should report its spent work`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, 3) }, arrayOf(
+            Linear(IntArray(8) { 1 }, IntArray(8) { it }, LinearOp.GE, 1),
+        ))
+        val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, LinearObjective()))
+        var reported = 0L
+        LpPropagator(
+            object : LpSearchPolicy {},
+            effort = { LpEffortProfile(work = 100L) },
+            onPreparation = { reported += it.workOps },
+        ).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            val edit = assertNotNull(sources.prepare(assertNotNull(lp.state), RootDomains(problem)))
+
+            assertFalse(lp.editSources(edit))
+
+            assertTrue(reported > 0L)
+            assertEquals(lp.metrics?.preparationWork, reported)
+        }
+    }
+
+    @Test
+    fun `reported source preparation should not be charged again with the float solve`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val sources = LpRetainedSources(problem, CpToLpRelaxation(
+            problem, LinearObjective(intCoefficients = longArrayOf(1L)),
+        ))
+        var reported = 0L
+        LpPropagator(object : LpSearchPolicy {}, onPreparation = { reported += it.workOps }).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            assertTrue(lp.editSources(assertNotNull(sources.prepare(assertNotNull(lp.state), RootDomains(problem)))))
+
+            val solved = assertNotNull(lp.solveFloat())
+
+            assertTrue(reported > 0L)
+            assertEquals(solved.first.lastMetrics.workOps, lp.lastMetrics.workOps)
+        }
+    }
+
+    @Test
     fun `premised bound batches should explain the first conflicting prefix`() {
         val problem = Problem(3, 2, Array(2) { IntDomain(0, 10) }, emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)))

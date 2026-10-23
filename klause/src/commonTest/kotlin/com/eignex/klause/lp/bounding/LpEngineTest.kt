@@ -231,6 +231,44 @@ class LpEngineTest {
     }
 
     @Test
+    fun `separate root preparation should preserve the adaptive float query cap`() {
+        val problem = boundedProblem()
+        val factory = RecordingLpEngineFactory()
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
+            LpParams(lpPlan = LpPlan(bounding = true, boundMaxDepth = 0), solveBudgetMillis = 30_000L),
+            SolveStatsSink(backend = "root-preparation-cap"),
+            LpSolveContext(factory, decline),
+            prepareRootWithinAllowance = true,
+        ).use { engine ->
+            val queryCap = engine.nodeWorkBudget()
+
+            engine.pruneNode(PropagationSession(problem), Double.POSITIVE_INFINITY, -1, true)
+
+            assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > queryCap)
+            assertEquals(queryCap, assertNotNull(factory.floatAllowances.single()).work)
+        }
+    }
+
+    @Test
+    fun `root preparation should use only the remaining containing LP allowance`() {
+        val plan = LpPlan(bounding = true, boundMaxDepth = 0)
+        val problem = boundedProblem()
+        LpEngine(
+            problem,
+            LinearObjective(),
+            LpParams(lpPlan = plan, solveBudgetMillis = 4L),
+            SolveStatsSink(backend = "root-preparation-remaining"),
+            prepareRootWithinAllowance = true,
+        ).use { engine ->
+            engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
+
+            assertEquals(15_000L, engine.nodePreparationWorkBudget())
+        }
+    }
+
+    @Test
     fun `sliced LP queries should receive a native slice cap only behind a finite external cutoff`() {
         for (cutoff in listOf(Double.POSITIVE_INFINITY, 100.0)) {
             val problem = boundedProblem()

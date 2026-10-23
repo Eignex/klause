@@ -116,8 +116,13 @@ internal class LpEngine(
     internal val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
     private val nodeWorkAllowance: () -> Long? = { null },
     private val containingWork: (Long) -> Unit = {},
+    private val prepareRootWithinAllowance: Boolean = false,
 ) : AutoCloseable {
-    init { projections?.requireSource(problem) }
+    init {
+        projections?.requireSource(problem)
+        require(!prepareRootWithinAllowance || (params0.lpPlan.boundMaxDepth == 0 &&
+            lpWorkAllowance(params0.solveBudgetMillis, params0.lpPlan.lpWorkBudgetFraction) > 0L))
+    }
 
     private var closed = false
     internal var primalPropagationWork: Long = 0L
@@ -456,6 +461,10 @@ internal class LpEngine(
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
+    internal fun nodePreparationWorkBudget(): Long = if (prepareRootWithinAllowance) {
+        lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: nodeWorkBudget()
+    } else nodeWorkBudget()
+
     internal fun rootPrimalWorkBudget(additionalWork: Long = 0L): Long {
         val root = params.lpPlan.rootMaxWork.takeIf {
             it > 0L && params.lpPlan.rootBudgetFraction > 0.0
@@ -584,14 +593,20 @@ internal class LpEngine(
         effort = {
             LpEffortProfile(
                 iterations = nodePivotBudget(),
-                work = nodeWorkBudget(),
+                work = nodePreparationWorkBudget(),
                 trackDegeneracy = adaptiveWork,
                 pricing = pricingOptions,
             )
         },
         solveContext = solveContext,
         cancellation = params.cancellation,
-        queryWorkAllowance = ::nodeQueryWorkBudget,
+        queryWorkAllowance = {
+            nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { prepareRootWithinAllowance }
+        },
+        onPreparation = if (prepareRootWithinAllowance) { metrics ->
+            sink.lp.observeEngineCost(LpRoute.NODE, metrics)
+            noteSolveOps(metrics.workOps)
+        } else null,
     )
 
     internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
