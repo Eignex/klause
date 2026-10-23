@@ -126,7 +126,9 @@ class SearchRun internal constructor(
                                 return finish(SearchRunEvent.Indeterminate.Component)
                             }
 
-                            is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
+                            is SearchLearnedConflictResult.Backjump -> {
+                                error("learned conflict cascade did not terminate")
+                            }
                         }
                         continue
                     }
