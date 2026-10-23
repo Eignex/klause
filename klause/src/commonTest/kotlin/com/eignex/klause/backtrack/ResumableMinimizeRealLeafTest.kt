@@ -23,6 +23,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -73,7 +74,7 @@ class ResumableMinimizeRealLeafTest {
                 if (terminal == null && offered.isEmpty() && work > previousWork) {
                     val nodes = search.stats.search.nodes.sum
                     pendingNodes?.let { assertEquals(it, nodes) } ?: run { pendingNodes = nodes }
-                    assertFalse(search.canReseed)
+                    assertFalse(assertIs<ReseedGuard>(search).canReseed)
                 }
                 previousWork = work
             }

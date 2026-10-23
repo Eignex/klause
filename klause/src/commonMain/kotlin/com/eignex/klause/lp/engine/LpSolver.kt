@@ -125,8 +125,10 @@ internal data class LpSolveMetrics(
         singularRecoveryRefactorizations = singularRecoveryRefactorizations - previous.singularRecoveryRefactorizations,
         updateLimitRefactorizations = updateLimitRefactorizations - previous.updateLimitRefactorizations,
         backendRequestedRefactorizations = backendRequestedRefactorizations - previous.backendRequestedRefactorizations,
-        reconcileRecoveryRefactorizations = reconcileRecoveryRefactorizations - previous.reconcileRecoveryRefactorizations,
-        numericalRecoveryRefactorizations = numericalRecoveryRefactorizations - previous.numericalRecoveryRefactorizations,
+        reconcileRecoveryRefactorizations =
+            reconcileRecoveryRefactorizations - previous.reconcileRecoveryRefactorizations,
+        numericalRecoveryRefactorizations =
+            numericalRecoveryRefactorizations - previous.numericalRecoveryRefactorizations,
         primalRefactorizations = primalRefactorizations - previous.primalRefactorizations,
         objectiveWarmAttempts = objectiveWarmAttempts - previous.objectiveWarmAttempts,
         objectiveWarmHits = objectiveWarmHits - previous.objectiveWarmHits,

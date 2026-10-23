@@ -36,7 +36,9 @@ class LeafRealSolverTest {
     fun `releasing pending completion should permit fresh pins without stale coordinates`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0L, 1L)),
-            arrayOf<Factor>(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(2.0), LinearOp.EQ, 2.0)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(2.0), LinearOp.EQ, 2.0),
+            ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(1.0),

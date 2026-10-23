@@ -36,8 +36,14 @@ class RevisedSimplexTest {
                         assertEquals(expected?.primal?.toList(), result?.primal?.toList())
                         assertEquals(expectedMetrics.pivots, sliced.lastMetrics.pivots)
                         assertEquals(expectedMetrics.workOps, sliced.lastMetrics.workOps)
-                        assertEquals(expectedMetrics.initialRefactorizations, sliced.lastMetrics.initialRefactorizations)
-                        assertEquals(expectedMetrics.updateLimitRefactorizations, sliced.lastMetrics.updateLimitRefactorizations)
+                        assertEquals(
+                            expectedMetrics.initialRefactorizations,
+                            sliced.lastMetrics.initialRefactorizations,
+                        )
+                        assertEquals(
+                            expectedMetrics.updateLimitRefactorizations,
+                            sliced.lastMetrics.updateLimitRefactorizations,
+                        )
                         assertEquals(proof.verdict, certifyLpResult(model, sliced, result).verdict)
                     }
                 }
