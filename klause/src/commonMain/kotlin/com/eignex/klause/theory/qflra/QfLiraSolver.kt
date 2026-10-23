@@ -1583,6 +1583,23 @@ class ExactLiraSearchComponent private constructor(
         if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage)
     }
 
+    private fun observeCompleteResidualLpStage(stage: String) {
+        observeCompleteStage(stage)
+        when (stage) {
+            "RECOVERY_REAL_COMPONENT_LP_REQUEST",
+            "RECOVERY_REAL_COMPONENT_LP_DIMENSION",
+            "RECOVERY_REAL_COMPONENT_LP_CERTIFIED_BOUND",
+            "RECOVERY_REAL_COMPONENT_LP_FEASIBLE",
+            "RECOVERY_REAL_COMPONENT_LP_ATTAINED_OPTIMUM",
+            "RECOVERY_REAL_COMPONENT_LP_TOLERANCE_OPTIMUM",
+            "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE",
+            "RECOVERY_REAL_COMPONENT_LP_UNBOUNDED",
+            "RECOVERY_REAL_COMPONENT_LP_INDETERMINATE",
+            "RECOVERY_REAL_COMPONENT_LP_null",
+            -> observeCompleteStage("COMPLETE_$stage")
+        }
+    }
+
     private fun sourceRecoveryScope(): Boolean = model.numIntVars == 0 && !hasSourceDisjunctions &&
         model.numRealVars in 1..10000 &&
         node.sourceBranches.isEmpty() && node.rowAssertions.isEmpty() && node.disequalityDirections.isEmpty() &&
@@ -1828,7 +1845,8 @@ class ExactLiraSearchComponent private constructor(
                         onStage = ::observeCompleteStage,
                         onSourceInfeasible = reportInfeasible,
                         realCompletion = { columns, residual, token, onInfeasible ->
-                            reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
+                            reduction.completeReals(columns, residual, token,
+                                ::observeCompleteResidualLpStage, onInfeasible)
                         }, recoveryGuesses = if (sourceRecoveryScope()) retainedRecoveryGuesses() else emptySequence())
                     val support = sourceInfeasible
                     if (candidate == null && support != null && origins != null &&
