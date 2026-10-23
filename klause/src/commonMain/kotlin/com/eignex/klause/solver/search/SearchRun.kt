@@ -137,8 +137,8 @@ class SearchRun internal constructor(
                     ComponentCheck.Feasible
                 } else session.check()) {
                     ComponentCheck.Feasible -> {
+                        if (pendingModel == null) params.restart.onSolution()
                         val model = pendingModel ?: session.model().also {
-                            params.restart.onSolution()
                             lastModel = it
                             observer.onModel(it)
                         }
