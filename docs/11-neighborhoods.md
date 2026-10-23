@@ -79,7 +79,7 @@ whole-source validation remain required.
 
 ## Board swap coverage
 
-At feasibility, the reserved structural draw rotates across elected AllDifferent
+After a feasible sampled pick misses, the reserved structural draw rotates across elected AllDifferent
 boards. Each board starts at a random unordered pair and visits cyclic pair ranks
 without repetition, using a coprime stride to spread partial passes across ranks.
 A pick keeps the ordinary limit of four proposals and 24
@@ -91,6 +91,7 @@ A cancelled selection restores uncommitted pair progress. Assignment changes,
 restarts, definition changes and ownership reseeding invalidate coverage.
 
 Coverage uses the existing resample window and never delays its restart boundary.
+Strict descent with a zero resample cap starts coverage directly.
 An incomplete pass reports a feasible stall rather than a board local optimum.
 Configuration filtering, non-improving tabu aspiration and partial continuous
 completion also withhold that classification when they can hide an improvement.
