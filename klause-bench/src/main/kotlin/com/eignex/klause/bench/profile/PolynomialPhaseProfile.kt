@@ -302,7 +302,8 @@ internal object PolynomialPhaseProfile {
                     parsed.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = token,
                 ))
                 val problem = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
-                    ?: error("prepared diagnostic requires a polynomial service")
+                    ?: return PhaseTrace(emptyList(), "NotPolynomial", invocation.route.javaClass.simpleName,
+                        null, 0, 0, charges, stop)
                 Triple(
                     problem.javaClass.getDeclaredField("formula").apply { isAccessible = true }.get(problem),
                     problem.javaClass.getDeclaredField("totalBoolCount").apply { isAccessible = true }.getInt(problem),
