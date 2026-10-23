@@ -712,6 +712,15 @@ observation. When supplied by the selected revision, `progress` records committe
 root snapshots, their latest atom/elimination counts, charged root/search work and
 first regional entry. A missing progress field is unavailable. These scalar
 observations retain no uncommitted formula or partial reconstruction.
+
+`prepared=true` selects the unconditioned polynomial formula from
+`SourceSetup.prepare` and records its total query dimensions. The same containing
+deadline includes parsing and source preparation; their charges stay separate
+from native query work. `prepared-trace.json` retains this diagnostic instead of
+the raw-source gate/query pair. CP-root pins and portfolio execution are absent,
+so these are neither default-route timings nor published source verdicts. A
+different prepared owner yields `NotPolynomial`. This option is separate from
+`pipeline=true|both`.
 Use the alternating bounded-probe profile for deterministic observed/plain parity;
 pair phase attribution with source-matched ordinary CLI records.
 

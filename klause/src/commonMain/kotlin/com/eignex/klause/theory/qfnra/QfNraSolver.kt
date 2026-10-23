@@ -122,7 +122,8 @@ internal class QfNraQuery(
             var reduction = checkNotNull(preparingFormula.next())
             progress.committed(reduction, work.spentWork)
             var searched = reduction
-            var searching: Iterator<QfNraResult?>? = search(normalized, reduction, fixed, algebraic)
+            var searching: Iterator<QfNraResult?>? = null
+            var startedSearch = false
             var declined: QfNraResult.Unknown? = null
             while (true) {
                 if (!reduction.finished && (searching == null || progress.rootWork < progress.searchWork)) {
@@ -140,11 +141,13 @@ internal class QfNraQuery(
                             yield(QfNraResult.Unsatisfiable(work.snapshot()))
                             return@sequence
                         }
-                        if (stage.formula !== searched.formula) {
+                        if (searching == null && (!startedSearch || stage.formula !== searched.formula)) {
                             searching = search(normalized, stage, fixed, algebraic)
                             searched = stage
                             declined = null
-                            progress.searchRestarts++
+                            progress.started(stage)
+                            if (startedSearch) progress.searchRestarts++
+                            startedSearch = true
                         }
                     }
                 } else if (searching != null) {
@@ -159,6 +162,13 @@ internal class QfNraQuery(
                     if (completed is QfNraResult.Unknown) {
                         declined = completed
                         searching = null
+                        if (reduction.formula !== searched.formula) {
+                            searching = search(normalized, reduction, fixed, algebraic)
+                            searched = reduction
+                            declined = null
+                            progress.started(reduction)
+                            progress.searchRestarts++
+                        }
                     } else if (completed != null) {
                         yield(completed)
                         return@sequence
