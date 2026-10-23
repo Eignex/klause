@@ -9,13 +9,11 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.result.TerminationReason
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 @RunWith(Parameterized::class)
@@ -50,28 +48,4 @@ class LinearTraversalTest(private val traversal: LinearTraversal) {
         else assertIs<SourceExecutionResult.Finite>(result)
     }
 
-    @Test
-    fun `an interrupted bounded split should withhold terminal authority`() {
-        val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(3))),
-                lower = SemanticRational.ONE)),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
-        )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
-            linearTraversal = traversal,
-        ))
-
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.maxDecisions(0))))
-
-        if (result is SourceExecutionResult.Numerical) {
-            assertNull(result.result.terminal)
-            assertEquals(TerminationReason.BudgetExhausted, result.result.reason)
-        }
-        if (result is SourceExecutionResult.Numerical) {
-            assertEquals(LinearSourceConclusion.UNKNOWN, result.linearSource?.conclusion)
-        }
-    }
 }

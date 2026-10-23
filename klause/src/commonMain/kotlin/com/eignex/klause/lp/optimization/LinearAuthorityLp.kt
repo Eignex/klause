@@ -22,7 +22,10 @@ import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 
-internal class LinearAuthorityLp(private val budget: SourceLpBudget) {
+internal class LinearAuthorityLp(
+    private val budget: SourceLpBudget,
+    private val onShape: (Int, Int, Boolean) -> Unit = { _, _, _ -> },
+) {
     private val observer = object : LpCertificationObserver {
         override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
         override fun observeExactInput(accepted: Boolean) = Unit
@@ -61,6 +64,8 @@ internal class LinearAuthorityLp(private val budget: SourceLpBudget) {
                 refinement = owner.refinementCache.work)
             budget.closeOwner(owner)
         }
+    }.also {
+        onShape(rows.size, costs.size, budget.admitsDimensions(costs.size, rows.size.toLong()))
     }
 
     fun combination(

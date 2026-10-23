@@ -32,8 +32,11 @@ internal data class LinearAuthorityResult(
     val split: Pair<SourceCoordinate, BigFraction>? = null,
 )
 
-internal class LinearAuthority(private val budget: SourceLpBudget) {
-    private val lp = LinearAuthorityLp(budget)
+internal class LinearAuthority(
+    private val budget: SourceLpBudget,
+    onLpShape: (Int, Int, Boolean) -> Unit = { _, _, _ -> },
+) {
+    private val lp = LinearAuthorityLp(budget, onLpShape)
 
     fun check(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return LinearAuthorityResult()

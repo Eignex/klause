@@ -41,6 +41,27 @@ import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
     @Test
+    fun `an interrupted bounded numerical split should withhold terminal authority`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(3))),
+                lower = SemanticRational.ONE)),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL,
+        ))
+
+        val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(invocation,
+            ExecutionOptions(ExecutionOption.maxDecisions(0)))))
+
+        assertNull(result.result.terminal)
+        assertEquals(TerminationReason.BudgetExhausted, result.result.reason)
+        assertEquals(LinearSourceConclusion.UNKNOWN, result.linearSource?.conclusion)
+    }
+
+    @Test
     fun `nonzero numerical underflow should retain an unsupported numerical result`() {
         val tiny = SemanticRational.of(BIG_ONE, parseBigInt("1" + "0".repeat(400)))
         for (tolerance in listOf(SourceTolerance(), SourceTolerance(
