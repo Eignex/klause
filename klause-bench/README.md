@@ -1500,6 +1500,9 @@ closed leaves and missing guidance. LP shape maxima and dimension declines descr
 the numerical source adapter's admission guard. Pending leaves include unvisited siblings and
 unresolved leaves; retained nodes include the complete coverage tree. These fields
 are observations rather than proof authority or a retained best-bound queue.
+`numericalIncumbentDominatedSplits` counts unclosed fractional nodes whose checked
+bound already dominates the invocation's checked incumbent. Observation retains
+the ordinary split and confers no pruning or terminal authority.
 `nativeNominalObjectiveBound` is the checked native bound in original objective
 units; it does not certify the feasible set enlarged by a positive tolerance.
 Independent source witness validation remains separate from solver proof claims.

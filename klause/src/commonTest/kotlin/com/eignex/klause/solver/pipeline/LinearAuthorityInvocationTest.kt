@@ -30,6 +30,34 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `a dominated fractional sibling should remain open in diagnostic traversal`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(bool, integer),
+            mapOf(
+                "false" to SourcePremise(
+                    SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+                    mapOf(0 to false),
+                ),
+                "true" to SourcePremise(
+                    SourceInequality(mapOf(integer to BigFraction.ofLong(-2)), BigFraction.ofLong(-3)),
+                    mapOf(0 to true),
+                ),
+            ),
+            mapOf(integer to BigFraction.ONE),
+        )
+
+        val result = assertNotNull(LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 2)).use {
+            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+        })
+
+        assertNull(result.terminal)
+        assertEquals(BigFraction.ONE, result.value)
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalIncumbentDominatedSplits"))
+    }
+
+    @Test
     fun `integer strict positivity should reach an attained integer minimum`() {
         val source = SourceProofContext(
             scope,
