@@ -185,9 +185,9 @@ internal class RevisedSimplex(
     private val reconcileQueue = workspace.reconcileQueue
 
     /**
-     * The LP's columns with the logical ones explicit, fixed for this engine's lifetime.
+     * The LP's owned columns with the logical ones explicit, for the current scaling view.
      *
-     * That fixity is what lets a basis be named by index: [basicVar] *is* what the basis solver
+     * Fixed structure within that view lets a basis be named by index: [basicVar] *is* what the basis solver
      * factorizes, so a refactorization hands over the choice of columns rather than a square matrix
      * assembled for the occasion.
      */
@@ -447,9 +447,9 @@ internal class RevisedSimplex(
         into.scatterStored(rowIdx, colPtr[j], colVal, colPtr[j], columnNnz(j))
     }
 
-    /** `y · A_j`, uncharged — for the passes that must not move the work meter. */
-    private fun columnDot(y: DoubleArray, j: Int): Double = if (j < n) {
-        koblas.sparseKernels.dot(rowIdx, colPtr[j], colVal, colPtr[j], columnNnz(j), y)
+    // Uncharged pricing reads the current owner so an unscaled fallback cannot retain a retired CSC generation.
+    internal fun columnDot(y: DoubleArray, j: Int): Double = if (j < n) {
+        koblas.sparseKernels.dotColumn(columns, j, y)
     } else {
         y[j - n]
     }
