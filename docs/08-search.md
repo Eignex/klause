@@ -36,7 +36,7 @@ Four owners divide the work:
   owns decisions, Boolean values, reasons and publishers, integer facts, undo levels
   and pending assertion delivery.
 - [SearchLearning](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
-  owns shared clauses, attachment and propagation cursors, unit reawakening and
+    owns learned clauses, attachment and propagation cursors, unit reawakening and
   reduction. Clause identifiers and watch-list order remain stable across index
   growth and rebuilds.
 - [SearchRun](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchRun.kt)
