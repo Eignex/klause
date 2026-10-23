@@ -2,8 +2,8 @@
 
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.factor.global.AllDifferentInvariant
+import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
@@ -822,7 +822,8 @@ internal class LocalSearchEngine(
                 beforeObjective == objective.evaluate(state.assignment))
             println("% structuredCoverage check=${coverageChecks++} work=$totalFlips restart=$restartCount " +
                 "hash=$before objective=$beforeObjective tested=$tested feasible=$feasible improving=$improving " +
-                "bestDelta=$bestDelta complete=$complete rescue=$coverageRescue policy=${configuredRestart::class.simpleName}")
+                "bestDelta=$bestDelta complete=$complete rescue=$coverageRescue " +
+                "policy=${configuredRestart::class.simpleName}")
             return best.takeIf { complete }
         }
         // The feasibility-fight strategy whose moves form the rounds (the unified descent strategy
@@ -1296,8 +1297,12 @@ internal class LocalSearchEngine(
         val coverageBefore = coverageBoardVars.map { state.assignment.intValue(it) }
         restarts.restart(state, anchor)
         if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params, checkpoint, onPause)
-        val changed = coverageBoardVars.indices.count { state.assignment.intValue(coverageBoardVars[it]) != coverageBefore[it] }
-        val differsAnchor = anchor?.let { sample -> coverageBoardVars.count { state.assignment.intValue(it) != sample.intValue(it) } }
+        val changed = coverageBoardVars.indices.count {
+            state.assignment.intValue(coverageBoardVars[it]) != coverageBefore[it]
+        }
+        val differsAnchor = anchor?.let { sample ->
+            coverageBoardVars.count { state.assignment.intValue(it) != sample.intValue(it) }
+        }
         println("% structuredRestart policy=${configuredRestart::class.simpleName} " +
             "seedImplicit=$seedImplicitOnRestart boardVars=${coverageBoardVars.size} changed=$changed " +
             "differsBestAnchor=$differsAnchor cost=${state.cost}")
