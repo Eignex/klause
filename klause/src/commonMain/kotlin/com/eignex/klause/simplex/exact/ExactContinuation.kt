@@ -32,7 +32,7 @@ internal enum class ContinuationDecline {
 }
 
 internal data class ExactContinuationLimits(
-    val maxRows: Int = 128,
+    val maxRows: Int = Int.MAX_VALUE,
     val maxColumns: Int = 4096,
     val maxCells: Int = 65536,
     val maxBits: Int = 4096,
@@ -47,6 +47,9 @@ internal data class ExactContinuationLimits(
         require(maxRows >= 0 && maxColumns >= 0 && maxCells >= 0 && maxBits >= 24)
         require(maxWork >= 0 && maxAllocation >= 0 && (maxTimeNs ?: 0) >= 0 && maxImportPivots >= 0 && maxPivots >= 0)
     }
+
+    fun admitsDimensions(rows: Int, columns: Int): Boolean =
+        rows in 0..maxRows && columns in rows..maxColumns && rows.toLong() * (columns.toLong() + 1L) <= maxCells
 }
 
 internal data class ExactContinuationMetrics(
@@ -317,9 +320,7 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
         }
         budget.step()
         val limits = budget.limits
-        if (input.m > limits.maxRows || input.total > limits.maxColumns ||
-            input.m.toLong() * (input.total.toLong() + input.m + 1L) > limits.maxCells
-        ) {
+        if (!limits.admitsDimensions(input.m, input.total)) {
             throw ContinuationStop(ContinuationDecline.DIMENSION)
         }
         if (input.lower.size != input.total || input.upper.size != input.total ||
@@ -410,7 +411,7 @@ private class RationalContinuationLane<F>(
     budget: ContinuationBudget,
     private val admitScalarPeak: (Int) -> Unit,
 ) : ContinuationLane {
-    private val width = input.total + input.m + 1
+    private val width = input.total + 1
     private var table: List<MutableList<F>>
     private var headings = MutableList(input.m) { input.n + it }
     private var seats: MutableList<F>
@@ -438,7 +439,7 @@ private class RationalContinuationLane<F>(
         table = List(input.m) { row ->
             MutableList(width) { j ->
                 when (j) {
-                    input.n + row, input.total + row -> ops.one
+                    input.n + row -> ops.one
                     width - 1 -> fromBig(input.rhs[row], budget)
                     else -> ops.zero
                 }
@@ -701,7 +702,8 @@ private class RationalContinuationLane<F>(
 
     private fun conflict(row: Int, direction: Int, budget: ContinuationBudget): LaneResult = LaneResult(
         ray = List(input.m) { i ->
-            val value = table[row][input.total + i]
+            // Transformed logical columns are B^-1 I, including when a logical enters the basis.
+            val value = table[row][input.n + i]
             toBig(if (direction > 0) multiply(ops.minusOne, value, budget) else value, budget)
         },
     )

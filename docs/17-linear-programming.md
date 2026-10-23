@@ -288,6 +288,13 @@ and pivot spending. Changed layouts and incomplete imports use fresh continuatio
 Every returned point or conflict is verified against the current source authority
 and premises; retained feasibility supplies no prior proof package.
 
+The exact tableau stores `[A | I | b]`. Pivoted logical columns already contain
+`B^-1 I` and supply the Farkas multipliers, sharing storage with the constraint
+columns. Admission counts `m * (n + m + 1)` stored cells under the 65,536-cell
+ceiling and 4,096 total columns. Callers may impose a row limit; the default
+uses the cell envelope. Work, allocation, scalar size and pivot limits also
+apply to the complete operation, including import and current-source verification.
+
 ### Farkas and recession checks
 
 For `M = [A | I]`, a Farkas contradiction requires
