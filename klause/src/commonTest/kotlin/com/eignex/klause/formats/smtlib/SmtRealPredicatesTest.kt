@@ -11,7 +11,7 @@ import kotlin.test.assertFailsWith
 class SmtRealPredicatesTest {
     @Test
     fun `a full extrema table should retain shared results and leave new extrema independent`() {
-        val predicates = SmtRealPredicates(Cancellation.Never, maxEntries = 5)
+        val predicates = SmtRealPredicates(Cancellation.Never, maxEntries = 6)
         val first = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)
         val second = RealComb(emptyMap(), mapOf(1 to BigFraction.ONE), BigFraction.ZERO)
         val third = RealComb(emptyMap(), mapOf(2 to BigFraction.ONE), BigFraction.ZERO)

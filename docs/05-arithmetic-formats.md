@@ -222,6 +222,11 @@ Equivalent extrema share a result coordinate for the same exact affine arms,
 independently of operand order; minima and maxima keep separate identities.
 Predicate and extremum entries share one 65,536-entry allowance, and a full table
 retains existing definitions while emitting new ones without caching them.
+An inequality containing a cached extremum can substitute its two affine arms and
+combine their comparisons with AND or OR. The coefficient sign and comparison
+direction select the connective, with strictness unchanged. Each inequality
+expands one extremum once; its complete defining bounds and choice remain in the
+model.
 Hard unit-weight counts of distinct Boolean indicators retain `Cardinality` when
 their threshold lies within the count's range. Signed guards and opposite `0`/`1`
 arms keep their polarity; repeated guards and other arithmetic retain exact integer

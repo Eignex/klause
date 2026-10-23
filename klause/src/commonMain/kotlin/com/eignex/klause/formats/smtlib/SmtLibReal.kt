@@ -145,6 +145,14 @@ private fun Compiler.Builder.assertRealRelation(op: String, a: RealComb, b: Real
         if (!holds) forceTrue(Lit.negate(trueLit()))
         return
     }
+    realPredicates.comparison(d)?.let { comparison ->
+        val literal = if (linOp == LinearOp.EQ) reifyAnd(listOf(
+            reifyExtremumComparison(comparison, LinearOp.LE, strict = false),
+            reifyExtremumComparison(comparison, LinearOp.GE, strict = false),
+        )) else reifyExtremumComparison(comparison, linOp, strict)
+        forceTrue(literal)
+        return
+    }
     factors.add(realRow(d, linOp, strict))
 }
 
@@ -161,6 +169,13 @@ private fun exactRealRow(
     (d.intCoeffs.keys.map(Term::ofIntVar) + d.realCoeffs.keys.map(Term::ofRealVar)).toIntArray(),
     d.intCoeffs.values.toList() + d.realCoeffs.values.toList(), op, d.constant.negated(), strict, activator,
 )
+
+// Definition guards keep raw rows so observation predicates can use their complete Boolean encoding.
+internal fun Compiler.Builder.reifyRealDefinition(term: RealComb, relation: LinearOp): Int {
+    val variable = newBool()
+    factors.add(exactRealRow(term, relation, strict = false, activator = variable))
+    return Lit.make(variable, true)
+}
 
 /**
  * Reify a real relation `(op a b)` as a Boolean literal: an inequality atom becomes one
@@ -184,7 +199,12 @@ internal fun Compiler.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb)
     return reifyRealAtom(d, linOp, strict)
 }
 
-private fun Compiler.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict: Boolean): Int {
+private fun Compiler.Builder.reifyRealAtom(
+    d: RealComb,
+    linOp: LinearOp,
+    strict: Boolean,
+    expandExtrema: Boolean = true,
+): Int {
     if (d.isConstant) {
         val sign = d.constant.signum()
         val holds = when {
@@ -195,13 +215,28 @@ private fun Compiler.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict:
         return if (holds) trueLit() else Lit.negate(trueLit())
     }
     return realPredicates.literal(d, linOp, strict) {
-        val w = newBool()
-        factors.add(exactRealRow(d, linOp, strict, w))
-        Lit.make(w, true)
+        val comparison = if (expandExtrema) realPredicates.comparison(d) else null
+        if (comparison != null) reifyExtremumComparison(comparison, linOp, strict)
+        else {
+            val w = newBool()
+            factors.add(exactRealRow(d, linOp, strict, w))
+            Lit.make(w, true)
+        }
     }
 }
 
+private fun Compiler.Builder.reifyExtremumComparison(
+    comparison: SmtRealPredicates.Comparison,
+    relation: LinearOp,
+    strict: Boolean,
+): Int {
+    val literals = comparison.arms.map { reifyRealAtom(it, relation, strict, expandExtrema = false) }
+    return if (comparison.minimum == (relation == LinearOp.GE)) reifyAnd(literals) else reifyOr(literals)
+}
+
 internal class SmtRealPredicates(private val cancellation: Cancellation, private val maxEntries: Int = 65_536) {
+    class Comparison(val minimum: Boolean, val arms: List<RealComb>)
+
     private data class Arm(
         val integers: Map<Int, BigFraction>,
         val reals: Map<Int, BigFraction>,
@@ -220,6 +255,7 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
 
     private val literals = HashMap<Predicate, Int>()
     private val extrema = HashMap<Extremum, RealComb>()
+    private val extremumResults = HashMap<Int, Extremum>()
     private var retainedEntries = 0
 
     init {
@@ -228,7 +264,7 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
 
     fun extremum(first: RealComb, second: RealComb, minimum: Boolean, create: () -> RealComb): RealComb {
         val entries = first.intCoeffs.size.toLong() + first.realCoeffs.size +
-            second.intCoeffs.size + second.realCoeffs.size + 3L
+            second.intCoeffs.size + second.realCoeffs.size + 4L
         cancellation.charge(4L * entries)
         if (cancellation()) throw PolynomialSourceInterrupted()
         if (entries > maxEntries) return create()
@@ -242,9 +278,43 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
         val result = create()
         if (entries <= maxEntries - retainedEntries) {
             extrema[key] = result
+            val coordinate = result.realCoeffs.entries.singleOrNull()
+            if (result.intCoeffs.isEmpty() && result.constant.isZero &&
+                coordinate != null && coordinate.value == BigFraction.ONE
+            ) {
+                extremumResults[coordinate.key] = key
+            }
             retainedEntries += entries.toInt()
         }
         return result
+    }
+
+    fun comparison(term: RealComb): Comparison? {
+        if (extremumResults.isEmpty()) return null
+        val entries = term.intCoeffs.size.toLong() + term.realCoeffs.size + 1L
+        cancellation.charge(entries)
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        if (entries > maxEntries) return null
+        var variable = -1
+        for ((column, coefficient) in term.realCoeffs) {
+            cancellation.charge(1)
+            if (cancellation()) throw PolynomialSourceInterrupted()
+            if (!coefficient.isZero && column in extremumResults && (variable < 0 || column < variable)) {
+                variable = column
+            }
+        }
+        if (variable < 0) return null
+        val definition = extremumResults.getValue(variable)
+        val coefficient = term.realCoeffs.getValue(variable)
+        cancellation.charge(4L * (entries + definition.first.integers.size + definition.first.reals.size +
+            definition.second.integers.size + definition.second.reals.size + 2L))
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        val rest = RealComb(term.intCoeffs, term.realCoeffs.filterKeys { it != variable }, term.constant)
+        val arms = listOf(definition.first, definition.second).map {
+            rest.plus(RealComb(it.integers, it.reals, it.constant).scaled(coefficient))
+        }
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        return Comparison(definition.minimum == (coefficient.signum() > 0), arms)
     }
 
     fun literal(term: RealComb, relation: LinearOp, strict: Boolean, create: () -> Int): Int {

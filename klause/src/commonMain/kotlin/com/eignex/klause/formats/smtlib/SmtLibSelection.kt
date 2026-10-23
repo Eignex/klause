@@ -80,9 +80,10 @@ internal fun Compiler.Builder.realSelection(condition: Int, whenTrue: RealComb, 
             val relation = if (minimum) LinearOp.LE else LinearOp.GE
             factors.add(realRow(result.plus(whenTrue.scaled(BigFraction.MINUS_ONE)), relation))
             factors.add(realRow(result.plus(whenFalse.scaled(BigFraction.MINUS_ONE)), relation))
-            val opposite = if (minimum) ">=" else "<="
+            val opposite = if (minimum) LinearOp.GE else LinearOp.LE
             factors.add(Clause(intArrayOf(
-                reifyRealRel(opposite, result, whenTrue), reifyRealRel(opposite, result, whenFalse),
+                reifyRealDefinition(result.plus(whenTrue.scaled(BigFraction.MINUS_ONE)), opposite),
+                reifyRealDefinition(result.plus(whenFalse.scaled(BigFraction.MINUS_ONE)), opposite),
             )))
             result
         }

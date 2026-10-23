@@ -29,6 +29,80 @@ import kotlin.test.assertTrue
 
 class SmtLibSelectionTest {
     @Test
+    fun `reified extrema comparisons should preserve signed affine source truth`() {
+        for (maximum in listOf(false, true)) for (scale in listOf(-2, 1)) {
+            for (first in -1..1) for (second in -1..1) {
+                val value = scale * (if (maximum) maxOf(first, second) else minOf(first, second)) + 1
+                val x = if (first < 0) "(- ${-first})" else "$first"
+                val y = if (second < 0) "(- ${-second})" else "$second"
+                val coefficient = if (scale < 0) "(- ${-scale})" else "$scale"
+                val extreme = if (maximum) "(ite (< x y) y x)" else "(ite (< x y) x y)"
+                for (op in listOf("<=", "<", ">=", ">", "=")) for (truth in listOf(false, true)) {
+                    val expected = when (op) {
+                        "<=" -> value <= 0
+                        "<" -> value < 0
+                        ">=" -> value >= 0
+                        ">" -> value > 0
+                        else -> value == 0
+                    }
+                    val parsed = SmtLib.parse(
+                        """
+                        (declare-const p Bool)
+                        (declare-const x Real) (declare-const y Real) (declare-const z Real)
+                        (assert (= x (/ $x 3))) (assert (= y (/ $y 3))) (assert (= z (/ 1 3)))
+                        (assert (= p ($op (+ (* $coefficient $extreme) z) 0)))
+                        (assert ${if (truth) "p" else "(not p)"})
+                        """.trimIndent(),
+                    )
+
+                    val result = BacktrackSolver.source(parsed.model)
+                        .solve(BacktrackParams(randomSeed = 0, maxDecisions = 1000))
+
+                    val context = "max=$maximum scale=$scale x=$first y=$second op=$op truth=$truth"
+                    if (truth == expected) assertIs<OpenTheoryResult.Sat>(result, context)
+                    else assertIs<OpenTheoryResult.Unsat>(result, context)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `hard extrema comparisons should preserve strict source boundaries`() {
+        for (maximum in listOf(false, true)) for (scale in listOf(-1, 2)) {
+            for (first in -1..1) for (second in -1..1) {
+                val value = scale * (if (maximum) maxOf(first, second) else minOf(first, second))
+                val x = if (first < 0) "(- ${-first})" else "$first"
+                val y = if (second < 0) "(- ${-second})" else "$second"
+                val coefficient = if (scale < 0) "(- ${-scale})" else "$scale"
+                val extreme = if (maximum) "(ite (<= x y) y x)" else "(ite (<= x y) x y)"
+                for (op in listOf("<=", "<", ">=", ">", "=")) {
+                    val expected = when (op) {
+                        "<=" -> value <= 1
+                        "<" -> value < 1
+                        ">=" -> value >= 1
+                        ">" -> value > 1
+                        else -> value == 1
+                    }
+                    val parsed = SmtLib.parse(
+                        """
+                        (declare-const x Real) (declare-const y Real)
+                        (assert (= x (/ $x 3))) (assert (= y (/ $y 3)))
+                        (assert ($op (* $coefficient $extreme) (/ 1 3)))
+                        """.trimIndent(),
+                    )
+
+                    val result = BacktrackSolver.source(parsed.model)
+                        .solve(BacktrackParams(randomSeed = 0, maxDecisions = 1000))
+
+                    val context = "max=$maximum scale=$scale x=$first y=$second op=$op"
+                    if (expected) assertIs<OpenTheoryResult.Sat>(result, context)
+                    else assertIs<OpenTheoryResult.Unsat>(result, context)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `equivalent real extrema should share their result coordinate`() {
         for (maximum in listOf(false, true)) for (affine in listOf(false, true)) {
             val left = if (affine) "(+ x (/ 1 3))" else "x"
