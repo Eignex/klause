@@ -919,6 +919,15 @@ win/eight losses, four gbac wins/five losses and nine photo ties. All 72 witness
 pass source checking. Completing coverage before restart changes basin cadence;
 these results do not support that policy.
 
+[7755](https://lab.eignex.com/jobs/7755) keeps the existing restart boundary at
+`c0a0b55951` and reports incomplete passes as feasible stalls with unchanged ILS
+anchor acceptance. Fixed work has eight small-source wins and four large-source
+wins/four losses; all sixteen control pairs tie. All 64 witnesses pass source
+checking. The default route in [7756](https://lab.eignex.com/jobs/7756) has five
+small-source wins/four losses, three large-source wins/six losses, three gbac
+wins/four losses/two ties and nine photo ties. All 72 witnesses pass source
+checking. Replacing sampled descent from first feasibility remains unsupported.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;

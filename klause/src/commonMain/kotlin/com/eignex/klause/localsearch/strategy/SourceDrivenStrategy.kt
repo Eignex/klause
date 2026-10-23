@@ -86,9 +86,9 @@ class SourceDrivenStrategy(
      *  strictly: CBLS sets [AcceptanceRule.GreedyDescent] so it takes only objective-improving moves and
      *  otherwise returns `null` to resample or restart. `null` reuses [acceptance] in both phases. */
     val feasibleAcceptance: AcceptanceRule? = null,
-    /** Consecutive missed picks before restarting. Bounded board coverage uses the same picks and
-     *  does not extend this cap. An incomplete pass reports a feasible stall, not a local optimum.
-     *  Zero restarts on the first miss. */
+    /** Consecutive missed picks before restarting. The first miss enables bounded board coverage
+     *  within the same window. An incomplete pass reports a feasible stall, not a local optimum.
+     *  Zero starts coverage directly and restarts on the first miss. */
     val feasibleResampleCap: Int = 0,
 ) {
 

@@ -977,7 +977,9 @@ internal class LocalSearchEngine(
                     // states. Best-feasible is snapshotted above, so wandering never loses the incumbent. A
                     // feasibility-breaking pick is reverted and retried; misses spend the resample allowance.
                     FeasibleDescent.SelfOwned -> {
-                        if (supportsBoardCoverage && !state.boardCoverage.requested) state.boardCoverage.request(state)
+                        if (feasibleResampleCap == 0 && supportsBoardCoverage && !state.boardCoverage.requested) {
+                            state.boardCoverage.request(state)
+                        }
                         val moveEvaluation = completedMoves?.takeIf { liveCompletion is Completion.Witness }
                         val m = timing.inPhase("selection") {
                             feasibleStrategy.pickMove(state, params.cancellation, moveEvaluation)
@@ -1021,6 +1023,9 @@ internal class LocalSearchEngine(
                         }
                         // An incomplete pass supplies a feasible anchor, not a local-optimum classification.
                         if (feasibleMisses < feasibleResampleCap) {
+                            if (supportsBoardCoverage && !state.boardCoverage.requested) {
+                                state.boardCoverage.request(state)
+                            }
                             feasibleMisses++
                             flipsSinceRestart++
                             totalFlips++
