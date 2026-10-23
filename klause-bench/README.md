@@ -975,6 +975,13 @@ team fixed-work wins/six losses and all control ties in
 five large-source wins/four losses, with mean losses on both sources. All 136
 witnesses pass source checking; this selection remains unsupported for promotion.
 
+Independent retained ILS board swaps at `64852b491f` leave all sixteen fixed-restart
+pairs unchanged in [7770](https://lab.eignex.com/jobs/7770). ILS has two small-source
+wins/two losses and four large-source losses; gbac and photo controls tie. Default
+[7771](https://lab.eignex.com/jobs/7771) loses all nine small-source pairs and five
+of nine large-source pairs. All 136 witnesses pass original-source checks. Lower
+fixed-work elapsed cost does not establish optimization recovery.
+
 The complete baseline/coverage/perturbation/combined comparison in
 [7772](https://lab.eignex.com/jobs/7772) preserves fixed-restart controls exactly.
 Adding perturbation to coverage loses all eight ILS team pairs. Default
@@ -982,6 +989,7 @@ Adding perturbation to coverage loses all eight ILS team pairs. Default
 against both baseline and coverage; large-source combined pairs have five wins
 and four losses against baseline. All 272 witnesses pass source checks. Combining
 the two interventions does not resolve the small-source loss.
+Selecting boards in place of the original factor targets is unsupported by these results.
 
 ### Source-scoped derivation admission
 
