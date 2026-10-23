@@ -318,7 +318,7 @@ internal class ComponentLpSolver(
             optimal = results.all { it.optimal },
             warmStarted = results.any { it.warmStarted },
             refactorizations = results.sumOf { it.refactorizations },
-            exactState = solvedExactState,
+            exactState = model.exactState,
         )
     }
 
