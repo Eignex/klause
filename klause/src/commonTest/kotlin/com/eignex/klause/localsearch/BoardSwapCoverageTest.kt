@@ -236,7 +236,7 @@ class BoardSwapCoverageTest {
             acceptance = AcceptanceRule.GreedyDescent,
             feasibleAcceptance = AcceptanceRule.GreedyDescent,
             feasibleDescent = FeasibleDescent.SelfOwned,
-            feasibleResampleCap = 4,
+            feasibleResampleCap = 5,
         )
         val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
 
@@ -350,6 +350,30 @@ class BoardSwapCoverageTest {
         ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(listOf("stall", "stall"), events)
+    }
+
+    @Test
+    fun `a sampled miss should enable coverage within the same resample window`() {
+        val initial = state()
+        val requested = mutableListOf<Boolean>()
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            feasibleResampleCap = 2,
+            perturbation = { state ->
+                requested.add(state.boardCoverage.requested)
+                null
+            },
+        )
+
+        LocalSearchEngine(initial.model, strategy = strategy).resumable(
+            LinearObjective(),
+            LocalSearchParams(maxFlips = 2L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
+        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(listOf(false, true), requested)
     }
 
     @Test

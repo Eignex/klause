@@ -1483,6 +1483,7 @@ abstract interface com.eignex.klause.localsearch/Invariant { // com.eignex.klaus
 abstract interface com.eignex.klause.localsearch/RestartPolicy { // com.eignex.klause.localsearch/RestartPolicy|null[0]
     abstract fun restart(com.eignex.klause.localsearch/LocalSearchState, com.eignex.klause.solver/Sample?) // com.eignex.klause.localsearch/RestartPolicy.restart|restart(com.eignex.klause.localsearch.LocalSearchState;com.eignex.klause.solver.Sample?){}[0]
     abstract fun shouldRestart(kotlin/Int): kotlin/Boolean // com.eignex.klause.localsearch/RestartPolicy.shouldRestart|shouldRestart(kotlin.Int){}[0]
+    open fun onFeasibleStall(com.eignex.klause.localsearch/LocalSearchState, com.eignex.klause.solver/Sample, kotlin/Double) // com.eignex.klause.localsearch/RestartPolicy.onFeasibleStall|onFeasibleStall(com.eignex.klause.localsearch.LocalSearchState;com.eignex.klause.solver.Sample;kotlin.Double){}[0]
     open fun onLocalOptimum(com.eignex.klause.localsearch/LocalSearchState, com.eignex.klause.solver/Sample, kotlin/Double) // com.eignex.klause.localsearch/RestartPolicy.onLocalOptimum|onLocalOptimum(com.eignex.klause.localsearch.LocalSearchState;com.eignex.klause.solver.Sample;kotlin.Double){}[0]
     open fun reset() // com.eignex.klause.localsearch/RestartPolicy.reset|reset(){}[0]
 }
@@ -9408,6 +9409,7 @@ final class com.eignex.klause.localsearch/IteratedLocalSearchRestart : com.eigne
     final var perturbationStrength // com.eignex.klause.localsearch/IteratedLocalSearchRestart.perturbationStrength|{}perturbationStrength[0]
         final fun <get-perturbationStrength>(): kotlin/Int // com.eignex.klause.localsearch/IteratedLocalSearchRestart.perturbationStrength.<get-perturbationStrength>|<get-perturbationStrength>(){}[0]
 
+    final fun onFeasibleStall(com.eignex.klause.localsearch/LocalSearchState, com.eignex.klause.solver/Sample, kotlin/Double) // com.eignex.klause.localsearch/IteratedLocalSearchRestart.onFeasibleStall|onFeasibleStall(com.eignex.klause.localsearch.LocalSearchState;com.eignex.klause.solver.Sample;kotlin.Double){}[0]
     final fun onLocalOptimum(com.eignex.klause.localsearch/LocalSearchState, com.eignex.klause.solver/Sample, kotlin/Double) // com.eignex.klause.localsearch/IteratedLocalSearchRestart.onLocalOptimum|onLocalOptimum(com.eignex.klause.localsearch.LocalSearchState;com.eignex.klause.solver.Sample;kotlin.Double){}[0]
     final fun reset() // com.eignex.klause.localsearch/IteratedLocalSearchRestart.reset|reset(){}[0]
     final fun restart(com.eignex.klause.localsearch/LocalSearchState, com.eignex.klause.solver/Sample?) // com.eignex.klause.localsearch/IteratedLocalSearchRestart.restart|restart(com.eignex.klause.localsearch.LocalSearchState;com.eignex.klause.solver.Sample?){}[0]
