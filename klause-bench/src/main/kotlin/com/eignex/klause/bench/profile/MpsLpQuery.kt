@@ -94,7 +94,7 @@ internal object MpsLpQuery {
                 val pruneAllocated = bean.getThreadAllocatedBytes(thread) - pruneBytes
                 val afterPrune = stats(active.first, active.second)
                 val rootUnchanged = !sameRoot || (
-                    rootDomains.indices.all { session.intDomain(it) == rootDomains[it] } &&
+                    rootDomains.indices.all { session.intDomain(it) === rootDomains[it] } &&
                         rootBooleans.indices.all { session.boolValue(it) == rootBooleans[it] })
                 val stopReason = when {
                     !sameRoot && repeat == 2 -> "three-repeats"
