@@ -6,19 +6,135 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PreparedSource
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class OpenSourcePreparationTest {
 
     private val aggregateOnly = PresolveConfig.parse(PresolvePass.AGGREGATE_SUB_SUMS.id)
+
+    @Test
+    fun `unchanged source preparation should reuse its captured projection binding`() {
+        val model = refutable()
+        val projections = FactorProjectionProviders.Default.prepare(model)
+        val captured = model.componentPlan(projections)
+        val budget = PresolveBudget(0L)
+        var work = 0L
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+
+        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
+            config = PresolveConfig.NONE, projections = projections, capturedPlan = captured,
+            budget = budget, cancellation = token,
+        ))
+
+        assertSame(model, planned.model)
+        assertSame(captured, planned.plan)
+        assertEquals(1L, work)
+        assertEquals(1L, budget.preparationStages.single().nativeWork)
+        assertEquals(0L, budget.spent())
+    }
+
+    @Test
+    fun `a changed source should select a fresh plan despite identical factors`() {
+        val model = refutable()
+        val projections = FactorProjectionProviders.Default.prepare(model)
+        val captured = model.componentPlan(projections)
+        val changed = Problem(numBoolVars = 0, intBounds = model.intBounds, factors = model.factors.copyOf())
+
+        val planned = PreparedSource.unchanged(model, null).planned(changed, projections, capturedPlan = captured)
+
+        assertNotSame(captured, planned.plan)
+        planned.plan.requireSource(changed)
+    }
+
+    @Test
+    fun `an appended objective row should select a fresh plan`() {
+        val model = refutable()
+        val projections = FactorProjectionProviders.Default.prepare(model)
+        val captured = model.componentPlan(projections)
+        val augmented = Problem(numBoolVars = 0, intBounds = model.intBounds,
+            factors = model.factors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1))
+
+        val planned = PreparedSource.unchanged(model, null).planned(augmented, projections, capturedPlan = captured)
+
+        assertNotSame(captured, planned.plan)
+        planned.plan.requireSource(augmented)
+    }
+
+    @Test
+    fun `a different projection binding should select a fresh plan`() {
+        val model = refutable()
+        val projections = FactorProjectionProviders.Default.prepare(model)
+        val captured = model.componentPlan(projections)
+        val different = projections.providers.prepare(model)
+
+        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
+            config = PresolveConfig.NONE, projections = different, capturedPlan = captured,
+        ))
+
+        assertNotSame(captured, planned.plan)
+        assertSame(different, planned.plan.factorProjections)
+    }
+
+    @Test
+    fun `a resource declined capture should retry planning under the current token`() {
+        val model = refutable()
+        val projections = FactorProjectionProviders.Default.prepare(model)
+        val captured = model.componentPlan(projections, cancellation = Cancellation { true })
+        assertEquals(EncoderDecline.RESOURCE, captured.encodingDecline)
+
+        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
+            config = PresolveConfig.NONE, projections = projections, capturedPlan = captured,
+        ))
+
+        assertNotSame(captured, planned.plan)
+        assertNull(planned.plan.encodingDecline)
+    }
+
+    @Test
+    fun `captured satisfaction plans should install once across independent executions`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        var installations = 0
+        val projections = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (!selected.enforcesSource) selected else Encoder(selected.support) { view, encoding ->
+                installations++
+                selected.install(view, encoding)
+            }
+        }).prepare(model)
+        val captured = model.componentPlan(projections)
+        val request = OpenTheoryRequest(model, componentPlan = captured).withPresolve(PresolveConfig.NONE)
+        val first = OpenTheoryPipeline.engineFor(request)
+        val second = OpenTheoryPipeline.engineFor(request)
+
+        assertIs<OpenTheoryResult.Unknown>(first.solve(TheoryParams(maxLeaves = 0)))
+        assertIs<OpenTheoryResult.Sat>(second.solve())
+        assertIs<OpenTheoryResult.Sat>(first.solve())
+
+        assertEquals(1, installations)
+    }
 
     // Three AllDifferent columns, since structural reduction rewrites a two-column one into a disequality.
     private fun aggregatable(openColumns: Boolean): Problem {
@@ -49,8 +165,11 @@ class OpenSourcePreparationTest {
         val model = aggregatable(openColumns = true)
         val declared = model.componentPlan()
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(config = aggregateOnly))
+        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
+            config = aggregateOnly, projections = declared.factorProjections, capturedPlan = declared,
+        ))
 
+        assertNotSame(declared, planned.plan)
         assertEquals(FactorOwner.CP, planned.plan.factorOwner(1))
         assertNotEquals(declared.factorOwner(1), planned.plan.factorOwner(1))
     }
