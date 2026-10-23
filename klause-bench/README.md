@@ -612,7 +612,9 @@ Counts of removable-looking rows do not establish that a projected system fits.
 With `inspectJob=ID captureSha256=HEX`, the same profile reads its retained
 `complete.klexact` from a prior local lab job, checks its hash, reports fixed
 structural coordinates and row components, then uses the existing `LpExactReplay`
-for a cold numerical replay. Constant-row counts do not certify feasibility, and
+for a cold numerical replay. It also invokes existing exact continuation from a
+natural logical basis under a ten-second cancellation bound, reporting current
+full-verifier acceptance and cumulative costs. Constant-row counts do not certify feasibility, and
 cold replay does not reproduce the original warm factors, path or elapsed cost.
 
 ### Polynomial phases and witness checkpoints
@@ -797,11 +799,20 @@ helped specific workloads without a general replacement. See
 
 Retained exact feasibility reuses a fully imported tableau across compatible bound
 assertions and retractions under cumulative resource limits. In the Mac/aarch64
-overflow comparison [7752](https://lab.eignex.com/jobs/7752), continuation builds
-fell from 734 to 105–106 and complete linear checks rose from zero to 1625–1838;
+overflow comparison [7786](https://lab.eignex.com/jobs/7786), continuation builds
+fell from 727–757 to 105 and complete linear checks rose from zero to 1819–1830;
 all original verdicts remained UNKNOWN. These are mechanism and search-progress
-observations, not an end-to-end speedup or independent refutation. Dimension-declined
-completions require exact state capture before selecting a scaling design.
+observations, not an end-to-end speedup or independent refutation.
+
+[Capture 7793](https://lab.eignex.com/jobs/7793) retains 149 active rows and 72
+structural columns, with no free logical definitions to remove. Shared logical and
+certificate storage represents them in 33,078 cells instead of 55,279. Partial
+Boolean states retain a 128-row continuation allowance: unrestricted admission
+stopped at 43 open Booleans in all three [7820](https://lab.eignex.com/jobs/7820)
+repeats. In [7829](https://lab.eignex.com/jobs/7829), reserving larger capacity for
+Boolean-complete checks produced 33 exact, explained LP conflicts in each repeat,
+with modeled allocation about 973M to 833M and similar work. The SMT verdict stays
+UNKNOWN; these are completion and resource observations.
 
 Retain the bounded dense-LU selection with windowed updates (direct benefit measured
 at order six; larger bases favored sparse construction), the fraction factory paths
