@@ -757,6 +757,24 @@ Use the captured dimensions, internal counters and terminal stacks to distinguis
 representations and stopped operations. Paired diagnostic timings establish no
 default-route performance gain, and direct results supply no shared-source acceptance.
 
+The retained-snapshot policy has a source-matched sequencing result in
+[run 7823](https://lab.eignex.com/jobs/7823): sorting and kissing reach completed
+projection/lifting in all three 10-second Mac/aarch64, P1, seed-3 repeats, while
+root-first completes neither counter. Both originals remain UNKNOWN. Keeping the
+active cursor avoids the discarded preparation from restarting at every commit.
+[Prepared captures 7808](https://lab.eignex.com/jobs/7808) and
+[7825](https://lab.eignex.com/jobs/7825) reduce sorting's first-region work from
+78,271,952 to 436,221 units, with zero search restarts. Global and regional graph
+elimination still repeat arithmetic; early search can use a less reduced formula.
+
+This tradeoff increases the tower SAT control from 14,795 to 28,607 native units.
+[Regression run 7830](https://lab.eignex.com/jobs/7830) preserves all 68 paired
+outcomes across the complete core/heldout sets and additional original, mixed and
+Boolean controls. Each arm has 37 independently accepted SAT models, one unchecked
+DIMACS SAT and one SAT whose power syntax the checker cannot parse. Native UNSAT
+claims have no independent certificates. Single regression samples establish no
+timing comparison, and several small sources spend more native work.
+
 ### MPS LP admission capture
 
 `bench.profile.MpsLpAdmission` takes `batch64=<base64 JSON array of argument arrays>`
