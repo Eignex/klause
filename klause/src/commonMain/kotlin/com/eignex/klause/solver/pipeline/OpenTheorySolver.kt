@@ -28,8 +28,10 @@ import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchSelection
 import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRestart
 import com.eignex.klause.solver.search.SearchRun
@@ -465,13 +467,33 @@ class OpenTheoryEngine internal constructor(
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
                 OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
             }
+            val pointOwner = planned.theory as? ExactLiraSearchComponent
+            val sourcePoints = if (pointOwner != null && params.maxDecisions == Long.MAX_VALUE &&
+                params.maxLeaves == Long.MAX_VALUE &&
+                params.nodeBudget == null && params.openHintFlips == null &&
+                params.openBranching == OpenBranching.Automatic
+            ) LinearSourcePointCandidate.prepare(model, plan.factorProjections, cancellation,
+                state.smt::observeCompleteSearchStage) else null
+            if (sourcePoints != null) state.smt.observeCompleteSearchStage("SOURCE_POINT_ADMITTED")
+            val witnesses = SourceWitnessAssembler(prepared.mapping.target, prepared.source)
+            var checkedPoint: OpenTheoryAssignment? = null
+            val candidatePolicy = object : SearchNodePolicy {
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+                    val disposition = nodePolicy.beforeBranch(context)
+                    if (disposition != SearchNodeDisposition.Expand || sourcePoints == null) return disposition
+                    val point = pointOwner?.currentUnverifiedRealPoint() ?: return disposition
+                    val checked = sourcePoints.check(point, planned.session) ?: return disposition
+                    checkedPoint = witnesses.assemble(checked, prepared.mapping)
+                    return if (checkedPoint != null) SearchNodeDisposition.Pause else disposition
+                }
+            }
             val run = planned.session.openRun(
                 model.numBoolVars,
                 solveParams,
                 decisionBudget = state.decisionBudget,
                 booleanBranching = branching,
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
-                nodePolicy = nodePolicy,
+                nodePolicy = candidatePolicy,
                 candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
                 branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
                     SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
@@ -482,7 +504,7 @@ class OpenTheoryEngine internal constructor(
                     SearchBranchKind.Finite)) else SearchBranchSelection.Default,
             )
             handedOff = true
-            return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
+            return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params) { checkedPoint })
         } catch (primary: Throwable) {
             failure = primary
             throw primary
@@ -499,6 +521,7 @@ class OpenTheoryEngine internal constructor(
         private val stats: SolveStatsSink,
         private val state: OpenTheorySolveState,
         private val params: TheoryParams,
+        private val checkedPoint: () -> OpenTheoryAssignment?,
     ) : AutoCloseable {
         private val witnesses = SourceWitnessAssembler(prepared.mapping.target, prepared.source)
 
@@ -520,7 +543,9 @@ class OpenTheoryEngine internal constructor(
 
             SearchRunEvent.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
 
-            SearchRunEvent.Paused -> null
+            SearchRunEvent.Paused -> checkedPoint()?.let {
+                OpenTheoryResult.Sat(it, stats.finish(state, planned.session))
+            }
 
             is SearchRunEvent.Indeterminate -> unknown(
                 params.timeout(),

@@ -145,6 +145,15 @@ after all required checks finish. Missing or multiply represented coordinates le
 publication unavailable. [Theory completion](09-learning.md#theory-completion) describes
 how those values are contributed.
 
+Default pure-real traversal can also submit a completed numerical point to an
+isolated whole-source check before every Boolean has been chosen. The pipeline
+derives exact comparison truths, preserves containing root pins and completes
+Boolean clauses privately. It reserves a containing check before validating all
+source factors and bounds, including cardinalities, and publishes only after typed
+source reconstruction succeeds. A rejected or interrupted candidate leaves the
+containing trail and its alternatives intact. Explicit traversal limits and
+branching controls retain ordinary traversal.
+
 ## Finite propagation
 
 After a decision is applied, search runs the finite-domain fixpoint: every
