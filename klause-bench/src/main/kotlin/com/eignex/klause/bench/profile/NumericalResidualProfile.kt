@@ -10,9 +10,12 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -51,23 +54,36 @@ internal object NumericalResidualProfile {
 
     private fun capture(source: JsonElement, out: File) {
         val input = source.jsonObject
-        require(input.keys == setOf("suite", "problem", "sha256") ||
-            input.keys == setOf("suite", "problem", "sha256", "root"))
-        val suite = input.getValue("suite").jsonPrimitive.content
+        val supplied = input["mps64"]?.jsonPrimitive?.content
+        val catalogKeys = setOf("suite", "problem", "sha256")
+        require(input.keys == catalogKeys || input.keys == catalogKeys + "root" ||
+            input.keys == setOf("mps64", "problem", "sha256", "root"))
+        val suite = input["suite"]?.jsonPrimitive?.content ?: "self-authored"
         val name = input.getValue("problem").jsonPrimitive.content
-        val reference = Catalog.uncapped(suite).problems.single { it.name == name }
-        require(reference.format == Format.MPS)
-        val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(4 * 1024 * 1024 + 1) }
+        val reference = if (supplied == null) Catalog.uncapped(suite).problems.single { it.name == name } else null
+        require(reference == null || reference.format == Format.MPS)
+        val bytes = if (supplied == null) {
+            CorpusFiles.open(CorpusFetcher.resolve(requireNotNull(reference).source)).use {
+                it.readNBytes(4 * 1024 * 1024 + 1)
+            }
+        } else {
+            Base64.getDecoder().decode(supplied)
+        }
         require(bytes.size <= 4 * 1024 * 1024 && sha256(bytes) == input.getValue("sha256").jsonPrimitive.content)
         out.resolve("source.mps").writeBytes(bytes)
-        val entry = Runners.resolve(reference)
+        val entry = reference?.let { Runners.resolve(it) }
+        val compiled = if (entry == null) Mps.parse(bytes.decodeToString()).toProblem() else null
+        val problem = entry?.problem ?: requireNotNull(compiled).model
+        val sourceObjective = entry?.objective ?: compiled?.objective?.toLinearObjective()?.let {
+            if (compiled?.maximize == true) it.negated() else it
+        }
         if (input["root"]?.jsonPrimitive?.content?.toBooleanStrict() == true) {
-            captureRoot(entry.problem, entry.objective, source, out)
+            captureRoot(problem, sourceObjective, source, out)
             return
         }
-        val objective = requireNotNull(entry.objective)
+        val objective = requireNotNull(sourceObjective)
         val probe = Probe()
-        val solver = BacktrackSolver(entry.problem.bake())
+        val solver = BacktrackSolver(problem.bake())
         set(solver, "lpSolveContext", probe.context)
         val stop = Cancellation.after(2000.milliseconds)
         val params = BacktrackPresets.satOptimized(randomSeed = 3, cancellation = stop)

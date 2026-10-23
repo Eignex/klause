@@ -564,6 +564,9 @@ An entry with `root=true` captures the existing production relaxation over decla
 root domains without traversal or presolve. That root projection is labelled
 separately from an observed continuous leaf and retains its normalized numerical
 authority, rather than asserting original MPS decimal equivalence.
+Self-authored conditioning controls can supply `{mps64, problem, sha256, root}`;
+the bounded request supplies original MPS bytes, which receive the same hash check
+and numerical compilation as catalog inputs.
 
 `NumericalResidualReplay` accepts an array of
 `{job, source, residual, sha256, dense}` capture references through the same argument.
