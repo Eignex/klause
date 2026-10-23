@@ -9,7 +9,9 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -48,7 +50,8 @@ internal object NumericalResidualProfile {
 
     private fun capture(source: JsonElement, out: File) {
         val input = source.jsonObject
-        require(input.keys == setOf("suite", "problem", "sha256"))
+        require(input.keys == setOf("suite", "problem", "sha256") ||
+            input.keys == setOf("suite", "problem", "sha256", "root"))
         val suite = input.getValue("suite").jsonPrimitive.content
         val name = input.getValue("problem").jsonPrimitive.content
         val reference = Catalog.uncapped(suite).problems.single { it.name == name }
@@ -56,6 +59,10 @@ internal object NumericalResidualProfile {
         require(bytes.size <= 4 * 1024 * 1024 && sha256(bytes) == input.getValue("sha256").jsonPrimitive.content)
         out.resolve("source.mps").writeBytes(bytes)
         val entry = Runners.resolve(reference)
+        if (input["root"]?.jsonPrimitive?.content?.toBooleanStrict() == true) {
+            captureRoot(entry.problem, entry.objective, source, out)
+            return
+        }
         val objective = requireNotNull(entry.objective)
         val probe = Probe()
         val solver = BacktrackSolver(entry.problem.bake())
@@ -90,6 +97,48 @@ internal object NumericalResidualProfile {
         }
         out.resolve("capture.json").writeText(report.toString())
         println("captured $suite/$name: ${probe.solves.size} float invocations, ${probe.captures.size} residuals")
+    }
+
+    private fun captureRoot(problem: Problem, objective: LinearObjective?, source: JsonElement, out: File) {
+        val prefix = "com.eignex.klause.lp.relaxation."
+        val type = Class.forName(prefix + "CpToLpRelaxation")
+        val constructor = type.constructors.single {
+            it.parameterTypes.last().simpleName == "DefaultConstructorMarker"
+        }
+        val count = constructor.parameterCount - 2
+        require(count in 3..31)
+        val arguments = arrayOfNulls<Any>(constructor.parameterCount)
+        arguments[0] = problem
+        arguments[1] = objective
+        for (index in 2 until count) {
+            if (constructor.parameterTypes[index] == Boolean::class.javaPrimitiveType) arguments[index] = false
+        }
+        arguments[count] = -4
+        @Suppress("SpreadOperator")
+        val builder = constructor.newInstance(*arguments)
+        val domains = Class.forName(prefix + "RootDomains").constructors.single().newInstance(problem)
+        val build = type.methods.single {
+            it.name == "build" && it.parameterCount == 3 && it.parameterTypes.first().isInstance(domains)
+        }
+        val relaxation = requireNotNull(build.invoke(builder, domains, emptyList<Any>(), Cancellation.Never))
+        val model = requireNotNull(call(relaxation, "getModel"))
+        val authority = Class.forName(ENGINE + "LegacyLpModelKt").methods.single {
+            it.name == "authoritativeModel" && it.parameterCount == 1
+        }
+        val exact = requireNotNull(authority.invoke(null, model))
+        val state = Class.forName(ENGINE + "LpExactState").constructors.single { it.parameterCount == 1 }
+            .newInstance(exact)
+        val bytes = encode(state)
+        out.resolve("residual-0.klexact").writeBytes(bytes)
+        val report = buildJsonObject {
+            put("revision", Reports.readGitSha())
+            put("source", source)
+            put("entry", "diagnostic production root relaxation over declared domains; no traversal or presolve")
+            put("sourceVerdictClaim", false)
+            put("cliRoutingEquivalence", false)
+            put("captureHashes", JsonArray(listOf(JsonPrimitive(sha256(bytes)))))
+        }
+        out.resolve("capture.json").writeText(report.toString())
     }
 
     internal class Probe(private val denseLimit: Int = 6) {
