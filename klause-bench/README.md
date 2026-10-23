@@ -609,6 +609,11 @@ dense guards and free versus constrained logical-row counts. Encoding and codec
 round-trip checks follow traversal; observer cost is recorded separately. This is
 a diagnostic opening, not the CLI/default portfolio or an independent source proof.
 Counts of removable-looking rows do not establish that a projected system fits.
+With `inspectJob=ID captureSha256=HEX`, the same profile reads its retained
+`complete.klexact` from a prior local lab job, checks its hash, reports fixed
+structural coordinates and row components, then uses the existing `LpExactReplay`
+for a cold numerical replay. Constant-row counts do not certify feasibility, and
+cold replay does not reproduce the original warm factors, path or elapsed cost.
 
 ### Polynomial phases and witness checkpoints
 

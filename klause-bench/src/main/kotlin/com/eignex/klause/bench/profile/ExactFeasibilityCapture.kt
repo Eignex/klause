@@ -42,6 +42,10 @@ internal object ExactFeasibilityCapture {
             return
         }
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        if (options.keys == setOf("inspectJob", "captureSha256")) {
+            inspect(options, out)
+            return
+        }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -180,6 +184,99 @@ internal object ExactFeasibilityCapture {
         val decoded = requireNotNull(call(companion, "decode", bytes))
         check(bytes.contentEquals(call(decoded, "encode") as ByteArray)) { "exact state codec did not round trip" }
         return bytes
+    }
+
+    private fun inspect(options: Map<String, String>, out: File) {
+        val sourceJob = options.getValue("inspectJob").toLong().also { require(it > 0L) }
+        val jobs = File(requireNotNull(System.getenv("JOB_DIR"))).canonicalFile.parentFile
+        val path = jobs.resolve("$sourceJob/cases/0/out/complete.klexact").canonicalFile
+        require(path.toPath().startsWith(jobs.toPath()) && path.length() in 1..16L * 1024 * 1024)
+        val bytes = path.readBytes()
+        require(sha256(bytes) == options.getValue("captureSha256"))
+        val prefix = "com.eignex.klause.lp.engine."
+        val companion = Class.forName(prefix + "LpExactCapture").getField("Companion").get(null)
+        val capture = requireNotNull(call(companion, "decode", bytes))
+        val state = requireNotNull(call(capture, "getInitialState"))
+        Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
+        out.resolve("shape.json").writeText(buildJsonObject {
+            put("inspectionRevision", Reports.readGitSha())
+            put("sourceJob", sourceJob)
+            put("captureSha256", sha256(bytes))
+            put("shape", shape(state))
+            put("fixedAndComponents", components(state))
+        }.toString())
+        val contextCompanion = Class.forName(prefix + "LpSolveContext").getField("Companion").get(null)
+        val context = requireNotNull(call(contextCompanion, "getProduction"))
+        val replay = Class.forName(prefix + "LpExactReplay").getField("INSTANCE").get(null)
+        val started = System.nanoTime()
+        val report = requireNotNull(call(replay, "replay", capture, context))
+        val elapsed = System.nanoTime() - started
+        val steps = call(report, "getSteps") as List<*>
+        out.resolve("replay.json").writeText(buildJsonObject {
+            put("inspectionRevision", Reports.readGitSha())
+            put("captureSha256", sha256(bytes))
+            put("coldReplayElapsedNs", elapsed)
+            put("declinedEvent", call(report, "getDeclinedEventIndex")?.toString())
+            put("originalWarmFactorsCaptured", false)
+            put("sourceVerdictClaim", false)
+            put("steps", buildJsonArray {
+                for (step in steps) {
+                    val current = requireNotNull(step)
+                    val result = call(current, "getResult")
+                    add(buildJsonObject {
+                        put("accepted", call(current, "getAccepted") as Boolean)
+                        put("verdict", result?.let { call(it, "getVerdict") }?.toString())
+                        put("hasExactPoint", result?.let { call(it, "getExactPrimal") } != null)
+                        put("continuation", result?.let { call(it, "getContinuation") }?.toString())
+                    })
+                }
+            })
+        }.toString())
+    }
+
+    private fun components(state: Any): JsonElement {
+        val model = requireNotNull(call(state, "getModel"))
+        val n = call(model, "getN") as Int
+        val m = call(model, "getM") as Int
+        val fixed = BooleanArray(n) { j ->
+            val column = requireNotNull(call(model, "column", j))
+            call(requireNotNull(call(column, "getBounds")), "getFixed") == true
+        }
+        val parent = IntArray(n + m) { it }
+        fun root(node: Int): Int {
+            var current = node
+            while (current != parent[current]) current = parent[current]
+            return current
+        }
+        val degrees = IntArray(m)
+        for (j in 0 until n) {
+            if (fixed[j]) continue
+            val entries = call(model, "entries", j) as List<*>
+            for (entry in entries) {
+                val item = requireNotNull(entry)
+                if (call(requireNotNull(call(item, "getNumber")), "getValue").toString() == "0") continue
+                val row = call(item, "getRow") as Int
+                degrees[row]++
+                parent[root(n + row)] = root(j)
+            }
+        }
+        val grouped = (0 until m).filter { degrees[it] > 0 }.groupBy { root(n + it) }
+        return buildJsonObject {
+            put("fixedStructuralColumns", JsonArray((0 until n).filter { fixed[it] }.map(::JsonPrimitive)))
+            put("constantRowsAfterSubstitution", JsonArray((0 until m).filter { degrees[it] == 0 }.map(::JsonPrimitive)))
+            put("constantRowsVerified", false)
+            put("rowUnfixedDegrees", JsonArray(degrees.map(::JsonPrimitive)))
+            put("components", buildJsonArray {
+                for ((key, rows) in grouped) {
+                    val columns = (0 until n).filter { !fixed[it] && root(it) == key }
+                    add(buildJsonObject {
+                        put("rows", JsonArray(rows.map(::JsonPrimitive)))
+                        put("columns", JsonArray(columns.map(::JsonPrimitive)))
+                        put("denseCells", rows.size.toLong() * (columns.size.toLong() + 2L * rows.size + 1))
+                    })
+                }
+            })
+        }
     }
 
     private fun shape(state: Any): JsonElement {
