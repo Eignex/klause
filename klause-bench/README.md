@@ -906,6 +906,15 @@ against both baseline and coverage; large-source combined pairs have five wins
 and four losses against baseline. All 272 witnesses pass source checks. Selecting
 boards in place of the original factor targets is unsupported by these results.
 
+Direct sampled scopes at `c2768f9186` improve all eight ILS team pairs in fixed-work
+[7779](https://lab.eignex.com/jobs/7779), with every fixed-restart and non-board
+control tied. Default [7780](https://lab.eignex.com/jobs/7780) has seven small-source
+losses and nine large-source losses. Revised interaction
+[7781](https://lab.eignex.com/jobs/7781)/[7782](https://lab.eignex.com/jobs/7782)
+preserves the controls but gives eight small-source and six large-source combined
+default losses. All 408 witnesses pass source checks; fixed-work gains do not
+establish default-route recovery.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;

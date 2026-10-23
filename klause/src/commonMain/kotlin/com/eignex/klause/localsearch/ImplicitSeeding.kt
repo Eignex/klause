@@ -38,11 +38,11 @@ class ImplicitSeeding(
         }
 
     /** Implicit-solving owner map over int vars: `ownerInt[v]` is the factor id that owns int var
-     *  `v`, or `-1` if `v` is searched freely. A variable is owned after seeding or validation of a
-     *  retained feasible assignment establishes its [implicitSeedFactors] global. Only that global's
-     *  structure-preserving [Invariant.proposeStructuredMoves] may change it, so the generic
-     *  neighbourhood cannot break the implicitly-solved constraint. `null` until seeding or retained
-     *  assignment validation establishes ownership. The [MoveSink] enforces the filter via
+     *  `v`, or `-1` if `v` is searched freely. A variable is owned once [seedImplicitFeasible] seeds
+     *  its [implicitSeedFactors] global feasibly; from then on only that global's structure-preserving
+     *  [Invariant.proposeStructuredMoves] may change it, so the generic neighbourhood can never break
+     *  the implicitly-solved constraint. `null` until the first seeding pass, and populated only
+     *  when implicit feasible-init is enabled. The [MoveSink] enforces the filter via
      *  [MoveSink.setOwners]. */
     var ownerInt: IntArray? = null
         private set
@@ -136,19 +136,6 @@ class ImplicitSeeding(
     internal fun implicitFeasible(state: LocalSearchState): Boolean = implicitSeedFactors.all { fid ->
         !state.factors[fid].isViolated(state, fid) &&
             problem.factors[fid].intVars.all { state.assignment.intValue(it) in state.rootDomains[it] }
-    }
-
-    internal fun retainFeasibleOwners(state: LocalSearchState): Boolean {
-        if (!implicitFeasible(state)) return false
-        val seeds = implicitSeedFactors
-        val current = ownerInt
-        if (current != null && seeds.all { fid -> problem.factors[fid].intVars.all { current[it] == fid } }) return true
-        val owners = current ?: IntArray(problem.numIntVars)
-        owners.fill(-1)
-        for (fid in seeds) for (variable in problem.factors[fid].intVars) owners[variable] = fid
-        ownerInt = owners
-        state.moveSink.setOwners(owners)
-        return true
     }
 
     internal fun seedSteps(state: LocalSearchState): Sequence<Unit> = sequence {

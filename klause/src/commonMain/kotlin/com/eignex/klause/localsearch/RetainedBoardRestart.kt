@@ -26,14 +26,7 @@ internal class RetainedBoardRestart private constructor(
         val attempts = if (kind == PerturbationKind.Uniform) strength / 2 else strength
         repeat(attempts) {
             sink.clear()
-            val scope = when (kind) {
-                PerturbationKind.BasinHopping ->
-                    state.problem.factors[state.rng.nextInt(state.problem.numFactors)].intVars.toSet()
-                PerturbationKind.Uniform -> {
-                    val target = state.rng.nextInt(state.problem.numBoolVars + state.problem.numIntVars)
-                    setOf(target - state.problem.numBoolVars)
-                }
-            }
+            val scope = targetedInputs(state, kind)
             val eligible = boards.filter { board ->
                 state.problem.factors[board].intVars.any { it in scope }
             }
@@ -50,6 +43,37 @@ internal class RetainedBoardRestart private constructor(
             if (state.preservesRestartStructure(move)) state.apply(move)
         }
         state.resetStepCounters()
+    }
+
+    private fun targetedInputs(state: LocalSearchState, kind: PerturbationKind): Set<Int> {
+        val problem = state.problem
+        val pending = ArrayDeque<Int>()
+        when (kind) {
+            PerturbationKind.BasinHopping -> {
+                val factor = problem.factors[state.rng.nextInt(problem.numFactors)]
+                for (variable in factor.boolVars) pending.addLast(variable)
+                for (variable in factor.intVars) pending.addLast(problem.numBoolVars + variable)
+            }
+            PerturbationKind.Uniform -> pending.addLast(state.rng.nextInt(problem.numBoolVars + problem.numIntVars))
+        }
+        val seen = mutableSetOf<Int>()
+        val inputs = mutableSetOf<Int>()
+        val net = state.invariants
+        while (pending.isNotEmpty()) {
+            val slot = pending.removeLast()
+            if (!seen.add(slot)) continue
+            val bool = slot < problem.numBoolVars
+            val variable = if (bool) slot else slot - problem.numBoolVars
+            val writer = if (net == null) -1 else if (bool) net.boolWriter(variable) else net.intWriter(variable)
+            if (writer < 0) {
+                if (!bool) inputs.add(variable)
+                continue
+            }
+            val node = checkNotNull(net).node(writer)
+            for (input in node.boolInputs) pending.addLast(input)
+            for (input in node.intInputs) pending.addLast(problem.numBoolVars + input)
+        }
+        return inputs
     }
 
     private fun admissibleSwap(state: LocalSearchState, move: Move.Compound): Boolean {
