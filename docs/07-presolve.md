@@ -191,6 +191,11 @@ it; the temporary recorder restores the containing meter on exit. The
 [CLI statistics](20-cli.md#statistics) expose bounded lane/pass/outcome and
 preparation-stage summaries of this ledger, including preparation-only requests.
 
+Stop observation reuses a directly observed token only for its owning budget and
+records interruption on the active invocation at polling time. Composed tokens keep
+their added predicates even when their meter is shared. The source pipeline binds
+the elective phase allowance; required encoder selection keeps the containing token.
+
 ## Selected reductions
 
 The passes listed under [Pipeline](#pipeline) share the guarantees above. Candidate
