@@ -168,8 +168,11 @@ class LinearBoundFusionTest {
             val delta = Presolve.fuseLinearBounds(model)
 
             val row = delta.addedFactors.single().linearRows.single()
-            assertEquals(op, row.relation)
-            assertEquals(expected, row.bound)
+            assertEquals(LinearOp.LE, row.relation)
+            val sign = if (op == LinearOp.GE) -1L else 1L
+            assertEquals(sign * expected, row.bound)
+            assertEquals(sign, row.coeff(0))
+            assertEquals(sign, row.coeff(1))
             assertTrue(delta.droppedIndices.isEmpty())
         }
     }
@@ -190,8 +193,9 @@ class LinearBoundFusionTest {
 
         val delta = Presolve.fuseLinearBounds(model)
 
-        val bounds = delta.addedFactors.map { it.linearRows.single() }.associate { it.relation to it.bound }
-        assertEquals(mapOf(LinearOp.GE to 3L, LinearOp.LE to 8L), bounds)
+        val rows = delta.addedFactors.map { it.linearRows.single() }
+        assertTrue(rows.all { it.relation == LinearOp.LE })
+        assertEquals(setOf(-1L to -3L, 1L to 8L), rows.map { it.coeff(0) to it.bound }.toSet())
         assertTrue(delta.droppedIndices.isEmpty())
     }
 
@@ -243,8 +247,11 @@ class LinearBoundFusionTest {
             val delta = Presolve.fuseLinearBounds(model)
 
             val row = delta.addedFactors.single().linearRows.single()
-            assertEquals(expectedOp, row.relation)
-            assertEquals(bound, row.bound)
+            assertEquals(LinearOp.LE, row.relation)
+            val sign = if (expectedOp == LinearOp.GE) -1L else 1L
+            assertEquals(sign * bound, row.bound)
+            assertEquals(sign, row.coeff(0))
+            assertEquals(sign, row.coeff(1))
         }
     }
 
@@ -264,8 +271,9 @@ class LinearBoundFusionTest {
 
         val delta = Presolve.fuseLinearBounds(model)
 
-        val bounds = delta.addedFactors.map { it.linearRows.single() }.associate { it.relation to it.bound }
-        assertEquals(mapOf(LinearOp.GE to 4L, LinearOp.LE to 9L), bounds)
+        val rows = delta.addedFactors.map { it.linearRows.single() }
+        assertTrue(rows.all { it.relation == LinearOp.LE })
+        assertEquals(setOf(-1L to -4L, 1L to 9L), rows.map { it.coeff(0) to it.bound }.toSet())
     }
 
     @Test
@@ -323,8 +331,8 @@ class LinearBoundFusionTest {
             numBoolVars = 3,
             intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
             factors = arrayOf(
-                ReifiedLinear(1, longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, Long.MAX_VALUE),
-                ReifiedLinear(2, longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, Long.MAX_VALUE),
+                ReifiedLinear(1, longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, Long.MIN_VALUE),
+                ReifiedLinear(2, longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, Long.MIN_VALUE),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(2, false))),
             ),
@@ -333,8 +341,8 @@ class LinearBoundFusionTest {
         val delta = Presolve.fuseLinearBounds(model)
 
         val row = delta.addedFactors.single().linearRows.single()
-        assertEquals(LinearOp.GE, row.relation)
-        assertEquals(bigIntOf(Long.MAX_VALUE) + BIG_ONE, (row.constants as IntegralConstants).exactBound)
+        assertEquals(LinearOp.LE, row.relation)
+        assertEquals(bigIntOf(Long.MIN_VALUE) - BIG_ONE, (row.constants as IntegralConstants).exactBound)
     }
 
     @Test
