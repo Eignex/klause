@@ -75,6 +75,9 @@ from exact intervals over its terms. Coefficient signs select the bounding sides
 strict endpoints and every active bound premise enter the explanation. Missing
 bounds or ambiguous guards decline. The probe publishes through the shared Boolean
 trail, and retraction removes consequences whose premises leave that trail.
+Its optional propagation mode caches eligible row metadata and publishes before
+the pending LP query. The component applies its own pins locally, then yields to
+the shared fixpoint before numerical checking, retaining the operation allowance.
 
 #### Disjunctions and disequalities
 

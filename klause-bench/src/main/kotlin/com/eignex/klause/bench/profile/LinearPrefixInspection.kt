@@ -34,7 +34,9 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object LinearPrefixInspection {
-    fun inspect(compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false) {
+    fun inspect(
+        compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false, integrated: Boolean = false,
+    ) {
         val captures = (0..1).map { replay ->
             val stop = Cancellation.after(10.seconds)
             val started = System.nanoTime()
@@ -57,6 +59,10 @@ internal object LinearPrefixInspection {
             val opening = requireNotNull(begin.invoke(engine, params, state, boundary))
             val run = member(opening, "getRun")
             try {
+                if (integrated && replay == 1 && run != null) {
+                    val planned = field(run, "planned") as PlannedSearch
+                    call(requireNotNull(planned.theory), "usePartialLinearPropagation")
+                }
                 val result = run?.let { call(it, "advance") } ?: member(opening, "getResult")
                 val elapsed = System.nanoTime() - started
                 val ready = run != null && boundary.paused && result == null && !stop()
@@ -67,11 +73,17 @@ internal object LinearPrefixInspection {
                     put("targetNonRootBoundaries", 8)
                     put("visitedNonRootBoundaries", boundary.visits)
                     put("sourceVerdictClaim", false)
+                    put("integrated", integrated && replay == 1)
                     put("cliEquivalence", "unverified-direct-library-diagnostic")
                     put("ready", ready)
                     put("stopped", stop())
                     put("result", result?.javaClass?.simpleName)
                     put("openingAndTraversalNs", elapsed)
+                    if (run != null) {
+                        val theory = (field(run, "planned") as PlannedSearch).theory
+                        put("partialPropagation", LinearPrefixSnapshot(Cancellation.after(10.seconds))
+                            .record(theory?.let { member(it, "getPartialLinearPropagationStats") }))
+                    }
                 }
                 out.resolve("prefix-$replay-status.json").writeText("$status\n")
                 check(ready) { "prefix did not reach its boundary: $status" }
@@ -81,13 +93,13 @@ internal object LinearPrefixInspection {
                 val bytes = capture.toString().toByteArray()
                 require(bytes.size <= MAX_BYTES) { "prefix snapshot exceeds byte allowance" }
                 out.resolve("prefix-$replay.json").writeBytes(bytes)
-                if (probe && !stop()) {
+                if ((probe || integrated) && !stop()) {
                     val probeStarted = System.nanoTime()
                     val work = member(state, "getWork") as OpenTheoryWorkSink
                     val before = work.snapshot()
-                    val deductions = if (replay == 1) call(requireNotNull(planned.theory),
+                    val deductions = if (probe && replay == 1) call(requireNotNull(planned.theory),
                         "probePartialLinearImplications") else null
-                    val propagation = planned.session.propagate()
+                    val propagation = if (probe) planned.session.propagate() else ComponentResult.Consistent
                     val probeElapsed = System.nanoTime() - probeStarted
                     boundary.resume()
                     val continuation = if (propagation is ComponentResult.Consistent && !stop()) {
@@ -96,6 +108,7 @@ internal object LinearPrefixInspection {
                     val after = work.snapshot()
                     val observation = buildJsonObject {
                         put("treated", replay == 1)
+                        put("integrated", integrated && replay == 1)
                         put("probeNs", probeElapsed)
                         put("probe", LinearPrefixSnapshot(Cancellation.after(10.seconds)).record(deductions))
                         put("propagation", propagation.javaClass.simpleName)
@@ -111,6 +124,8 @@ internal object LinearPrefixInspection {
                         put("assignedBooleans", (0 until (field(requireNotNull(planned.theory), "model") as Problem)
                             .numBoolVars).count { planned.session.boolValue(it) != null })
                         put("stopCause", planned.session.executionControls.stopCause?.name)
+                        put("partialPropagation", LinearPrefixSnapshot(Cancellation.after(10.seconds))
+                            .record(member(requireNotNull(planned.theory), "getPartialLinearPropagationStats")))
                     }
                     out.resolve("probe-$replay.json").writeText("$observation\n")
                     println(observation)
@@ -134,12 +149,13 @@ internal object LinearPrefixInspection {
             put("sourceSha256", sourceSha256)
             put("snapshotSha256", sha256(captures[0]))
             put("replaySha256", sha256(captures[1]))
-            put("exactReplay", captures[0].contentEquals(captures[1]))
+            put("experiment", if (integrated) "plain-versus-integrated" else "exact-prefix-replay")
+            put("exactReplay", if (integrated) JsonNull else JsonPrimitive(captures[0].contentEquals(captures[1])))
             put("sourceVerdictClaim", false)
         }
         out.resolve("replay.json").writeText("$report\n")
         println(report)
-        check(captures[0].contentEquals(captures[1])) { "fresh prefix replay differs" }
+        if (!integrated) check(captures[0].contentEquals(captures[1])) { "fresh prefix replay differs" }
     }
 
     private class PrefixBoundary : SearchNodePolicy {

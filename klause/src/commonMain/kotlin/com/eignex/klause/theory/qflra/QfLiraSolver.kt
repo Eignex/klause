@@ -229,6 +229,13 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
     private var dirty = true
+    private var partialLinearPropagation = false
+    private var partialLinearCandidates: List<PreparedSourceRow>? = null
+    private var partialLinearInvocations = 0L
+    private var partialLinearVisited = 0L
+    private var partialLinearEligible = 0L
+    private var partialLinearDeductions = 0L
+    private var partialLinearDeferrals = 0L
     private var sourceInstalled = false
     private var graphFirst = false
     private var solveContext = LpSolveContext.Production
@@ -411,30 +418,70 @@ class ExactLiraSearchComponent private constructor(
     internal fun probePartialLinearImplications(): PartialLinearProbe {
         val current = checkNotNull(context)
         beginOperation()
+        return try {
+            derivePartialLinearImplications(current, applyLocally = false)
+        } finally {
+            endOperation(current)
+        }
+    }
+
+    internal fun usePartialLinearPropagation() {
+        val current = context
+        check(current == null || current.decisionLevel == 0)
+        partialLinearPropagation = true
+    }
+
+    internal val partialLinearPropagationStats: PartialLinearPropagationStats
+        get() = PartialLinearPropagationStats(partialLinearCandidates?.size ?: 0,
+            partialLinearInvocations, partialLinearVisited, partialLinearEligible,
+            partialLinearDeductions, partialLinearDeferrals)
+
+    private fun partialLinearCandidateRows(): List<PreparedSourceRow>? {
+        partialLinearCandidates?.let { return it }
+        operationStop.charge(bools.size.toLong() + 1L)
+        if (operationStop()) return null
+        val heads = IntArray(bools.size)
+        for (prepared in preparedRows) {
+            operationStop.charge(1)
+            if (operationStop()) return null
+            if (prepared.row.activator != LinearRow.ALWAYS) heads[prepared.row.activator]++
+        }
+        val candidates = ArrayList<PreparedSourceRow>()
+        for (prepared in preparedRows) {
+            operationStop.charge(1)
+            if (operationStop()) return null
+            val row = prepared.row
+            if (prepared.disjunction || row.activator == LinearRow.ALWAYS || heads[row.activator] != 1) continue
+            operationStop.charge(row.size.toLong())
+            if ((0 until row.size).none {
+                    Term.isBool(row.ref(it)) && Lit.variable(Term.lit(row.ref(it))) == row.activator
+                }
+            ) candidates += prepared
+        }
+        operationStop.charge(candidates.size.toLong() + 1L)
+        if (operationStop()) return null
+        return candidates.toList().also { partialLinearCandidates = it }
+    }
+
+    private fun derivePartialLinearImplications(current: SearchContext, applyLocally: Boolean): PartialLinearProbe {
         var visited = 0
         var eligible = 0
         var unexplained = 0
         val deductions = ArrayList<PartialLinearDeduction>()
+        partialLinearInvocations++
         try {
             val state = lp.state ?: return PartialLinearProbe(0, 0, 0, false, emptyList())
-            operationStop.charge(preparedRows.size.toLong() + 1L)
-            if (operationStop()) return PartialLinearProbe(0, 0, 0, true, emptyList())
-            val heads = preparedRows.groupingBy { it.row.activator }.eachCount()
-            for (prepared in preparedRows) {
+            val candidates = partialLinearCandidateRows()
+                ?: return PartialLinearProbe(0, 0, 0, true, emptyList())
+            for (prepared in candidates) {
                 operationStop.charge(1)
                 if (operationStop()) break
                 visited++
                 val variable = prepared.row.activator
-                if (prepared.disjunction || variable == LinearRow.ALWAYS || heads[variable] != 1 ||
-                    current.boolValue(variable) != null
-                ) continue
+                if (current.boolValue(variable) != null) continue
                 val row = prepared.row
                 operationStop.charge(row.size.toLong() + prepared.booleans.size)
-                if ((0 until row.size).any { Term.isBool(row.ref(it)) &&
-                        (Lit.variable(Term.lit(row.ref(it))) == variable ||
-                            bools[Lit.variable(Term.lit(row.ref(it)))] == UNASSIGNED)
-                    }
-                ) continue
+                if (prepared.booleans.any { it != variable && bools[it] == UNASSIGNED }) continue
                 eligible++
                 val comparison = prepared.form.comparison(true) { bools[it] == TRUE }
                 val implication = partialLinearImplication(comparison, { column, upper ->
@@ -457,12 +504,15 @@ class ExactLiraSearchComponent private constructor(
                 operationStop.charge(reason.literals.size.toLong() + rhs.size + 1L)
                 if (operationStop()) break
                 if (current.imply(decision.literal, reason) !is ComponentResult.Consistent) break
+                if (applyLocally && accept(decision, current) !is ComponentResult.Consistent) break
                 deductions += PartialLinearDeduction(prepared.address.factor, prepared.address.row,
                     variable, implication.truth, reason.literals.copyOf())
             }
             return PartialLinearProbe(visited, eligible, unexplained, operationStop(), deductions)
         } finally {
-            endOperation(current)
+            partialLinearVisited += visited
+            partialLinearEligible += eligible
+            partialLinearDeductions += deductions.size
         }
     }
 
@@ -1252,6 +1302,14 @@ class ExactLiraSearchComponent private constructor(
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
+        }
+        if (partialLinearPropagation && bools.any { it == UNASSIGNED }) {
+            val propagated = derivePartialLinearImplications(context, applyLocally = true)
+            if (operationStop()) return ComponentResult.Indeterminate
+            if (propagated.deductions.isNotEmpty()) {
+                partialLinearDeferrals++
+                return ComponentResult.Consistent
+            }
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0

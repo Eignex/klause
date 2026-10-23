@@ -606,6 +606,11 @@ compares eight further boundary visits with and without an explained interval
 probe. The probe uses exact active column bounds and shared reasons; it enables no
 default solver policy. Probe time, charged work, deductions and subsequent search
 progress are separate observations, not source-verdict or complete-solve speed claims.
+`inspect=partial-propagation` compares a plain opening with the opt-in producer
+enabled after root initialization and before the first decision. The producer
+uses a cached list of eligible guards and returns to the shared fixpoint before
+an LP query when it publishes a consequence. Its snapshots represent different
+interventions; the report does not claim they are identical replay states.
 
 `LinearSourceShape` accepts `suite=ID problem=NAME sha256=HEX` and retains the
 hash-matched original, build identity, declaration/lowered dimensions, factor kinds
