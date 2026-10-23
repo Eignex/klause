@@ -8,6 +8,7 @@ import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -223,6 +224,7 @@ internal object NumericalResidualReplay {
             put("phaseNs", NumericalResidualProfile.json(probe.phaseNs))
             put("phaseCalls", NumericalResidualProfile.json(probe.phaseCalls))
             put("transformEntries", NumericalResidualProfile.json(probe.transformEntries))
+            put("minimumPivotSpread", probe.minimumPivotSpread?.let(::JsonPrimitive) ?: JsonNull)
             put("floatSolves", JsonArray(probe.solves))
             put("builds", JsonArray(probe.builds))
             put("certification", JsonArray(observations))
