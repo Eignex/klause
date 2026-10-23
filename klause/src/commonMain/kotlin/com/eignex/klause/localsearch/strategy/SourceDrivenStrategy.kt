@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.movesource.Pool
+import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.localsearch.schedule.NoiseSchedule
 import com.eignex.klause.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
@@ -150,6 +151,19 @@ class SourceDrivenStrategy(
         cancellation: Cancellation,
         evaluation: CompletedMoveEvaluation?,
     ): Move? {
+        state.boardCoverage.beginPick()
+        try {
+            return pickCollectedMove(state, cancellation, evaluation)
+        } finally {
+            state.boardCoverage.finishPick(cancellation())
+        }
+    }
+
+    private fun pickCollectedMove(
+        state: LocalSearchState,
+        cancellation: Cancellation,
+        evaluation: CompletedMoveEvaluation?,
+    ): Move? {
         evaluation?.begin()
         val stall = schedule.noise as? StallSchedule
         val fraction = if ((schedule.weights != null || stall != null) && scoring != MoveScoring.Break) {
@@ -245,7 +259,7 @@ class SourceDrivenStrategy(
             val before = if (objectiveSeed) sink.list.size else 0
             val closure = state.booleanRepairs
             if (closure == null) {
-                cs.source.generate(state, sink)
+                generate(cs, state, sink, cancellation)
             } else {
                 val raw = repairSink ?: MoveSink().also { repairSink = it }
                 raw.clear()
@@ -261,7 +275,7 @@ class SourceDrivenStrategy(
                         raw.alternativeRepairs = it
                     }
                 } else null
-                cs.source.generate(state, raw)
+                generate(cs, state, raw, cancellation)
                 closure.closeInto(state, raw.list, sink, cancellation)
                 if (alternatives != null) closure.closeInto(state, alternatives.list, alternativeSink, cancellation)
             }
@@ -271,6 +285,11 @@ class SourceDrivenStrategy(
             }
         }
         return completionSeed
+    }
+
+    private fun generate(cs: ConfiguredSource, state: LocalSearchState, sink: MoveSink, cancellation: Cancellation) {
+        val source = cs.source
+        if (source is SatisfiedStructured) source.generate(state, sink, cancellation) else source.generate(state, sink)
     }
 
     private fun selectMove(

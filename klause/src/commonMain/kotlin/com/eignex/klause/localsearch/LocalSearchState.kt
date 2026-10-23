@@ -412,6 +412,7 @@ class LocalSearchState private constructor(
     }
 
     internal fun finishRecompute() {
+        boardCoverage.invalidate()
         assignmentRevision++
         definitionValues?.clear()
         // Initialize break/make vectors from factor deltas (payloads are current after initialize()).
@@ -460,12 +461,14 @@ class LocalSearchState private constructor(
             definitionTraversal = null
             definitionValues = null
             moveSink.setInvariants(value)
+            boardCoverage.invalidate()
         }
 
     /** Apply [move], updating cost and payloads incrementally; when [invariants] is set, the
      *  affected definitional cone is propagated afterwards through the same primitives. */
     fun apply(move: Move) {
         check(!probeActive && !moveActive) { "local-search moves cannot be nested" }
+        boardCoverage.invalidate()
         moveActive = true
         trackedMoveStarted = false
         try {
@@ -680,6 +683,8 @@ class LocalSearchState private constructor(
 
     // Counts assignment changes through this state and recomputes after external writes.
     private var assignmentRevision = 0L
+
+    internal val boardCoverage = BoardSwapCoverage()
 
     private fun committedValue(objective: FunctionalObjective): BigInt {
         if (committedObjectiveOf !== objective || committedObjectiveRevision != assignmentRevision) {

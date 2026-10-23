@@ -137,6 +137,7 @@ class ImplicitSeeding(
         yieldAll(seedSetSteps())
         val seeds = checkNotNull(preparedSeedFactors)
         if (seeds.isEmpty()) return@sequence
+        state.boardCoverage.invalidate()
         val owners = ownerInt ?: IntArray(problem.numIntVars)
         yield(Unit)
         for (from in owners.indices step INITIALIZATION_BATCH) {
