@@ -717,6 +717,26 @@ identity and actual platform. These instrumented snapshots establish neither
 worker scheduling, solve cost, useful deductions nor a source verdict; pair them
 with ordinary records' actual recipe and segment observations.
 
+Add `queries=true` after `batch64=...` to compare bounded root queries on each
+prepared source. The profile keeps the existing caller override `bounding=true`
+and governor defaults, depth zero, no primal probe or cuts. Full cold owners,
+full retained-owner consultations and cone cold owners each make three paired
+checked-root-bound/node-prune consultations, with a fresh equal root session for
+each node query. Each mode has a thirty-second containing deadline, each
+consultation at most ten seconds, and one cumulative governor per owner. Adaptive
+work and actual warm-start counters remain visible; retained owners do not imply
+retained factors or equal work budgets.
+
+`queries.jsonl` flushes construction, checked-bound, node-session/prune and close
+timings and current-thread allocations independently, with before/after work,
+pivots and certifier counters. The checked bound comes from the existing certified
+root-bound operation; a declined/nonfinite bound is null. Infinite cutoffs permit
+infeasibility prunes only. These are native compiled-LP observations, not
+configured-tolerance MPS source verdicts or proof validation. Current-thread
+allocations omit native memory and physical RSS; the report retains the actual
+profile JVM heap ceiling. Use maintained ordinary resource captures and source
+validation for end-to-end qualification. No production admission threshold changes.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing
