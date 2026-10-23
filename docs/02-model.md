@@ -135,6 +135,18 @@ with exact source values, and open integer declarations stay open. Finite global
 compose with arithmetic completion through their finite owner, as described by
 [theory composition](14-theories.md#shared-composition-contract).
 
+`AllDifferentTuples` retains equal-width ordered rows, including repeated integer
+coordinates. Rows must differ in at least one position; values may repeat within a
+row. Its representation and engine preparation use space proportional to the source
+coordinates, without tuple-pair or domain-product enumeration. Finite propagation
+rejects identical variable rows and hashes fully fixed rows, explaining a clash
+from the two rows' bounds. This gives an exact assignment check without partial-row
+filtering. Local search maintains tuple multiplicities and grades the excess above
+one per tuple. A move updates every row reading its coordinate once; zero-count
+entries are removed, so state does not retain the walk's history. Full tuple values
+resolve hash collisions. Factor preparation and propagation visits remain atomic
+linear scans between the engine's cancellation polls.
+
 ### Distinct-value counts
 
 `NValue` retains its counted positions, target, comparison mode, optional presence

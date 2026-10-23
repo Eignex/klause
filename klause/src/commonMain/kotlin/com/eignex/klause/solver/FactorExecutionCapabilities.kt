@@ -133,7 +133,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     is Clause, is Cardinality, is PseudoBoolean, is ReifiedCardinality, is ReifiedPseudoBoolean,
     is Circuit, is Cumulative, is Diffn,
     -> filteringRelaxation
-    is ComparisonClause, is Xor, is LexLess, is Sort -> finiteFiltering
+    is ComparisonClause, is Xor, is LexLess, is Sort, is AllDifferentTuples -> finiteFiltering
     is GridArrayMinMax -> filteringRelaxation
     is RealElement -> realArithmetic.copy(propagation = PropagationCapability.BOUNDS_FILTERING, inertReason = null)
     is RealArrayMinMax -> realArithmetic.copy(propagation = PropagationCapability.UNSUPPORTED, inertReason = null)

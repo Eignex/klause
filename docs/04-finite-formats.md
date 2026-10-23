@@ -103,7 +103,7 @@ Constraints keep their global structure where Klause has a matching factor:
 | `extension` | Positive tables become `Table` with wildcards and ranges in short tuples; negative tables are complemented into a `Table` when the domain product is at most 10^6 and become nogood clauses otherwise |
 | `intension` | Linear relations become `Linear` or `ReifiedLinear`; disjunctions of single-variable comparisons become one `ComparisonClause`; other Boolean structure uses Tseitin literals |
 | `sum`, `count`, `knapsack`, `binPacking` | Exact linear rows over the terms or over reified 0/1 channels; `count` needs one constant value, `binPacking` constant sizes and a `le` capacity or loads |
-| `allDifferent`, `allEqual`, `ordered`, `instantiation` | `AllDifferent` (with `except`, per row and column for matrices), pairwise equalities, `Increasing` chains (or difference rows with lengths) and fixings |
+| `allDifferent`, `allEqual`, `ordered`, `instantiation` | `AllDifferent` (with `except`, per row and column for matrices), `AllDifferentTuples` for multiple lists, pairwise equalities, `Increasing` chains (or difference rows with lengths) and fixings |
 | `element`, `channel`, `minimum`, `maximum` | `Element` (including constant and variable matrices), `Inverse` and channel rows, `ArrayMinMax` with optional index |
 | `cardinality`, `nValues`, `precedence`, `lex` | `GlobalCardinality` (with `closed`), `NValue`, `ValuePrecede`, `LexLess` chains including matrix rows and columns |
 | `regular`, `mdd` | `Regular` automata; a cleanly layered MDD becomes an `Mdd`, other diagrams fall back to an automaton |
@@ -113,6 +113,11 @@ Constraints keep their global structure where Klause has a matching factor:
 Some forms are rejected because the retained factor cannot express them, such as
 `zeroIgnored="false"` no-overlap, a `circuit` with a nonzero start index and
 `binPacking` conditions other than an upper capacity.
+
+Multiple `allDifferent` lists retain ordered tuple distinctness in one factor,
+without auxiliary coordinates or pairwise clauses. Repeated coordinates and
+declared domains stay intact. Tuple exceptions and tuple reification attributes
+are unsupported and raise `UnsupportedXcsp3Exception`.
 
 ### Expressions and selection
 

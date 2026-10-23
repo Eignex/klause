@@ -45,6 +45,7 @@ class FactorExecutionCapabilitiesTest {
             Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 3), longArrayOf(0, 0, 0), 0, intArrayOf(0), 3),
             Regular(intArrayOf(0), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(2)),
             AllDifferent(intArrayOf(0, 1), 0, 2),
+            AllDifferentTuples(listOf(intArrayOf(0, 1), intArrayOf(2, 3))),
             AllDifferent(intArrayOf(0, 1), 0, 2, presents = literals, boundsConsistent = true),
             GlobalCardinality(
                 intArrayOf(0, 1),
