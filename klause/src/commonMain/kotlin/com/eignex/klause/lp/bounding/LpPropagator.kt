@@ -114,6 +114,7 @@ internal class LpPropagator(
         private set
     val state: LpExactState? get() = owner?.state
     val metrics: LpScopedMetrics? get() = owner?.metrics
+    val floatTermination get() = owner?.lastFloatTermination
 
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
 

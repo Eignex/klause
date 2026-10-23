@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
@@ -24,7 +25,9 @@ internal object MpsLpQuery {
         check(bean.isThreadAllocatedMemorySupported)
         bean.isThreadAllocatedMemoryEnabled = true
         out.resolve("queries.jsonl").bufferedWriter().use { output ->
-            for (mode in listOf("full-cold", "full-retained", "cone-cold", "prepared-cold", "prepared-retained")) {
+            for (mode in listOf(
+                "full-cold", "full-retained", "cone-cold", "prepared-cold", "prepared-retained", "prepared-session",
+            )) {
                 queryMode(problem, objective, mode, bean) { report ->
                     output.appendLine(report.toString())
                     output.flush()
@@ -51,9 +54,14 @@ internal object MpsLpQuery {
             override fun workMeter() = callStop.workMeter()
         }
         var owner: Pair<AutoCloseable, Any>? = null
+        val sameRoot = mode == "prepared-session"
+        var retainedRoot: PropagationSession? = null
+        var rootDomains = emptyList<IntDomain>()
+        var rootBooleans = emptyList<Boolean?>()
         val thread = Thread.currentThread().threadId()
         try {
-            repeat(3) { repeat ->
+            var repeat = 0
+            while (true) {
                 callStop = containing or Cancellation.after(10.seconds)
                 val startNs = System.nanoTime()
                 val startBytes = bean.getThreadAllocatedBytes(thread)
@@ -72,16 +80,34 @@ internal object MpsLpQuery {
                 val afterBound = stats(active.first, active.second)
                 val pruneNs = System.nanoTime()
                 val pruneBytes = bean.getThreadAllocatedBytes(thread)
-                val session = PropagationSession(problem, token)
+                val session = retainedRoot ?: PropagationSession(problem, token).also {
+                    if (sameRoot) {
+                        retainedRoot = it
+                        rootDomains = List(problem.numIntVars, it::intDomain)
+                        rootBooleans = List(problem.numBoolVars, it::boolValue)
+                    }
+                }
                 val prune = active.first.javaClass.methods.single { it.name == "pruneNode" }.invoke(
                     active.first, session, Double.POSITIVE_INFINITY, -1, true,
                 ) as Boolean
                 val pruneElapsed = System.nanoTime() - pruneNs
                 val pruneAllocated = bean.getThreadAllocatedBytes(thread) - pruneBytes
                 val afterPrune = stats(active.first, active.second)
+                val rootUnchanged = !sameRoot || (
+                    rootDomains.indices.all { session.intDomain(it) == rootDomains[it] } &&
+                        rootBooleans.indices.all { session.boolValue(it) == rootBooleans[it] })
+                val stopReason = when {
+                    !sameRoot && repeat == 2 -> "three-repeats"
+                    sameRoot && !rootUnchanged -> "root-deduction"
+                    sameRoot && prune -> "certified-prune"
+                    sameRoot && token() -> "cancelled"
+                    sameRoot && afterPrune["workAllowanceSpent"].toString() == "true" -> "work-allowance"
+                    sameRoot && afterPrune["demoted"].toString() == "true" -> "governor-demotion"
+                    else -> null
+                }
                 val closeNs = System.nanoTime()
                 val closeBytes = bean.getThreadAllocatedBytes(thread)
-                if (!mode.endsWith("retained") || repeat == 2) {
+                if ((!mode.endsWith("retained") && !sameRoot) || stopReason != null) {
                     active.first.close()
                     owner = null
                 }
@@ -95,7 +121,9 @@ internal object MpsLpQuery {
                     put("mode", mode)
                     put("repeat", repeat)
                     put("ownerReused", reused)
-                    put("freshRootSession", true)
+                    put("freshRootSession", !sameRoot || repeat == 0)
+                    put("rootUnchanged", rootUnchanged)
+                    put("stopReason", stopReason)
                     put("prepareRootWithinAllowance", mode.startsWith("prepared-"))
                     put("plan", plan.toString())
                     put("containingSeconds", 30)
@@ -118,6 +146,8 @@ internal object MpsLpQuery {
                     put("afterCheckedRootBound", afterBound)
                     put("afterNodePrune", afterPrune)
                 })
+                if (stopReason != null) break
+                repeat++
             }
         } finally {
             owner?.first?.close()
@@ -199,6 +229,8 @@ internal object MpsLpQuery {
         val propagator = owner.javaClass.methods.single { it.name.startsWith("getPropagator") }.invoke(owner)
         val metrics = propagator.javaClass.getMethod("getMetrics").invoke(propagator) ?: return JsonNull
         return buildJsonObject {
+            put("floatTermination", propagator.javaClass.getMethod("getFloatTermination")
+                .invoke(propagator)?.toString())
             for (name in listOf(
                 "EditAttempts", "EditDeclines", "PreparationAttempts", "PreparationDeclines", "PreparationWork",
                 "CreatedOwners", "ClosedOwners", "RetainedRows", "ActiveRows", "ReservedConstructionWork",
