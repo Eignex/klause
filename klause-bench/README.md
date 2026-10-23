@@ -778,6 +778,14 @@ helped specific workloads without a general replacement. See
 
 ### Numerical kernel decisions
 
+Retained exact feasibility reuses a fully imported tableau across compatible bound
+assertions and retractions under cumulative resource limits. In the Mac/aarch64
+overflow comparison [7752](https://lab.eignex.com/jobs/7752), continuation builds
+fell from 734 to 105–106 and complete linear checks rose from zero to 1625–1838;
+all original verdicts remained UNKNOWN. These are mechanism and search-progress
+observations, not an end-to-end speedup or independent refutation. Dimension-declined
+completions require exact state capture before selecting a scaling design.
+
 Retain the bounded dense-LU selection with windowed updates (direct benefit measured
 at order six; larger bases favored sparse construction), the fraction factory paths
 that skip redundant normalization when coprimality is established, and the current
