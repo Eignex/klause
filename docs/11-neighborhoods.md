@@ -219,6 +219,17 @@ improvement, and each restart receives a fresh copy so a policy cannot alter the
 anchor. Fixed-cadence and Luby policies keep no copy. Anchored perturbations restore
 exact pins after their random draws and clear tabu state.
 
+Retained ILS board kicks select complete AllDifferent swaps through the proposing
+owner's move sink. Both inputs must be searched, unpinned and in each other's root
+domains. A BasinHopping factor attempt spends at most one swap; Uniform spends two
+input slots per swap. The existing strength bounds the attempts, including misses.
+The definition network propagates outputs, and a swap that breaks an implicitly
+owned global is undone. Restart preparation preserves a feasible owner assignment,
+reconciles definitions and verifies ownership again; failed preservation uses the
+ordinary seeding path. The policy reports whether the prepared assignment changed
+admissible searched board inputs, explicitly declining unchanged diversification.
+Crossover keeps its selection policy, reapplies pins and clears tabu state.
+
 ### ALNS incumbent acquisition
 
 ALNS alternates destroying part of an incumbent with repairing it. Adjacency
