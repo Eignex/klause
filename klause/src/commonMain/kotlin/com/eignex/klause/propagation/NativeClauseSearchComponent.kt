@@ -64,7 +64,7 @@ internal class NativeClauseSearchComponent(
     }
 
     override fun reasonFor(literal: Int): SearchExplanation? =
-        if (literal ushr 1 in 0 until numBoolVars) delegate.reasonFor(literal) else null
+        if (interruptedLevel == null && literal ushr 1 in 0 until numBoolVars) delegate.reasonFor(literal) else null
 
     override fun check(context: SearchContext): ComponentCheck =
         if (unavailable(context)) ComponentCheck.Indeterminate else delegate.check(context)
