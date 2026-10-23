@@ -902,6 +902,14 @@ with matching source, installed dependency, compiler and runtime identities.
 This placement is unsuitable for promotion: bounded enumeration alone does not
 establish optimization recovery.
 
+[7746](https://lab.eignex.com/jobs/7746) preserves the sampled resample window before
+starting the cursor at `c2657f344a`. Fixed work has ten original-team wins and six
+losses, with all sixteen control pairs tied. All 64 witnesses pass source checking.
+The unchanged default route in [7747](https://lab.eignex.com/jobs/7747) still has
+nine small-source losses; large-source pairs have four wins/five losses, gbac two
+wins/four losses/three ties and photo nine ties. All 72 witnesses pass source
+checking. Preserving the sampled prefix alone does not support promotion.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;
