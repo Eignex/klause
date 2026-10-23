@@ -101,6 +101,7 @@ internal class LinearSourcePointCandidate private constructor(
                 values[factor.activator] = truth
             }
         }
+        observe("SOURCE_POINT_ROWS_COMPLETE")
         var changed: Boolean
         do {
             changed = false
@@ -131,6 +132,7 @@ internal class LinearSourcePointCandidate private constructor(
                 }
             }
         } while (changed)
+        observe("SOURCE_POINT_CLAUSES_COMPLETE")
         stop.charge(source.numBoolVars.toLong() + 2L * source.numRealVars)
         if (stop()) return null
         return Sample.fromOwned(BooleanArray(values.size) { values[it] ?: false }, longArrayOf(),

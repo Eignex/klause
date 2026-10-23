@@ -154,6 +154,10 @@ source reconstruction succeeds. A rejected or interrupted candidate leaves the
 containing trail and its alternatives intact. Explicit traversal limits and
 branching controls retain ordinary traversal.
 
+A paused open-theory worker exposes its cumulative arithmetic telemetry alongside
+search progress. Closing it without a verdict retains the same snapshot, so a
+portfolio deadline does not erase source-check stages or native LP work counters.
+
 ## Finite propagation
 
 After a decision is applied, search runs the finite-domain fixpoint: every
