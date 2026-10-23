@@ -773,7 +773,7 @@ internal class LocalSearchEngine(
         // re-sample before a restart (see [SourceDrivenStrategy.feasibleResampleCap]).
         val feasibleResampleCap = (descentStrategy ?: strategy).feasibleResampleCap
         var feasibleMisses = 0
-        val coverageRescue = false
+        val coverageRescue = true
         var coverageChecks = 0
         fun coverageHash(): Int {
             var hash = 1
