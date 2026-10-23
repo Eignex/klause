@@ -250,10 +250,8 @@ internal object NumericalResidualProfile {
         }
 
         private fun wrapEngine(owner: Any, id: Int): Any {
-            if (!syntheticWorkEnabled) {
-                set(owner, "syntheticWorkEnabled", false)
-                set(field(field(owner, "refactorPolicy"), "config"), "syntheticWorkEnabled", false)
-            }
+            set(owner, "syntheticWorkEnabled", syntheticWorkEnabled)
+            set(field(field(owner, "refactorPolicy"), "config"), "syntheticWorkEnabled", syntheticWorkEnabled)
             val basisFactory: (Any) -> Any = letBackend@{ matrix ->
                 val type = Class.forName(BASIS + "KotlinBasisSolver")
                 val constructor = type.constructors.single { it.parameterCount == 10 }
