@@ -27,12 +27,19 @@ internal class BoardSwapCoverage {
         complete = false
     }
 
-    fun beginPick() {
+    fun beginPick(state: LocalSearchState) {
+        syncAssumptions(state)
         savedBoard = board
         savedLeft = left
         savedRight = right
         savedStarted = started
         savedComplete = complete
+    }
+
+    private fun syncAssumptions(state: LocalSearchState) {
+        if (assumptions === state.assumptions) return
+        invalidate()
+        assumptions = state.assumptions
     }
 
     fun finishPick(cancelled: Boolean) {
@@ -47,10 +54,7 @@ internal class BoardSwapCoverage {
     fun generate(state: LocalSearchState, sink: MoveSink, cancellation: Cancellation): Boolean {
         val elected = state.seeding.electedImplicit
         if (elected.none { state.factors[it] is AllDifferentInvariant }) return false
-        if (assumptions !== state.assumptions) {
-            invalidate()
-            assumptions = state.assumptions
-        }
+        syncAssumptions(state)
         started = true
         var visits = 0
         val before = sink.size
