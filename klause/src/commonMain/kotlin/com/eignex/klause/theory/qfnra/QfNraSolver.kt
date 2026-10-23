@@ -141,7 +141,9 @@ internal class QfNraQuery(
                             yield(QfNraResult.Unsatisfiable(work.snapshot()))
                             return@sequence
                         }
-                        if (searching == null && (!startedSearch || stage.formula !== searched.formula)) {
+                        if ((searching == null && (!startedSearch || stage.formula !== searched.formula)) ||
+                            (stage.finished && stage.formula !== searched.formula)
+                        ) {
                             searching = search(normalized, stage, fixed, algebraic)
                             searched = stage
                             declined = null

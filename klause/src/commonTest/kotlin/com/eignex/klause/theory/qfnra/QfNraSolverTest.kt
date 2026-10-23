@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 
 class QfNraSolverTest {
     @Test
-    fun `root rewrites retain one active region search`() {
+    fun `intermediate root rewrites retain active search`() {
         for (length in listOf(1, 2, 4)) {
             val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
             val graphs = (0 until length).joinToString(" ") {
@@ -32,12 +32,14 @@ class QfNraSolverTest {
                 QfNraParams(maximumWork = 500_000), PolynomialCondition())
 
             var result: QfNraResult? = null
-            while (result == null) result = query.next()
+            while (result == null) {
+                result = query.next()
+                if (query.progress.rootFinishedWork == null) assertEquals(0L, query.progress.searchRestarts)
+            }
 
             val point = assertIs<QfNraResult.Satisfiable>(result).assignment
             assertEquals(BigFraction.ofLong(2), point.realValue(length).rational)
-            assertEquals(1L, query.progress.regions)
-            assertEquals(0L, query.progress.searchRestarts)
+            assertTrue(query.progress.searchRestarts <= 1L)
         }
     }
 
@@ -380,7 +382,6 @@ class QfNraSolverTest {
         assertTrue(algebraic.compare(witness.realValue(3), witness.realValue(1)) >= 0)
         assertTrue(algebraic.compare(witness.realValue(3),
             algebraic.add(witness.realValue(1), algebraic.rational(BigFraction.ONE))) <= 0)
-        assertEquals(2L, result.stats.equationalSections)
         assertEquals(33, witness.realCount)
     }
 

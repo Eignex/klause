@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -89,7 +90,7 @@ class PolynomialPhaseProfileTest {
         assertEquals("Pending", trace.checkpoints.first().result)
         assertEquals("Unsatisfiable", trace.checkpoints.last().result)
         assertTrue(trace.checkpoints.dropLast(1).all { it.result == "Pending" })
-        assertTrue(trace.checkpoints.any { it.progress?.contains("snapshots=1,") == true })
+        assertFalse(requireNotNull(trace.checkpoints.last().progress).contains("firstSnapshotWork=null"))
         assertNull(trace.containingDeadlineStack)
     }
 }

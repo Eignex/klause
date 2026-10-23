@@ -287,8 +287,9 @@ Root reduction and exact search retain separate cursors under one arithmetic
 allowance. The cursor with less charged work advances at the next checkpoint;
 finished reduction leaves the remaining work to search. Search starts from the
 first completed rewrite, or from a finished unchanged formula, and retains its
-cursor while later snapshots commit. A representation decline can retry the
-latest different snapshot. Only the latest snapshot and one search cursor are
+cursor while intermediate snapshots commit. A finished different root formula
+replaces that cursor; a representation decline can also retry the latest different
+snapshot. Only the latest snapshot and one search cursor are
 retained, and discarded work remains charged. Regional refutations do not cross
 snapshot boundaries. A containing stop terminates both cursors. Optional probing
 shares one cumulative allowance across retries.
