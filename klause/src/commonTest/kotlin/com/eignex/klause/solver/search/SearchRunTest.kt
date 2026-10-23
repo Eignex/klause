@@ -14,6 +14,25 @@ import kotlin.test.assertSame
 
 class SearchRunTest {
     @Test
+    fun `solution notification should precede model assembly`() {
+        var notified = false
+        val key = SearchModelKey(Boolean::class)
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+            override fun contributeModel(model: SearchModel, context: SearchContext) { model.contribute(key, notified) }
+        }))
+        val restart = object : SearchRestartPolicy {
+            override fun shouldRestart(decisionsThisRun: Long): Boolean = false
+            override fun onSolution() { notified = true }
+        }
+        session.initialize()
+
+        val model = assertIs<SearchRunEvent.Satisfied>(session.openRun(0, SearchSolveParams(restart = restart)).next()).model
+
+        assertEquals(true, model.valueOf(key))
+    }
+
+    @Test
     fun `paused completion should retry the same model before traversing siblings`() {
         for (continuation in listOf(SearchModelContinuation.Chronological, SearchModelContinuation.BlockAtRoot)) {
             var checks = 0
