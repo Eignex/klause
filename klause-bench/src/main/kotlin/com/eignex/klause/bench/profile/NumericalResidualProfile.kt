@@ -119,6 +119,7 @@ internal object NumericalResidualProfile {
             put("phaseNs", json(probe.phaseNs))
             put("phaseCalls", json(probe.phaseCalls))
             put("transformEntries", json(probe.transformEntries))
+            put("minimumPivotSpread", probe.minimumPivotSpread?.let(::JsonPrimitive) ?: JsonNull)
             put("solves", JsonArray(probe.solves))
             put("builds", JsonArray(probe.builds))
             put("captureHashes", JsonArray(captureHashes.map(::JsonPrimitive)))
@@ -181,6 +182,8 @@ internal object NumericalResidualProfile {
         val phaseNs = linkedMapOf<String, Long>()
         val phaseCalls = linkedMapOf<String, Long>()
         val transformEntries = linkedMapOf<String, Long>()
+        var minimumPivotSpread: Double? = null
+            private set
         val solves = ArrayList<JsonElement>()
         val builds = ArrayList<JsonElement>()
         val captures = ArrayList<Any>()
@@ -265,6 +268,12 @@ internal object NumericalResidualProfile {
                         val work = requireNotNull(call(backend, "getLastSolveWork"))
                         val entries = call(work, "getTransformEntries") as Long
                         transformEntries[phase] = (transformEntries[phase] ?: 0L) + entries
+                    }
+                    if (phase == "update" && result.toString() != "SINGULAR") {
+                        val spread = call(backend, "getRcond") as Double
+                        if (spread.isFinite() && spread >= 0.0) {
+                            minimumPivotSpread = minimumPivotSpread?.let { minOf(it, spread) } ?: spread
+                        }
                     }
                     if (observation != null) {
                         builds += buildJsonObject {
