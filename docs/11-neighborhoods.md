@@ -80,7 +80,9 @@ whole-source validation remain required.
 ## Board swap coverage
 
 After a strict feasible descent's sampled pick misses, the reserved structural draw rotates across elected AllDifferent
-boards. Each board starts at a random unordered pair and visits cyclic pair ranks
+boards between picks. A pick groups its proposals from one board; an exhausted board
+that emits none leaves the remaining visit allowance available to another board.
+Each board starts at a random unordered pair and visits cyclic pair ranks
 without repetition, using a random coprime stride to spread partial passes across ranks.
 A pick keeps the ordinary limit of four proposals and 24
 visits. Both inputs pass pin, definition, domain and proposing-owner filters before
