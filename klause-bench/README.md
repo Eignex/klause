@@ -594,7 +594,8 @@ consistent boundary and opens the source twice at seed 1. Each opening has a
 ten-second deadline; each read-only snapshot has a separate ten-second allowance.
 The snapshots retain source names and private slots, ordered reconstruction steps,
 exact rows, signed guards and reasons, private choices, bound witnesses and any
-partial point. The existing exact LP capture codec preserves matrix and scoped
+partial point. Shared premise chains retain graph references instead of repeated
+tree expansion. The existing exact LP capture codec preserves matrix and scoped
 assertions in `prefix-N.exact`; decoding and encoding must preserve its bytes.
 `replay.json` compares canonical state snapshots from the two fresh openings.
 This is a direct-library diagnostic, not default CLI or source-verdict evidence.
