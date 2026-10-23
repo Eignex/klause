@@ -11,6 +11,22 @@ import kotlin.time.TestTimeSource
 
 class EncodingPreparationCancellationTest {
     @Test
+    fun `an enclosing poll should retain a stop observed by a nested poll`() {
+        var nested = false
+        lateinit var scope: Cancellation
+        scope = Cancellation {
+            if (nested) true else {
+                nested = true
+                assertTrue(scope())
+                false
+            }
+        }.encodingPreparationScope()
+
+        assertTrue(scope())
+        assertTrue(scope())
+    }
+
+    @Test
     fun `an observed external stop should remain latched`() {
         var cancelled = false
         val scope = Cancellation { cancelled }.encodingPreparationScope()
