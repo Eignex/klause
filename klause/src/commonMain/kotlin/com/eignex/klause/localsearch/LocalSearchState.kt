@@ -65,6 +65,10 @@ class LocalSearchState private constructor(
     val projection: LocalSearchProblem,
     buffers: LocalSearchBuffers,
 ) {
+    internal var structuredRestartIndex = -1
+    internal var structuredRestartTrace: ((String) -> Unit)? = null
+    internal var structuredRestartObjective: Objective? = null
+
     constructor(
         model: LocalSearchModel,
         rng: Random,

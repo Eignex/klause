@@ -78,6 +78,7 @@ internal fun anchorAndPerturb(
     val problem = state.problem
     for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, anchor.boolValue(b))
     for (i in 0 until problem.numIntVars) state.assignment.setInt(i, anchor.intValue(i))
+    state.structuredRestartTrace?.invoke("anchor")
     val totalVars = problem.numBoolVars + problem.numIntVars
     if (totalVars > 0) {
         when (kind) {
@@ -93,6 +94,14 @@ internal fun anchorAndPerturb(
                     repeat(perturbationStrength) {
                         val fid = state.rng.nextInt(numFactors)
                         val f = state.problem.factors[fid]
+                        if (state.structuredRestartTrace != null) {
+                            val ints = f.intVars.take(64).joinToString(",") { variable ->
+                                "$variable:${state.invariants?.isDefinedInt(variable) == true}:" +
+                                    "${state.assumptions.isFrozenInt(variable)}"
+                            }
+                            println("% structuredTarget boundary=${state.structuredRestartIndex} factor=$fid " +
+                                "kind=${f::class.simpleName} ints=$ints bools=${f.boolVars.size}")
+                        }
                         for (b in f.boolVars) state.assignment.flipBool(b)
                         for (i in f.intVars) state.assignment.setInt(i, state.randomIntValue(i))
                     }
@@ -104,6 +113,7 @@ internal fun anchorAndPerturb(
     state.assumptions.forEachInt { variable, value -> state.assignment.setInt(variable, value) }
     state.resetStepCounters()
     state.recompute()
+    state.structuredRestartTrace?.invoke("after-perturbation")
 }
 
 private fun kickRandomVar(state: LocalSearchState) {

@@ -145,6 +145,7 @@ internal class LocalSearchEngine(
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 val previousBest = state.bestCostSeen
                 configuredRestart.restart(state, bestSoFar)
+                traceStructuredRestart(state, "after-policy")
                 prepareAssignment(state)
                 state.recompute()
                 state.bestCostSeen = minOf(previousBest, state.cost)
@@ -738,6 +739,7 @@ internal class LocalSearchEngine(
         var cancelled = false
         var liveCompletion: Completion? = null
         var pendingCompletedMove = false
+        state.structuredRestartObjective = objective
 
         // Cross-engine solution flow: publish each improvement into the shared exchange, and before a
         // restart adopt a fresher-and-better published assignment as the incumbent so the restart anchors
@@ -1089,6 +1091,7 @@ internal class LocalSearchEngine(
             totalFlips++
             roundFeedback?.record(costBefore, state.cost, totalFlips)
         }
+        traceStructuredRestart(state, "after-descent")
         reportProgress()
         val reason = if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted
         sink.stop()
@@ -1239,9 +1242,40 @@ internal class LocalSearchEngine(
         checkpoint: LocalSearchCheckpoint?,
         onPause: () -> Unit,
     ) = state.phaseTimer.inPhase("seeding") {
+        traceStructuredRestart(state, "after-descent")
+        state.structuredRestartIndex++
+        state.structuredRestartTrace = if (state.structuredRestartIndex < 24) {
+            { phase -> traceStructuredRestart(state, phase) }
+        } else null
+        traceStructuredRestart(state, "before-restart")
         state.boardCoverage.invalidate()
         restarts.restart(state, anchor)
+        traceStructuredRestart(state, "after-preparation")
         if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params, checkpoint, onPause)
+        traceStructuredRestart(state, "after-repair")
+        state.structuredRestartTrace = null
+    }
+
+    private fun traceStructuredRestart(state: LocalSearchState, phase: String) {
+        if (state.structuredRestartIndex !in 0 until 24) return
+        val boards = state.seeding.electedImplicit.filter {
+            state.factors[it] is com.eignex.klause.factor.global.AllDifferentInvariant
+        }
+        for (fid in boards.take(32)) {
+            val variables = problem.factors[fid].intVars
+            if (variables.size > 64) continue
+            val inputs = variables.filter {
+                !state.assumptions.isFrozenInt(it) && state.invariants?.isDefinedInt(it) != true
+            }
+            val values = variables.joinToString(",") { state.assignment.intValue(it).toString() }
+            val searched = inputs.joinToString(",") { state.assignment.intValue(it).toString() }
+            val cost = if (phase == "anchor") "unreconciled" else state.cost.toString()
+            println("% structuredRestart boundary=${state.structuredRestartIndex} phase=$phase board=$fid " +
+                "policy=${configuredRestart::class.simpleName} seedImplicit=$seedImplicitOnRestart " +
+                "cost=$cost objective=${state.structuredRestartObjective?.evaluate(state.assignment)} " +
+                "vars=${variables.joinToString(",")} values=$values " +
+                "inputs=${inputs.joinToString(",")} searched=$searched")
+        }
     }
 
     /** True when the problem is big enough that the post-restart greedy-repair sweep pays for
