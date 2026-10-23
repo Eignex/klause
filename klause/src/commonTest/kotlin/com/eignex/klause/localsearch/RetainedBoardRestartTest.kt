@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.circuit.Circuit
@@ -374,6 +375,43 @@ class RetainedBoardRestartTest {
         ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(listOf(listOf(2L, 0L, 1L), listOf(0L, 1L, 2L)), observed)
+    }
+
+    @Test
+    fun `post restart repair should report an undone board kick as declined`() {
+        val problem = Problem(
+            0, 32, Array(32) { if (it < 2) IntDomain(0, 1) else IntDomain(0, 0) },
+            arrayOf<Factor>(
+                AllDifferent(intArrayOf(0, 1), 0, 2),
+                Linear(longArrayOf(2L), intArrayOf(0), LinearOp.EQ, 0L),
+                Linear(longArrayOf(2L), intArrayOf(1), LinearOp.EQ, 2L),
+            ),
+        )
+        val policy = IteratedLocalSearchRestart(
+            initialPerturbationStrength = 1, adaptivePerturbation = false,
+            perturbationKind = PerturbationKind.BasinHopping,
+        )
+        val observed = mutableListOf<Pair<List<Long>, Boolean?>>()
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            perturbation = { state ->
+                observed.add((0 until 2).map(state.assignment::intValue) to policy.lastBoardDiversificationChanged)
+                null
+            },
+        )
+        val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
+
+        engine.resumable(
+            LinearObjective(),
+            LocalSearchParams(
+                maxFlips = 2L, randomSeed = 7L,
+                initialAssignment = Sample(BooleanArray(0), LongArray(32) { if (it == 1) 1L else 0L }),
+            ),
+        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(listOf(listOf(0L, 1L) to null, listOf(0L, 1L) to false), observed)
     }
 
     @Test

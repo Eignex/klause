@@ -87,6 +87,7 @@ class IteratedLocalSearchRestart(
     var perturbationStrength: Int = initialPerturbationStrength
         private set
     private var stallCount: Int = 0
+    private var boardRestart: RetainedBoardRestart? = null
 
     /** Whether the last retained restart changed admissible searched board inputs. The engine
      *  refreshes this after restart preparation. `false` explicitly declines board diversification;
@@ -121,6 +122,7 @@ class IteratedLocalSearchRestart(
     override fun reset() {
         population.clear()
         stallCount = 0
+        boardRestart = null
         lastBoardDiversificationChanged = null
         perturbationStrength = initialPerturbationStrength
         pendingArm = -1
@@ -195,6 +197,7 @@ class IteratedLocalSearchRestart(
 
     internal fun restart(state: LocalSearchState, bestSoFar: Sample?, prepare: () -> Unit) {
         val board = if (population.isNotEmpty() || bestSoFar != null) RetainedBoardRestart.capture(state) else null
+        boardRestart = board
         lastBoardDiversificationChanged = null
         // Crossover restart: recombine two random population members; skips perturbation since
         // crossover itself diversifies. Only fires with ≥2 incumbents.
@@ -204,7 +207,7 @@ class IteratedLocalSearchRestart(
             val child = biasedCrossover(state, parentA.sample, parentB.sample, probA, state.rng)
             applyChild(state, child)
             prepare()
-            lastBoardDiversificationChanged = board?.changed(state)
+            refreshBoardDiversification(state)
             return
         }
         val anchor = pickAnchor(state) ?: bestSoFar
@@ -215,7 +218,11 @@ class IteratedLocalSearchRestart(
         }
         prepare()
         if (anchor != null) board?.perturb(state, perturbationStrength, perturbationKind)
-        lastBoardDiversificationChanged = board?.changed(state)
+        refreshBoardDiversification(state)
+    }
+
+    internal fun refreshBoardDiversification(state: LocalSearchState) {
+        lastBoardDiversificationChanged = boardRestart?.changed(state)
     }
 
     private fun pickAnchor(state: LocalSearchState): Sample? {

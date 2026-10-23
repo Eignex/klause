@@ -228,9 +228,9 @@ domains. A BasinHopping factor attempt spends at most one swap; Uniform spends t
 input slots per swap. The existing strength bounds the attempts, including misses.
 The definition network propagates outputs in a reversible probe. A swap that would
 break an implicitly owned global or leave a blocked maintained output inconsistent
-is declined. Board kicks follow ordinary restart preparation, including enabled
-implicit seeding and definition reconciliation. Preparation cannot overwrite a
-committed kick. The policy reports whether the prepared assignment changed
+is declined. Enabled implicit seeding and definition reconciliation precede board
+kicks. An enabled greedy-repair pass follows the kick and can undo it. The policy
+refreshes its outcome after that pass and reports whether the prepared assignment changed
 admissible searched board inputs, explicitly declining unchanged diversification.
 Crossover keeps its selection policy and reapplies pins.
 

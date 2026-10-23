@@ -1247,7 +1247,13 @@ internal class LocalSearchEngine(
     ) = state.phaseTimer.inPhase("seeding") {
         state.boardCoverage.invalidate()
         restarts.restart(state, anchor)
-        if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params, checkpoint, onPause)
+        if (greedyRepairOnRestart && isLargeEnoughForGreedy()) {
+            try {
+                greedyRepairPass(state, params, checkpoint, onPause)
+            } finally {
+                (configuredRestart as? IteratedLocalSearchRestart)?.refreshBoardDiversification(state)
+            }
+        }
     }
 
     /** True when the problem is big enough that the post-restart greedy-repair sweep pays for
