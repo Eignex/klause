@@ -23,6 +23,8 @@ internal class PolynomialBooleanPropagation(
     private val choices = ArrayList<Choice>()
 
     val trailSize: Int get() = trail.size
+    var numericChanges: Long = 0
+        private set
 
     fun value(index: Int): Int = values[index]
 
@@ -70,6 +72,7 @@ internal class PolynomialBooleanPropagation(
         arithmetic.step()
         if (values[index] != UNASSIGNED) return values[index] == value
         values[index] = value
+        if (nodes[index] is FormulaNode.Atom) numericChanges++
         trail.add(index)
         enqueue(index)
         for (parent in parents[index]) {
@@ -153,7 +156,9 @@ internal class PolynomialBooleanPropagation(
             }
             while (trail.size > choice.mark) {
                 arithmetic.step()
-                values[trail.removeAt(trail.lastIndex)] = UNASSIGNED
+                val index = trail.removeAt(trail.lastIndex)
+                values[index] = UNASSIGNED
+                if (nodes[index] is FormulaNode.Atom) numericChanges++
             }
             if (!choice.triedTrue) {
                 choice.triedTrue = true

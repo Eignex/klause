@@ -14,6 +14,12 @@ internal data class PolynomialQueryProgress(
     var firstSnapshotWork: Long? = null,
     var firstRegionWork: Long? = null,
     var rootFinishedWork: Long? = null,
+    var partialChecks: Long = 0,
+    var partialConflicts: Long = 0,
+    var partialDeclines: Long = 0,
+    var partialConflictPremises: Long = 0,
+    var partialExclusionUses: Long = 0,
+    var partialExclusionReuses: Long = 0,
 ) {
     fun committed(reduction: PolynomialFormulaReduction, work: Long) {
         snapshots++

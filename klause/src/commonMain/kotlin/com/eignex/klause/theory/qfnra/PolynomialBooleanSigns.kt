@@ -15,9 +15,10 @@ internal class PolynomialBooleanSigns(
     private val inferred = LinkedHashSet<Int>()
     private val premises = ArrayList<Int>()
     private var completed = false
+    var realCount: Int = 0
+        private set
 
     fun prepare(): Iterator<Boolean?> = sequence {
-        var realCount = 0
         for (atom in atoms) for (variable in atom.polynomial.variables) {
             arithmetic.step()
             require(variable in 0 until Int.MAX_VALUE)
