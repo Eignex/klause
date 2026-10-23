@@ -1,6 +1,11 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.CpBranching
+import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,12 +20,19 @@ class SearchRunTest {
             var observations = 0
             var nodes = 0
             val models = ArrayList<AssembledSearchModel>()
-            val session = SearchSession(listOf(object : SearchComponent {
-                override fun check(context: SearchContext): ComponentCheck {
-                    checks++
-                    return ComponentCheck.Feasible
-                }
-            }))
+            val cp = CpSearchComponent(
+                PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
+                branching = CpBranching.None,
+            )
+            val session = SearchSession(listOf(
+                cp,
+                object : SearchComponent {
+                    override fun check(context: SearchContext): ComponentCheck {
+                        checks++
+                        return ComponentCheck.Feasible
+                    }
+                },
+            ))
             session.initialize()
             val run = session.openRun(
                 1,
@@ -78,7 +90,8 @@ class SearchRunTest {
         cancelled = true
         val result = run.next()
 
-        assertSame(SearchRunEvent.Indeterminate.Cancelled, result)
+        assertIs<SearchRunEvent.Indeterminate>(result)
+        assertEquals(SearchStopCause.Cancelled, session.executionControls.stopCause)
         assertEquals(1, retries)
     }
 
