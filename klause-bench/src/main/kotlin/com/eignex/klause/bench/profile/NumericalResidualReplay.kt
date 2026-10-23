@@ -63,9 +63,9 @@ internal object NumericalResidualReplay {
         val dense = spec.getValue("dense").jsonPrimitive.content.toBooleanStrict()
         require(!dense || !compareSynthetic)
         val arms = when {
-            dense -> listOf(0 to true, 64 to true)
+            dense -> listOf(0 to false, 64 to false)
             compareSynthetic -> listOf(6 to true, 6 to false)
-            else -> listOf(6 to true)
+            else -> listOf(6 to false)
         }
         val observedOnly = spec["observedOnly"]?.jsonPrimitive?.content?.toBooleanStrict() == true
         val rounds = if (observedOnly) listOf(-1, 3) else (-1..3).toList()

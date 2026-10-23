@@ -121,6 +121,7 @@ internal object NumericalResidualProfile {
             put("cliRoutingEquivalence", false)
             put("processors", Runtime.getRuntime().availableProcessors())
             put("runtimeDebug", System.getenv("KLAUSE_DEBUG"))
+            put("syntheticWorkEnabled", probe.syntheticWorkEnabled)
             put("elapsedNs", elapsed)
             put("rawResult", result.javaClass.simpleName)
             put("objective", result.objectiveValue?.let(::JsonPrimitive) ?: JsonNull)
@@ -212,7 +213,7 @@ internal object NumericalResidualProfile {
     internal class Probe(
         private val denseLimit: Int = 6,
         private val observed: Boolean = true,
-        private val syntheticWorkEnabled: Boolean = true,
+        val syntheticWorkEnabled: Boolean = false,
     ) {
         val phaseNs = linkedMapOf<String, Long>()
         val phaseCalls = linkedMapOf<String, Long>()
