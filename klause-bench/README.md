@@ -846,6 +846,20 @@ solver speedup.
 Keep `clause-subsume` opt-in: it helped one WCNF control and made no reduction on
 the negative controls. See [presolve](../docs/07-presolve.md#boolean-reductions).
 
+### Tuple distinctness
+
+XCSP3 tuple `allDifferent` retains one native relation with source-sized storage;
+see [tuple semantics](../docs/02-model.md#distinct-integer-positions).
+[Lab 7851](https://lab.eignex.com/jobs/7851), at `79809f8a7`, uses the default
+portfolio, seed 1, debug statistics, 60 s, macOS/aarch64, Serial GC, one active
+processor and the ordinary 3 GB heap. Its `LotteryDesign-32-6-6-2-2000_c25` source
+hash matches [7241 case 970](https://lab.eignex.com/jobs/7241), which exhausted that
+heap in tuple lowering. The native run loaded in 757 ms, reached search and returned
+UNKNOWN with exit 0 and peak RSS 2,275,056 KiB. The seven-row `0007_c25` control
+returned SAT and passed the independent XCSP3 SolutionChecker. These external-time
+captures establish source admission and a checked small witness, without a large
+instance verdict or a runtime speedup claim.
+
 ### Portfolio slice policy
 
 Retain the finite schedule's base 5000, maximum 150000 and growth 1.5; alternatives
