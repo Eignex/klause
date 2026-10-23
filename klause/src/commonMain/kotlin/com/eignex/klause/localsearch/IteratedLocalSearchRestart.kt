@@ -220,9 +220,8 @@ class IteratedLocalSearchRestart(
                 anchorAndPerturb(state, anchor, perturbationStrength, perturbationKind)
             } else {
                 anchorAndPerturb(state, anchor, 0, perturbationKind)
-                state.seeding.retainFeasibleOwners(state)
                 board.perturb(state, perturbationStrength, perturbationKind)
-                preservesImplicitOnRestart = state.seeding.retainFeasibleOwners(state)
+                preservesImplicitOnRestart = state.seeding.implicitFeasible(state)
             }
         }
         finishRestart(state)

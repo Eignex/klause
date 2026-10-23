@@ -312,6 +312,43 @@ class RetainedBoardRestartTest {
     }
 
     @Test
+    fun `board kicks should honor the implicit initialization ownership setting`() {
+        for (enabled in listOf(false, true)) {
+            val problem = Problem(
+                0, 2, Array(2) { IntDomain(0, 1) },
+                arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), 0, 2)),
+            )
+            val policy = IteratedLocalSearchRestart(
+                initialPerturbationStrength = 1, adaptivePerturbation = false,
+                perturbationKind = PerturbationKind.BasinHopping,
+            )
+            val observed = mutableListOf<Boolean>()
+            val strategy = SourceDrivenStrategy(
+                sources = emptyList(),
+                acceptance = AcceptanceRule.GreedyDescent,
+                feasibleDescent = FeasibleDescent.SelfOwned,
+                perturbation = { state ->
+                    observed.add(state.seeding.ownerInt != null)
+                    null
+                },
+            )
+            val engine = LocalSearchEngine(
+                LocalSearchModel.open(problem), strategy = strategy,
+                restartPolicy = policy, seedImplicitOnRestart = enabled,
+            )
+
+            engine.resumable(
+                LinearObjective(),
+                LocalSearchParams(
+                    maxFlips = 2L, randomSeed = 7L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1)),
+                ),
+            ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+            assertEquals(listOf(false, enabled), observed)
+        }
+    }
+
+    @Test
     fun `prepared crossover outcomes should describe the searched board assignment`() {
         for (seed in 0L..7L) {
             val problem = Problem(
