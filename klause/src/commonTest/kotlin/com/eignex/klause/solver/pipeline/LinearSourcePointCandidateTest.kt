@@ -34,6 +34,104 @@ import kotlin.test.assertTrue
 
 class LinearSourcePointCandidateTest {
     @Test
+    fun `projected source clauses should imply signed comparisons across retraction`() {
+        for (mask in 0..3) {
+            val first = Lit.make(0, mask and 1 == 0)
+            val second = Lit.make(1, mask and 2 == 0)
+            val gate = Lit.make(2, true)
+            val low = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO, activator = 0)
+            val high = ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO, activator = 1)
+            val model = Problem(3, 0, emptyArray(), arrayOf(low, high,
+                Clause(intArrayOf(Lit.negate(first), gate)),
+                Clause(intArrayOf(Lit.negate(gate), Lit.negate(second))),
+                Cardinality.exactlyOne(intArrayOf(first, second))), numRealVars = 2,
+                realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+            val owner = SearchSession(emptyList())
+            owner.initialize()
+            val checker = assertNotNull(LinearSourcePointCandidate.prepare(model,
+                FactorProjectionProviders.Default.prepare(model), Cancellation.Never))
+            val point = listOf(first, second).map {
+                if (Lit.isPositive(it)) BigFraction.MINUS_ONE else BigFraction.ONE
+            }
+
+            assertNull(checker.check(point, owner))
+            assertEquals(ComponentResult.Consistent, owner.push(SearchDecision.Bool(first)))
+
+            assertEquals(!Lit.isPositive(second), owner.boolValue(1))
+            assertNull(owner.boolValue(2))
+            owner.popTo(0)
+            assertEquals(ComponentResult.Consistent, owner.push(SearchDecision.Bool(second)))
+            assertEquals(!Lit.isPositive(first), owner.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `projected source clauses should preserve every Boolean source model`() {
+        val low = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ZERO, activator = 0)
+        val high = ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ZERO, activator = 1)
+        val model = Problem(3, 0, emptyArray(), arrayOf(low, high,
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(2, false), Lit.make(1, false))),
+            Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))), numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        var preserved = 0
+        for (mask in 0..7) {
+            val first = mask and 1 != 0
+            val second = mask and 2 != 0
+            val gate = mask and 4 != 0
+            if ((first && !gate) || (gate && second) || first == second) continue
+            val owner = SearchSession(emptyList())
+            owner.initialize()
+            owner.publish(Lit.make(2, gate))
+            val checker = assertNotNull(LinearSourcePointCandidate.prepare(model,
+                FactorProjectionProviders.Default.prepare(model), Cancellation.Never))
+
+            assertNull(checker.check(listOf(BigFraction.ZERO, BigFraction.ZERO), owner))
+
+            assertEquals(ComponentResult.Consistent, owner.push(SearchDecision.Bool(Lit.make(0, first))))
+            assertEquals(ComponentResult.Consistent, owner.push(SearchDecision.Bool(Lit.make(1, second))))
+            assertEquals(gate, owner.boolValue(2))
+            preserved++
+        }
+        assertEquals(2, preserved)
+    }
+
+    @Test
+    fun `cancelled source clause derivations should publish no learned clause`() {
+        val low = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ZERO, activator = 0)
+        val high = ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ZERO, activator = 1)
+        val model = Problem(3, 0, emptyArray(), arrayOf(low, high,
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(2, false), Lit.make(1, false))),
+            Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))), numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        var cancelled = false
+        val parent = Cancellation { cancelled }
+        val owner = SearchSession(emptyList(), executionControls = SearchExecutionControlAdapter(parent))
+        owner.initialize()
+        val checker = assertNotNull(LinearSourcePointCandidate.prepare(model,
+            FactorProjectionProviders.Default.prepare(model), Cancellation.Never) {
+            if (it == "SOURCE_POINT_CUBE_ATTEMPT") cancelled = true
+        })
+
+        val result = checker.check(listOf(BigFraction.ZERO, BigFraction.ZERO), owner)
+
+        assertNull(result)
+        assertTrue(cancelled)
+        assertEquals(0, owner.learnedClauseCount)
+        for (id in 0..2) assertNull(owner.boolValue(id))
+    }
+
+    @Test
     fun `compiled cardinalities and real extrema admit a checked source point`() {
         val parsed = SmtLib.parse(
             """

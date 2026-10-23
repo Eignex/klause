@@ -154,6 +154,13 @@ source reconstruction succeeds. A rejected or interrupted candidate leaves the
 containing trail and its alternatives intact. Explicit traversal limits and
 branching controls retain ordinary traversal.
 
+For sources containing cardinalities, a failed private clause completion can
+resolve its unit reasons into a source Boolean clause. Initial comparison truths
+and containing root pins remain assumptions in that clause; only resolution from
+source CNF proves it. The bounded derivation enters ordinary shared learning and
+can propagate after retraction. Cardinality factors supply no premises to this
+clause proof and still require the full source check before publication.
+
 A paused open-theory worker exposes its cumulative arithmetic telemetry alongside
 search progress. Closing it without a verdict retains the same snapshot, so a
 portfolio deadline does not erase source-check stages or native LP work counters.

@@ -21,6 +21,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchExactRealValue
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.validation.verifyOpenWitness
@@ -32,6 +33,7 @@ import com.eignex.klause.util.magnitudeBitLength
 internal class LinearSourcePointCandidate private constructor(
     private val source: Problem,
     selection: PreparedFactorProjections,
+    private val learnClauseCubes: Boolean,
     private val observe: (String) -> Unit,
 ) {
     private val projection = PropagationProblem(source, selection)
@@ -78,9 +80,10 @@ internal class LinearSourcePointCandidate private constructor(
 
     private fun complete(point: List<BigFraction>, owner: SearchSession, stop: Cancellation): Sample? {
         if (point.size != source.numRealVars || stop()) return null
-        stop.charge(source.numBoolVars.toLong() + source.numRealVars)
+        stop.charge(source.numBoolVars * (if (learnClauseCubes) 2L else 1L) + source.numRealVars)
         if (stop()) return null
         val values = arrayOfNulls<Boolean>(source.numBoolVars)
+        val reasons = if (learnClauseCubes) IntArray(source.numBoolVars) { -1 } else null
         for (id in values.indices) {
             stop.charge(1)
             if (stop()) return null
@@ -105,7 +108,7 @@ internal class LinearSourcePointCandidate private constructor(
         var changed: Boolean
         do {
             changed = false
-            for (factor in source.factors) {
+            for ((factorIndex, factor) in source.factors.withIndex()) {
                 stop.charge(1)
                 if (stop()) return null
                 if (factor !is Clause || factor.tautological) continue
@@ -125,9 +128,14 @@ internal class LinearSourcePointCandidate private constructor(
                     }
                 }
                 if (satisfied) continue
-                if (unknown == 0) return null
+                if (unknown == 0) {
+                    if (reasons != null) learnConflict(factor, values, reasons, owner, stop)
+                    return null
+                }
                 if (unknown == 1) {
-                    values[Lit.variable(unit)] = Lit.isPositive(unit)
+                    val variable = Lit.variable(unit)
+                    values[variable] = Lit.isPositive(unit)
+                    reasons?.set(variable, factorIndex)
                     changed = true
                 }
             }
@@ -137,6 +145,68 @@ internal class LinearSourcePointCandidate private constructor(
         if (stop()) return null
         return Sample.fromOwned(BooleanArray(values.size) { values[it] ?: false }, longArrayOf(),
             DoubleArray(point.size) { point[it].toDouble() }, point)
+    }
+
+    private fun learnConflict(
+        conflict: Clause,
+        values: Array<Boolean?>,
+        reasons: IntArray,
+        owner: SearchSession,
+        stop: Cancellation,
+    ) {
+        observe("SOURCE_POINT_CUBE_ATTEMPT")
+        stop.charge(3L * values.size + 1L)
+        if (stop()) return
+        val seen = BooleanArray(values.size)
+        val pending = IntArray(values.size)
+        val clause = IntArray(minOf(values.size, MAX_CUBE_LITERALS))
+        var head = 0
+        var tail = 0
+        var size = 0
+        var entries = 0
+        fun enqueueFalse(literal: Int): Boolean {
+            stop.charge(1)
+            if (stop() || entries++ == MAX_CUBE_ENTRIES) return false
+            val variable = Lit.variable(literal)
+            val value = values.getOrNull(variable) ?: return false
+            if (Lit.evaluate(literal, value)) return false
+            if (!seen[variable]) {
+                seen[variable] = true
+                pending[tail++] = variable
+            }
+            return true
+        }
+        for (literal in conflict.literals) if (!enqueueFalse(literal)) return
+        while (head < tail) {
+            stop.charge(1)
+            if (stop()) return
+            val variable = pending[head++]
+            val value = values[variable] ?: return
+            val reason = reasons[variable]
+            if (reason < 0) {
+                if (size == clause.size) return
+                clause[size++] = Lit.make(variable, !value)
+            } else {
+                val row = source.factors[reason] as? Clause ?: return
+                val implied = Lit.make(variable, value)
+                var found = false
+                for (literal in row.literals) {
+                    if (literal == implied) {
+                        stop.charge(1)
+                        if (stop() || entries++ == MAX_CUBE_ENTRIES) return
+                        found = true
+                    } else if (!enqueueFalse(literal)) return
+                }
+                if (!found) return
+            }
+        }
+        if (size == 0) return
+        stop.charge(8L * size + 1L)
+        if (stop()) return
+        // Only source-clause resolution proves this lemma; point truths remain assumptions in it.
+        owner.learn(SearchExplanation(clause.copyOf(size)))
+        observe("SOURCE_POINT_CUBE_OFFERED")
+        observe("SOURCE_POINT_CUBE_L_$size")
     }
 
     private fun truth(row: ExactLinear, point: List<BigFraction>, stop: Cancellation): Boolean? {
@@ -182,6 +252,8 @@ internal class LinearSourcePointCandidate private constructor(
         private const val MAX_ATTEMPTS = 64
         private const val MAX_WORK = 16_777_216L
         private const val MAX_BITS = 4096
+        private const val MAX_CUBE_ENTRIES = 65_536
+        private const val MAX_CUBE_LITERALS = 4096
 
         fun prepare(
             source: Problem,
@@ -193,11 +265,13 @@ internal class LinearSourcePointCandidate private constructor(
                 source.numBoolVars.toLong() + source.numRealVars > MAX_COORDINATES ||
                 selection.providers !== FactorProjectionProviders.Default || selection.problem !== source
             ) return null
+            var hasCardinality = false
             for (factor in source.factors) {
                 stop.charge(1)
                 if (stop() || (factor !is ExactLinear && factor !is Clause && factor !is Cardinality)) return null
+                if (factor is Cardinality) hasCardinality = true
             }
-            return LinearSourcePointCandidate(source, selection, observe)
+            return LinearSourcePointCandidate(source, selection, hasCardinality, observe)
         }
     }
 }
