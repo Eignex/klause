@@ -305,6 +305,11 @@ published facade; each facade forwards to one allowance without copying counters
 come from the caller's adapter, and solver policy owns conversions and result
 semantics.
 
+Polynomial native polls read the shared allowance, worker quota and representation
+stops together under their ledger lock, then inspect containing predicates outside
+the lock. Encoder preparation latches an observed stop for that capture while
+forwarding live deadlines and work meters to its parent.
+
 ---
 
 Previous: [5. MPS and SMT-LIB](05-arithmetic-formats.md) · [Contents](README.md) · Next: [7. Presolve and validation](07-presolve.md)
