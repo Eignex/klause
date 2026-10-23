@@ -223,29 +223,7 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
         try {
             val next = replacement ?: input
             validate(next, budget)
-            if (next !== input) {
-                budget.phase = ContinuationPhase.INPUT
-                budget.step(input.m.toLong() + input.total + input.columns.sumOf { it.size.toLong() })
-                if (next.columns != input.columns || next.rhs != input.rhs) {
-                    throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
-                }
-                if (next.lower != input.lower || next.upper != input.upper ||
-                    next.lowerStrict != input.lowerStrict || next.upperStrict != input.upperStrict
-                ) {
-                    val current = lane ?: throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
-                    if (!current.ready) throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
-                    try {
-                        current.rebind(next, budget)
-                    } catch (_: ContinuationOverflow) {
-                        check(!big)
-                        big = true
-                        admitScalarPeak(current.normalizedScalarPeak)
-                        lane = null
-                        restarts++
-                    }
-                }
-                input = next
-            }
+            restarts += rebind(next, budget)
             eligible = true
             while (result == null) {
                 try {
@@ -294,6 +272,33 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
             workByPhase = budget.workByPhase.toMap(), allocationByPhase = budget.allocationByPhase.toMap(),
         )
         return ExactContinuationResult(result?.values, result?.ray, result?.headings, result?.statuses, metrics)
+    }
+
+    private fun rebind(next: ExactContinuationInput, budget: ContinuationBudget): Int {
+        if (next === input) return 0
+        budget.phase = ContinuationPhase.INPUT
+        budget.step(input.m.toLong() + input.total + input.columns.sumOf { it.size.toLong() })
+        if (next.columns != input.columns || next.rhs != input.rhs) {
+            throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
+        }
+        var restarts = 0
+        if (next.lower != input.lower || next.upper != input.upper ||
+            next.lowerStrict != input.lowerStrict || next.upperStrict != input.upperStrict
+        ) {
+            val current = lane
+            if (current == null || !current.ready) throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
+            try {
+                current.rebind(next, budget)
+            } catch (_: ContinuationOverflow) {
+                check(!big)
+                big = true
+                admitScalarPeak(current.normalizedScalarPeak)
+                lane = null
+                restarts++
+            }
+        }
+        input = next
+        return restarts
     }
 
     private fun admitScalarPeak(bits: Int) {
