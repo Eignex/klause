@@ -140,8 +140,9 @@ The discrete assignment, assembled row authority, source encoding and required
 certification remain owned by that request. Numerical pauses preserve the live
 solve; a completed floating solve can wait for certification in a later slice.
 Neither pause consumes the discrete model or records an indeterminate region.
-Reseeding is deferred while completion is pending, and explicit rebind or close
-discards its numerical owners before changing the traversal.
+Reseeding and shared objective-floor imports are deferred while completion is
+pending, and explicit rebind or close discards its numerical owners before changing
+the traversal.
 
 Mixed witness recovery can submit a connected real residual to `SourceLp` after
 fixing integer guesses, within its `SourceLpBudget`. Only exact primal coordinates
