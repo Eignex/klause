@@ -40,8 +40,13 @@ internal object PolynomialPhaseProfile {
     fun main(args: Array<String>) {
         require(args.size in 1..4 && args[0].startsWith("request64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs", "repeats") })
+        require(options.size == args.size - 1 && options.keys.all {
+            it in setOf("pipeline", "timeoutMs", "repeats", "prepared")
+        })
         require(options["pipeline"] == null || options["pipeline"] in setOf("true", "both"))
+        require(options["prepared"] == null || options["prepared"] == "true")
+        require(options["prepared"] == null || options["pipeline"] == null)
+        val preparedMode = options["prepared"] == "true"
         val pipelineMode = options["pipeline"] != null
         val directMode = options["pipeline"] != "true"
         val repeats = options["repeats"]?.toInt() ?: 1
@@ -69,7 +74,8 @@ internal object PolynomialPhaseProfile {
             "repeats" to repeats.toString(),
             "maximumWork" to "null",
             "representationLimits" to "default",
-            "route" to if (pipelineMode && directMode) "paired direct query and default MIXED pipeline/P1/seed3"
+            "route" to if (preparedMode) "unconditioned prepared polynomial service; no CP root pins or publication"
+                else if (pipelineMode && directMode) "paired direct query and default MIXED pipeline/P1/seed3"
                 else if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
                 else "direct normalized QfNraQuery; separate gate inspection",
         )))
@@ -88,7 +94,11 @@ internal object PolynomialPhaseProfile {
                     directory.resolve(name).writeText(Json.encodeToString(pipeline(text, timeoutMs)))
                 }
             }
-            if (directMode) {
+            if (preparedMode) {
+                directory.resolve("prepared-trace.json").writeText(
+                    Json.encodeToString(access.measure(text, timeoutMs = timeoutMs, prepared = true)),
+                )
+            } else if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
                     Json.encodeToString(access.measure(text, timeoutMs = timeoutMs)),
@@ -267,7 +277,12 @@ internal object PolynomialPhaseProfile {
                 atoms.size, guides?.size, kinds, charges)
         }
 
-        fun measure(text: String, maximumWork: Long? = null, timeoutMs: Long = 60_000L): PhaseTrace {
+        fun measure(
+            text: String,
+            maximumWork: Long? = null,
+            timeoutMs: Long = 60_000L,
+            prepared: Boolean = false,
+        ): PhaseTrace {
             val clock = Cancellation.after(timeoutMs.milliseconds)
             var charges = 0L
             var stop: List<String>? = null
@@ -281,11 +296,26 @@ internal object PolynomialPhaseProfile {
                 override fun deadline() = clock.deadline()
                 override fun workMeter(): WorkMeter = meter
             }
-            val source = parsed(text, token)
-            val original = formula.invoke(source)
+            val source = if (prepared) {
+                val parsed = SmtLib.parse(text, cancellation = token)
+                val invocation = SourceSetup.prepare(SourceSetupRequest(
+                    parsed.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = token,
+                ))
+                val problem = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
+                    ?: error("prepared diagnostic requires a polynomial service")
+                Triple(
+                    problem.javaClass.getDeclaredField("formula").apply { isAccessible = true }.get(problem),
+                    problem.javaClass.getDeclaredField("totalBoolCount").apply { isAccessible = true }.getInt(problem),
+                    problem.javaClass.getDeclaredField("totalRealCount").apply { isAccessible = true }.getInt(problem),
+                )
+            } else {
+                val parsed = parsed(text, token)
+                Triple(formula.invoke(parsed), boolCount.invoke(parsed) as Int, realCount.invoke(parsed) as Int)
+            }
+            val original = source.first
             val fixed = fixings.invoke(null, original, { check(!token()) })
             val preparationCharges = charges
-            val owner = query.newInstance(original, boolCount.invoke(source), realCount.invoke(source),
+            val owner = query.newInstance(original, source.second, source.third,
                 params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance()),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
             val checkpoints = ArrayList<PhaseCheckpoint>()
@@ -318,7 +348,7 @@ internal object PolynomialPhaseProfile {
             return PhaseTrace(checkpoints, result.javaClass.simpleName,
                 result.javaClass.methods.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
-                nativeWork, charges - preparationCharges, preparationCharges, stop)
+                nativeWork, charges - preparationCharges, preparationCharges, stop, source.second, source.third)
         }
     }
 }
@@ -355,6 +385,8 @@ internal data class PhaseTrace(
     val chargeSum: Long,
     val preparationCharges: Long,
     val containingDeadlineStack: List<String>?,
+    val queryBooleans: Int? = null,
+    val queryReals: Int? = null,
 )
 
 @Serializable
