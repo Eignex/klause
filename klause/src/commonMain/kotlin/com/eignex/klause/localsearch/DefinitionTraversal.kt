@@ -33,6 +33,10 @@ internal class DefinitionTraversal(val network: InvariantNetwork) {
         marked.set(node)
     }
 
+    // A short cone can cross many empty words.
+    fun prefersNodeScan(): Boolean = nodes.size == 0 ||
+        nodes.size <= (nodes[nodes.size - 1] ushr 6) - (nodes[0] ushr 6) + 1
+
     // Re-read the current word: evaluating a node can invalidate a later node in that same word.
     fun nextPending(pending: Bits, from: Int): Int {
         if (nodes.size == 0) return -1

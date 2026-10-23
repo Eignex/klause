@@ -24,6 +24,28 @@ import kotlin.test.assertTrue
 
 class DefinitionalSweepNetworkTest {
     @Test
+    fun `changed outputs should reach distant descendants in a sparse cone`() {
+        val problem = Problem(2, 129, Array(129) { IntDomain(0, 200) }, emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = InvariantNetwork(
+            List(129) { i ->
+                if (i == 128) DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(128, FunctionalObjective.Operand.v(0), FunctionalObjective.Operand.c(1)),
+                    intArrayOf(0),
+                )
+                else DefinitionalSweep.SweepNode.Bool2Int(i, if (i == 0) 0 else 1)
+            },
+            129,
+            2,
+        )
+        state.apply(Move.BoolFlip(0))
+
+        state.apply(Move.BoolFlip(0))
+
+        assertEquals(1L, state.assignment.intValue(128))
+    }
+
+    @Test
     fun `a changed output should propagate through later definitions across packed words`() {
         val problem = Problem(1, 71, Array(71) { IntDomain(0, 100) }, emptyArray())
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))

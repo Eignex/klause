@@ -298,8 +298,9 @@ owns its traversal workspace and marks each affected node once. It can reuse its
 single-coordinate cone when the network has no selection-dependent Element readers.
 Definition evaluations are cached per state: coordinate writes invalidate direct
 readers and mark the written coordinate's producer for reconciliation, including on
-probe rollback. Propagation intersects pending nodes with the full affected cone in
-packed words and visits them in topological order. Writes can enqueue later nodes;
+probe rollback. Propagation visits pending members of the full affected cone in
+topological order, scanning the shorter of its node list and packed word span.
+Evaluation caches start on the first affected move. Writes can enqueue later nodes;
 blocked outputs remain pending for a later visit with live pin and implicit-owner
 checks. An unchanged intermediate does not prevent repair of an inconsistent
 descendant. Recomputation after external assignment writes clears every evaluation,
