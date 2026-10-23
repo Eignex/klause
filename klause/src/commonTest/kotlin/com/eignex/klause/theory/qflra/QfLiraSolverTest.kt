@@ -50,6 +50,50 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `automatic partial propagation should complete the sole component after its own implication`() {
+        val model = Problem(3, 0, emptyArray(), arrayOf(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, 1.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                LinearOp.GE, 2.0),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
+                LinearOp.LE, -4.0),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        ExactLiraSearchComponent(model).use { component ->
+            component.usePartialLinearPropagation()
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(true, session.boolValue(2))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `automatic partial propagation should not retain a consequence in the opposite branch`() {
+        val model = Problem(2, intBounds = openBounds(), factors = arrayOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+        ))
+        ExactLiraSearchComponent(model).use { component ->
+            component.usePartialLinearPropagation()
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(true, session.boolValue(1))
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertNull(session.boolValue(1))
+        }
+    }
+
+    @Test
     fun `partial interval propagation should publish a guard with both active bound premises`() {
         val model = Problem(3, 0, emptyArray(), arrayOf(
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),

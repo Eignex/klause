@@ -31,6 +31,15 @@ internal data class PartialLinearProbe(
     val deductions: List<PartialLinearDeduction>,
 )
 
+internal data class PartialLinearPropagationStats(
+    val candidateRows: Int,
+    val invocations: Long,
+    val visited: Long,
+    val eligible: Long,
+    val deductions: Long,
+    val numericalDeferrals: Long,
+)
+
 internal fun partialLinearImplication(
     comparison: ExactComparison,
     bound: (column: Int, upper: Boolean) -> ExplainedLinearBound?,
