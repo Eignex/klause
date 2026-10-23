@@ -35,11 +35,14 @@ internal class DefinitionTraversal(val network: InvariantNetwork) {
 
     // Re-read the current word: evaluating a node can invalidate a later node in that same word.
     fun nextPending(pending: Bits, from: Int): Int {
-        var word = from ushr 6
-        if (word >= marked.words.size) return -1
-        var candidates = marked.words[word] and pending.words[word] and (-1L shl (from and 63))
+        if (nodes.size == 0) return -1
+        val start = maxOf(from, nodes[0])
+        val lastWord = nodes[nodes.size - 1] ushr 6
+        var word = start ushr 6
+        if (word > lastWord) return -1
+        var candidates = marked.words[word] and pending.words[word] and (-1L shl (start and 63))
         while (candidates == 0L) {
-            if (++word >= marked.words.size) return -1
+            if (++word > lastWord) return -1
             candidates = marked.words[word] and pending.words[word]
         }
         return (word shl 6) + candidates.countTrailingZeroBits()
