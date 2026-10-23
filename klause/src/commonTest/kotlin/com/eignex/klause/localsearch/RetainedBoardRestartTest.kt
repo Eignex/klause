@@ -135,6 +135,32 @@ class RetainedBoardRestartTest {
     }
 
     @Test
+    fun `a kick should decline when propagated outputs would break another owner`() {
+        val problem = Problem(
+            0, 5, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(1, 1)),
+            arrayOf<Factor>(
+                AllDifferent(intArrayOf(0, 1), 0, 2), AllDifferent(intArrayOf(2, 3), 0, 2), Product(0, 4, 2),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
+        state.assignment.setInt(4, 1L)
+        state.seedImplicitFeasible()
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        sweep.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
+        state.recompute()
+        val anchor = state.assignment.snapshot()
+        val policy = IteratedLocalSearchRestart(
+            initialPerturbationStrength = 1, perturbationKind = PerturbationKind.BasinHopping,
+        )
+
+        policy.restart(state, anchor)
+
+        assertEquals(anchor, state.assignment.snapshot())
+        assertEquals(false, policy.lastBoardDiversificationChanged)
+    }
+
+    @Test
     fun `foreign ownership should never leave a partial board kick`() {
         val problem = Problem(
             0, 4, Array(4) { IntDomain(0, 2) },
@@ -187,6 +213,46 @@ class RetainedBoardRestartTest {
         ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(listOf(0L to null, 1L to true), observed)
+    }
+
+    @Test
+    fun `prepared crossover outcomes should describe the searched board assignment`() {
+        for (seed in 0L..7L) {
+            val problem = Problem(
+                0, 2, Array(2) { IntDomain(0, 1) },
+                arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), 0, 2)),
+            )
+            val policy = IteratedLocalSearchRestart(
+                initialPerturbationStrength = 1, adaptivePerturbation = false, populationSize = 2,
+                crossoverRate = 1.0, perturbationKind = PerturbationKind.BasinHopping,
+            )
+            val observed = mutableListOf<Pair<Sample, Boolean?>>()
+            val strategy = SourceDrivenStrategy(
+                sources = emptyList(),
+                acceptance = AcceptanceRule.GreedyDescent,
+                feasibleDescent = FeasibleDescent.SelfOwned,
+                perturbation = { state ->
+                    observed.add(state.assignment.snapshot() to policy.lastBoardDiversificationChanged)
+                    null
+                },
+            )
+            val engine = LocalSearchEngine(
+                LocalSearchModel.open(problem), strategy = strategy,
+                restartPolicy = policy, seedImplicitOnRestart = true,
+            )
+
+            engine.resumable(
+                LinearObjective(),
+                LocalSearchParams(
+                    maxFlips = 4L, randomSeed = seed, initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1)),
+                ),
+            ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+            assertEquals(4, observed.size)
+            for (i in 1 until observed.size) {
+                assertEquals(observed[i - 1].first != observed[i].first, observed[i].second)
+            }
+        }
     }
 
     @Test

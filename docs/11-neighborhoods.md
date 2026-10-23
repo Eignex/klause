@@ -200,12 +200,13 @@ Retained ILS board kicks select complete AllDifferent swaps through the proposin
 owner's move sink. Both inputs must be searched, unpinned and in each other's root
 domains. A BasinHopping factor attempt spends at most one swap; Uniform spends two
 input slots per swap. The existing strength bounds the attempts, including misses.
-The definition network propagates outputs, and a swap that breaks an implicitly
-owned global is undone. Restart preparation preserves a feasible owner assignment,
+The definition network propagates outputs in a reversible probe; a swap that would
+break an implicitly owned global is declined. A feasible warm assignment establishes
+owners without rewriting its inputs. Restart preparation preserves a feasible owner assignment,
 reconciles definitions and verifies ownership again; failed preservation uses the
 ordinary seeding path. The policy reports whether the prepared assignment changed
 admissible searched board inputs, explicitly declining unchanged diversification.
-Crossover keeps its selection policy, reapplies pins and clears tabu state.
+Crossover keeps its selection policy and reapplies pins.
 
 ### ALNS incumbent acquisition
 

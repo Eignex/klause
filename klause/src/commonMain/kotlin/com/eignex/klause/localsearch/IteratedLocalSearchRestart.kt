@@ -213,8 +213,9 @@ class IteratedLocalSearchRestart(
                 anchorAndPerturb(state, anchor, perturbationStrength, perturbationKind)
             } else {
                 anchorAndPerturb(state, anchor, 0, perturbationKind)
+                state.seeding.retainFeasibleOwners(state)
                 board.perturb(state, perturbationStrength, perturbationKind)
-                preservesImplicitOnRestart = RetainedBoardRestart.canPreserveOwners(state)
+                preservesImplicitOnRestart = state.seeding.retainFeasibleOwners(state)
             }
         }
         finishRestart(state)
@@ -320,7 +321,6 @@ class IteratedLocalSearchRestart(
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, child.intValue(i))
         state.assumptions.forEachBool { variable, value -> state.assignment.setBool(variable, value) }
         state.assumptions.forEachInt { variable, value -> state.assignment.setInt(variable, value) }
-        state.resetStepCounters()
         state.recompute()
     }
 

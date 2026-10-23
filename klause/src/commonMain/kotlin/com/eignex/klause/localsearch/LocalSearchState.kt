@@ -1232,6 +1232,13 @@ class LocalSearchState private constructor(
         }
     }
 
+    internal fun preservesImplicitFeasibility(move: Move): Boolean {
+        if (seeding.implicitSeedFactors.isEmpty()) return true
+        var feasible = false
+        evaluateMove(move, capture = { feasible = seeding.implicitFeasible(this) })
+        return feasible
+    }
+
     internal fun completionCandidate(move: Move): Sample? {
         var sample: Sample? = null
         evaluateMove(move, capture = { sample = completionCandidate() })
