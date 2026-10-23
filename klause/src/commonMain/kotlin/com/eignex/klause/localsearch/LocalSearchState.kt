@@ -1238,11 +1238,28 @@ class LocalSearchState private constructor(
         }
     }
 
-    internal fun preservesImplicitFeasibility(move: Move): Boolean {
-        if (seeding.implicitSeedFactors.isEmpty()) return true
+    internal fun preservesRestartStructure(move: Move): Boolean {
         var feasible = false
-        evaluateMove(move, capture = { feasible = seeding.implicitFeasible(this) })
+        evaluateMove(move, capture = {
+            feasible = seeding.implicitFeasible(this) && probeMaintainsDefinitions()
+        })
         return feasible
+    }
+
+    private fun probeMaintainsDefinitions(): Boolean {
+        val net = invariants ?: return true
+        for (i in 0 until probeSlots.size) {
+            val slot = probeSlots[i]
+            val writer = when {
+                slot < problem.numBoolVars -> net.boolWriter(slot)
+                slot < problem.numBoolVars + problem.numIntVars -> net.intWriter(slot - problem.numBoolVars)
+                else -> -1
+            }
+            if (writer < 0) continue
+            val value = net.node(writer).eval(assignment, rootDomains)
+            if (value == DefinitionalSweep.SweepNode.NO_WRITE || value != probeValue(slot)) return false
+        }
+        return true
     }
 
     internal fun completionCandidate(move: Move): Sample? {
