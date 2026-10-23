@@ -23,6 +23,26 @@ import kotlin.test.assertTrue
 
 class DefinitionalSweepNetworkTest {
     @Test
+    fun `a rolled back Element selection should not change the next committed evaluation`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 10) }, emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = InvariantNetwork(
+            listOf(ElementResultDefinition(Element(0, 3, longArrayOf(1, 2), true, 0))),
+            4,
+            0,
+        )
+        state.assignment.setInt(1, 4)
+        state.assignment.setInt(2, 9)
+        state.recompute()
+        state.apply(Move.IntSet(0, 0))
+
+        state.netDelta(Move.IntSet(0, 1))
+        state.apply(Move.IntSet(0, 0))
+
+        assertEquals(4L, state.assignment.intValue(3))
+    }
+
+    @Test
     fun `definition evaluations should follow external writes after recompute`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 20) }, emptyArray())
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
