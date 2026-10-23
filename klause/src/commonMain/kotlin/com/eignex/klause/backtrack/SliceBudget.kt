@@ -41,8 +41,8 @@ internal class SliceBudget(
     private var lpWorkMark: Long = preparation?.lpWorkMark ?: 0L
     private var propagationWorkMark: Long = preparation?.propagationWorkMark ?: 0L
 
-    // Nodes an earlier slice spent past its budget. One LP solve can cost many slices' worth of nodes, and a slice
-    // cannot stop inside it, so the excess is repaid from the slices that follow.
+    // Atomic LP setup, factorization and certification can overrun a slice even when numerical iterations yield.
+    // The excess is repaid from the slices that follow.
     private var nodeDebt: Long = preparation?.nodeDebt ?: 0L
 
     fun inheritPreparation(preparation: SliceBudget) {
