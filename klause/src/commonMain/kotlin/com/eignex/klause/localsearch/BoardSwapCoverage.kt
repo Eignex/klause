@@ -79,6 +79,11 @@ internal class BoardSwapCoverage {
                     continue
                 }
                 sink.proposer = fid
+                if (!invariant.allowsSwapCoordinate(state, left, sink)) {
+                    left++
+                    right = left + 1
+                    continue
+                }
                 invariant.proposeSwap(state, left, right, sink)
                 right++
                 if (right >= invariant.swapCoordinateCount) {
