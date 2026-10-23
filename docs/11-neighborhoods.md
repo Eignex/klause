@@ -81,7 +81,7 @@ whole-source validation remain required.
 
 After a strict feasible descent's sampled pick misses, the reserved structural draw rotates across elected AllDifferent
 boards. Each board starts at a random unordered pair and visits cyclic pair ranks
-without repetition, using a coprime stride to spread partial passes across ranks.
+without repetition, using a random coprime stride to spread partial passes across ranks.
 A pick keeps the ordinary limit of four proposals and 24
 visits. Both inputs pass pin, definition, domain and proposing-owner filters before
 the complete compound enters ordinary generated-move scoring and acceptance.
