@@ -51,6 +51,20 @@ class NodeBudgetTest {
         assertEquals(0L, phase.spent)
     }
 
+    @Test
+    fun `a bounded phase should retain its worker quota after a sibling overspends`() {
+        val parent = NodeBudget(10)
+        val workers = parent.quotas(2)
+        val phase = workers[1].boundedPhase(Long.MAX_VALUE)
+
+        workers[0].spendMoves(8)
+        phase.spend()
+
+        assertEquals(4L, phase.decisionsLeft())
+        assertEquals(1L, workers[1].spent)
+        assertEquals(11L, parent.spent)
+    }
+
     private fun php(pigeons: Int, holes: Int): Problem {
         fun x(p: Int, h: Int) = p * holes + h
         val factors = ArrayList<Factor>()

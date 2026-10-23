@@ -410,7 +410,7 @@ class OpenTheoryMinimizer internal constructor(
                 declaredRoute = opened.boundedPlan.theoryPipeline,
             )
             reuseOpeningBoundAttempt = false
-            return ResumableOpenTheory(engine, params, state)
+            return ResumableOpenTheory(engine, params, state, clausalAbstraction = false)
         }
 
         // Read a finished round: the descent's verdict when it ends here, else null to go on to the next round.

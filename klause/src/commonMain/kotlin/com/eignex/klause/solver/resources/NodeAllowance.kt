@@ -7,8 +7,9 @@ internal class NodeAllowance private constructor(
     val limit: Long,
     private val ledger: Ledger,
     private val parent: NodeAllowance?,
+    private val tracksParentRemaining: Boolean,
 ) {
-    constructor(limit: Long) : this(limit, Ledger(), null)
+    constructor(limit: Long) : this(limit, Ledger(), null, false)
 
     init {
         require(limit >= 0L) { "node budget must be nonnegative, got $limit" }
@@ -36,7 +37,7 @@ internal class NodeAllowance private constructor(
 
     internal fun boundedPhase(maximum: Long): NodeAllowance = ledger.lock.withLock {
         require(maximum >= 0L)
-        NodeAllowance(minOf(maximum, remainingUnlocked()), ledger, this)
+        NodeAllowance(minOf(maximum, remainingUnlocked()), ledger, this, true)
     }
 
     internal fun quotas(count: Int): List<NodeAllowance> = mapQuotas(count) { it }
@@ -50,19 +51,20 @@ internal class NodeAllowance private constructor(
         val remaining = remainingUnlocked()
         val share = remaining / count
         val remainder = remaining % count
-        List(count) { index -> NodeAllowance(share + if (index < remainder) 1L else 0L, ledger, this) }
+        List(count) { index -> NodeAllowance(share + if (index < remainder) 1L else 0L, ledger, this, false) }
             .also { children = it }.let(map)
     }
 
     private fun spentUnlocked(): Long = saturatedSum(used, pricedInstructions(moves))
 
     private fun remainingUnlocked(): Long = minOf(
-        (limit - spentUnlocked()).coerceAtLeast(0L), parent?.remainingUnlocked() ?: Long.MAX_VALUE,
+        (limit - spentUnlocked()).coerceAtLeast(0L),
+        if (tracksParentRemaining) parent?.remainingUnlocked() ?: Long.MAX_VALUE else Long.MAX_VALUE,
     )
 
     private fun movesLeftUnlocked(): Long = minOf(
         (instructionsFor((limit - used).coerceAtLeast(0L)) - moves).coerceAtLeast(0L),
-        parent?.movesLeftUnlocked() ?: Long.MAX_VALUE,
+        if (tracksParentRemaining) parent?.movesLeftUnlocked() ?: Long.MAX_VALUE else Long.MAX_VALUE,
     )
 
     private fun record(nodes: Long, instructions: Long) {

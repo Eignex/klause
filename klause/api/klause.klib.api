@@ -15642,10 +15642,12 @@ final class com.eignex.klause.solver.result/OpenTheoryWorkSink { // com.eignex.k
 }
 
 final class com.eignex.klause.solver.result/OpenTheoryWorkStats { // com.eignex.klause.solver.result/OpenTheoryWorkStats|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/OpenTheoryWorkStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/OpenTheoryWorkStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
 
     final val openBoolDecisions // com.eignex.klause.solver.result/OpenTheoryWorkStats.openBoolDecisions|{}openBoolDecisions[0]
         final fun <get-openBoolDecisions>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.openBoolDecisions.<get-openBoolDecisions>|<get-openBoolDecisions>(){}[0]
+    final val openClauseWork // com.eignex.klause.solver.result/OpenTheoryWorkStats.openClauseWork|{}openClauseWork[0]
+        final fun <get-openClauseWork>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.openClauseWork.<get-openClauseWork>|<get-openClauseWork>(){}[0]
     final val openIntDecisions // com.eignex.klause.solver.result/OpenTheoryWorkStats.openIntDecisions|{}openIntDecisions[0]
         final fun <get-openIntDecisions>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.openIntDecisions.<get-openIntDecisions>|<get-openIntDecisions>(){}[0]
     final val openTheoryChecks // com.eignex.klause.solver.result/OpenTheoryWorkStats.openTheoryChecks|{}openTheoryChecks[0]
@@ -15660,7 +15662,8 @@ final class com.eignex.klause.solver.result/OpenTheoryWorkStats { // com.eignex.
     final fun component3(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.component3|component3(){}[0]
     final fun component4(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.component4|component4(){}[0]
     final fun component5(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.component5|component5(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/OpenTheoryWorkStats // com.eignex.klause.solver.result/OpenTheoryWorkStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    final fun component6(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.component6|component6(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/OpenTheoryWorkStats // com.eignex.klause.solver.result/OpenTheoryWorkStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/OpenTheoryWorkStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/OpenTheoryWorkStats.toString|toString(){}[0]

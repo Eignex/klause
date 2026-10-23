@@ -27,6 +27,7 @@ internal class ResumableOpenTheory(
     private val engine: OpenTheoryEngine,
     private val params: TheoryParams,
     private val state: OpenTheorySolveState = OpenTheorySolveState(params),
+    private val clausalAbstraction: Boolean = true,
 ) : AutoCloseable {
     private var globalToken: Cancellation = Cancellation.Never
     private var sliceEndWork = Long.MAX_VALUE
@@ -80,7 +81,7 @@ internal class ResumableOpenTheory(
     private fun begin(): OpenTheoryStart {
         val stop = Cancellation { globalToken() }
         return engine.begin(params.copy(cancellation = params.cancellation or stop), state, pausing,
-            clausalAbstraction = true)
+            clausalAbstraction = clausalAbstraction)
     }
 
     private fun decide(result: OpenTheoryResult): OpenTheoryResult {

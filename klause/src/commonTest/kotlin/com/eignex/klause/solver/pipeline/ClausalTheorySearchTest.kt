@@ -109,7 +109,7 @@ class ClausalTheorySearchTest {
             val unknown = assertIs<OpenTheoryResult.Unknown>(result)
             assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
             assertNotNull(unknown.stats.smt.completeSearchStages?.get("CLAUSAL_BOOLEAN_SAT"))
-            assertEquals(checks, unknown.stats.smt.completeSearchStages?.get("CLAUSAL_CUBE_REFUTED") ?: 0L)
+            assertEquals(checks, unknown.stats.smt.completeSearchStages.get("CLAUSAL_CUBE_REFUTED") ?: 0L)
         }
     }
 
@@ -126,18 +126,20 @@ class ClausalTheorySearchTest {
                 ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             ),
         )
-        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
-        ResumableOpenTheory(engine, TheoryParams()).use { search ->
-            var result: OpenTheoryResult? = null
-            var slices = 0
-            while (result == null && slices < 100) {
-                result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1)
-                slices++
-            }
+        for (sliceWork in listOf(1L, -1L)) {
+            val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+            ResumableOpenTheory(engine, TheoryParams()).use { search ->
+                var result: OpenTheoryResult? = null
+                var slices = 0
+                while (result == null && slices < 100) {
+                    result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork)
+                    slices++
+                }
 
-            val stats = assertIs<OpenTheoryResult.Unsat>(result).stats
-            assertTrue(slices > 1)
-            assertEquals(2L, stats.smt.completeSearchStages?.get("CLAUSAL_CUBE_REFUTED"))
+                val stats = assertIs<OpenTheoryResult.Unsat>(result).stats
+                if (sliceWork >= 0L) assertTrue(slices > 1) else assertEquals(1, slices)
+                assertEquals(2L, stats.smt.completeSearchStages?.get("CLAUSAL_CUBE_REFUTED"))
+            }
         }
     }
 

@@ -249,7 +249,9 @@ search across pauses. Native Boolean decision attempts debit `openClauseWork` an
 the containing open-work allowance; arithmetic checks and shared decisions keep
 their existing units. A bounded phase counter charges its parent `NodeBudget`
 immediately without partitioning or renewing the parent's remaining allowance.
-Ancestor exhaustion stops later phase decisions. Boolean propagation and baking
+Exhaustion of the containing allowance stops later phase decisions. Partitioned
+worker quotas retain their own limits when a sibling atomically overspends its share.
+Boolean propagation and baking
 retain their native counters rather than becoming shared decision frames.
 
 `SearchStopCause` separates timeout, cancellation, native work, checks, decisions,

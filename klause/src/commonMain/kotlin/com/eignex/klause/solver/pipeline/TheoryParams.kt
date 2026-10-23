@@ -67,9 +67,9 @@ data class TheoryParams(
     /**
      * Boolean branching for each feasibility traversal.
      *
-     * [OpenBranching.Automatic] selects clausal completion for pure integer models with shared clauses,
+     * [OpenBranching.Automatic] selects clausal completion for pure integer satisfaction with shared clauses,
      * activity for a complete mixed worker with one default point owner, and source order for other
-     * openings, including private queries and explicit hint allowances.
+     * openings, including integral objective rounds, private queries and explicit hint allowances.
      * The theory decides the arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,

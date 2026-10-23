@@ -85,7 +85,7 @@ internal class ClausalTheorySearch(
                 chargeBooleanWork()
                 state.observeClauseProgress(search.stats.search)
                 when (result) {
-                    null -> if (nodePolicy !== SearchNodePolicy.ExpandAll) return SearchRunEvent.Paused else continue
+                    null -> continue
                     is SolveResult.Unsat -> {
                         observe("CLAUSAL_BOOLEAN_UNSAT")
                         closeBooleanSearch()
