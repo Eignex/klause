@@ -130,10 +130,11 @@ class SourceDrivenStrategy(
 
     internal var prioritizePrimaryRepairs: Boolean = false
 
-    internal val supportsBoardCoverage: Boolean get() = sources.any {
-        it.enabled && it.cap > 0 && !it.stallGated && it.effectivePhase.appliesAt(0L) &&
-            (it.source as? SatisfiedStructured)?.supportsBoardCoverage == true
-    }
+    internal val supportsBoardCoverage: Boolean get() =
+        (feasibleAcceptance ?: acceptance) == AcceptanceRule.GreedyDescent && sources.any {
+            it.enabled && it.cap > 0 && !it.stallGated && it.effectivePhase.appliesAt(0L) &&
+                (it.source as? SatisfiedStructured)?.supportsBoardCoverage == true
+        }
 
     internal val gradesAllBoardImprovements: Boolean get() =
         !configurationChecking && (feasibleAcceptance ?: acceptance) == AcceptanceRule.GreedyDescent &&
