@@ -170,7 +170,7 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
 }
 
 // Totals belong to one authority, including abandoned fixed-width operations. Tokens are invocation-local.
-internal class ExactContinuation(private val input: ExactContinuationInput) {
+internal class ExactContinuation(private var input: ExactContinuationInput) {
     private var lane: ContinuationLane? = null
     private var big = false
     private var work = 0L
@@ -188,6 +188,7 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
     val usedImportPivots get() = imports
     val usedPivots get() = pivots
     val normalizedScalarPeak get() = maxOf(scalarHistory, lane?.normalizedScalarPeak ?: 0)
+    val canRebind get() = lane?.ready == true
 
     fun account(work: Long, allocation: Long, elapsedNs: Long) {
         require(work >= 0L && allocation >= 0L && elapsedNs >= 0L)
@@ -202,6 +203,7 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
     fun resume(
         limits: ExactContinuationLimits = ExactContinuationLimits(),
         cancellation: Cancellation = Cancellation.Never,
+        replacement: ExactContinuationInput? = null,
     ): ExactContinuationResult {
         val budget = ContinuationBudget(
             limits.copy(
@@ -219,7 +221,31 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
         var stop: ContinuationDecline? = null
         var result: LaneResult? = null
         try {
-            validate(budget)
+            val next = replacement ?: input
+            validate(next, budget)
+            if (next !== input) {
+                budget.phase = ContinuationPhase.INPUT
+                budget.step(input.m.toLong() + input.total + input.columns.sumOf { it.size.toLong() })
+                if (next.columns != input.columns || next.rhs != input.rhs) {
+                    throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
+                }
+                if (next.lower != input.lower || next.upper != input.upper ||
+                    next.lowerStrict != input.lowerStrict || next.upperStrict != input.upperStrict
+                ) {
+                    val current = lane ?: throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
+                    if (!current.ready) throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
+                    try {
+                        current.rebind(next, budget)
+                    } catch (_: ContinuationOverflow) {
+                        check(!big)
+                        big = true
+                        admitScalarPeak(current.normalizedScalarPeak)
+                        lane = null
+                        restarts++
+                    }
+                }
+                input = next
+            }
             eligible = true
             while (result == null) {
                 try {
@@ -275,7 +301,7 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
     }
 
     @Suppress("ThrowsCount")
-    private fun validate(budget: ContinuationBudget) {
+    private fun validate(input: ExactContinuationInput, budget: ContinuationBudget) {
         if (normalizedScalarPeak > budget.limits.maxBits) throw ContinuationStop(ContinuationDecline.BITS)
         var oversized = false
         fun visit(value: BigFraction): BigFraction {
@@ -357,6 +383,8 @@ private interface ContinuationLane {
     val normalizedScalarPeak: Int
     val pivots: Int
     val position: Int
+    val ready: Boolean
+    fun rebind(input: ExactContinuationInput, budget: ContinuationBudget)
     fun advance(
         budget: ContinuationBudget,
         beforeImport: () -> Unit,
@@ -372,7 +400,7 @@ private interface ContinuationLane {
 // https://doi.org/10.1287/moor.2.2.103). Strict sides carry a symbolic infinitesimal as in B. Dutertre and
 // L. de Moura, "A fast linear-arithmetic solver for DPLL(T)", CAV 2006, https://doi.org/10.1007/11817963_11.
 private class RationalContinuationLane<F>(
-    private val input: ExactContinuationInput,
+    private var input: ExactContinuationInput,
     private val ops: FracOps<F>,
     budget: ContinuationBudget,
     private val admitScalarPeak: (Int) -> Unit,
@@ -381,15 +409,16 @@ private class RationalContinuationLane<F>(
     private var table: List<MutableList<F>>
     private var headings = MutableList(input.m) { input.n + it }
     private var seats: MutableList<F>
-    private val seatEpsilon: MutableList<F>?
+    private var seatEpsilon: MutableList<F>?
     private var statuses = MutableList(input.total) { j -> canonical(j) }
-    private val lower: List<F?>
-    private val upper: List<F?>
+    private var lower: List<F?>
+    private var upper: List<F?>
     override var position = 0
         private set
     override var pivots = 0
         private set
     private var ordered = false
+    override val ready get() = position == input.m && ordered
     private var scalarPeak = 0
         set(value) {
             field = value
@@ -424,6 +453,45 @@ private class RationalContinuationLane<F>(
         } else {
             null
         }
+    }
+
+    override fun rebind(input: ExactContinuationInput, budget: ContinuationBudget) {
+        check(ready)
+        budget.step(input.total.toLong() * 6L, input.total * 64L)
+        val nextLower = input.lower.map { it?.let { value -> fromBig(value, budget) } }
+        val nextUpper = input.upper.map { it?.let { value -> fromBig(value, budget) } }
+        val nextStatuses = statuses.mapIndexed { j, status ->
+            if (status == ContinuationStatus.BASIC) status else when {
+                input.lower[j] != null && input.lower[j] == input.upper[j] -> ContinuationStatus.FIXED
+                status == ContinuationStatus.UPPER && input.upper[j] != null -> ContinuationStatus.UPPER
+                input.lower[j] != null -> ContinuationStatus.LOWER
+                input.upper[j] != null -> ContinuationStatus.UPPER
+                else -> ContinuationStatus.FREE
+            }
+        }.toMutableList()
+        val nextSeats = nextStatuses.mapIndexed { j, status ->
+            when (status) {
+                ContinuationStatus.LOWER, ContinuationStatus.FIXED -> requireNotNull(nextLower[j])
+                ContinuationStatus.UPPER -> requireNotNull(nextUpper[j])
+                else -> ops.zero
+            }
+        }.toMutableList()
+        val nextEpsilon = if (input.hasStrictSides) {
+            nextStatuses.mapIndexed { j, status ->
+                when {
+                    status == ContinuationStatus.LOWER && input.lowerIsStrict(j) -> ops.one
+                    status == ContinuationStatus.UPPER && input.upperIsStrict(j) -> ops.minusOne
+                    else -> ops.zero
+                }
+            }.toMutableList()
+        } else null
+        budget.step()
+        this.input = input
+        lower = nextLower
+        upper = nextUpper
+        statuses = nextStatuses
+        seats = nextSeats
+        seatEpsilon = nextEpsilon
     }
 
     override fun advance(
