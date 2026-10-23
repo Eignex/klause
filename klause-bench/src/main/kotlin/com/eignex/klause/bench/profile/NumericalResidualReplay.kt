@@ -40,7 +40,7 @@ internal object NumericalResidualReplay {
     private fun replay(input: JsonElement, out: File) {
         val spec = input.jsonObject
         val keys = setOf("job", "source", "residual", "sha256", "dense")
-        val options = setOf("synthetic", "entry", "workLimit")
+        val options = setOf("synthetic", "entry", "workLimit", "observedOnly")
         require(spec.keys.containsAll(keys) && (spec.keys - keys).all { it in options })
         val entry = spec["entry"]?.jsonPrimitive?.content ?: "scoped"
         require(entry == "scoped" || entry == "session")
@@ -67,7 +67,9 @@ internal object NumericalResidualReplay {
             compareSynthetic -> listOf(6 to true, 6 to false)
             else -> listOf(6 to true)
         }
-        for (round in -1..3) {
+        val observedOnly = spec["observedOnly"]?.jsonPrimitive?.content?.toBooleanStrict() == true
+        val rounds = if (observedOnly) listOf(-1, 3) else (-1..3).toList()
+        for (round in rounds) {
             val ordered = if (round % 2 == 0) arms.reversed() else arms
             for ((denseLimit, syntheticWorkEnabled) in ordered) {
                 for (retained in listOf(false, true)) {
@@ -228,6 +230,7 @@ internal object NumericalResidualReplay {
             put("phaseNs", NumericalResidualProfile.json(probe.phaseNs))
             put("phaseCalls", NumericalResidualProfile.json(probe.phaseCalls))
             put("transformEntries", NumericalResidualProfile.json(probe.transformEntries))
+            put("basisSolveWork", NumericalResidualProfile.json(probe.basisSolveWork))
             put("minimumPivotSpread", probe.minimumPivotSpread?.let(::JsonPrimitive) ?: JsonNull)
             put("floatSolves", JsonArray(probe.solves))
             put("builds", JsonArray(probe.builds))

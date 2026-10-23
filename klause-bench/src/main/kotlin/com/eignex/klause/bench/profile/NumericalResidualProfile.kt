@@ -127,6 +127,7 @@ internal object NumericalResidualProfile {
             put("phaseNs", json(probe.phaseNs))
             put("phaseCalls", json(probe.phaseCalls))
             put("transformEntries", json(probe.transformEntries))
+            put("basisSolveWork", json(probe.basisSolveWork))
             put("minimumPivotSpread", probe.minimumPivotSpread?.let(::JsonPrimitive) ?: JsonNull)
             put("solves", JsonArray(probe.solves))
             put("builds", JsonArray(probe.builds))
@@ -216,6 +217,7 @@ internal object NumericalResidualProfile {
         val phaseNs = linkedMapOf<String, Long>()
         val phaseCalls = linkedMapOf<String, Long>()
         val transformEntries = linkedMapOf<String, Long>()
+        val basisSolveWork = linkedMapOf<String, MutableMap<String, Long>>()
         var minimumPivotSpread: Double? = null
             private set
         val solves = ArrayList<JsonElement>()
@@ -268,6 +270,8 @@ internal object NumericalResidualProfile {
                 Proxy.newProxyInstance(basisType.classLoader, arrayOf(basisType)) { _, method, values ->
                     val arguments = values.orEmpty()
                     val phase = method.name
+                    val transform = phase == "ftran" || phase == "btran"
+                    val inputSupport = if (transform) call(requireNotNull(arguments[0]), "getCount") as Int else 0
                     val observation = if (phase == "refactorize" && builds.size < 4096) {
                         buildJsonObject {
                             put("owner", id)
@@ -296,10 +300,11 @@ internal object NumericalResidualProfile {
                     } else {
                         invoke(backend, method, arguments)
                     }
-                    if (phase == "ftran" || phase == "btran") {
+                    if (transform) {
                         val work = requireNotNull(call(backend, "getLastSolveWork"))
                         val entries = call(work, "getTransformEntries") as Long
                         transformEntries[phase] = (transformEntries[phase] ?: 0L) + entries
+                        recordSolveWork(phase, arguments, inputSupport, work)
                     }
                     if (phase == "update" && result.toString() != "SINGULAR") {
                         val spread = call(backend, "getRcond") as Double
@@ -352,6 +357,28 @@ internal object NumericalResidualProfile {
             } finally {
                 phaseNs[phase] = (phaseNs[phase] ?: 0L) + System.nanoTime() - start
                 phaseCalls[phase] = (phaseCalls[phase] ?: 0L) + 1L
+            }
+        }
+
+        private fun recordSolveWork(phase: String, arguments: Array<out Any?>, inputSupport: Int, work: Any) {
+            val hint = if (arguments[1] == 1.0) "dense-hint" else "adaptive-hint"
+            val counters = basisSolveWork.getOrPut("$phase:$hint") { linkedMapOf() }
+            fun add(key: String, value: Long) {
+                counters[key] = (counters[key] ?: 0L) + value
+            }
+            val size = call(requireNotNull(arguments[0]), "getSize") as Int
+            add("calls", 1L)
+            add("dimensions", size.toLong())
+            add("inputSupport", inputSupport.toLong())
+            add("inputAtMostTwentyPercent", if (inputSupport <= size * 0.2) 1L else 0L)
+            add("outputSupport", (call(work, "getOutputSupport") as Int).toLong())
+            for (part in listOf("First", "Second")) {
+                val triangular = requireNotNull(call(work, "get$part"))
+                val prefix = part.lowercase()
+                add("${prefix}SparseCalls", if (call(triangular, "getSparse") == true) 1L else 0L)
+                add("${prefix}PivotVisits", (call(triangular, "getPivotVisits") as Int).toLong())
+                add("${prefix}ArithmeticEntries", call(triangular, "getArithmeticEntries") as Long)
+                add("${prefix}ReachEntries", call(triangular, "getReachEntries") as Long)
             }
         }
     }
