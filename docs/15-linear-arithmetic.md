@@ -218,6 +218,15 @@ leaves use plain branching, though their equality rows alone may still be reduce
 [Open portfolios](12-portfolio.md) can pair this proof-producing route with
 source-checked local-search workers.
 
+The default pure-integer traversal with shared clauses completes its Boolean
+abstraction through native SAT before opening an arithmetic candidate. Each
+proposal becomes private root unit clauses over the unchanged source Boolean
+coordinates; all finite and arithmetic constraints still participate in completion.
+A completed conditioned refutation excludes that entire Boolean assignment. An
+undecided candidate stops without exclusion, and a Boolean model alone supplies no
+source witness. Exhausting the necessary clauses after these exclusions refutes the
+source. Explicit Boolean branching or hint settings use the shared traversal.
+
 ### Results and proof authority
 
 `ExactLiraAssignment` carries arbitrary-precision integer coordinates. Publication

@@ -24,6 +24,33 @@ import kotlin.test.assertTrue
 
 class NodeBudgetTest {
 
+    @Test
+    fun `bounded phases should debit their parent without reserving the remaining allowance`() {
+        val parent = NodeBudget(5)
+        parent.spend()
+        val phase = parent.boundedPhase(2)
+
+        phase.spend()
+        phase.spend()
+        val next = parent.boundedPhase(Long.MAX_VALUE)
+
+        assertEquals(2L, phase.spent)
+        assertEquals(3L, parent.spent)
+        assertEquals(2L, next.limit)
+        assertEquals(0L, next.spent)
+    }
+
+    @Test
+    fun `a bounded phase should observe an exhausted ancestor`() {
+        val parent = NodeBudget(3)
+        val phase = parent.boundedPhase(3)
+        repeat(3) { parent.spend() }
+
+        assertTrue(phase.exhausted())
+        assertEquals(0L, phase.decisionsLeft())
+        assertEquals(0L, phase.spent)
+    }
+
     private fun php(pigeons: Int, holes: Int): Problem {
         fun x(p: Int, h: Int) = p * holes + h
         val factors = ArrayList<Factor>()

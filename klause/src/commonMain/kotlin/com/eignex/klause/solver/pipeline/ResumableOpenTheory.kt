@@ -79,7 +79,8 @@ internal class ResumableOpenTheory(
 
     private fun begin(): OpenTheoryStart {
         val stop = Cancellation { globalToken() }
-        return engine.begin(params.copy(cancellation = params.cancellation or stop), state, pausing)
+        return engine.begin(params.copy(cancellation = params.cancellation or stop), state, pausing,
+            clausalAbstraction = true)
     }
 
     private fun decide(result: OpenTheoryResult): OpenTheoryResult {
@@ -91,7 +92,7 @@ internal class ResumableOpenTheory(
     override fun close() {
         val current = run ?: return
         try {
-            if (verdict == null) state.capture(current.session)
+            if (verdict == null) current.captureProgress()
             current.close()
         } finally {
             run = null

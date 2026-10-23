@@ -143,5 +143,7 @@ internal class PreparedSearchComponents(
         smtStats: SmtStatsSink? = null,
         theorySolveStop: Cancellation? = null,
         openHintFlips: Long? = null,
-    ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips)
+        rootBooleans: BooleanArray? = null,
+    ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips,
+        rootBooleans)
 }

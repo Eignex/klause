@@ -25,6 +25,22 @@ import kotlin.test.assertTrue
 
 class SolveStatsTest {
 
+    @Test
+    fun `clausal work should consume the open allowance and survive worker merges`() {
+        val work = OpenTheoryWorkSink(5)
+        work.clauseWork(3)
+        work.theoryCheck()
+        val first = SolveStats(openTheory = work.snapshot())
+        val second = SolveStats(openTheory = OpenTheoryWorkStats(openWork = 2, openClauseWork = 2))
+
+        val merged = first.mergedWith(second).openTheory
+
+        assertEquals(1L, work.remaining())
+        assertEquals(5L, merged.openClauseWork)
+        assertEquals(6L, merged.openWork)
+        assertEquals(1L, merged.openTheoryChecks)
+    }
+
     private class Queens6 : VariableSchema() {
         val q0 by intVar(0, 5)
         val q1 by intVar(0, 5)

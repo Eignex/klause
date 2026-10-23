@@ -10,8 +10,10 @@ data class OpenTheoryWorkStats(
     val openTheoryDecisions: Long = 0,
     /** Accepted theory-check allowance uses. */
     val openTheoryChecks: Long = 0,
-    /** Accounting-policy sum of committed decisions, checks, and charged hint moves. */
+    /** Accounting-policy sum of decisions, checks, clausal attempts and charged hint moves. */
     val openWork: Long = 0,
+    /** Decision attempts in the necessary Boolean clause abstraction. Included in [openWork]. */
+    val openClauseWork: Long = 0,
 )
 
 /** Mutable allocation-free sink scoped to one open-theory solve. */
@@ -21,6 +23,7 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
     private var theoryDecisions = 0L
     private var theoryChecks = 0L
     private var work = 0L
+    private var clauseWork = 0L
 
     /** Whether a charged event found the fixed-work allowance already spent, or spent the last of it. */
     var exhausted: Boolean = false
@@ -76,6 +79,14 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
         if (work >= limit) exhausted = true
     }
 
+    internal fun clauseWork(attempts: Long) {
+        require(attempts >= 0L)
+        val charged = minOf(attempts, remaining())
+        clauseWork += charged
+        work += charged
+        if (work >= limit) exhausted = true
+    }
+
     /** Return the immutable public snapshot. */
     fun snapshot(): OpenTheoryWorkStats = OpenTheoryWorkStats(
         boolDecisions,
@@ -83,5 +94,6 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
         theoryDecisions,
         theoryChecks,
         work,
+        clauseWork,
     )
 }

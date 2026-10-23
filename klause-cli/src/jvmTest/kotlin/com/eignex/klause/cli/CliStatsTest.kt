@@ -41,6 +41,18 @@ import kotlin.time.Duration
 class CliStatsTest {
 
     @Test
+    fun `clausal abstraction work should be reported separately from shared Boolean decisions`() {
+        val stats = SolveStats(openTheory = OpenTheoryWorkStats(openBoolDecisions = 2, openWork = 7,
+            openClauseWork = 5))
+
+        val pairs = openTheoryStatPairs(stats, 1).toMap()
+
+        assertEquals("2", pairs["openBoolDecisions"])
+        assertEquals("5", pairs["openClauseWork"])
+        assertEquals("7", pairs["openWork"])
+    }
+
+    @Test
     fun `complete traversal Boolean progress should stay absent until observed`() {
         for (observed in listOf(false, true)) {
             val stats = if (observed) {

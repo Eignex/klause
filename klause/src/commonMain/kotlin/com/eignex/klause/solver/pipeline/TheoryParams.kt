@@ -14,7 +14,7 @@ enum class OpenBranching(
     /** Conflict-activity order over the shared session. */
     Activity("activity"),
 
-    /** Activity for a complete mixed default point owner; source order for other openings. */
+    /** Clausal completion for pure integers, activity for a mixed point owner, otherwise source order. */
     Automatic("auto"),
     ;
 
@@ -31,7 +31,7 @@ private const val DEFAULT_HINT_MIN_SPLITS = 128L
 data class TheoryParams(
     /** Maximum theory-check allowance; this is not a complete leaf count. */
     val maxLeaves: Long = Long.MAX_VALUE,
-    /** Solve-wide deterministic open-theory work allowance, covering the hint draw and the traversal. */
+    /** Solve-wide work allowance for clausal completion, the hint draw and the shared traversal. */
     val openWorkLimit: Long = Long.MAX_VALUE,
     /** Maximum committed shared decisions, independent of open-theory work accounting. */
     val maxDecisions: Long = Long.MAX_VALUE,
@@ -67,8 +67,9 @@ data class TheoryParams(
     /**
      * Boolean branching for each feasibility traversal.
      *
-     * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner,
-     * and source order for other openings, including private queries and explicit hint allowances.
+     * [OpenBranching.Automatic] selects clausal completion for pure integer models with shared clauses,
+     * activity for a complete mixed worker with one default point owner, and source order for other
+     * openings, including private queries and explicit hint allowances.
      * The theory decides the arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,

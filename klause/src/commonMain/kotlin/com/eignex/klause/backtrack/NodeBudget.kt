@@ -32,6 +32,8 @@ class NodeBudget private constructor(internal val allowance: NodeAllowance) {
     internal fun decisionsLeft(): Long = allowance.decisionsLeft()
     internal fun movesLeft(): Long = allowance.movesLeft()
 
+    internal fun boundedPhase(maximum: Long): NodeBudget = NodeBudget(allowance.boundedPhase(maximum))
+
     private var children: List<NodeBudget>? = null
 
     internal fun quotas(count: Int): List<NodeBudget> = allowance.mapQuotas(count) { quotas ->

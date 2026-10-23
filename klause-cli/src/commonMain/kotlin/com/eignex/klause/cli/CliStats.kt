@@ -415,6 +415,7 @@ internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pai
             "openIntDecisions" to "$openIntDecisions",
             "openTheoryDecisions" to "$openTheoryDecisions",
             "openTheoryChecks" to "$openTheoryChecks",
+            "openClauseWork" to "$openClauseWork",
             "openWork" to "$openWork",
         ) + with(stats.openTheoryClauses) {
             listOf(

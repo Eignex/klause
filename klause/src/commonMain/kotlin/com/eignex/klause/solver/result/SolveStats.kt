@@ -101,6 +101,7 @@ data class SolveStats(
                 openTheory.openTheoryDecisions + other.openTheory.openTheoryDecisions,
                 openTheory.openTheoryChecks + other.openTheory.openTheoryChecks,
                 openTheory.openWork + other.openTheory.openWork,
+                openTheory.openClauseWork + other.openTheory.openClauseWork,
             ),
             smt = smt.mergedWith(other.smt),
             openTheoryClauses = openTheoryClauses.mergedWith(other.openTheoryClauses),

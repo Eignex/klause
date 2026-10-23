@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
@@ -29,6 +30,7 @@ import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchSelection
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchDecisionBudget
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRestart
@@ -338,7 +340,7 @@ class OpenTheoryEngine internal constructor(
     }
 
     private fun solvePrepared(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult =
-        when (val begun = begin(params, state, SearchNodePolicy.ExpandAll)) {
+        when (val begun = begin(params, state, SearchNodePolicy.ExpandAll, clausalAbstraction = true)) {
             is OpenTheoryStart.Decided -> begun.result
 
             is OpenTheoryStart.Running -> begun.run.use {
@@ -359,6 +361,7 @@ class OpenTheoryEngine internal constructor(
         params: TheoryParams,
         state: OpenTheorySolveState,
         nodePolicy: SearchNodePolicy,
+        clausalAbstraction: Boolean = false,
     ): OpenTheoryStart {
         val work = state.work
         val cancellation = params.timeout or params.cancellation
@@ -412,9 +415,16 @@ class OpenTheoryEngine internal constructor(
         val plan = selectedPlan.forObjectiveRound(model, appended = false, cancellation = cancellation)
         if (cancellation()) return OpenTheoryStart.Decided(unknown(params.timeout(), stats = stats, state = state))
         val cpDomains = plan.cpSourceDomains(model)
-        val planned = plan.search(
-            model,
-            cpDomains,
+        val components = PreparedSearchComponents(plan, model, cpDomains)
+        val clauses = if (clausalAbstraction && plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
+            model.numRealVars == 0 && model.numBoolVars > 0 &&
+            params.openBranching == OpenBranching.Automatic && params.openHintFlips == null
+        ) model.factors.indices.filter { plan.factorOwner(it) == FactorOwner.SHARED }
+            .mapNotNull { model.factors[it] as? Clause } else emptyList()
+        if (clauses.isNotEmpty() && !components.prepareSource(cancellation)) {
+            return OpenTheoryStart.Decided(unknown(params.timeout(), stats = stats, state = state))
+        }
+        val planned = components.open(
             maxChecks = params.maxLeaves,
             cancellation = cancellation,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
@@ -448,6 +458,39 @@ class OpenTheoryEngine internal constructor(
                     ),
                 )
             }
+            val branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+                SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
+                    SearchBranchKind.Finite))
+            } else if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA && plan.cpIntVars.isNotEmpty()) {
+                SearchBranchSelection.Priority(listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
+                    SearchBranchKind.Finite))
+            } else SearchBranchSelection.Default
+            val abstraction = if (clauses.isNotEmpty() && planned.theory is ExactLiraSearchComponent &&
+                (0 until model.numBoolVars).any { planned.session.boolValue(it) == null }
+            ) ClausalTheorySearch(model, clauses, params, state, planned.session, cancellation, nodePolicy,
+                branchSelection) { cube ->
+                components.open(
+                    maxChecks = (params.maxLeaves - state.work.acceptedChecks).coerceAtLeast(0L),
+                    cancellation = cancellation,
+                    learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
+                    smtStats = state.smt,
+                    theorySolveStop = cancellation,
+                    openHintFlips = params.openHintFlips,
+                    rootBooleans = cube,
+                ).also { inner ->
+                    (inner.theory as? ExactLiraSearchComponent)?.let {
+                        it.observePrimaryLpWith(stats.lp.certificationObserver(LpRoute.STANDALONE))
+                        it.observeCompleteTraversal()
+                        it.useMixedPointCompletion()
+                    }
+                    inner.session.bindOpenTheoryWork(work)
+                }
+            } else null
+            if (abstraction != null) {
+                handedOff = true
+                return OpenTheoryStart.Running(OpenTheoryRun(planned, null, prepared, stats, state, params,
+                    abstraction))
+            }
             val solveParams = SearchSolveParams(
                 maxDecisions = state.remainingDecisions(),
                 restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
@@ -473,13 +516,7 @@ class OpenTheoryEngine internal constructor(
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = nodePolicy,
                 candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
-                branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
-                    SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
-                        SearchBranchKind.Finite))
-                } else if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
-                    plan.cpIntVars.isNotEmpty()
-                ) SearchBranchSelection.Priority(listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
-                    SearchBranchKind.Finite)) else SearchBranchSelection.Default,
+                branchSelection = branchSelection,
             )
             handedOff = true
             return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
@@ -494,45 +531,55 @@ class OpenTheoryEngine internal constructor(
     /** A theory search held open across [advance] calls; closing it releases the search. */
     internal inner class OpenTheoryRun(
         private val planned: PlannedSearch,
-        private val run: SearchRun,
+        private val run: SearchRun?,
         private val prepared: PreparedSource,
         private val stats: SolveStatsSink,
         private val state: OpenTheorySolveState,
         private val params: TheoryParams,
+        private val abstraction: ClausalTheorySearch? = null,
     ) : AutoCloseable {
         private val witnesses = SourceWitnessAssembler(prepared.mapping.target, prepared.source)
+        private val resources = SearchInvocationResources().apply {
+            own(planned)
+            abstraction?.let { own(it) }
+        }
 
         /** The search this run drives. */
-        val session: com.eignex.klause.solver.search.SearchSession get() = planned.session
+        val session: com.eignex.klause.solver.search.SearchSession get() = abstraction?.session ?: planned.session
+
+        private val statsSession: com.eignex.klause.solver.search.SearchSession?
+            get() = if (abstraction == null) planned.session else abstraction.statsSession
+
+        fun captureProgress() = state.capture(statsSession)
 
         /** Continue the search: its verdict, or null when the node policy paused it. */
-        fun advance(): OpenTheoryResult? = when (val event = run.next()) {
+        fun advance(): OpenTheoryResult? = when (val event = abstraction?.next() ?: checkNotNull(run).next()) {
             is SearchRunEvent.Satisfied -> {
                 val assignment = witnesses.assemble(event.model, prepared.mapping)
                 if (assignment != null) {
-                    OpenTheoryResult.Sat(assignment, stats.finish(state, planned.session))
+                    OpenTheoryResult.Sat(assignment, stats.finish(state, statsSession))
                 } else if (params.timeout() || params.cancellation() || state.work.exhausted) {
-                    unknown(params.timeout(), stats = stats, state = state, session = planned.session)
+                    unknown(params.timeout(), stats = stats, state = state, session = statsSession)
                 } else {
-                    OpenTheoryResult.Unknown(TerminationReason.Unsupported, stats.finish(state, planned.session))
+                    OpenTheoryResult.Unknown(TerminationReason.Unsupported, stats.finish(state, statsSession))
                 }
             }
 
-            SearchRunEvent.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
+            SearchRunEvent.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, statsSession))
 
             SearchRunEvent.Paused -> null
 
             is SearchRunEvent.Indeterminate -> unknown(
                 params.timeout(),
-                planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted(),
+                session.checkBudgetExhausted() || session.decisionBudgetExhausted(),
                 stats,
                 state,
-                planned.session,
-                planned.session.executionControls.stopCause,
+                statsSession,
+                abstraction?.stopCause ?: session.executionControls.stopCause,
             )
         }
 
-        override fun close() = planned.close()
+        override fun close() = resources.close()
     }
 
     /** Prepare the source under the caller's stop, once per engine. */
@@ -616,6 +663,17 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
         private set
     private var capturedGlue = 0L
     private var capturedRootFixed = 0
+    private var clauseSearch = SearchStats()
+    private var currentClauseSearch = SearchStats()
+
+    fun observeClauseProgress(progress: SearchStats) {
+        currentClauseSearch = progress
+    }
+
+    fun finishClauseProgress(progress: SearchStats) {
+        clauseSearch = clauseSearch.mergedWith(progress)
+        currentClauseSearch = SearchStats()
+    }
 
     /** What the request's hint draw produced, cost, and has steered so far. */
     val hints: OpenHintStats get() = drawStats.copy(
@@ -669,7 +727,8 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
 
     fun remainingDecisions(): Long {
         val workStats = work.snapshot()
-        val committed = workStats.openBoolDecisions + workStats.openIntDecisions + workStats.openTheoryDecisions
+        val committed = workStats.openBoolDecisions + workStats.openIntDecisions + workStats.openTheoryDecisions +
+            workStats.openClauseWork
         return minOf(
             (maxDecisions - committed).coerceAtLeast(0),
             params.nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE,
@@ -690,7 +749,7 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     fun progress(live: com.eignex.klause.solver.search.SearchSession?): SearchStats = SearchStats(
         rootFixed = MaxResult(maxOf(capturedRootFixed, live?.rootFixedCount ?: 0).toDouble()),
         glueClauses = SumResult((capturedGlue + (live?.glueClauseCount ?: 0L)).toDouble()),
-    )
+    ).mergedWith(clauseSearch).mergedWith(currentClauseSearch)
 }
 
 /** How [OpenTheoryEngine.begin] left a solve: decided before the first branch, or running. */

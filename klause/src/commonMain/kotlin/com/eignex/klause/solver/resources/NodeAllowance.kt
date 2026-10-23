@@ -28,14 +28,16 @@ internal class NodeAllowance private constructor(
         if (count > 0L) record(nodes = 0L, instructions = count)
     }
 
-    internal fun decisionsLeft(): Long = ledger.lock.withLock { (limit - spentUnlocked()).coerceAtLeast(0L) }
+    internal fun decisionsLeft(): Long = ledger.lock.withLock { remainingUnlocked() }
 
-    internal fun movesLeft(): Long = ledger.lock.withLock {
-        val capacity = instructionsFor((limit - used).coerceAtLeast(0L))
-        (capacity - moves).coerceAtLeast(0L)
+    internal fun movesLeft(): Long = ledger.lock.withLock { movesLeftUnlocked() }
+
+    fun exhausted(): Boolean = ledger.lock.withLock { remainingUnlocked() == 0L }
+
+    internal fun boundedPhase(maximum: Long): NodeAllowance = ledger.lock.withLock {
+        require(maximum >= 0L)
+        NodeAllowance(minOf(maximum, remainingUnlocked()), ledger, this)
     }
-
-    fun exhausted(): Boolean = ledger.lock.withLock { spentUnlocked() >= limit }
 
     internal fun quotas(count: Int): List<NodeAllowance> = mapQuotas(count) { it }
 
@@ -45,7 +47,7 @@ internal class NodeAllowance private constructor(
             require(it.size == count) { "a solve allowance cannot be repartitioned for another worker count" }
             return@withLock map(it)
         }
-        val remaining = (limit - spentUnlocked()).coerceAtLeast(0L)
+        val remaining = remainingUnlocked()
         val share = remaining / count
         val remainder = remaining % count
         List(count) { index -> NodeAllowance(share + if (index < remainder) 1L else 0L, ledger, this) }
@@ -53,6 +55,15 @@ internal class NodeAllowance private constructor(
     }
 
     private fun spentUnlocked(): Long = saturatedSum(used, pricedInstructions(moves))
+
+    private fun remainingUnlocked(): Long = minOf(
+        (limit - spentUnlocked()).coerceAtLeast(0L), parent?.remainingUnlocked() ?: Long.MAX_VALUE,
+    )
+
+    private fun movesLeftUnlocked(): Long = minOf(
+        (instructionsFor((limit - used).coerceAtLeast(0L)) - moves).coerceAtLeast(0L),
+        parent?.movesLeftUnlocked() ?: Long.MAX_VALUE,
+    )
 
     private fun record(nodes: Long, instructions: Long) {
         used = saturatedSum(used, nodes)

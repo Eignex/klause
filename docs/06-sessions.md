@@ -244,6 +244,14 @@ open-theory pipeline supplies its `OpenTheoryWorkSink`; shared search does not p
 native work. The containing sink survives branches, retractions, restarts and
 retained queries.
 
+Clausal linear completion retains both its Boolean search and conditioned arithmetic
+search across pauses. Native Boolean decision attempts debit `openClauseWork` and
+the containing open-work allowance; arithmetic checks and shared decisions keep
+their existing units. A bounded phase counter charges its parent `NodeBudget`
+immediately without partitioning or renewing the parent's remaining allowance.
+Ancestor exhaustion stops later phase decisions. Boolean propagation and baking
+retain their native counters rather than becoming shared decision frames.
+
 `SearchStopCause` separates timeout, cancellation, native work, checks, decisions,
 operation allowance and representation decline. A local operation stop clears when
 the next operation begins, without renewing containing allowances. Timeout takes

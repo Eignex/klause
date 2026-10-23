@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.solver.result.HintIndexOutcome
@@ -176,12 +177,19 @@ internal class PreparedSearchRegistrations(
         smtStats: SmtStatsSink?,
         theorySolveStop: Cancellation?,
         openHintFlips: Long? = null,
+        rootBooleans: BooleanArray? = null,
     ): PlannedSearch {
+        require(rootBooleans == null || rootBooleans.size == boolCount)
         val resources = SearchInvocationResources()
         val opening = SearchComponentOpening(cancellation, smtStats, theorySolveStop, resources, openHintFlips)
         try {
             val groups = registrations.map { it.open(opening) }
-            val components = groups.flatten()
+            val assumptions = rootBooleans?.let { values ->
+                ClauseSearchComponent(values.mapIndexed { variable, value ->
+                    Clause(intArrayOf(Lit.make(variable, value)))
+                }).also(opening::ownComponent)
+            }
+            val components = listOfNotNull(assumptions) + groups.flatten()
             val arithmetic = registrations.indices.filter {
                 registrations[it].descriptor.responsibility == ComponentResponsibility.COMPLETION
             }
