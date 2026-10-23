@@ -252,8 +252,10 @@ occurrence index supplies no projection, and completed rows survive a later stop
 ### Structural reductions
 
 Structural reduction calls each factor's `structuralReduce` hook under current
-domains; source execution restricts this to closed integer columns. Ground tables
-with at most 4096 tuples allocate survivor storage on the first rejected tuple,
+domains; source execution restricts this to closed integer columns. Both lanes skip
+the final `Clause` type's unchanged hook before visiting its columns, retaining the
+factor-level charge and cancellation poll. Other factor types retain their hooks.
+Ground tables with at most 4096 tuples allocate survivor storage on the first rejected tuple,
 copying the retained prefix once; unchanged tables keep their tuple payload.
 Redundancy and subsumption use indexes maintained across rounds. Duplicate removal and index
 retraction identify stable factor occurrences, so repeated references to one immutable
