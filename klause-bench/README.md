@@ -871,6 +871,14 @@ allocations omit native memory and physical RSS; the report retains the actual
 profile JVM heap ceiling. Use maintained ordinary resource captures and source
 validation for end-to-end qualification. No production admission threshold changes.
 
+The `prepared-cold` and `prepared-retained` modes separate root source preparation
+from adaptive floating-query work under the existing cumulative LP allowance.
+Preparation is charged before solving, including declined edits. These opt-in
+internal modes retain the same deadlines, source authority and query caps; ordinary
+solver callers keep their existing policy. Compare them with the full modes using
+the reported preparation allowance, reservations, owners and actual work rather
+than treating extra construction work as a matched solve budget.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing
