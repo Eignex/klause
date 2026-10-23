@@ -164,7 +164,8 @@ object SourceSetup {
             preparationCancellation = stop,
             polynomialCancellation = polynomialCancellation or stop,
             onLpStats = onLpStats,
-            routePreference = request.routePreference,
+            routePreference = if (request.operation in sourceOperations) request.routePreference
+            else SourceRoutePreference.AUTOMATIC,
         )
         return PreparedSourceInvocation(request, route, stop)
     }

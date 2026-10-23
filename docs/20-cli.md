@@ -34,8 +34,8 @@ Numerical kernel selection at run time is described in
 
 ## Formats and dispatch
 
-`--param source-route=exact-linear` requests an admitted exact-linear owner through
-shared source setup, including SMT-LIB. `automatic` retains ordinary selection.
+For SMT-LIB, `--param source-route=exact-linear` requests an admitted exact-linear
+owner through shared source setup. `automatic` retains ordinary selection.
 This preference preserves declared bounds and finite membership; unsupported
 alternatives keep their ordinary route. Engine selection still determines the
 strategy within the selected route.

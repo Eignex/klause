@@ -751,6 +751,17 @@ final enum class com.eignex.klause.solver.pipeline/SourceExecutionKind : kotlin/
     final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/SourceExecutionKind> // com.eignex.klause.solver.pipeline/SourceExecutionKind.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.solver.pipeline/SourceRoutePreference : kotlin/Enum<com.eignex.klause.solver.pipeline/SourceRoutePreference> { // com.eignex.klause.solver.pipeline/SourceRoutePreference|null[0]
+    enum entry AUTOMATIC // com.eignex.klause.solver.pipeline/SourceRoutePreference.AUTOMATIC|null[0]
+    enum entry EXACT_LINEAR // com.eignex.klause.solver.pipeline/SourceRoutePreference.EXACT_LINEAR|null[0]
+
+    final val entries // com.eignex.klause.solver.pipeline/SourceRoutePreference.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/SourceRoutePreference> // com.eignex.klause.solver.pipeline/SourceRoutePreference.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/SourceRoutePreference // com.eignex.klause.solver.pipeline/SourceRoutePreference.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/SourceRoutePreference> // com.eignex.klause.solver.pipeline/SourceRoutePreference.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.solver.pipeline/ValSelectorKind : kotlin/Enum<com.eignex.klause.solver.pipeline/ValSelectorKind> { // com.eignex.klause.solver.pipeline/ValSelectorKind|null[0]
     enum entry MAX // com.eignex.klause.solver.pipeline/ValSelectorKind.MAX|null[0]
     enum entry MEDIAN // com.eignex.klause.solver.pipeline/ValSelectorKind.MEDIAN|null[0]
@@ -14419,7 +14430,7 @@ final class com.eignex.klause.solver.pipeline/SourceIncumbentPublication { // co
 }
 
 final class com.eignex.klause.solver.pipeline/SourceSetupRequest { // com.eignex.klause.solver.pipeline/SourceSetupRequest|null[0]
-    constructor <init>(com.eignex.klause.solver.pipeline/SourceAttachment, com.eignex.klause.solver.pipeline/ExecutionOperation, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., com.eignex.klause.solver/FactorProjectionProviders = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/SourceSetupRequest.<init>|<init>(com.eignex.klause.solver.pipeline.SourceAttachment;com.eignex.klause.solver.pipeline.ExecutionOperation;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/SourceAttachment, com.eignex.klause.solver.pipeline/ExecutionOperation, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., com.eignex.klause.solver/FactorProjectionProviders = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.pipeline/SourceRoutePreference = ...) // com.eignex.klause.solver.pipeline/SourceSetupRequest.<init>|<init>(com.eignex.klause.solver.pipeline.SourceAttachment;com.eignex.klause.solver.pipeline.ExecutionOperation;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.pipeline.SourceRoutePreference){}[0]
     constructor <init>(com.eignex.klause.solver.pipeline/SourceAttachment, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.solver/FactorProjectionProviders = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/SourceSetupRequest.<init>|<init>(com.eignex.klause.solver.pipeline.SourceAttachment;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
 
     final val boundCancellation // com.eignex.klause.solver.pipeline/SourceSetupRequest.boundCancellation|{}boundCancellation[0]
@@ -14438,6 +14449,8 @@ final class com.eignex.klause.solver.pipeline/SourceSetupRequest { // com.eignex
         final fun <get-providers>(): com.eignex.klause.solver/FactorProjectionProviders // com.eignex.klause.solver.pipeline/SourceSetupRequest.providers.<get-providers>|<get-providers>(){}[0]
     final val quadraticObjective // com.eignex.klause.solver.pipeline/SourceSetupRequest.quadraticObjective|{}quadraticObjective[0]
         final fun <get-quadraticObjective>(): com.eignex.klause.ir/QuadraticObjectiveSpec? // com.eignex.klause.solver.pipeline/SourceSetupRequest.quadraticObjective.<get-quadraticObjective>|<get-quadraticObjective>(){}[0]
+    final val routePreference // com.eignex.klause.solver.pipeline/SourceSetupRequest.routePreference|{}routePreference[0]
+        final fun <get-routePreference>(): com.eignex.klause.solver.pipeline/SourceRoutePreference // com.eignex.klause.solver.pipeline/SourceSetupRequest.routePreference.<get-routePreference>|<get-routePreference>(){}[0]
     final val source // com.eignex.klause.solver.pipeline/SourceSetupRequest.source|{}source[0]
         final fun <get-source>(): com.eignex.klause.solver.pipeline/SourceAttachment // com.eignex.klause.solver.pipeline/SourceSetupRequest.source.<get-source>|<get-source>(){}[0]
 }
