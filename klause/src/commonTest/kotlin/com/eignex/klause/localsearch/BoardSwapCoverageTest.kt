@@ -6,22 +6,22 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
-import com.eignex.klause.solver.InstructionSlicedSearch
-import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.localsearch.movesource.freshState
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertIs
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BoardSwapCoverageTest {
