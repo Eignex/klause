@@ -156,7 +156,7 @@ feedback snapshot:
 - **Noise**, steered by a controller that raises it on stalls and lowers it on
   improvement, or by a bandit over bump-on-stall profiles.
 - **Restart cadence**: fixed, Luby, stagnation-driven, anchored perturbation of the
-  best assignment, or iterated local search over a population of local optima.
+  best assignment, or iterated local search over a population of feasible basin anchors.
   Learned weights survive restarts; the assignment, tabu clock and
   configuration-checking flags reset.
 

@@ -57,7 +57,7 @@ class IteratedLocalSearchRestart(
      *  parent with the lower objective. Only consulted when [crossoverRate] > 0 and a
      *  crossover restart fires. */
     val crossoverBias: CrossoverBias = CrossoverBias.Uniform,
-    /** Perturbation kind for the kick out of a local optimum. [PerturbationKind.Uniform]
+    /** Perturbation kind for the kick from a feasible anchor. [PerturbationKind.Uniform]
      *  scatters single-variable mutations across the problem; [PerturbationKind.BasinHopping]
      *  randomises every variable of a small set of randomly-picked factors, producing a
      *  coordinated jump biased toward escaping the current basin. */
@@ -66,11 +66,11 @@ class IteratedLocalSearchRestart(
      *  per-variable, preserving co-adapted assignments that uniform recombination would
      *  shred. */
     val linkageAware: Boolean = false,
-    /** Optional contextual-bandit acceptance: when non-null, the accept/reject of a new local
-     *  optimum is decided by any 2-arm kumulant [ContextualBandit] (arm 0 = accept, 1 = reject) over
+    /** Optional contextual-bandit acceptance: when non-null, the accept/reject of a feasible
+     *  anchor is decided by any 2-arm kumulant [ContextualBandit] (arm 0 = accept, 1 = reject) over
      *  context features (margin vs the population's worst and best, stall fraction) instead of the
      *  fixed [acceptance] criterion. The bandit is rewarded by whether the population best improved
-     *  by the next local optimum, so it learns *when* drifting through worse optima pays off. The
+     *  by the next candidate anchor, so it learns *when* drifting through worse basins pays off. The
      *  [acceptanceBandit] factory builds the default; null (default) keeps the fixed criterion. */
     private val acceptanceBandit: ContextualBandit? = null,
 ) : RestartPolicy {
@@ -86,7 +86,7 @@ class IteratedLocalSearchRestart(
         private set
     private var stallCount: Int = 0
 
-    // Pending bandit decision, rewarded at the next local optimum by whether the population best
+    // Pending bandit decision, rewarded at the next candidate anchor by whether the population best
     // improved since (delayed credit, the standard meta-bandit signal). -1 = nothing pending.
     private var pendingArm: Int = -1
     private var pendingContext: DoubleArray? = null
@@ -153,7 +153,7 @@ class IteratedLocalSearchRestart(
     }
 
     /** Decide accept/reject via the contextual bandit, first crediting the previous decision by
-     *  whether the population best improved since it was made. The first local optimum (empty
+     *  whether the population best improved since it was made. The first candidate (empty
      *  population) is always accepted to seed the population. */
     private fun banditAccept(bandit: ContextualBandit, objective: Double, worstObjective: Double): Boolean {
         val bestBefore = population.firstOrNull()?.objective ?: Double.POSITIVE_INFINITY

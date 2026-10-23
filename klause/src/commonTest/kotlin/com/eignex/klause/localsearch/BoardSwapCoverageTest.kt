@@ -33,7 +33,7 @@ class BoardSwapCoverageTest {
         val source = SatisfiedStructured.structural(1)
         val pairs = mutableSetOf<Set<Int>>()
 
-        repeat(5) {
+        repeat(6) {
             sink.clear()
             source.generate(state, sink)
             assertTrue(sink.list.size <= 4)
@@ -98,7 +98,7 @@ class BoardSwapCoverageTest {
         sink.clear()
 
         val pairs = mutableSetOf<Set<Int>>()
-        repeat(5) {
+        repeat(6) {
             sink.clear()
             source.generate(state, sink)
             for (move in sink.list) {
@@ -114,7 +114,7 @@ class BoardSwapCoverageTest {
         val state = state()
         val source = SatisfiedStructured.structural(1)
         val sink = MoveSink()
-        repeat(5) {
+        repeat(6) {
             sink.clear()
             source.generate(state, sink)
         }
@@ -169,12 +169,12 @@ class BoardSwapCoverageTest {
                 acceptance = AcceptanceRule.GreedyDescent,
                 feasibleAcceptance = AcceptanceRule.GreedyDescent,
                 feasibleDescent = FeasibleDescent.SelfOwned,
-                feasibleResampleCap = 5,
+                feasibleResampleCap = 6,
             )
             val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
             engine.resumable(
                 LinearObjective(intCoefficients = LongArray(10) { if (it == 9) 1L else 0L }),
-                LocalSearchParams(maxFlips = 24L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
+                LocalSearchParams(maxFlips = 32L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
             ).use { handle ->
                 val counted = assertIs<InstructionSlicedSearch>(handle)
                 var result: MinimizeResult? = null
@@ -184,7 +184,7 @@ class BoardSwapCoverageTest {
                     ) {}
                 }
                 assertEquals(0.0, assertIs<MinimizeResult.BestFound>(result).objective)
-                assertEquals(24L, handle.stats.ls.moves.sum.toLong())
+                assertEquals(32L, handle.stats.ls.moves.sum.toLong())
             }
         }
     }
@@ -223,29 +223,39 @@ class BoardSwapCoverageTest {
     @Test
     fun `a restart retaining its assignment should begin fresh board coverage`() {
         val initial = state()
-        var optima = 0
+        var completed = false
+        val fresh = mutableListOf<Move>()
+        val source = SatisfiedStructured.structural(1)
         val policy = object : RestartPolicy {
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) = Unit
             override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
-                optima++
+                completed = true
             }
         }
         val strategy = SourceDrivenStrategy(
-            sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
+            sources = listOf(ConfiguredSource(source)),
             acceptance = AcceptanceRule.GreedyDescent,
             feasibleAcceptance = AcceptanceRule.GreedyDescent,
             feasibleDescent = FeasibleDescent.SelfOwned,
-            feasibleResampleCap = 5,
+            feasibleResampleCap = 6,
+            perturbation = { state ->
+                if (completed) {
+                    val sink = MoveSink()
+                    source.generate(state, sink)
+                    fresh.addAll(sink.list)
+                }
+                null
+            },
         )
         val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
 
         engine.resumable(
             LinearObjective(),
-            LocalSearchParams(maxFlips = 7L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
+            LocalSearchParams(maxFlips = 8L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
         ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
 
-        assertEquals(1, optima)
+        assertEquals(4, fresh.size)
     }
 
     @Test
@@ -261,7 +271,7 @@ class BoardSwapCoverageTest {
         sink.setOwners(state.seeding.ownerInt)
 
         val pairs = mutableSetOf<Set<Int>>()
-        repeat(5) {
+        repeat(6) {
             sink.clear()
             source.generate(state, sink)
             for (move in sink.list) {
@@ -312,7 +322,7 @@ class BoardSwapCoverageTest {
         )
 
         state.boardCoverage.request(state)
-        repeat(5) { assertNull(strategy.pickMove(state)) }
+        repeat(6) { assertNull(strategy.pickMove(state)) }
 
         assertEquals(before, state.assignment.snapshot())
         assertEquals(0L, state.cost)
@@ -419,7 +429,7 @@ class BoardSwapCoverageTest {
     }
 
     @Test
-    fun `bounded coverage should rotate across searchable boards`() {
+    fun `bounded draws should visit one board per pick in rotation`() {
         val problem = Problem(
             0, 15, Array(15) { IntDomain(0, 4) },
             Array<Factor>(3) { board -> AllDifferent(IntArray(5) { board * 5 + it }, 0, 5) },
@@ -429,12 +439,17 @@ class BoardSwapCoverageTest {
         state.recompute()
         val sink = MoveSink()
 
-        SatisfiedStructured.structural(1).generate(state, sink)
-
-        assertEquals(4, sink.list.size)
-        val boards = sink.list.map { move ->
-            ((move as Move.Compound).parts.first() as Move.IntSet).varId / 5
-        }.toSet()
+        val boards = mutableSetOf<Int>()
+        repeat(3) {
+            sink.clear()
+            SatisfiedStructured.structural(1).generate(state, sink)
+            assertEquals(4, sink.list.size)
+            val batchBoards = sink.list.map { move ->
+                ((move as Move.Compound).parts.first() as Move.IntSet).varId / 5
+            }.toSet()
+            assertEquals(1, batchBoards.size)
+            boards.addAll(batchBoards)
+        }
         assertEquals(setOf(0, 1, 2), boards)
     }
 
@@ -513,7 +528,7 @@ class BoardSwapCoverageTest {
         source.generate(state, sink)
         state.apply(Move.IntSet(0, state.assignment.intValue(0)))
 
-        repeat(4) {
+        repeat(5) {
             sink.clear()
             source.generate(state, sink)
         }
