@@ -40,9 +40,12 @@ internal object NumericalResidualReplay {
     private fun replay(input: JsonElement, out: File) {
         val spec = input.jsonObject
         val keys = setOf("job", "source", "residual", "sha256", "dense")
-        require(spec.keys.containsAll(keys) && (spec.keys - keys).all { it in setOf("synthetic", "entry") })
+        val options = setOf("synthetic", "entry", "workLimit")
+        require(spec.keys.containsAll(keys) && (spec.keys - keys).all { it in options })
         val entry = spec["entry"]?.jsonPrimitive?.content ?: "scoped"
         require(entry == "scoped" || entry == "session")
+        val workLimit = spec["workLimit"]?.jsonPrimitive?.content?.toLong() ?: 1_200_000_000L
+        require(workLimit in 0L..1_200_000_000L)
         val compareSynthetic = spec["synthetic"]?.jsonPrimitive?.content?.also { require(it == "compare") } != null
         val job = spec.getValue("job").jsonPrimitive.content.toLong().also { require(it > 0L) }
         val source = spec.getValue("source").jsonPrimitive.content.toInt().also { require(it in 0..7) }
@@ -69,7 +72,7 @@ internal object NumericalResidualReplay {
             for ((denseLimit, syntheticWorkEnabled) in ordered) {
                 for (retained in listOf(false, true)) {
                     val observed = round == 3
-                    val result = measure(state, denseLimit, retained, observed, syntheticWorkEnabled, entry)
+                    val result = measure(state, denseLimit, retained, observed, syntheticWorkEnabled, entry, workLimit)
                     val report = buildJsonObject {
                         put("revision", Reports.readGitSha())
                         put("input", input)
@@ -100,6 +103,7 @@ internal object NumericalResidualReplay {
         observed: Boolean,
         syntheticWorkEnabled: Boolean,
         entry: String,
+        workLimit: Long,
     ): JsonElement {
         val probe = NumericalResidualProfile.Probe(denseLimit, observed, syntheticWorkEnabled)
         val observerType = Class.forName(ENGINE + "LpCertificationObserver")
@@ -132,7 +136,7 @@ internal object NumericalResidualReplay {
             constructor.newInstance(probe.context, pricing, false)
         } else {
             constructor.newInstance(
-                state, Cancellation.Never, probe.context, 64, 4096, 1_200_000_000L, false, Int.MAX_VALUE, pricing,
+                state, Cancellation.Never, probe.context, 64, 4096, workLimit, false, Int.MAX_VALUE, pricing,
             )
         }
         val steps = ArrayList<JsonElement>()
@@ -155,7 +159,7 @@ internal object NumericalResidualReplay {
                 val result = if (prepared) {
                     if (session) {
                         defaultSolve.invoke(
-                            null, active, model, stop, 1_200_000_000L, observer, null, null, 0.0, null, 240, null,
+                            null, active, model, stop, workLimit, observer, null, null, 0.0, null, 240, null,
                         )
                     } else {
                         defaultSolve.invoke(
@@ -218,7 +222,7 @@ internal object NumericalResidualReplay {
             put("perSolveTimeoutMs", 2000)
             put("pivotLimit", if (session) 0 else 4096)
             put("inputProjectionExcluded", session)
-            put("workLimit", 1_200_000_000L)
+            put("workLimit", workLimit)
             put("instrumentation", if (observed) "lab JFR, basis timing and certifier observer" else "lab JFR")
             put("steps", JsonArray(steps))
             put("phaseNs", NumericalResidualProfile.json(probe.phaseNs))
