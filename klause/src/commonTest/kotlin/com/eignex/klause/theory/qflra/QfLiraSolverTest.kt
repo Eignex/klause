@@ -19,6 +19,7 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -49,6 +50,34 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `integer cut origin observations should describe partial checks only`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0L, 0L), longArrayOf(10L, 10L), null, null),
+            factors = arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4)),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val partial = assertNotNull(stats.snapshot().completeSearchStages)
+            assertEquals(1L, partial["INTEGER_CUT_ORIGINS_CHECK"])
+            assertEquals(1L, partial["INTEGER_CUT_ORIGINS_FINITE_LONG_ORIGINS"])
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val complete = assertNotNull(stats.snapshot().completeSearchStages)
+            assertEquals(partial["INTEGER_CUT_ORIGINS_CHECK"], complete["INTEGER_CUT_ORIGINS_CHECK"])
+            assertEquals(partial["INTEGER_CUT_ORIGINS_FINITE_LONG_ORIGINS"],
+                complete["INTEGER_CUT_ORIGINS_FINITE_LONG_ORIGINS"])
+        }
+    }
+
     @Test
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")

@@ -1217,6 +1217,16 @@ class ExactLiraSearchComponent private constructor(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
+        if (completeTraversalObserved && smtStats != null && unassignedBooleans > 0 &&
+            model.numIntVars > 0 && result.float?.optimal == true
+        ) {
+            observeCompleteStage("INTEGER_CUT_ORIGINS_CHECK")
+            val state = lp.state
+            val origins = state?.let { IntegerCutOriginProbe.inspect(it.model, operationStop) }
+            val key = if (state == null) "MISSING_STATE" else origins?.name ?: "INTERRUPTED"
+            observeCompleteStage("INTEGER_CUT_ORIGINS_$key")
+            if (operationStop()) return ComponentResult.Indeterminate
+        }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
         if (bools.any { it == UNASSIGNED }) {
             candidate?.let { capturePointHints(it, context) }

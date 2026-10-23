@@ -390,6 +390,15 @@ can contain only declined preferences. Release counts a live default consultatio
 not avoided registration or capture work. These observations add no numerical
 invocation and establish neither a timing cause nor a whole-source witness gain.
 
+`smtCompleteSearchStage_INTEGER_CUT_ORIGINS_*` observes structural-column lower
+origins at existing float-optimal partial linear checks. `CHECK` counts selected
+checks; the outcome names the first unsupported origin or `FINITE_LONG_ORIGINS`
+after a complete scan. Logical slack columns are excluded. Visits spend the current
+operation token, and `INTERRUPTED` supplies no completed classification. Finite Long
+origins are one prerequisite of the existing tableau separator; these observations
+establish no fractional basic row, violated cut or solver benefit. They generate
+no cuts, numerical invocation, point recovery or polarity preference.
+
 ### Subprocess exit records
 
 Each returned subprocess record retains the actual child exit in `stats.exit`,

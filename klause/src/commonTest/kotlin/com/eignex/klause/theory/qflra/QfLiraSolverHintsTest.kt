@@ -748,6 +748,7 @@ class QfLiraSolverHintsTest {
                 if (complete) component.observeCompleteTraversal()
                 val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
                 assertNull(hints.preferredBool(0))
+                assertNull(stats.snapshot().completeSearchStages?.get("INTEGER_CUT_ORIGINS_CHECK"))
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertEquals(false, hints.preferredBool(0))
@@ -773,6 +774,9 @@ class QfLiraSolverHintsTest {
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_UNAVAILABLE"))
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_PREFERRED"))
                 assertEquals(complete, (observed.completeSearchStages?.get("POINT_HINT_LP_CAPTURE") ?: 0L) > 0L)
+                assertEquals(complete, (observed.completeSearchStages?.get("INTEGER_CUT_ORIGINS_CHECK") ?: 0L) > 0L)
+                assertEquals(complete,
+                    (observed.completeSearchStages?.get("INTEGER_CUT_ORIGINS_FINITE_LONG_ORIGINS") ?: 0L) > 0L)
             }
         }
     }
