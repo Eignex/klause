@@ -79,9 +79,10 @@ whole-source validation remain required.
 
 ## Board swap coverage
 
-At feasibility, the reserved structural draw in CBLS and SA walks elected
-AllDifferent boards and their unordered pairs. Each pick keeps the ordinary limit
-of four proposals and 24 pair visits. Both inputs must pass the pin, definition,
+After the feasible walk's sampled resample window finds no accepted move, its
+reserved structural draw walks elected AllDifferent boards and their unordered
+pairs. Strict descent with a zero resample cap starts coverage directly. Each pick
+keeps the ordinary limit of four proposals and 24 pair visits. Both inputs must pass the pin, definition,
 domain and proposing-owner filters; the complete compound enters ordinary generated
 move scoring and acceptance.
 

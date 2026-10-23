@@ -891,6 +891,17 @@ promotion. A retained bounded cursor still needs cancellation/resume, cost and
 default-route validation; fixed-work gains establish neither whole-solver recovery
 nor a general speedup.
 
+[Lab 7735](https://lab.eignex.com/jobs/7735) tests a bounded cursor at `6bdac2f7dd`
+in the first reserved structural draw from the start of feasibility. Under the
+same fixed-work controls, all sixteen original-team pairs lose; gbac and photo
+tie in all sixteen control pairs. All 64 witnesses pass original-source checking.
+[7736](https://lab.eignex.com/jobs/7736) keeps the default mixed/P1 route: the
+small source has one win/eight losses, the large source nine losses, gbac six
+wins/three losses and photo nine ties. All 72 witnesses pass source checking,
+with matching source, installed dependency, compiler and runtime identities.
+This placement is unsuitable for promotion: bounded enumeration alone does not
+establish optimization recovery.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;
