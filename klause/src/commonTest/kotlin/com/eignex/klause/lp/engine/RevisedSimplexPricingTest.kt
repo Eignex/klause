@@ -101,6 +101,9 @@ class RevisedSimplexPricingTest {
                 delegate
             }
         }).use { solver ->
+            val duals = doubleArrayOf(0.5)
+            assertTrue(solver.scalingMetrics.applied)
+            for (column in 0 until model.n) assertTrue(solver.columnDot(duals, column).isFinite())
             val result = assertNotNull(solver.solve())
             assertEquals(2, owners.size)
             assertNotSame(owners[0], owners[1])
@@ -108,8 +111,8 @@ class RevisedSimplexPricingTest {
             assertEquals(1, solver.scalingMetrics.fallbacks)
             owners[0].values.fill(Double.NaN)
 
-            assertEquals(-0.5, solver.columnDot(doubleArrayOf(0.5), 0))
-            assertEquals(-512.0, solver.columnDot(doubleArrayOf(0.5), 1))
+            assertEquals(-0.5, solver.columnDot(duals, 0))
+            assertEquals(-512.0, solver.columnDot(duals, 1))
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, certifyLpResult(model, solver, result).verdict)
         }
     }
