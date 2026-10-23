@@ -34,7 +34,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object LinearPrefixInspection {
-    fun inspect(compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false) {
+    fun inspect(
+        compiled: SmtLibProblem,
+        out: File,
+        sourceSha256: String,
+        probe: Boolean = false,
+        targetBoundaries: Int = 8,
+    ) {
+        require(targetBoundaries in 1..8)
         val captures = (0..1).map { replay ->
             val stop = Cancellation.after(10.seconds)
             val started = System.nanoTime()
@@ -50,7 +57,7 @@ internal object LinearPrefixInspection {
             val params = TheoryParams(timeout = stop, randomSeed = 1L)
             val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
-            val boundary = PrefixBoundary()
+            val boundary = PrefixBoundary(targetBoundaries)
             val begin = engine.javaClass.declaredMethods.single {
                 it.name.startsWith("begin") && it.parameterCount == 3
             }
@@ -64,7 +71,7 @@ internal object LinearPrefixInspection {
                     put("revision", Reports.readGitSha())
                     put("sourceSha256", sourceSha256)
                     put("seed", 1)
-                    put("targetNonRootBoundaries", 8)
+                    put("targetNonRootBoundaries", targetBoundaries)
                     put("visitedNonRootBoundaries", boundary.visits)
                     put("sourceVerdictClaim", false)
                     put("cliEquivalence", "unverified-direct-library-diagnostic")
@@ -142,10 +149,9 @@ internal object LinearPrefixInspection {
         check(captures[0].contentEquals(captures[1])) { "fresh prefix replay differs" }
     }
 
-    private class PrefixBoundary : SearchNodePolicy {
+    private class PrefixBoundary(private var target: Int) : SearchNodePolicy {
         var visits = 0
         var paused = false
-        private var target = 8
         fun resume() {
             target = visits + 8
             paused = false
