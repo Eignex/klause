@@ -50,6 +50,34 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `a strict bound should enable a guard after a closed endpoint declined`() {
+        val model = Problem(4, 0, emptyArray(), arrayOf(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, 1.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                LinearOp.GE, 2.0),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
+                LinearOp.LE, -4.0, strict = true),
+            ReifiedRealLinear(3, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                LinearOp.GE, 2.0, strict = true),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        ExactLiraSearchComponent(model).use { component ->
+            component.usePartialLinearPropagation()
+            component.reusePartialLinearDeclines()
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertNull(session.boolValue(2))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(3, true))))
+
+            assertEquals(true, session.boolValue(2))
+        }
+    }
+
+    @Test
     fun `automatic partial propagation should complete the sole component after its own implication`() {
         val model = Problem(3, 0, emptyArray(), arrayOf(
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
