@@ -879,6 +879,14 @@ solver callers keep their existing policy. Compare them with the full modes usin
 the reported preparation allowance, reservations, owners and actual work rather
 than treating extra construction work as a matched solve budget.
 
+`prepared-session` holds one root session and its existing scoped numerical owner.
+It compares every Boolean pin and immutable integer domain with the initial root
+after each consultation and stops on a changed root, a certified prune,
+cancellation or the existing governor's demotion/exhaustion. Its consultation count
+is determined by those boundaries, rather than three repeats. This mode tests
+retained partial progress without inheriting a changed CP problem; float termination
+and cumulative preparation/work counters expose retries and ownership reuse.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing
