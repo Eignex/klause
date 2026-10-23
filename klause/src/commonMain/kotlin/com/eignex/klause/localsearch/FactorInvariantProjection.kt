@@ -39,6 +39,8 @@ internal fun Factor.invariantProjection(
 }
 
 internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invariant = when (this) {
+    is AllDifferentTuples -> AllDifferentTuplesInvariant(tuples)
+
     is AllDifferent -> allDifferentInvariantProjection()
 
     is Abs -> AbsInvariant(operand, result)

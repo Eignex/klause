@@ -2,6 +2,7 @@ package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
+import com.eignex.klause.factor.global.AllDifferentTuples
 import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.global.ValuePrecede
@@ -58,6 +59,39 @@ class Xcsp3GlobalsTest {
     }
 
     private val threeVars = """<var id="x">1..3</var><var id="y">1..3</var><var id="z">1..3</var>"""
+
+    @Test
+    fun `tuple distinctness should preserve repeated coordinates through source reconstruction`() {
+        val parsed = parse(
+            "<allDifferent><list>x x</list><list>y z</list><list>z x</list></allDifferent>",
+            """<var id="x">0..1</var><var id="y">0..1</var><var id="z">0..1</var>""",
+        )
+
+        assertEquals(setOf(listOf(0L, 0L, 1L), listOf(0L, 1L, 1L),
+            listOf(1L, 0L, 0L), listOf(1L, 1L, 0L)), solutions(parsed, 3))
+    }
+
+    @Test
+    fun `tuple lowering should retain source-sized data without auxiliary coordinates`() {
+        val rows = (0 until 64).joinToString("") { "<list>x[$it][]</list>" }
+        val parsed = parse("<allDifferent>$rows</allDifferent>", """<array id="x" size="[64][6]">0..31</array>""")
+        val relation = factorsOf(parsed).single() as AllDifferentTuples
+
+        assertEquals(64, relation.tuples.size)
+        assertEquals(384, relation.intVars.size)
+        assertEquals(384, parsed.problem.numIntVars)
+        assertEquals(0, parsed.problem.numBoolVars)
+    }
+
+    @Test
+    fun `tuple reification attributes should decline unsupported source semantics`() {
+        for (attribute in listOf("reifiedBy", "hreifiedFrom", "hreifiedTo")) {
+            assertFailsWith<UnsupportedXcsp3Exception> {
+                parse("<allDifferent $attribute=\"b\"><list>x x</list><list>y y</list></allDifferent>",
+                    """<var id="x">0..1</var><var id="y">0..1</var><var id="b">0..1</var>""")
+            }
+        }
+    }
 
     @Test
     fun `nValues except should retain one relation across wide source domains`() {

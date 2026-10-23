@@ -35,6 +35,8 @@ internal fun Factor.propagatorProjection(
 }
 
 internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPreparation?): Propagator = when (this) {
+    is AllDifferentTuples -> AllDifferentTuplesPropagator(this)
+
     is AllDifferent -> AllDifferentPropagator(
         boolVars,
         intVars,

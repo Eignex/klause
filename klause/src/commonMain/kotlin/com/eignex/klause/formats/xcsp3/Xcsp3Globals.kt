@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.AllDifferentTuples
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.Inverse
@@ -1171,6 +1172,9 @@ internal fun Compiler.Builder.allDifferent(e: XmlElement) {
     val lists = e.children.filter { it.tag == "list" }
     if (lists.size > 1) {
         if (e.child("except") != null) throw UnsupportedXcsp3Exception("allDifferent: <list>s with <except>")
+        if (listOf("reifiedBy", "hreifiedFrom", "hreifiedTo").any { e.attr(it).isNotEmpty() }) {
+            throw UnsupportedXcsp3Exception("allDifferent: reified <list>s")
+        }
         return allDifferentLists(lists.map { refList(it.textContent) })
     }
     val vars = refList(listText(e))
@@ -1205,17 +1209,7 @@ internal fun Compiler.Builder.postAllDifferent(vars: IntArray) {
 /** `allDifferent` over several `<list>`s: the lists, read as tuples, are pairwise distinct — each pair
  *  differs at some position. The variables themselves may repeat values within and across lists. */
 internal fun Compiler.Builder.allDifferentLists(lists: List<IntArray>) {
-    val width = lists[0].size
-    require(lists.all { it.size == width }) { "allDifferent: <list>s of unequal length" }
-    for (a in lists.indices) {
-        for (b in a + 1 until lists.size) {
-            // A position holding one variable in both lists can never differ.
-            val differs = (0 until width).filter { k -> lists[a][k] != lists[b][k] }.map { k ->
-                reifyLinear(intArrayOf(1, -1), intArrayOf(lists[a][k], lists[b][k]), LinearOp.NE, 0)
-            }
-            factors.add(Clause(differs.toIntArray()))
-        }
-    }
+    factors.add(AllDifferentTuples(lists))
 }
 
 /** `allDifferent` with `<except>`: variables must be pairwise distinct unless they take an exempt
