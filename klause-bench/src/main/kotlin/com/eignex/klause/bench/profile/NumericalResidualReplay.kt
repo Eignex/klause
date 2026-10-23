@@ -4,10 +4,6 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.reflect.Proxy
-import java.util.Base64
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
@@ -15,6 +11,10 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.reflect.Proxy
+import java.util.Base64
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object NumericalResidualReplay {
     private const val ENGINE = "com.eignex.klause.lp.engine."
@@ -52,9 +52,11 @@ internal object NumericalResidualReplay {
         val arms = if (spec.getValue("dense").jsonPrimitive.content.toBooleanStrict()) listOf(0, 64) else listOf(6)
         for (round in -1..2) {
             val ordered = if (round % 2 == 0) arms.reversed() else arms
-            for (denseLimit in ordered) for (retained in listOf(false, true)) {
+            for (denseLimit in ordered) {
+                for (retained in listOf(false, true)) {
                 val result = measure(state, denseLimit, retained)
-                out.resolve("round-$round-dense-$denseLimit-retained-$retained.json").writeText(buildJsonObject {
+                out.resolve("round-$round-dense-$denseLimit-retained-$retained.json").writeText(
+                    buildJsonObject {
                     put("revision", Reports.readGitSha())
                     put("input", input)
                     put("warmup", round == -1)
@@ -64,7 +66,9 @@ internal object NumericalResidualReplay {
                     put("sourceVerdictClaim", false)
                     put("captureContainsOriginalFactors", false)
                     put("result", result)
-                }.toString())
+                }.toString()
+                )
+            }
             }
         }
         println("replayed residual ${sha256(bytes)}")
@@ -75,9 +79,11 @@ internal object NumericalResidualReplay {
         val observerType = Class.forName(ENGINE + "LpCertificationObserver")
         val observations = ArrayList<JsonElement>()
         val observer = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, method, values ->
-            if (observations.size < 256) observations += buildJsonObject {
+            if (observations.size < 256) {
+                observations += buildJsonObject {
                 put("method", method.name)
                 put("values", JsonArray(values.orEmpty().map { NumericalResidualProfile.json(it) }))
+            }
             }
             null
         }
@@ -98,9 +104,13 @@ internal object NumericalResidualReplay {
                 val continuation = Class.forName("com.eignex.klause.simplex.exact.ExactContinuationLimits")
                     .getConstructor().newInstance()
                 val refinement = Class.forName(ENGINE + "LpRefinementLimits").getConstructor().newInstance()
-                val result = if (prepared) NumericalResidualProfile.call(
+                val result = if (prepared) {
+                    NumericalResidualProfile.call(
                     active, "solve", null, stop, null, continuation, true, observer, refinement, false,
-                ) else null
+                )
+                } else {
+                    null
+                }
                 val elapsed = System.nanoTime() - solveStarted
                 steps += buildJsonObject {
                     put("step", index)
@@ -111,12 +121,18 @@ internal object NumericalResidualReplay {
                     put("verdict", result?.let { NumericalResidualProfile.call(it, "getVerdict").toString() })
                     put("bound", result?.let { NumericalResidualProfile.call(it, "getLowerBound")?.toString() })
                     put("point", result?.let { NumericalResidualProfile.call(it, "getExactPrimal")?.toString() })
-                    put("floatTermination",
-                        NumericalResidualProfile.call(active, "getLastFloatTermination")?.toString())
-                    put("metrics",
-                        NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getLastMetrics")))
-                    put("scopeMetrics",
-                        NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getMetrics")))
+                    put(
+                        "floatTermination",
+                        NumericalResidualProfile.call(active, "getLastFloatTermination")?.toString(),
+                    )
+                    put(
+                        "metrics",
+                        NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getLastMetrics")),
+                    )
+                    put(
+                        "scopeMetrics",
+                        NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getMetrics")),
+                    )
                 }
                 if (!retained) {
                     (active as AutoCloseable).close()
@@ -137,6 +153,7 @@ internal object NumericalResidualReplay {
             put("steps", JsonArray(steps))
             put("phaseNs", NumericalResidualProfile.json(probe.phaseNs))
             put("phaseCalls", NumericalResidualProfile.json(probe.phaseCalls))
+            put("transformEntries", NumericalResidualProfile.json(probe.transformEntries))
             put("floatSolves", JsonArray(probe.solves))
             put("builds", JsonArray(probe.builds))
             put("certification", JsonArray(observations))
