@@ -184,6 +184,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val queue = IntArrayDeque()
     private val queued = BooleanArray(numCols)
     private val poll = PollStride()
+    private val meter = cancellation.workMeter()
     private var stopped = false
 
     private var conflict = false
@@ -197,9 +198,14 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
 
     private fun visit(): Boolean {
         if (stopped) return false
-        cancellation.charge(PROBE_SOURCE_WORK_WEIGHT)
-        if ((cancellation.workMeter() != null || poll.due()) && cancellation()) stopped = true
+        meter?.charge(PROBE_SOURCE_WORK_WEIGHT)
+        if (poll.due(PROBE_SOURCE_WORK_WEIGHT)) checkStop()
         return !stopped
+    }
+
+    private fun checkStop(): Boolean {
+        if (!stopped && cancellation()) stopped = true
+        return stopped
     }
 
     private fun prepare() {
@@ -423,7 +429,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
 
     fun propagateRoot(): Boolean {
         for (h in rowCols.indices) {
-            if (stopped) break
+            if (checkStop()) break
             process(h)
             if (crossed) return false
         }
@@ -443,15 +449,16 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
 
     // Probe up to `maxCandidates` free Booleans; false when the model is refuted.
     fun probeAll(maxCandidates: Int): Boolean {
+        if (checkStop()) return true
         var probed = 0
         var b = 0
         while (b < problem.numBoolVars && probed < maxCandidates && !stopped) {
-            if (!visit()) break
+            if (checkStop() || !visit()) break
             val col = numInts + b++
             if (fixed(col) || incidenceStart[col] == incidenceStart[col + 1]) continue
             probed++
             if (!probe(col)) return false
-            if (!stopped && cancellation()) stopped = true
+            checkStop()
         }
         return true
     }
@@ -463,12 +470,12 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         val trueHolds = propagate()
         if (trueHolds && !stopped) recordTouched(mark)
         undoTo(mark)
-        if (stopped) return true
+        if (checkStop()) return true
         setHi(col, 0L)
         val falseHolds = propagate()
         if (trueHolds && falseHolds && !stopped) collectCommon(mark)
         undoTo(mark)
-        if (stopped) return true
+        if (checkStop()) return true
         when {
             !trueHolds && !falseHolds -> return false
             !trueHolds -> setHi(col, 0L)
