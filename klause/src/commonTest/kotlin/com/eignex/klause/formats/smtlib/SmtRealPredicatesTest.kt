@@ -10,6 +10,30 @@ import kotlin.test.assertFailsWith
 
 class SmtRealPredicatesTest {
     @Test
+    fun `opposite comparison directions should share exact predicate identities`() {
+        for (strict in listOf(false, true)) for (relation in listOf(LinearOp.LE, LinearOp.GE)) {
+            val predicates = SmtRealPredicates(Cancellation.Never)
+            val term = RealComb(mapOf(0 to BigFraction.ONE), mapOf(1 to BigFraction.MINUS_ONE), BigFraction.ONE)
+            val opposite = term.scaled(BigFraction.MINUS_ONE)
+            val direction = if (relation == LinearOp.LE) LinearOp.GE else LinearOp.LE
+            val otherSorts = RealComb(mapOf(1 to BigFraction.MINUS_ONE), mapOf(0 to BigFraction.ONE), BigFraction.ONE)
+            var next = 0
+
+            val names = listOf(
+                predicates.literal(term, relation, strict) { next++ },
+                predicates.literal(opposite, direction, strict) { next++ },
+                predicates.literal(term, relation, !strict) { next++ },
+                predicates.literal(term.plus(term), relation, strict) { next++ },
+                predicates.literal(otherSorts, relation, strict) { next++ },
+            )
+            val cached = predicates.cachedLiteral(opposite, direction, strict)
+
+            assertEquals(listOf(0, 0, 1, 2, 3), names)
+            assertEquals(0, cached)
+        }
+    }
+
+    @Test
     fun `a full extrema table should retain shared results and leave new extrema independent`() {
         val predicates = SmtRealPredicates(Cancellation.Never, maxEntries = 6)
         val first = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)

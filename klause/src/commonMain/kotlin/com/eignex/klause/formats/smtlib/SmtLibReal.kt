@@ -336,11 +336,7 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
         cancellation.charge(entries)
         if (cancellation()) throw PolynomialSourceInterrupted()
         if (entries > maxEntries) return create()
-        val key = Predicate(
-            term.intCoeffs.filterValues { !it.isZero },
-            term.realCoeffs.filterValues { !it.isZero },
-            term.constant, relation, strict,
-        )
+        val key = predicate(term, relation, strict)
         literals[key]?.let { return it }
         val literal = create()
         if (entries <= maxEntries - retainedEntries) {
@@ -355,11 +351,22 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
         cancellation.charge(entries)
         if (cancellation()) throw PolynomialSourceInterrupted()
         if (entries > maxEntries) return null
-        return literals[Predicate(
-            term.intCoeffs.filterValues { !it.isZero },
-            term.realCoeffs.filterValues { !it.isZero },
-            term.constant, relation, strict,
-        )]
+        return literals[predicate(term, relation, strict)]
+    }
+
+    private fun predicate(term: RealComb, relation: LinearOp, strict: Boolean): Predicate {
+        val reversed = relation == LinearOp.GE
+        if (reversed) {
+            cancellation.charge(term.intCoeffs.size.toLong() + term.realCoeffs.size + 1L)
+            checkCancellation()
+        }
+        val normalized = if (reversed) term.scaled(BigFraction.MINUS_ONE) else term
+        if (reversed) checkCancellation()
+        return Predicate(
+            normalized.intCoeffs.filterValues { !it.isZero },
+            normalized.realCoeffs.filterValues { !it.isZero },
+            normalized.constant, if (reversed) LinearOp.LE else relation, strict,
+        )
     }
 }
 
