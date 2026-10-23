@@ -38,14 +38,23 @@ internal fun equationalSection(
         }
     }
     val pivot = best ?: return null
+    return totalPolynomialSection(pivot.variable, pivot.polynomial, pivot.term, arithmetic)
+}
+
+internal fun totalPolynomialSection(
+    variable: Int,
+    polynomial: Polynomial,
+    selected: PolynomialTerm,
+    arithmetic: PolynomialArithmetic,
+): PolynomialEquationalProjection {
     val remainder = ArrayList<PolynomialTerm>()
-    for (term in pivot.polynomial.terms) {
+    for (term in polynomial.terms) {
         arithmetic.step()
-        if (term != pivot.term) remainder.add(term)
+        if (term != selected) remainder.add(term)
     }
     // A nonzero rational coefficient makes the section total, including singular base points.
-    val replacement = arithmetic.scale(Polynomial.of(remainder), pivot.term.coefficient.reciprocal().negated())
-    return PolynomialEquationalProjection(pivot.variable, replacement)
+    val replacement = arithmetic.scale(Polynomial.of(remainder), selected.coefficient.reciprocal().negated())
+    return PolynomialEquationalProjection(variable, replacement)
 }
 
 private class SectionPivot(

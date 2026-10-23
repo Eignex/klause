@@ -273,6 +273,13 @@ decline a substitution while preserving its completed prefix; cancellation and
 work exhaustion withhold the result. Expansion uses the caller's remaining work
 and representation limits.
 
+Root section selection retains each current equation's eligible rational
+coefficients and updates variable occurrences from changes in the whole predicate
+family. It ranks sections by fill, coefficient size and source coordinate, with
+source order breaking remaining ties. Each invocation owns this metadata; only
+current equations and family counts survive a completed update. Boolean facts and
+numeric predicates are recomputed after each substitution.
+
 The procedure then runs in four stages; only the last two are needed for
 completeness.
 
