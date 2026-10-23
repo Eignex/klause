@@ -22,7 +22,7 @@ class LpSolveTest {
         val y = builder.addRealVar(0.0, 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(2_000_003.0), Relation.EQ, 1.0)
         builder.addRealRow(intArrayOf(y), doubleArrayOf(2_000_029.0), Relation.EQ, 1.0)
-        repeat(129) {
+        repeat(256) {
             builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
         }
         val model = builder.build(Sense.MINIMIZE)

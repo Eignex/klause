@@ -32,6 +32,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.lang.reflect.Array as ReflectArray
 
 internal object ExactFeasibilityCapture {
     @JvmStatic
@@ -81,6 +82,7 @@ internal object ExactFeasibilityCapture {
         var captureNs = 0L
         var observations = 0L
         val wrapped = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, method, values ->
+            @Suppress("SpreadOperator")
             val result = method.invoke(observer, *values.orEmpty())
             if (method.name == "observeContinuation" && snapshot == null &&
                 call(requireNotNull(values?.first()), "getDecline").toString() == "DIMENSION" &&
@@ -243,7 +245,7 @@ internal object ExactFeasibilityCapture {
         val projection = Class.forName(prefix + "LpProjectionMeter").getConstructor().newInstance()
         val model = requireNotNull(call(state, "toWorkingModel", projection))
         val statusType = Class.forName(prefix + "VarStatus")
-        val statuses = java.lang.reflect.Array.newInstance(statusType, n + m)
+        val statuses = ReflectArray.newInstance(statusType, n + m)
         for (j in 0 until n + m) {
             val bounds = requireNotNull(call(requireNotNull(call(exact, "column", j)), "getBounds"))
             val name = when {
@@ -253,7 +255,7 @@ internal object ExactFeasibilityCapture {
                 call(bounds, "getUpper") != null -> "AT_UPPER"
                 else -> "FREE"
             }
-            java.lang.reflect.Array.set(statuses, j, statusType.enumConstants.single { it.toString() == name })
+            ReflectArray.set(statuses, j, statusType.enumConstants.single { it.toString() == name })
         }
         val basis = Class.forName(prefix + "Basis").constructors.single { it.parameterCount == 3 }
             .newInstance(IntArray(m) { n + it }, statuses, true)
@@ -307,9 +309,10 @@ internal object ExactFeasibilityCapture {
             }
         }
         val grouped = (0 until m).filter { degrees[it] > 0 }.groupBy { root(n + it) }
+        val constantRows = (0 until m).filter { degrees[it] == 0 }
         return buildJsonObject {
             put("fixedStructuralColumns", JsonArray((0 until n).filter { fixed[it] }.map(::JsonPrimitive)))
-            put("constantRowsAfterSubstitution", JsonArray((0 until m).filter { degrees[it] == 0 }.map(::JsonPrimitive)))
+            put("constantRowsAfterSubstitution", JsonArray(constantRows.map(::JsonPrimitive)))
             put("constantRowsVerified", false)
             put("rowUnfixedDegrees", JsonArray(degrees.map(::JsonPrimitive)))
             put("components", buildJsonArray {
