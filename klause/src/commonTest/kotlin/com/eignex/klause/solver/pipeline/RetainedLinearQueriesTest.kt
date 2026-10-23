@@ -74,12 +74,12 @@ class RetainedLinearQueriesTest {
     @Test
     fun `retained query should search the complement of a refuted component preference`() {
         val model = Problem(1, 0, emptyArray(), emptyArray())
-        val checked = ArrayList<Boolean?>()
+        val checked = ArrayList<Boolean>()
         val component = object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck {
-                val value = context.boolValue(0)
+                val value = requireNotNull(context.boolValue(0))
                 checked += value
-                return if (value == true) ComponentCheck.Infeasible() else ComponentCheck.Feasible
+                return if (value) ComponentCheck.Infeasible() else ComponentCheck.Feasible
             }
         }
         val queries = RetainedLinearQueries(model, TheoryParams(), null) { _, _ ->
@@ -104,7 +104,8 @@ class RetainedLinearQueriesTest {
         }
 
         queries.use {
-            val result = it.check(ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap()), Cancellation.Never)
+            val condition = ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap())
+            val result = it.check(condition, Cancellation.Never)
 
             assertEquals(false, assertIs<ExactNeighborhoodResult.Witness>(result).sample.boolValue(0))
             assertEquals(0L, it.stats.openHints.usage.componentConsultations)
