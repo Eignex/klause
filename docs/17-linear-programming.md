@@ -170,8 +170,10 @@ coefficient values follow the selected indexed kernel's arithmetic.
 Dual leaving selection uses verified Devex, reselecting when a maintained weight
 falls below `0.25 * norm(rho)^2`. Entering selection uses a scaled Harris window,
 a ministep floor and a breakpoint walk. Zero-objective solves choose between
-`MIN_BOUND_SUPPORT` (default) and `LARGEST_PIVOT`. Refactorization is triggered by
-estimated work and fill, sampled residuals or a hard update cap.
+`MIN_BOUND_SUPPORT` (default) and `LARGEST_PIVOT`. Refactorization responds to
+backend requests, sampled residuals, factor fill or per-solve work growth, and a
+hard update cap. Unavoidable repeated solve work does not justify rebuilding
+unchanged factors.
 
 Power-of-two scaling guards lost nonzeros, overflow and underflow, and results map
 back to unscaled authority. Safeguards include small-pivot checks, refactor and

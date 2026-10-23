@@ -597,11 +597,11 @@ timing; result serialization follows each timed call.
 of order at most 64, recording input dimension and density together. This diagnostic
 does not change production dense selection. Captures contain no original warm factors;
 replay and instrumented timings are separate from whole-source measurements.
-With `dense=false`, optional `synthetic="compare"` pairs the default numerical
-policy with cumulative-work refactorization disabled. Residual, fill, solve-work
+With `dense=false`, optional `synthetic="compare"` pairs cumulative-work
+refactorization enabled and disabled. Residual, fill, solve-work
 growth, backend requests and hard update limits retain their production settings.
-This construction-only diagnostic keeps the default policy enabled in ordinary
-solves and records each intervention separately from the dense comparison.
+Ordinary solves disable cumulative-work refactorization. The diagnostic records
+each intervention separately from the dense comparison.
 Optional `entry="session"` uses the retained solve-session consumer used by real
 leaf completion; the default scoped entry prepares factors before its first query.
 These are distinct numerical openings. The session entry excludes caller model
