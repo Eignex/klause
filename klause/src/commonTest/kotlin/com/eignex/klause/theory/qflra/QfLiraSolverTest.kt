@@ -60,16 +60,19 @@ class QfLiraSolverTest {
                 LinearOp.LE, -4.0),
         ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
-        ExactLiraSearchComponent(model).use { component ->
-            component.usePartialLinearPropagation()
-            val session = SearchSession(listOf(component))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        for (cached in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                component.usePartialLinearPropagation()
+                if (cached) component.reusePartialLinearDeclines()
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
-            assertEquals(true, session.boolValue(2))
-            assertIs<ComponentCheck.Feasible>(component.check(session))
+                assertEquals(true, session.boolValue(2))
+                assertIs<ComponentCheck.Feasible>(component.check(session))
+            }
         }
     }
 
@@ -79,17 +82,20 @@ class QfLiraSolverTest {
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
             ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
         ))
-        ExactLiraSearchComponent(model).use { component ->
-            component.usePartialLinearPropagation()
-            val session = SearchSession(listOf(component))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
-            assertEquals(true, session.boolValue(1))
-            session.popTo(0)
+        for (cached in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                component.usePartialLinearPropagation()
+                if (cached) component.reusePartialLinearDeclines()
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertEquals(true, session.boolValue(1))
+                session.popTo(0)
 
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
 
-            assertNull(session.boolValue(1))
+                assertNull(session.boolValue(1))
+            }
         }
     }
 

@@ -236,6 +236,10 @@ class ExactLiraSearchComponent private constructor(
     private var partialLinearEligible = 0L
     private var partialLinearDeductions = 0L
     private var partialLinearDeferrals = 0L
+    private var partialLinearCache = false
+    private val partialLinearDeclines = HashMap<PreparedSourceRow, PartialLinearInputs>()
+    private var partialLinearEvaluations = 0L
+    private var partialLinearUnchanged = 0L
     private var sourceInstalled = false
     private var graphFirst = false
     private var solveContext = LpSolveContext.Production
@@ -434,7 +438,12 @@ class ExactLiraSearchComponent private constructor(
     internal val partialLinearPropagationStats: PartialLinearPropagationStats
         get() = PartialLinearPropagationStats(partialLinearCandidates?.size ?: 0,
             partialLinearInvocations, partialLinearVisited, partialLinearEligible,
-            partialLinearDeductions, partialLinearDeferrals)
+            partialLinearDeductions, partialLinearDeferrals, partialLinearEvaluations, partialLinearUnchanged)
+
+    internal fun reusePartialLinearDeclines() {
+        check(context == null || context?.decisionLevel == 0)
+        partialLinearCache = true
+    }
 
     private fun partialLinearCandidateRows(): List<PreparedSourceRow>? {
         partialLinearCandidates?.let { return it }
@@ -484,14 +493,27 @@ class ExactLiraSearchComponent private constructor(
                 if (prepared.booleans.any { it != variable && bools[it] == UNASSIGNED }) continue
                 eligible++
                 val comparison = prepared.form.comparison(true) { bools[it] == TRUE }
+                val inputs = if (partialLinearCache) partialLinearInputs(comparison) ?: continue else null
+                if (inputs != null && partialLinearDeclines[prepared] == inputs) {
+                    partialLinearUnchanged++
+                    continue
+                }
+                var unavailable = false
+                partialLinearEvaluations++
                 val implication = partialLinearImplication(comparison, { column, upper ->
                     val metadata = state.model.column(column)
                     if (metadata.tag != column || !metadata.origin.value.isZero) null
                     else state.activeSide(column, upper)?.let { active ->
-                        ExplainedLinearBound(active.side.number.value, active.side.strict,
-                            lp.activeBoundPremise(column, upper) ?: SearchAtomPremise.Unavailable)
+                        val premise = lp.activeBoundPremise(column, upper) ?: SearchAtomPremise.Unavailable
+                        if (premise === SearchAtomPremise.Unavailable) unavailable = true
+                        ExplainedLinearBound(active.side.number.value, active.side.strict, premise)
                     }
-                }, operationStop) ?: continue
+                }, operationStop)
+                if (implication == null) {
+                    if (inputs != null && !unavailable && !operationStop()) partialLinearDeclines[prepared] = inputs
+                    continue
+                }
+                partialLinearDeclines.remove(prepared)
                 val rhs = prepared.booleans.filter { it != variable }.map { input ->
                     SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(input, bools[input] == TRUE)))
                 }
@@ -514,6 +536,21 @@ class ExactLiraSearchComponent private constructor(
             partialLinearEligible += eligible
             partialLinearDeductions += deductions.size
         }
+    }
+
+    private fun partialLinearInputs(comparison: ExactComparison): PartialLinearInputs? {
+        val state = lp.state ?: return null
+        val sides = ArrayList<PartialLinearSide?>(comparison.terms.size * 2)
+        for (column in comparison.terms.keys) {
+            operationStop.charge(3)
+            if (operationStop()) return null
+            val metadata = state.model.column(column)
+            if (metadata.tag != column || !metadata.origin.value.isZero) return null
+            for (upper in listOf(false, true)) {
+                sides += state.activeSide(column, upper)?.side?.let { PartialLinearSide(it.number.value, it.strict) }
+            }
+        }
+        return PartialLinearInputs(comparison.bound, sides)
     }
 
     private fun capturePointHints(point: List<BigFraction>, context: SearchContext, graph: Boolean = false) {

@@ -78,6 +78,9 @@ trail, and retraction removes consequences whose premises leave that trail.
 Its optional propagation mode caches eligible row metadata and publishes before
 the pending LP query. The component applies its own pins locally, then yields to
 the shared fixpoint before numerical checking, retaining the operation allowance.
+An optional decline cache reuses only a failed numerical comparison with the same
+right-hand side and exact bound values and strictness. It retains no consequence
+or premise; changed bounds and every successful proof require fresh evaluation.
 
 #### Disjunctions and disequalities
 

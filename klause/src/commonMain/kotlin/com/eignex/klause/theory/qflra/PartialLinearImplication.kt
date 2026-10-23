@@ -38,7 +38,13 @@ internal data class PartialLinearPropagationStats(
     val eligible: Long,
     val deductions: Long,
     val numericalDeferrals: Long,
+    val arithmeticEvaluations: Long,
+    val unchangedDeclines: Long,
 )
+
+internal data class PartialLinearSide(val value: BigFraction, val strict: Boolean)
+
+internal data class PartialLinearInputs(val bound: BigFraction, val sides: List<PartialLinearSide?>)
 
 internal fun partialLinearImplication(
     comparison: ExactComparison,
