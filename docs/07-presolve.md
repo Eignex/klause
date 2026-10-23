@@ -357,6 +357,10 @@ integer and open-range probing extend this to bounds and holes. Compilation, inc
 row and graph visits charge and poll the pass token. An interruption retains completed
 unconditional deductions and retracts the active hypothetical branch. Candidate,
 entry and representation limits bound optional analysis, not solve time.
+Open-range probing caches its invocation meter and charges every visit exactly.
+Full cancellation polls occur at entry, root-row and hypothetical-branch boundaries,
+and within scans every 64 visits or 4,096 work units. An interrupted scan can spend
+at most one polling stride beyond a stop; hypothetical retraction always completes.
 Finite SAC ordering shares one lazy propagator-filtered integer incidence index per
 ordering call; fixed columns require no incidence. Interior-hole candidates follow
 present domain successors in ascending order, skipping accumulated exclusions without

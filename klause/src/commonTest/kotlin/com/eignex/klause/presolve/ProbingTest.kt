@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -262,7 +263,7 @@ class ProbingTest {
     }
 
     @Test
-    fun `source preparation and root rows should stop at the next metered visit`() {
+    fun `source preparation and root rows should stop within one metered stride`() {
         val problem = Problem(
             0, 8, Array(8) { IntDomain(0, 1) },
             List(8) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
@@ -274,7 +275,7 @@ class ProbingTest {
 
             assertTrue(delta.isEmpty, "allowance=$allowance")
             assertFalse(delta.infeasible)
-            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+            assertTrue(budget.spent() in allowance..allowance + 639, "spent=${budget.spent()}")
         }
     }
 
@@ -287,14 +288,14 @@ class ProbingTest {
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 5),
             ),
         )
-        val budget = PresolveBudget(220)
+        val budget = PresolveBudget(210)
 
         val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
 
         assertFalse(delta.infeasible)
         assertEquals(5L, delta.bounds!!.upper(0))
         assertEquals(10L, delta.bounds.upper(1))
-        assertEquals(220L, budget.spent())
+        assertEquals(210L, budget.spent())
     }
 
     @Test
@@ -307,15 +308,77 @@ class ProbingTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true))),
             ),
         )
-        for (allowance in listOf(451L, 491L, 531L, 581L, 631L, 681L)) {
+        for (allowance in listOf(451L, 491L, 531L, 581L, 631L, 681L, 701L, 781L, 851L)) {
             val budget = PresolveBudget(allowance)
 
             val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
 
             assertTrue(delta.isEmpty, "allowance=$allowance")
             assertFalse(delta.infeasible)
-            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+            assertTrue(budget.spent() in allowance..allowance + 639, "spent=${budget.spent()}")
         }
+    }
+
+    @Test
+    fun `metered source scans without deadlines should batch polls and retain exact charges`() {
+        val problem = Problem(
+            0, 128, Array(128) { IntDomain(0, 1) },
+            List(128) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
+        )
+        var work = 0L
+        var polls = 0
+        var meterReads = 0
+        val meter = WorkMeter { work += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean { polls++; return false }
+            override fun workMeter(): WorkMeter { meterReads++; return meter }
+        }
+
+        val delta = Presolve.probeSource(problem, cap, token)
+
+        assertTrue(delta.isEmpty)
+        assertEquals(15_360L, work)
+        assertTrue(polls in 1..200, "polls=$polls")
+        assertEquals(1, meterReads)
+    }
+
+    @Test
+    fun `metered and unmetered complete source probes should retain the same deductions`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5)),
+        )
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val metered = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+        val unmetered = Presolve.probeSource(problem, cap, Cancellation.Never)
+
+        assertEquals(5L, metered.bounds!!.upper(0))
+        assertEquals(unmetered.bounds!!.upper(0), metered.bounds.upper(0))
+        assertEquals(sourceUnits(unmetered), sourceUnits(metered))
+        assertEquals(160L, budget.spent())
+    }
+
+    @Test
+    fun `metered external cancellation should stop compilation within one stride`() {
+        val problem = Problem(
+            0, 128, Array(128) { IntDomain(0, 1) },
+            List(128) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
+        )
+        var work = 0L
+        var polls = 0
+        val meter = WorkMeter { work += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean { polls++; return work >= 451L }
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val delta = Presolve.probeSource(problem, cap, token)
+
+        assertTrue(delta.isEmpty)
+        assertFalse(delta.infeasible)
+        assertTrue(work in 451L..1_090L, "work=$work")
+        assertTrue(polls in 1..4, "polls=$polls")
     }
 
     @Test
@@ -347,7 +410,7 @@ class ProbingTest {
 
             assertTrue(delta.isEmpty)
             assertFalse(delta.infeasible)
-            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+            assertTrue(budget.spent() in allowance..allowance + 639, "spent=${budget.spent()}")
         }
     }
 
@@ -364,7 +427,7 @@ class ProbingTest {
 
             assertTrue(delta.isEmpty)
             assertFalse(delta.infeasible)
-            assertTrue(budget.spent() in allowance..allowance + 9, "spent=${budget.spent()}")
+            assertTrue(budget.spent() in allowance..allowance + 639, "spent=${budget.spent()}")
         }
     }
 }
