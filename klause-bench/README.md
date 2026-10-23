@@ -767,6 +767,16 @@ that skip redundant normalization when coprimality is established, and the curre
 cancellation polling frequency. See [LP architecture](../docs/17-linear-programming.md)
 and [exact arithmetic](../docs/18-exact-arithmetic.md#numerical-dependencies).
 
+Validated CSC column pricing was compared with pinned current and dependency-only
+controls in [lab 7615](https://lab.eignex.com/experiments/7615): 19 sources, three
+repetitions, seed 1, one core and 10 s, plus reference arms. All 171 Klause cases
+executed; feasibility, objective and proof claims matched across the three arms.
+Recorded work counters matched on 16 sources; time-capped LP work varied on three.
+Solchecker accepted 81 witnesses. Another 63 checks were unsupported, nine were
+undecided and 18 infeasibility claims had no witness check. CLI elapsed time includes
+startup and preparation; full case intervals and separate build/setup logs retain
+the remaining setup costs. The mixed timings establish no solver or SIMD speedup.
+
 ### State ownership
 
 Retain concrete buffer owners, separate indexed vector roles and one cursor/cleanup
