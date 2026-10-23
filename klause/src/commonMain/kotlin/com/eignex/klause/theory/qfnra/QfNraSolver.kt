@@ -97,6 +97,7 @@ internal class QfNraQuery(
     private val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
     var projectionObserver: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null
     var reducedRegionObserver: ((List<PolynomialAtom>) -> Unit)? = null
+    var partialConflictObserver: ((List<PolynomialAtom>) -> Unit)? = null
     val stats: QfNraStats get() = work.snapshot()
     val progress = PolynomialQueryProgress()
     var probeCompleted: Boolean = false
@@ -235,7 +236,7 @@ internal class QfNraQuery(
         work.booleanTheoryAtoms = work.booleanTheoryAtoms ?: 0
         work.booleanTheoryConstantRefutations = work.booleanTheoryConstantRefutations ?: 0
         work.booleanTheoryResourceRefusals = work.booleanTheoryResourceRefusals ?: 0
-        val regions = reducedFormula.booleanRegions(arithmetic)
+        val regions = reducedFormula.booleanRegions(arithmetic, progress) { partialConflictObserver?.invoke(it) }
         var incomplete: PolynomialResource? = null
         while (regions.hasNext()) {
             val region = regions.next()

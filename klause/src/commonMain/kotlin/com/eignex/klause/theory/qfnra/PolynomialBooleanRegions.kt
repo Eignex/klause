@@ -1,6 +1,8 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.FALSE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.TRUE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.UNASSIGNED
@@ -12,10 +14,13 @@ internal class PolynomialBooleanRegions(
     private val root: Int,
     private val atoms: List<PolynomialAtom>,
     private val arithmetic: PolynomialArithmetic,
+    private val progress: PolynomialQueryProgress? = null,
+    private val onConflict: ((List<PolynomialAtom>) -> Unit)? = null,
 ) {
     private val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
-    private val exclusions = ArrayList<List<Literal>>()
+    private val exclusions = ArrayList<Exclusion>()
     private val signs = PolynomialBooleanSigns(nodes, atoms, state, arithmetic)
+    private var partialAvailable = true
 
     fun prepare(): Iterator<PolynomialBooleanRegion?> = sequence<PolynomialBooleanRegion?> {
         if (!initialize()) return@sequence
@@ -23,12 +28,23 @@ internal class PolynomialBooleanRegions(
             if (ready == false) return@sequence
             if (ready == null) yield(null)
         }
+        var checkedChanges = state.numericChanges
         while (true) {
             arithmetic.step()
             if (!propagate()) {
                 if (!state.backtrack()) return@sequence
                 yield(null)
                 continue
+            }
+            if (partialAvailable && state.numericChanges != checkedChanges) {
+                val checking = checkPartial()
+                var consistent: Boolean? = null
+                while (consistent == null) {
+                    consistent = checking.next()
+                    if (consistent == null) yield(null)
+                }
+                checkedChanges = state.numericChanges
+                if (!consistent) continue
             }
             val proof = proof()
             if (proof == null) {
@@ -37,7 +53,7 @@ internal class PolynomialBooleanRegions(
                 yield(proof.region)
                 arithmetic.step()
                 // Exclusions record visited regions; only the numeric caller can certify their exhaustion.
-                exclusions.add(proof.literals)
+                exclusions.add(Exclusion(proof.literals, numeric = false))
             }
             yield(null)
         }
@@ -70,10 +86,10 @@ internal class PolynomialBooleanRegions(
         }
     }
 
-    private fun propagate(excluded: List<Literal>): Boolean {
+    private fun propagate(excluded: Exclusion): Boolean {
         var unknowns = 0
         var pending: Literal? = null
-        for (literal in excluded) {
+        for (literal in excluded.literals) {
             arithmetic.step()
             val value = state.value(literal.node)
             if (value == UNASSIGNED) {
@@ -81,13 +97,76 @@ internal class PolynomialBooleanRegions(
                 pending = literal
             } else if (value != literal.value) return true
         }
-        if (unknowns == 0) return false
+        if (unknowns == 0) {
+            used(excluded)
+            return false
+        }
         if (unknowns == 1) {
+            used(excluded)
             val literal = checkNotNull(pending)
             return state.assign(literal.node, TRUE - literal.value)
         }
         return true
     }
+
+    private fun used(exclusion: Exclusion) {
+        if (!exclusion.numeric) return
+        arithmetic.step()
+        progress?.let {
+            it.partialExclusionUses++
+            if (exclusion.uses > 0) it.partialExclusionReuses++
+        }
+        exclusion.uses++
+    }
+
+    private fun checkPartial(): Iterator<Boolean?> = sequence {
+        try {
+            val required = ArrayList<PolynomialAtom>()
+            val premises = ArrayList<Literal>()
+            for ((index, node) in nodes.withIndex()) {
+                arithmetic.step()
+                if (node !is FormulaNode.Atom) continue
+                val value = state.value(index)
+                if (value == UNASSIGNED) continue
+                val atom = atoms[node.atom]
+                required.add(if (value == TRUE) atom else PolynomialAtom(atom.polynomial, when (atom.relation) {
+                    PolynomialRelation.EQ -> PolynomialRelation.NE
+                    PolynomialRelation.NE -> PolynomialRelation.EQ
+                    PolynomialRelation.LT -> PolynomialRelation.GE
+                    PolynomialRelation.LE -> PolynomialRelation.GT
+                    PolynomialRelation.GT -> PolynomialRelation.LE
+                    PolynomialRelation.GE -> PolynomialRelation.LT
+                }))
+                premises.add(Literal(index, value))
+            }
+            if (premises.isEmpty()) {
+                yield(true)
+                return@sequence
+            }
+            progress?.let { it.partialChecks++ }
+            val checking = preparePolynomialSignRefutation(required, signs.realCount, arithmetic)
+            var conflict: Boolean? = null
+            while (conflict == null) {
+                conflict = checking.next()
+                if (conflict == null) yield(null)
+            }
+            arithmetic.step()
+            if (conflict) {
+                // A completed arithmetic contradiction excludes these signed predicates under every Boolean prefix.
+                exclusions.add(Exclusion(premises, numeric = true))
+                progress?.let {
+                    it.partialConflicts++
+                    it.partialConflictPremises += premises.size
+                }
+                onConflict?.invoke(required.toList())
+            }
+            yield(!conflict)
+        } catch (_: PolynomialResourceLimit) {
+            partialAvailable = false
+            progress?.let { it.partialDeclines++ }
+            yield(true)
+        }
+    }.iterator()
 
     private fun proof(): Proof? {
         val witnessed = BooleanArray(nodes.size)
@@ -177,5 +256,6 @@ internal class PolynomialBooleanRegions(
     }
 
     private class Literal(val node: Int, val value: Int)
+    private class Exclusion(val literals: List<Literal>, val numeric: Boolean, var uses: Long = 0)
     private class Proof(val region: PolynomialBooleanRegion, val literals: List<Literal>)
 }
