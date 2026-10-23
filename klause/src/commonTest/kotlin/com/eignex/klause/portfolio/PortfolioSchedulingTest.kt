@@ -168,7 +168,9 @@ class PortfolioSchedulingTest {
         )
         val bandit = fixedBandit(2, arm = 1)
 
-        val result = Portfolio(workers, bandit).use {
+        val result = Portfolio(workers, bandit).also {
+            it.runTimeSource = TestTimeSource()
+        }.use {
             it.minimize(Cancellation { slices.sum() >= 8 })
         }
 
@@ -688,7 +690,9 @@ class PortfolioSchedulingTest {
             )
             val bandit = fixedBandit(2, arm = 1)
 
-            Portfolio(workers, bandit, minShares = doubleArrayOf(1.0, 0.0)).use {
+            Portfolio(workers, bandit, minShares = doubleArrayOf(1.0, 0.0)).also {
+                it.runTimeSource = TestTimeSource()
+            }.use {
                 it.reserveBeforeIncumbentOnly = feasibilityOnly
                 it.minimize(Cancellation { reached.size >= 3 })
             }
