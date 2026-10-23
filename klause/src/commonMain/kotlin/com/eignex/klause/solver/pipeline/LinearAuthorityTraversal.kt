@@ -44,7 +44,8 @@ internal class LinearAuthorityTraversal(
         observations["numericalLpInputMaxRows"] =
             maxOf(observations["numericalLpInputMaxRows"] ?: 0L, shape.inputRows.toLong())
         observations["numericalLpMaxRows"] = maxOf(observations["numericalLpMaxRows"] ?: 0L, shape.rows.toLong())
-        observations["numericalLpMaxColumns"] = maxOf(observations["numericalLpMaxColumns"] ?: 0L, shape.columns.toLong())
+        observations["numericalLpMaxColumns"] =
+            maxOf(observations["numericalLpMaxColumns"] ?: 0L, shape.columns.toLong())
         observations["numericalLpExtractedBoundRows"] =
             (observations["numericalLpExtractedBoundRows"] ?: 0L) + shape.inputRows - shape.rows
         if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
