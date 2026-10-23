@@ -224,7 +224,7 @@ internal class LinearPrefixSnapshot(private val stop: Cancellation) {
             })
             put("registeredAtoms", scalar(atoms?.let { field(it, "assertions") }))
             put("registeredPins", buildJsonArray {
-                val assertions = atoms?.let { field(it, "assertions") } as? List<*> ?: emptyList<Any>()
+                val assertions = (atoms?.let { field(it, "assertions") } as? List<*>).orEmpty()
                 for (assertion in assertions) {
                     val literal = member(requireNotNull(assertion), "getLiteral") as Int
                     if (literal and 1 != 0) continue
