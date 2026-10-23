@@ -65,6 +65,65 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
     @Test
+    fun `retained free coordinates should complete a full Boolean state before component LP`() {
+        val scale = 1.0 / (1L shl 40).toDouble()
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 133,
+            realLower = DoubleArray(133) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(133) { Double.POSITIVE_INFINITY },
+            factors = Array<Factor>(133) { index ->
+                when (index) {
+                    0 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, -scale, -1.0), LinearOp.EQ, 0.0)
+                    1 -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                        doubleArrayOf(1.0, 1.0), LinearOp.LE, scale / 2.0)
+                    2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                        doubleArrayOf(1.0, 1.0), LinearOp.GE, scale / 2.0)
+                    3 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1),
+                        doubleArrayOf(-1.0), LinearOp.LE, 0.0, strict = true)
+                    4 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
+                        doubleArrayOf(-1.0, -1.0), LinearOp.LE, 0.0, strict = true)
+                    else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index),
+                        doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
+                }
+            },
+        )
+        var repairableGuess = true
+        val factory = TrackingLpFactory(transform = { result ->
+            if (result.primal.size <= 128) result else {
+                val primal = DoubleArray(result.primal.size)
+                if (repairableGuess) primal[1] = 0.25
+                FloatLpResult(result.basis, result.objective, result.duals, primal,
+                    optimal = result.optimal, exactState = result.exactState)
+            }
+        })
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.useMixedPointCompletion()
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            val operations = stats.snapshot().sourceLp.operations
+            repairableGuess = false
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            val result = assertIs<SearchResult.Satisfied>(session.solve(2))
+
+            val point = assertNotNull(result.model.valueOf(component.realAssignmentKey)).reals
+            assertTrue(point[1] > BigFraction.ZERO)
+            assertEquals(assertNotNull(BigFraction.ofDouble(scale / 2.0)), point[0] + point[3])
+            assertEquals(operations, stats.snapshot().sourceLp.operations)
+            assertTrue((stats.snapshot().completeSearchStages?.get("RECOVERY_RETAINED_EQUALITY_POINT") ?: 0L) > 0L)
+        }
+    }
+
+    @Test
     fun `ordinary primary points should guide a checked sibling after retraction`() {
         val source = Problem(
             numBoolVars = 2,

@@ -1829,7 +1829,7 @@ class ExactLiraSearchComponent private constructor(
                         onSourceInfeasible = reportInfeasible,
                         realCompletion = { columns, residual, token, onInfeasible ->
                             reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
-                        })
+                        }, recoveryGuesses = if (sourceRecoveryScope()) retainedRecoveryGuesses() else emptySequence())
                     val support = sourceInfeasible
                     if (candidate == null && support != null && origins != null &&
                         sourceEqualityConflict(context, origins, support)

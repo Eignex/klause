@@ -182,7 +182,8 @@ same retained-coordinate repairs afterward in that unchanged row scope.
 When the ordinary float-based equality repair
 fails, the bounded repair can also reconstruct the retained free coordinates against
 the current source equations before component LP completion. Every selected original
-row checks that reconstructed candidate.
+row checks that reconstructed candidate. Complete Boolean states use these same
+bounded numerical offers when their float candidate lacks an exact point.
 
 ### Results and proof authority
 
