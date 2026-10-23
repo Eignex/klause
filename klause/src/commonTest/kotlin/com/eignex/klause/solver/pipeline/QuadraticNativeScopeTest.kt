@@ -10,8 +10,73 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
 class QuadraticNativeScopeTest {
+    @Test
+    fun `native polling should preserve timeout and external predicate order`() {
+        val visited = ArrayList<Int>()
+        var expired = false
+        val scope = QuadraticNativeScope(PolynomialTheoryParams(
+            timeout = Cancellation { visited += 1; expired },
+            cancellation = Cancellation { visited += 2; false },
+        )).worker(0)
+
+        assertFalse(scope.polynomial())
+        assertEquals(listOf(1, 2), visited)
+        visited.clear()
+        expired = true
+        assertTrue(scope.polynomial())
+
+        assertEquals(listOf(1), visited)
+    }
+
+    @Test
+    fun `native allowance stops should precede containing predicates`() {
+        var polls = 0
+        val scope = QuadraticNativeScope(PolynomialTheoryParams(
+            maximumWork = 3,
+            cancellation = Cancellation { polls++; false },
+        ))
+        val worker = scope.worker(0, maximumWork = 1)
+
+        worker.polynomial.charge(1)
+        assertTrue(worker.polynomial())
+
+        assertEquals(0, polls)
+        assertFalse(scope.polynomial())
+        assertEquals(1, polls)
+    }
+
+    @Test
+    fun `a containing deadline should stop every native worker`() {
+        val clock = TestTimeSource()
+        val scope = QuadraticNativeScope(PolynomialTheoryParams(
+            timeout = Cancellation.until(clock.markNow() + 1.seconds),
+        ))
+        val first = scope.worker(0)
+        val second = scope.worker(1)
+        assertFalse(first.polynomial())
+
+        clock += 1.seconds
+
+        assertTrue(first.polynomial())
+        assertTrue(second.numerical())
+        assertTrue(scope.polynomial())
+    }
+
+    @Test
+    fun `a containing representation decline should stop existing workers`() {
+        val scope = QuadraticNativeScope(PolynomialTheoryParams())
+        val worker = scope.worker(0)
+
+        scope.decline(PolynomialResource.MATRIX_CELLS)
+
+        assertTrue(worker.polynomial())
+        assertTrue(scope.polynomial())
+    }
+
     @Test
     fun `native observation aggregation should saturate without polling or charging`() {
         var polls = 0
