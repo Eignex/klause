@@ -159,8 +159,9 @@ class NativeClauseSearchComponentTest {
         interrupted = true
         assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(1)))
         assertNull(session.boolValue(1))
-        session.popTo(0)
         interrupted = false
+        assertIs<ComponentResult.Indeterminate>(session.propagate())
+        session.popTo(0)
 
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
 

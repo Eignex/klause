@@ -22,17 +22,24 @@ internal class NativeClauseSearchComponent(
     )
     private val delegate = CpSearchComponent(native, sourceIntIds = IntArray(0))
     private val levels = IntArrayList().apply { add(native.decisionLevel) }
+    private var interruptedLevel: Int? = null
+
+    private fun unavailable(context: SearchContext): Boolean =
+        interruptedLevel != null || native.fixpointCancelled || context.cancelled()
 
     override fun initialize(context: SearchContext): ComponentResult =
-        if (native.fixpointCancelled || context.cancelled()) ComponentResult.Indeterminate else delegate.initialize(context)
+        if (unavailable(context)) ComponentResult.Indeterminate else delegate.initialize(context)
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
         val result = when {
-            native.fixpointCancelled || context.cancelled() -> ComponentResult.Indeterminate
+            unavailable(context) -> ComponentResult.Indeterminate
             decision is SearchDecision.Bool && decision.literal ushr 1 in 0 until numBoolVars -> {
                 val complete = native.decisionLevel
                 val asserted = delegate.assert(decision, context)
-                if (native.restoreInterruptedFixpoint(complete)) ComponentResult.Indeterminate else asserted
+                if (native.restoreInterruptedFixpoint(complete)) {
+                    interruptedLevel = context.decisionLevel
+                    ComponentResult.Indeterminate
+                } else asserted
             }
             else -> ComponentResult.Consistent
         }
@@ -44,16 +51,18 @@ internal class NativeClauseSearchComponent(
     }
 
     override fun propagate(context: SearchContext): ComponentResult =
-        if (native.fixpointCancelled || context.cancelled()) ComponentResult.Indeterminate else ComponentResult.Consistent
+        if (unavailable(context)) ComponentResult.Indeterminate else ComponentResult.Consistent
 
     override fun retract(decisionLevel: Int) {
         native.popToLevel(levels[decisionLevel])
         levels.truncateTo(decisionLevel + 1)
+        // Shared publications survive private rollback until their shared suffix is also removed.
+        if (interruptedLevel?.let { decisionLevel < it } == true) interruptedLevel = null
     }
 
     override fun reasonFor(literal: Int): SearchExplanation? =
         if (literal ushr 1 in 0 until numBoolVars) delegate.reasonFor(literal) else null
 
     override fun check(context: SearchContext): ComponentCheck =
-        if (context.cancelled()) ComponentCheck.Indeterminate else delegate.check(context)
+        if (unavailable(context)) ComponentCheck.Indeterminate else delegate.check(context)
 }
