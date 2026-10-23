@@ -96,7 +96,9 @@ The opt-in `extended-*` variants of `violated`, `structured` and `elected` draw
 richer moves that cost more to generate and are not always net-positive, such as a
 Circuit 2-opt reversal, an AllDifferent 3-cycle or a DP-optimal accepting run for
 Regular. Default arms never pay for them. Each
-configured source carries a per-pick candidate cap and an enable gate; the stall
+configured source carries a per-pick candidate cap and an enable gate. The reserved
+feasible structural draw retains bounded [board swap coverage](11-neighborhoods.md#board-swap-coverage)
+between picks and slices. The stall
 signal of the schedule axis gates the plateau-escape sources.
 
 Every source closes its candidates through the ordinary move sink, which applies

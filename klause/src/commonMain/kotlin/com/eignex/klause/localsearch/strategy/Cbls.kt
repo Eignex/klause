@@ -69,7 +69,7 @@ fun Cbls(
      *  tolerated before a restart. CBLS samples its sources, so a `null` pick is usually a draw that
      *  missed an existing improving move, not a true local optimum — re-sampling this many times (while
      *  the stall machinery engages) before restarting keeps an unlucky draw from discarding a good
-     *  partial solution. `0` reverts to restart-on-first-miss. */
+     *  partial solution. `0` restarts on the first miss after retained board coverage completes. */
     feasibleResampleCap: Int = 32,
     /** **Plateau-buster** (opt-in, `0` = off): cap on stall-gated, score-only same-domain pair-swap
      *  moves — the coordinated exchange equal-coefficient-sum (bacp-style) plateaus need. */
