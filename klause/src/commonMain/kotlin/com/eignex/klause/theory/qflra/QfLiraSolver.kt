@@ -241,6 +241,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintStop = Cancellation.Never
     private var dirty = true
     private var sourceInstalled = false
+    private var missingSourceOwnerObserved = false
     private var graphFirst = false
     private var solveContext = LpSolveContext.Production
     private var solveStop: Cancellation? = null
@@ -1238,7 +1239,19 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun installSource(): Boolean {
-        if (sourceInstalled) return true
+        if (sourceInstalled) {
+            if (!missingSourceOwnerObserved && lp.state == null) {
+                missingSourceOwnerObserved = true
+                val stage = if (parentStop() || (pollContextStop && context?.cancelled() == true)) {
+                    "SOURCE_CACHED_INSTALL_OWNER_MISSING_CONTAINING_STOPPED"
+                } else {
+                    "SOURCE_CACHED_INSTALL_OWNER_MISSING_CONTAINING_LIVE"
+                }
+                smtStats?.observeOpenRunEvent(stage)
+                if (completeTraversalObserved) smtStats?.observeOpenRunEvent("COMPLETE_$stage")
+            }
+            return true
+        }
         return system.install().also { sourceInstalled = it }
     }
 

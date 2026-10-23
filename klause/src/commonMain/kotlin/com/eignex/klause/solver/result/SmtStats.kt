@@ -91,7 +91,7 @@ data class SmtStats(
     val completeSearchLinearPoints: Long? = null,
     /** Returned LP verdict and stage observations before the caller stop check; excludes private queries. */
     val completeSearchLinearOutcomes: Map<String, Long>? = null,
-    /** Complete-traversal branch and mixed recovery stages; null until observed. */
+    /** Complete-traversal stages, open worker terminal events and source owner observations; null until observed. */
     val completeSearchStages: Map<String, Long>? = null,
 ) {
     /** Combine independent solve slices. */
