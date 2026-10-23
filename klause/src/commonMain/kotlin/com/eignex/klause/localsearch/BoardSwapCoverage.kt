@@ -29,7 +29,7 @@ internal class BoardSwapCoverage {
         syncAssumptions(state)
         if (!checked) {
             val boards = state.seeding.electedImplicit.filter { state.factors[it] is AllDifferentInvariant }
-            if (boards.isNotEmpty()) cursor = Cursor(boards.toIntArray())
+            if (boards.isNotEmpty()) cursor = Cursor(boards.toIntArray(), state.seeding.electedImplicit)
             checked = true
         }
         val live = cursor ?: return false
@@ -55,6 +55,12 @@ internal class BoardSwapCoverage {
         cursor?.finishPick(cancelled && consulted)
     }
 
+    fun nextFactor(state: LocalSearchState): Int? {
+        if (!request(state)) return null
+        consulted = true
+        return cursor?.nextFactor(state)
+    }
+
     fun generate(state: LocalSearchState, factorId: Int, sink: MoveSink, cancellation: Cancellation): Boolean {
         if (!request(state)) return false
         val live = checkNotNull(cursor)
@@ -78,7 +84,7 @@ internal class BoardSwapCoverage {
         }
     }
 
-    private class Cursor(private val boards: IntArray) {
+    private class Cursor(private val boards: IntArray, private val elected: IntArray) {
         private val initialized = LongArray(boards.size)
         private val finished = LongArray(boards.size)
         private val position = LongArray(boards.size)
@@ -88,6 +94,8 @@ internal class BoardSwapCoverage {
         private var boardsLeft = 0
         private var savedBoardsLeft = 0
         private var savedEpoch = 0L
+        private var source = -1
+        private var savedSource = -1
         private var picking = false
         private val touched = IntArrayList()
         private val savedPosition = LongArrayList()
@@ -104,16 +112,29 @@ internal class BoardSwapCoverage {
             picking = false
             epoch++
             boardsLeft = 0
+            source = -1
         }
 
         fun start() {
             boardsLeft = boards.size
+            source = -1
+        }
+
+        fun nextFactor(state: LocalSearchState): Int {
+            if (source < 0) {
+                source = state.rng.nextInt(elected.size)
+                if (picking) savedSource = source
+            }
+            val factor = elected[source]
+            source = (source + 1) % elected.size
+            return factor
         }
 
         fun beginPick() {
             picking = true
             savedBoardsLeft = boardsLeft
             savedEpoch = epoch
+            savedSource = source
             touched.clear()
             savedPosition.clear()
             savedRemaining.clear()
@@ -130,6 +151,7 @@ internal class BoardSwapCoverage {
                 finished[id] = savedFinished[i]
             }
             boardsLeft = savedBoardsLeft
+            source = savedSource
         }
 
         fun visit(state: LocalSearchState, id: Int, sink: MoveSink) {
