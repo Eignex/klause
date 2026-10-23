@@ -6,6 +6,7 @@ plugins {
 tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
     testLogging.events = testLogging.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED
     testLogging.showStandardStreams = true
+    testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
 }
 
 // Coverage belongs to this solver; instrumenting dependencies adds startup work unrelated to its report.
