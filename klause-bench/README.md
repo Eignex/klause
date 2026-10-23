@@ -807,6 +807,16 @@ did not improve consistently; objectives had five wins, six losses and 79 ties
 pre-solver compile timeouts from [7647](https://lab.eignex.com/jobs/7647) remain
 outside this LS-only rerun.
 
+All 191 steelmillslab incumbent publications in 7667 came from the annotation CP
+worker. Every pair has the same first objective; the 79 pairs that stop at that
+first publication have identical witnesses. The eleven unequal pairs differ by a
+later CP improvement, published 9.30–10.25 s into the process. Unchanged main at
+seed 1 returns 54, 54 and 51 on `bench_16_10`, and 56, 52 and 56 on `bench_15_11`.
+The corresponding median annotation-CP work across all nine runs is 13775 versus
+15508 and 15524 versus 15524 for main and sparse/packed traversal. Individual
+losses remain measured losses, but move rates and a shared seed do not establish
+equal CP work or scoring trajectories under elapsed-dependent scheduling.
+
 Control costs vary: mapping/code-generator paired move-rate ratios span 0.84–1.19.
 In the three-way fixed-arm [7660](https://lab.eignex.com/jobs/7660) guard,
 `ring_mp3` CBLS median elapsed time was 919 ms on main, 922 ms with packed-only
