@@ -910,6 +910,15 @@ nine small-source losses; large-source pairs have four wins/five losses, gbac tw
 wins/four losses/three ties and photo nine ties. All 72 witnesses pass source
 checking. Preserving the sampled prefix alone does not support promotion.
 
+[7753](https://lab.eignex.com/jobs/7753) rotates boards and randomizes initial pair
+ranks at `6a480af1ee`, retaining the completion requirement before restart. Fixed
+work has ten original-team wins and six losses; all sixteen control pairs tie.
+All 64 witnesses pass source checking. The default route in
+[7754](https://lab.eignex.com/jobs/7754) has nine small-source losses, one large-source
+win/eight losses, four gbac wins/five losses and nine photo ties. All 72 witnesses
+pass source checking. Completing coverage before restart changes basin cadence;
+these results do not support that policy.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;

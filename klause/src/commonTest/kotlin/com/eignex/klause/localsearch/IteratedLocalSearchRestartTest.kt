@@ -1,4 +1,5 @@
 package com.eignex.klause.localsearch
+
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
@@ -17,6 +18,21 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class IteratedLocalSearchRestartTest {
+    @Test
+    fun `feasible stalls should use the same anchor acceptance and strength adaptation`() {
+        val state = LocalSearchState(Problem(1, 0, emptyArray(), emptyArray()).bake(), Random(0))
+        val completed = IteratedLocalSearchRestart(populationSize = 2, initialPerturbationStrength = 3)
+        val stalled = IteratedLocalSearchRestart(populationSize = 2, initialPerturbationStrength = 3)
+        val sample = Sample(booleanArrayOf(true), longArrayOf())
+
+        for (objective in listOf(10.0, 8.0, 12.0, 12.0, 12.0, 5.0)) {
+            completed.onLocalOptimum(state, sample, objective)
+            stalled.onFeasibleStall(state, sample, objective)
+        }
+
+        assertEquals(completed.incumbents, stalled.incumbents)
+        assertEquals(completed.perturbationStrength, stalled.perturbationStrength)
+    }
 
     @Test
     fun `each acceptance criterion should accept candidates per its semantics`() {

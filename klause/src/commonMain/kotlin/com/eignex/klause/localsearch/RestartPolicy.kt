@@ -22,6 +22,10 @@ interface RestartPolicy {
      *  is a no-op. The optimiser calls it right before [restart]. */
     fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {}
 
+    /** A feasible walk reached its restart boundary without establishing local optimality.
+     *  Policies may retain this sample as a basin anchor; the notification grants no optimum credit. */
+    fun onFeasibleStall(state: LocalSearchState, sample: Sample, objective: Double) {}
+
     /** Carry out the restart. Default behaviour is a fresh random assignment via
      *  [LocalSearchState.restart]; policies that anchor to good regions override using
      *  `bestSoFar`. The optimiser path supplies the running best feasible sample;

@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch.strategy
 
+import com.eignex.klause.localsearch.AspirationCriterion
 import com.eignex.klause.localsearch.CompletedMoveEvaluation
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -83,12 +84,11 @@ class SourceDrivenStrategy(
     /** Acceptance used only in the feasible (`cost == 0`) phase, when the objective is scored, in place
      *  of [acceptance]. Lets a strategy fight infeasibility with noise but descend the objective
      *  strictly: CBLS sets [AcceptanceRule.GreedyDescent] so it takes only objective-improving moves and
-     *  otherwise returns `null` to resample or finish retained coverage. `null` reuses [acceptance] in both phases. */
+     *  otherwise returns `null` to resample or restart. `null` reuses [acceptance] in both phases. */
     val feasibleAcceptance: AcceptanceRule? = null,
-    /** Consecutive sampled misses before requesting bounded retained board coverage or restarting.
-     *  A positive cap preserves the sampled descent before coverage; `0` starts coverage directly for
-     *  [AcceptanceRule.GreedyDescent]. Without a retained source, zero restarts on the first miss.
-     *  Incomplete coverage delays the local-optimum callback within the containing work allowance. */
+    /** Consecutive missed picks before restarting. Bounded board coverage uses the same picks and
+     *  does not extend this cap. An incomplete pass reports a feasible stall, not a local optimum.
+     *  Zero restarts on the first miss. */
     val feasibleResampleCap: Int = 0,
 ) {
 
@@ -134,6 +134,10 @@ class SourceDrivenStrategy(
         it.enabled && it.cap > 0 && !it.stallGated && it.effectivePhase.appliesAt(0L) &&
             (it.source as? SatisfiedStructured)?.supportsBoardCoverage == true
     }
+
+    internal val gradesAllBoardImprovements: Boolean get() =
+        !configurationChecking && (feasibleAcceptance ?: acceptance) == AcceptanceRule.GreedyDescent &&
+            (tabu.aspiration == AspirationCriterion.OrImproving || (tabu.tenure <= 0 && tabu.dynamicTenure == null))
 
     private data class CompletionSeed(val sink: MoveSink, val remaining: Int)
 
