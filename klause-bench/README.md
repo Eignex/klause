@@ -957,6 +957,17 @@ seven gbac wins/eleven losses/two ties and twenty photo ties. All 160 witnesses
 pass source checking. The small-source loss rejects promotion despite the
 large-source gain; pair ordering alone does not preserve sampled descent quality.
 
+Keeping one productive board per reserved draw at `83c1bf1e97` passes CI and has ten
+original-team fixed-work wins/six losses with all controls tied in
+[7765](https://lab.eignex.com/jobs/7765). Default
+[7766](https://lab.eignex.com/jobs/7766) has four small-source wins/five losses,
+eight large-source wins/one loss, seven gbac wins/two ties and nine photo ties.
+All 136 witnesses pass source checking. Across every seed from one through ten,
+twice, [7767](https://lab.eignex.com/jobs/7767) has nine small-source wins/eleven
+losses and mean loss 735.9, fifteen large-source wins/five losses and mean gain
+3337.4, nine gbac wins/eleven losses and twenty photo ties. All 160 witnesses pass
+source checking. Grouping alone leaves a small-source quality tradeoff.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;

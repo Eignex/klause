@@ -79,9 +79,9 @@ whole-source validation remain required.
 
 ## Board swap coverage
 
-After a strict feasible descent's sampled pick misses, the reserved structural draw rotates across elected AllDifferent
-boards between picks. A pick groups its proposals from one board; an exhausted board
-that emits none leaves the remaining visit allowance available to another board.
+After a strict feasible descent's sampled pick misses, the reserved structural draw
+keeps its existing elected-global selection. A selected AllDifferent board retains
+its pair progress; other elected globals keep their ordinary structured proposals.
 Each board starts at a random unordered pair and visits cyclic pair ranks
 without repetition, using a random coprime stride to spread partial passes across ranks.
 A pick keeps the ordinary limit of four proposals and 24
@@ -89,7 +89,7 @@ visits. Both inputs pass pin, definition, domain and proposing-owner filters bef
 the complete compound enters ordinary generated-move scoring and acceptance.
 
 The live state retains its board and pair cursor across picks and suspended slices.
-A cancelled selection restores uncommitted pair progress. Assignment changes,
+A cancelled selection restores ungraded pair progress. Assignment changes,
 restarts, definition changes and ownership reseeding invalidate coverage.
 
 Coverage uses the existing resample window and never delays its restart boundary.

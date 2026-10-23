@@ -54,29 +54,25 @@ internal class BoardSwapCoverage {
         cursor?.finishPick(cancelled && consulted)
     }
 
-    fun generate(state: LocalSearchState, sink: MoveSink, cancellation: Cancellation): Boolean {
+    fun generate(state: LocalSearchState, factorId: Int, sink: MoveSink, cancellation: Cancellation): Boolean {
         if (!request(state)) return false
-        consulted = true
         val live = checkNotNull(cursor)
+        val board = live.boardIndex(factorId)
+        if (board < 0) return false
+        consulted = true
         val before = sink.size
         var visits = 0
         val cap = AllDifferentInvariant.MAX_STRUCTURED_SWAPS
-        live.beginBatch()
         try {
-            while (live.hasRemaining && visits < cap * AllDifferentInvariant.SWAP_ATTEMPT_STRIDE &&
+            while (live.hasRemaining(board) && visits < cap * AllDifferentInvariant.SWAP_ATTEMPT_STRIDE &&
                 sink.size - before < cap
             ) {
                 if (cancellation()) return true
                 visits++
-                live.visit(state, sink)
-                if (live.batchFinished) {
-                    if (sink.size > before) break
-                    live.advanceBoard()
-                }
+                live.visit(state, board, sink)
             }
             return true
         } finally {
-            live.advanceBoard()
             sink.proposer = MoveSink.NO_PROPOSER
         }
     }
@@ -88,21 +84,20 @@ internal class BoardSwapCoverage {
         private val stride = LongArray(boards.size)
         private val remaining = LongArray(boards.size)
         private var epoch = 1L
-        private var board = 0
-        private var started = false
         private var boardsLeft = 0
-        private var savedBoard = 0
         private var savedBoardsLeft = 0
         private var savedEpoch = 0L
         private var picking = false
-        var batchFinished: Boolean = false
-            private set
         private val touched = IntArrayList()
         private val savedPosition = LongArrayList()
         private val savedRemaining = LongArrayList()
         private val savedFinished = LongArrayList()
 
         val hasRemaining: Boolean get() = boardsLeft > 0
+
+        fun hasRemaining(board: Int): Boolean = finished[board] != epoch
+
+        fun boardIndex(factorId: Int): Int = boards.binarySearch(factorId)
 
         fun invalidate() {
             picking = false
@@ -111,22 +106,11 @@ internal class BoardSwapCoverage {
         }
 
         fun start() {
-            started = false
             boardsLeft = boards.size
-        }
-
-        fun beginBatch() {
-            batchFinished = false
-        }
-
-        fun advanceBoard() {
-            board = (board + 1) % boards.size
-            batchFinished = false
         }
 
         fun beginPick() {
             picking = true
-            savedBoard = board
             savedBoardsLeft = boardsLeft
             savedEpoch = epoch
             touched.clear()
@@ -144,21 +128,10 @@ internal class BoardSwapCoverage {
                 remaining[id] = savedRemaining[i]
                 finished[id] = savedFinished[i]
             }
-            board = savedBoard
             boardsLeft = savedBoardsLeft
         }
 
-        fun visit(state: LocalSearchState, sink: MoveSink) {
-            if (!started) {
-                board = state.rng.nextInt(boards.size)
-                started = true
-                if (picking) savedBoard = board
-            }
-            val id = board
-            if (finished[id] == epoch) {
-                advanceBoard()
-                return
-            }
+        fun visit(state: LocalSearchState, id: Int, sink: MoveSink) {
             val fid = boards[id]
             val invariant = state.factors[fid] as AllDifferentInvariant
             val size = invariant.swapCoordinateCount
@@ -190,7 +163,6 @@ internal class BoardSwapCoverage {
             if (remaining[id] == 0L) {
                 finished[id] = epoch
                 boardsLeft--
-                batchFinished = true
             }
         }
 
