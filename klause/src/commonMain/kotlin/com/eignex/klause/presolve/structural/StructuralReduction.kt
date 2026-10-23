@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve.structural
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
@@ -26,6 +27,8 @@ internal object StructuralReduction {
         var domains: Array<IntDomain>? = null
         for ((i, f) in problem.factors.withIndex()) {
             if (!visit(cancellation)) break
+            // Clause is final and inherits the unchanged hook.
+            if (f is Clause) continue
             for (v in f.intVars) if (!visit(cancellation)) {
                 return PassDelta(dropped.toIntArray(), added, domains)
             }
@@ -79,6 +82,7 @@ internal object StructuralReduction {
         val tightening = bounds.tightening()
         for ((i, f) in problem.factors.withIndex()) {
             if (!visit(cancellation)) break
+            if (f is Clause) continue
             var allClosed = true
             for (v in f.intVars) {
                 if (!visit(cancellation)) return SourceDelta(dropped.toIntArray(), added, tightening.build())
@@ -119,6 +123,6 @@ internal object StructuralReduction {
         return !cancellation()
     }
 
-    // Work charged per factor offered the hook, scaled by its arity: most hooks read each column once.
+    // Every factor is charged; hook candidates also pay for their columns.
     private const val STRUCTURAL_WORK_WEIGHT = 10L
 }

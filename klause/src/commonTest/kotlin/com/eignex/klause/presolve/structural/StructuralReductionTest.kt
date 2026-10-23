@@ -2,6 +2,9 @@ package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -10,7 +13,9 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveBudget
@@ -22,9 +27,91 @@ import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class StructuralReductionTest {
+    @Test
+    fun `clause scan work should be independent of literal count`() {
+        for (source in listOf(true, false)) {
+            for (width in listOf(1, 64)) {
+                val clause = Clause(IntArray(width) { Lit.make(it, true) })
+                val problem = BakedProblem(width, 0, emptyArray(), List(3) { clause }, alreadyFolded = true)
+                val budget = PresolveBudget(10_000L)
+                val token = budget.orSpent(Cancellation.Never)
+
+                val empty = if (source) StructuralReduction.reduceSource(problem, token).isEmpty
+                else StructuralReduction.reduce(problem, token).isEmpty
+
+                assertTrue(empty)
+                assertEquals(30L, budget.spent())
+            }
+        }
+    }
+
+    @Test
+    fun `clause scan should stop before a later hook when its budget is spent`() {
+        for (source in listOf(true, false)) {
+            var called = false
+            val clause = Clause(intArrayOf(Lit.make(0, true)))
+            val custom = object : Factor by clause, Propagator by clause.propagatorProjection() {
+                override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+                    called = true
+                    return FactorReduction.Rewrite(emptyList())
+                }
+            }
+            val problem = BakedProblem(1, 0, emptyArray(), List(32) { clause } + custom, alreadyFolded = true)
+            val budget = PresolveBudget(80L)
+            val token = budget.orSpent(Cancellation.Never)
+
+            val empty = if (source) StructuralReduction.reduceSource(problem, token).isEmpty
+            else StructuralReduction.reduce(problem, token).isEmpty
+
+            assertTrue(empty)
+            assertFalse(called)
+            assertEquals(80L, budget.spent())
+        }
+    }
+
+    @Test
+    fun `clauses should leave Boolean global and custom rewrites available`() {
+        for (source in listOf(true, false)) {
+            val literals = intArrayOf(Lit.make(0, true), Lit.make(1, true))
+            val clause = Clause(literals)
+            val custom = object : Factor by clause, Propagator by clause.propagatorProjection() {
+                override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
+                    FactorReduction.Rewrite(emptyList())
+            }
+            val factors = listOf(
+                clause,
+                Cardinality(literals, min = 0, max = 2),
+                PseudoBoolean(longArrayOf(1, 1), literals, PbOp.LE, 1),
+                Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false),
+                custom,
+                clause,
+            )
+            val problem = BakedProblem(
+                2, 2, arrayOf(IntDomain(2, 2), IntDomain(0, 100)), factors, alreadyFolded = true,
+            )
+
+            val (dropped, added) = if (source) {
+                val delta = StructuralReduction.reduceSource(problem)
+                delta.droppedIndices to delta.addedFactors
+            } else {
+                val delta = StructuralReduction.reduce(problem)
+                delta.droppedIndices to delta.addedFactors
+            }
+
+            assertEquals(listOf(1, 2, 3, 4), dropped.toList())
+            assertEquals(2, added.size)
+            val cardinality = added.filterIsInstance<Cardinality>().single()
+            assertEquals(0, cardinality.min)
+            assertEquals(1, cardinality.max)
+            val linear = added.filterIsInstance<Linear>().single()
+            assertEquals(20L, checkNotNull(linear.integerConstants).bound)
+        }
+    }
+
     @Test
     fun `interruption in a later hook should retain only the complete earlier rewrite`() {
         for (source in listOf(true, false)) {
