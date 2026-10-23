@@ -683,15 +683,22 @@ class PortfolioSchedulingTest {
     @Test
     fun `the first incumbent should release a feasibility only reservation`() {
         for (feasibilityOnly in listOf(false, true)) {
+            val clock = TestTimeSource()
             val reached = ArrayList<Int>()
             val workers = listOf(
-                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
-                trackingWorker("improver", 1, TrackingResumableSearch(null, onRun = { reached += 1 })),
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) {
+                    reached += 0
+                    clock += 1.milliseconds
+                }),
+                trackingWorker("improver", 1, TrackingResumableSearch(null, onRun = {
+                    reached += 1
+                    clock += 1.milliseconds
+                })),
             )
             val bandit = fixedBandit(2, arm = 1)
 
             Portfolio(workers, bandit, minShares = doubleArrayOf(1.0, 0.0)).also {
-                it.runTimeSource = TestTimeSource()
+                it.runTimeSource = clock
             }.use {
                 it.reserveBeforeIncumbentOnly = feasibilityOnly
                 it.minimize(Cancellation { reached.size >= 3 })
