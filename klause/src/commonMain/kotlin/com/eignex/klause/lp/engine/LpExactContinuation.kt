@@ -285,8 +285,7 @@ private fun admissionLimits(limits: ExactContinuationLimits) = limits.copy(
 )
 
 internal fun ExactContinuationLimits.admitsDimensions(model: LpModel): Boolean =
-    model.m <= maxRows && model.numVars <= maxColumns &&
-        model.m.toLong() * (model.numVars.toLong() + model.m + 1L) <= maxCells
+    admitsDimensions(model.m, model.numVars)
 
 private fun admitContinuation(model: LpModel, budget: ContinuationBudget) {
     if (!budget.limits.admitsDimensions(model)) {

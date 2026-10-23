@@ -13,6 +13,68 @@ import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
     @Test
+    fun `cell bounded continuation should verify every row beyond a fixed row threshold`() {
+        val rows = 149
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            repeat(rows) { addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L) }
+        }.build(Sense.MINIMIZE)
+
+        val result = continueExactLp(
+            model,
+            Basis(IntArray(rows) { it + 1 }, Array(rows + 1) { if (it == 0) VarStatus.AT_LOWER else VarStatus.BASIC }),
+        )
+
+        assertEquals(listOf(BigFraction.ONE), assertNotNull(result.witness).primal)
+        assertTrue(result.metrics.success)
+        assertNull(result.metrics.decline)
+        assertNull(result.conflict)
+    }
+
+    @Test
+    fun `logical columns should certify scoped conflicts after basis import`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            List(2) { listOf(ExactLpEntry(0, one), ExactLpEntry(1, one)) },
+            listOf(one, ExactLpNumber.of(2L)),
+            List(2) { ExactLpColumn(ExactLpBounds()) } +
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))) },
+            List(2) { ExactLpRow(global = false, premises = ExactLpPremises(emptyList(), listOf(9 + it))) },
+            ExactLpObjective(List(4) { zero }),
+        )
+        val state = LpExactState(source)
+
+        val result = continueExactLp(
+            assertNotNull(state.toWorkingModel()),
+            Basis(intArrayOf(0, 3), arrayOf(VarStatus.BASIC, VarStatus.FREE, VarStatus.FIXED, VarStatus.BASIC)),
+        )
+
+        assertNotNull(result.conflict)
+        assertNull(result.witness)
+        val support = assertNotNull(result.support)
+        assertTrue(support.state === state)
+        assertEquals(setOf(9, 10), support.rows.flatMap { assertNotNull(it.second.premises).literalEntries() }.toSet())
+    }
+
+    @Test
+    fun `cell admission should include only stored constraint columns and right hand side`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+
+        val result = continueExactLp(
+            model,
+            Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED)),
+            limits = ExactContinuationLimits(maxCells = 3),
+        )
+
+        assertEquals(listOf(BigFraction.ONE), assertNotNull(result.witness).primal)
+        assertNull(result.metrics.decline)
+    }
+
+    @Test
     fun `direct continuation dimension declines should retain no state and later admit another model`() {
         val cache = LpExactContinuationCache()
         val models = listOf(2, 1).map { rows ->
@@ -62,7 +124,7 @@ class LpExactContinuationTest {
         val limits = listOf(
             ExactContinuationLimits(maxRows = 0),
             ExactContinuationLimits(maxColumns = 1),
-            ExactContinuationLimits(maxCells = 3),
+            ExactContinuationLimits(maxCells = 2),
         )
         for (limit in limits) {
             repeat(2) {
