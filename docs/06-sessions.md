@@ -113,7 +113,9 @@ Conditioned linear queries keep one private prepared search and work ledger. Eac
 query captures Boolean pins, exact coordinate bounds and a strict objective cutoff,
 retracted afterwards with its deadline and meter. The traversal keeps its opening
 decision level through restarts and backjumps, so exhaustion refutes only the active
-condition, never the source; see
+condition, never the source. Unpinned Boolean splits consult caller hints before
+the prepared component's live-point preferences; retraction, cancellation and close
+keep the component's validity checks. Both Boolean alternatives remain available; see
 [search](08-search.md#shared-component-search) and
 [resources](#native-arithmetic-allowances). Private auxiliary names
 never reach a published assignment. Polynomial and nonlinear integer invocations
