@@ -41,6 +41,17 @@ import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 
+internal data class LpAdmission(
+    val estimatedRows: Long,
+    val estimatedColumns: Long,
+    val estimatedCells: Long,
+    val structurallyApplicable: Boolean,
+    val boundingPermitted: Boolean,
+    val withinCeiling: Boolean,
+    val explicitBounding: Boolean,
+    val plan: LpPlan,
+)
+
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled only when the
  * problem contains the structure it targets and the [LpConfig] emphasis permits its cost tier:
@@ -119,7 +130,18 @@ object LpAutoConfig {
         return checkNotNull(result)
     }
 
-    internal suspend fun SequenceScope<Unit>.prepare(problem: Problem, config: LpConfig, base: LpPlan): LpPlan {
+    internal fun admission(problem: Problem, config: LpConfig, base: LpPlan): LpAdmission {
+        var result: LpAdmission? = null
+        sequence { prepare(problem, config, base) { result = it } }.forEach { }
+        return checkNotNull(result)
+    }
+
+    internal suspend fun SequenceScope<Unit>.prepare(
+        problem: Problem,
+        config: LpConfig,
+        base: LpPlan,
+        observe: ((LpAdmission) -> Unit)? = null,
+    ): LpPlan {
         var visits = 0
         var lpEmittable = false
         var allDifferent = false
@@ -306,7 +328,7 @@ object LpAutoConfig {
         val cuts = lpActive && config.resolved(LpTechnique.CUTS)
         val structuralCuts = cuts && (cutEligible || pseudoBoolean)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
-        return base.copy(
+        val plan = base.copy(
             bounding = base.bounding || lpActive,
             cuts = base.cuts || cuts,
             // LP learning rides on the bounding path: the objective-bound reason is built from the
@@ -347,6 +369,9 @@ object LpAutoConfig {
                 base.energeticEvery
             },
         )
+        observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,
+            config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan))
+        return plan
     }
 
     /** Relaxation-size proxy `m × (n + m + 1)` for `rows = m` constraint rows and `cols = n`

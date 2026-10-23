@@ -971,3 +971,18 @@ or a general speedup.
 Retain typed original-source derivations separately from native engine completion;
 capture stays optional and unsupported capture withholds mathematical coverage. See
 [source evidence](../docs/13-evidence.md).
+
+### MPS LP admission capture
+
+`bench.profile.MpsLpAdmission` takes `batch64=<base64 JSON array of argument arrays>`
+with one to sixteen `["suite=ID", "problem=NAME", "sha256=HEX"]` requests. It binds
+hash-matched original MPS bytes through numerical source preparation, captures the
+resolved default/aggressive LP admission predicates and plans, then assembles full
+and objective-cone root relaxations without solving them. Each result reports
+emitted rows, structural columns, stored nonzeros, connected component sizes and
+isolated columns separately from the admission proxy. Reflection checks the internal
+assembler ABI and fails on a mismatch. Run as a bounded lab profile at a pushed
+revision; retain its original bytes, installed-build/runtime identity and actual
+platform. These instrumented root snapshots establish neither worker scheduling,
+solve cost, useful deductions nor a source verdict; pair them with ordinary records'
+actual recipe and segment observations.
