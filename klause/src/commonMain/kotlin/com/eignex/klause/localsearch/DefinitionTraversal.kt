@@ -1,10 +1,11 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntArrayList
 
 // A state borrows the live node prefix until its synchronous move or probe returns.
 internal class DefinitionTraversal(val network: InvariantNetwork) {
-    private val marked = BooleanArray(network.size)
+    private val marked = Bits(network.size)
     val nodes = IntArrayList()
     private var seedInt = -1
     private var seedBool = -1
@@ -22,13 +23,25 @@ internal class DefinitionTraversal(val network: InvariantNetwork) {
     fun clear() {
         seedInt = -1
         seedBool = -1
-        for (position in 0 until nodes.size) marked[nodes[position]] = false
+        for (position in 0 until nodes.size) marked.clear(nodes[position])
         nodes.clear()
     }
 
     fun add(node: Int) {
-        if (marked[node]) return
+        if (marked.get(node)) return
         nodes.add(node)
-        marked[node] = true
+        marked.set(node)
+    }
+
+    // Re-read the current word: evaluating a node can invalidate a later node in that same word.
+    fun nextPending(pending: Bits, from: Int): Int {
+        var word = from ushr 6
+        if (word >= marked.words.size) return -1
+        var candidates = marked.words[word] and pending.words[word] and (-1L shl (from and 63))
+        while (candidates == 0L) {
+            if (++word >= marked.words.size) return -1
+            candidates = marked.words[word] and pending.words[word]
+        }
+        return (word shl 6) + candidates.countTrailingZeroBits()
     }
 }

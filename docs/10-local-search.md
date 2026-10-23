@@ -297,11 +297,14 @@ unsupported definitions decline the candidate without stopping the scan. Each st
 owns its traversal workspace and marks each affected node once. It can reuse its last
 single-coordinate cone when the network has no selection-dependent Element readers.
 Definition evaluations are cached per state: coordinate writes invalidate direct
-readers, including probe rollback, and recomputation after external assignment writes
-clears every evaluation. Network replacement discards both caches. Propagation still
-visits the full affected cone and checks pins and implicit ownership on each visit,
-so an unchanged intermediate can repair an inconsistent descendant. Reentrant use
-throws before mutating the workspace.
+readers and mark the written coordinate's producer for reconciliation, including on
+probe rollback. Propagation intersects pending nodes with the full affected cone in
+packed words and visits them in topological order. Writes can enqueue later nodes;
+blocked outputs remain pending for a later visit with live pin and implicit-owner
+checks. An unchanged intermediate does not prevent repair of an inconsistent
+descendant. Recomputation after external assignment writes clears every evaluation,
+and network replacement discards both caches. Reentrant use throws before mutating
+the workspace.
 
 Boolean-only clause models close native proposals under clause implications before
 ranking: forced literals propagate to a fixpoint, then a newly broken longer clause
