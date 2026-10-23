@@ -587,6 +587,10 @@ Optional `workLimit` records an explicit allowance up to that default; zero pres
 the source leaf's unbounded-work setting while retaining the containing cancellation.
 One warmup and three measured rounds disable per-operation observation; a separate
 observed round retains phase and certification details. Lab JFR remains enabled.
+Optional `observedOnly=true` retains the warmup and observed rounds for a subsequent
+attribution question. It supplies no observation-disabled timing sample. Observed
+solve records aggregate actual RHS/output support, density hints, sparse triangular
+selection and visits separately for FTRAN and BTRAN.
 Owner construction, preparation, solve, certification and close enter lifecycle
 timing; result serialization follows each timed call.
 `dense=true` pairs sparse construction with the existing dense LU builder on bases
