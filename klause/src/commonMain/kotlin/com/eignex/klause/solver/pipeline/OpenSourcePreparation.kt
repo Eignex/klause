@@ -54,13 +54,12 @@ internal fun Problem.prepareOpenSource(
 ): OpenSourcePreparation {
     projections?.requireSource(this)
     val mark = TimeSource.Monotonic.markNow()
-    val preparation = budget?.orSpent(presolveCancellation) ?: presolveCancellation
     val prepared = PresolvePipeline.prepareSource(
         this,
         config,
         objective,
         solutionSetSensitive,
-        preparation,
+        presolveCancellation,
         budget,
     )
     if (prepared.infeasible) return OpenSourcePreparation.Refuted(prepared)

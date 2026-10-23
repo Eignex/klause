@@ -165,9 +165,12 @@ class PresolveBudget(
         Metered(nativeMeter) { remaining() == 0L } or outer,
     )
 
-    internal fun observeStops(token: Cancellation): Cancellation = object : Cancellation {
+    internal fun observeStops(token: Cancellation): Cancellation =
+        if (token is StopObserver && token.budget === this) token else StopObserver(this, token)
+
+    private class StopObserver(val budget: PresolveBudget, private val token: Cancellation) : Cancellation {
         override fun isCancelled(): Boolean = token().also { stopped ->
-            if (stopped) activeInvocation?.interrupted = true
+            if (stopped) budget.activeInvocation?.interrupted = true
         }
 
         override fun deadline() = token.deadline()
