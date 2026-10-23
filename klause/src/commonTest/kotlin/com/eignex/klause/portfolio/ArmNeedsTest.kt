@@ -13,6 +13,9 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
@@ -21,6 +24,29 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ArmNeedsTest {
+    @Test
+    fun `finite preparation should preserve an integer linear proof recipe`() {
+        val side = 4
+        val rows = (0 until side).map { row ->
+            Linear(LongArray(side) { 1L }, IntArray(side) { row * side + it }, LinearOp.EQ, 2L)
+        } + (0 until side).map { column ->
+            Linear(LongArray(side) { 1L }, IntArray(side) { it * side + column }, LinearOp.EQ, 2L)
+        }
+        val source = Problem(0, side * side, Array(side * side) { IntDomain(0, 1) }, rows)
+        val objective = LinearObjective(intCoefficients = LongArray(side * side) {
+            val distance = it / side - it % side
+            (distance * distance).toLong()
+        })
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective))
+        val model = prepared.executableProblem()
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE, prepared.objective)
+
+        val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
+
+        assertTrue(arms.any { it.label == "lp-aggressive" },
+            "recipes=${arms.map { it.label }} factors=${model.factors.map { it::class.simpleName }}")
+    }
+
     private fun linearModel(upper: Long = 5L) = Problem(
         numBoolVars = 0,
         numIntVars = 2,
