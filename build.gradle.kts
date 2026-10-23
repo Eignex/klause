@@ -13,9 +13,26 @@ val koblasJvmArgs = buildList {
     }
 }
 
+val koblasPins = mapOf(
+    "koblas" to "0.1.1-20261023.051622-264",
+    "koblas-jvm" to "0.1.1-20261023.051622-267",
+    "koblas-linuxx64" to "0.1.1-20261023.051622-263",
+    "koblas-linuxarm64" to "0.1.1-20261023.051622-264",
+    "koblas-macosarm64" to "0.1.1-20261023.051354-287",
+)
+
 // Koblas and Kumulant use timestamped snapshots; this endpoint is outside the conventions'
 // default repository set.
 allprojects {
+    val targetProject = this
+    // Direct Kumulant consumers need their own constraints to override its published Koblas pins.
+    configurations.matching { it.name == "commonMainImplementation" || it.name == "implementation" }.all {
+        for ((module, pinned) in koblasPins) {
+            targetProject.dependencies.constraints.add(name, "com.eignex:$module:$pinned") {
+                version { strictly(pinned) }
+            }
+        }
+    }
     repositories {
         maven("https://central.sonatype.com/repository/maven-snapshots/") {
             mavenContent { snapshotsOnly() }
