@@ -724,7 +724,9 @@ observations retain no uncommitted formula or partial reconstruction.
 Partial-state sign checking exposes exact check/conflict counts and numeric
 exclusion uses/reuses through the same progress record. A supported conflict
 observer retains the first completed conflict's full premise count and a preview
-of at most 16 predicates, each limited to 512 characters. The completeness flag
+of at most 16 predicates, each limited to 512 characters. Coordinate identifiers
+belong to the measured query. Formatting visits at most eight terms and eight
+coordinates per term; coefficients wider than 96 bits are abbreviated. The completeness flag
 distinguishes a full preview from truncated diagnostic text; neither is an exported
 proof or source verdict. A missing observer or an unobserved conflict leaves these
 fields absent. Interrupted and representation-declined checks learn no exclusion.
