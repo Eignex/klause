@@ -19,6 +19,40 @@ import kotlin.time.TimeSource
 
 class SourceLpTest {
     @Test
+    fun `empty operation allowance should skip source input preparation`() {
+        val budget = SourceLpBudget(maxOperations = 0)
+        var prepared = false
+
+        val result = budget.runPrepared(Cancellation.Never, prepare = {
+            prepared = true
+            SourceLpInput(emptyList(), 0, emptyList())
+        }) { true }
+
+        assertNull(result)
+        assertFalse(prepared)
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
+    fun `cancelled source input preparation should spend an operation without entering the solver`() {
+        val budget = SourceLpBudget()
+        var cancelled = false
+        var entered = false
+
+        val result = budget.runPrepared(Cancellation { cancelled }, prepare = {
+            cancelled = true
+            SourceLpInput(emptyList(), 0, emptyList())
+        }) {
+            entered = true
+            true
+        }
+
+        assertNull(result)
+        assertFalse(entered)
+        assertEquals(1, budget.operations)
+    }
+
+    @Test
     fun `operation token should use the caller deadline unless an active cap ends sooner`() {
         val rows = listOf(exactColumnUpper(0, BigFraction.ONE))
         val caller = TimeSource.Monotonic.markNow() + 1.hours

@@ -22,9 +22,17 @@ import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 
+internal data class LinearAuthorityLpShape(val inputRows: Int, val rows: Int, val columns: Int, val admitted: Boolean)
+
+internal data class LinearAuthorityLpResult(
+    val result: CertifiedLpResult,
+    val boundWeights: List<BigFraction>?,
+    val conflictWeights: List<BigFraction>?,
+)
+
 internal class LinearAuthorityLp(
     private val budget: SourceLpBudget,
-    private val onShape: (Int, Int, Boolean) -> Unit = { _, _, _ -> },
+    private val onShape: (LinearAuthorityLpShape) -> Unit = {},
 ) {
     private val observer = object : LpCertificationObserver {
         override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
@@ -39,33 +47,56 @@ internal class LinearAuthorityLp(
         costs: List<BigFraction>,
         constant: BigFraction,
         cancellation: Cancellation,
-    ): CertifiedLpResult? = budget.run(rows, costs.size, cancellation, rhs = costs + constant) { token ->
-        val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(
-            costs.indices.map { column -> rows.mapIndexedNotNull { index, row ->
-                row.columns.indexOf(column).takeIf { it >= 0 }?.let {
-                    ExactLpEntry(index, ExactLpNumber.of(row.coefficients[it]))
+    ): LinearAuthorityLpResult? {
+        var prepared: LinearAuthorityModel? = null
+        return budget.runPrepared(cancellation, prepare = { token ->
+            LinearAuthorityModel.prepare(rows, costs.size, token)?.also { prepared = it }
+                ?.input(costs, constant)
+        }) { token ->
+            val packed = checkNotNull(prepared)
+            val workingRows = packed.rows
+            val zero = ExactLpNumber.of(0L)
+            val model = ExactLpModel(
+                costs.indices.map { column -> workingRows.mapIndexedNotNull { index, row ->
+                    row.columns.indexOf(column).takeIf { it >= 0 }?.let {
+                        ExactLpEntry(index, ExactLpNumber.of(row.coefficients[it]))
+                    }
+                } },
+                workingRows.map { ExactLpNumber.of(it.rhs) },
+                packed.columns + workingRows.map {
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero, it.strict)), integral = false)
+                },
+                workingRows.map { ExactLpRow(strict = it.strict) },
+                ExactLpObjective(costs.map(ExactLpNumber::of) + List(workingRows.size) { zero }, ExactLpNumber.of(constant)),
+            )
+            val owner = LpScopedSolver(LpExactState(model), token, context = budget.context,
+                iterationLimit = 1024, workLimit = 2_000_000L)
+            try {
+                val solved = owner.solve(token = token, observer = observer)
+                val result = solved?.takeIf { result -> result.exactPrimal?.admittedSourcePoint() != false &&
+                    result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false } ?: return@runPrepared null
+                val boundWeights = result.bound?.dualMultipliers?.map { it.negated() }
+                    ?.let { packed.lift(it, costs.map { cost -> cost.negated() }, token) }
+                val conflict = result.rationalConflict
+                val conflictMultipliers = if (conflict != null) {
+                    MutableList(workingRows.size) { BigFraction.ZERO }.also { weights ->
+                        for (id in conflict.rows.indices) weights[conflict.rows[id]] += conflict.multipliers[id]
+                    }
+                } else result.farkasRay?.map { BigFraction.ofLong(it).negated() }
+                val conflictWeights = conflictMultipliers?.let {
+                    packed.lift(it, List(costs.size) { BigFraction.ZERO }, token)
                 }
-            } },
-            rows.map { ExactLpNumber.of(it.rhs) },
-            List(costs.size) { ExactLpColumn(ExactLpBounds(), integral = false) } +
-                rows.map { ExactLpColumn(ExactLpBounds(ExactLpSide(zero, it.strict)), integral = false) },
-            rows.map { ExactLpRow(strict = it.strict) },
-            ExactLpObjective(costs.map(ExactLpNumber::of) + List(rows.size) { zero }, ExactLpNumber.of(constant)),
-        )
-        val owner = LpScopedSolver(LpExactState(model), token, context = budget.context,
-            iterationLimit = 1024, workLimit = 2_000_000L)
-        try {
-            val solved = owner.solve(token = token, observer = observer)
-            solved?.takeIf { result -> result.exactPrimal?.admittedSourcePoint() != false &&
-                result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false }
-        } finally {
-            budget.observe(preparation = owner.metrics.preparationWork, floatWork = owner.lastMetrics.workOps,
-                refinement = owner.refinementCache.work)
-            budget.closeOwner(owner)
+                LinearAuthorityLpResult(result, boundWeights, conflictWeights)
+            } finally {
+                budget.observe(preparation = owner.metrics.preparationWork, floatWork = owner.lastMetrics.workOps,
+                    refinement = owner.refinementCache.work)
+                budget.closeOwner(owner)
+            }
+        }.also {
+            val workingRows = prepared?.rows?.size ?: rows.size
+            onShape(LinearAuthorityLpShape(rows.size, workingRows, costs.size,
+                budget.admitsDimensions(costs.size, workingRows.toLong())))
         }
-    }.also {
-        onShape(rows.size, costs.size, budget.admitsDimensions(costs.size, rows.size.toLong()))
     }
 
     fun combination(
@@ -101,7 +132,7 @@ internal class LinearAuthorityLp(
         val result = solve(constraints, List(variables) {
             if (strict && it == count) BigFraction.MINUS_ONE else BigFraction.ZERO
         }, BigFraction.ZERO, cancellation) ?: return null
-        val point = result.exactPrimal ?: return null
+        val point = result.result.exactPrimal ?: return null
         if (strict && point[count] <= BigFraction.ZERO) return null
         return point.take(count)
     }

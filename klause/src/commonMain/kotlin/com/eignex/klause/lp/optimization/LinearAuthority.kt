@@ -2,7 +2,6 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
-import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -34,7 +33,7 @@ internal data class LinearAuthorityResult(
 
 internal class LinearAuthority(
     private val budget: SourceLpBudget,
-    onLpShape: (Int, Int, Boolean) -> Unit = { _, _, _ -> },
+    onLpShape: (LinearAuthorityLpShape) -> Unit = {},
 ) {
     private val lp = LinearAuthorityLp(budget, onLpShape)
 
@@ -88,12 +87,9 @@ internal class LinearAuthority(
                 SourceEvidenceVerifier(context).verify(it, cancellation) == SourceEvidenceCheck.Checked
             }
         }
-        fun refutation(result: CertifiedLpResult): SourceEvidence? {
-            if (result.verdict != LpVerdict.INFEASIBLE) return null
-            val conflict = result.rationalConflict
-            if (conflict != null) {
-                val weights = MutableList(rows.size) { BigFraction.ZERO }
-                for (id in conflict.rows.indices) weights[conflict.rows[id]] += conflict.multipliers[id]
+        fun refutation(result: LinearAuthorityLpResult): SourceEvidence? {
+            if (result.result.verdict != LpVerdict.INFEASIBLE) return null
+            result.conflictWeights?.let { weights ->
                 checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))?.let { return it }
             }
             val zeros = List(coordinates.size) { BigFraction.ZERO }
@@ -102,17 +98,17 @@ internal class LinearAuthority(
             return checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
         }
         val closureRows = rows.map { ExactRationalInequality(it.columns, it.coefficients, it.rhs) }
-        val closure = lp.solve(closureRows, costs, constant, cancellation) ?: return LinearAuthorityResult()
+        val solved = lp.solve(closureRows, costs, constant, cancellation) ?: return LinearAuthorityResult()
+        val closure = solved.result
         val bound = closure.lowerBound?.let { value ->
             fun checkBound(weights: List<BigFraction>): SourceEvidence? =
                 checked(SourceClaim.Bound(value * sign), LinearPinnedObjective(derivation(weights)))
-            val retained = closure.bound?.dualMultipliers?.takeIf { it.size == rows.size }
-                ?.map { it.negated() }?.let(::checkBound)
+            val retained = solved.boundWeights?.let(::checkBound)
             retained ?: lp.combination(rows, costs.map { it.negated() }, constant - value, false, cancellation)
                 ?.let(::checkBound)
         }
         if (closure.verdict == LpVerdict.INFEASIBLE) {
-            return LinearAuthorityResult(refutation(closure), bound)
+            return LinearAuthorityResult(refutation(solved), bound)
         }
         val endpoint = closure.exactPrimal?.take(coordinates.size)
         fractional(coordinates, endpoint)?.let { return LinearAuthorityResult(bound = bound, split = it) }
@@ -129,7 +125,7 @@ internal class LinearAuthority(
         val feasible = if (endpointAccepted != null) endpointAccepted else {
             val original = lp.solve(rows, List(costs.size) { BigFraction.ZERO }, BigFraction.ZERO, cancellation)
             original?.let { refutation(it) }?.let { return LinearAuthorityResult(it, bound) }
-            val primal = original?.exactPrimal?.take(coordinates.size)
+            val primal = original?.result?.exactPrimal?.take(coordinates.size)
             fractional(coordinates, primal)?.let { return LinearAuthorityResult(bound = bound, split = it) }
             primal?.let { sample(source, coordinates, it) }?.takeIf {
                 checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null

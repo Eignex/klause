@@ -34,6 +34,12 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TimeSource.Monotonic
 
+internal data class SourceLpInput(
+    val rows: List<ExactRationalInequality>,
+    val variables: Int,
+    val rhs: List<BigFraction>,
+)
+
 internal class SourceLpBudget(
     private val maxOperations: Int = 256,
     // Unset by default: operation count and each operation's work and pivot limits bound the work, and only a caller
@@ -132,6 +138,12 @@ internal class SourceLpBudget(
         block: (Cancellation) -> T?,
     ): T? = runAdmitted(rows, variables, cancellation, emptyList(), emptyList(), true, block)
 
+    fun <T> runPrepared(
+        cancellation: Cancellation,
+        prepare: (Cancellation) -> SourceLpInput?,
+        block: (Cancellation) -> T?,
+    ): T? = runAdmitted(emptyList(), 0, cancellation, emptyList(), emptyList(), false, block, prepare)
+
     fun admitsDimensions(variables: Int, rows: Long): Boolean =
         variables >= 0 && rows >= 0L && variables.toLong() + rows <= 128L
 
@@ -143,6 +155,7 @@ internal class SourceLpBudget(
         rhs: List<BigFraction>,
         pairing: Boolean,
         block: (Cancellation) -> T?,
+        prepare: ((Cancellation) -> SourceLpInput?)? = null,
     ): T? {
         val activeCap = maxActiveNanos
         if (cancellation() || operations >= maxOperations) return null
@@ -159,9 +172,13 @@ internal class SourceLpBudget(
             cancellation or Cancellation.until(start + (activeCap - activeNanos).nanoseconds)
         }
         try {
-            val groups = listOf(rows) + additional
+            val prepared = prepare?.invoke(token)
+            if (prepare != null && (prepared == null || token())) return null
+            val admittedVariables = prepared?.variables ?: variables
+            val admittedRhs = prepared?.rhs ?: rhs
+            val groups = listOf(prepared?.rows ?: rows) + additional
             val rowCount = groups.sumOf { it.size.toLong() }
-            if (!admitsDimensions(variables, rowCount) || rhs.size > 128) return null
+            if (!admitsDimensions(admittedVariables, rowCount) || admittedRhs.size > 128) return null
             var entries = 0L
             var bits = 0L
             fun admit(number: BigFraction): Boolean {
@@ -176,23 +193,23 @@ internal class SourceLpBudget(
                 for (row in group) {
                     if (token()) return null
                     entries += row.columns.size
-                    if (entries > 512L || row.columns.any { it !in 0 until variables }) return null
+                    if (entries > 512L || row.columns.any { it !in 0 until admittedVariables }) return null
                     if (!admit(row.rhs) || row.coefficients.any { !admit(it) }) return null
                 }
             }
-            if (rhs.any { !admit(it) }) return null
+            if (admittedRhs.any { !admit(it) }) return null
             // Hadamard's inequality: a minor of the scaled rows has at most their bits plus log2(n)/2 per row, so this
             // bounds every exact basis intermediate without charging a fixed width per row.
-            val dimension = variables + rowCount
+            val dimension = admittedVariables + rowCount
             val width = if (pairing) {
                 4L * bits + 64L
             } else {
                 bits + dimension * (Long.SIZE_BITS - dimension.countLeadingZeroBits()) + 64L
             }
             val visits = 32L * if (pairing) {
-                entries + rowCount * entries + rowCount * rowCount + variables + 1L
+                entries + rowCount * entries + rowCount * rowCount + admittedVariables + 1L
             } else {
-                entries + variables + rowCount * 2L + 1L
+                entries + admittedVariables + rowCount * 2L + 1L
             }
             val words = (width + 63L) / 64L
             val work = (if (pairing) 0L else 400_000_000L) + visits * words * words
