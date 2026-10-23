@@ -7,8 +7,16 @@ internal class RetainedBoardRestart private constructor(
     private val inputs: IntArray,
     private val before: LongArray,
 ) {
-    fun changed(state: LocalSearchState): Boolean =
-        inputs.indices.any { state.assignment.intValue(inputs[it]) != before[it] }
+    fun changed(state: LocalSearchState): Boolean {
+        val owners = state.seeding.ownerInt
+        return inputs.indices.any {
+            val variable = inputs[it]
+            val owner = owners?.get(variable) ?: -1
+            (owner < 0 || boards.binarySearch(owner) >= 0) &&
+                state.assignment.intValue(variable) in state.rootDomains[variable] &&
+                state.assignment.intValue(variable) != before[it]
+        }
+    }
 
     fun perturb(state: LocalSearchState, strength: Int, kind: PerturbationKind) {
         val sink = MoveSink(state.assumptions)
@@ -24,12 +32,7 @@ internal class RetainedBoardRestart private constructor(
             val swaps = sink.list.filterIsInstance<Move.Compound>().filter { admissibleSwap(state, it) }
             if (swaps.isEmpty()) return@repeat
             val move = swaps[state.rng.nextInt(swaps.size)]
-            val reverse = Move.Compound(move.parts.map {
-                val part = it as Move.IntSet
-                Move.IntSet(part.varId, state.assignment.intValue(part.varId))
-            })
-            state.apply(move)
-            if (!ownedGlobalsFeasible(state)) state.apply(reverse)
+            if (state.preservesImplicitFeasibility(move)) state.apply(move)
         }
         state.resetStepCounters()
     }
@@ -48,26 +51,14 @@ internal class RetainedBoardRestart private constructor(
         fun capture(state: LocalSearchState): RetainedBoardRestart? {
             val boards = state.seeding.electedImplicit.filter { state.factors[it] is AllDifferentInvariant }
             if (boards.isEmpty()) return null
-            val owners = state.seeding.ownerInt
             val inputs = boards.flatMap { fid ->
                 state.problem.factors[fid].intVars.filter { variable ->
-                    !state.assumptions.isFrozenInt(variable) && state.invariants?.isDefinedInt(variable) != true &&
-                        (owners == null || owners[variable] < 0 || owners[variable] == fid)
+                    !state.assumptions.isFrozenInt(variable) && state.invariants?.isDefinedInt(variable) != true
                 }
             }.distinct().toIntArray()
             return RetainedBoardRestart(
                 boards.toIntArray(), inputs, LongArray(inputs.size) { state.assignment.intValue(inputs[it]) },
             )
-        }
-
-        fun ownedGlobalsFeasible(state: LocalSearchState): Boolean =
-            state.seeding.implicitSeedFactors.all { !state.factors[it].isViolated(state, it) }
-
-        fun canPreserveOwners(state: LocalSearchState): Boolean {
-            val owners = state.seeding.ownerInt ?: return false
-            return ownedGlobalsFeasible(state) && state.seeding.implicitSeedFactors.all { fid ->
-                state.problem.factors[fid].intVars.all { owners[it] == fid }
-            }
         }
     }
 }
