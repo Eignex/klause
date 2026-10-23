@@ -438,7 +438,9 @@ class ExactLiraSearchComponent private constructor(
                 eligible++
                 val comparison = prepared.form.comparison(true) { bools[it] == TRUE }
                 val implication = partialLinearImplication(comparison, { column, upper ->
-                    state.activeSide(column, upper)?.let { active ->
+                    val metadata = state.model.column(column)
+                    if (metadata.tag != column || !metadata.origin.value.isZero) null
+                    else state.activeSide(column, upper)?.let { active ->
                         ExplainedLinearBound(active.side.number.value, active.side.strict,
                             lp.activeBoundPremise(column, upper) ?: SearchAtomPremise.Unavailable)
                     }
@@ -452,6 +454,7 @@ class ExactLiraSearchComponent private constructor(
                     unexplained++
                     continue
                 }
+                operationStop.charge(reason.literals.size.toLong() + rhs.size + 1L)
                 if (operationStop()) break
                 if (current.imply(decision.literal, reason) !is ComponentResult.Consistent) break
                 deductions += PartialLinearDeduction(prepared.address.factor, prepared.address.row,

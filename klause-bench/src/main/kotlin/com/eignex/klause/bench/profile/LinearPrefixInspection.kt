@@ -5,6 +5,7 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -14,11 +15,11 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
+import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.lang.reflect.Modifier
@@ -89,7 +90,9 @@ internal object LinearPrefixInspection {
                     val propagation = planned.session.propagate()
                     val probeElapsed = System.nanoTime() - probeStarted
                     boundary.resume()
-                    val continuation = if (!stop()) call(run, "advance") else null
+                    val continuation = if (propagation is ComponentResult.Consistent && !stop()) {
+                        call(run, "advance")
+                    } else null
                     val after = work.snapshot()
                     val observation = buildJsonObject {
                         put("treated", replay == 1)
