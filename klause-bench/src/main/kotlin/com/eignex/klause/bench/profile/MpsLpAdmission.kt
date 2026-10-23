@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
@@ -15,6 +16,11 @@ import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -105,6 +111,8 @@ internal object MpsLpAdmission {
             put("lpCeilingTableauCells", problem.settings.lpCeilingTableauCells)
             put("defaultAdmission", admission(problem, LpConfig.AUTO))
             put("aggressiveAdmission", admission(problem, LpConfig.AGGRESSIVE))
+            put("mixedRecipes", recipes(problem as BakedProblem, objective, EngineMix.MIXED))
+            put("cpRecipes", recipes(problem, objective, EngineMix.BACKTRACK))
             put("full", shape(problem, objective, false, stop))
             put("objectiveCone", shape(problem, objective, true, stop))
             put("javaVersion", System.getProperty("java.version"))
@@ -116,6 +124,43 @@ internal object MpsLpAdmission {
         }
         out.resolve("admission.json").writeText("$report\n")
         println(report)
+    }
+
+    private fun recipes(problem: BakedProblem, objective: LinearObjective?, mix: EngineMix): JsonObject {
+        val scenario = PortfolioScenario.sequential(Kind.COP, mix, seed = 3L)
+        val factsType = Class.forName("com.eignex.klause.portfolio.ProblemFacts")
+        val companion = factsType.getField("Companion").get(null)
+        val facts = companion.javaClass.methods.single { it.name == "of" }.invoke(
+            companion, problem, ProblemProfile.of(problem, true), scenario.lpCeiling, objective,
+        )
+        val compositionType = Class.forName("com.eignex.klause.portfolio.PortfolioComposition")
+        val composition = compositionType.getField("INSTANCE").get(null)
+        val selected = compositionType.methods.single { it.name.startsWith("plan") && it.parameterCount == 2 }
+            .invoke(composition, scenario, facts)
+        val arms = get(selected, "Arms") as List<*>
+        val first = get(selected, "FirstSolutionCount") as Int
+        return buildJsonObject {
+            put("firstSolutionCount", first)
+            put("arms", buildJsonArray {
+                arms.forEachIndexed { index, value ->
+                    val arm = requireNotNull(value)
+                    add(buildJsonObject {
+                        put("label", get(arm, "Label").toString())
+                        put("kind", arm.javaClass.simpleName)
+                        put("firstSolutionEligible", index < first)
+                        if (arm.javaClass.simpleName == "BacktrackWorkerConfig") {
+                            val recipe = get(arm, "Recipe") as BacktrackRecipe
+                            val params = recipe.build(1003L + index, null)
+                            val resolved = params.lpConfig?.let { LpAutoConfig.resolve(problem, it, params.lpPlan) }
+                                ?: params.lpPlan
+                            put("configuredLp", params.lpConfig.toString())
+                            put("nodeBounding", resolved.bounding)
+                            put("plan", resolved.toString())
+                        }
+                    })
+                }
+            })
+        }
     }
 
     private fun admission(problem: Problem, config: LpConfig): JsonObject {
