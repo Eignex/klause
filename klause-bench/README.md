@@ -817,6 +817,16 @@ The corresponding median annotation-CP work across all nine runs is 13775 versus
 losses remain measured losses, but move rates and a shared seed do not establish
 equal CP work or scoring trajectories under elapsed-dependent scheduling.
 
+[Lab 7676](https://lab.eignex.com/jobs/7676) isolates both reported inputs at seed 1,
+three repeats and one core, comparing `fc34aad83d` with merged runtime
+`fa9acca195`. Optional presolve is off throughout. All 36 witnesses passed source
+checking. Annotation-only CP uses exactly 500 decisions and returns identical
+witnesses on both revisions in every repeat: objective 48 on `bench_16_10` and 49
+on `bench_15_11`. Mixed 10/20 s pairs have two wins, three losses and seven ties;
+both revisions beat the originally missed objectives at 20 s. These controls
+support elapsed-dependent portfolio variation without reproducing a scoring defect;
+they do not establish equal optimization quality across deadlines or seeds.
+
 Control costs vary: mapping/code-generator paired move-rate ratios span 0.84–1.19.
 In the three-way fixed-arm [7660](https://lab.eignex.com/jobs/7660) guard,
 `ring_mp3` CBLS median elapsed time was 919 ms on main, 922 ms with packed-only
