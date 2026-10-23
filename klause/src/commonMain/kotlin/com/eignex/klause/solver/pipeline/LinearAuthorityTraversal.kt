@@ -36,6 +36,7 @@ internal class LinearAuthorityTraversal(
     private val cancellation: Cancellation,
     private val pause: () -> Boolean,
     private val onIncumbent: (Sample) -> Unit,
+    private val incumbentValue: () -> BigFraction?,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -47,7 +48,7 @@ internal class LinearAuthorityTraversal(
     private val root = CoverageNode(source.scope.condition)
     private val path = arrayListOf(0 to root)
     private val current: CoverageNode get() = path.last().second
-    private val observations = linkedMapOf<String, Long>()
+    private val observations = linkedMapOf("numericalIncumbentDominatedSplits" to 0L)
     private var pending = 1L
     private var peakPending = 1L
     private var retained = 1L
@@ -125,10 +126,14 @@ internal class LinearAuthorityTraversal(
             observe("numericalCertifiedBounds")
             val parent = path.getOrNull(path.lastIndex - 1)?.second?.result?.bound?.claim as? SourceClaim.Bound
             val bound = result.bound.claim as SourceClaim.Bound
+            val after = (bound.value as SourceValue.Rational).value
+            val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
+            val standing = incumbentValue()
+            if (result.evidence == null && result.split != null && standing != null &&
+                if (minimizes) after >= standing else after <= standing
+            ) observe("numericalIncumbentDominatedSplits")
             if (parent != null) {
                 val before = (parent.value as SourceValue.Rational).value
-                val after = (bound.value as SourceValue.Rational).value
-                val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
                 if (if (minimizes) after > before else after < before) observe("numericalChildBoundGains")
             }
         }
