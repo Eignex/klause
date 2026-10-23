@@ -51,7 +51,7 @@ internal class BoardSwapCoverage {
     }
 
     fun finishPick(cancelled: Boolean) {
-        if (consulted) cursor?.finishPick(cancelled)
+        cursor?.finishPick(cancelled && consulted)
     }
 
     fun generate(state: LocalSearchState, sink: MoveSink, cancellation: Cancellation): Boolean {
