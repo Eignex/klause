@@ -15,14 +15,16 @@ import kotlin.test.assertTrue
 class PolynomialBooleanPropagationTest {
     @Test
     fun `required junction identities force every child`() {
-        for (conjunction in listOf(true, false)) {
+        for (conjunction in listOf(true, false)) for (skipConfirmedParents in listOf(false, true)) {
             val nodes = listOf(
                 FormulaNode.BooleanVariable(0),
                 FormulaNode.BooleanVariable(1),
                 FormulaNode.Junction(intArrayOf(0, 1), conjunction),
                 FormulaNode.Not(2),
             )
-            val state = PolynomialBooleanPropagation(nodes, if (conjunction) 2 else 3, PolynomialArithmetic())
+            val state = PolynomialBooleanPropagation(
+                nodes, if (conjunction) 2 else 3, PolynomialArithmetic(), skipConfirmedParents,
+            )
             assertTrue(state.initialize())
 
             val consistent = state.propagate()
@@ -36,7 +38,7 @@ class PolynomialBooleanPropagationTest {
 
     @Test
     fun `duplicate and shared children retain required identity truth`() {
-        for (conjunction in listOf(true, false)) {
+        for (conjunction in listOf(true, false)) for (skipConfirmedParents in listOf(false, true)) {
             val nodes = listOf(
                 FormulaNode.BooleanVariable(0),
                 FormulaNode.BooleanVariable(1),
@@ -44,7 +46,9 @@ class PolynomialBooleanPropagationTest {
                 FormulaNode.Junction(intArrayOf(0, 2), conjunction),
                 FormulaNode.Not(3),
             )
-            val state = PolynomialBooleanPropagation(nodes, if (conjunction) 3 else 4, PolynomialArithmetic())
+            val state = PolynomialBooleanPropagation(
+                nodes, if (conjunction) 3 else 4, PolynomialArithmetic(), skipConfirmedParents,
+            )
             assertTrue(state.initialize())
 
             val consistent = state.propagate()
@@ -57,14 +61,16 @@ class PolynomialBooleanPropagationTest {
 
     @Test
     fun `opposite child truth conflicts with a required junction identity`() {
-        for (conjunction in listOf(true, false)) {
+        for (conjunction in listOf(true, false)) for (skipConfirmedParents in listOf(false, true)) {
             val nodes = listOf(
                 FormulaNode.BooleanVariable(0),
                 FormulaNode.BooleanVariable(1),
                 FormulaNode.Junction(intArrayOf(0, 1), conjunction),
                 FormulaNode.Not(2),
             )
-            val state = PolynomialBooleanPropagation(nodes, if (conjunction) 2 else 3, PolynomialArithmetic())
+            val state = PolynomialBooleanPropagation(
+                nodes, if (conjunction) 2 else 3, PolynomialArithmetic(), skipConfirmedParents,
+            )
             assertTrue(state.initialize())
             assertTrue(state.assign(0, if (conjunction) FALSE else TRUE))
 
@@ -76,33 +82,35 @@ class PolynomialBooleanPropagationTest {
 
     @Test
     fun `backtracking retracts a shared child's identity consequences`() {
-        val nodes = listOf(
-            FormulaNode.BooleanVariable(0),
-            FormulaNode.BooleanVariable(1),
-            FormulaNode.BooleanVariable(2),
-            FormulaNode.Junction(intArrayOf(0, 1), true),
-            FormulaNode.Junction(intArrayOf(0, 2), true),
-            FormulaNode.Junction(intArrayOf(3, 4), false),
-        )
-        val state = PolynomialBooleanPropagation(nodes, 5, PolynomialArithmetic())
-        assertTrue(state.initialize())
-        assertTrue(state.propagate())
-        assertTrue(state.decide())
-        assertFalse(state.propagate())
-        assertTrue(state.backtrack())
-        assertTrue(state.propagate())
-        assertTrue(state.decide())
-        assertTrue(state.propagate())
-        assertEquals(FALSE, state.value(1))
-        assertEquals(TRUE, state.value(2))
+        for (skipConfirmedParents in listOf(false, true)) {
+            val nodes = listOf(
+                FormulaNode.BooleanVariable(0),
+                FormulaNode.BooleanVariable(1),
+                FormulaNode.BooleanVariable(2),
+                FormulaNode.Junction(intArrayOf(0, 1), true),
+                FormulaNode.Junction(intArrayOf(0, 2), true),
+                FormulaNode.Junction(intArrayOf(3, 4), false),
+            )
+            val state = PolynomialBooleanPropagation(nodes, 5, PolynomialArithmetic(), skipConfirmedParents)
+            assertTrue(state.initialize())
+            assertTrue(state.propagate())
+            assertTrue(state.decide())
+            assertFalse(state.propagate())
+            assertTrue(state.backtrack())
+            assertTrue(state.propagate())
+            assertTrue(state.decide())
+            assertTrue(state.propagate())
+            assertEquals(FALSE, state.value(1))
+            assertEquals(TRUE, state.value(2))
 
-        assertTrue(state.backtrack())
-        val consistent = state.propagate()
+            assertTrue(state.backtrack())
+            val consistent = state.propagate()
 
-        assertTrue(consistent)
-        assertEquals(TRUE, state.value(0))
-        assertEquals(TRUE, state.value(1))
-        assertEquals(UNASSIGNED, state.value(2))
+            assertTrue(consistent)
+            assertEquals(TRUE, state.value(0))
+            assertEquals(TRUE, state.value(1))
+            assertEquals(UNASSIGNED, state.value(2))
+        }
     }
 
     @Test
