@@ -10,6 +10,26 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `a rebound wide endpoint should restart from current exact bounds`() {
+        val initial = ExactContinuationInput(
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
+            emptyList(), listOf(ContinuationStatus.LOWER),
+        )
+        val session = ExactContinuation(initial)
+        assertNotNull(session.resume().values)
+        val huge = BigFraction.of(BIG_ONE shl 140, BIG_ONE)
+        val changed = ExactContinuationInput(
+            initial.columns, initial.rhs, listOf(huge), initial.upper,
+            initial.headings, initial.statuses,
+        )
+
+        val result = session.resume(replacement = changed)
+
+        assertEquals(listOf(huge), assertNotNull(result.values))
+        assertNull(result.ray)
+    }
+
+    @Test
     fun `rebound open sides should reseat nonbasic coordinates`() {
         val initial = ExactContinuationInput(
             listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
