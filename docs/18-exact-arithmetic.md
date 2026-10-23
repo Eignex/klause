@@ -245,21 +245,23 @@ numerical authority or create another solver.
 
 #### Koblas
 
-The [build](../klause/build.gradle.kts) pins immutable timestamps for both the KMP root and every platform module. A root timestamp
+The [build](../build.gradle.kts) pins immutable timestamps for both the KMP root and every platform module. A root timestamp
 alone is insufficient because its Gradle metadata redirects to mutable platform snapshots. Strict
-platform constraints propagate into klause publications.
+platform constraints propagate into klause publications. Each module that directly
+consumes Kumulant declares these constraints at its own dependency root, taking
+precedence over Kumulant's transitive Koblas pins.
 
-The pins consume Koblas revision `74cf0237084597cce8eeef47ddd9c3613c30cf8e`,
-published by its [snapshot workflow](https://github.com/Eignex/koblas/actions/runs/38446077479).
+The pins consume Koblas revision `3ce4036a5c2a17c911b01f052515baddf8e497b4`,
+published by its [snapshot workflow](https://github.com/Eignex/koblas/actions/runs/39904556100).
 Koblas coordinates use group `com.eignex`:
 
 | Module | Version | Binary SHA-256 |
 |---|---|---|
-| koblas | `0.1.1-20261013.182449-263` | `4bb78bbe9448b937e2bf88601e22c9414c5d8000b5ec75024be2d9c8444161b5` |
-| koblas-jvm | `0.1.1-20261013.182449-266` | `36c06138be124ab6df809e7f9dde8f5dad4efd890585fc1350724b26662bd57d` |
-| koblas-linuxx64 | `0.1.1-20261013.182449-262` | `27020e001be9346a675c0246b053e10f71d68e2577a139c3d99715d94b3c6492` |
-| koblas-linuxarm64 | `0.1.1-20261013.182449-263` | `26224afb64a272b51e723bacca20e1b5e01b20473cb42d3f6b66c454eabd1004` |
-| koblas-macosarm64 | `0.1.1-20261013.182206-286` | `8534ca098a41e671db582d14f664770895ec9b84b845d85f72ce80e12cadc36f` |
+| koblas | `0.1.1-20261023.051622-264` | `6d5165feffda2f4e9f3f854ae1862b6fbe85e5d33c06705e6b59d423983fa71f` |
+| koblas-jvm | `0.1.1-20261023.051622-267` | `682299d91c8cea739bca89d63960cd67e466cc6d8d6bf85d310fb186b3e6774a` |
+| koblas-linuxx64 | `0.1.1-20261023.051622-263` | `17462f0c3cfa302f278ef61befbdb16deb3a766da9ef9b66e72b85f8966ca0da` |
+| koblas-linuxarm64 | `0.1.1-20261023.051622-264` | `6c1827255bf924811bb7b0d79943050a8610fad0d18b90d8c037dd671388285b` |
+| koblas-macosarm64 | `0.1.1-20261023.051354-287` | `375180c0461aae5afa205fe26b403f0bfa0cfd1413de8c764f5cfd373533121a` |
 
 The build does not consult Maven Local. For source integration, use Gradle's supported composite
 substitution with an isolated checkout at the revision under test:
@@ -294,7 +296,7 @@ Kumulant coordinates use group `com.eignex` and version prefix `0.3.4-20261013.1
 |---|---|
 | `simplex.basis` | Zero-based sorted unique CSC, owned factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Dense LU uses windowed GER in owner-local buffers; arithmetic guards and failed-attempt work stay in Klause. |
 | `util.SparseSlices` | Validated slice workflows shared by the LP engine and basis: windows, indices and overlap are checked before mutation, and checked dot keeps input order and nonfinite diagnostics. |
-| `lp.engine` | Pricing and column updates use indexed kernels. Scaling and refinement keep guarded powers of two and exact accumulation. No dense vendor Level 2/3 call is required. |
+| `lp.engine` | Selected-column pricing reuses the current owned CSC's validated support through `dotColumn`; column updates use indexed kernels. Scaling and refinement keep guarded powers of two and exact accumulation. No dense vendor Level 2/3 call is required. |
 
 Unchecked reductions may reassociate or fuse arithmetic according to the selected
 implementation, so Klause does not use vendor `iamax` to choose pivots. Exact proof
