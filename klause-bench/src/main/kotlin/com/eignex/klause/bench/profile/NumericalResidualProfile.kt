@@ -88,7 +88,7 @@ internal object NumericalResidualProfile {
         println("captured $suite/$name: ${probe.solves.size} float invocations, ${probe.captures.size} residuals")
     }
 
-    private class Probe {
+    internal class Probe(private val denseLimit: Int = 6) {
         val phaseNs = linkedMapOf<String, Long>()
         val phaseCalls = linkedMapOf<String, Long>()
         val solves = ArrayList<JsonElement>()
@@ -118,8 +118,10 @@ internal object NumericalResidualProfile {
                 val type = Class.forName(BASIS + "KotlinBasisSolver")
                 val constructor = type.constructors.single { it.parameterCount == 10 }
                 val backend = measured("basis-setup") {
-                    constructor.newInstance(matrix, null, 0, 0.0, 0.0, false, 0, 0.0, 254, null)
+                    constructor.newInstance(matrix, null, 0, 0.0, 0.0, false, denseLimit, if (denseLimit == 64) 0.0 else 0.5, 62, null)
                 }
+                val pointers = call(matrix, "copyColumnPointers") as IntArray
+                val coefficients = call(matrix, "getValues") as DoubleArray
                 val basisType = Class.forName(BASIS + "BasisSolver")
                 Proxy.newProxyInstance(basisType.classLoader, arrayOf(basisType)) { _, method, values ->
                     val arguments = values.orEmpty()
@@ -128,6 +130,13 @@ internal object NumericalResidualProfile {
                         put("owner", id)
                         put("dimension", call(backend, "getN") as Int)
                         put("updates", call(backend, "getUpdateCount") as Int)
+                        val headings = arguments.single() as IntArray
+                        var entries = 0
+                        for (column in headings) for (entry in pointers[column] until pointers[column + 1]) {
+                            if (coefficients[entry] != 0.0) entries++
+                        }
+                        put("basisEntries", entries)
+                        put("basisDensity", entries.toDouble() / (headings.size.toDouble() * headings.size))
                         put("policy", json(call(owner, "getLastRefactorPolicyMetrics")))
                         put("backendWorkBefore", json(call(backend, "getBasisWork")))
                     } else null
@@ -200,7 +209,7 @@ internal object NumericalResidualProfile {
         owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.set(owner, value)
     }
 
-    private fun call(owner: Any, name: String, vararg arguments: Any?): Any? {
+    internal fun call(owner: Any, name: String, vararg arguments: Any?): Any? {
         val candidates = owner.javaClass.methods.filter {
             it.name.substringBefore('$') == name && it.parameterCount == arguments.size
         }
@@ -214,7 +223,7 @@ internal object NumericalResidualProfile {
         throw failure.targetException
     }
 
-    private fun json(value: Any?, depth: Int = 0): JsonElement = when {
+    internal fun json(value: Any?, depth: Int = 0): JsonElement = when {
         value == null -> JsonNull
         value is Number -> JsonPrimitive(value)
         value is Boolean -> JsonPrimitive(value)

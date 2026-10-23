@@ -553,6 +553,25 @@ factor batches are separate controls.
 
 ## Profiling
 
+`NumericalResidualProfile` accepts `request64=<base64 JSON array>` of up to eight
+`{suite, problem, sha256}` MPS sources. It checks original bytes, observes a direct
+satOptimized worker at seed 3 for two seconds, and retains actual refactor-policy
+triggers, basis phase timings and up to two immutable exact residual snapshots.
+The profile uses reflection over existing private seams; observations add overhead.
+Its exact leaf acceptance differs from ordinary configured-tolerance CLI execution.
+It establishes neither a source result nor default portfolio equivalence.
+
+`NumericalResidualReplay` accepts an array of
+`{job, source, residual, sha256, dense}` capture references through the same argument.
+It checks retained local-job bytes and replays each state through the existing scoped
+solver and production certification, comparing cold and retained owners. Each solve
+has two seconds, 4096 pivots and 50 million work units. One warmup and three measured
+rounds retain phase observations, certification, results and complete owner cost.
+`dense=true` pairs sparse construction with the existing dense LU builder on bases
+of order at most 64, recording input dimension and density together. This diagnostic
+does not change production dense selection. Captures contain no original warm factors;
+replay and instrumented timings are separate from whole-source measurements.
+
 Profile mains live in `com.eignex.klause.bench.profile` and run as a `lab profile`
 job: the lab builds the named commit and runs the class once under JFR, keeping what
 it writes to `$OUT` (see the lab's
