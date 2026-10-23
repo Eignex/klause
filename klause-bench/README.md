@@ -569,8 +569,11 @@ authority, rather than asserting original MPS decimal equivalence.
 `{job, source, residual, sha256, dense}` capture references through the same argument.
 It checks retained local-job bytes and replays each state through the existing scoped
 solver and production certification, comparing cold and retained owners. Each solve
-has two seconds, 4096 pivots and 50 million work units. One warmup and three measured
-rounds retain phase observations, certification, results and complete owner cost.
+has two seconds, 4096 pivots and 50 million work units, with pricing tie seed 3.
+One warmup and three measured rounds disable per-operation observation; a separate
+observed round retains phase and certification details. Lab JFR remains enabled.
+Owner construction, preparation, solve, certification and close enter lifecycle
+timing; result serialization follows each timed call.
 `dense=true` pairs sparse construction with the existing dense LU builder on bases
 of order at most 64, recording input dimension and density together. This diagnostic
 does not change production dense selection. Captures contain no original warm factors;

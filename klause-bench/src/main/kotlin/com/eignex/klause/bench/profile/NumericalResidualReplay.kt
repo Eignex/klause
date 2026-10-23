@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -50,11 +51,12 @@ internal object NumericalResidualReplay {
         val state = requireNotNull(NumericalResidualProfile.call(capture, "getInitialState"))
         out.resolve("residual.klexact").writeBytes(bytes)
         val arms = if (spec.getValue("dense").jsonPrimitive.content.toBooleanStrict()) listOf(0, 64) else listOf(6)
-        for (round in -1..2) {
+        for (round in -1..3) {
             val ordered = if (round % 2 == 0) arms.reversed() else arms
             for (denseLimit in ordered) {
                 for (retained in listOf(false, true)) {
-                    val result = measure(state, denseLimit, retained)
+                    val observed = round == 3
+                    val result = measure(state, denseLimit, retained, observed)
                     val report = buildJsonObject {
                         put("revision", Reports.readGitSha())
                         put("input", input)
@@ -62,6 +64,7 @@ internal object NumericalResidualReplay {
                         put("round", round)
                         put("denseLimit", denseLimit)
                         put("retained", retained)
+                        put("observed", observed)
                         put("sourceVerdictClaim", false)
                         put("captureContainsOriginalFactors", false)
                         put("result", result)
@@ -73,11 +76,11 @@ internal object NumericalResidualReplay {
         println("replayed residual ${sha256(bytes)}")
     }
 
-    private fun measure(state: Any, denseLimit: Int, retained: Boolean): JsonElement {
-        val probe = NumericalResidualProfile.Probe(denseLimit)
+    private fun measure(state: Any, denseLimit: Int, retained: Boolean, observed: Boolean): JsonElement {
+        val probe = NumericalResidualProfile.Probe(denseLimit, observed)
         val observerType = Class.forName(ENGINE + "LpCertificationObserver")
         val observations = ArrayList<JsonElement>()
-        val observer = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, method, values ->
+        val recording = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, method, values ->
             if (observations.size < 256) {
                 observations += buildJsonObject {
                     put("method", method.name)
@@ -86,15 +89,23 @@ internal object NumericalResidualReplay {
             }
             null
         }
-        val pricing = Class.forName(ENGINE + "LpPricingOptions").getConstructor().newInstance()
+        val observer = recording.takeIf { observed }
+        val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 2 }
+            .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L)
         fun owner(): Any = Class.forName(ENGINE + "LpScopedSolver").constructors.single { it.parameterCount == 9 }
             .newInstance(state, Cancellation.Never, probe.context, 64, 4096, 50_000_000L, false, Int.MAX_VALUE, pricing)
         val steps = ArrayList<JsonElement>()
         var current: Any? = null
-        val started = System.nanoTime()
+        var setupNs = 0L
+        var solveNs = 0L
+        var closeNs = 0L
         try {
             repeat(2) { index ->
-                if (current == null) current = owner()
+                if (current == null) {
+                    val started = System.nanoTime()
+                    current = owner()
+                    setupNs += System.nanoTime() - started
+                }
                 val active = requireNotNull(current)
                 val stop = Cancellation.after(2000.milliseconds)
                 val solveStarted = System.nanoTime()
@@ -111,6 +122,7 @@ internal object NumericalResidualReplay {
                     null
                 }
                 val elapsed = System.nanoTime() - solveStarted
+                solveNs += elapsed
                 steps += buildJsonObject {
                     put("step", index)
                     put("prepared", prepared)
@@ -134,21 +146,28 @@ internal object NumericalResidualReplay {
                     )
                 }
                 if (!retained) {
+                    val closeStarted = System.nanoTime()
                     (active as AutoCloseable).close()
+                    closeNs += System.nanoTime() - closeStarted
                     current = null
                 }
             }
         } finally {
+            val closeStarted = System.nanoTime()
             (current as? AutoCloseable)?.close()
+            closeNs += System.nanoTime() - closeStarted
         }
-        val elapsed = System.nanoTime() - started
         return buildJsonObject {
-            put("elapsedNs", elapsed)
+            put("elapsedNs", setupNs + solveNs + closeNs)
+            put("setupNs", setupNs)
+            put("solveNs", solveNs)
+            put("closeNs", closeNs)
             put("processors", Runtime.getRuntime().availableProcessors())
+            put("tieSeed", 3)
             put("perSolveTimeoutMs", 2000)
             put("pivotLimit", 4096)
             put("workLimit", 50_000_000L)
-            put("instrumentation", "lab JFR, reflective basis timing and existing certifier observer")
+            put("instrumentation", if (observed) "lab JFR, basis timing and certifier observer" else "lab JFR")
             put("steps", JsonArray(steps))
             put("phaseNs", NumericalResidualProfile.json(probe.phaseNs))
             put("phaseCalls", NumericalResidualProfile.json(probe.phaseCalls))

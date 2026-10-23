@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
@@ -55,6 +56,7 @@ internal object NumericalResidualProfile {
         val suite = input.getValue("suite").jsonPrimitive.content
         val name = input.getValue("problem").jsonPrimitive.content
         val reference = Catalog.uncapped(suite).problems.single { it.name == name }
+        require(reference.format == Format.MPS)
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(4 * 1024 * 1024 + 1) }
         require(bytes.size <= 4 * 1024 * 1024 && sha256(bytes) == input.getValue("sha256").jsonPrimitive.content)
         out.resolve("source.mps").writeBytes(bytes)
@@ -141,7 +143,7 @@ internal object NumericalResidualProfile {
         out.resolve("capture.json").writeText(report.toString())
     }
 
-    internal class Probe(private val denseLimit: Int = 6) {
+    internal class Probe(private val denseLimit: Int = 6, private val observed: Boolean = true) {
         val phaseNs = linkedMapOf<String, Long>()
         val phaseCalls = linkedMapOf<String, Long>()
         val transformEntries = linkedMapOf<String, Long>()
@@ -156,7 +158,11 @@ internal object NumericalResidualProfile {
             val factoryType = Class.forName(ENGINE + "LpEngineFactory")
             val factory = Proxy.newProxyInstance(factoryType.classLoader, arrayOf(factoryType)) { _, method, values ->
                 val arguments = values.orEmpty()
-                val owner = measured("owner-setup") { invoke(production, method, arguments) }
+                val owner = if (observed) {
+                    measured("owner-setup") { invoke(production, method, arguments) }
+                } else {
+                    invoke(production, method, arguments)
+                }
                 val numericalOwner = owner != null && method.name.startsWith("new") &&
                     owner.javaClass.simpleName.startsWith("RevisedSimplex")
                 if (!numericalOwner) {
@@ -170,7 +176,7 @@ internal object NumericalResidualProfile {
         }
 
         private fun wrapEngine(owner: Any, id: Int): Any {
-            val basisFactory: (Any) -> Any = { matrix ->
+            val basisFactory: (Any) -> Any = letBackend@{ matrix ->
                 val type = Class.forName(BASIS + "KotlinBasisSolver")
                 val constructor = type.constructors.single { it.parameterCount == 10 }
                 val backend = measured("basis-setup") {
@@ -179,6 +185,7 @@ internal object NumericalResidualProfile {
                         denseLimit, if (denseLimit == 64) 0.0 else 0.5, 62, null,
                     )
                 }
+                if (!observed) return@letBackend backend
                 val pointers = call(matrix, "copyColumnPointers") as IntArray
                 val coefficients = call(matrix, "getValues") as DoubleArray
                 val basisType = Class.forName(BASIS + "BasisSolver")
@@ -231,6 +238,7 @@ internal object NumericalResidualProfile {
                 }
             }
             set(owner, "basisSolverFactory", basisFactory)
+            if (!observed) return owner
             val interfaces = owner.javaClass.interfaces
             return Proxy.newProxyInstance(owner.javaClass.classLoader, interfaces) { _, method, values ->
                 val operation = method.name.substringBefore('$')
