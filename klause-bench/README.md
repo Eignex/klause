@@ -930,6 +930,21 @@ solve seconds change from 2.760/2.789 to 2.677/2.815 on the small source and fro
 coexists with a small-source mean loss; this is not uniform optimization recovery
 or a general speedup.
 
+Independent retained ILS board swaps at `64852b491f` leave all sixteen fixed-restart
+pairs unchanged in [7770](https://lab.eignex.com/jobs/7770). ILS has two small-source
+wins/two losses and four large-source losses; gbac and photo controls tie. Default
+[7771](https://lab.eignex.com/jobs/7771) loses all nine small-source pairs and five
+of nine large-source pairs. All 136 witnesses pass original-source checks. Lower
+fixed-work elapsed cost does not establish optimization recovery.
+
+The complete baseline/coverage/perturbation/combined comparison in
+[7772](https://lab.eignex.com/jobs/7772) preserves fixed-restart controls exactly.
+Adding perturbation to coverage loses all eight ILS team pairs. Default
+[7773](https://lab.eignex.com/jobs/7773) loses all nine small-source combined pairs
+against both baseline and coverage; large-source combined pairs have five wins
+and four losses against baseline. All 272 witnesses pass source checks. Selecting
+boards in place of the original factor targets is unsupported by these results.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;
