@@ -144,8 +144,10 @@ internal object NumericalResidualProfile {
             it.name == "authoritativeModel" && it.parameterCount == 1
         }
         val exact = requireNotNull(authority.invoke(null, model))
-        val state = Class.forName(ENGINE + "LpExactState").constructors.single { it.parameterCount == 1 }
-            .newInstance(exact)
+        val trail = Class.forName(ENGINE + "LpBoundTrail").constructors.single {
+            it.parameterCount == 1 && it.parameterTypes.single().isInstance(exact)
+        }.newInstance(exact)
+        val state = requireNotNull(call(trail, "getState"))
         val bytes = encode(state)
         out.resolve("residual-0.klexact").writeBytes(bytes)
         val report = buildJsonObject {
