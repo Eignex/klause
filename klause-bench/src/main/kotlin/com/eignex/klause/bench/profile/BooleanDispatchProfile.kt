@@ -96,7 +96,9 @@ internal object BooleanDispatchProfile {
                             put("traceNs", traceNs)
                             put("propagationNs", propagationNs)
                             put("callbacks", observer.assertions)
-                            put("observationsSha256", observations.digest().joinToString("") { "%02x".format(Locale.ROOT, it) })
+                            put("observationsSha256", observations.digest().joinToString("") {
+                                "%02x".format(Locale.ROOT, it)
+                            })
                         })
                     }
                 }
