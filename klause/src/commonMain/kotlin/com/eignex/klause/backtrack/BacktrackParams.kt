@@ -265,9 +265,11 @@ data class BacktrackParams(
     /**
      * The verified incumbent any arm has published — the read counterpart of [improvedSolutionSink]. On each
      * restart the engine adopts a not-yet-seen incumbent as solution-phasing hints (see [solutionPhasing]) so
-     * its stable phase dives toward the globally-good assignment instead of only its own. Purely heuristic:
-     * the assignment reorders value trials (out-of-domain integers are clamped), so a peer's solution can
-     * never make this search unsound. After its first admitted incumbent, [SolutionGuided] value selection
+     * its stable phase dives toward the globally-good assignment instead of only its own. Value hints
+     * reorder trials (out-of-domain integers are clamped) without supplying pruning authority.
+     * Retained optimization with [objectiveBoundSupplier] separately revalidates the current assignment
+     * at its first root before admitting it as a starting incumbent. After its first admitted incumbent,
+     * [SolutionGuided] value selection
      * adopts better pooled incumbents when optimization resumes, without restarting traversal.
      * LP-bounding search may prefer those values before its first local witness.
      * `null` (default) disables it.

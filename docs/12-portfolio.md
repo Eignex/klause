@@ -288,6 +288,11 @@ after admitting a complete improving incumbent; solution-guided selectors adopt
 better verified pooled incumbents when traversal resumes, keeping their trail and
 learned state.
 
+At its first root, a retained CP worker with a shared cutoff revalidates the current
+pooled assignment as a starting incumbent. An equal-cutoff witness can supply local
+objective propagation without another portfolio improvement. Pool membership alone
+supplies no authority; source validation and conditional proof admission still apply.
+
 ## Worker recipes
 
 Publication and scheduling apply to every pool. Recipes decide which workers a

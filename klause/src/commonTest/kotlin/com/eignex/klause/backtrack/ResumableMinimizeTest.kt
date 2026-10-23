@@ -37,6 +37,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -403,7 +404,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `a starting witness equal to the shared cutoff should tighten the first root`() {
+    fun `retained search should revalidate a pooled witness and tighten its first root`() {
         var firstMaximum: Long? = null
         val selector = object : VariableSelector {
             override fun pick(session: PropagationSession, rng: Random): VarRef? {
@@ -420,12 +421,12 @@ class ResumableMinimizeTest {
             valueSelector = IndomainMin,
             lpPlan = LpPlan(bounding = false),
             objectiveBoundSupplier = { 5.0 },
+            pooledIncumbents = IncumbentExchange.minimizing<Sample>().apply {
+                offer(Sample(BooleanArray(0), longArrayOf(5L)), 5.0)
+            },
         )
 
-        ResumableMinimize(
-            BacktrackSolver(problem), objective, params,
-            initialCandidate = Sample(BooleanArray(0), longArrayOf(5L)),
-        ).use { search ->
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
             val result = assertIs<MinimizeResult.BestFound>(
                 search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {},
             )
@@ -437,7 +438,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `a starting witness at the shared cutoff should still pass source validation`() {
+    fun `retained search should reject an invalid pooled witness at the shared cutoff`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0, 10)),
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 4)),
@@ -447,13 +448,13 @@ class ResumableMinimizeTest {
             valueSelector = IndomainMin,
             lpPlan = LpPlan(bounding = false),
             objectiveBoundSupplier = { 5.0 },
+            pooledIncumbents = IncumbentExchange.minimizing<Sample>().apply {
+                offer(Sample(BooleanArray(0), longArrayOf(5L)), 5.0)
+            },
         )
         val offers = mutableListOf<Double>()
 
-        ResumableMinimize(
-            BacktrackSolver(problem), objective, params,
-            initialCandidate = Sample(BooleanArray(0), longArrayOf(5L)),
-        ).use { search ->
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
             search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
         }
 
