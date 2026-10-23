@@ -128,12 +128,12 @@ internal object NumericalResidualReplay {
                 val solveStarted = System.nanoTime()
                 val prepared = NumericalResidualProfile.call(active, "prepare", stop) as Boolean
                 val prepareNs = System.nanoTime() - solveStarted
-                val continuation = Class.forName("com.eignex.klause.simplex.exact.ExactContinuationLimits")
-                    .getConstructor().newInstance()
-                val refinement = Class.forName(ENGINE + "LpRefinementLimits").getConstructor().newInstance()
+                val defaultSolve = active.javaClass.methods.single {
+                    it.name == "solve\$default" && it.parameterCount == 11
+                }
                 val result = if (prepared) {
-                    NumericalResidualProfile.call(
-                        active, "solve", null, stop, null, continuation, true, observer, refinement, false,
+                    defaultSolve.invoke(
+                        null, active, null, stop, null, null, true, observer, null, false, 221, null,
                     )
                 } else {
                     null
