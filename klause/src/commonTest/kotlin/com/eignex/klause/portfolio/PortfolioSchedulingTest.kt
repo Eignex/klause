@@ -242,7 +242,9 @@ class PortfolioSchedulingTest {
             }
             var polls = 0
 
-            Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 2_000 }) }
+            Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
+                it.minimize(Cancellation { ++polls > 2_000 })
+            }
 
             val share = slices.drop(1).sum().toDouble() / slices.sum()
             assertTrue(share < 0.05, "$useless useless arms took $share of the slices")
@@ -517,7 +519,9 @@ class PortfolioSchedulingTest {
         val workers = listOf(trackingWorker("finder", 0, finder), trackingWorker("improver", 1, improver))
         var polls = 0
 
-        Portfolio.thompson(workers, seed = 3L).use { it.minimize(Cancellation { ++polls > 100 }) }
+        Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = TestTimeSource() }.use {
+            it.minimize(Cancellation { ++polls > 100 })
+        }
 
         assertTrue(slices[1] > 3 * slices[0], "finder ${slices[0]} slices, improver ${slices[1]}")
     }
@@ -630,7 +634,9 @@ class PortfolioSchedulingTest {
         }
         var polls = 0
 
-        Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 300 }) }
+        Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
+            it.minimize(Cancellation { ++polls > 300 })
+        }
 
         assertTrue(slices[1] > 3 * slices[2], "raiser ${slices[1]} slices, idle ${slices[2]}")
     }
@@ -653,7 +659,9 @@ class PortfolioSchedulingTest {
         }
         var polls = 0
 
-        Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 300 }) }
+        Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
+            it.minimize(Cancellation { ++polls > 300 })
+        }
 
         assertTrue(slices[1] > 3 * slices[2], "sharer ${slices[1]} slices, idle ${slices[2]}")
     }
@@ -700,7 +708,9 @@ class PortfolioSchedulingTest {
             )
             val bandit = fixedBandit(2, arm = 1)
 
-            val result = Portfolio(workers, bandit, maxSliceWork = 5_000L).use {
+            val result = Portfolio(workers, bandit, maxSliceWork = 5_000L).also {
+                it.runTimeSource = TestTimeSource()
+            }.use {
                 it.incumbentProbeArms = setOf(1)
                 it.minimize(Cancellation { reached.size >= 15 })
             }
