@@ -75,7 +75,7 @@ internal object NumericalResidualProfile {
         val compiled = if (entry == null) Mps.parse(bytes.decodeToString()).toProblem() else null
         val problem = entry?.problem ?: requireNotNull(compiled).model
         val sourceObjective = entry?.objective ?: compiled?.objective?.toLinearObjective()?.let {
-            if (compiled?.maximize == true) it.negated() else it
+            if (compiled.maximize) it.negated() else it
         }
         if (input["root"]?.jsonPrimitive?.content?.toBooleanStrict() == true) {
             captureRoot(problem, sourceObjective, source, out)
