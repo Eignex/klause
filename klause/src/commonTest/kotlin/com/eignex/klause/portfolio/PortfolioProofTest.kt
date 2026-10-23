@@ -11,6 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
 class PortfolioProofTest {
     @Test
@@ -285,7 +286,9 @@ class PortfolioProofTest {
                 )
             }
 
-            val result = Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+            val result = Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).also {
+                it.runTimeSource = TestTimeSource()
+            }.use {
                 it.minimize(Cancellation { reached.size >= 16 })
             }
 

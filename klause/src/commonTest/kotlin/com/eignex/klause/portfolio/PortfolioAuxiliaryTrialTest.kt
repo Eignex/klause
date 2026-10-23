@@ -305,7 +305,9 @@ class PortfolioAuxiliaryTrialTest {
                 )
             }
 
-            Portfolio.thompson(workers, seed = 0, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
+            Portfolio.thompson(workers, seed = 0, maxSliceWork = 5_000L, reseedStaleThreshold = 0).also {
+                it.runTimeSource = TestTimeSource()
+            }.use {
                 it.incumbentProbeArms = setOf(if (admittedBeforeIncumbent) 0 else 2)
                 it.minimize(Cancellation { reached.size >= 16 })
             }
