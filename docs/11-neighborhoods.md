@@ -202,8 +202,9 @@ move sink. A target without an admissible board swap declines its attempt.
 Both inputs must be searched, unpinned and in each other's root
 domains. A BasinHopping factor attempt spends at most one swap; Uniform spends two
 input slots per swap. The existing strength bounds the attempts, including misses.
-The definition network propagates outputs in a reversible probe; a swap that would
-break an implicitly owned global is declined. A feasible warm assignment establishes
+The definition network propagates outputs in a reversible probe. A swap that would
+break an implicitly owned global or leave a blocked maintained output inconsistent
+is declined. A feasible warm assignment establishes
 owners without rewriting its inputs. Restart preparation preserves a feasible owner assignment,
 reconciles definitions and verifies ownership again; failed preservation uses the
 ordinary seeding path. The policy reports whether the prepared assignment changed
