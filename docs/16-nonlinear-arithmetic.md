@@ -273,6 +273,13 @@ decline a substitution while preserving its completed prefix; cancellation and
 work exhaustion withhold the result. Expansion uses the caller's remaining work
 and representation limits.
 
+Root reduction exposes immutable committed snapshots. Each snapshot retains its
+own formula and persistent reverse-fibre chain; later substitutions cannot change
+an earlier reconstruction. A snapshot is available only after an entire Boolean
+rewrite or numeric substitution commits. An interrupted rewrite publishes no
+snapshot. Query progress records committed snapshots, root and search work, and
+the first regional entry separately from completed projection and lifting.
+
 The procedure then runs in four stages; only the last two are needed for
 completeness.
 
