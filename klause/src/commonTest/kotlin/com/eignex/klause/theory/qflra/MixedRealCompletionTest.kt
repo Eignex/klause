@@ -13,6 +13,98 @@ import kotlin.test.assertTrue
 
 class MixedRealCompletionTest {
     @Test
+    fun `partial ceilings should preserve source operations for completion`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget(maxOperations = 2)
+        val stages = ArrayList<String>()
+        assertNotNull(completeMixedRealComponents(3, rows, budget, Cancellation.Never, operationCeiling = 1))
+
+        val partial = completeMixedRealComponents(3, rows, budget, Cancellation.Never,
+            onStage = { stages += it }, operationCeiling = 1)
+        val operationsAfterPartial = budget.operations
+        val complete = completeMixedRealComponents(3, rows, budget, Cancellation.Never)
+
+        assertNull(partial)
+        assertEquals(1, operationsAfterPartial)
+        assertTrue("RECOVERY_REAL_COMPONENT_LP_RESERVED" in stages)
+        assertTrue("RECOVERY_REAL_COMPONENT_LP_REQUEST" !in stages)
+        assertTrue("RECOVERY_REAL_COMPONENT_LP_null" !in stages)
+        assertTrue(assertNotNull(complete).satisfiesSourceRows(rows))
+        assertEquals(2, budget.operations)
+    }
+
+    @Test
+    fun `completion should retain the shared source operation cap`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget(maxOperations = 1)
+        val stages = ArrayList<String>()
+        assertNotNull(completeMixedRealComponents(3, rows, budget, Cancellation.Never))
+
+        val point = completeMixedRealComponents(3, rows, budget, Cancellation.Never, onStage = { stages += it })
+
+        assertNull(point)
+        assertEquals(1, budget.operations)
+        assertTrue("RECOVERY_REAL_COMPONENT_LP_null" in stages)
+        assertTrue("RECOVERY_REAL_COMPONENT_LP_RESERVED" !in stages)
+    }
+
+    @Test
+    fun `cheap conflicts should remain available at the partial ceiling`() {
+        for (kind in listOf("graph", "parallel")) {
+            for (strict in listOf(false, true)) {
+                val columns = if (kind == "parallel") intArrayOf(0, 1, 2) else intArrayOf(0)
+                val rows = listOf(
+                    ExactRationalInequality(columns, List(columns.size) { BigFraction.ONE },
+                        if (strict) BigFraction.ONE else BigFraction.ZERO, strict),
+                    ExactRationalInequality(columns, List(columns.size) { BigFraction.MINUS_ONE },
+                        BigFraction.MINUS_ONE),
+                )
+                val budget = SourceLpBudget(maxOperations = 1)
+                var support: IntArray? = null
+
+                val point = completeMixedRealComponents(3, rows, budget, Cancellation.Never,
+                    onInfeasible = { support = it }, operationCeiling = 0)
+
+                assertNull(point)
+                assertEquals(setOf(0, 1), assertNotNull(support).toSet())
+                assertEquals(0, budget.operations)
+            }
+        }
+    }
+
+    @Test
+    fun `cancelled cheap conflicts should withhold support at the partial ceiling`() {
+        for (kind in listOf("graph", "parallel")) {
+            val columns = if (kind == "parallel") intArrayOf(0, 1, 2) else intArrayOf(0)
+            val rows = listOf(
+                ExactRationalInequality(columns, List(columns.size) { BigFraction.ONE }, BigFraction.ZERO),
+                ExactRationalInequality(columns, List(columns.size) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            )
+            val budget = SourceLpBudget(maxOperations = 1)
+            val cancelledStage = if (kind == "parallel") {
+                "RECOVERY_REAL_COMPONENT_PARALLEL_CONFLICT"
+            } else {
+                "RECOVERY_REAL_COMPONENT_GRAPH_CONFLICT"
+            }
+            var stopped = false
+            var support: IntArray? = null
+
+            val point = completeMixedRealComponents(3, rows, budget, Cancellation { stopped },
+                onStage = { if (it == cancelledStage) stopped = true },
+                onInfeasible = { support = it }, operationCeiling = 0)
+
+            assertTrue(stopped)
+            assertNull(point)
+            assertNull(support)
+            assertEquals(0, budget.operations)
+        }
+    }
+
+    @Test
     fun `graph conflicts should cite their original component rows`() {
         for (strict in listOf(false, true)) {
             val rows = listOf(

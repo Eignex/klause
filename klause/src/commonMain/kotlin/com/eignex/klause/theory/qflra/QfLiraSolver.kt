@@ -1632,7 +1632,8 @@ class ExactLiraSearchComponent private constructor(
             onStage = ::observeCompleteStage,
             onSourceInfeasible = reportInfeasible,
             realCompletion = { columns, residual, token, onInfeasible ->
-                reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible)
+                reduction.completeReals(columns, residual, token, ::observeCompleteStage, onInfeasible,
+                    operationCeiling = 192)
             }, recoveryGuesses = if (checkRetainedRepairs) guesses else emptySequence())
         if (point != null && !operationStop()) {
             candidate = point
@@ -2290,7 +2291,9 @@ private class ExactLiraReductionCache(
         stop: Cancellation,
         onStage: (String) -> Unit,
         onInfeasible: ((IntArray) -> Unit)?,
-    ): List<BigFraction>? = completeMixedRealComponents(columns, rows, budget, stop, onStage, onInfeasible)
+        operationCeiling: Int? = null,
+    ): List<BigFraction>? = completeMixedRealComponents(columns, rows, budget, stop, onStage, onInfeasible,
+        operationCeiling)
 
     fun reduce(
         bools: IntArray,

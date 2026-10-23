@@ -86,6 +86,11 @@ Boolean premise in the retained support must be assigned. The same restricted th
 that conflict. A recovered partial point that passes every selected original row
 can guide unresolved guards through the existing point-reuse lifecycle. Complete
 source agreement still gates publication of a witness.
+Pure-real partial recovery admits residual LP calls only while fewer than 192
+shared source LP operations have been consumed. Equality, graph and parallel
+contradiction checks precede that admission. Complete recovery can use the remaining
+operations under the same total cap of 256; mixed callers retain the shared cap
+without the partial ceiling.
 An indexed point checks a single changed guard through its unique source-row index.
 Batches of changed guards and shared activators scan all pending source rows.
 Wide pure-real candidates can partition into independent blocks connected by selected rows.

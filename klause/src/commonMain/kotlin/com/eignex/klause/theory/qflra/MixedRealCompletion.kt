@@ -21,6 +21,7 @@ internal fun completeMixedRealComponents(
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
     onInfeasible: ((IntArray) -> Unit)? = null,
+    operationCeiling: Int? = null,
 ): List<BigFraction>? {
     if (columns <= 0 || columns.toLong() * columns > 65536L) return null
     // Each parent can change at most once per union; the batch covers all compressed walks.
@@ -100,6 +101,11 @@ internal fun completeMixedRealComponents(
             onStage?.invoke("RECOVERY_REAL_COMPONENT_ROWS_${localRows.size}_${reduced.rows.size}")
             if (!budget.admitsDimensions(component.size, reduced.rows.size.toLong())) {
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_DIMENSION")
+                return null
+            }
+            if (stop()) return null
+            if (operationCeiling != null && budget.operations >= operationCeiling) {
+                onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_RESERVED")
                 return null
             }
             onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_REQUEST")
