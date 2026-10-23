@@ -83,20 +83,22 @@ class QfLiraSolverLpTest {
                         doubleArrayOf(1.0, 1.0), LinearOp.GE, scale / 2.0)
                     3 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1),
                         doubleArrayOf(-1.0), LinearOp.LE, 0.0, strict = true)
-                    4 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
-                        doubleArrayOf(-1.0, -1.0), LinearOp.LE, 0.0, strict = true)
+                    4 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 4),
+                        doubleArrayOf(-1.0, 1.0, 1.0), LinearOp.LE, 0.0, strict = true)
                     else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index),
                         doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
                 }
             },
         )
         var repairableGuess = true
+        var withheld = 0
         val factory = TrackingLpFactory(transform = { result ->
             if (result.primal.size <= 128) result else {
+                withheld++
                 val primal = DoubleArray(result.primal.size)
                 if (repairableGuess) primal[1] = 0.25
                 FloatLpResult(result.basis, result.objective, result.duals, primal,
-                    optimal = result.optimal, exactState = result.exactState)
+                    optimal = result.optimal, exactState = null)
             }
         })
         val stats = SmtStatsSink()
@@ -105,10 +107,12 @@ class QfLiraSolverLpTest {
             component.useMixedPointCompletion()
             component.observeWith(stats)
             component.observeCompleteTraversal()
-            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertTrue(withheld > 0)
+            assertEquals(false, hints.preferredBool(1))
             val operations = stats.snapshot().sourceLp.operations
             repairableGuess = false
 
@@ -119,7 +123,8 @@ class QfLiraSolverLpTest {
             assertTrue(point[1] > BigFraction.ZERO)
             assertEquals(assertNotNull(BigFraction.ofDouble(scale / 2.0)), point[0] + point[3])
             assertEquals(operations, stats.snapshot().sourceLp.operations)
-            assertTrue((stats.snapshot().completeSearchStages?.get("RECOVERY_RETAINED_EQUALITY_POINT") ?: 0L) > 0L)
+            assertTrue((stats.snapshot().completeSearchStages?.get("RECOVERY_RETAINED_EQUALITY_POINT") ?: 0L) > 0L,
+                stats.snapshot().completeSearchStages.toString())
         }
     }
 
