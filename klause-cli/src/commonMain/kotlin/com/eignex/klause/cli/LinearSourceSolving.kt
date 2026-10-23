@@ -111,7 +111,7 @@ internal fun solveLinearSource(
         val bound = result.result.bound?.claim as? com.eignex.klause.solver.evidence.SourceClaim.Bound
         val value = bound?.value as? SourceValue.Rational
         if (value != null) output.onAllowanceStatistics(listOf(
-            "nativeNominalObjectiveBound" to (value.value / qualified.objectiveScale).toString(),
+            "nativeNominalObjectiveBound" to (value.value * qualified.objectiveScale.reciprocal()).toString(),
         ))
     }
     output.onAllowanceStatistics(
