@@ -196,8 +196,10 @@ improvement, and each restart receives a fresh copy so a policy cannot alter the
 anchor. Fixed-cadence and Luby policies keep no copy. Anchored perturbations restore
 exact pins after their random draws and clear tabu state.
 
-Retained ILS board kicks select complete AllDifferent swaps through the proposing
-owner's move sink. Both inputs must be searched, unpinned and in each other's root
+Retained ILS board kicks keep the random factor or variable target and select
+complete AllDifferent swaps touching that target through the proposing owner's
+move sink. A target without an admissible board swap declines its attempt.
+Both inputs must be searched, unpinned and in each other's root
 domains. A BasinHopping factor attempt spends at most one swap; Uniform spends two
 input slots per swap. The existing strength bounds the attempts, including misses.
 The definition network propagates outputs in a reversible probe; a swap that would

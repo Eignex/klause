@@ -38,11 +38,11 @@ class ImplicitSeeding(
         }
 
     /** Implicit-solving owner map over int vars: `ownerInt[v]` is the factor id that owns int var
-     *  `v`, or `-1` if `v` is searched freely. A variable is owned once [seedImplicitFeasible] seeds
-     *  its [implicitSeedFactors] global feasibly; from then on only that global's structure-preserving
-     *  [Invariant.proposeStructuredMoves] may change it, so the generic neighbourhood can never break
-     *  the implicitly-solved constraint. `null` until the first seeding pass, and populated only
-     *  when implicit feasible-init is enabled. The [MoveSink] enforces the filter via
+     *  `v`, or `-1` if `v` is searched freely. A variable is owned after seeding or validation of a
+     *  retained feasible assignment establishes its [implicitSeedFactors] global. Only that global's
+     *  structure-preserving [Invariant.proposeStructuredMoves] may change it, so the generic
+     *  neighbourhood cannot break the implicitly-solved constraint. `null` until seeding or retained assignment validation
+     *  establishes ownership. The [MoveSink] enforces the filter via
      *  [MoveSink.setOwners]. */
     var ownerInt: IntArray? = null
         private set

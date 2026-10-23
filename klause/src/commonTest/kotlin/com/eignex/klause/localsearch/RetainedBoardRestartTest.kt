@@ -87,6 +87,74 @@ class RetainedBoardRestartTest {
     }
 
     @Test
+    fun `a basin attempt on an unrelated factor should decline board diversification`() {
+        val problem = Problem(
+            0, 5, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0), IntDomain(1, 1), IntDomain(0, 0)),
+            arrayOf<Factor>(Product(2, 3, 4), AllDifferent(intArrayOf(0, 1), 0, 2)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), object : Random() {
+            private var draws = 0
+            override fun nextBits(bitCount: Int): Int = if (bitCount == 0) 0 else draws++ % 2
+        })
+        state.assignment.setInt(1, 1L)
+        state.assignment.setInt(3, 1L)
+        state.recompute()
+        val anchor = state.assignment.snapshot()
+        val policy = IteratedLocalSearchRestart(
+            initialPerturbationStrength = 1, perturbationKind = PerturbationKind.BasinHopping,
+        )
+
+        policy.restart(state, anchor)
+
+        assertEquals(anchor, state.assignment.snapshot())
+        assertEquals(false, policy.lastBoardDiversificationChanged)
+    }
+
+    @Test
+    fun `a uniform target on a maintained output should decline board diversification`() {
+        val problem = Problem(
+            0, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(2, 2)),
+            arrayOf<Factor>(AllDifferent(intArrayOf(1, 2), 0, 2), Product(1, 3, 0)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), object : Random() {
+            private var draws = 0
+            override fun nextBits(bitCount: Int): Int = if (bitCount == 0) 0 else draws++ % 2
+        })
+        state.assignment.setInt(2, 1L)
+        state.assignment.setInt(3, 2L)
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        sweep.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
+        state.recompute()
+        val anchor = state.assignment.snapshot()
+        val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 2)
+
+        policy.restart(state, anchor)
+
+        assertEquals(anchor, state.assignment.snapshot())
+        assertEquals(false, policy.lastBoardDiversificationChanged)
+    }
+
+    @Test
+    fun `two uniform input slots should admit a complete board swap`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), 0, 2)),
+        )
+        val state = freshState(problem, 7L)
+        state.seedImplicitFeasible()
+        state.recompute()
+        val anchor = state.assignment.snapshot()
+        val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 2)
+
+        policy.restart(state, anchor)
+
+        assertNotEquals(anchor, state.assignment.snapshot())
+        assertEquals(true, policy.lastBoardDiversificationChanged)
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
     fun `a board kick should propagate maintained outputs from searched inputs`() {
         val problem = Problem(
             0, 4, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2), IntDomain(2, 2)),

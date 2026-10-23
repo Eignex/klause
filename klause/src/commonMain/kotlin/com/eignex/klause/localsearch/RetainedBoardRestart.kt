@@ -26,11 +26,25 @@ internal class RetainedBoardRestart private constructor(
         val attempts = if (kind == PerturbationKind.Uniform) strength / 2 else strength
         repeat(attempts) {
             sink.clear()
-            val fid = boards[state.rng.nextInt(boards.size)]
+            val scope = when (kind) {
+                PerturbationKind.BasinHopping ->
+                    state.problem.factors[state.rng.nextInt(state.problem.numFactors)].intVars
+                PerturbationKind.Uniform -> {
+                    val target = state.rng.nextInt(state.problem.numBoolVars + state.problem.numIntVars)
+                    intArrayOf(target - state.problem.numBoolVars)
+                }
+            }
+            val eligible = boards.filter { board ->
+                state.problem.factors[board].intVars.any { it in scope }
+            }
+            if (eligible.isEmpty()) return@repeat
+            val fid = eligible[state.rng.nextInt(eligible.size)]
             if (state.factors[fid].isViolated(state, fid)) return@repeat
             sink.proposer = fid
             state.factors[fid].proposeStructuredMoves(state, fid, sink)
-            val swaps = sink.list.filterIsInstance<Move.Compound>().filter { admissibleSwap(state, it) }
+            val swaps = sink.list.filterIsInstance<Move.Compound>().filter { move ->
+                admissibleSwap(state, move) && move.parts.any { (it as Move.IntSet).varId in scope }
+            }
             if (swaps.isEmpty()) return@repeat
             val move = swaps[state.rng.nextInt(swaps.size)]
             if (state.preservesImplicitFeasibility(move)) state.apply(move)

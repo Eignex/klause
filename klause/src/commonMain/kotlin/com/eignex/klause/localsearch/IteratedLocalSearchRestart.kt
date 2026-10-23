@@ -61,7 +61,8 @@ class IteratedLocalSearchRestart(
      *  scatters single-variable mutations across the problem; [PerturbationKind.BasinHopping]
      *  randomises every variable of a small set of randomly-picked factors, producing a
      *  coordinated jump biased toward escaping the current basin. On board models, kicks use
-     *  complete searched-input swaps: one factor attempt for BasinHopping, two input slots for Uniform. */
+     *  complete searched-input swaps touching the sampled factor or variable: one factor attempt
+     *  for BasinHopping, two input slots for Uniform. Targets without an admissible board swap decline. */
     val perturbationKind: PerturbationKind = PerturbationKind.Uniform,
     /** When true, crossover transfers entire factor scopes at once instead of mixing
      *  per-variable, preserving co-adapted assignments that uniform recombination would
