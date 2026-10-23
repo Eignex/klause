@@ -514,12 +514,20 @@ class LocalSearchState private constructor(
     }
 
     private fun propagateInvariants(net: InvariantNetwork, move: Move, affected: IntArrayList?) {
-        val values = definitionValues ?: DefinitionValues(net).also { definitionValues = it }
-        if (affected == null) {
+        val nodes = affected ?: run {
             collectMoveSeeds(move)
             affectedDefinitions(net)
         }
+        if (nodes.size == 0) return
+        val values = definitionValues ?: DefinitionValues(net).also { definitionValues = it }
         val traversal = checkNotNull(definitionTraversal)
+        if (traversal.prefersNodeScan()) {
+            for (position in 0 until nodes.size) {
+                val idx = nodes[position]
+                if (values.pending.get(idx)) propagateDefinition(net, values, idx)
+            }
+            return
+        }
         var next = traversal.nextPending(values.pending, 0)
         while (next >= 0) {
             val idx = next
