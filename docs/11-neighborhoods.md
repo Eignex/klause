@@ -219,18 +219,18 @@ improvement, and each restart receives a fresh copy so a policy cannot alter the
 anchor. Fixed-cadence and Luby policies keep no copy. Anchored perturbations restore
 exact pins after their random draws and clear tabu state.
 
-Retained ILS board kicks keep the random factor or variable target and select
-complete AllDifferent swaps touching that target through the proposing owner's
-move sink. A target without an admissible board swap declines its attempt.
+Retained ILS board kicks keep the random factor or variable target. Maintained
+integer and Boolean definitions lead back to searched inputs; complete AllDifferent
+swaps touching those inputs enter the proposing owner's move sink. A target without
+an admissible board swap declines its attempt.
 Both inputs must be searched, unpinned and in each other's root
 domains. A BasinHopping factor attempt spends at most one swap; Uniform spends two
 input slots per swap. The existing strength bounds the attempts, including misses.
 The definition network propagates outputs in a reversible probe. A swap that would
 break an implicitly owned global or leave a blocked maintained output inconsistent
-is declined. With implicit initialization enabled, a feasible warm assignment establishes
-owners without rewriting its inputs. Restart preparation preserves a feasible owner assignment,
-reconciles definitions and verifies ownership again; failed preservation uses the
-ordinary seeding path. The policy reports whether the prepared assignment changed
+is declined. Board kicks follow ordinary restart preparation, including enabled
+implicit seeding and definition reconciliation. Preparation cannot overwrite a
+committed kick. The policy reports whether the prepared assignment changed
 admissible searched board inputs, explicitly declining unchanged diversification.
 Crossover keeps its selection policy and reapplies pins.
 

@@ -1,10 +1,12 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.freshState
@@ -111,7 +113,7 @@ class RetainedBoardRestartTest {
     }
 
     @Test
-    fun `a uniform target on a maintained output should decline board diversification`() {
+    fun `a maintained integer target should diversify through its searched board input`() {
         val problem = Problem(
             0, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(2, 2)),
             arrayOf<Factor>(AllDifferent(intArrayOf(1, 2), 0, 2), Product(1, 3, 0)),
@@ -131,8 +133,37 @@ class RetainedBoardRestartTest {
 
         policy.restart(state, anchor)
 
-        assertEquals(anchor, state.assignment.snapshot())
-        assertEquals(false, policy.lastBoardDiversificationChanged)
+        assertEquals(1L, state.assignment.intValue(1))
+        assertEquals(2L, state.assignment.intValue(0))
+        assertEquals(true, policy.lastBoardDiversificationChanged)
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `a maintained Boolean target should diversify through its searched board input`() {
+        val problem = Problem(
+            1, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf<Factor>(
+                AllDifferent(intArrayOf(0, 1), 0, 2),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), object : Random() {
+            private var draws = 0
+            override fun nextBits(bitCount: Int): Int = if (bitCount == 0) 0 else draws++ % 2
+        })
+        state.assignment.setBool(0, true)
+        state.assignment.setInt(1, 1L)
+        state.invariants = InvariantNetwork(listOf(EqualityPredicateDefinition(0, 0, 0L)), 2, 1)
+        state.recompute()
+        val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 2)
+
+        policy.restart(state, state.assignment.snapshot())
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(false, state.assignment.boolValue(0))
+        assertEquals(true, policy.lastBoardDiversificationChanged)
+        assertEquals(0L, state.cost)
     }
 
     @Test
@@ -278,7 +309,7 @@ class RetainedBoardRestartTest {
     }
 
     @Test
-    fun `restart preparation should retain an effective owned board kick`() {
+    fun `restart preparation should precede an effective owned board kick`() {
         val problem = Problem(
             0, 2, Array(2) { IntDomain(0, 1) },
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), 0, 2)),
@@ -309,6 +340,40 @@ class RetainedBoardRestartTest {
         ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(listOf(0L to null, 1L to true), observed)
+    }
+
+    @Test
+    fun `a retained board restart should preserve enabled implicit preparation`() {
+        val problem = Problem(
+            0, 3, Array(3) { IntDomain(0, 2) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
+        )
+        val policy = IteratedLocalSearchRestart(
+            initialPerturbationStrength = 0, adaptivePerturbation = false,
+            perturbationKind = PerturbationKind.BasinHopping,
+        )
+        val observed = mutableListOf<List<Long>>()
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            perturbation = { state ->
+                observed.add((0 until 3).map(state.assignment::intValue))
+                null
+            },
+        )
+        val engine = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy, seedImplicitOnRestart = true,
+        )
+
+        engine.resumable(
+            LinearObjective(),
+            LocalSearchParams(
+                maxFlips = 2L, randomSeed = 7L, initialAssignment = Sample(BooleanArray(0), longArrayOf(2, 0, 1)),
+            ),
+        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(listOf(listOf(2L, 0L, 1L), listOf(0L, 1L, 2L)), observed)
     }
 
     @Test

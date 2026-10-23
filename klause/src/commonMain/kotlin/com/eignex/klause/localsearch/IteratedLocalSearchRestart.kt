@@ -60,9 +60,9 @@ class IteratedLocalSearchRestart(
     /** Perturbation kind for the kick from a feasible anchor. [PerturbationKind.Uniform]
      *  scatters single-variable mutations across the problem; [PerturbationKind.BasinHopping]
      *  randomises every variable of a small set of randomly-picked factors, producing a
-     *  coordinated jump biased toward escaping the current basin. On board models, kicks use
-     *  complete searched-input swaps touching the sampled factor or variable: one factor attempt
-     *  for BasinHopping, two input slots for Uniform. Targets without an admissible board swap decline. */
+     *  coordinated jump biased toward escaping the current basin. On board models, target definitions
+     *  lead to complete searched-input swaps: one factor attempt for BasinHopping, two input slots
+     *  for Uniform. Targets without an admissible board swap decline. */
     val perturbationKind: PerturbationKind = PerturbationKind.Uniform,
     /** When true, crossover transfers entire factor scopes at once instead of mixing
      *  per-variable, preserving co-adapted assignments that uniform recombination would
@@ -87,15 +87,11 @@ class IteratedLocalSearchRestart(
     var perturbationStrength: Int = initialPerturbationStrength
         private set
     private var stallCount: Int = 0
-    private var boardRestart: RetainedBoardRestart? = null
 
     /** Whether the last retained restart changed admissible searched board inputs. The engine
      *  refreshes this after restart preparation. `false` explicitly declines board diversification;
      *  `null` denotes an unanchored or non-board restart. */
     var lastBoardDiversificationChanged: Boolean? = null
-        private set
-
-    internal var preservesImplicitOnRestart: Boolean = false
         private set
 
     // Pending bandit decision, rewarded at the next candidate anchor by whether the population best
@@ -125,9 +121,7 @@ class IteratedLocalSearchRestart(
     override fun reset() {
         population.clear()
         stallCount = 0
-        boardRestart = null
         lastBoardDiversificationChanged = null
-        preservesImplicitOnRestart = false
         perturbationStrength = initialPerturbationStrength
         pendingArm = -1
         pendingContext = null
@@ -197,10 +191,11 @@ class IteratedLocalSearchRestart(
         return doubleArrayOf(vsWorst.coerceIn(-1.0, 1.0), vsBest.coerceIn(-1.0, 1.0), stallFrac)
     }
 
-    override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-        boardRestart = if (population.isNotEmpty() || bestSoFar != null) RetainedBoardRestart.capture(state) else null
+    override fun restart(state: LocalSearchState, bestSoFar: Sample?) = restart(state, bestSoFar) {}
+
+    internal fun restart(state: LocalSearchState, bestSoFar: Sample?, prepare: () -> Unit) {
+        val board = if (population.isNotEmpty() || bestSoFar != null) RetainedBoardRestart.capture(state) else null
         lastBoardDiversificationChanged = null
-        preservesImplicitOnRestart = false
         // Crossover restart: recombine two random population members; skips perturbation since
         // crossover itself diversifies. Only fires with ≥2 incumbents.
         if (population.size >= 2 && state.rng.nextDouble() < crossoverRate) {
@@ -208,27 +203,19 @@ class IteratedLocalSearchRestart(
             val probA = crossoverBias.probParentA(parentA.objective, parentB.objective)
             val child = biasedCrossover(state, parentA.sample, parentB.sample, probA, state.rng)
             applyChild(state, child)
-            finishRestart(state)
+            prepare()
+            lastBoardDiversificationChanged = board?.changed(state)
             return
         }
         val anchor = pickAnchor(state) ?: bestSoFar
         if (anchor == null) {
             state.restart()
         } else {
-            val board = boardRestart
-            if (board == null) {
-                anchorAndPerturb(state, anchor, perturbationStrength, perturbationKind)
-            } else {
-                anchorAndPerturb(state, anchor, 0, perturbationKind)
-                board.perturb(state, perturbationStrength, perturbationKind)
-                preservesImplicitOnRestart = state.seeding.implicitFeasible(state)
-            }
+            anchorAndPerturb(state, anchor, if (board == null) perturbationStrength else 0, perturbationKind)
         }
-        finishRestart(state)
-    }
-
-    internal fun finishRestart(state: LocalSearchState) {
-        lastBoardDiversificationChanged = boardRestart?.changed(state)
+        prepare()
+        if (anchor != null) board?.perturb(state, perturbationStrength, perturbationKind)
+        lastBoardDiversificationChanged = board?.changed(state)
     }
 
     private fun pickAnchor(state: LocalSearchState): Sample? {

@@ -126,8 +126,7 @@ internal class LocalSearchEngine(
     private val configuredRestart: RestartPolicy =
         strategy.schedule.restart ?: restartPolicy
 
-    // Restart preparation reconciles definitions and implicit ownership. A valid retained owner
-    // assignment survives preparation so feasible-init cannot erase its structural perturbation.
+    // Board kicks follow preparation so feasible-init cannot overwrite their searched inputs.
     private val restarts: RestartPolicy = if (definitionalSweep == null && !seedImplicitOnRestart) {
         configuredRestart
     } else {
@@ -143,24 +142,24 @@ internal class LocalSearchEngine(
 
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 val previousBest = state.bestCostSeen
-                configuredRestart.restart(state, bestSoFar)
                 val ils = configuredRestart as? IteratedLocalSearchRestart
-                val preserve = seedImplicitOnRestart && ils?.preservesImplicitOnRestart == true &&
-                    state.seeding.retainFeasibleOwners(state)
-                prepareAssignment(state, preserveImplicit = preserve)
-                state.recompute()
-                if (preserve && !state.seeding.retainFeasibleOwners(state)) {
+                val prepare = {
                     prepareAssignment(state)
                     state.recompute()
                 }
-                ils?.finishRestart(state)
+                if (ils == null) {
+                    configuredRestart.restart(state, bestSoFar)
+                    prepare()
+                } else {
+                    ils.restart(state, bestSoFar, prepare)
+                }
                 state.bestCostSeen = minOf(previousBest, state.cost)
             }
         }
     }
 
-    private fun prepareAssignment(state: LocalSearchState, preserveImplicit: Boolean = false) {
-        if (seedImplicitOnRestart && !preserveImplicit) state.seedImplicitFeasible()
+    private fun prepareAssignment(state: LocalSearchState) {
+        if (seedImplicitOnRestart) state.seedImplicitFeasible()
         definitionalSweep?.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
     }
 
