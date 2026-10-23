@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -43,8 +44,7 @@ class ArmNeedsTest {
 
         val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
 
-        assertTrue(arms.any { it.label == "lp-aggressive" },
-            "recipes=${arms.map { it.label }} factors=${model.factors.map { it::class.simpleName }}")
+        assertTrue(arms.any { it.label == "lp-aggressive" })
     }
 
     private fun linearModel(upper: Long = 5L) = Problem(
@@ -131,14 +131,29 @@ class ArmNeedsTest {
                 LinearOp.LE, BigFraction.ofLong(-2).reciprocal(),
             ),
         )
-        for (row in rows) {
-            val model = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(row)).bake()
+        for ((row, symmetry) in rows.flatMap { row -> listOf(row to false, row to true) }) {
+            val factors = if (symmetry) {
+                listOf(row, SymmetryHandling(listOf(intArrayOf(0, 1, 3, 2) to intArrayOf())))
+            } else listOf(row)
+            val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, factors).bake()
             val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO)
 
             val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
 
             assertTrue(arms.any { it.label == "lp-aggressive" })
         }
+    }
+
+    @Test
+    fun `symmetry alone should not admit an integer linear recipe`() {
+        val model = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(SymmetryHandling(listOf(intArrayOf(1, 0) to intArrayOf()))),
+        ).bake()
+
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE)
+
+        assertFalse(facts.integerLinear)
     }
 
     @Test
