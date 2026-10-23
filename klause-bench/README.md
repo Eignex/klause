@@ -598,6 +598,18 @@ and supplies no route or verdict claim. For up to eight sources,
 `batch64=<base64 JSON array of argument arrays>` retains each inspection in a
 numbered directory.
 
+`ExactFeasibilityCapture` takes the same source arguments and observes one direct
+complete-worker search at P1/seed3 under a ten-second containing deadline. It wraps
+the existing certification observer and retains the first complete DIMENSION
+observation without changing its verdict or limits. `complete.klexact` uses the
+engine's existing exact-state codec, with current bounds, origins, scoped rows and
+witness ids; `premises.json` binds active sides to source-atom antecedents and their
+observed truth. The capture includes source/build/runtime hashes, Booleans, failing
+dense guards and free versus constrained logical-row counts. Encoding and codec
+round-trip checks follow traversal; observer cost is recorded separately. This is
+a diagnostic opening, not the CLI/default portfolio or an independent source proof.
+Counts of removable-looking rows do not establish that a projected system fits.
+
 ### Polynomial phases and witness checkpoints
 
 `com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
