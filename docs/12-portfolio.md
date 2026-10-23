@@ -218,6 +218,12 @@ and subresultant preparation checkpoints in small batches. Every continuation ke
 the same native allowance, and unfinished initialization publishes neither a point
 nor a refutation.
 
+Within a polynomial query, root reduction and exact search cooperate on committed
+equivalent formulas. Snapshots keep their reconstruction fibres, both cursors
+charge the same allowance, and a new snapshot can replace search only at a
+checkpoint. [Polynomial execution](16-nonlinear-arithmetic.md#decision-procedure)
+owns reconstruction, cumulative probing and refutation authority.
+
 #### Auxiliary incumbent evaluation
 
 An auxiliary arm keeps its preparation and receives a bounded search trial after an

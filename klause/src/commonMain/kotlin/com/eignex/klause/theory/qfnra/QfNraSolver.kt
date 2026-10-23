@@ -119,30 +119,56 @@ internal class QfNraQuery(
                 val sections = checkNotNull(work.equationalSections)
                 work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
             }
-            var formulaReduction: PolynomialFormulaReduction? = null
-            while (formulaReduction == null) {
-                val before = work.spentWork
-                val stage = try {
-                    preparingFormula.next()
-                } finally {
-                    progress.rootWork += work.spentWork - before
-                }
-                if (stage != null) {
-                    progress.committed(stage, work.spentWork)
-                    if (stage.finished) formulaReduction = stage
-                }
-                if (formulaReduction == null) yield(null)
-            }
-            val searching = search(normalized, formulaReduction, fixed, algebraic)
+            var reduction = checkNotNull(preparingFormula.next())
+            progress.committed(reduction, work.spentWork)
+            var searched = reduction
+            var searching: Iterator<QfNraResult?>? = search(normalized, reduction, fixed, algebraic)
+            var declined: QfNraResult.Unknown? = null
             while (true) {
-                val before = work.spentWork
-                val completed = try {
-                    searching.next()
-                } finally {
-                    progress.searchWork += work.spentWork - before
+                if (!reduction.finished && (searching == null || progress.rootWork < progress.searchWork)) {
+                    val before = work.spentWork
+                    val stage = try {
+                        preparingFormula.next()
+                    } finally {
+                        progress.rootWork += work.spentWork - before
+                    }
+                    if (stage != null) {
+                        progress.committed(stage, work.spentWork)
+                        reduction = stage
+                        if (stage.inconsistent) {
+                            arithmetic.step()
+                            yield(QfNraResult.Unsatisfiable(work.snapshot()))
+                            return@sequence
+                        }
+                        if (stage.formula !== searched.formula) {
+                            searching = search(normalized, stage, fixed, algebraic)
+                            searched = stage
+                            declined = null
+                            progress.searchRestarts++
+                        }
+                    }
+                } else if (searching != null) {
+                    val before = work.spentWork
+                    val completed = try {
+                        searching.next()
+                    } catch (stop: PolynomialResourceLimit) {
+                        QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), stop.resource)
+                    } finally {
+                        progress.searchWork += work.spentWork - before
+                    }
+                    if (completed is QfNraResult.Unknown) {
+                        declined = completed
+                        searching = null
+                    } else if (completed != null) {
+                        yield(completed)
+                        return@sequence
+                    }
+                } else {
+                    arithmetic.step()
+                    yield(checkNotNull(declined).copy(stats = work.snapshot()))
+                    return@sequence
                 }
-                yield(completed)
-                if (completed != null) return@sequence
+                yield(null)
             }
         } catch (_: PolynomialInterrupted) {
             val reason = if (work.limitReached) QfNraReason.WorkLimit else QfNraReason.Interrupted
@@ -192,11 +218,11 @@ internal class QfNraQuery(
             return@sequence
         }
         yield(null)
-        work.equationalRootLevels = 0
-        work.booleanTheoryRegions = 0
-        work.booleanTheoryAtoms = 0
-        work.booleanTheoryConstantRefutations = 0
-        work.booleanTheoryResourceRefusals = 0
+        work.equationalRootLevels = work.equationalRootLevels ?: 0
+        work.booleanTheoryRegions = work.booleanTheoryRegions ?: 0
+        work.booleanTheoryAtoms = work.booleanTheoryAtoms ?: 0
+        work.booleanTheoryConstantRefutations = work.booleanTheoryConstantRefutations ?: 0
+        work.booleanTheoryResourceRefusals = work.booleanTheoryResourceRefusals ?: 0
         val regions = reducedFormula.booleanRegions(arithmetic)
         var incomplete: PolynomialResource? = null
         while (regions.hasNext()) {
@@ -359,6 +385,7 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     private var probeEnd: Long? = null
     private var coupledEnd: Long? = null
     private var probeStart: Long = 0
+    private var probeSpent: Long = 0
     private var probeParentStopped = false
     val limitReached: Boolean get() = params.maximumWork?.let { spent >= it } == true
     override fun isCancelled(): Boolean {
@@ -375,8 +402,10 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     }
     fun probe(block: () -> QfNraAssignment?): QfNraAssignment? {
         check(probeEnd == null)
+        val remaining = (MAX_WITNESS_WORK - probeSpent).coerceAtLeast(0)
+        if (remaining == 0L) return null
         probeStart = spent
-        probeEnd = spent + minOf(MAX_WITNESS_WORK, Long.MAX_VALUE - spent)
+        probeEnd = spent + minOf(remaining, Long.MAX_VALUE - spent)
         probeParentStopped = false
         return try {
             block()
@@ -387,6 +416,7 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
         } catch (_: PolynomialResourceLimit) {
             null
         } finally {
+            probeSpent += minOf(spent - probeStart, Long.MAX_VALUE - probeSpent)
             probeEnd = null
         }
     }
