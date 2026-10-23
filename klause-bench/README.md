@@ -833,6 +833,47 @@ In the three-way fixed-arm [7660](https://lab.eignex.com/jobs/7660) guard,
 traversal and 961 ms with sparse/packed traversal; chain medians were 4637, 4763
 and 4026 ms. Work and elapsed-driven restart variation limit equivalence claims.
 
+### Feasible board-swap coverage
+
+Retain the sampled production route pending
+[bounded retained coverage](https://github.com/Eignex/klause/issues/3421) and
+[effective ILS perturbations](https://github.com/Eignex/klause/issues/3422).
+[Lab 7701](https://lab.eignex.com/jobs/7701), based on `b00ecc68ac`, compares sampling,
+a read-only complete swap audit and best-swap rescue on both original
+team-assignment sources, reduced_UD6-gbac and the seven-position photo permutation.
+Each case uses one CBLS plateau worker, fixed or ILS restarts, optional presolve off,
+seeds 1/3, two repeats and a 2000-unit shared allowance: all spend 2000 and report
+1600 LS moves. All 96 final witnesses pass original-source checking. Final witnesses
+and non-timing LS counters agree in all 32 baseline/audit pairs and 48 duplicate
+groups; elapsed-dependent incumbent publications do not establish identical paths.
+
+In one repeat per seed/policy, sampling misses improving feasible swaps at 34/65
+restart boundaries on `data2_6_12` and 56/56 on `data3_4_31`. Every scan covers all
+330/1395 admissible board swaps through ordinary ownership and generated-move
+scoring. Fixed-restart rescue changes objectives 15920/16958 to 17920/16921 and
+28750/30749 to 38676/42711; gains are not universal. Complete scans also find true
+swap-local optima: checked final witnesses score 16921 and 42711 against the
+source-matched optima 17946 and 44706. Original source hashes, board permutations,
+rating balance and the `1000 * happiness - balance` objective are unchanged.
+
+ILS returns identical board assignments after 13/51 small-source and 6/45
+large-source sampled feasible restarts, including eleven with improving swaps.
+After complete-scan descent it leaves the boards unchanged at 15/44 and 10/36
+swap-local-optimum restarts. Fixed restarts have no unchanged boards at these
+boundaries. Coverage, local optima and ineffective anchor perturbations are distinct
+observations; these counts select no replacement restart policy.
+
+[Lab 7710](https://lab.eignex.com/jobs/7710) removes audit instrumentation and tests
+eager rescue under the unchanged default mixed/P1/presolve route: 10 s, three seeds
+and three repeats. All 72 witnesses pass source checking. Small-source pairs have
+two wins and seven losses, with median objective 14770 to 11866; all nine
+large-source pairs lose, with median 8574 to 4500. The gbac control has six losses
+and three ties, with median minimization objective 278 to 438; the photo control
+ties at six throughout. Eager restart-boundary scans are therefore unsuitable for
+promotion. A retained bounded cursor still needs cancellation/resume, cost and
+default-route validation; fixed-work gains establish neither whole-solver recovery
+nor a general speedup.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;
