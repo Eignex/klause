@@ -126,9 +126,8 @@ private class EncodingPreparationCancellation(private val parent: Cancellation) 
 
     override fun isCancelled(): Boolean {
         if (stopped.load()) return true
-        val cancelled = parent()
-        if (cancelled) stopped.store(true)
-        return cancelled
+        if (parent()) stopped.store(true)
+        return stopped.load()
     }
 
     override fun deadline() = parent.deadline()
