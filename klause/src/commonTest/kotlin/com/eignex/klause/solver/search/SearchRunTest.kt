@@ -17,17 +17,25 @@ class SearchRunTest {
     fun `solution notification should precede model assembly`() {
         var notified = false
         val key = SearchModelKey(Boolean::class)
-        val session = SearchSession(listOf(object : SearchComponent {
-            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
-            override fun contributeModel(model: SearchModel, context: SearchContext) { model.contribute(key, notified) }
-        }))
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+                override fun contributeModel(model: SearchModel, context: SearchContext) {
+                    model.contribute(key, notified)
+                }
+            }),
+        )
         val restart = object : SearchRestartPolicy {
             override fun shouldRestart(decisionsThisRun: Long): Boolean = false
-            override fun onSolution() { notified = true }
+            override fun onSolution() {
+                notified = true
+            }
         }
         session.initialize()
 
-        val model = assertIs<SearchRunEvent.Satisfied>(session.openRun(0, SearchSolveParams(restart = restart)).next()).model
+        val model = assertIs<SearchRunEvent.Satisfied>(
+            session.openRun(0, SearchSolveParams(restart = restart)).next(),
+        ).model
 
         assertEquals(true, model.valueOf(key))
     }
@@ -43,21 +51,25 @@ class SearchRunTest {
                 PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
                 branching = CpBranching.None,
             )
-            val session = SearchSession(listOf(
-                cp,
-                object : SearchComponent {
-                    override fun check(context: SearchContext): ComponentCheck {
-                        checks++
-                        return ComponentCheck.Feasible
-                    }
-                },
-            ))
+            val session = SearchSession(
+                listOf(
+                    cp,
+                    object : SearchComponent {
+                        override fun check(context: SearchContext): ComponentCheck {
+                            checks++
+                            return ComponentCheck.Feasible
+                        }
+                    },
+                ),
+            )
             session.initialize()
             val run = session.openRun(
                 1,
                 modelContinuation = continuation,
                 observer = object : SearchRunObserver {
-                    override fun onModel(model: AssembledSearchModel) { observations++ }
+                    override fun onModel(model: AssembledSearchModel) {
+                        observations++
+                    }
                 },
                 nodePolicy = object : SearchNodePolicy {
                     override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
@@ -98,12 +110,15 @@ class SearchRunTest {
         var retries = 0
         val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
         session.initialize()
-        val run = session.openRun(0, modelPolicy = object : SearchModelPolicy {
-            override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
-                retries++
-                return SearchModelDisposition.Pause
-            }
-        })
+        val run = session.openRun(
+            0,
+            modelPolicy = object : SearchModelPolicy {
+                override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
+                    retries++
+                    return SearchModelDisposition.Pause
+                }
+            },
+        )
         assertIs<SearchRunEvent.Paused>(run.next())
 
         cancelled = true
@@ -117,17 +132,22 @@ class SearchRunTest {
     @Test
     fun `root reset should discard a pending model`() {
         var checks = 0
-        val session = SearchSession(listOf(object : SearchComponent {
-            override fun check(context: SearchContext): ComponentCheck {
-                checks++
-                return ComponentCheck.Feasible
-            }
-        }))
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck {
+                    checks++
+                    return ComponentCheck.Feasible
+                }
+            }),
+        )
         session.initialize()
-        val run = session.openRun(0, modelPolicy = object : SearchModelPolicy {
-            override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition =
-                SearchModelDisposition.Pause
-        })
+        val run = session.openRun(
+            0,
+            modelPolicy = object : SearchModelPolicy {
+                override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition =
+                    SearchModelDisposition.Pause
+            },
+        )
         assertIs<SearchRunEvent.Paused>(run.next())
 
         run.reset()

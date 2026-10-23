@@ -19,12 +19,15 @@ class SearchRun internal constructor(
     private val branchSelection: SearchBranchSelection,
     private val minimumDecisionLevel: Int,
 ) {
-    private val branchSources = if (branchSelection === SearchBranchSelection.Default) null else
+    private val branchSources = if (branchSelection === SearchBranchSelection.Default) {
+        null
+    } else {
         object : SearchBranchSources {
             override fun booleanAlternatives(): List<SearchDecision>? = booleanBranching.alternatives(session)
             override fun componentAlternatives(kind: SearchBranchKind?): List<SearchDecision>? =
                 session.branchAlternatives(kind)
         }
+    }
     private val frames = ArrayList<Frame>()
     private var decisions = 0L
     private var decisionsSinceRestart = 0L
@@ -99,43 +102,49 @@ class SearchRun internal constructor(
                 }
                 cancellationPoller.rearm()
             }
-            if (pendingModel == null) when (val node = nodePolicy.beforeBranch(session)) {
-                SearchNodeDisposition.Expand -> Unit
+            if (pendingModel == null) {
+                when (val node = nodePolicy.beforeBranch(session)) {
+                    SearchNodeDisposition.Expand -> Unit
 
-                SearchNodeDisposition.Prune -> {
-                    observer.onConflict(null)
-                    if (!backtrack()) return stopAfterBacktrack()
-                    continue
-                }
-
-                is SearchNodeDisposition.Backjump -> {
-                    observer.onConflict(null)
-                    observer.onLearnedNodeBackjump()
-                    when (applyLearnedConflict(node.consequence)) {
-                        SearchLearnedConflictResult.Resume -> continue
-
-                        SearchLearnedConflictResult.Exhausted -> return finish(SearchRunEvent.Exhausted)
-
-                        SearchLearnedConflictResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
-
-                        SearchLearnedConflictResult.Indeterminate -> {
-                            return finish(SearchRunEvent.Indeterminate.Component)
-                        }
-
-                        is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
+                    SearchNodeDisposition.Prune -> {
+                        observer.onConflict(null)
+                        if (!backtrack()) return stopAfterBacktrack()
+                        continue
                     }
-                    continue
+
+                    is SearchNodeDisposition.Backjump -> {
+                        observer.onConflict(null)
+                        observer.onLearnedNodeBackjump()
+                        when (applyLearnedConflict(node.consequence)) {
+                            SearchLearnedConflictResult.Resume -> continue
+
+                            SearchLearnedConflictResult.Exhausted -> return finish(SearchRunEvent.Exhausted)
+
+                            SearchLearnedConflictResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
+
+                            SearchLearnedConflictResult.Indeterminate -> {
+                                return finish(SearchRunEvent.Indeterminate.Component)
+                            }
+
+                            is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
+                        }
+                        continue
+                    }
+
+                    SearchNodeDisposition.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+
+                    // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
+                    SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
                 }
-
-                SearchNodeDisposition.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
-
-                // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
-                SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
             }
             when (val alternatives = if (pendingModel != null) Alternatives.Leaf else alternatives()) {
-                is Alternatives.Leaf -> when (val result = if (pendingModel != null) {
-                    ComponentCheck.Feasible
-                } else session.check()) {
+                is Alternatives.Leaf -> when (
+                    val result = if (pendingModel != null) {
+                        ComponentCheck.Feasible
+                    } else {
+                        session.check()
+                    }
+                ) {
                     ComponentCheck.Feasible -> {
                         if (pendingModel == null) params.restart.onSolution()
                         val model = pendingModel ?: session.model().also {
