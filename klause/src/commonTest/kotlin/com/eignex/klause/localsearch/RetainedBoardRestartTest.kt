@@ -213,6 +213,7 @@ class RetainedBoardRestartTest {
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
         state.assignment.setInt(4, 1L)
         state.seedImplicitFeasible()
+        state.assignment.setInt(3, 1L - state.assignment.intValue(0))
         val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
         state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
         sweep.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
@@ -222,6 +223,7 @@ class RetainedBoardRestartTest {
             initialPerturbationStrength = 1, perturbationKind = PerturbationKind.BasinHopping,
         )
 
+        assertEquals(0L, state.cost)
         policy.restart(state, anchor)
 
         assertEquals(anchor, state.assignment.snapshot())
