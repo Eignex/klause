@@ -19,6 +19,7 @@ internal data class RefactorPolicyConfig(
     val fillGrowthFactor: Double = 5.0,
     val solveWorkGrowthFactor: Double = 2.0,
     val minimumUpdatesForAdaptiveTrigger: Int = 8,
+    val syntheticWorkEnabled: Boolean = true,
 ) {
     init {
         require(hardUpdateCap > 0 && residualSampleInterval > 0 && minimumUpdatesForAdaptiveTrigger >= 0)
@@ -179,7 +180,7 @@ internal class RefactorPolicy(private val config: RefactorPolicyConfig = Refacto
     }
 
     private fun syntheticWorkExceeded(): Boolean {
-        if (!adaptiveWorkUsable) return false
+        if (!config.syntheticWorkEnabled || !adaptiveWorkUsable) return false
         val fresh = freshBuildWork ?: return false
         return accumulatedSolveWork >= fresh
     }

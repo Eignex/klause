@@ -159,7 +159,11 @@ internal object NumericalResidualProfile {
         out.resolve("capture.json").writeText(report.toString())
     }
 
-    internal class Probe(private val denseLimit: Int = 6, private val observed: Boolean = true) {
+    internal class Probe(
+        private val denseLimit: Int = 6,
+        private val observed: Boolean = true,
+        private val syntheticWorkEnabled: Boolean = true,
+    ) {
         val phaseNs = linkedMapOf<String, Long>()
         val phaseCalls = linkedMapOf<String, Long>()
         val transformEntries = linkedMapOf<String, Long>()
@@ -192,6 +196,10 @@ internal object NumericalResidualProfile {
         }
 
         private fun wrapEngine(owner: Any, id: Int): Any {
+            if (!syntheticWorkEnabled) {
+                set(owner, "syntheticWorkEnabled", false)
+                set(field(field(owner, "refactorPolicy"), "config"), "syntheticWorkEnabled", false)
+            }
             val basisFactory: (Any) -> Any = letBackend@{ matrix ->
                 val type = Class.forName(BASIS + "KotlinBasisSolver")
                 val constructor = type.constructors.single { it.parameterCount == 10 }

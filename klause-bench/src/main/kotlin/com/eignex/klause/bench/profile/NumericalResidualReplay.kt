@@ -37,7 +37,9 @@ internal object NumericalResidualReplay {
 
     private fun replay(input: JsonElement, out: File) {
         val spec = input.jsonObject
-        require(spec.keys == setOf("job", "source", "residual", "sha256", "dense"))
+        val keys = setOf("job", "source", "residual", "sha256", "dense")
+        require(spec.keys == keys || spec.keys == keys + "synthetic")
+        val compareSynthetic = spec["synthetic"]?.jsonPrimitive?.content?.also { require(it == "compare") } != null
         val job = spec.getValue("job").jsonPrimitive.content.toLong().also { require(it > 0L) }
         val source = spec.getValue("source").jsonPrimitive.content.toInt().also { require(it in 0..7) }
         val residual = spec.getValue("residual").jsonPrimitive.content.toInt().also { require(it in 0..1) }
@@ -50,13 +52,19 @@ internal object NumericalResidualReplay {
         val capture = requireNotNull(NumericalResidualProfile.call(companion, "decode", bytes))
         val state = requireNotNull(NumericalResidualProfile.call(capture, "getInitialState"))
         out.resolve("residual.klexact").writeBytes(bytes)
-        val arms = if (spec.getValue("dense").jsonPrimitive.content.toBooleanStrict()) listOf(0, 64) else listOf(6)
+        val dense = spec.getValue("dense").jsonPrimitive.content.toBooleanStrict()
+        require(!dense || !compareSynthetic)
+        val arms = when {
+            dense -> listOf(0 to true, 64 to true)
+            compareSynthetic -> listOf(6 to true, 6 to false)
+            else -> listOf(6 to true)
+        }
         for (round in -1..3) {
             val ordered = if (round % 2 == 0) arms.reversed() else arms
-            for (denseLimit in ordered) {
+            for ((denseLimit, syntheticWorkEnabled) in ordered) {
                 for (retained in listOf(false, true)) {
                     val observed = round == 3
-                    val result = measure(state, denseLimit, retained, observed)
+                    val result = measure(state, denseLimit, retained, observed, syntheticWorkEnabled)
                     val report = buildJsonObject {
                         put("revision", Reports.readGitSha())
                         put("input", input)
@@ -65,19 +73,28 @@ internal object NumericalResidualReplay {
                         put("denseLimit", denseLimit)
                         put("retained", retained)
                         put("observed", observed)
+                        put("syntheticWorkEnabled", syntheticWorkEnabled)
                         put("sourceVerdictClaim", false)
                         put("captureContainsOriginalFactors", false)
                         put("result", result)
                     }
-                    out.resolve("round-$round-dense-$denseLimit-retained-$retained.json").writeText(report.toString())
+                    val filename = "round-$round-dense-$denseLimit-retained-$retained-" +
+                        "synthetic-$syntheticWorkEnabled.json"
+                    out.resolve(filename).writeText(report.toString())
                 }
             }
         }
         println("replayed residual ${sha256(bytes)}")
     }
 
-    private fun measure(state: Any, denseLimit: Int, retained: Boolean, observed: Boolean): JsonElement {
-        val probe = NumericalResidualProfile.Probe(denseLimit, observed)
+    private fun measure(
+        state: Any,
+        denseLimit: Int,
+        retained: Boolean,
+        observed: Boolean,
+        syntheticWorkEnabled: Boolean,
+    ): JsonElement {
+        val probe = NumericalResidualProfile.Probe(denseLimit, observed, syntheticWorkEnabled)
         val observerType = Class.forName(ENGINE + "LpCertificationObserver")
         val observations = ArrayList<JsonElement>()
         val recording = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, method, values ->
