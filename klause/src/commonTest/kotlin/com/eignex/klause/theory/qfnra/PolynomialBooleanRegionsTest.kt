@@ -464,7 +464,7 @@ class PolynomialBooleanRegionsTest {
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(witness.boolValue(0))
         assertEquals(BigFraction.ofLong(3), witness.realValue(1).rational)
-        assertEquals(1L, result.stats.booleanTheoryRegions)
+        assertEquals(0L, result.stats.booleanTheoryConstantRefutations)
     }
 
     @Test
@@ -919,10 +919,12 @@ class PolynomialBooleanRegionsTest {
     fun `numeric conjunctions retain a single complete region`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse("$declarations (assert (= x0 3))")
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+        val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
 
-        assertIs<QfNraResult.Satisfiable>(result)
-        assertEquals(1L, result.stats.booleanTheoryRegions)
+        assertEquals(1, regions.size)
+        assertEquals(mapOf(0 to true), regions.single().atoms)
     }
 }
