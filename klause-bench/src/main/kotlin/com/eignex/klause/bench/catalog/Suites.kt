@@ -29,8 +29,9 @@ internal object Suites {
         listOf(
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
             smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit, productAliases,
-        ) + QfNraSuites.all + QfNraCanonicalSuite.suite + QfNraPartialConflictSuite.suite + NonlinearIntegerSuite.suite +
-            DivModSuite.suite + AbsSuite.suite + ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
+        ) + QfNraSuites.all + QfNraCanonicalSuite.suite + QfNraPartialConflictSuite.suite +
+            NonlinearIntegerSuite.suite + DivModSuite.suite + AbsSuite.suite +
+            ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
             SourceOwnershipSuite.suite + ExactGlobalsSuite.suite
     }
 
