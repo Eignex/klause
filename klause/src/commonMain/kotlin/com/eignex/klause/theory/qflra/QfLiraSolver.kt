@@ -596,14 +596,18 @@ class ExactLiraSearchComponent private constructor(
         val booleanEntries = if (pointHintIndex == null) model.numBoolVars else 0
         operationStop.charge(booleanEntries.toLong() + point.size + 1L)
         if (operationStop() || point.any { !hintScalar(it) }) return
+        val reusable = pointReuseEnabled && !graph &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+        val snapshot = if (pointHintIndex != null ||
+            (reusable && recoveryGuessEnabled && recoveryGuess !== point)
+        ) point.toList() else point
+        if (operationStop() || pointHintStop()) return
         if (pointHintIndex != null) {
-            val copied = point.toList()
+            if (reusable) rememberCapturedRecoveryGuess(point, snapshot)
             if (operationStop() || pointHintStop()) return
-            pointHintPoint = copied
-            if (pointReuseEnabled && !graph &&
-                solveContext.certificationPolicy === ProductionLpCertificationPolicy
-            ) {
-                pointReusePoint = copied
+            pointHintPoint = snapshot
+            if (reusable) {
+                pointReusePoint = snapshot
                 pointReusePendingRow = NO_POINT_ROW_CHANGES
                 observeCompleteStage("POINT_REUSE_CAPTURE")
             }
@@ -635,10 +639,10 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         if (operationStop() || pointHintStop()) return
-        if (pointReuseEnabled && !graph &&
-            solveContext.certificationPolicy === ProductionLpCertificationPolicy
-        ) {
-            pointReusePoint = point
+        if (reusable) {
+            rememberCapturedRecoveryGuess(point, snapshot)
+            if (operationStop() || pointHintStop()) return
+            pointReusePoint = snapshot
             pointReuseHintValues = values
             observeCompleteStage("POINT_REUSE_CAPTURE")
         }
@@ -646,6 +650,14 @@ class ExactLiraSearchComponent private constructor(
         pointHintValues = values
         smtStats?.observePointHintCapture(graph)
         observeCompleteStage(if (graph) "POINT_HINT_GRAPH_CAPTURE" else "POINT_HINT_LP_CAPTURE")
+    }
+
+    private fun rememberCapturedRecoveryGuess(point: List<BigFraction>, snapshot: List<BigFraction>) {
+        if (!recoveryGuessEnabled || recoveryGuess === point) return
+        rememberRecoveryGuess(snapshot)
+        if (recoveryGuess === snapshot && !operationStop() && !pointHintStop()) {
+            observeCompleteStage("POINT_CAPTURE_NUMERIC_GUESS")
+        }
     }
 
     private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? =
@@ -1667,6 +1679,22 @@ class ExactLiraSearchComponent private constructor(
     private fun rememberRecoveryGuess(point: List<BigFraction>) {
         if (!recoveryGuessEnabled || pointHintStop()) return
         val previous = recoveryGuess
+        if (previous != null && previous !== point && previous.size == point.size) {
+            var equal = true
+            for (column in point.indices) {
+                val old = previous[column]
+                val fresh = point[column]
+                val bits = old.num.magnitudeBitLength().toLong() + old.den.magnitudeBitLength() +
+                    fresh.num.magnitudeBitLength() + fresh.den.magnitudeBitLength()
+                lpStop.charge(1L + bits / Long.SIZE_BITS)
+                if (operationStop() || pointHintStop()) return
+                if (old != fresh) {
+                    equal = false
+                    break
+                }
+            }
+            if (equal) return
+        }
         if (previous != null && previous !== point && recoveryGuessHistoryCapacity > 0) {
             var history = recoveryGuessHistory
             if (history == null) {

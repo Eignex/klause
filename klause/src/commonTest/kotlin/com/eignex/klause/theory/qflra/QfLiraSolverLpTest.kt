@@ -65,6 +65,51 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
     @Test
+    fun `ordinary primary points should guide a checked sibling after retraction`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, -1.0, -1.0), LinearOp.EQ, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 1.0), LinearOp.GE, 1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        val factory = TrackingLpFactory()
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.useMixedPointCompletion()
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(1))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(false, hints.preferredBool(1))
+            assertNull(stats.snapshot().completeSearchStages?.get("PARTIAL_SOURCE_RECOVERY_ATTEMPT"))
+            session.popTo(0)
+            assertNull(hints.preferredBool(0))
+            val previousSolves = factory.solveRequests
+            assertTrue(previousSolves > 0)
+
+            val result = session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            assertIs<ComponentResult.Consistent>(result)
+            assertEquals(previousSolves, factory.solveRequests)
+            assertEquals(false, hints.preferredBool(0))
+            assertNull(session.model().valueOf(component.assignmentKey))
+        }
+    }
+
+    @Test
     fun `retained free coordinates should replace a primary relaxation after equations change`() {
         val scale = 1.0 / (1L shl 40).toDouble()
         val source = Problem(
@@ -845,6 +890,7 @@ class QfLiraSolverLpTest {
     ) : LpEngineFactory by ProductionLpEngineFactory {
         var created = 0
         var closed = 0
+        var solveRequests = 0
         lateinit var lastCancellation: Cancellation
 
         override fun newPersistentSolver(
@@ -868,10 +914,15 @@ class QfLiraSolverLpTest {
                 pricing,
             )
             return object : PersistentLpSolver by delegate {
-                override fun solve(warm: Basis?): FloatLpResult? = delegate.solve(warm)?.let(transform)
+                override fun solve(warm: Basis?): FloatLpResult? {
+                    solveRequests++
+                    return delegate.solve(warm)?.let(transform)
+                }
 
-                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
-                    resolve(delegate, allowance)?.let(transform)
+                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                    solveRequests++
+                    return resolve(delegate, allowance)?.let(transform)
+                }
 
                 override fun close() {
                     closed++
