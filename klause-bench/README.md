@@ -706,6 +706,12 @@ frontend rendering and source publication. A rejected bounded producer has no
 refutation authority. A direct witness needs ordinary pipeline admission and
 independent full-source checking before credit. Timed traces need not have identical
 work prefixes, and their component timings establish no default-route speedup.
+
+Direct query checkpoints retain up to 128 stage observations plus the terminal
+observation. When supplied by the selected revision, `progress` records committed
+root snapshots, their latest atom/elimination counts, charged root/search work and
+first regional entry. A missing progress field is unavailable. These scalar
+observations retain no uncommitted formula or partial reconstruction.
 Use the alternating bounded-probe profile for deterministic observed/plain parity;
 pair phase attribution with source-matched ordinary CLI records.
 

@@ -9,12 +9,13 @@ import com.eignex.klause.ir.PolynomialRelation
 
 internal class PolynomialFormulaReduction private constructor(
     val formula: PolynomialFormula,
-    private val fibres: List<FormulaFibre>,
+    private val fibres: FormulaFibre?,
     val inconsistent: Boolean,
     private val booleansReduced: Boolean,
+    val finished: Boolean,
 ) {
-    val eliminatedCount: Int get() = fibres.size
-    val requiresOriginalCheck: Boolean get() = booleansReduced || fibres.isNotEmpty()
+    val eliminatedCount: Int get() = fibres?.count ?: 0
+    val requiresOriginalCheck: Boolean get() = booleansReduced || fibres != null
 
     fun reconstruct(
         assignment: QfNraAssignment,
@@ -26,9 +27,11 @@ internal class PolynomialFormulaReduction private constructor(
             arithmetic.step()
             point[id] = assignment.realValue(id)
         }
-        for (fibre in fibres.asReversed()) {
+        var fibre = fibres
+        while (fibre != null) {
             arithmetic.step()
             point[fibre.variable] = algebraic.evaluate(fibre.replacement, point)
+            fibre = fibre.previous
         }
         arithmetic.step()
         return point
@@ -40,12 +43,21 @@ internal class PolynomialFormulaReduction private constructor(
             realCount: Int,
             arithmetic: PolynomialArithmetic,
             onGraph: (() -> Unit)? = null,
+        ): Iterator<PolynomialFormulaReduction?> = stages(formula, realCount, arithmetic, onGraph)
+            .asSequence().map { it?.takeIf { stage -> stage.finished } }.iterator()
+
+        fun stages(
+            formula: PolynomialFormula,
+            realCount: Int,
+            arithmetic: PolynomialArithmetic,
+            onGraph: (() -> Unit)? = null,
         ): Iterator<PolynomialFormulaReduction?> = sequence {
             var current = formula
-            val fibres = ArrayList<FormulaFibre>()
+            var fibres: FormulaFibre? = null
             var inconsistent = false
             var signsChecked = false
             var booleansReduced = false
+            yield(PolynomialFormulaReduction(current, fibres, false, booleansReduced, false))
             try {
                 while (true) {
                     arithmetic.step()
@@ -53,7 +65,7 @@ internal class PolynomialFormulaReduction private constructor(
                     if (reducedBooleans != null) {
                         current = reducedBooleans
                         booleansReduced = true
-                        yield(null)
+                        yield(PolynomialFormulaReduction(current, fibres, false, booleansReduced, false))
                     }
                     val forced = current.forcedAtoms(arithmetic)
                     if (forced == null) {
@@ -130,21 +142,26 @@ internal class PolynomialFormulaReduction private constructor(
                         yield(null)
                     }
                     val rewrittenFormula = current.withAtoms(rewritten, arithmetic)
+                    var rewrittenFibres = fibres
                     for ((variable, replacement) in replacements) {
                         arithmetic.step()
-                        fibres.add(FormulaFibre(variable, replacement))
+                        rewrittenFibres = FormulaFibre(variable, replacement, rewrittenFibres)
                     }
+                    arithmetic.step()
                     current = rewrittenFormula
+                    fibres = rewrittenFibres
                     repeat(replacements.size) { arithmetic.step(); onGraph?.invoke() }
-                    yield(null)
+                    yield(PolynomialFormulaReduction(current, fibres, false, booleansReduced, false))
                 }
             } catch (_: PolynomialResourceLimit) {
                 // Only completed total substitutions and their reverse fibres survive a representation decline.
             }
             arithmetic.step()
-            yield(PolynomialFormulaReduction(current, fibres.toList(), inconsistent, booleansReduced))
+            yield(PolynomialFormulaReduction(current, fibres, inconsistent, booleansReduced, true))
         }.iterator()
     }
 }
 
-private class FormulaFibre(val variable: Int, val replacement: Polynomial)
+private class FormulaFibre(val variable: Int, val replacement: Polynomial, val previous: FormulaFibre?) {
+    val count: Int = (previous?.count ?: 0) + 1
+}
