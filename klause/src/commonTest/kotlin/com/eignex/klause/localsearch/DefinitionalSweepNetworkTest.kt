@@ -6,7 +6,9 @@ import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
@@ -20,6 +22,88 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class DefinitionalSweepNetworkTest {
+    @Test
+    fun `definition evaluations should follow external writes after recompute`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 20) }, emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = InvariantNetwork(
+            listOf(
+                DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(2, FunctionalObjective.Operand.v(0), FunctionalObjective.Operand.v(1)),
+                    intArrayOf(0, 1),
+                ),
+            ),
+            3,
+            0,
+        )
+        state.apply(Move.IntSet(0, 2))
+        state.assignment.setInt(1, 7)
+        state.recompute()
+
+        state.apply(Move.IntSet(0, 2))
+
+        assertEquals(9L, state.assignment.intValue(2))
+    }
+
+    @Test
+    fun `unblocked definitions should propagate current inputs through an unchanged seed`() {
+        for (block in listOf("pin", "owner")) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 20) }, emptyArray())
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = InvariantNetwork(
+                listOf(
+                    DefinitionalSweep.SweepNode.IntDef(
+                        FunctionalObjective.Plus(1, FunctionalObjective.Operand.v(0), FunctionalObjective.Operand.c(1)),
+                        intArrayOf(0),
+                    ),
+                    DefinitionalSweep.SweepNode.IntDef(
+                        FunctionalObjective.Plus(2, FunctionalObjective.Operand.v(1), FunctionalObjective.Operand.c(1)),
+                        intArrayOf(1),
+                    ),
+                ),
+                3,
+                0,
+            )
+            state.apply(Move.IntSet(0, 2))
+            if (block == "pin") state.moveSink.setAssumptions(Assumptions(ints = mapOf(1 to 3L)))
+            else state.moveSink.setOwners(intArrayOf(-1, 7, -1))
+            state.apply(Move.IntSet(0, 5))
+            assertEquals(3L, state.assignment.intValue(1))
+            assertEquals(4L, state.assignment.intValue(2))
+            state.moveSink.setAssumptions(Assumptions.None)
+            state.moveSink.setOwners(null)
+
+            state.apply(Move.IntSet(0, 5))
+
+            assertEquals(6L, state.assignment.intValue(1))
+            assertEquals(7L, state.assignment.intValue(2))
+        }
+    }
+
+    @Test
+    fun `an unchanged intermediate should still repair its affected descendants`() {
+        val problem = Problem(1, 2, Array(2) { IntDomain(0, 20) }, emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = InvariantNetwork(
+            listOf(
+                DefinitionalSweep.SweepNode.Bool2Int(0, 0),
+                DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(1, FunctionalObjective.Operand.v(0), FunctionalObjective.Operand.c(10)),
+                    intArrayOf(0),
+                ),
+            ),
+            2,
+            1,
+        )
+        state.apply(Move.BoolFlip(0))
+        state.apply(Move.IntSet(1, 7))
+
+        state.apply(Move.Compound(listOf(Move.BoolFlip(0), Move.BoolFlip(0))))
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(11L, state.assignment.intValue(1))
+    }
+
     @Test
     fun `shared definition preparation should resume without exposing unfinished readers`() {
         val problem = Problem(

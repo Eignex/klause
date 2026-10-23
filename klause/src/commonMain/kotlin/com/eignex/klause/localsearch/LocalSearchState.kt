@@ -248,6 +248,7 @@ class LocalSearchState private constructor(
     private val moveIntSeeds = IntArrayList(2)
     private val moveBoolSeeds = IntArrayList(2)
     private var definitionTraversal: DefinitionTraversal? = null
+    private var definitionValues: DefinitionValues? = null
     private var moveActive = false
 
     // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
@@ -412,6 +413,7 @@ class LocalSearchState private constructor(
 
     internal fun finishRecompute() {
         assignmentRevision++
+        definitionValues?.clear()
         // Initialize break/make vectors from factor deltas (payloads are current after initialize()).
         if (boolScoresInitialized) addAllBreakMake()
         if (cost < bestCostSeen) bestCostSeen = cost
@@ -456,6 +458,7 @@ class LocalSearchState private constructor(
             check(!probeActive && !moveActive) { "cannot replace definitions during a move" }
             field = value
             definitionTraversal = null
+            definitionValues = null
             moveSink.setInvariants(value)
         }
 
@@ -511,6 +514,7 @@ class LocalSearchState private constructor(
     }
 
     private fun propagateInvariants(net: InvariantNetwork, move: Move, affected: IntArrayList?) {
+        val values = definitionValues ?: DefinitionValues(net).also { definitionValues = it }
         val nodes = affected ?: run {
             collectMoveSeeds(move)
             affectedDefinitions(net)
@@ -519,7 +523,7 @@ class LocalSearchState private constructor(
             val idx = nodes[position]
             val n = net.node(idx)
             if (if (n.outIsBool) assumptions.isFrozenBool(n.out) else !moveSink.allowsDefinedInt(n.out)) continue
-            val v = n.eval(assignment, rootDomains)
+            val v = values.eval(idx, assignment, rootDomains)
             if (v == DefinitionalSweep.SweepNode.NO_WRITE) continue
             if (n.outIsBool) {
                 if (assignment.boolValue(n.out) != (v != 0L)) applyBoolFlip(n.out)
@@ -995,6 +999,7 @@ class LocalSearchState private constructor(
     }
 
     private fun applyBoolFlip(boolVar: Int) {
+        definitionValues?.boolChanged(boolVar)
         val touched = projection.boolOccurrences[boolVar]
         applyMove(
             touchedFactors = touched,
@@ -1029,6 +1034,7 @@ class LocalSearchState private constructor(
     private fun applyIntSet(intVar: Int, newValue: Long) {
         val old = assignment.intValue(intVar)
         if (old == newValue) return
+        definitionValues?.intChanged(intVar)
         val touched = projection.intOccurrences[intVar]
         applyMove(
             touchedFactors = touched,

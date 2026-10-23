@@ -931,6 +931,12 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
 
     internal fun readsBool(v: Int): Boolean = boolReaders[v].isNotEmpty()
 
+    internal fun intReaders(v: Int): IntArray = intReaders[v]
+
+    internal fun boolReaders(v: Int): IntArray = boolReaders[v]
+
+    internal val hasDynamicReaders: Boolean = nodeArr.any { it is ElementResultDefinition }
+
     internal fun linearDefinition(v: Int): FunctionalObjective.Lin? = intDefinitions[v] as? FunctionalObjective.Lin
 
     /** The node at [index] (indexes ascend in topological order). */
@@ -998,6 +1004,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
         traversal: DefinitionTraversal,
     ): IntArrayList {
         check(traversal.network === this) { "definition traversal belongs to another network" }
+        if (traversal.reuses(seedInts, intCount, seedBools, boolCount)) return traversal.nodes
         traversal.clear()
         val work = traversal.nodes
         fun seedInt(v: Int) {
@@ -1019,6 +1026,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             if (n.outIsBool) seedBool(n.out) else seedInt(n.out)
         }
         work.backingData.sort(0, work.size)
+        traversal.remember(seedInts, intCount, seedBools, boolCount)
         return work
     }
 }

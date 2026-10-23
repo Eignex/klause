@@ -294,8 +294,14 @@ The node families share that contract:
 
 Nested repairs follow at most 16 definitions. Overflow, nonintegral inverses and
 unsupported definitions decline the candidate without stopping the scan. Each state
-owns its traversal workspace, marks each affected node once and keeps no
-assignment-dependent cone between moves; reentrant use throws before mutating it.
+owns its traversal workspace and marks each affected node once. It can reuse its last
+single-coordinate cone when the network has no selection-dependent Element readers.
+Definition evaluations are cached per state: coordinate writes invalidate direct
+readers, including probe rollback, and recomputation after external assignment writes
+clears every evaluation. Network replacement discards both caches. Propagation still
+visits the full affected cone and checks pins and implicit ownership on each visit,
+so an unchanged intermediate can repair an inconsistent descendant. Reentrant use
+throws before mutating the workspace.
 
 Boolean-only clause models close native proposals under clause implications before
 ranking: forced literals propagate to a fixpoint, then a newly broken longer clause
