@@ -560,13 +560,14 @@ triggers, basis phase timings and up to two immutable exact residual snapshots.
 The profile uses reflection over existing private seams; observations add overhead.
 Its exact leaf acceptance differs from ordinary configured-tolerance CLI execution.
 It establishes neither a source result nor default portfolio equivalence.
-An entry with `root=true` captures the existing production relaxation over declared
-root domains without traversal or presolve. That root projection is labelled
+An entry with `root=true` captures the existing production relaxation after root
+propagation, without traversal or optional presolve. That root projection is labelled
 separately from an observed continuous leaf and retains its normalized numerical
 authority, rather than asserting original MPS decimal equivalence.
 Self-authored conditioning controls can supply `{mps64, problem, sha256, root}`;
 the bounded request supplies original MPS bytes, which receive the same hash check
-and numerical compilation as catalog inputs.
+and numerical compilation as catalog inputs. Optional `exact=true` uses zero source
+feasibility tolerance for that supplied control, retaining its distinct semantics.
 
 `NumericalResidualReplay` accepts an array of
 `{job, source, residual, sha256, dense}` capture references through the same argument.
@@ -586,6 +587,11 @@ policy with cumulative-work refactorization disabled. Residual, fill, solve-work
 growth, backend requests and hard update limits retain their production settings.
 This construction-only diagnostic keeps the default policy enabled in ordinary
 solves and records each intervention separately from the dense comparison.
+Optional `entry="session"` uses the retained solve-session consumer used by real
+leaf completion; the default scoped entry prepares factors before its first query.
+These are distinct numerical openings. The session entry excludes caller model
+projection from lifecycle timing and retains its default pivot allowance. Both
+entries reuse the existing exact-state shape inspector outside timed calls.
 
 Profile mains live in `com.eignex.klause.bench.profile` and run as a `lab profile`
 job: the lab builds the named commit and runs the class once under JFR, keeping what
