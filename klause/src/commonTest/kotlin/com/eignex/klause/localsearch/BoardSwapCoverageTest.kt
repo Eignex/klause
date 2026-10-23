@@ -95,10 +95,16 @@ class BoardSwapCoverageTest {
         state.apply(sink.list.first())
         sink.clear()
 
-        source.generate(state, sink)
+        val pairs = mutableSetOf<Set<Int>>()
+        repeat(5) {
+            sink.clear()
+            source.generate(state, sink)
+            for (move in sink.list) {
+                pairs.add((move as Move.Compound).parts.map { (it as Move.IntSet).varId }.toSet())
+            }
+        }
 
-        val first = sink.list.first() as Move.Compound
-        assertEquals(listOf(Move.IntSet(0, 0), Move.IntSet(1, 1)), first.parts)
+        assertEquals(20, pairs.size)
     }
 
     @Test
@@ -146,15 +152,14 @@ class BoardSwapCoverageTest {
     }
 
     @Test
-    fun `suspended walks should find a late board improvement before reporting a local optimum`() {
+    fun `suspended walks should exhaust improving board swaps before reporting a local optimum`() {
         for (sliced in listOf(false, true)) {
             val initial = state()
-            var optima = 0
             val policy = object : RestartPolicy {
                 override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
-                override fun restart(state: LocalSearchState, bestSoFar: Sample?) = state.restart()
+                override fun restart(state: LocalSearchState, bestSoFar: Sample?) = Unit
                 override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
-                    optima++
+                    assertEquals(0.0, objective)
                 }
             }
             val strategy = SourceDrivenStrategy(
@@ -167,7 +172,7 @@ class BoardSwapCoverageTest {
             val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
             engine.resumable(
                 LinearObjective(intCoefficients = LongArray(10) { if (it == 9) 1L else 0L }),
-                LocalSearchParams(maxFlips = 5L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
+                LocalSearchParams(maxFlips = 24L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
             ).use { handle ->
                 val counted = assertIs<InstructionSlicedSearch>(handle)
                 var result: MinimizeResult? = null
@@ -177,9 +182,8 @@ class BoardSwapCoverageTest {
                     ) {}
                 }
                 assertEquals(0.0, assertIs<MinimizeResult.BestFound>(result).objective)
-                assertEquals(5L, handle.stats.ls.moves.sum.toLong())
+                assertEquals(24L, handle.stats.ls.moves.sum.toLong())
             }
-            assertEquals(0, optima)
         }
     }
 
@@ -247,16 +251,22 @@ class BoardSwapCoverageTest {
         val sink = MoveSink()
         val source = SatisfiedStructured.structural(1)
         source.generate(state, sink)
-        val first = sink.list
         sink.clear()
         source.generate(state, sink)
         state.seedImplicitFeasible()
         sink.clear()
         sink.setOwners(state.seeding.ownerInt)
 
-        source.generate(state, sink)
+        val pairs = mutableSetOf<Set<Int>>()
+        repeat(5) {
+            sink.clear()
+            source.generate(state, sink)
+            for (move in sink.list) {
+                pairs.add((move as Move.Compound).parts.map { (it as Move.IntSet).varId }.toSet())
+            }
+        }
 
-        assertEquals(first, sink.list)
+        assertEquals(20, pairs.size)
     }
 
     @Test
@@ -351,6 +361,55 @@ class BoardSwapCoverageTest {
 
             assertEquals(sampledSink.list, deferredSink.list)
             assertEquals(sampled.rng.nextLong(), deferred.rng.nextLong())
+        }
+    }
+
+    @Test
+    fun `bounded coverage should rotate across searchable boards`() {
+        val problem = Problem(
+            0, 15, Array(15) { IntDomain(0, 4) },
+            Array<Factor>(3) { board -> AllDifferent(IntArray(5) { board * 5 + it }, 0, 5) },
+        )
+        val state = freshState(problem, 7L)
+        repeat(15) { state.assignment.setInt(it, (it % 5).toLong()) }
+        state.recompute()
+        val sink = MoveSink()
+
+        SatisfiedStructured.structural(1).generate(state, sink)
+
+        assertEquals(4, sink.list.size)
+        val boards = sink.list.map { move ->
+            ((move as Move.Compound).parts.first() as Move.IntSet).varId / 5
+        }.toSet()
+        assertEquals(setOf(0, 1, 2), boards)
+    }
+
+    @Test
+    fun `cyclic pair coverage should include every unordered pair once`() {
+        for (size in listOf(2, 3, 5, 7)) {
+            val problem = Problem(
+                0, size, Array(size) { IntDomain(0, (size - 1).toLong()) },
+                arrayOf<Factor>(AllDifferent(IntArray(size) { it }, 0, size)),
+            )
+            val state = freshState(problem, 7L)
+            repeat(size) { state.assignment.setInt(it, it.toLong()) }
+            state.recompute()
+            val sink = MoveSink()
+            val pairs = mutableSetOf<Set<Int>>()
+            val count = size * (size - 1) / 2
+
+            repeat((count + 3) / 4) {
+                sink.clear()
+                SatisfiedStructured.structural(1).generate(state, sink)
+                assertTrue(sink.list.size <= 4)
+                for (move in sink.list) {
+                    val ids = (move as Move.Compound).parts.map { (it as Move.IntSet).varId }.toSet()
+                    assertTrue(pairs.add(ids))
+                }
+            }
+
+            assertEquals(count, pairs.size)
+            assertFalse(state.boardCoverage.pending)
         }
     }
 
