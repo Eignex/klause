@@ -112,6 +112,10 @@ internal class PolynomialBooleanPropagation(
     private fun propagate(index: Int, node: FormulaNode.Junction): Boolean {
         val decisive = if (node.conjunction) FALSE else TRUE
         val identity = TRUE - decisive
+        if (values[index] == identity) {
+            for (child in node.children) if (!assign(child, identity)) return false
+            return true
+        }
         var unknowns = 0
         var lastUnknown = -1
         var decided = false

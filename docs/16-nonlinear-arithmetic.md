@@ -273,6 +273,11 @@ decline a substitution while preserving its completed prefix; cancellation and
 work exhaustion withhold the result. Expansion uses the caller's remaining work
 and representation limits.
 
+A required true conjunction or false disjunction directly requires the same truth
+from every child. Each child assignment checks existing truth and observes the
+caller's cancellation and work allowance; other junctions inspect their children
+to discover decisive or unit consequences.
+
 The procedure then runs in four stages; only the last two are needed for
 completeness.
 
