@@ -13,14 +13,20 @@ internal class PolynomialPredicateSharing(
     private val originalAtoms: List<PolynomialAtom>,
     private val arithmetic: PolynomialArithmetic,
     private val definitions: Map<Int, PolynomialBooleanDefinition> = emptyMap(),
+    private val previousScalings: PolynomialPredicateScalings? = null,
 ) {
     val nodes = ArrayList<FormulaNode>()
     val atoms = ArrayList<PolynomialAtom>()
-    private val normalized = HashMap<Polynomial, ScaledPredicate>()
+    private val normalized = HashMap<Polynomial, PolynomialPredicateScaling>()
     private val representatives = HashMap<PredicateKey, PredicateRepresentative>()
     private val negations = HashMap<Int, Int>()
     private val constants = HashMap<Boolean, Int>()
     private val definitionPredicates = HashMap<PolynomialAtom, Int>()
+
+    fun scalings(): PolynomialPredicateScalings {
+        arithmetic.step()
+        return PolynomialPredicateScalings(arithmetic, normalized)
+    }
 
     fun rewrite(root: Int): Int {
         val predicates = if (definitions.isEmpty()) null else IntArray(originalAtoms.size) { index ->
@@ -147,8 +153,12 @@ internal class PolynomialPredicateSharing(
             return append(FormulaNode.Atom(atoms.lastIndex))
         }
         val scaled = normalized.getOrPut(atom.polynomial) {
-            val coefficient = terms.first().coefficient
-            ScaledPredicate(arithmetic.scale(atom.polynomial, coefficient.reciprocal()), coefficient.signum() > 0)
+            previousScalings?.get(atom.polynomial, arithmetic) ?: run {
+                val coefficient = terms.first().coefficient
+                PolynomialPredicateScaling(
+                    arithmetic.scale(atom.polynomial, coefficient.reciprocal()), coefficient.signum() > 0,
+                )
+            }
         }
         val signs = relationSigns(atom.relation).let { if (scaled.sameSign) it else negateSigns(it) }
         val truth = signs and POSITIVE_SIGN == 0
@@ -180,6 +190,15 @@ internal class PolynomialPredicateSharing(
     }
 }
 
-private data class ScaledPredicate(val polynomial: Polynomial, val sameSign: Boolean)
+internal data class PolynomialPredicateScaling(val polynomial: Polynomial, val sameSign: Boolean)
+
+internal class PolynomialPredicateScalings(
+    private val owner: PolynomialArithmetic,
+    private val values: Map<Polynomial, PolynomialPredicateScaling>,
+) {
+    fun get(polynomial: Polynomial, arithmetic: PolynomialArithmetic): PolynomialPredicateScaling? =
+        if (owner === arithmetic) values[polynomial] else null
+}
+
 private data class PredicateKey(val polynomial: Polynomial, val signs: Int)
 private data class PredicateRepresentative(val node: Int, val truth: Boolean)

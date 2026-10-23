@@ -27,13 +27,15 @@ internal class PolynomialFormula private constructor(
     private val root: Int,
     val atoms: List<PolynomialAtom>,
     val booleanVariables: List<Int>,
+    private val predicateScalings: PolynomialPredicateScalings? = null,
 ) {
     fun booleanRegions(arithmetic: PolynomialArithmetic): Iterator<PolynomialBooleanRegion?> =
         PolynomialBooleanRegions(nodes, root, atoms, arithmetic).prepare()
 
     fun withAtoms(replacements: List<PolynomialAtom>, arithmetic: PolynomialArithmetic): PolynomialFormula {
         require(replacements.size == atoms.size)
-        return PolynomialFormula(nodes, root, replacements.toList(), booleanVariables).sharePredicates(arithmetic)
+        return PolynomialFormula(nodes, root, replacements.toList(), booleanVariables, predicateScalings)
+            .sharePredicates(arithmetic)
     }
 
     fun reduceBooleanDefinitions(arithmetic: PolynomialArithmetic): PolynomialFormula? {
@@ -48,13 +50,17 @@ internal class PolynomialFormula private constructor(
         arithmetic: PolynomialArithmetic,
         definitions: Map<Int, PolynomialBooleanDefinition> = emptyMap(),
     ): PolynomialFormula {
-        val sharing = PolynomialPredicateSharing(nodes, atoms, arithmetic, definitions)
+        val sharing = PolynomialPredicateSharing(nodes, atoms, arithmetic, definitions, predicateScalings)
         val rewrittenRoot = sharing.rewrite(root)
         if (definitions.isEmpty()) {
-            return PolynomialFormula(sharing.nodes, rewrittenRoot, sharing.atoms, booleanVariables)
+            return PolynomialFormula(
+                sharing.nodes, rewrittenRoot, sharing.atoms, booleanVariables, sharing.scalings(),
+            )
         }
         val sharedRoot = sharing.compact(rewrittenRoot)
-        return PolynomialFormula(sharing.nodes, sharedRoot, sharing.atoms, sharing.booleanVariables())
+        return PolynomialFormula(
+            sharing.nodes, sharedRoot, sharing.atoms, sharing.booleanVariables(), sharing.scalings(),
+        )
     }
 
     fun forcedAtoms(arithmetic: PolynomialArithmetic): List<PolynomialAtom>? {

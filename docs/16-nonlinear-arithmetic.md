@@ -252,6 +252,10 @@ different zero boundaries, and variable factors retain singular fibres. The
 Boolean DAG retains original Boolean identities and the first numeric
 representative, including after graph substitution. Constant numeric atoms retain
 their exact polynomials; Boolean propagation evaluates their truth.
+Formula rewrites retain exact scalar-normalization facts for unchanged predicates
+within the same arithmetic context. Another context normalizes under its own
+cancellation and work scope. Each rewrite computes Boolean state and numeric truth
+afresh.
 
 Before probing or Boolean search, required equivalences defining Boolean variables
 by numeric predicates are substituted throughout the formula. Their tautologies
