@@ -12,6 +12,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchRealValue
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
@@ -110,9 +111,9 @@ class NativeClauseSearchComponentTest {
         val session = SearchSession(listOf(clauses, theory))
         assertIs<ComponentResult.Consistent>(session.initialize())
 
-        val result = session.solveBoolean(2, candidateHints = SearchCandidateHints { true })
+        val result = session.solve(2, candidateHints = SearchCandidateHints { true })
 
-        val model = assertIs<BooleanSearchResult.Satisfied>(result).model
+        val model = assertIs<SearchResult.Satisfied>(result).model
         assertEquals(false, model.valueOf(SearchBoolValue(0)))
         assertEquals(true, model.valueOf(SearchBoolValue(1)))
         assertEquals(1L, session.learnedClauseStats().assertingConflicts)
