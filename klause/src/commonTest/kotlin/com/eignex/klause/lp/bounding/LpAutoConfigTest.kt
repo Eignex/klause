@@ -49,6 +49,7 @@ class LpAutoConfigTest {
 
             assertEquals(expected.first, admission.withinCeiling)
             assertEquals(expected.second, admission.boundingPermitted)
+            assertEquals(expected.first && expected.second, admission.plan.bounding)
             assertEquals(LpAutoConfig.resolve(p, config), admission.plan)
         }
     }

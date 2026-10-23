@@ -177,6 +177,7 @@ internal object MpsLpAdmission {
         }
     }
 
+    @Suppress("SpreadOperator") // Java reflection requires varargs at the constructor boundary.
     private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean, stop: Cancellation): JsonObject {
         check(!stop())
         // Reflection keeps diagnostic access to internal assembly out of the published API.
