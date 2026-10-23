@@ -309,9 +309,18 @@ complete CAD available.
 
 **2. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
 enumerates source implicants: assignments of Boolean leaves and signed numeric
-predicates that make the formula true. Propagation treats numeric predicates as
-opaque leaves, a proof scan keeps only supporting literals, and private exclusion
-clauses prevent revisiting a region without entering shared learning.
+predicates that make the formula true. Initial exact sign propagation derives
+numeric consequences and retains their premises for supporting regions. Numeric
+assignment or retraction during Boolean search triggers another exact sign check
+before further decisions. A completed contradiction learns a private exclusion
+containing every assigned signed numeric premise; that arithmetic impossibility
+holds under every Boolean prefix. A feasible sign overapproximation learns nothing.
+Pure Boolean changes do not repeat the numeric check, and interrupted or declined
+checks supply no exclusion. The Boolean trail retracts assignments while valid
+numeric exclusions remain available within that enumerator. They do not cross
+query, condition or root-snapshot boundaries. A proof scan keeps supporting
+literals, and separate visited-region exclusions prevent repeating an issued
+region. Neither exclusion kind enters shared learning.
 
 **3. Regional reduction and projection.** Each region's signed predicates form a
 conjunction. Ordered polynomial remainders simplify other predicates modulo the

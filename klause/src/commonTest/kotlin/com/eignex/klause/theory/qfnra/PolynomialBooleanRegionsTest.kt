@@ -7,6 +7,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -18,6 +19,138 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
+    @Test
+    fun `partial numeric conflicts exclude a guarded branch before its unrelated obligations`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) " +
+                "(declare-const gate Bool) (declare-const a Bool) (declare-const b Bool) " +
+                "(assert (and (or gate (and (not (<= x 0)) (> y 0) (not (>= (* x y) 0)))) (or a b)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val progress = PolynomialQueryProgress()
+        val conflicts = ArrayList<List<PolynomialAtom>>()
+
+        val regions = formula.booleanRegions(arithmetic, progress) { conflicts.add(it) }
+            .asSequence().filterNotNull().toList()
+
+        assertTrue(regions.isNotEmpty())
+        assertTrue(regions.all { it.bools.getValue(0) && it.atoms.isEmpty() })
+        assertEquals(1L, progress.partialConflicts)
+        assertEquals(mapOf(PolynomialRelation.GT to 2, PolynomialRelation.LT to 1),
+            conflicts.single().groupingBy { it.relation }.eachCount())
+    }
+
+    @Test
+    fun `numeric exclusions are reused across unrelated Boolean prefixes`() {
+        for (length in listOf(1, 2, 4)) {
+            val declarations = (0 until length).joinToString(" ") {
+                "(declare-const a$it Bool) (declare-const b$it Bool)"
+            }
+            val prefix = (0 until length).joinToString(" ") { "(or a$it b$it)" }
+            val source = SmtLibPolynomial.parse(
+                "(declare-const x Real) (declare-const y Real) $declarations (declare-const gate Bool) " +
+                    "(assert (and $prefix (or gate (and (> x 0) (> y 0) (< (* x y) 0)))))",
+            )
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+            val progress = PolynomialQueryProgress()
+
+            val regions = formula.booleanRegions(arithmetic, progress).asSequence().filterNotNull().toList()
+
+            assertTrue(regions.isNotEmpty())
+            assertTrue(regions.all { it.bools.getValue(2 * length) })
+            assertEquals(1L, progress.partialChecks)
+            assertEquals(1L, progress.partialConflicts)
+            assertTrue(progress.partialExclusionReuses > 0)
+        }
+    }
+
+    @Test
+    fun `partial conflicts can exhaust both numeric guard alternatives`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const gate Bool) " +
+                "(assert (or (and (not gate) (> x 0) (> y 0) (< (* x y) 0)) " +
+                "(and gate (< x 0) (< y 0) (< (* x y) 0))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val progress = PolynomialQueryProgress()
+
+        val regions = formula.booleanRegions(arithmetic, progress).asSequence().filterNotNull().toList()
+
+        assertTrue(regions.isEmpty())
+        assertTrue(progress.partialConflicts > 0)
+    }
+
+    @Test
+    fun `interrupted partial sign checks publish no numeric exclusion`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const gate Bool) " +
+                "(assert (or gate (and (> x 0) (> y 0) (< (* x y) 0))))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        var stopped = false
+        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val progress = PolynomialQueryProgress()
+        val pending = formula.booleanRegions(arithmetic, progress)
+        while (progress.partialChecks == 0L) assertNull(pending.next())
+
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { pending.next() }
+        assertEquals(0L, progress.partialConflicts)
+        assertEquals(0L, progress.partialExclusionUses)
+    }
+
+    @Test
+    fun `partial exclusions retain a zero boundary through retracted guard pins`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const gate Bool) " +
+                "(assert (or (and (not gate) (> x0 0) (> x1 0) (< (* x0 x1) 0)) " +
+                "(and gate (= x0 0) (= x1 (- 1)))))",
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+
+        service.invocation().use { invocation ->
+            val unconditioned = assertIs<QfNraResult.Satisfiable>(invocation.check()).assignment
+            assertTrue(unconditioned.boolValue(0))
+            for (pin in listOf(true, false, true)) {
+                val result = invocation.check(PolynomialCondition(bools = mapOf(0 to pin)))
+
+                if (pin) {
+                    val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+                    assertTrue(witness.boolValue(0))
+                    assertEquals(BigFraction.ZERO, witness.realValue(0).rational)
+                    assertEquals(BigFraction.MINUS_ONE, witness.realValue(1).rational)
+                    assertEquals(33, witness.realCount)
+                } else assertIs<QfNraResult.Unsatisfiable>(result)
+            }
+        }
+    }
+
+    @Test
+    fun `observing partial conflict premises preserves native work`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const gate Bool) " +
+                "(assert (or gate (and (> x0 0) (> x1 0) (< (* x0 x1) 0))))",
+        )
+        val plain = solveQfNra(source.formula, source.boolCount, source.realCount)
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(), PolynomialCondition())
+        val conflicts = ArrayList<List<PolynomialAtom>>()
+        query.partialConflictObserver = { conflicts.add(it) }
+
+        var observed: QfNraResult? = null
+        while (observed == null) observed = query.next()
+
+        assertIs<QfNraResult.Satisfiable>(observed)
+        assertEquals(plain.stats, observed.stats)
+        assertTrue(conflicts.isNotEmpty())
+    }
+
     @Test
     fun `graph substitutions expose strict nonzero factors within the matrix allowance`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
