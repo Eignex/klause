@@ -12501,6 +12501,7 @@ final class com.eignex.klause.presolve/PassDelta { // com.eignex.klause.presolve
 
 final class com.eignex.klause.presolve/PresolveBudget : com.eignex.klause.util/WorkMeter { // com.eignex.klause.presolve/PresolveBudget|null[0]
     constructor <init>(kotlin/Long) // com.eignex.klause.presolve/PresolveBudget.<init>|<init>(kotlin.Long){}[0]
+    constructor <init>(kotlin/Long, kotlin/Long) // com.eignex.klause.presolve/PresolveBudget.<init>|<init>(kotlin.Long;kotlin.Long){}[0]
 
     final val allowance // com.eignex.klause.presolve/PresolveBudget.allowance|{}allowance[0]
         final fun <get-allowance>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.allowance.<get-allowance>|<get-allowance>(){}[0]
@@ -12510,6 +12511,8 @@ final class com.eignex.klause.presolve/PresolveBudget : com.eignex.klause.util/W
         final fun <get-passCalls>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.presolve/PresolveBudget.passCalls.<get-passCalls>|<get-passCalls>(){}[0]
     final val preparationStages // com.eignex.klause.presolve/PresolveBudget.preparationStages|{}preparationStages[0]
         final fun <get-preparationStages>(): kotlin.collections/List<com.eignex.klause.solver.result/PresolvePreparationStats> // com.eignex.klause.presolve/PresolveBudget.preparationStages.<get-preparationStages>|<get-preparationStages>(){}[0]
+    final val sourceProbeWorkWeight // com.eignex.klause.presolve/PresolveBudget.sourceProbeWorkWeight|{}sourceProbeWorkWeight[0]
+        final fun <get-sourceProbeWorkWeight>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.sourceProbeWorkWeight.<get-sourceProbeWorkWeight>|<get-sourceProbeWorkWeight>(){}[0]
 
     final var entrySizeVisits // com.eignex.klause.presolve/PresolveBudget.entrySizeVisits|{}entrySizeVisits[0]
         final fun <get-entrySizeVisits>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.entrySizeVisits.<get-entrySizeVisits>|<get-entrySizeVisits>(){}[0]

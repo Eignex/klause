@@ -31,8 +31,11 @@ class PresolveBudget(
     /** Work units the phase may spend in all. */
     val allowance: Long,
     /** Phase units per open-range probe visit; explicit work allowances use the default currency. */
-    val sourceProbeWorkWeight: Long = 10L,
+    val sourceProbeWorkWeight: Long,
 ) : WorkMeter {
+    /** A phase allowance with the standard work currency for every kernel. */
+    constructor(allowance: Long) : this(allowance, 10L)
+
     init {
         require(sourceProbeWorkWeight in 1L..10L)
     }

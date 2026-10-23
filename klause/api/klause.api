@@ -9014,6 +9014,7 @@ public final class com/eignex/klause/presolve/Presolve {
 
 public final class com/eignex/klause/presolve/PresolveBudget : com/eignex/klause/util/WorkMeter {
 	public fun <init> (J)V
+	public fun <init> (JJ)V
 	public fun charge (J)V
 	public final fun getAllowance ()J
 	public final fun getEntrySizeVisits ()J
@@ -9024,6 +9025,7 @@ public final class com/eignex/klause/presolve/PresolveBudget : com/eignex/klause
 	public final fun getRootConstructionEntries ()J
 	public final fun getRootPropagationWork ()J
 	public final fun getRounds ()I
+	public final fun getSourceProbeWorkWeight ()J
 	public final fun orSpent (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
 	public final fun remaining ()J
 	public final fun slice (J)Lcom/eignex/klause/util/Cancellation;
