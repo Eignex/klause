@@ -1637,11 +1637,13 @@ class ExactLiraSearchComponent private constructor(
         val arithmetic = MixedPointArithmetic(lpStop)
         var prepared = false
         var repair: MixedEqualityRepair? = null
+        var firstRow = 0
+        val onViolation: (Int) -> Unit = { firstRow = it }
         for (guess in guesses) {
             lpStop.charge(1L)
             if (operationStop() || pointHintStop()) return null
             if (guess.size != model.numRealVars) continue
-            if (arithmetic.satisfies(guess, rows) && !pointHintStop()) {
+            if (arithmetic.satisfies(guess, rows, firstRow, onViolation) && !pointHintStop()) {
                 observeCompleteStage("RECOVERY_GUESS_ACCEPTED")
                 return guess
             }
@@ -1651,7 +1653,7 @@ class ExactLiraSearchComponent private constructor(
             }
             if (operationStop() || pointHintStop()) return null
             val repaired = repair?.point(guess)
-            if (repaired != null && arithmetic.satisfies(repaired, rows) && !pointHintStop()) {
+            if (repaired != null && arithmetic.satisfies(repaired, rows, firstRow, onViolation) && !pointHintStop()) {
                 rememberRecoveryGuess(repaired)
                 observeCompleteStage("RECOVERY_RETAINED_EQUALITY_BEFORE_LP")
                 return repaired

@@ -165,6 +165,10 @@ the hint workspace discards the guesses. Both providers can retain older numeric
 vectors in unused entries of the same envelope, including one entry per ring slot.
 Indexed storage counts the head index, selected heads, numerical point and current
 guess before reserving history coordinates and slots. Candidates are tried in recency order.
+Within one retained-guess sweep over immutable selected rows, a row that rejects a
+candidate is checked first for the next candidate. Validation wraps through every
+row before acceptance; the row priority expires with that sweep. Scalar admission,
+strictness and the current cancellation and work allowances still govern the check.
 In a partial pure-real production scope, checking every selected original row can
 replace the primary LP solve when the conjunctive rows contain only inequalities
 and unconditional equalities, without Boolean coefficients or added theory assertions.

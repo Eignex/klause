@@ -12,15 +12,27 @@ internal class MixedPointArithmetic(private val stop: Cancellation) {
         return bits <= MAX_POINT_BITS && !stop()
     }
 
-    fun satisfies(point: List<BigFraction>, rows: List<ExactRationalInequality>): Boolean {
+    fun satisfies(
+        point: List<BigFraction>,
+        rows: List<ExactRationalInequality>,
+        firstRow: Int = 0,
+        onViolation: ((Int) -> Unit)? = null,
+    ): Boolean {
         if (!point.all(::admitted)) return false
-        for (row in rows) {
+        var rowIndex = if (firstRow in rows.indices) firstRow else 0
+        repeat(rows.size) {
+            val row = rows[rowIndex]
             var slack = row.rhs
             if (!admitted(slack)) return false
             for (index in row.columns.indices) {
                 slack = subtractProduct(slack, row.coefficients[index], point[row.columns[index]]) ?: return false
             }
-            if (if (row.strict) slack <= BigFraction.ZERO else slack < BigFraction.ZERO) return false
+            if (if (row.strict) slack <= BigFraction.ZERO else slack < BigFraction.ZERO) {
+                onViolation?.invoke(rowIndex)
+                return false
+            }
+            rowIndex++
+            if (rowIndex == rows.size) rowIndex = 0
         }
         return !stop()
     }
