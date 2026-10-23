@@ -946,6 +946,17 @@ large-source pairs have eleven wins/nine losses but mean loss 572.6. Gbac has
 eight wins/nine losses/three ties and photo twenty ties. All 160 witnesses pass
 source checking. These tradeoffs do not support a default improvement claim.
 
+Random coprime strides at `88d9769671` keep ten original-team fixed-work wins/six
+losses with all controls tied in [7762](https://lab.eignex.com/jobs/7762).
+Default [7763](https://lab.eignex.com/jobs/7763) has six small-source wins/three
+losses and five large-source wins/four losses. All 136 witnesses pass source
+checking. Across every seed from one through ten, twice, default
+[7764](https://lab.eignex.com/jobs/7764) has eight small-source wins/twelve losses
+and mean loss 994.8, eleven large-source wins/nine losses and mean gain 734.85,
+seven gbac wins/eleven losses/two ties and twenty photo ties. All 160 witnesses
+pass source checking. The small-source loss rejects promotion despite the
+large-source gain; pair ordering alone does not preserve sampled descent quality.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;

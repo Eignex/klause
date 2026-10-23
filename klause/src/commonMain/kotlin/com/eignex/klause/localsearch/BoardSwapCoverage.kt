@@ -61,6 +61,7 @@ internal class BoardSwapCoverage {
         val before = sink.size
         var visits = 0
         val cap = AllDifferentInvariant.MAX_STRUCTURED_SWAPS
+        live.beginBatch()
         try {
             while (live.hasRemaining && visits < cap * AllDifferentInvariant.SWAP_ATTEMPT_STRIDE &&
                 sink.size - before < cap
@@ -68,9 +69,14 @@ internal class BoardSwapCoverage {
                 if (cancellation()) return true
                 visits++
                 live.visit(state, sink)
+                if (live.batchFinished) {
+                    if (sink.size > before) break
+                    live.advanceBoard()
+                }
             }
             return true
         } finally {
+            live.advanceBoard()
             sink.proposer = MoveSink.NO_PROPOSER
         }
     }
@@ -89,6 +95,8 @@ internal class BoardSwapCoverage {
         private var savedBoardsLeft = 0
         private var savedEpoch = 0L
         private var picking = false
+        var batchFinished: Boolean = false
+            private set
         private val touched = IntArrayList()
         private val savedPosition = LongArrayList()
         private val savedRemaining = LongArrayList()
@@ -105,6 +113,15 @@ internal class BoardSwapCoverage {
         fun start() {
             started = false
             boardsLeft = boards.size
+        }
+
+        fun beginBatch() {
+            batchFinished = false
+        }
+
+        fun advanceBoard() {
+            board = (board + 1) % boards.size
+            batchFinished = false
         }
 
         fun beginPick() {
@@ -138,8 +155,10 @@ internal class BoardSwapCoverage {
                 if (picking) savedBoard = board
             }
             val id = board
-            board = (board + 1) % boards.size
-            if (finished[id] == epoch) return
+            if (finished[id] == epoch) {
+                advanceBoard()
+                return
+            }
             val fid = boards[id]
             val invariant = state.factors[fid] as AllDifferentInvariant
             val size = invariant.swapCoordinateCount
@@ -171,6 +190,7 @@ internal class BoardSwapCoverage {
             if (remaining[id] == 0L) {
                 finished[id] = epoch
                 boardsLeft--
+                batchFinished = true
             }
         }
 
