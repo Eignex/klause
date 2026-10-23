@@ -23,6 +23,7 @@ import java.io.File
 import java.lang.management.ManagementFactory
 import java.lang.reflect.Proxy
 import java.util.IdentityHashMap
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -72,7 +73,7 @@ internal object ExactFeasibilityCapture {
         val observerType = Class.forName("com.eignex.klause.lp.engine.LpCertificationObserver")
         var snapshot: Any? = null
         var booleans: IntArray? = null
-        var premises: JsonElement = JsonNull
+        var capturedPremises: JsonElement = JsonNull
         var captureNs = 0L
         var observations = 0L
         val wrapped = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, method, values ->
@@ -86,7 +87,7 @@ internal object ExactFeasibilityCapture {
                 val lp = (field(theory, "lpDelegate") as Lazy<*>).value ?: error("missing LP owner")
                 snapshot = requireNotNull(call(lp, "getState"))
                 booleans = (field(theory, "bools") as IntArray).copyOf()
-                premises = premises(lp, requireNotNull(snapshot), field(theory, "context") as SearchContext)
+                capturedPremises = premises(lp, requireNotNull(snapshot), field(theory, "context") as SearchContext)
                 captureNs = System.nanoTime() - started
             }
             result
@@ -101,7 +102,7 @@ internal object ExactFeasibilityCapture {
         val captured = snapshot ?: error("no complete dimension-declined state observed")
         val encoded = encode(captured)
         out.resolve("complete.klexact").writeBytes(encoded)
-        out.resolve("premises.json").writeText(premises.toString())
+        out.resolve("premises.json").writeText(capturedPremises.toString())
         out.resolve("capture.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
             put("sourceSha256", sha256(bytes))
@@ -245,8 +246,14 @@ internal object ExactFeasibilityCapture {
             .redirectOutput(out.resolve("child.stdout"))
             .redirectError(out.resolve("child.stderr"))
             .apply { environment()["KLAUSE_EXACT_CAPTURE_CHILD"] = "1" }.start()
-        val exit = process.waitFor()
+        val completed = process.waitFor(120, TimeUnit.SECONDS)
+        if (process.isAlive) {
+            process.destroyForcibly()
+            process.waitFor()
+        }
+        val exit = process.exitValue()
         out.resolve("child.exit").writeText("$exit\n")
+        check(completed) { "capture child transport did not finish" }
         check(exit == 0) { "capture child failed" }
     }
 }
