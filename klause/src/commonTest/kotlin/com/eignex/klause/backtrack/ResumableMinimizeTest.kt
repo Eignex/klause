@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.SmallestDomain
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
@@ -435,6 +436,50 @@ class ResumableMinimizeTest {
             assertEquals(0.0, result.objective)
             assertEquals(TerminationReason.SearchExhausted, result.reason)
         }
+    }
+
+    @Test
+    fun `a pooled proof bound should preserve the first discovered improvement`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(
+            valueSelector = SolutionGuided(IndomainMin),
+            solutionPhasing = true,
+            lpPlan = LpPlan(bounding = false),
+            objectiveBoundSupplier = { 5.0 },
+            pooledIncumbents = IncumbentExchange.minimizing<Sample>().apply {
+                offer(Sample(BooleanArray(0), longArrayOf(5L)), 5.0)
+            },
+        )
+        val offers = mutableListOf<Double>()
+
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
+        }
+
+        assertEquals(listOf(5.0, 0.0), offers)
+    }
+
+    @Test
+    fun `restarting retained search should discover its own first incumbent`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(
+            valueSelector = IndomainMin,
+            lubyRestartBase = 10L,
+            lpPlan = LpPlan(bounding = false),
+            objectiveBoundSupplier = { 5.0 },
+            pooledIncumbents = IncumbentExchange.minimizing<Sample>().apply {
+                offer(Sample(BooleanArray(0), longArrayOf(5L)), 5.0)
+            },
+        )
+        val offers = mutableListOf<Double>()
+
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
+        }
+
+        assertEquals(listOf(0.0), offers)
     }
 
     @Test

@@ -103,12 +103,14 @@ fewer of them. Index construction is bounded and charged to the opening token; s
 Solution-guided LP bounding may also order values by verified peer incumbents until
 its first local witness. Hints supply no incumbent, pruning or publication authority.
 
-A retained complete optimization worker with an external cutoff reads the current
-pooled assignment at its first root and revalidates it before using it as a local
-incumbent. A witness equal to the containing portfolio's cutoff
+A non-restarting retained complete optimization worker with an external cutoff reads
+the current pooled assignment at its first root and revalidates it before using it
+as a local incumbent. A witness equal to the containing portfolio's cutoff
 can seed that worker's incumbent and objective propagation at its first root; it
 need not improve the containing portfolio again. Invalid assignments and assignments
-above the cutoff do not seed it. Rebindable neighborhood searches retain strict
+above the cutoff do not seed it. This starting witness supplies bounds without
+priming solution guidance or earning incumbent progress. Restarting workers retain
+their discovery and root-primal startup path. Rebindable neighborhood searches retain strict
 improvement admission, and exhaustion under an external cutoff keeps its conditional
 result scope.
 
