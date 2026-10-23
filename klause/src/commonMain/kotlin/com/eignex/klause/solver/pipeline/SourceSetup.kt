@@ -43,7 +43,19 @@ class SourceSetupRequest private constructor(
         providers: FactorProjectionProviders = source.providers,
         cancellation: Cancellation = Cancellation.Never,
         boundCancellation: Cancellation = cancellation,
-        linearTraversal: LinearTraversal = LinearTraversal.AUTOMATIC,
+    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null)
+
+    /** Bind a linear source traversal independently of its declarations and finite worker recipe. */
+    constructor(
+        source: SourceAttachment,
+        operation: ExecutionOperation,
+        engine: FiniteEngine,
+        objective: LinearObjective? = null,
+        maximize: Boolean = false,
+        providers: FactorProjectionProviders = source.providers,
+        cancellation: Cancellation = Cancellation.Never,
+        boundCancellation: Cancellation = cancellation,
+        linearTraversal: LinearTraversal,
     ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null,
         linearTraversal = linearTraversal)
 
