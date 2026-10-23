@@ -149,4 +149,33 @@ class NativeClauseSearchComponentTest {
 
         assertEquals(true, session.boolValue(0))
     }
+
+    @Test
+    fun `interrupted native propagation should leave a complete sibling prefix`() {
+        var interrupted = false
+        val clauses = NativeClauseSearchComponent(2, listOf(Clause(intArrayOf(0, 2))), Cancellation { interrupted })
+        val session = SearchSession(listOf(clauses))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        interrupted = true
+        assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(1)))
+        assertNull(session.boolValue(1))
+        session.popTo(0)
+        interrupted = false
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+
+        assertEquals(true, session.boolValue(0))
+        assertEquals(setOf(0, 2), clauses.reasonFor(0)?.literals?.toSet())
+    }
+
+    @Test
+    fun `interrupted native initialization should not publish a partial root`() {
+        val clauses = NativeClauseSearchComponent(1, listOf(Clause(intArrayOf(0))), Cancellation { true })
+        val session = SearchSession(listOf(clauses))
+
+        val result = session.initialize()
+
+        assertIs<ComponentResult.Indeterminate>(result)
+        assertNull(session.boolValue(0))
+    }
 }

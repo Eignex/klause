@@ -29,8 +29,11 @@ internal class NativeClauseSearchComponent(
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
         val result = when {
             native.fixpointCancelled || context.cancelled() -> ComponentResult.Indeterminate
-            decision is SearchDecision.Bool && decision.literal ushr 1 in 0 until numBoolVars ->
-                delegate.assert(decision, context)
+            decision is SearchDecision.Bool && decision.literal ushr 1 in 0 until numBoolVars -> {
+                val complete = native.decisionLevel
+                val asserted = delegate.assert(decision, context)
+                if (native.restoreInterruptedFixpoint(complete)) ComponentResult.Indeterminate else asserted
+            }
             else -> ComponentResult.Consistent
         }
         // Arithmetic assertions do not enter the native projection, but their shared levels must

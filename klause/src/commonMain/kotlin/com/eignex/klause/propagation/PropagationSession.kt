@@ -515,6 +515,14 @@ class PropagationSession private constructor(
     internal fun probeBool(v: Int, value: Boolean): PropagationResult? =
         probeFixpoint { pushBool(v, value, reportImplied = false) }
 
+    internal fun restoreInterruptedFixpoint(level: Int): Boolean {
+        if (!state.runCancelled) return false
+        // The caller retains a complete prefix; no fact from the interrupted suffix may survive it.
+        popToLevel(level)
+        state.runCancelled = false
+        return true
+    }
+
     /** [pinInt] as a probe — see [probeFixpoint]. */
     internal fun probeInt(v: Int, value: Long): PropagationResult? =
         probeFixpoint { pushInt(v, value, reportImplied = false) }

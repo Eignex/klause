@@ -95,7 +95,9 @@ The shared open-model clause participant uses a clause-only native projection wi
 the original Boolean identifiers. Shared integer facts and registered arithmetic
 atoms stay with their owners. Native implications supply reasons to shared first-UIP;
 the shared database owns learned consequences. Retraction checkpoints include
-arithmetic-only levels, and an interrupted native fixpoint leaves checks indeterminate.
+arithmetic-only levels. An interrupted native assertion restores its last complete
+private prefix and leaves the shared query indeterminate; retraction removes its
+shared suffix before a sibling resumes. An interrupted root cannot publish a point.
 
 ## Pseudo-Boolean learning
 
