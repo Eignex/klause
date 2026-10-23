@@ -45,7 +45,8 @@ import kotlinx.serialization.json.put
 internal object MpsLpAdmission {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1 && args[0].startsWith("batch64="))
+        require(args.size in 1..2 && args[0].startsWith("batch64="))
+        require(args.size == 1 || args[1] == "queries=true")
         val requests = Json.decodeFromString<List<List<String>>>(
             Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString(),
         )
@@ -53,11 +54,11 @@ internal object MpsLpAdmission {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         requests.forEachIndexed { index, request ->
-            inspect(request, out.resolve("$index").apply { mkdirs() })
+            inspect(request, out.resolve("$index").apply { mkdirs() }, args.size == 2)
         }
     }
 
-    private fun inspect(request: List<String>, out: File) {
+    private fun inspect(request: List<String>, out: File, queries: Boolean) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val source = Catalog.uncapped(options.getValue("suite")).problems
@@ -118,6 +119,7 @@ internal object MpsLpAdmission {
             put("full", shape(problem, objective, false, stop))
             put("objectiveCone", shape(problem, objective, true, stop))
             put("javaVersion", System.getProperty("java.version"))
+            put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
             put("os", System.getProperty("os.name"))
             put("arch", System.getProperty("os.arch"))
             put("jvmOptions", buildJsonArray {
@@ -126,6 +128,7 @@ internal object MpsLpAdmission {
         }
         out.resolve("admission.json").writeText("$report\n")
         println(report)
+        if (queries) MpsLpQuery.measure(problem, checkNotNull(objective), out)
     }
 
     internal fun preparedObjective(plan: PreparedSourcePlan): LinearObjective? {
@@ -161,7 +164,14 @@ internal object MpsLpAdmission {
                             val params = recipe.build(1003L + index, null)
                             val resolved = params.lpConfig?.let { LpAutoConfig.resolve(problem, it, params.lpPlan) }
                                 ?: params.lpPlan
-                            put("configuredLp", params.lpConfig.toString())
+                            put("configuredLp", buildJsonObject {
+                                put("emphasis", params.lpConfig?.emphasis?.name)
+                                put("overrides", buildJsonObject {
+                                    params.lpConfig?.overrides?.forEach { (technique, enabled) ->
+                                        put(technique.id, enabled)
+                                    }
+                                })
+                            })
                             put("nodeBounding", resolved.bounding)
                             put("plan", resolved.toString())
                         }
