@@ -31,6 +31,7 @@ internal class ComponentLpSolver(
     ResumableLpSolver {
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var activeChild: LpSolver? = null
+    private var solveStarted = false
     private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
@@ -77,16 +78,19 @@ internal class ComponentLpSolver(
 
     override fun solve(warm: Basis?): FloatLpResult? {
         check(activeSolve == null) { "LP solve is suspended" }
+        solveStarted = true
         return immediateLpSolve { invoke { s -> s.solve(null) } }
     }
 
     override fun solvePrimal(warm: Basis?): FloatLpResult? {
         check(activeSolve == null) { "LP solve is suspended" }
+        solveStarted = true
         return immediateLpSolve { invoke { s -> s.solvePrimal(null) } }
     }
 
     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
         check(activeSolve == null) { "LP solve is suspended" }
+        solveStarted = true
         return immediateLpSolve {
             invoke { solver ->
                 check(solver is RetainedLpSolver)
@@ -99,6 +103,8 @@ internal class ComponentLpSolver(
     override fun openSolve(allowance: LpFloatAllowance?): LpSolveCursor<FloatLpResult?> {
         check(!closed && activeSolve == null) { "LP solve is closed or suspended" }
         return LpSolveCursor<FloatLpResult?>(completed = { activeSolve = null }) {
+            val reuse = solveStarted
+            solveStarted = true
             invoke { child ->
                 checkpoint(metrics.workOps)
                 var started = false
@@ -115,10 +121,14 @@ internal class ComponentLpSolver(
                             (step as LpSolveStep.Completed<FloatLpResult?>).value
                         }
                     } else {
-                        check(child is RetainedLpSolver)
                         activeChild = child
                         started = true
-                        child.resolveBounds(allowance)
+                        if (reuse) {
+                            check(child is RetainedLpSolver)
+                            child.resolveBounds(allowance)
+                        } else {
+                            child.solve(null)
+                        }
                     }
                 } catch (failure: Throwable) {
                     if (started) metrics += child.lastMetrics

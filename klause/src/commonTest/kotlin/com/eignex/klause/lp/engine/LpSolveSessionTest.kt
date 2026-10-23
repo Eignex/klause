@@ -14,6 +14,58 @@ import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
     @Test
+    fun `component cursors should cold solve children without resumable support before reusing them`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 5.0, cost = 1.0)
+        val y = builder.addRealVar(0.0, 5.0, cost = 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+        builder.addRealRow(intArrayOf(y), doubleArrayOf(1.0), Relation.GE, 2.0)
+        val model = assertNotNull(
+            LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel(),
+        )
+        var cold = 0
+        var retained = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun solve(warm: Basis?): FloatLpResult? {
+                        cold++
+                        return delegate.solve(warm)
+                    }
+
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        retained++
+                        return delegate.resolveBounds(allowance)
+                    }
+                }
+            }
+        }
+
+        LpSolveSession(LpSolveContext(factory)).use { owner ->
+            repeat(2) {
+                owner.openSolve(model).use { cursor ->
+                    val result = assertIs<LpSolveStep.Completed<CertifiedLpResult>>(cursor.advance()).value
+                    assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+                }
+            }
+        }
+
+        assertEquals(2, cold)
+        assertEquals(2, retained)
+    }
+
+    @Test
     fun `paused solve work should be charged once before certification`() {
         for (split in listOf(false, true)) {
             val builder = LpBuilder()
