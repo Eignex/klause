@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "license": "Apache-2.0",
+  "attribution": "Self-authored Eignex Klause regression fixtures",
+  "cases": [
+    {
+      "sha256": "cddee350e58107b882854c3fb31d6d3a393fd1a9f8af8ce34cd39b12459541c2",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/early-1-sat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "early-1-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "1fa97b80c8d334de81087e630853da4a7aab2aefeeb343f20821fe0b2383e5f3",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/early-1-unsat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "early-1-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "1921818f3e0187e6ef2da56c258113ec700bf8538661befdad0b81a5babff50f",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/early-2-sat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "early-2-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "e5fac173fe4bf20183dc0504fc7ed063d1b5654ac7cd5d6f02e049ead39142f3",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/early-2-unsat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "early-2-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "7740ae0ebc8f50ed8314989eb506ea220f10ecb9a96c8a427dc8a44c57f5d4ec",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/early-4-sat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "early-4-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "bf4b5c8a3f61dc65324ea2a3a17b19c1957351a547a76fbfe204fd23b8b3edc4",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/early-4-unsat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "early-4-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "26bd8ae4a4d1a7bcf266f7cedba2e1f189ecbc6f9b836cacd9a2b5eb5fea7b9a",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/late-1-sat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "late-1-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "9635c7e4e1917daec9f0310d892762174f3863ffe8968e20432474b60f178576",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/late-1-unsat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "late-1-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "f4a47b1fd3aaaf560bf78cc40d817cf076be6672e95d715cc1b64759e17e992a",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/late-2-sat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "late-2-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "dd5d426192cca92735b4394248fee7c16a85d072010d6264481c740f1a2933b7",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/late-2-unsat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "late-2-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "6753d90edc88fabf7937d4dfeb5ebd005835231a2d47e7d186a33c2219c02115",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/late-4-sat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "late-4-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "f2e088a789776ce3d81bfc4df1055e2459ab313b1ec13e2c6679e7b5ec9bc196",
+      "path": "klause-bench/smoke-corpus/qfnra-partial-conflicts-v1/late-4-unsat.smt2",
+      "suite": "smtlib-qfnra-partial-conflicts-v1",
+      "name": "late-4-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    }
+  ]
+}

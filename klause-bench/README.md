@@ -89,6 +89,14 @@ The [fixture manifest](smoke-corpus/qfnra-v1/manifest.json) binds every identity
 its original source SHA-256, license and mathematical expectation. Change names
 for membership or byte changes; preserve version-1 selections.
 
+`qfnra-partial-conflicts-v1` and its matching `smtlib-qfnra-partial-conflicts-v1`
+suite fix 12 guarded numeric-conflict controls. Early and late guards with one,
+two or four unrelated Boolean pairs distinguish pruning before region completion
+from exclusion reuse across prefixes. SAT alternatives and complete UNSAT inputs
+retain 33 real source coordinates. The [fixture notes](smoke-corpus/qfnra-partial-conflicts-v1/README.md)
+and [manifest](smoke-corpus/qfnra-partial-conflicts-v1/manifest.json) define their
+scope, mathematical expectations and pinned source bytes.
+
 `qfnra-source-canonical-v1` selects two canonical negative-constant variants under
 `smtlib-qfnra-source-canonical-v1`: `degeneracy/degree-drop` and
 `degeneracy/equal-degree-common-root`. Their [manifest](smoke-corpus/qfnra-source-canonical-v1/manifest.json)
@@ -712,6 +720,14 @@ observation. When supplied by the selected revision, `progress` records committe
 root snapshots, their latest atom/elimination counts, charged root/search work and
 first regional entry. A missing progress field is unavailable. These scalar
 observations retain no uncommitted formula or partial reconstruction.
+
+Partial-state sign checking exposes exact check/conflict counts and numeric
+exclusion uses/reuses through the same progress record. A supported conflict
+observer retains the first completed conflict's full premise count and a preview
+of at most 16 predicates, each limited to 512 characters. The completeness flag
+distinguishes a full preview from truncated diagnostic text; neither is an exported
+proof or source verdict. A missing observer or an unobserved conflict leaves these
+fields absent. Interrupted and representation-declined checks learn no exclusion.
 
 `prepared=true` selects the unconditioned polynomial formula from
 `SourceSetup.prepare` and records its total query dimensions. The same containing

@@ -1,0 +1,13 @@
+# Frozen version 1 membership. Source hashes: smoke-corpus/qfnra-partial-conflicts-v1/manifest.json
+smtlib-qfnra-partial-conflicts-v1/early-1-sat
+smtlib-qfnra-partial-conflicts-v1/early-1-unsat
+smtlib-qfnra-partial-conflicts-v1/early-2-sat
+smtlib-qfnra-partial-conflicts-v1/early-2-unsat
+smtlib-qfnra-partial-conflicts-v1/early-4-sat
+smtlib-qfnra-partial-conflicts-v1/early-4-unsat
+smtlib-qfnra-partial-conflicts-v1/late-1-sat
+smtlib-qfnra-partial-conflicts-v1/late-1-unsat
+smtlib-qfnra-partial-conflicts-v1/late-2-sat
+smtlib-qfnra-partial-conflicts-v1/late-2-unsat
+smtlib-qfnra-partial-conflicts-v1/late-4-sat
+smtlib-qfnra-partial-conflicts-v1/late-4-unsat

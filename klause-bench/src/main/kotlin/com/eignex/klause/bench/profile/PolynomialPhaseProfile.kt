@@ -240,6 +240,8 @@ internal object PolynomialPhaseProfile {
         private val next = queryType.getMethod("next")
         private val stats = queryType.getMethod("getStats")
         private val progress = queryType.methods.singleOrNull { it.name == "getProgress" }
+        private val partialConflicts = progress?.returnType?.methods?.singleOrNull { it.name == "getPartialConflicts" }
+        private val conflictObserver = queryType.methods.singleOrNull { it.name == "setPartialConflictObserver" }
         private val fixings = Class.forName(prefix + "PolynomialPointFixingsKt").methods.single {
             it.name == "polynomialPointFixings"
         }
@@ -319,11 +321,27 @@ internal object PolynomialPhaseProfile {
             val owner = query.newInstance(original, source.second, source.third,
                 params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance()),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
+            var conflictPremises: Int? = null
+            var conflictPreview: List<String>? = null
+            var conflictPreviewComplete: Boolean? = null
+            val observeConflict: (List<*>) -> Unit = { premises ->
+                if (conflictPremises == null) {
+                    conflictPremises = premises.size
+                    var complete = premises.size <= 16
+                    conflictPreview = premises.take(16).map {
+                        val rendered = it.toString()
+                        if (rendered.length > 512) complete = false
+                        rendered.take(512)
+                    }
+                    conflictPreviewComplete = complete
+                }
+            }
+            conflictObserver?.invoke(owner, observeConflict)
             val checkpoints = ArrayList<PhaseCheckpoint>()
             val start = System.nanoTime()
             var calls = 0L
             var lastProjected = 0L
-            var lastStage: Pair<Long, Long>? = null
+            var lastStage: Triple<Long, Long, Long>? = null
             var result: Any?
             do {
                 result = next.invoke(owner)
@@ -332,8 +350,9 @@ internal object PolynomialPhaseProfile {
                 val projected = snapshot.javaClass.getMethod("getProjectedPolynomials").invoke(snapshot) as Long
                 val observed = progress?.invoke(owner)
                 val stage = observed?.let {
-                    (it.javaClass.getMethod("getSnapshots").invoke(it) as Long) to
-                        (it.javaClass.getMethod("getRegions").invoke(it) as Long)
+                    Triple(it.javaClass.getMethod("getSnapshots").invoke(it) as Long,
+                        it.javaClass.getMethod("getRegions").invoke(it) as Long,
+                        partialConflicts?.invoke(it) as? Long ?: 0L)
                 }
                 if (result != null || (checkpoints.size < 128 &&
                         (calls <= 2 || projected != lastProjected || stage != lastStage))) {
@@ -349,7 +368,9 @@ internal object PolynomialPhaseProfile {
             return PhaseTrace(checkpoints, result.javaClass.simpleName,
                 result.javaClass.methods.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
-                nativeWork, charges - preparationCharges, preparationCharges, stop, source.second, source.third)
+                nativeWork, charges - preparationCharges, preparationCharges, stop, source.second, source.third,
+                partialConflictPremises = conflictPremises, partialConflictPreview = conflictPreview,
+                partialConflictPreviewComplete = conflictPreviewComplete)
         }
     }
 }
@@ -388,6 +409,9 @@ internal data class PhaseTrace(
     val containingDeadlineStack: List<String>?,
     val queryBooleans: Int? = null,
     val queryReals: Int? = null,
+    val partialConflictPremises: Int? = null,
+    val partialConflictPreview: List<String>? = null,
+    val partialConflictPreviewComplete: Boolean? = null,
 )
 
 @Serializable
