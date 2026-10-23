@@ -111,9 +111,12 @@ internal object NumericalResidualReplay {
                     put("verdict", result?.let { NumericalResidualProfile.call(it, "getVerdict").toString() })
                     put("bound", result?.let { NumericalResidualProfile.call(it, "getLowerBound")?.toString() })
                     put("point", result?.let { NumericalResidualProfile.call(it, "getExactPrimal")?.toString() })
-                    put("floatTermination", NumericalResidualProfile.call(active, "getLastFloatTermination")?.toString())
-                    put("metrics", NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getLastMetrics")))
-                    put("scopeMetrics", NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getMetrics")))
+                    put("floatTermination",
+                        NumericalResidualProfile.call(active, "getLastFloatTermination")?.toString())
+                    put("metrics",
+                        NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getLastMetrics")))
+                    put("scopeMetrics",
+                        NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getMetrics")))
                 }
                 if (!retained) {
                     (active as AutoCloseable).close()
