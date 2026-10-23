@@ -564,6 +564,129 @@ class LpPropagatorTest {
     }
 
     @Test
+    fun `cancelled scope synchronization should rebuild from retained authority before a sibling check`() {
+        for (popping in listOf(false, true)) {
+            var cancelNext = false
+            var operationStopped = false
+            var conflicting = false
+            var constructions = 0
+            var closes = 0
+            var editWork = 0L
+            val factory = wrappingFactory { delegate ->
+                constructions++
+                object : PersistentLpSolver by delegate {
+                    private var discarded = false
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                        check(!discarded)
+                        if (cancelNext) {
+                            cancelNext = false
+                            operationStopped = true
+                        }
+                        return delegate.adopt(state, token).also {
+                            if (!it && operationStopped) discarded = true
+                        }
+                    }
+                    override fun close() {
+                        closes++
+                        delegate.close()
+                    }
+                }
+            }
+            val zero = ExactLpNumber.of(0L)
+            val source = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(5L))))),
+                emptyList(),
+                ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+            )
+            val rootPremise = SearchAtomPremise.Asserted(SearchDecision.Bool(0))
+            val policy = object : LpSearchPolicy {
+                override fun propagate(context: SearchContext): ComponentResult =
+                    if (conflicting) ComponentResult.Conflict() else ComponentResult.Consistent
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+            }
+            LpPropagator(
+                policy,
+                solveContext = LpSolveContext(factory),
+                onEdit = { editWork += it },
+            ).use { lp ->
+                assertTrue(lp.install(Any(), source))
+                val session = SearchSession(listOf(lp))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), rootPremise))
+                if (popping) {
+                    assertTrue(lp.atLevel(1))
+                    assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L))))
+                }
+                assertNotNull(lp.solve())
+                val before = assertNotNull(lp.state)
+                val premises = assertNotNull(lp.sourcePremises)
+                val spent = editWork
+                cancelNext = true
+
+                assertFalse(lp.atLevel(if (popping) 0 else 1, Cancellation { operationStopped }))
+
+                assertTrue(operationStopped)
+                assertFalse(session.cancelled())
+                assertSame(before, lp.state)
+                assertSame(premises, lp.sourcePremises)
+                assertEquals(spent + 1L, editWork)
+                assertEquals(1, closes)
+                assertEquals(1, constructions)
+                assertEquals(ComponentCheck.Indeterminate, lp.check(session))
+                assertIs<ComponentResult.Indeterminate>(lp.propagate(session))
+                conflicting = true
+                assertIs<ComponentResult.Indeterminate>(lp.propagate(session))
+                conflicting = false
+                lp.retract(0)
+                assertTrue(lp.atLevel(1, Cancellation.Never))
+                assertEquals(rootPremise, lp.activeBoundPremise(0, false))
+                assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L))))
+                assertEquals(BigFraction.ofLong(2L), assertNotNull(lp.solve()).witness?.objective)
+                assertEquals(2, constructions)
+                assertTrue(operationStopped)
+                assertSame(premises, lp.sourcePremises)
+                assertEquals(ComponentCheck.Feasible, lp.check(session))
+            }
+            assertEquals(2, closes)
+        }
+    }
+
+    @Test
+    fun `a live scope adoption decline should invalidate source authority`() {
+        for (popping in listOf(false, true)) {
+            var reject = false
+            val factory = wrappingFactory { delegate ->
+                object : PersistentLpSolver by delegate {
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                        !reject && delegate.adopt(state, token)
+                }
+            }
+            val zero = ExactLpNumber.of(0L)
+            val source = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(5L))))),
+                emptyList(),
+                ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+            )
+            LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
+                assertTrue(lp.install(Any(), source))
+                if (popping) assertTrue(lp.atLevel(1))
+                assertNotNull(lp.solve())
+                reject = true
+
+                assertFalse(lp.atLevel(if (popping) 0 else 1, Cancellation.Never))
+
+                assertNull(lp.state)
+                assertNull(lp.sourcePremises)
+                assertNull(lp.solve())
+            }
+        }
+    }
+
+    @Test
     fun `row budget decline should not become a feasible neutral check`() {
         val source = ExactLpModel(
             listOf(emptyList()),

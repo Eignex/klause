@@ -102,6 +102,7 @@ internal class LpPropagator(
 
     private var closed = false
     private var invalidated = false
+    private var scopeAlignmentPending = false
     private var nextWitness = 0L
     private var preparedWork = 0L
     private var preparedRefactors = 0L
@@ -208,15 +209,23 @@ internal class LpPropagator(
         val current = owner ?: return false
         if (depth < current.state.depth) {
             onEdit(current.state.model.numVars.toLong())
-            if (!current.pop(depth, token)) return invalidate()
+            if (!current.pop(depth, token)) return declineScope(token)
             retainWitnesses()
         }
         val levels = depth - current.state.depth
         if (levels > 0) {
             onEdit(current.state.model.numVars.toLong() * levels)
-            if (!current.pushTo(depth, token)) return invalidate()
+            if (!current.pushTo(depth, token)) return declineScope(token)
         }
+        scopeAlignmentPending = false
         return true
+    }
+
+    private fun declineScope(token: Cancellation): Boolean {
+        if (!token()) return invalidate()
+        scopeAlignmentPending = true
+        releaseSolver()
+        return false
     }
 
     fun assertBound(
@@ -445,6 +454,7 @@ internal class LpPropagator(
         witnesses.clear()
         nextWitness = 0L
         sourcePremises = LpSourcePremises(requireNotNull(modelKey))
+        scopeAlignmentPending = false
         return true
     }
 
@@ -481,6 +491,7 @@ internal class LpPropagator(
     override fun propagate(context: SearchContext): ComponentResult {
         if (closed || context.cancelled()) return ComponentResult.Indeterminate
         val result = policy.propagate(context)
+        if (scopeAlignmentPending) return ComponentResult.Indeterminate
         if (result !is ComponentResult.Consistent) return result
         val current = state ?: return result
         val conflict = current.conflict ?: return result
@@ -496,7 +507,9 @@ internal class LpPropagator(
     }
 
     override fun check(context: SearchContext): ComponentCheck =
-        if (closed || invalidated || context.cancelled()) ComponentCheck.Indeterminate else policy.check(context)
+        if (closed || invalidated || scopeAlignmentPending || context.cancelled()) {
+            ComponentCheck.Indeterminate
+        } else policy.check(context)
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
         if (closed || context.cancelled()) return null
@@ -549,6 +562,7 @@ internal class LpPropagator(
         val previous = owner
         owner = null
         invalidated = false
+        scopeAlignmentPending = false
         modelKey = null
         proofContext = null
         sourcePremises = null

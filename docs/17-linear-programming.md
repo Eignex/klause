@@ -135,6 +135,11 @@ Batches publish witnesses only for a committed prefix; crossed bounds cite both
 sides, and pop restores bounds and deactivates scoped rows.
 Consecutive empty scopes can share one snapshot while retaining every backjump
 mark and the modeled work of each crossed level. Cancellation keeps the predecessor.
+A scope alignment declined with a stopped token discards its numerical owner and
+retains the immutable predecessor with its source premises and bound witnesses. A
+later operation retries alignment under the containing allowance; policy results
+stay withheld until alignment succeeds. A live adoption decline invalidates the
+installed authority.
 Source comparison batches append neutral definitions together and assert individual
 premised bounds; a crossed-bound prefix retains both contradictory sides.
 Row appends retain validation of identical assertion prefixes when column addresses,
