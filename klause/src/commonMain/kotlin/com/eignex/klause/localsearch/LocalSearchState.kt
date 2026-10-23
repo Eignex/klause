@@ -515,22 +515,31 @@ class LocalSearchState private constructor(
 
     private fun propagateInvariants(net: InvariantNetwork, move: Move, affected: IntArrayList?) {
         val values = definitionValues ?: DefinitionValues(net).also { definitionValues = it }
-        val nodes = affected ?: run {
+        if (affected == null) {
             collectMoveSeeds(move)
             affectedDefinitions(net)
         }
-        for (position in 0 until nodes.size) {
-            val idx = nodes[position]
-            val n = net.node(idx)
-            if (if (n.outIsBool) assumptions.isFrozenBool(n.out) else !moveSink.allowsDefinedInt(n.out)) continue
-            val v = values.eval(idx, assignment, rootDomains)
-            if (v == DefinitionalSweep.SweepNode.NO_WRITE) continue
+        val traversal = checkNotNull(definitionTraversal)
+        var next = traversal.nextPending(values.pending, 0)
+        while (next >= 0) {
+            val idx = next
+            propagateDefinition(net, values, idx)
+            next = traversal.nextPending(values.pending, idx + 1)
+        }
+    }
+
+    private fun propagateDefinition(net: InvariantNetwork, values: DefinitionValues, idx: Int) {
+        val n = net.node(idx)
+        if (if (n.outIsBool) assumptions.isFrozenBool(n.out) else !moveSink.allowsDefinedInt(n.out)) return
+        val v = values.eval(idx, assignment, rootDomains)
+        if (v != DefinitionalSweep.SweepNode.NO_WRITE) {
             if (n.outIsBool) {
                 if (assignment.boolValue(n.out) != (v != 0L)) applyBoolFlip(n.out)
             } else {
                 if (assignment.intValue(n.out) != v) applyIntSet(n.out, v)
             }
         }
+        values.pending.clear(idx)
     }
 
     /**

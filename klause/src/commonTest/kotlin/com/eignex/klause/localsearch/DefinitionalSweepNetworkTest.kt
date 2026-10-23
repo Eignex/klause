@@ -8,6 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
@@ -22,6 +23,28 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class DefinitionalSweepNetworkTest {
+    @Test
+    fun `a changed output should propagate through later definitions across packed words`() {
+        val problem = Problem(1, 71, Array(71) { IntDomain(0, 100) }, emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = InvariantNetwork(
+            List(71) { i ->
+                if (i == 0) DefinitionalSweep.SweepNode.Bool2Int(0, 0)
+                else DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(i, FunctionalObjective.Operand.v(i - 1), FunctionalObjective.Operand.c(1)),
+                    intArrayOf(i - 1),
+                )
+            },
+            71,
+            1,
+        )
+        state.apply(Move.BoolFlip(0))
+
+        state.apply(Move.BoolFlip(0))
+
+        assertEquals(70L, state.assignment.intValue(70))
+    }
+
     @Test
     fun `a rolled back Element selection should not change the next committed evaluation`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 10) }, emptyArray())
@@ -287,6 +310,33 @@ class DefinitionalSweepNetworkTest {
         constraint int_le(s, 6);
         solve satisfy;
     """.trimIndent()
+
+    @Test
+    fun `propagated moves after probes should agree with complete definition sweeps`() {
+        val execution = parseFlatZincExecution(src)
+        val problem = execution.program.problem.bake()
+        val sweep = assertNotNull(execution.definitionalSweep)
+        val state = LocalSearchState(problem, Random(5))
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        sweep.sweep(state.assignment, state.rootDomains)
+        state.recompute()
+        val x = execution.program.intVarsByName.getValue("x")
+        val y = execution.program.intVarsByName.getValue("y")
+        val expected = Assignment(problem.numBoolVars, problem.numIntVars)
+
+        for (i in 0 until 20) {
+            val move = Move.IntSet(if (i % 2 == 0) x else y, (i % 11).toLong())
+            state.netDelta(move)
+            state.apply(move)
+            for (v in 0 until problem.numIntVars) expected.setInt(v, state.assignment.intValue(v))
+            sweep.sweep(expected, state.rootDomains)
+
+            assertContentEquals(
+                LongArray(problem.numIntVars) { expected.intValue(it) },
+                LongArray(problem.numIntVars) { state.assignment.intValue(it) },
+            )
+        }
+    }
 
     @Test
     fun `states sharing a definition network should propagate their own assignments`() {

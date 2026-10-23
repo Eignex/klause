@@ -805,6 +805,8 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
     private val extremumRepairs: BooleanArray = data.extremumRepairs
     private val intReaders: Array<IntArray> = data.intReaders
     private val boolReaders: Array<IntArray> = data.boolReaders
+    private val intWriters: IntArray = data.intWriters
+    private val boolWriters: IntArray = data.boolWriters
 
     internal companion object {
         fun preparation(
@@ -828,15 +830,21 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             yield(null)
             val extremumRepairs = BooleanArray(numIntVars)
             yield(null)
+            val intWriters = IntArray(numIntVars)
+            yield(null)
+            val boolWriters = IntArray(numBoolVars)
+            yield(null)
             val intDefinitions = MutableIntObjectMap<FunctionalObjective.Node>()
             val literalChannels = MutableIntObjectMap<LiteralIntDefinition>()
             val unaryPredicates = MutableIntObjectMap<UnaryPredicateDefinition>()
             val booleanLiterals = MutableIntIntMap()
             val elementResults = MutableIntObjectMap<ElementResultDefinition>()
+            var hasDynamicReaders = false
             for (i in nodeArr.indices) {
                 if (i % INITIALIZATION_BATCH == 0) yield(null)
                 val n = nodeArr[i]
                 if (n.outIsBool) definedBool[n.out] = true else definedInt[n.out] = true
+                if (n.outIsBool) boolWriters[n.out] = i + 1 else intWriters[n.out] = i + 1
                 val intDef = n as? DefinitionalSweep.SweepNode.IntDef
                 if (intDef != null) {
                     intDefinitions.put(n.out, intDef.node)
@@ -847,7 +855,10 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
                 if (n is DefinitionalSweep.SweepNode.BoolFold && n.ins.size == 1) {
                     booleanLiterals.put(n.out, n.ins[0])
                 }
-                if (n is ElementResultDefinition) elementResults.put(n.out, n)
+                if (n is ElementResultDefinition) {
+                    elementResults.put(n.out, n)
+                    hasDynamicReaders = true
+                }
             }
             var intReaders: Array<IntArray>? = null
             for (part in readerPreparation(nodeArr, numIntVars) { it.intInputs }) {
@@ -863,6 +874,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
                     nodeArr, definedInt, definedBool, intDefinitions, literalChannels,
                     unaryPredicates, booleanLiterals, elementResults, extremumRepairs,
                     checkNotNull(intReaders), checkNotNull(boolReaders),
+                    intWriters, boolWriters, hasDynamicReaders,
                 ),
             )
         }
@@ -935,7 +947,11 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
 
     internal fun boolReaders(v: Int): IntArray = boolReaders[v]
 
-    internal val hasDynamicReaders: Boolean = nodeArr.any { it is ElementResultDefinition }
+    internal fun intWriter(v: Int): Int = intWriters[v] - 1
+
+    internal fun boolWriter(v: Int): Int = boolWriters[v] - 1
+
+    internal val hasDynamicReaders: Boolean = data.hasDynamicReaders
 
     internal fun linearDefinition(v: Int): FunctionalObjective.Lin? = intDefinitions[v] as? FunctionalObjective.Lin
 
@@ -1043,4 +1059,7 @@ private class DefinitionIndex(
     val extremumRepairs: BooleanArray,
     val intReaders: Array<IntArray>,
     val boolReaders: Array<IntArray>,
+    val intWriters: IntArray,
+    val boolWriters: IntArray,
+    val hasDynamicReaders: Boolean,
 )
