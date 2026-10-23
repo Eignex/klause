@@ -686,6 +686,9 @@ class LocalSearchState private constructor(
     private var assignmentRevision = 0L
 
     internal val boardCoverage = BoardSwapCoverage()
+    internal val boardRestartInputs: BoardRestartInputs by lazy(LazyThreadSafetyMode.NONE) {
+        BoardRestartInputs.capture(this)
+    }
 
     private fun committedValue(objective: FunctionalObjective): BigInt {
         if (committedObjectiveOf !== objective || committedObjectiveRevision != assignmentRevision) {

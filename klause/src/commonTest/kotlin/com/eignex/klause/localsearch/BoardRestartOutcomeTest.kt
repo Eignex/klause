@@ -112,6 +112,24 @@ class BoardRestartOutcomeTest {
     }
 
     @Test
+    fun `cached board inputs should obey changed assumption pins`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))))
+        val state = freshState(problem, 7L)
+        state.assignment.setInt(1, 1L)
+        state.recompute()
+        val restart = assertNotNull(PreparedBoardRestart.capture(state))
+
+        state.assumptions = Assumptions(ints = mapOf(0 to 1L, 1 to 0L))
+        state.assignment.setInt(0, 1L)
+        state.assignment.setInt(1, 0L)
+        state.recompute()
+        restart.afterPolicy(state)
+        restart.afterPreparation(state)
+
+        assertEquals(BoardRestartOutcome.DeclinedUnavailable, restart.finish(state))
+    }
+
+    @Test
     fun `foreign implicit owners should exclude board inputs from diversification`() {
         val problem = Problem(
             0, 3, Array(3) { IntDomain(0, 2) },
