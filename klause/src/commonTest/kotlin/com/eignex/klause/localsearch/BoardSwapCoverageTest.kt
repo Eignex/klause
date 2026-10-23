@@ -558,6 +558,36 @@ class BoardSwapCoverageTest {
     }
 
     @Test
+    fun `invalidation during selection should withhold a board optimum`() {
+        val initial = state()
+        var optima = 0
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) = Unit
+            override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
+                optima++
+            }
+        }
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            perturbation = { state ->
+                state.recompute()
+                null
+            },
+        )
+        val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
+
+        engine.resumable(
+            LinearObjective(),
+            LocalSearchParams(maxFlips = 1L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
+        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(0, optima)
+    }
+
+    @Test
     fun `an unchanged move should retain board coverage progress`() {
         val state = state()
         val source = SatisfiedStructured.structural(1)
