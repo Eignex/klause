@@ -408,6 +408,10 @@ bounds, and checks source witnesses and recession directions. A strict infimum i
 reported as a limit: a checked strict bound, a closure endpoint and a feasible base
 approached along `endpoint + t * (base - endpoint)`.
 
+Retained exact row multipliers can supply the source bound combination directly.
+The source verifier checks that derivation before admission; missing or rejected
+multipliers fall back to a separate combination solve under the same allowance.
+
 `OpenTheoryPipeline.optimizeLinear` runs a complete affine context in the shared
 search session. A branch optimum becomes global only after every required Boolean
 and integer alternative has a checked bound or refutation; an improving source ray

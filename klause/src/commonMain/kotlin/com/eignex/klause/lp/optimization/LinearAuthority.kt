@@ -104,9 +104,12 @@ internal class LinearAuthority(
         val closureRows = rows.map { ExactRationalInequality(it.columns, it.coefficients, it.rhs) }
         val closure = lp.solve(closureRows, costs, constant, cancellation) ?: return LinearAuthorityResult()
         val bound = closure.lowerBound?.let { value ->
-            lp.combination(rows, costs.map { it.negated() }, constant - value, false, cancellation)?.let { weights ->
+            fun checkBound(weights: List<BigFraction>): SourceEvidence? =
                 checked(SourceClaim.Bound(value * sign), LinearPinnedObjective(derivation(weights)))
-            }
+            val retained = closure.bound?.dualMultipliers?.takeIf { it.size == rows.size }
+                ?.map { it.negated() }?.let(::checkBound)
+            retained ?: lp.combination(rows, costs.map { it.negated() }, constant - value, false, cancellation)
+                ?.let(::checkBound)
         }
         if (closure.verdict == LpVerdict.INFEASIBLE) {
             return LinearAuthorityResult(refutation(closure), bound)
