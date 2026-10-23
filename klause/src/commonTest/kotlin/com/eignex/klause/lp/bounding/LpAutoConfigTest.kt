@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -31,6 +32,39 @@ class LpAutoConfigTest {
         realLower = DoubleArray(realVars),
         realUpper = DoubleArray(realVars) { 1.0 },
     )
+
+    @Test
+    fun `admission should distinguish size refusal from disabled bounding`() {
+        for ((ceiling, spec, expected) in listOf(
+            Triple(1L, "default", false to true),
+            Triple(64L, "off", true to false),
+            Triple(64L, "default", true to true),
+        )) {
+            val p = Problem(0, 2, Array(2) { IntDomain(0, 5) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2)),
+                settings = ProblemSettings(lpCeilingTableauCells = ceiling))
+            val config = LpConfig.parse(spec)
+
+            val admission = LpAutoConfig.admission(p, config, LpPlan())
+
+            assertEquals(expected.first, admission.withinCeiling)
+            assertEquals(expected.second, admission.boundingPermitted)
+            assertEquals(LpAutoConfig.resolve(p, config), admission.plan)
+        }
+    }
+
+    @Test
+    fun `admission should retain explicit bounding above the ceiling`() {
+        val p = Problem(0, 2, Array(2) { IntDomain(0, 5) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+
+        val admission = LpAutoConfig.admission(p, LpConfig.parse("off"), LpPlan(bounding = true))
+
+        assertTrue(admission.explicitBounding)
+        assertTrue(admission.plan.bounding)
+        assertFalse(admission.withinCeiling)
+    }
 
     @Test
     fun `linear structure should enable the bounding stack and permitted cuts`() {

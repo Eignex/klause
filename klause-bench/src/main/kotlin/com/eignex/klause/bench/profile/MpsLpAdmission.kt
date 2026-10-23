@@ -13,6 +13,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -84,8 +85,8 @@ internal object MpsLpAdmission {
             })
             put("lpMaxTableauCells", problem.settings.lpMaxTableauCells)
             put("lpCeilingTableauCells", problem.settings.lpCeilingTableauCells)
-            put("defaultPlan", LpAutoConfig.resolve(problem, LpConfig.AUTO).toString())
-            put("aggressivePlan", LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE).toString())
+            put("defaultAdmission", admission(problem, LpConfig.AUTO))
+            put("aggressiveAdmission", admission(problem, LpConfig.AGGRESSIVE))
             put("full", shape(problem, objective, false, stop))
             put("objectiveCone", shape(problem, objective, true, stop))
             put("javaVersion", System.getProperty("java.version"))
@@ -97,6 +98,20 @@ internal object MpsLpAdmission {
         }
         out.resolve("admission.json").writeText("$report\n")
         println(report)
+    }
+
+    private fun admission(problem: Problem, config: LpConfig): JsonObject {
+        val method = LpAutoConfig.javaClass.methods.single { it.name.startsWith("admission$") }
+        val observed = method.invoke(LpAutoConfig, problem, config, LpPlan())
+        return buildJsonObject {
+            for (name in listOf("EstimatedRows", "EstimatedColumns", "EstimatedCells")) {
+                put(name.replaceFirstChar { it.lowercase() }, get(observed, name) as Long)
+            }
+            for (name in listOf("StructurallyApplicable", "BoundingPermitted", "WithinCeiling", "ExplicitBounding")) {
+                put(name.replaceFirstChar { it.lowercase() }, get(observed, name) as Boolean)
+            }
+            put("plan", get(observed, "Plan").toString())
+        }
     }
 
     private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean, stop: Cancellation): JsonObject {
