@@ -928,6 +928,24 @@ small-source wins/four losses, three large-source wins/six losses, three gbac
 wins/four losses/two ties and nine photo ties. All 72 witnesses pass source
 checking. Replacing sampled descent from first feasibility remains unsupported.
 
+[7757](https://lab.eignex.com/jobs/7757) starts coverage at the first sampled miss,
+inside the original resample window. Its fixed-work original-team pairs have ten
+wins/six losses; controls tie throughout. Default [7758](https://lab.eignex.com/jobs/7758)
+has six small-source wins/three losses and four large-source wins/five losses.
+All 136 witnesses pass source checking.
+
+Restricting coverage to strict descent at `46de073f60` preserves sampled annealing.
+Fixed-work [7759](https://lab.eignex.com/jobs/7759) reproduces those paired objectives
+at 1600 moves per case, with all control pairs tied. Default
+[7760](https://lab.eignex.com/jobs/7760) has seven small-source wins/one loss/one tie,
+four large-source wins/five losses, one gbac win/five losses/three ties and nine
+photo ties. All 136 witnesses pass source checking. The broader default check
+[7761](https://lab.eignex.com/jobs/7761) uses every seed from one through ten, twice:
+small-source pairs have ten wins/nine losses/one tie and mean improvement 14;
+large-source pairs have eleven wins/nine losses but mean loss 572.6. Gbac has
+eight wins/nine losses/three ties and photo twenty ties. All 160 witnesses pass
+source checking. These tradeoffs do not support a default improvement claim.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;
