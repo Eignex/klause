@@ -159,6 +159,8 @@ feedback snapshot:
   best assignment, or iterated local search over a population of feasible basin anchors.
   Learned weights survive restarts; the assignment, tabu clock and
   configuration-checking flags reset.
+  Retained board perturbations preserve searched-input structure through
+  [restart preparation](11-neighborhoods.md#restart-anchors).
 
 ### Tabu and configuration checking
 

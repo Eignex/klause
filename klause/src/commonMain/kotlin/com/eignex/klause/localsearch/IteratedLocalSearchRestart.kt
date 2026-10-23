@@ -60,7 +60,8 @@ class IteratedLocalSearchRestart(
     /** Perturbation kind for the kick from a feasible anchor. [PerturbationKind.Uniform]
      *  scatters single-variable mutations across the problem; [PerturbationKind.BasinHopping]
      *  randomises every variable of a small set of randomly-picked factors, producing a
-     *  coordinated jump biased toward escaping the current basin. */
+     *  coordinated jump biased toward escaping the current basin. On board models, kicks use
+     *  complete searched-input swaps: one factor attempt for BasinHopping, two input slots for Uniform. */
     val perturbationKind: PerturbationKind = PerturbationKind.Uniform,
     /** When true, crossover transfers entire factor scopes at once instead of mixing
      *  per-variable, preserving co-adapted assignments that uniform recombination would
@@ -85,6 +86,16 @@ class IteratedLocalSearchRestart(
     var perturbationStrength: Int = initialPerturbationStrength
         private set
     private var stallCount: Int = 0
+    private var boardRestart: RetainedBoardRestart? = null
+
+    /** Whether the last retained restart changed admissible searched board inputs. The engine
+     *  refreshes this after restart preparation. `false` explicitly declines board diversification;
+     *  `null` denotes an unanchored or non-board restart. */
+    var lastBoardDiversificationChanged: Boolean? = null
+        private set
+
+    internal var preservesImplicitOnRestart: Boolean = false
+        private set
 
     // Pending bandit decision, rewarded at the next candidate anchor by whether the population best
     // improved since (delayed credit, the standard meta-bandit signal). -1 = nothing pending.
@@ -113,6 +124,9 @@ class IteratedLocalSearchRestart(
     override fun reset() {
         population.clear()
         stallCount = 0
+        boardRestart = null
+        lastBoardDiversificationChanged = null
+        preservesImplicitOnRestart = false
         perturbationStrength = initialPerturbationStrength
         pendingArm = -1
         pendingContext = null
@@ -183,6 +197,9 @@ class IteratedLocalSearchRestart(
     }
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+        boardRestart = if (population.isNotEmpty() || bestSoFar != null) RetainedBoardRestart.capture(state) else null
+        lastBoardDiversificationChanged = null
+        preservesImplicitOnRestart = false
         // Crossover restart: recombine two random population members; skips perturbation since
         // crossover itself diversifies. Only fires with ≥2 incumbents.
         if (population.size >= 2 && state.rng.nextDouble() < crossoverRate) {
@@ -190,14 +207,27 @@ class IteratedLocalSearchRestart(
             val probA = crossoverBias.probParentA(parentA.objective, parentB.objective)
             val child = biasedCrossover(state, parentA.sample, parentB.sample, probA, state.rng)
             applyChild(state, child)
+            finishRestart(state)
             return
         }
         val anchor = pickAnchor(state) ?: bestSoFar
         if (anchor == null) {
             state.restart()
         } else {
-            anchorAndPerturb(state, anchor, perturbationStrength, perturbationKind)
+            val board = boardRestart
+            if (board == null) {
+                anchorAndPerturb(state, anchor, perturbationStrength, perturbationKind)
+            } else {
+                anchorAndPerturb(state, anchor, 0, perturbationKind)
+                board.perturb(state, perturbationStrength, perturbationKind)
+                preservesImplicitOnRestart = RetainedBoardRestart.canPreserveOwners(state)
+            }
         }
+        finishRestart(state)
+    }
+
+    internal fun finishRestart(state: LocalSearchState) {
+        lastBoardDiversificationChanged = boardRestart?.changed(state)
     }
 
     private fun pickAnchor(state: LocalSearchState): Sample? {
@@ -294,6 +324,9 @@ class IteratedLocalSearchRestart(
         val problem = state.problem
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, child.boolValue(b))
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, child.intValue(i))
+        state.assumptions.forEachBool { variable, value -> state.assignment.setBool(variable, value) }
+        state.assumptions.forEachInt { variable, value -> state.assignment.setInt(variable, value) }
+        state.resetStepCounters()
         state.recompute()
     }
 
