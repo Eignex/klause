@@ -1008,6 +1008,23 @@ independently certify native optimality.
 
 ### Numerical kernel decisions
 
+[Session replay 7872](https://lab.eignex.com/jobs/7872) compares cumulative-work
+rebuilds on identical MPS residuals. Disabling that trigger reduces cap64's median
+two-cold-query lifecycle from 1.623 s to 0.793 s, retaining its native feasible
+package while charging 2.5 times the LP work. The engine keeps its existing
+backend-independent allowance price. These Mac/aarch64 JFR timings establish no
+ordinary source gain. With source-matched unbounded work,
+[7875](https://lab.eignex.com/jobs/7875) reaches 3150 dsbmip pivots per two seconds
+against about 1696; both remain indeterminate.
+
+[Control 7877](https://lab.eignex.com/jobs/7877) certifies all ones at objective 40
+on a near-dependent 40-row model under both policies. Forced dense construction
+at 2.5–5% basis density increases median cold lifecycle from 1.856 ms to 2.499 ms;
+the dense admission envelope stays at order six. The same attribution records
+5945 dense-hint dsbmip BTRAN calls with total RHS support two, motivating the
+empty-RHS path's zero-visit solve. Larger adaptive transpose solves retain their
+reach and density guards.
+
 Retained exact feasibility reuses a fully imported tableau across compatible bound
 assertions and retractions under cumulative resource limits. In the Mac/aarch64
 overflow comparison [7786](https://lab.eignex.com/jobs/7786), continuation builds
