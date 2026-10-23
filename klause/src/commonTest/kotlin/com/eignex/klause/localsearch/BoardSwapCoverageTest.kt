@@ -377,6 +377,28 @@ class BoardSwapCoverageTest {
     }
 
     @Test
+    fun `annealing should preserve sampled structured generation`() {
+        val initial = state()
+        val requested = mutableListOf<Boolean>()
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
+            acceptance = AcceptanceRule.Metropolis,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            perturbation = { state ->
+                requested.add(state.boardCoverage.requested)
+                null
+            },
+        )
+
+        LocalSearchEngine(initial.model, strategy = strategy).resumable(
+            LinearObjective(),
+            LocalSearchParams(maxFlips = 2L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
+        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(listOf(false, false), requested)
+    }
+
+    @Test
     fun `disabled retained generation should preserve sampled candidates and random draws`() {
         val sampled = state()
         val deferred = state()
