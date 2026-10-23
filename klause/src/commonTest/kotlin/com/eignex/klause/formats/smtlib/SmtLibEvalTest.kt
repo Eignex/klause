@@ -1,12 +1,82 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SmtLibEvalTest {
+    @Test
+    fun `nested Boolean chains should share the flat gate definition`() {
+        for (operator in listOf("and", "or")) {
+            val builder = Compiler.Builder(DEFAULT_UNBOUNDED_INT_LO, DEFAULT_UNBOUNDED_INT_HI, strictBounds = false)
+            SExprReader("(declare-const a Bool) (declare-const b Bool) " +
+                "(declare-const c Bool) (declare-const d Bool)").readAll().forEach(builder::command)
+
+            val nested = builder.compileBool(SExprReader("($operator ($operator a b) ($operator c d))")
+                .readAll().single())
+            val flat = builder.compileBool(SExprReader("($operator a b c d)").readAll().single())
+
+            assertEquals(nested, flat)
+            assertEquals(5, builder.nextBool)
+        }
+    }
+
+    @Test
+    fun `Boolean chain operands should retain let and helper scopes`() {
+        for ((operator, expected) in listOf("and" to false, "or" to true)) {
+            val source = SmtLib.parse(
+                """
+                    (declare-const a Bool) (declare-const b Bool) (declare-const result Bool)
+                    (define-fun value ((p Bool)) Bool ($operator a p))
+                    (assert (= a false)) (assert (= b false))
+                    (assert (let ((a true))
+                        (= result ($operator ($operator (value b) a)
+                            (let ((a b) (b a)) ($operator a b))))))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(source.model).solve()
+
+            assertEquals(expected, assertIs<OpenTheoryResult.Sat>(result).assignment
+                .boolValue(source.boolVarNames.getValue("result")))
+        }
+    }
+
+    @Test
+    fun `cancelled Boolean chain expansion should not emit a gate`() {
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 4L
+            override fun charge(units: Long) { charged += units }
+        }
+        val builder = Compiler.Builder(DEFAULT_UNBOUNDED_INT_LO, DEFAULT_UNBOUNDED_INT_HI,
+            strictBounds = false, sourceCancellation = stop)
+        val expression = SExprReader("(and (and true true) (and true true))").readAll().single()
+
+        assertFailsWith<PolynomialSourceInterrupted> { builder.compileBool(expression) }
+
+        assertEquals(0, builder.nextBool)
+        assertTrue(builder.factors.isEmpty())
+    }
+
+    @Test
+    fun `Boolean chain operands should report the first malformed expression`() {
+        val builder = Compiler.Builder(DEFAULT_UNBOUNDED_INT_LO, DEFAULT_UNBOUNDED_INT_HI, strictBounds = false)
+        val expression = SExprReader("(and false (and (not true false) (ite true true)))").readAll().single()
+
+        val error = assertFailsWith<UnsupportedSmtException> { builder.compileBool(expression) }
+
+        assertTrue(error.message!!.contains("not expects 1 argument"))
+    }
+
     @Test
     fun `recursive helpers should be rejected before body expansion`() {
         for (source in listOf(

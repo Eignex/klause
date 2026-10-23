@@ -56,6 +56,8 @@ private sealed interface Frame {
     object PopScope : Frame
 }
 
+private const val MAX_ASSOCIATIVE_BOOL_OPERANDS = 65_536
+
 /**
  * Fold [root] to a [Res] of the requested [sort], driven by an explicit heap work-stack rather than the
  * call stack: SMT-LIB formulas nest thousands of operators deep, which overflows the stack under
@@ -199,7 +201,9 @@ private fun Compiler.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pai
                 args.map { it to Sort.BOOL }
             }
 
-            "and", "or", "xor", "=>" -> args.map { it to Sort.BOOL }
+            "and", "or" -> associativeBoolChildren(head, args)
+
+            "xor", "=>" -> args.map { it to Sort.BOOL }
 
             "<=", "<", ">=", ">" ->
                 args.map { it to (if (isRealRelation(node)) Sort.REAL else Sort.INT) }
@@ -275,6 +279,33 @@ private fun Compiler.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pai
     return kids ?: smtUnsupported(
         "unsupported ${if (sort == Sort.BOOL) "boolean" else "int"} op '$head'",
     )
+}
+
+private fun Compiler.Builder.associativeBoolChildren(head: String, args: List<SExpr>): List<Pair<SExpr, Sort>> {
+    if (args.size > MAX_ASSOCIATIVE_BOOL_OPERANDS) return args.map { it to Sort.BOOL }
+    val pending = ArrayDeque<SExpr>()
+    for (index in args.indices.reversed()) {
+        sourceCancellation.polynomialSourceCheckpoint(1)
+        pending.addLast(args[index])
+    }
+    val children = ArrayList<Pair<SExpr, Sort>>()
+    while (pending.isNotEmpty()) {
+        sourceCancellation.polynomialSourceCheckpoint(1)
+        val child = pending.removeLast()
+        val nested = child as? SExpr.SList
+        val nestedHead = (nested?.items?.firstOrNull() as? SExpr.Atom)?.text
+        if (nested != null && nestedHead == head && head !in macros &&
+            nested.items.size - 1 <= MAX_ASSOCIATIVE_BOOL_OPERANDS - children.size - pending.size
+        ) {
+            for (index in nested.items.lastIndex downTo 1) {
+                sourceCancellation.polynomialSourceCheckpoint(1)
+                pending.addLast(nested.items[index])
+            }
+        } else {
+            children.add(child to Sort.BOOL)
+        }
+    }
+    return children
 }
 
 private fun iteChildren(args: List<SExpr>, resultSort: Sort): List<Pair<SExpr, Sort>> {

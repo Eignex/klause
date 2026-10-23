@@ -193,7 +193,11 @@ at their command. The binding tables are discarded after lowering.
 
 Boolean lowering folds constants and literal identities in AND, OR and IFF, so
 empty, duplicate and complementary operands keep their meaning without extra
-gates. Repeated AND/OR gates share a definition for the same signed inputs, independently
+gates. Syntactically nested AND or OR operands of the same operator are flattened
+before reification, preserving their order and leaving bindings and helper calls
+as separate operands. Expansion charges the source cancellation token and keeps
+at most 65,536 pending and retained operands; wider subtrees keep their own gates.
+Repeated AND/OR gates share a definition for the same signed inputs, independently
 of operand order. IFF also shares simultaneous input negation. The table belongs
 to one parser builder, retains the first definition's ownership and uses at most
 65,536 key entries, charging each gate's arity plus one. Lookup and normalization
