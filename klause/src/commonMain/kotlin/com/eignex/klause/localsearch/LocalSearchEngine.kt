@@ -1223,6 +1223,7 @@ internal class LocalSearchEngine(
         checkpoint: LocalSearchCheckpoint?,
         onPause: () -> Unit,
     ) = state.phaseTimer.inPhase("seeding") {
+        state.boardCoverage.invalidate()
         restarts.restart(state, anchor)
         if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params, checkpoint, onPause)
     }
