@@ -9,6 +9,30 @@ import kotlin.test.assertTrue
 
 class RefactorPolicyTest {
     @Test
+    fun `cumulative solve work should request a rebuild after the adaptive minimum`() {
+        val policy = RefactorPolicy()
+        policy.recordFactorization(factorNnz = 100, buildWork = 100L, pivotSpread = 0.5)
+        repeat(8) {
+            policy.recordBasisSolve(20L)
+            policy.recordAcceptedUpdate(1L)
+        }
+
+        assertEquals(EngineRefactorTrigger.SYNTHETIC_WORK, policy.chooseAtSafePoint(8, 100))
+    }
+
+    @Test
+    fun `disabled cumulative work should not request a rebuild for unchanged solve costs`() {
+        val policy = RefactorPolicy(RefactorPolicyConfig(syntheticWorkEnabled = false))
+        policy.recordFactorization(factorNnz = 100, buildWork = 100L, pivotSpread = 0.5)
+        repeat(8) {
+            policy.recordBasisSolve(20L)
+            policy.recordAcceptedUpdate(1L)
+        }
+
+        assertNull(policy.chooseAtSafePoint(8, 100))
+    }
+
+    @Test
     fun `hard cap should trigger exactly after sixty four accepted updates`() {
         val policy = RefactorPolicy()
         policy.recordFactorization(factorNnz = 100, buildWork = 10_000L, pivotSpread = 0.5)

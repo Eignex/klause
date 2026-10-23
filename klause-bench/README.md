@@ -581,6 +581,11 @@ timing; result serialization follows each timed call.
 of order at most 64, recording input dimension and density together. This diagnostic
 does not change production dense selection. Captures contain no original warm factors;
 replay and instrumented timings are separate from whole-source measurements.
+With `dense=false`, optional `synthetic="compare"` pairs the default numerical
+policy with cumulative-work refactorization disabled. Residual, fill, solve-work
+growth, backend requests and hard update limits retain their production settings.
+This construction-only diagnostic keeps the default policy enabled in ordinary
+solves and records each intervention separately from the dense comparison.
 
 Profile mains live in `com.eignex.klause.bench.profile` and run as a `lab profile`
 job: the lab builds the named commit and runs the class once under JFR, keeping what

@@ -122,6 +122,7 @@ internal class RevisedSimplex(
     private val reuseRationalOrder: Boolean = true,
     private val scalingOptions: LpScalingOptions = LpScalingOptions(),
     private val primalPricingTolerance: Double = TOL,
+    private val syntheticWorkEnabled: Boolean = true,
 ) : TableauCutSolver,
     PersistentLpSolver {
     internal val lastDevexWeightCorrections: Int get() = observations.lastDevexWeightCorrections
@@ -254,7 +255,12 @@ internal class RevisedSimplex(
     internal val scaleVersion: Long get() = numerical.version
 
     private val basisRepairer = EngineBasisRepairer()
-    private var refactorPolicy = RefactorPolicy(RefactorPolicyConfig(hardUpdateCap = refactorUpdateLimit))
+    private var refactorPolicy = RefactorPolicy(
+        RefactorPolicyConfig(
+            hardUpdateCap = refactorUpdateLimit,
+            syntheticWorkEnabled = syntheticWorkEnabled,
+        ),
+    )
     private var pendingSolveQuality: BasisSolveQuality? = null
 
     internal val lastBasisRepairMetrics: BasisRepairMetrics get() = basisRepairer.metrics
@@ -984,7 +990,12 @@ internal class RevisedSimplex(
         rowIdx = columns.copyRowIndices()
         colVal = columns.values
         rebuildRowView()
-        refactorPolicy = RefactorPolicy(RefactorPolicyConfig(hardUpdateCap = refactorUpdateLimit))
+        refactorPolicy = RefactorPolicy(
+            RefactorPolicyConfig(
+                hardUpdateCap = refactorUpdateLimit,
+                syntheticWorkEnabled = syntheticWorkEnabled,
+            ),
+        )
         // Artificial sides are scaled values of the retired view.
         clearArtificialBounds()
         invalidateBasisDependentState()
