@@ -9439,7 +9439,6 @@ final class com.eignex.klause.localsearch/IteratedLocalSearchRestart : com.eigne
 
     final var lastBoardRestartOutcome // com.eignex.klause.localsearch/IteratedLocalSearchRestart.lastBoardRestartOutcome|{}lastBoardRestartOutcome[0]
         final fun <get-lastBoardRestartOutcome>(): com.eignex.klause.localsearch/BoardRestartOutcome? // com.eignex.klause.localsearch/IteratedLocalSearchRestart.lastBoardRestartOutcome.<get-lastBoardRestartOutcome>|<get-lastBoardRestartOutcome>(){}[0]
-
     final var perturbationStrength // com.eignex.klause.localsearch/IteratedLocalSearchRestart.perturbationStrength|{}perturbationStrength[0]
         final fun <get-perturbationStrength>(): kotlin/Int // com.eignex.klause.localsearch/IteratedLocalSearchRestart.perturbationStrength.<get-perturbationStrength>|<get-perturbationStrength>(){}[0]
 

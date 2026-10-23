@@ -66,6 +66,7 @@ internal class LocalSearchEngine(
         fun release() {
             if (released) return
             released = true
+            preparedBoardRestart = null
             searchOwned.store(false)
         }
     }
