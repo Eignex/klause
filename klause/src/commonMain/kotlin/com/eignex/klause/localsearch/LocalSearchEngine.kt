@@ -798,7 +798,10 @@ internal class LocalSearchEngine(
                 val invariant = state.factors[fid] as? AllDifferentInvariant ?: continue
                 proposals.clear()
                 proposals.proposer = fid
-                invariant.coverageProbeMoves(state, proposals)
+                if (!invariant.coverageProbeMoves(state, proposals)) {
+                    complete = false
+                    break
+                }
                 for (move in proposals.list) {
                     if (tested >= 8192 || params.cancellation()) {
                         complete = false
@@ -1076,6 +1079,10 @@ internal class LocalSearchEngine(
                         feasibleMisses = 0
                         if (state.cost == 0L && liveCompletion == null) {
                             val rescue = coverageProbe()
+                            if (params.cancellation()) {
+                                cancelCountdown = 0
+                                continue
+                            }
                             if (coverageRescue && rescue != null) {
                                 val beforeObjective = objective.evaluate(state.assignment)
                                 state.apply(rescue)

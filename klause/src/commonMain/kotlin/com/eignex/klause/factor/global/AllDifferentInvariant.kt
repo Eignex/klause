@@ -299,8 +299,8 @@ internal class AllDifferentInvariant(
         }
     }
 
-    internal fun coverageProbeMoves(state: LocalSearchState, sink: MoveSink) {
-        require(vars.size <= 64)
+    internal fun coverageProbeMoves(state: LocalSearchState, sink: MoveSink): Boolean {
+        if (vars.size > 64) return false
         for (ai in vars.indices) for (bi in ai + 1 until vars.size) {
             val a = vars[ai]
             val b = vars[bi]
@@ -310,6 +310,7 @@ internal class AllDifferentInvariant(
             if (va == vb || vb !in state.rootDomains[a] || va !in state.rootDomains[b]) continue
             sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
         }
+        return true
     }
 
     override fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
