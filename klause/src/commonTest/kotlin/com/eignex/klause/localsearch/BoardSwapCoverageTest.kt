@@ -257,6 +257,20 @@ class BoardSwapCoverageTest {
         assertEquals(first, sink.list)
     }
 
+    @Test
+    fun `a frozen board should leave the bounded draw available to searched boards`() {
+        val state = state()
+        state.assumptions = Assumptions(ints = (0 until 5).associateWith { it.toLong() })
+        val sink = MoveSink(state.assumptions)
+
+        SatisfiedStructured.structural(1).generate(state, sink)
+
+        assertEquals(4, sink.list.size)
+        for (move in sink.list) {
+            assertTrue((move as Move.Compound).parts.all { (it as Move.IntSet).varId >= 5 })
+        }
+    }
+
     private fun state(): LocalSearchState {
         val problem = Problem(
             0, 10, Array(10) { IntDomain(0, 4) },

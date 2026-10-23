@@ -1018,7 +1018,7 @@ internal class LocalSearchEngine(
                         // feasibleResampleCap times before diversifying — a restart here discards the current
                         // feasible solution. cap == 0 restarts immediately (exhaustive-generation semantics).
                         if (state.boardCoverage.pending || feasibleMisses < feasibleResampleCap) {
-                            feasibleMisses++
+                            if (feasibleMisses < feasibleResampleCap) feasibleMisses++
                             flipsSinceRestart++
                             totalFlips++
                             continue
