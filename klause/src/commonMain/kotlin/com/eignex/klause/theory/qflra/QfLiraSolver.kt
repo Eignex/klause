@@ -109,6 +109,7 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.negate
 import com.eignex.klause.util.rem
 import com.eignex.klause.util.toLongExact
+import kotlin.time.TimeSource
 
 /** An exact integer/rational witness for an open QF_LIRA or QF_LIA model. */
 class ExactLiraAssignment(
@@ -240,6 +241,10 @@ class ExactLiraSearchComponent private constructor(
     private val partialLinearDeclines = HashMap<PreparedSourceRow, PartialLinearInputs>()
     private var partialLinearEvaluations = 0L
     private var partialLinearUnchanged = 0L
+    private var partialLinearCost = false
+    private var partialLinearProducerNs = 0L
+    private var partialLinearAssertionNs = 0L
+    private var partialLinearNumericalNs = 0L
     private var sourceInstalled = false
     private var graphFirst = false
     private var solveContext = LpSolveContext.Production
@@ -438,7 +443,23 @@ class ExactLiraSearchComponent private constructor(
     internal val partialLinearPropagationStats: PartialLinearPropagationStats
         get() = PartialLinearPropagationStats(partialLinearCandidates?.size ?: 0,
             partialLinearInvocations, partialLinearVisited, partialLinearEligible,
-            partialLinearDeductions, partialLinearDeferrals, partialLinearEvaluations, partialLinearUnchanged)
+            partialLinearDeductions, partialLinearDeferrals, partialLinearEvaluations, partialLinearUnchanged,
+            partialLinearProducerNs, partialLinearAssertionNs, partialLinearNumericalNs)
+
+    internal fun observePartialLinearCost() {
+        check(context == null || context?.decisionLevel == 0)
+        partialLinearCost = true
+    }
+
+    private inline fun <T> measurePartialLinearPhase(record: (Long) -> Unit, action: () -> T): T {
+        if (!partialLinearCost) return action()
+        val started = TimeSource.Monotonic.markNow()
+        return try {
+            action()
+        } finally {
+            record(started.elapsedNow().inWholeNanoseconds)
+        }
+    }
 
     internal fun reusePartialLinearDeclines() {
         check(context == null || context?.decisionLevel == 0)
@@ -472,7 +493,14 @@ class ExactLiraSearchComponent private constructor(
         return candidates.toList().also { partialLinearCandidates = it }
     }
 
-    private fun derivePartialLinearImplications(current: SearchContext, applyLocally: Boolean): PartialLinearProbe {
+    private fun derivePartialLinearImplications(current: SearchContext, applyLocally: Boolean): PartialLinearProbe =
+        measurePartialLinearPhase({ partialLinearProducerNs += it }) {
+            derivePartialLinearImplicationsWithin(current, applyLocally)
+        }
+
+    private fun derivePartialLinearImplicationsWithin(
+        current: SearchContext, applyLocally: Boolean,
+    ): PartialLinearProbe {
         var visited = 0
         var eligible = 0
         var unexplained = 0
@@ -1336,7 +1364,7 @@ class ExactLiraSearchComponent private constructor(
                 else -> Unit
             }
         }
-        val asserted = assertSource(context)
+        val asserted = measurePartialLinearPhase({ partialLinearAssertionNs += it }) { assertSource(context) }
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
@@ -1351,7 +1379,9 @@ class ExactLiraSearchComponent private constructor(
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
-        val result = lp.solve(sparsePointRecovery = true)
+        val result = measurePartialLinearPhase({ partialLinearNumericalNs += it }) {
+            lp.solve(sparsePointRecovery = true)
+        }
         if (complete) {
             val key = if (result == null) "NO_RESULT" else listOf(
                 result.verdict.name,
