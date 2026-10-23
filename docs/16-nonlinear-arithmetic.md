@@ -289,8 +289,10 @@ complete CAD available.
 **2. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
 enumerates source implicants: assignments of Boolean leaves and signed numeric
 predicates that make the formula true. Propagation treats numeric predicates as
-opaque leaves, a proof scan keeps only supporting literals, and private exclusion
-clauses prevent revisiting a region without entering shared learning.
+opaque leaves. Root, constant and empty-junction facts seed propagation; each
+assignment schedules its affected parents. A proof scan keeps only supporting
+literals, and private exclusion clauses prevent revisiting a region without
+entering shared learning.
 
 **3. Regional reduction and projection.** Each region's signed predicates form a
 conjunction. Ordered polynomial remainders simplify other predicates modulo the

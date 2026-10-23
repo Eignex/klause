@@ -43,12 +43,14 @@ internal class PolynomialBooleanPropagation(
                 is FormulaNode.BooleanVariable -> leaves.add(index)
                 else -> Unit
             }
-            enqueue(index)
         }
         for ((index, node) in nodes.withIndex()) {
             arithmetic.step()
             if (node is FormulaNode.Atom) leaves.add(index)
             if (node is FormulaNode.Constant && !assign(index, if (node.value) TRUE else FALSE)) return false
+            if (node is FormulaNode.Junction && node.children.isEmpty() &&
+                !assign(index, if (node.conjunction) TRUE else FALSE)
+            ) return false
         }
         return assign(root, TRUE)
     }
