@@ -156,6 +156,7 @@ internal fun continueExactLp(
         var result = session.resume(
             limits.copy(maxPivots = minOf(shortPivots, limits.maxPivots)),
             cancellation,
+            replacement = authority.input,
         )
         metrics = result.metrics
         if (fullEffort && result.metrics.decline == ContinuationDecline.PIVOTS && limits.maxPivots > shortPivots) {
@@ -375,10 +376,18 @@ private fun selectContinuation(
             key != null && cache.key?.contentEquals(key) == true
         }
         val matching = sameAuthority && cache.headings == headings && cache.statuses == statuses
+        val retained = model.exactState?.let { state ->
+            cache.state?.let { previous ->
+                previous.baseModel === state.baseModel && previous.sameMatrix(state) &&
+                    previous.objectiveRevision == state.objectiveRevision && cache.continuation?.canRebind == true
+            }
+        } == true
         budget.step()
         if (!matching) {
-            invalidated = cache.headings != null
-            cache.clear()
+            if (!retained) {
+                invalidated = cache.headings != null
+                cache.clear()
+            }
             cache.state = model.exactState
             cache.key = key
             cache.headings = headings

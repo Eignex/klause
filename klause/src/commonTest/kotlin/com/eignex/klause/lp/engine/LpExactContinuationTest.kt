@@ -6,6 +6,7 @@ import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -254,6 +255,9 @@ class LpExactContinuationTest {
             ExactLpObjective(listOf(zero, zero)),
         )
         val trail = LpBoundTrail(source)
+        val cache = LpExactContinuationCache()
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FREE))
+        assertNotNull(continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache).witness)
         assertTrue(trail.assertBound(0, false, ExactLpSide(zero, strict = true), 11L))
         assertTrue(trail.assertBound(1, false, ExactLpSide(zero), 12L))
         val state = trail.state
@@ -261,6 +265,7 @@ class LpExactContinuationTest {
         val result = continueExactLp(
             assertNotNull(state.toWorkingModel()),
             Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER)),
+            cache,
         )
 
         assertNull(result.witness)
@@ -293,7 +298,72 @@ class LpExactContinuationTest {
 
         assertTrue(assertNotNull(strict.witness).primal.single() > BigFraction.ZERO)
         assertEquals(BigFraction.ZERO, assertNotNull(closed.witness).primal.single())
-        assertTrue(closed.metrics.invalidated)
+        assertFalse(closed.metrics.invalidated)
+    }
+
+    @Test
+    fun `retracting conflicting bounds should restore a coupled source witness`() {
+        val source = assertNotNull(LpBuilder().apply {
+            addVar(0L, 10L)
+            addVar(0L, 10L)
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        val basis = Basis(intArrayOf(2), arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC))
+        val cache = LpExactContinuationCache()
+        assertNotNull(continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache).witness)
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
+        val conflict = continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache)
+        assertNotNull(conflict.conflict)
+        assertTrue(trail.pop(0))
+
+        val restored = continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache)
+
+        val point = assertNotNull(restored.witness).primal
+        assertEquals(BigFraction.ONE, point[0] + point[1])
+        assertTrue(point.all { it >= BigFraction.ZERO })
+        assertNull(restored.conflict)
+    }
+
+    @Test
+    fun `bound edits should retain the exhausted continuation allowance`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val cache = LpExactContinuationCache()
+        assertNotNull(continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache).witness)
+        val spent = cache.usedWork
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
+
+        val limited = continueExactLp(
+            assertNotNull(trail.state.toWorkingModel()), basis, cache,
+            limits = ExactContinuationLimits(maxWork = spent),
+        )
+
+        assertNull(limited.witness)
+        assertNull(limited.conflict)
+        assertEquals(ContinuationDecline.WORK, limited.metrics.decline)
+    }
+
+    @Test
+    fun `a cancelled bound update should allow a current source retry`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val cache = LpExactContinuationCache()
+        assertNotNull(continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache).witness)
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
+        val model = assertNotNull(trail.state.toWorkingModel())
+        val stopped = continueExactLp(model, basis, cache, cancellation = Cancellation { true })
+        assertNull(stopped.witness)
+
+        val retried = continueExactLp(model, basis, cache)
+
+        assertEquals(listOf(BigFraction.ofLong(2)), assertNotNull(retried.witness).primal)
+        assertNull(retried.conflict)
     }
 
     @Test

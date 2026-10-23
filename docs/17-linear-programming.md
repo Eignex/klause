@@ -279,6 +279,15 @@ restarts the operation from authority, and every attempt is charged. Owner-local
 exact factors require the same matrix and ordered basis. An off-status feasible
 point cannot furnish a claimed warm basis.
 
+A fully imported exact feasibility tableau can retain its own basis across bound
+assertions and retraction when the source matrix, right-hand side and objective
+identity remain compatible. Nonbasic columns are reseated against current bounds
+and strictness; basic values are recomputed from the retained exact tableau.
+Rebinding publishes only complete seats and retains cumulative work, allocation
+and pivot spending. Changed layouts and incomplete imports use fresh continuation.
+Every returned point or conflict is verified against the current source authority
+and premises; retained feasibility supplies no prior proof package.
+
 ### Farkas and recession checks
 
 For `M = [A | I]`, a Farkas contradiction requires
