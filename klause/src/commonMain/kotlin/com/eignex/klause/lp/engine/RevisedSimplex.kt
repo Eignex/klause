@@ -903,7 +903,9 @@ internal class RevisedSimplex(
             val reuse = solveStarted
             val progress = SolveProgress()
             try {
-                runNumericalSolve(progress) { reset -> solveCore(null, reuse = reuse, reset = reset, progress = progress) }
+                runNumericalSolve(progress) { reset ->
+                    solveCore(null, reuse = reuse, reset = reset, progress = progress)
+                }
             } finally {
                 floatAllowance = previous
             }
@@ -1096,7 +1098,9 @@ internal class RevisedSimplex(
         return try {
             val progress = SolveProgress()
             immediateLpSolve {
-                runNumericalSolve(progress) { reset -> solveCore(null, reuse = true, reset = reset, progress = progress) }
+                runNumericalSolve(progress) { reset ->
+                    solveCore(null, reuse = true, reset = reset, progress = progress)
+                }
             }
         } finally {
             floatAllowance = previous
