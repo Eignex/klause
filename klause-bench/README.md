@@ -1496,8 +1496,10 @@ platform. Default and `exact=true` are separate comparisons.
 
 Numerical traversal's `smtCompleteSearchStage_numerical*` fields count checked nodes,
 certified bounds, strict child-bound improvements, fractional/indicator splits,
-closed leaves and missing guidance. LP shape maxima and dimension declines describe
-the numerical source adapter's admission guard. Pending leaves include unvisited siblings and
+closed leaves and missing guidance. LP shape maxima and
+`numericalLpShapesOutsideDimensionGuard` classify attempted adapter shapes; they do
+not identify the first stop condition when cancellation or another allowance also
+applies. Pending leaves include unvisited siblings and
 unresolved leaves; retained nodes include the complete coverage tree. These fields
 are observations rather than proof authority or a retained best-bound queue.
 `numericalIncumbentDominatedSplits` counts unclosed fractional nodes whose checked

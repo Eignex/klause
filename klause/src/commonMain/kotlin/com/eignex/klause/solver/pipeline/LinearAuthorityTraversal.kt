@@ -43,7 +43,7 @@ internal class LinearAuthorityTraversal(
     private val authority = LinearAuthority(budget) { rows, columns, admitted ->
         observations["numericalLpMaxRows"] = maxOf(observations["numericalLpMaxRows"] ?: 0L, rows.toLong())
         observations["numericalLpMaxColumns"] = maxOf(observations["numericalLpMaxColumns"] ?: 0L, columns.toLong())
-        if (!admitted) observe("numericalLpDimensionDeclines")
+        if (!admitted) observe("numericalLpShapesOutsideDimensionGuard")
     }
     private val root = CoverageNode(source.scope.condition)
     private val path = arrayListOf(0 to root)
