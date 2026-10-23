@@ -1502,6 +1502,10 @@ not identify the first stop condition when cancellation or another allowance als
 applies. Pending leaves include unvisited siblings and
 unresolved leaves; retained nodes include the complete coverage tree. These fields
 are observations rather than proof authority or a retained best-bound queue.
+`numericalLpInputMaxRows` measures rows before coordinate-side extraction;
+`numericalLpMaxRows` measures working rows and `numericalLpExtractedBoundRows`
+sums extracted rows over prepared attempts. An exhausted operation allowance can
+skip preparation, so such an attempt reports its unprepared shape.
 `numericalIncumbentDominatedSplits` counts unclosed fractional nodes whose checked
 bound already dominates the invocation's checked incumbent. Observation retains
 the ordinary split and confers no pruning or terminal authority.

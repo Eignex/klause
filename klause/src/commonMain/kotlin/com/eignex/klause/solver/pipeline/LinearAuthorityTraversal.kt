@@ -40,10 +40,14 @@ internal class LinearAuthorityTraversal(
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
-    private val authority = LinearAuthority(budget) { rows, columns, admitted ->
-        observations["numericalLpMaxRows"] = maxOf(observations["numericalLpMaxRows"] ?: 0L, rows.toLong())
-        observations["numericalLpMaxColumns"] = maxOf(observations["numericalLpMaxColumns"] ?: 0L, columns.toLong())
-        if (!admitted) observe("numericalLpShapesOutsideDimensionGuard")
+    private val authority = LinearAuthority(budget) { shape ->
+        observations["numericalLpInputMaxRows"] =
+            maxOf(observations["numericalLpInputMaxRows"] ?: 0L, shape.inputRows.toLong())
+        observations["numericalLpMaxRows"] = maxOf(observations["numericalLpMaxRows"] ?: 0L, shape.rows.toLong())
+        observations["numericalLpMaxColumns"] = maxOf(observations["numericalLpMaxColumns"] ?: 0L, shape.columns.toLong())
+        observations["numericalLpExtractedBoundRows"] =
+            (observations["numericalLpExtractedBoundRows"] ?: 0L) + shape.inputRows - shape.rows
+        if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
     }
     private val root = CoverageNode(source.scope.condition)
     private val path = arrayListOf(0 to root)

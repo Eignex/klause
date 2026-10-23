@@ -411,6 +411,14 @@ approached along `endpoint + t * (base - endpoint)`.
 Retained exact row multipliers can supply the source bound combination directly.
 The source verifier checks that derivation before admission; missing or rejected
 multipliers fall back to a separate combination solve under the same allowance.
+Non-strict coordinate inequalities become exact column sides, with their original
+cited row and scale retained. Residual objective and conflict coefficients lift
+through those sides into the full source row sequence. Strict inequalities remain
+rows in strict queries; contradictory sides retain the row representation.
+Preparation and lifting share the operation's cancellation and active-time scope.
+Admission applies the existing dimension, entry and scalar limits to the working
+matrix, objective and selected sides; every published claim still checks against
+the complete source context.
 
 `OpenTheoryPipeline.optimizeLinear` runs a complete affine context in the shared
 search session. A branch optimum becomes global only after every required Boolean

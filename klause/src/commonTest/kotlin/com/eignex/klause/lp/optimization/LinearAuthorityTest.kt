@@ -90,6 +90,60 @@ class LinearAuthorityTest {
     }
 
     @Test
+    fun `redundant coordinate bounds should admit a checked optimum within one operation`() {
+        val coordinates = List(32) { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = coordinates.flatMap { coordinate ->
+            List(2) { copy -> listOf(
+                "lower-${coordinate.id}-$copy" to SourcePremise(
+                    SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper-${coordinate.id}-$copy" to SourcePremise(
+                    SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ONE)),
+            ) }.flatten()
+        }.toMap()
+        val source = SourceProofContext(scope, coordinates.toSet(), premises,
+            coordinates.associateWith { BigFraction.ONE })
+
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, Cancellation.Never)
+
+        val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ZERO), claim.value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence))
+    }
+
+    @Test
+    fun `scaled upper column side should preserve a maximized source objective`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
+            setOf(real), mapOf("upper" to SourcePremise(
+                SourceInequality(mapOf(real to BigFraction.ofLong(3)), BigFraction.ofLong(2)))),
+            mapOf(real to BigFraction.ofLong(6)), objectiveConstant = BigFraction.ONE)
+
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, Cancellation.Never)
+
+        val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(5)), claim.value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence))
+    }
+
+    @Test
+    fun `infeasible row over column sides should lift a checked source refutation`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE, other to BigFraction.ONE),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, Cancellation.Never)
+
+        assertEquals(SourceClaim.Refutation, assertNotNull(result.evidence).claim)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence))
+    }
+
+    @Test
     fun `inclusive bound should supply an attained optimum`() {
         val source = SourceProofContext(
             scope,
