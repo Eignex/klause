@@ -23,7 +23,6 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
