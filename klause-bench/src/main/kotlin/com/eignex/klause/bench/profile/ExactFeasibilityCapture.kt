@@ -205,6 +205,7 @@ internal object ExactFeasibilityCapture {
             put("shape", shape(state))
             put("fixedAndComponents", components(state))
         }.toString())
+        out.resolve("continuation.json").writeText(continuation(state).toString())
         val contextCompanion = Class.forName(prefix + "LpSolveContext").getField("Companion").get(null)
         val context = requireNotNull(call(contextCompanion, "getProduction"))
         val replay = Class.forName(prefix + "LpExactReplay").getField("INSTANCE").get(null)
@@ -232,6 +233,51 @@ internal object ExactFeasibilityCapture {
                 }
             })
         }.toString())
+    }
+
+    private fun continuation(state: Any): JsonElement {
+        val prefix = "com.eignex.klause.lp.engine."
+        val exact = requireNotNull(call(state, "getModel"))
+        val n = call(exact, "getN") as Int
+        val m = call(exact, "getM") as Int
+        val projection = Class.forName(prefix + "LpProjectionMeter").getConstructor().newInstance()
+        val model = requireNotNull(call(state, "toWorkingModel", projection))
+        val statusType = Class.forName(prefix + "VarStatus")
+        val statuses = java.lang.reflect.Array.newInstance(statusType, n + m)
+        for (j in 0 until n + m) {
+            val bounds = requireNotNull(call(requireNotNull(call(exact, "column", j)), "getBounds"))
+            val name = when {
+                j >= n -> "BASIC"
+                call(bounds, "getFixed") == true -> "FIXED"
+                call(bounds, "getLower") != null -> "AT_LOWER"
+                call(bounds, "getUpper") != null -> "AT_UPPER"
+                else -> "FREE"
+            }
+            java.lang.reflect.Array.set(statuses, j, statusType.enumConstants.single { it.toString() == name })
+        }
+        val basis = Class.forName(prefix + "Basis").constructors.single { it.parameterCount == 3 }
+            .newInstance(IntArray(m) { n + it }, statuses, true)
+        val cache = Class.forName(prefix + "LpExactContinuationCache").getConstructor().newInstance()
+        val kernel = "com.eignex.klause.simplex.exact."
+        val limits = Class.forName(kernel + "ExactContinuationLimits").getConstructor().newInstance()
+        val metrics = Class.forName(kernel + "ExactContinuationMetrics").getConstructor().newInstance()
+        val method = Class.forName(prefix + "LpExactContinuationKt").declaredMethods.single {
+            it.name == "continueExactLp" && it.parameterCount == 8
+        }
+        val started = System.nanoTime()
+        val result = method.invoke(
+            null, model, basis, cache, Cancellation.after(10_000.milliseconds), limits, 20, true, metrics,
+        )
+        val elapsed = System.nanoTime() - started
+        return buildJsonObject {
+            put("revision", Reports.readGitSha())
+            put("entry", "existing exact continuation and current full verifier; natural logical basis")
+            put("sourceVerdictClaim", false)
+            put("elapsedNs", elapsed)
+            put("hasVerifiedPoint", call(result, "getWitness") != null)
+            put("hasVerifiedConflict", call(result, "getConflict") != null)
+            put("metrics", call(result, "getMetrics").toString())
+        }
     }
 
     private fun components(state: Any): JsonElement {
@@ -303,6 +349,7 @@ internal object ExactFeasibilityCapture {
             put("activeRows", active)
             put("totalColumns", total)
             put("denseCells", m.toLong() * (total.toLong() + m + 1))
+            put("sharedLogicalCertificateCells", m.toLong() * (total.toLong() + 1))
             put("failsRows128", m > 128)
             put("failsColumns4096", total > 4096)
             put("failsCells65536", m.toLong() * (total.toLong() + m + 1) > 65536)
