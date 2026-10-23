@@ -420,6 +420,12 @@ internal class KotlinBasisSolver(
         require(expectedDensity.isFinite() && expectedDensity in 0.0..1.0)
         lastSolveWork = null
         recordSolveAttempt(transpose)
+        if (x.count == 0) {
+            val empty = TriangularSolveWork(true, 0, 0L, 0, 0L)
+            lastSolveWork = BasisSolveWork(empty, empty, 0L, 0)
+            recordSolveSuccess(transpose, 0L)
+            return
+        }
         var successful = false
         var completedUnits = 0L
         var activeSolve: HyperSparseSolve? = null
