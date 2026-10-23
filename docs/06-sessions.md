@@ -208,6 +208,13 @@ verification charge the same currency, including rejected proposals. Retained
 finite optimization behind an external cutoff converts remaining slice work into an
 LP operation cap. Saturating arithmetic prevents large allowances from wrapping.
 
+Pending continuous CP completion charges visited numerical work at each pause,
+including component solves, without counting a pause as another solve. Its
+cursor retains the current numerical phase and cumulative limits; certification
+and source publication remain required before the discrete leaf is consumed.
+Factorization and certification operations stay atomic under the containing
+token, so a checkpoint can overspend and leave debt for later slices.
+
 Core-guided encoding and baking use the propagation currency and spend no
 decisions. An automatically deferred single-lane core worker has one base slice per
 turn and two seconds of cumulative active time; see

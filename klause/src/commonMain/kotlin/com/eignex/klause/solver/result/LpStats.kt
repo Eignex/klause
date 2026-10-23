@@ -527,8 +527,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private var rootPasses = 0L
     private var standalonePivots = 0L
     private var standaloneWorkOps = 0L
+    private var standaloneComponentWork = 0L
 
-    internal val standaloneWork: Long get() = standaloneWorkOps
+    internal val standaloneWork: Long get() = standaloneWorkOps + standaloneComponentWork
     private var componentPivots = 0L
     private var componentWorkOps = 0L
     private var rootPivots = 0L
@@ -583,7 +584,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
 
     /** Route-specific engine cost. The pivot, work, warm-start and refactor totals are node-only,
      * so their denominator ([solves]) always names the same route. */
-    fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics) {
+    fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics, finished: Boolean = true) {
         val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route
         if (metrics.sourceResidualCalls > 0L) {
             val key = "SOURCE_RESIDUALS_${effectiveRoute.name}"
@@ -593,24 +594,24 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                         "UNSCALED" to metrics.sourceResidualCalls - metrics.sourceResidualScaledCalls)),
             )
         }
-        if (effectiveRoute != LpRoute.NODE) routeMetrics[effectiveRoute.ordinal].observe(metrics)
+        if (effectiveRoute != LpRoute.NODE) routeMetrics[effectiveRoute.ordinal].observe(metrics, finished)
         when (effectiveRoute) {
             LpRoute.NODE -> observeMetrics(metrics)
 
             LpRoute.STANDALONE -> {
-                standalonePasses++
+                if (finished) standalonePasses++
                 standalonePivots += metrics.pivots
                 standaloneWorkOps += metrics.workOps
             }
 
             LpRoute.COMPONENT -> {
-                componentPasses++
+                if (finished) componentPasses++
                 componentPivots += metrics.pivots
                 componentWorkOps += metrics.workOps
             }
 
             LpRoute.ROOT -> {
-                rootPasses++
+                if (finished) rootPasses++
                 rootPivots += metrics.pivots
                 rootWorkOps += metrics.workOps
             }
@@ -673,11 +674,19 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     if (!accepted) exactInputRejections++
                 }
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
-                    val solveRoute = if (component) LpRoute.COMPONENT else route
-                    observeEngineCost(solveRoute, metrics)
+                    observeCertifiedSolve(route, metrics, component, true)
+                }
+
+                override fun observeSolveProgress(metrics: LpSolveMetrics, component: Boolean, finished: Boolean) {
+                    observeCertifiedSolve(route, metrics, component, finished)
                 }
             }
         }
+    }
+
+    private fun observeCertifiedSolve(route: LpRoute, metrics: LpSolveMetrics, component: Boolean, finished: Boolean) {
+        if (component && route == LpRoute.STANDALONE) standaloneComponentWork += metrics.workOps
+        observeEngineCost(if (component) LpRoute.COMPONENT else route, metrics, finished)
     }
 
     /** The local bridge passed into engine exact checks. */
@@ -986,8 +995,8 @@ private class LpRouteSolveStatsSink {
     private var numericalRecoveryRefactorizations = 0L
     private var primalRefactorizations = 0L
 
-    fun observe(value: LpSolveMetrics) {
-        passes++
+    fun observe(value: LpSolveMetrics, finished: Boolean = true) {
+        if (finished) passes++
         pivots += value.pivots
         workOps += value.workOps
         warmAttempts += value.warmAttempts

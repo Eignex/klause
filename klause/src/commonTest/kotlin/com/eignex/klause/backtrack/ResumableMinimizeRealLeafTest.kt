@@ -31,6 +31,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -40,6 +41,49 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.seconds
 
 class ResumableMinimizeRealLeafTest {
+    @Test
+    fun `continuous completion should retain its discrete leaf across work slices`() {
+        val n = 24
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0L, 1L)),
+            Array<Factor>(n) { row ->
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(row, (row + 1) % n),
+                    doubleArrayOf(1.0, 1.0), LinearOp.GE, 1.0)
+            },
+            numRealVars = n,
+            realLower = DoubleArray(n),
+            realUpper = DoubleArray(n) { 1.0 },
+        ).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(100L), realCoefficients = DoubleArray(n) { 1.0 })
+        val params = BacktrackParams(
+            randomSeed = 0L,
+            valueSelector = IndomainMin,
+            lpPlan = LpPlan(bounding = false, probe = false, rootCutHarvest = false, componentSplit = false),
+        )
+        val offered = ArrayList<Sample>()
+        var terminal: MinimizeResult? = null
+        var pendingNodes: Double? = null
+        var previousWork = 0.0
+        var slices = 0
+
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            while (terminal == null && slices++ < 512) {
+                terminal = search.runSlice(Cancellation.Never, 60_000L, 1L) { offered += it.sample }
+                val work = search.stats.lp.standaloneWorkOps.sum
+                if (terminal == null && offered.isEmpty() && work > previousWork) {
+                    val nodes = search.stats.search.nodes.sum
+                    pendingNodes?.let { assertEquals(it, nodes) } ?: run { pendingNodes = nodes }
+                    assertFalse(search.canReseed)
+                }
+                previousWork = work
+            }
+        }
+
+        assertNotNull(pendingNodes)
+        assertEquals(12.0, assertIs<MinimizeResult.Optimal>(terminal).objective)
+        assertEquals(0L, offered.single().ints.single())
+    }
+
     @Test
     fun `constant real leaf completion should require its independently accepted bound`() {
         for (acceptBound in listOf(false, true)) {

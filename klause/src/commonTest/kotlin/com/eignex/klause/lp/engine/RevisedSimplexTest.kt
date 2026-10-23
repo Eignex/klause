@@ -1,14 +1,78 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RevisedSimplexTest {
+
+    @Test
+    fun `sliced solves should preserve the numerical path and certified result`() {
+        for (original in listOf(coverModel(), infeasibleModel(), halfIntegralModel())) {
+            val model = assertNotNull(LpExactState(assertNotNull(original.authoritativeModel())).ownerWorkingModel())
+            RevisedSimplex(model).use { cold ->
+                val expected = cold.solve()
+                val expectedMetrics = cold.lastMetrics
+                val proof = certifyLpResult(model, cold, expected)
+                RevisedSimplex(model).use { sliced ->
+                    sliced.openSolve().use { cursor ->
+                        var step = cursor.advance(1L)
+                        var pauses = 0
+                        while (step is LpSolveStep.Paused && pauses < 64) {
+                            pauses++
+                            assertNull(sliced.solvedExactState)
+                            step = cursor.advance(1L)
+                        }
+                        val result = assertIs<LpSolveStep.Completed<FloatLpResult?>>(step).value
+
+                        assertTrue(pauses > 0)
+                        assertEquals(expected?.objective, result?.objective)
+                        assertEquals(expected?.primal?.toList(), result?.primal?.toList())
+                        assertEquals(expectedMetrics.pivots, sliced.lastMetrics.pivots)
+                        assertEquals(expectedMetrics.workOps, sliced.lastMetrics.workOps)
+                        assertEquals(expectedMetrics.initialRefactorizations, sliced.lastMetrics.initialRefactorizations)
+                        assertEquals(expectedMetrics.updateLimitRefactorizations, sliced.lastMetrics.updateLimitRefactorizations)
+                        assertEquals(proof.verdict, certifyLpResult(model, sliced, result).verdict)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `closing an unopened cursor should release the solve exclusion`() {
+        RevisedSimplex(halfIntegralModel()).use { solver ->
+            val cursor = solver.openSolve()
+
+            cursor.close()
+            val result = assertNotNull(solver.solve())
+
+            assertEquals(1.5, result.primal.single(), 1e-9)
+        }
+    }
+
+    @Test
+    fun `cancellation during a pause should publish no numerical result`() {
+        var cancelled = false
+        RevisedSimplex(halfIntegralModel(), cancellation = Cancellation { cancelled }).use { solver ->
+            solver.openSolve().use { cursor ->
+                assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = { true }))
+
+                cancelled = true
+                val step = assertIs<LpSolveStep.Completed<FloatLpResult?>>(cursor.advance())
+
+                assertNull(step.value)
+                assertEquals(LpFloatTermination.CANCELLED, solver.lastTermination)
+                assertNull(solver.solvedExactState)
+            }
+        }
+    }
 
     @Test
     fun `gated resolve should match a fresh solve of the enforced submodel`() {

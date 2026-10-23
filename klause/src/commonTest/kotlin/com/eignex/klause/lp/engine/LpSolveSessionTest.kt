@@ -1,15 +1,54 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
+    @Test
+    fun `paused solve work should be charged once before certification`() {
+        for (split in listOf(false, true)) {
+            val builder = LpBuilder()
+            val x = builder.addRealVar(0.0, 5.0, cost = 1.0)
+            val y = builder.addRealVar(0.0, 5.0, cost = 1.0)
+            builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+            builder.addRealRow(intArrayOf(y), doubleArrayOf(1.0), Relation.GE, 2.0)
+            val model = assertNotNull(
+                LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel(),
+            )
+            val baseline = LpStatsSink(LpRoute.STANDALONE)
+            val expected = LpSolveSession(componentSplit = split).use { owner ->
+                owner.solve(model, observer = baseline.certificationObserver())
+            }
+            val sink = LpStatsSink(LpRoute.STANDALONE)
+
+            LpSolveSession(componentSplit = split).use { owner ->
+                owner.openSolve(model, observer = sink.certificationObserver()).use { cursor ->
+                    var step = cursor.advance(1L)
+                    assertIs<LpSolveStep.Paused>(step)
+                    assertTrue(sink.standaloneWork > 0L)
+                    assertEquals(0.0, sink.snapshot().standalonePasses.sum + sink.snapshot().componentPasses.sum)
+                    var pauses = 0
+                    while (step is LpSolveStep.Paused && pauses++ < 64) step = cursor.advance(1L)
+                    val actual = assertIs<LpSolveStep.Completed<CertifiedLpResult>>(step).value
+
+                    assertEquals(expected.verdict, actual.verdict)
+                    assertEquals(baseline.standaloneWork, sink.standaloneWork)
+                    assertEquals(baseline.snapshot().standalonePasses, sink.snapshot().standalonePasses)
+                    assertEquals(baseline.snapshot().componentPasses, sink.snapshot().componentPasses)
+                }
+            }
+        }
+    }
+
     @Test
     fun `retained fractional equalities should reject a rounded product`() {
         val builder = LpBuilder()
