@@ -564,16 +564,27 @@ An entry with `root=true` captures the existing production relaxation after root
 propagation, without traversal or optional presolve. That root projection is labelled
 separately from an observed continuous leaf and retains its normalized numerical
 authority, rather than asserting original MPS decimal equivalence.
+Catalog roots use the baked in-process problem. Optional `unbaked=true` compiles the
+original bytes directly, matching the source-root representation used by basis traces;
+the two representations can have different dimensions and are separate controls.
 Self-authored conditioning controls can supply `{mps64, problem, sha256, root}`;
 the bounded request supplies original MPS bytes, which receive the same hash check
 and numerical compilation as catalog inputs. Optional `exact=true` uses zero source
 feasibility tolerance for that supplied control, retaining its distinct semantics.
+`{control: "near-dependent-40"}` captures a self-authored LP model with twenty
+independent two-row blocks. Each block has continuous bounds `[0, 2]`, matrix
+`[[1000000, 1000000], [1000000, 1000001]]`, right-hand side `[2000000, 2000001]`,
+and unit minimization costs. Its unique point is all ones. This model bypasses MPS
+compilation; recorded accepted-update pivot spread establishes whether replay visits
+the intended near-dependent basis.
 
 `NumericalResidualReplay` accepts an array of
 `{job, source, residual, sha256, dense}` capture references through the same argument.
 It checks retained local-job bytes and replays each state through the existing scoped
 solver and production certification, comparing cold and retained owners. Each solve
 has two seconds, 4096 pivots and 1.2 billion work units, with pricing tie seed 3.
+Optional `workLimit` records an explicit allowance up to that default; zero preserves
+the source leaf's unbounded-work setting while retaining the containing cancellation.
 One warmup and three measured rounds disable per-operation observation; a separate
 observed round retains phase and certification details. Lab JFR remains enabled.
 Owner construction, preparation, solve, certification and close enter lifecycle
