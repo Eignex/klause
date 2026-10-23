@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
@@ -77,7 +78,8 @@ internal class ProblemFacts(
                 binaryPackingObjective = binary && problem.hasPackingObjective(objective),
                 binaryEqualityObjective = binary && problem.hasBinaryEqualityObjective(objective),
                 continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
-                integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
+                integerLinear = problem.factors.any { it !is SymmetryHandling } && problem.factors.all {
+                    if (it is SymmetryHandling) return@all true
                     val form = it.linearForm as? LinearForm.Conjunction ?: return@all false
                     form.rows.isNotEmpty() && form.rows.all { row -> row.isLongUnconditional && row.isIntegerOnly }
                 },
