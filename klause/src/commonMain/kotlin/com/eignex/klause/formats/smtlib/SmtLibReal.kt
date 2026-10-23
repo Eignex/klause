@@ -135,6 +135,18 @@ private fun Compiler.Builder.assertRealRelation(op: String, a: RealComb, b: Real
         else -> smtUnsupported("real relation '$op'")
     }
     val d = a.plus(b.scaled(BigFraction.MINUS_ONE))
+    val comparison = realPredicates.comparison(d)
+    when {
+        comparison == null -> assertRealTerm(d, linOp, strict)
+        linOp == LinearOp.EQ -> {
+            assertRealTerm(comparison.reduced(LinearOp.LE, strict = false), LinearOp.LE, strict = false)
+            assertRealTerm(comparison.reduced(LinearOp.GE, strict = false), LinearOp.GE, strict = false)
+        }
+        else -> assertRealTerm(comparison.reduced(linOp, strict), linOp, strict)
+    }
+}
+
+private fun Compiler.Builder.assertRealTerm(d: RealComb, linOp: LinearOp, strict: Boolean) {
     if (d.isConstant) {
         val sign = d.constant.signum()
         val holds = when {
@@ -143,14 +155,6 @@ private fun Compiler.Builder.assertRealRelation(op: String, a: RealComb, b: Real
             else -> sign == 0
         }
         if (!holds) forceTrue(Lit.negate(trueLit()))
-        return
-    }
-    realPredicates.comparison(d)?.let { comparison ->
-        val literal = if (linOp == LinearOp.EQ) reifyAnd(listOf(
-            reifyExtremumComparison(comparison, LinearOp.LE, strict = false),
-            reifyExtremumComparison(comparison, LinearOp.GE, strict = false),
-        )) else reifyExtremumComparison(comparison, linOp, strict)
-        forceTrue(literal)
         return
     }
     factors.add(realRow(d, linOp, strict))
@@ -216,8 +220,9 @@ private fun Compiler.Builder.reifyRealAtom(
     }
     return realPredicates.literal(d, linOp, strict) {
         val comparison = if (expandExtrema) realPredicates.comparison(d) else null
-        if (comparison != null) reifyExtremumComparison(comparison, linOp, strict)
-        else {
+        if (comparison != null) {
+            reifyRealAtom(comparison.reduced(linOp, strict), linOp, strict, expandExtrema = false)
+        } else {
             val w = newBool()
             factors.add(exactRealRow(d, linOp, strict, w))
             Lit.make(w, true)
@@ -225,17 +230,21 @@ private fun Compiler.Builder.reifyRealAtom(
     }
 }
 
-private fun Compiler.Builder.reifyExtremumComparison(
-    comparison: SmtRealPredicates.Comparison,
-    relation: LinearOp,
-    strict: Boolean,
-): Int {
-    val literals = comparison.arms.map { reifyRealAtom(it, relation, strict, expandExtrema = false) }
-    return if (comparison.minimum == (relation == LinearOp.GE)) reifyAnd(literals) else reifyOr(literals)
-}
-
 internal class SmtRealPredicates(private val cancellation: Cancellation, private val maxEntries: Int = 65_536) {
-    class Comparison(val minimum: Boolean, val arms: List<RealComb>)
+    class Comparison(private val minimum: Boolean, private val arms: List<RealComb>) {
+        fun reduced(relation: LinearOp, strict: Boolean): RealComb {
+            val index = if (arms[0].isConstant) 0 else 1
+            val constant = arms[index]
+            val sign = constant.constant.signum()
+            val holds = when (relation) {
+                LinearOp.LE -> if (strict) sign < 0 else sign <= 0
+                LinearOp.GE -> if (strict) sign > 0 else sign >= 0
+                else -> error("expected a real inequality")
+            }
+            val conjunction = minimum == (relation == LinearOp.GE)
+            return if (holds != conjunction) constant else arms[1 - index]
+        }
+    }
 
     private data class Arm(
         val integers: Map<Int, BigFraction>,
@@ -314,6 +323,7 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
             rest.plus(RealComb(it.integers, it.reals, it.constant).scaled(coefficient))
         }
         checkCancellation()
+        if (arms.none { it.isConstant }) return null
         return Comparison(definition.minimum == (coefficient.signum() > 0), arms)
     }
 
