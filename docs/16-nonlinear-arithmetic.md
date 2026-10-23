@@ -280,6 +280,8 @@ an earlier reconstruction. A snapshot is available only after an entire Boolean
 rewrite or numeric substitution commits. An interrupted rewrite publishes no
 snapshot. Query progress records committed snapshots, root and search work, and
 the first regional entry separately from completed projection and lifting.
+Region and projection counters accumulate actual attempts across snapshot
+replacements; they do not count distinct source regions.
 
 Root reduction and exact search retain separate cursors under one arithmetic
 allowance. The cursor with less charged work advances at the next checkpoint;
