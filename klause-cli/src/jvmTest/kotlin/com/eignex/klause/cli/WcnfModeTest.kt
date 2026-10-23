@@ -60,7 +60,7 @@ class WcnfModeTest {
         val out = capture { main(arrayOf("-e", "bt", wcnf("h 1 2 0\n3 -1 0\n1 -2 0\n"))) }
         assertTrue("s OPTIMUM FOUND" in out, out)
         assertTrue("o 1" in out.lines().map { it.trim() }, "expected optimum cost 1: $out")
-        val model = out.lines().first { it.startsWith("v ") }.removePrefix("v ").trim()
+        val model = out.lines().last { it.startsWith("v ") }.removePrefix("v ").trim()
         assertEquals("01", model, out)
     }
 

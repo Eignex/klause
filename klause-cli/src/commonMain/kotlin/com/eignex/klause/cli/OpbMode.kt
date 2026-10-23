@@ -9,10 +9,11 @@ import com.eignex.klause.solver.objective.toLinearObjective
 /**
  * OPB/WBO pseudo-Boolean front-end (`.opb`, `.wbo`). Satisfaction (`SAT`), optimisation (`min:`),
  * and WBO soft-constraint (weighted-violation) instances are handled; the objective is always a
- * minimisation. Emits the PB-competition output protocol: an `o <cost>` line per improving
- * incumbent, a final `s SATISFIABLE` / `s OPTIMUM FOUND` / `s UNSATISFIABLE` / `s UNKNOWN` status,
- * and a `v <literals>` line listing each variable `xi` (1-based) as `xi` when true, `-xi` when
- * false. `-s` statistics are emitted as `c` comment lines.
+ * minimisation. Emits the PB-competition output protocol: an `o <cost>` line paired with a
+ * `v <literals>` line per improving incumbent, followed by a final `s SATISFIABLE` / `s OPTIMUM FOUND`
+ * / `s UNSATISFIABLE` / `s UNKNOWN` status. The `v` line lists each variable `xi` (1-based) as `xi`
+ * when true, `-xi` when false. Satisfaction emits its `v` line after the final status.
+ * `-s` statistics are emitted as `c` comment lines.
  */
 internal object OpbMode : CliMode {
     override val names = listOf("opb", "pb", "wbo")
@@ -54,11 +55,12 @@ private fun renderPbModel(numVars: Int, boolValue: (Int) -> Boolean): String = b
     for (v in 0 until numVars) append(if (boolValue(v)) " x${v + 1}" else " -x${v + 1}")
 }
 
-/** PB-competition output protocol. Incumbent `o` costs stream live; the final `s` status and the
- *  `v` literal line are emitted together at completion, after the best solution is known. */
+/** PB-competition output protocol. Each optimizing incumbent streams its `o` cost and `v` literals
+ *  together; the final `s` status is emitted at completion. */
 internal class OpbOutput : BufferedBestOutput() {
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true
+    override val streamFiniteWitness: Boolean = true
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.UNBOUNDED -> "s SATISFIABLE"
