@@ -58,11 +58,19 @@ internal object NumericalResidualProfile {
 
     private fun capture(source: JsonElement, out: File) {
         val input = source.jsonObject
+        if (input.keys == setOf("control")) {
+            require(input.getValue("control").jsonPrimitive.content == "near-dependent-40")
+            captureConditioningControl(source, out)
+            return
+        }
         val supplied = input["mps64"]?.jsonPrimitive?.content
         val catalogKeys = setOf("suite", "problem", "sha256")
         val suppliedKeys = setOf("mps64", "problem", "sha256", "root")
         require(input.keys == catalogKeys || input.keys == catalogKeys + "root" ||
+            input.keys == catalogKeys + setOf("root", "unbaked") ||
             input.keys == suppliedKeys || input.keys == suppliedKeys + "exact")
+        val unbaked = input["unbaked"]?.jsonPrimitive?.content?.toBooleanStrict() == true
+        require(!unbaked || input["root"]?.jsonPrimitive?.content?.toBooleanStrict() == true)
         val suite = input["suite"]?.jsonPrimitive?.content ?: "self-authored"
         val name = input.getValue("problem").jsonPrimitive.content
         val reference = if (supplied == null) Catalog.uncapped(suite).problems.single { it.name == name } else null
@@ -76,7 +84,7 @@ internal object NumericalResidualProfile {
         }
         require(bytes.size <= 4 * 1024 * 1024 && sha256(bytes) == input.getValue("sha256").jsonPrimitive.content)
         out.resolve("source.mps").writeBytes(bytes)
-        val entry = reference?.let { Runners.resolve(it) }
+        val entry = reference?.takeUnless { unbaked }?.let { Runners.resolve(it) }
         val overrides = if (input["exact"]?.jsonPrimitive?.content?.toBooleanStrict() == true) {
             SemanticOverrides(feasibilityTolerance = SourceTolerance())
         } else SemanticOverrides()
@@ -152,6 +160,32 @@ internal object NumericalResidualProfile {
         }
         val relaxation = requireNotNull(build.invoke(builder, domains, emptyList<Any>(), stop))
         val model = requireNotNull(call(relaxation, "getModel"))
+        captureModel(
+            model, source, out, "diagnostic root relaxation after propagation; no traversal or optional presolve",
+        )
+    }
+
+    private fun captureConditioningControl(source: JsonElement, out: File) {
+        val builder = Class.forName(ENGINE + "LpBuilder").getConstructor().newInstance()
+        val equal = Class.forName(ENGINE + "Relation").enumConstants.single { it.toString() == "EQ" }
+        repeat(20) {
+            val x = call(builder, "addRealVar", 0.0, 2.0, 1.0, -1) as Int
+            val y = call(builder, "addRealVar", 0.0, 2.0, 1.0, -1) as Int
+            call(
+                builder, "addRow", intArrayOf(x, y), longArrayOf(1_000_000L, 1_000_000L), equal,
+                2_000_000L, true, null,
+            )
+            call(
+                builder, "addRow", intArrayOf(x, y), longArrayOf(1_000_000L, 1_000_001L), equal,
+                2_000_001L, true, null,
+            )
+        }
+        val sense = Class.forName(ENGINE + "Sense").enumConstants.single { it.toString() == "MINIMIZE" }
+        val model = requireNotNull(call(builder, "build", sense))
+        captureModel(model, source, out, "self-authored exact LP model control; no MPS compilation or source verdict")
+    }
+
+    private fun captureModel(model: Any, source: JsonElement, out: File, entry: String) {
         val authority = Class.forName(ENGINE + "LegacyLpModelKt").methods.single {
             it.name == "authoritativeModel" && it.parameterCount == 1
         }
@@ -165,7 +199,7 @@ internal object NumericalResidualProfile {
         val report = buildJsonObject {
             put("revision", Reports.readGitSha())
             put("source", source)
-            put("entry", "diagnostic production root relaxation after propagation; no traversal or optional presolve")
+            put("entry", entry)
             put("sourceVerdictClaim", false)
             put("cliRoutingEquivalence", false)
             put("captureHashes", JsonArray(listOf(JsonPrimitive(sha256(bytes)))))
