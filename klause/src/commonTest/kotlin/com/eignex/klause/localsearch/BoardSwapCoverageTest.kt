@@ -50,22 +50,24 @@ class BoardSwapCoverageTest {
 
     @Test
     fun `a cancelled pick should retain the ungraded pairs for resume`() {
-        val resumed = state()
-        val uninterrupted = state()
-        val strategy = SourceDrivenStrategy(
-            sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
-            feasibleDescent = FeasibleDescent.SelfOwned,
-        )
-        var polls = 0
+        for (size in listOf(2, 5)) {
+            val resumed = state(size)
+            val uninterrupted = state(size)
+            val strategy = SourceDrivenStrategy(
+                sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
+                feasibleDescent = FeasibleDescent.SelfOwned,
+            )
+            var polls = 0
 
-        resumed.boardCoverage.request(resumed)
-        strategy.pickMove(resumed, Cancellation { ++polls >= 3 })
-        val resumedMoves = MoveSink()
-        val expectedMoves = MoveSink()
-        SatisfiedStructured.structural(1).generate(resumed, resumedMoves)
-        SatisfiedStructured.structural(1).generate(uninterrupted, expectedMoves)
+            resumed.boardCoverage.request(resumed)
+            strategy.pickMove(resumed, Cancellation { ++polls >= 3 })
+            val resumedMoves = MoveSink()
+            val expectedMoves = MoveSink()
+            SatisfiedStructured.structural(1).generate(resumed, resumedMoves)
+            SatisfiedStructured.structural(1).generate(uninterrupted, expectedMoves)
 
-        assertEquals(expectedMoves.list, resumedMoves.list)
+            assertEquals(expectedMoves.list, resumedMoves.list)
+        }
     }
 
     @Test
@@ -413,16 +415,13 @@ class BoardSwapCoverageTest {
         }
     }
 
-    private fun state(): LocalSearchState {
+    private fun state(size: Int = 5): LocalSearchState {
         val problem = Problem(
-            0, 10, Array(10) { IntDomain(0, 4) },
-            arrayOf<Factor>(
-                AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5),
-                AllDifferent(intArrayOf(5, 6, 7, 8, 9), domainMin = 0, domainSize = 5),
-            ),
+            0, size * 2, Array(size * 2) { IntDomain(0, (size - 1).toLong()) },
+            Array<Factor>(2) { board -> AllDifferent(IntArray(size) { board * size + it }, 0, size) },
         )
         return freshState(problem, 7L).also { state ->
-            repeat(10) { state.assignment.setInt(it, (it % 5).toLong()) }
+            repeat(size * 2) { state.assignment.setInt(it, (it % size).toLong()) }
             state.recompute()
         }
     }
