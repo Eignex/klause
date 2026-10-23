@@ -694,7 +694,7 @@ class PortfolioSchedulingTest {
                     reached += 1
                     clock += 1.milliseconds
                 })),
-            )
+            ).onEach { it.restartingSearch = true }
             val bandit = fixedBandit(2, arm = 1)
 
             Portfolio(workers, bandit, minShares = doubleArrayOf(1.0, 0.0)).also {
