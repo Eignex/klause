@@ -198,6 +198,13 @@ of operand order. IFF also shares simultaneous input negation. The table belongs
 to one parser builder, retains the first definition's ownership and uses at most
 65,536 key entries, charging each gate's arity plus one. Lookup and normalization
 use the source cancellation token; a declined cache entry still emits its definition.
+An asserted OR whose arms are direct AND expressions also posts unit clauses for
+atom names appearing as immediate conjuncts in every arm. The names compile in
+the assertion's current lexical scope, preserving signed Boolean aliases and exact
+comparison literals. The original clause and gate definitions remain. Recognition
+scans at most 65,536 immediate entries and atom characters with the source
+cancellation token; other arm shapes, a macro named `and` and exhausted scans supply
+no units.
 Comparison literals are shared within a parse when their folded exact rows agree.
 Greater-than directions negate the affine term into a less-than direction for
 cache identity, preserving strictness, coefficient scale and coordinate sorts.

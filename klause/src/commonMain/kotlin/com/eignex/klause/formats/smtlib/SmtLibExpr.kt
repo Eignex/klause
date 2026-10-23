@@ -4,9 +4,11 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
+import com.eignex.klause.util.Cancellation
 
 private sealed interface AssertionFrame {
     class Visit(val expression: SExpr) : AssertionFrame
@@ -73,6 +75,12 @@ internal fun Compiler.Builder.assert(top: SExpr) {
                 // needed; only the top node is saved. Empty `(or)` is false and left to the general path.
                 h == "or" && args.isNotEmpty() -> {
                     factors.add(Clause(IntArray(args.size) { compileBool(args[it]) }))
+                    val common = if ("and" in macros) emptyList() else commonAssertedAtoms(args, sourceCancellation)
+                    for (atom in common) {
+                        sourceCancellation.charge(1L)
+                        if (sourceCancellation()) throw PolynomialSourceInterrupted()
+                        forceTrue(compileBool(SExpr.Atom(atom)))
+                    }
                     continue
                 }
 
@@ -106,6 +114,51 @@ internal fun Compiler.Builder.assert(top: SExpr) {
         }
         forceTrue(compileBool(node))
     }
+}
+
+internal fun commonAssertedAtoms(
+    disjuncts: List<SExpr>,
+    cancellation: Cancellation,
+    entryLimit: Int = 65_536,
+): List<String> {
+    require(entryLimit >= 0)
+    var remaining = entryLimit.toLong()
+    fun spend(units: Long): Boolean {
+        cancellation.charge(units)
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        remaining -= units
+        return remaining >= 0L
+    }
+    if (!spend(1L)) return emptyList()
+    var common: LinkedHashSet<String>? = null
+    for (disjunct in disjuncts) {
+        if (!spend(1L)) return emptyList()
+        val conjunction = disjunct as? SExpr.SList ?: return emptyList()
+        if ((conjunction.items.firstOrNull() as? SExpr.Atom)?.text != "and") return emptyList()
+        val present = LinkedHashSet<String>()
+        for (index in 1 until conjunction.items.size) {
+            if (!spend(1L)) return emptyList()
+            val atom = conjunction.items[index] as? SExpr.Atom ?: continue
+            if (!spend(atom.text.length.toLong() + 1L)) return emptyList()
+            present.add(atom.text)
+        }
+        val previous = common
+        if (previous == null) common = present else {
+            val iterator = previous.iterator()
+            while (iterator.hasNext()) {
+                val atom = iterator.next()
+                if (!spend(atom.length.toLong() + 1L)) return emptyList()
+                if (atom !in present) iterator.remove()
+            }
+        }
+        if (common.isNullOrEmpty()) return emptyList()
+    }
+    val result = ArrayList<String>()
+    for (atom in common.orEmpty()) {
+        if (!spend(atom.length.toLong() + 1L)) return emptyList()
+        result.add(atom)
+    }
+    return result
 }
 
 internal fun Compiler.Builder.forceTrue(lit: Int) {
