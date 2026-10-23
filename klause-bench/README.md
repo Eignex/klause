@@ -808,6 +808,24 @@ undecided and 18 infeasibility claims had no witness check. CLI elapsed time inc
 startup and preparation; full case intervals and separate build/setup logs retain
 the remaining setup costs. The mixed timings establish no solver or SIMD speedup.
 
+### Native arithmetic cancellation
+
+Native polynomial polls inspect shared work, worker quotas and representation stops
+under one ledger lock, then call containing predicates outside it; see
+[resources](../docs/06-sessions.md#mechanism-and-compatibility).
+[Lab 7807](https://lab.eignex.com/jobs/7807) compares `8ac1afcfcf` with `4ef0caba09`
+on four retained polynomial sources, three alternating pairs, complete-only CP,
+seed 3, one core, debug enabled and no JFR, on Mac/aarch64. At 5,000,000 native
+units, sorting and kissing median full-process times fell from 2.105 to 2.037 s and
+2.074 to 2.027 s. Source/runtime identities, recorded work and outcomes matched in
+all twelve pairs. The two refutation controls have no independent proof check.
+
+Separate [baseline](https://lab.eignex.com/jobs/7799) and
+[candidate](https://lab.eignex.com/jobs/7800) pipeline diagnostics retain first
+expired-poll and return latency across linear and polynomial sources. Their small
+instrumented samples establish neither default CLI latency nor a general speedup.
+Polling frequency, parent predicate order and charge boundaries remain unchanged.
+
 ### State ownership
 
 Retain concrete buffer owners, separate indexed vector roles and one cursor/cleanup
