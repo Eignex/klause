@@ -203,7 +203,7 @@ class RetainedBoardRestartTest {
     }
 
     @Test
-    fun `a kick should decline when propagated outputs would break another owner`() {
+    fun `a kick should decline when ownership blocks a maintained output`() {
         val problem = Problem(
             0, 5, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(1, 1)),
             arrayOf<Factor>(
@@ -217,6 +217,32 @@ class RetainedBoardRestartTest {
         val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
         state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
         sweep.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
+        state.recompute()
+        val anchor = state.assignment.snapshot()
+        val policy = IteratedLocalSearchRestart(
+            initialPerturbationStrength = 1, perturbationKind = PerturbationKind.BasinHopping,
+        )
+
+        assertEquals(0L, state.cost)
+        policy.restart(state, anchor)
+
+        assertEquals(anchor, state.assignment.snapshot())
+        assertEquals(false, policy.lastBoardDiversificationChanged)
+    }
+
+    @Test
+    fun `a kick should decline when a pin blocks a maintained output`() {
+        val problem = Problem(
+            0, 4, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2), IntDomain(2, 2)),
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), 0, 2), Product(0, 3, 2)),
+        )
+        val state = LocalSearchState(
+            LocalSearchModel.open(problem), Random(7), Assumptions(ints = mapOf(2 to 0L)),
+        )
+        state.assignment.setInt(1, 1L)
+        state.assignment.setInt(3, 2L)
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
         state.recompute()
         val anchor = state.assignment.snapshot()
         val policy = IteratedLocalSearchRestart(

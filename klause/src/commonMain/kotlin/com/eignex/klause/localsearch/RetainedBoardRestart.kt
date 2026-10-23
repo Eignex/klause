@@ -47,7 +47,7 @@ internal class RetainedBoardRestart private constructor(
             }
             if (swaps.isEmpty()) return@repeat
             val move = swaps[state.rng.nextInt(swaps.size)]
-            if (state.preservesImplicitFeasibility(move)) state.apply(move)
+            if (state.preservesRestartStructure(move)) state.apply(move)
         }
         state.resetStepCounters()
     }
