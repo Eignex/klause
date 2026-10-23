@@ -136,7 +136,7 @@ internal class RetainedLinearQueries(
                     restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never),
                 decisionBudget = state.decisionBudget,
                 nodePolicy = policy, booleanBranching = branching,
-                candidateHints = observedCandidateHints(hints(scope.stop, state), SearchCandidateHints.None,
+                candidateHints = observedCandidateHints(hints(scope.stop, state), search.candidateHints,
                     state.smt.hintUsage),
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None)
             when (val event = run.next()) {
