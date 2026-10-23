@@ -185,7 +185,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val queued = BooleanArray(numCols)
     private val poll = PollStride()
     private val meter = cancellation.workMeter()
-    private val workWeight = cancellation.presolveBudget()?.sourceProbeWorkWeight ?: PROBE_SOURCE_WORK_WEIGHT
+    private val workWeight = meter.presolveBudget()?.sourceProbeWorkWeight ?: PROBE_SOURCE_WORK_WEIGHT
     private var stopped = false
 
     private var conflict = false

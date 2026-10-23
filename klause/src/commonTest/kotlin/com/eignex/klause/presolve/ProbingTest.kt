@@ -295,14 +295,16 @@ class ProbingTest {
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 5),
             ),
         )
-        val budget = PresolveBudget(210)
+        for (weight in listOf(3L, 10L)) {
+            val budget = PresolveBudget(21L * weight, sourceProbeWorkWeight = weight)
 
-        val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+            val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
 
-        assertFalse(delta.infeasible)
-        assertEquals(5L, delta.bounds!!.upper(0))
-        assertEquals(10L, delta.bounds.upper(1))
-        assertEquals(210L, budget.spent())
+            assertFalse(delta.infeasible)
+            assertEquals(5L, delta.bounds!!.upper(0))
+            assertEquals(10L, delta.bounds.upper(1))
+            assertEquals(21L * weight, budget.spent())
+        }
     }
 
     @Test
@@ -315,14 +317,17 @@ class ProbingTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true))),
             ),
         )
-        for (allowance in listOf(451L, 491L, 531L, 581L, 631L, 681L, 701L, 781L, 851L)) {
-            val budget = PresolveBudget(allowance)
+        for (weight in listOf(3L, 10L)) {
+            for (visits in listOf(45L, 49L, 53L, 58L, 63L, 68L, 70L, 78L, 85L)) {
+                val allowance = visits * weight + 1L
+                val budget = PresolveBudget(allowance, sourceProbeWorkWeight = weight)
 
-            val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
+                val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
 
-            assertTrue(delta.isEmpty, "allowance=$allowance")
-            assertFalse(delta.infeasible)
-            assertTrue(budget.spent() in allowance..allowance + 639, "spent=${budget.spent()}")
+                assertTrue(delta.isEmpty, "allowance=$allowance weight=$weight")
+                assertFalse(delta.infeasible)
+                assertTrue(budget.spent() in allowance..allowance + 64L * weight - 1L, "spent=${budget.spent()}")
+            }
         }
     }
 

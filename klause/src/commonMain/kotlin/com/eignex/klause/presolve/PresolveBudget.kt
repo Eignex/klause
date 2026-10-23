@@ -223,8 +223,10 @@ private fun saturatedSum(total: Long, units: Long): Long =
 private fun weighted(units: Long, weight: Long): Long =
     if (units > Long.MAX_VALUE / weight) Long.MAX_VALUE else units * weight
 
-internal fun Cancellation.presolveBudget(): PresolveBudget? = when (val meter = workMeter()) {
-    is PresolveRootWorkMeter -> meter.budget
-    is PreparationWorkMeter -> meter.budget
+internal fun Cancellation.presolveBudget(): PresolveBudget? = workMeter().presolveBudget()
+
+internal fun WorkMeter?.presolveBudget(): PresolveBudget? = when (this) {
+    is PresolveRootWorkMeter -> budget
+    is PreparationWorkMeter -> budget
     else -> null
 }
