@@ -47,6 +47,7 @@ internal class PolynomialFormulaReduction private constructor(
             var signsChecked = false
             var booleansReduced = false
             try {
+                val sections = PolynomialSectionSelection(arithmetic)
                 while (true) {
                     arithmetic.step()
                     val reducedBooleans = current.reduceBooleanDefinitions(arithmetic)
@@ -102,7 +103,7 @@ internal class PolynomialFormulaReduction private constructor(
                     if (inconsistent) break
                     if (replacements.isEmpty()) {
                         val family = current.atoms.map { arithmetic.step(); it.polynomial }
-                        val graph = equationalSection(equations, family, arithmetic)
+                        val graph = sections.select(equations, family)
                         if (graph == null) {
                             if (reducedBooleans != null) {
                                 yield(null)
