@@ -21,6 +21,27 @@ import kotlin.test.assertTrue
 
 class QfNraSolverTest {
     @Test
+    fun `root rewrites retain one active region search`() {
+        for (length in listOf(1, 2, 4)) {
+            val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+            val graphs = (0 until length).joinToString(" ") {
+                "(= x$it (+ (* x${it + 1} x${it + 1}) 1))"
+            }
+            val source = SmtLibPolynomial.parse("$declarations (assert (and $graphs (= x$length 2)))")
+            val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+                QfNraParams(maximumWork = 500_000), PolynomialCondition())
+
+            var result: QfNraResult? = null
+            while (result == null) result = query.next()
+
+            val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+            assertEquals(BigFraction.ofLong(2), point.realValue(length).rational)
+            assertEquals(1L, query.progress.regions)
+            assertEquals(0L, query.progress.searchRestarts)
+        }
+    }
+
+    @Test
     fun `a checked witness can complete before optional root reduction finishes`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) " +

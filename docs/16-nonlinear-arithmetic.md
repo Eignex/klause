@@ -286,11 +286,12 @@ replacements; they do not count distinct source regions.
 Root reduction and exact search retain separate cursors under one arithmetic
 allowance. The cursor with less charged work advances at the next checkpoint;
 finished reduction leaves the remaining work to search. Search starts from the
-normalized formula and restarts when a new equivalent formula commits. Only the
-latest snapshot and one search cursor are retained, and discarded work remains
-charged. Regional refutations do not cross snapshot boundaries. A representation
-decline in search permits reduction to continue; a containing stop terminates both
-cursors. Optional probing shares one cumulative allowance across restarts.
+first completed rewrite, or from a finished unchanged formula, and retains its
+cursor while later snapshots commit. A representation decline can retry the
+latest different snapshot. Only the latest snapshot and one search cursor are
+retained, and discarded work remains charged. Regional refutations do not cross
+snapshot boundaries. A containing stop terminates both cursors. Optional probing
+shares one cumulative allowance across retries.
 
 The procedure then runs in four stages; only the last two are needed for
 completeness.
