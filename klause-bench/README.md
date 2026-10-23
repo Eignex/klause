@@ -795,12 +795,23 @@ CBLS arm, seed 1 and three repeats, reduced median complete-case elapsed time fr
 `bench_16_10`. Team-assignment and gbac retained identical source-checked witnesses;
 elapsed-driven restart differences prevent a trajectory-equivalence claim.
 
-In the two reported instances' completed pairs from
-[7647](https://lab.eignex.com/jobs/7647), both mixed arms produced 9/9 checked
-witnesses at 10 s. The historical feasibility losses also do not reproduce on the
-current-main control. `bench_16_10`'s median objective was 51 on main and 54 with
-pending propagation, so reduced definition cost does not establish a portfolio
-quality improvement.
+[Lab 7667](https://lab.eignex.com/jobs/7667) compares sparse/packed traversal at
+`1a348f4706` with main `fc34aad83d`: 17 inputs, LS and mixed engines, three seeds,
+three repeats and 10 s. All 612 cases completed; all 276 feasible witnesses passed
+original-source checking, with no paired feasibility loss. Both mixed arms found
+90/90 steelmillslab witnesses; the historical feasibility losses also do not
+reproduce on this main control. Per-instance median paired move-rate ratios were
+1.51–2.25 for LS and 2.31–3.98 for mixed steelmillslab runs. First-feasibility times
+did not improve consistently; objectives had five wins, six losses and 79 ties
+([quality follow-up](https://github.com/Eignex/klause/issues/3406)). The 72 IHTC
+pre-solver compile timeouts from [7647](https://lab.eignex.com/jobs/7647) remain
+outside this LS-only rerun.
+
+Control costs vary: mapping/code-generator paired move-rate ratios span 0.84–1.19.
+In the three-way fixed-arm [7660](https://lab.eignex.com/jobs/7660) guard,
+`ring_mp3` CBLS median elapsed time was 919 ms on main, 922 ms with packed-only
+traversal and 961 ms with sparse/packed traversal; chain medians were 4637, 4763
+and 4026 ms. Work and elapsed-driven restart variation limit equivalence claims.
 
 ### Source-scoped derivation admission
 
