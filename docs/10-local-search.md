@@ -97,8 +97,9 @@ richer moves that cost more to generate and are not always net-positive, such as
 Circuit 2-opt reversal, an AllDifferent 3-cycle or a DP-optimal accepting run for
 Regular. Default arms never pay for them. Each
 configured source carries a per-pick candidate cap and an enable gate. The reserved
-feasible structural draw in strict descent retains bounded [board swap coverage](11-neighborhoods.md#board-swap-coverage)
-between picks and slices within the existing resample window. The schedule
+feasible structural draw in strict descent cycles elected globals and retains bounded
+[board swap coverage](11-neighborhoods.md#board-swap-coverage) between picks and slices
+within the existing resample window. The schedule
 axis gates the plateau-escape sources on its stall signal.
 
 Every source closes its candidates through the ordinary move sink, which applies

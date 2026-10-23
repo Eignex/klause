@@ -467,6 +467,22 @@ class BoardSwapCoverageTest {
     }
 
     @Test
+    fun `every board should receive a retained draw in each source cycle`() {
+        val state = state()
+        val sink = MoveSink()
+        val drawn = mutableListOf<Int>()
+
+        repeat(6) {
+            sink.clear()
+            SatisfiedStructured.structural(1).generate(state, sink)
+            val move = sink.list.first() as Move.Compound
+            drawn.add((move.parts.first() as Move.IntSet).varId / 5)
+        }
+
+        for (cycle in drawn.chunked(2)) assertEquals(setOf(0, 1), cycle.toSet())
+    }
+
+    @Test
     fun `retained board coverage should leave other elected globals eligible`() {
         val problem = Problem(
             0, 6, Array(6) { if (it < 2) IntDomain(0, 1) else IntDomain(0, 3) },
@@ -479,7 +495,7 @@ class BoardSwapCoverageTest {
         sink.setOwners(state.seeding.ownerInt)
         val moves = mutableListOf<Move>()
 
-        repeat(32) {
+        repeat(2) {
             sink.clear()
             SatisfiedStructured.structural(1).generate(state, sink)
             moves.addAll(sink.list)
@@ -487,6 +503,9 @@ class BoardSwapCoverageTest {
 
         assertTrue(moves.any { move ->
             (move as Move.Compound).parts.any { (it as Move.IntSet).varId >= 2 }
+        })
+        assertTrue(moves.any { move ->
+            (move as Move.Compound).parts.any { (it as Move.IntSet).varId < 2 }
         })
     }
 

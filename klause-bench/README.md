@@ -968,6 +968,21 @@ losses and mean loss 735.9, fifteen large-source wins/five losses and mean gain
 3337.4, nine gbac wins/eleven losses and twenty photo ties. All 160 witnesses pass
 source checking. Grouping alone leaves a small-source quality tradeoff.
 
+Retaining the original sampled elected-global selection at `ab03ecc47f` keeps ten
+team fixed-work wins/six losses and all control ties in
+[7768](https://lab.eignex.com/jobs/7768). Default
+[7769](https://lab.eignex.com/jobs/7769) has one small-source win/eight losses and
+five large-source wins/four losses, with mean losses on both sources. All 136
+witnesses pass source checking; this selection remains unsupported for promotion.
+
+The complete baseline/coverage/perturbation/combined comparison in
+[7772](https://lab.eignex.com/jobs/7772) preserves fixed-restart controls exactly.
+Adding perturbation to coverage loses all eight ILS team pairs. Default
+[7773](https://lab.eignex.com/jobs/7773) loses all nine small-source combined pairs
+against both baseline and coverage; large-source combined pairs have five wins
+and four losses against baseline. All 272 witnesses pass source checks. Combining
+the two interventions does not resolve the small-source loss.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;
