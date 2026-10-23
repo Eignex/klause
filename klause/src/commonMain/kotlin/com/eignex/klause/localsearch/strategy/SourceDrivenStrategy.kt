@@ -90,7 +90,8 @@ class SourceDrivenStrategy(
      *  when the strategy generates exhaustively, so a `null` is a genuine local optimum. A positive cap
      *  suits a *sampled* strategy, where a `null` is usually just a draw that missed an existing improving
      *  move: re-drawing the same basin this many times (letting the stall machinery engage) keeps one
-     *  unlucky draw from discarding a good partial solution. */
+     *  unlucky draw from discarding a good partial solution. An unfinished retained board pass delays
+     *  the local-optimum callback independently of this cap, within the containing work allowance. */
     val feasibleResampleCap: Int = 0,
 ) {
 
@@ -140,7 +141,7 @@ class SourceDrivenStrategy(
     private var repairSink: MoveSink? = null
     private var repairAlternativeSink: MoveSink? = null
 
-    /** Pick the next move to apply, or `null` when no candidate is available (the engine restarts). */
+    /** Pick the next move to apply, or `null` when this pick has no accepted candidate. */
     fun pickMove(state: LocalSearchState): Move? = pickMove(state, Cancellation.Never)
 
     internal fun pickMove(state: LocalSearchState, cancellation: Cancellation): Move? =
@@ -153,7 +154,7 @@ class SourceDrivenStrategy(
     ): Move? {
         state.boardCoverage.beginPick(state)
         val move = pickCollectedMove(state, cancellation, evaluation)
-        val cancelled = cancellation()
+        val cancelled = state.boardCoverage.consulted && cancellation()
         state.boardCoverage.finishPick(cancelled)
         return move.takeUnless { cancelled }
     }

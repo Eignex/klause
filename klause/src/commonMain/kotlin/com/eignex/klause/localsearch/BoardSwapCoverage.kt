@@ -17,6 +17,9 @@ internal class BoardSwapCoverage {
     private var complete = false
     private var savedComplete = false
 
+    var consulted: Boolean = false
+        private set
+
     val pending: Boolean get() = started && !complete
 
     fun invalidate() {
@@ -28,6 +31,7 @@ internal class BoardSwapCoverage {
     }
 
     fun beginPick(state: LocalSearchState) {
+        consulted = false
         syncAssumptions(state)
         savedBoard = board
         savedLeft = left
@@ -55,6 +59,7 @@ internal class BoardSwapCoverage {
         val elected = state.seeding.electedImplicit
         if (elected.none { state.factors[it] is AllDifferentInvariant }) return false
         syncAssumptions(state)
+        consulted = true
         started = true
         var visits = 0
         val before = sink.size
