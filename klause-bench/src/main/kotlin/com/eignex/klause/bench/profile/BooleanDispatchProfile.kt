@@ -21,6 +21,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.security.MessageDigest
+import java.util.Locale
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -70,7 +71,8 @@ internal object BooleanDispatchProfile {
                             for (variable in 0 until model.numBoolVars step stride) {
                                 for (positive in listOf(false, true)) {
                                     val pushStarted = System.nanoTime()
-                                    val result = session.push(SearchDecision.Bool((variable shl 1) or if (positive) 0 else 1))
+                                    val literal = (variable shl 1) or if (positive) 0 else 1
+                                    val result = session.push(SearchDecision.Bool(literal))
                                     propagationNs += System.nanoTime() - pushStarted
                                     observations.update(result::class.simpleName.orEmpty().encodeToByteArray())
                                     if (result is ComponentResult.Consistent) {
@@ -94,7 +96,7 @@ internal object BooleanDispatchProfile {
                             put("traceNs", traceNs)
                             put("propagationNs", propagationNs)
                             put("callbacks", observer.assertions)
-                            put("observationsSha256", observations.digest().joinToString("") { "%02x".format(it) })
+                            put("observationsSha256", observations.digest().joinToString("") { "%02x".format(Locale.ROOT, it) })
                         })
                     }
                 }
