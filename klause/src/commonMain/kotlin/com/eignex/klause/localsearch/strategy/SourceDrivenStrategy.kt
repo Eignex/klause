@@ -151,7 +151,7 @@ class SourceDrivenStrategy(
         cancellation: Cancellation,
         evaluation: CompletedMoveEvaluation?,
     ): Move? {
-        state.boardCoverage.beginPick()
+        state.boardCoverage.beginPick(state)
         try {
             return pickCollectedMove(state, cancellation, evaluation)
         } finally {

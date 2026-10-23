@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -18,6 +19,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertIs
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -176,6 +178,37 @@ class BoardSwapCoverageTest {
                 assertEquals(5L, handle.stats.ls.moves.sum.toLong())
             }
             assertEquals(0, optima)
+        }
+    }
+
+    @Test
+    fun `maintained board outputs should never become partial swaps`() {
+        val problem = Problem(
+            0, 7, Array(7) { IntDomain(0, 4) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), 0, 5), Product(5, 6, 0)),
+        )
+        val state = freshState(problem, 7L)
+        repeat(5) { state.assignment.setInt(it, it.toLong()) }
+        state.assignment.setInt(5, 0)
+        state.assignment.setInt(6, 1)
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
+            .network(problem.numIntVars, problem.numBoolVars)
+        state.recompute()
+        val sink = MoveSink()
+        sink.setInvariants(state.invariants)
+        val moves = mutableListOf<Move>()
+
+        repeat(3) {
+            sink.clear()
+            SatisfiedStructured.structural(1).generate(state, sink)
+            moves.addAll(sink.list)
+        }
+
+        assertEquals(6, moves.size)
+        for (move in moves) {
+            val parts = (move as Move.Compound).parts.map { it as Move.IntSet }
+            assertTrue(parts.none { it.varId == 0 })
+            assertEquals(0L, state.netDelta(move))
         }
     }
 
