@@ -228,7 +228,9 @@ The outcome stays pending across a suspended repair and is omitted for an
 interrupted incomplete pass. Each decline consumes the ordinary restart work unit;
 the subsequent walk and anchor-adaptation rules retain their existing allowances.
 These outcomes describe input changes, not feasibility or arrival in a new basin.
-Snapshots contain one value per distinct board coordinate and are released when
+Immutable coordinate and owner indexes are cached per state; eligibility filters
+read live assumptions, definitions and ownership. Snapshots contain one value per
+distinct board coordinate and are released when
 the restart transition completes or closes.
 
 ### ALNS incumbent acquisition

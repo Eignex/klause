@@ -3,7 +3,6 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.AllDifferentInvariant
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.binarySearchInt
 
 /** Input-change result of a retained ILS board restart after preparation and greedy repair.
  *  A changed input establishes neither feasibility nor arrival in a different basin. */
@@ -25,10 +24,10 @@ enum class BoardRestartOutcome {
 }
 
 internal class PreparedBoardRestart private constructor(
-    private val boards: IntArray,
-    private val inputs: IntArray,
+    private val scope: BoardRestartInputs,
     private val before: LongArray,
 ) {
+    private val inputs = scope.inputs
     private var policyChanged = false
     private var preparationChanged = false
 
@@ -59,23 +58,40 @@ internal class PreparedBoardRestart private constructor(
             state.invariants?.isDefinedInt(variable) == true
         ) return false
         val owner = state.seeding.ownerInt?.get(variable) ?: -1
-        return owner < 0 || boards.binarySearchInt(owner) >= 0
+        return owner < 0 || scope.owns(owner)
     }
 
     companion object {
         fun capture(state: LocalSearchState): PreparedBoardRestart? {
+            val scope = state.boardRestartInputs
+            if (scope.inputs.isEmpty()) return null
+            return PreparedBoardRestart(
+                scope, LongArray(scope.inputs.size) { state.assignment.intValue(scope.inputs[it]) },
+            )
+        }
+    }
+}
+
+internal class BoardRestartInputs private constructor(
+    private val owners: IntHashSet,
+    val inputs: IntArray,
+) {
+    fun owns(factor: Int): Boolean = owners.size != 0 && factor in owners
+
+    companion object {
+        fun capture(state: LocalSearchState): BoardRestartInputs {
             val boards = state.seeding.electedImplicit.filter { fid ->
                 val factor = state.problem.factors[fid] as? AllDifferent
                 factor != null && factor.presents.isEmpty() && factor.exceptSet.isEmpty() &&
                     state.factors[fid] is AllDifferentInvariant
-            }.toIntArray()
-            if (boards.isEmpty()) return null
+            }
+            val owners = IntHashSet()
             val unique = IntHashSet()
-            for (fid in boards) for (variable in state.problem.factors[fid].intVars) unique.add(variable)
-            val inputs = unique.toIntArray()
-            return PreparedBoardRestart(
-                boards, inputs, LongArray(inputs.size) { state.assignment.intValue(inputs[it]) },
-            )
+            for (fid in boards) {
+                owners.add(fid)
+                for (variable in state.problem.factors[fid].intVars) unique.add(variable)
+            }
+            return BoardRestartInputs(owners, unique.toIntArray())
         }
     }
 }
