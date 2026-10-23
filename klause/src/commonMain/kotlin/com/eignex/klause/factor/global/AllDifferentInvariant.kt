@@ -299,6 +299,19 @@ internal class AllDifferentInvariant(
         }
     }
 
+    internal val swapCoordinateCount: Int get() = vars.size
+
+    internal fun proposeSwap(state: LocalSearchState, ai: Int, bi: Int, sink: MoveSink) {
+        val a = vars[ai]
+        val b = vars[bi]
+        if (a == b || !presentInvFn(state, ai) || !presentInvFn(state, bi)) return
+        if (!sink.allowsInt(a) || !sink.allowsInt(b)) return
+        val va = state.assignment.intValue(a)
+        val vb = state.assignment.intValue(b)
+        if (va == vb || vb !in state.rootDomains[a] || va !in state.rootDomains[b]) return
+        sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+    }
+
     override fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         proposeRandomRotations(state, vars, sink, MAX_STRUCTURED_SWAPS, SWAP_ATTEMPT_STRIDE) { s, idx ->
             presentInvFn(s, idx)
