@@ -1311,7 +1311,9 @@ internal class ResumableMinimize(
             // incumbent: an assignment the composed fixpoint refutes is an engine defect, never a solution. A check
             // the deadline cut short refutes nothing, so the leaf stands.
             if (pendingRealLeaf == null) {
-                val verdict = composedFixpoint(problem, Candidate(sample, Unit), params.cancellation, params.assumptions)
+                val verdict = composedFixpoint(
+                    problem, Candidate(sample, Unit), params.cancellation, params.assumptions,
+                )
                 if (verdict is Verification.Rejected) {
                     throw UnsoundnessException(
                         "backtrack reached an optimization leaf its constraints refute: ${verdict.reason}",

@@ -63,7 +63,8 @@ internal class LpSolveSession(
                 val previous = solver
                 val current = prepare(model, cancellation, workLimit)
                     ?: return@LpSolveCursor cancelledResult()
-                val result = when (val stage = solveFloating(current, current === previous, cancellation, observer, workLimit)) {
+                val stage = solveFloating(current, current === previous, cancellation, observer, workLimit)
+                val result = when (stage) {
                     is FloatingStage.Completed -> stage.result
                     FloatingStage.Cancelled -> return@LpSolveCursor cancelledResult()
                 }
@@ -100,7 +101,7 @@ internal class LpSolveSession(
             reported = emitted
             observer?.observeSolveProgress(delta, current is ComponentLpSolverCapability, finished)
         }
-        var failure: Throwable? = null
+        var cancelled = false
         val result = try {
             if (current is ResumableLpSolver) {
                 current.openSolve(if (retained) LpFloatAllowance(workLimit, 0) else null).use { numerical ->
@@ -108,26 +109,27 @@ internal class LpSolveSession(
                     while (step is LpSolveStep.Paused) {
                         report(false)
                         pauseAt(current.currentWork)
-                        if (cancellation()) return FloatingStage.Cancelled
+                        if (cancellation()) {
+                            cancelled = true
+                            break
+                        }
                         step = numerical.advance(shouldPause = { shouldPause(current.currentWork) })
                     }
-                    (step as LpSolveStep.Completed<FloatLpResult?>).value
+                    if (cancelled) null else (step as LpSolveStep.Completed<FloatLpResult?>).value
                 }
             } else {
                 if (retained) current.resolveBounds(LpFloatAllowance(workLimit, 0)) else current.solve()
             }
         } catch (primary: Throwable) {
-            failure = primary
-            throw primary
-        } finally {
             try {
                 report(true)
             } catch (cleanup: Throwable) {
-                if (failure == null) throw cleanup
-                if (failure !== cleanup) failure.addSuppressed(cleanup)
+                if (primary !== cleanup) primary.addSuppressed(cleanup)
             }
+            throw primary
         }
-        return FloatingStage.Completed(result)
+        report(true)
+        return if (cancelled) FloatingStage.Cancelled else FloatingStage.Completed(result)
     }
 
     private sealed interface FloatingStage {
