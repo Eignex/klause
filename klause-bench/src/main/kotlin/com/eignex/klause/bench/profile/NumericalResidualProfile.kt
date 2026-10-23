@@ -11,12 +11,6 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.reflect.InvocationTargetException
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
-import java.util.Base64
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -27,6 +21,12 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
+import java.util.Base64
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object NumericalResidualProfile {
     private const val ENGINE = "com.eignex.klause.lp.engine."
@@ -69,28 +69,33 @@ internal object NumericalResidualProfile {
         probe.captures.forEachIndexed { index, state ->
             out.resolve("residual-$index.klexact").writeBytes(encode(state))
         }
-        out.resolve("capture.json").writeText(buildJsonObject {
+        out.resolve("capture.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("source", source)
             put("entry", "direct satOptimized worker, seed3, 2s, default exact leaf acceptance; diagnostic")
             put("sourceVerdictClaim", false)
             put("cliRoutingEquivalence", false)
             put("processors", Runtime.getRuntime().availableProcessors())
+            put("runtimeDebug", System.getenv("KLAUSE_DEBUG"))
             put("elapsedNs", elapsed)
             put("rawResult", result.javaClass.simpleName)
             put("objective", result.objectiveValue?.let(::JsonPrimitive) ?: JsonNull)
             put("phaseNs", json(probe.phaseNs))
             put("phaseCalls", json(probe.phaseCalls))
+            put("transformEntries", json(probe.transformEntries))
             put("solves", JsonArray(probe.solves))
             put("builds", JsonArray(probe.builds))
             put("captureHashes", buildJsonArray { probe.captures.forEach { add(JsonPrimitive(sha256(encode(it)))) } })
-        }.toString())
+        }.toString()
+        )
         println("captured $suite/$name: ${probe.solves.size} float invocations, ${probe.captures.size} residuals")
     }
 
     internal class Probe(private val denseLimit: Int = 6) {
         val phaseNs = linkedMapOf<String, Long>()
         val phaseCalls = linkedMapOf<String, Long>()
+        val transformEntries = linkedMapOf<String, Long>()
         val solves = ArrayList<JsonElement>()
         val builds = ArrayList<JsonElement>()
         val captures = ArrayList<Any>()
@@ -103,10 +108,12 @@ internal object NumericalResidualProfile {
             val factory = Proxy.newProxyInstance(factoryType.classLoader, arrayOf(factoryType)) { _, method, values ->
                 val arguments = values.orEmpty()
                 val owner = measured("owner-setup") { invoke(production, method, arguments) }
-                if (owner == null || !method.name.startsWith("new") || !owner.javaClass.simpleName.startsWith("RevisedSimplex")) {
+                val numericalOwner = owner != null && method.name.startsWith("new") &&
+                    owner.javaClass.simpleName.startsWith("RevisedSimplex")
+                if (!numericalOwner) {
                     owner
                 } else {
-                    wrapEngine(owner, owners++)
+                    wrapEngine(requireNotNull(owner), owners++)
                 }
             }
             context = Class.forName(ENGINE + "LpSolveContext").getConstructor().newInstance()
@@ -129,30 +136,47 @@ internal object NumericalResidualProfile {
                 Proxy.newProxyInstance(basisType.classLoader, arrayOf(basisType)) { _, method, values ->
                     val arguments = values.orEmpty()
                     val phase = method.name
-                    val observation = if (phase == "refactorize" && builds.size < 4096) buildJsonObject {
+                    val observation = if (phase == "refactorize" && builds.size < 4096) {
+                        buildJsonObject {
                         put("owner", id)
                         put("dimension", call(backend, "getN") as Int)
                         put("updates", call(backend, "getUpdateCount") as Int)
                         val headings = arguments.single() as IntArray
                         var entries = 0
-                        for (column in headings) for (entry in pointers[column] until pointers[column + 1]) {
-                            if (coefficients[entry] != 0.0) entries++
+                        for (column in headings) {
+                            for (entry in pointers[column] until pointers[column + 1]) {
+                                if (coefficients[entry] != 0.0) entries++
+                            }
                         }
                         put("basisEntries", entries)
                         put("basisDensity", entries.toDouble() / (headings.size.toDouble() * headings.size))
                         put("policy", json(call(owner, "getLastRefactorPolicyMetrics")))
                         put("backendWorkBefore", json(call(backend, "getBasisWork")))
-                    } else null
-                    val timed = setOf("refactorize", "ftran", "btran", "update", "close", "repair", "solveQuality")
+                        }
+                    } else {
+                        null
+                    }
+                    val timed = setOf(
+                        "refactorize", "ftran", "btran", "update", "close", "refactorizeRepairing", "solveQuality",
+                    )
                     val result = if (phase in timed) {
                         measured(phase) { invoke(backend, method, arguments) }
-                    } else invoke(backend, method, arguments)
-                    if (observation != null) builds += buildJsonObject {
+                    } else {
+                        invoke(backend, method, arguments)
+                    }
+                    if (phase == "ftran" || phase == "btran") {
+                        val work = requireNotNull(call(backend, "getLastSolveWork"))
+                        val entries = call(work, "getTransformEntries") as Long
+                        transformEntries[phase] = (transformEntries[phase] ?: 0L) + entries
+                    }
+                    if (observation != null) {
+                        builds += buildJsonObject {
                         observation.forEach { (key, value) -> put(key, value) }
                         put("accepted", result as Boolean)
                         put("factorNnz", call(backend, "getNnz") as Int)
                         put("kernel", json(call(backend, "getKernel")))
                         put("backendWorkAfter", json(call(backend, "getBasisWork")))
+                        }
                     }
                     result
                 }
@@ -172,6 +196,7 @@ internal object NumericalResidualProfile {
                         put("elapsedNs", System.nanoTime() - started)
                         put("metrics", json(call(owner, "getLastMetrics")))
                         put("policy", json(call(owner, "getLastRefactorPolicyMetrics")))
+                        put("policyMetricsScope", "owner lifetime; replaced on unscaled fallback")
                         put("result", json(result))
                     }
                     val pivots = call(requireNotNull(call(owner, "getLastMetrics")), "getPivots") as Int
@@ -183,7 +208,9 @@ internal object NumericalResidualProfile {
 
         private fun <T> measured(phase: String, block: () -> T): T {
             val start = System.nanoTime()
-            try { return block() } finally {
+            try {
+                return block()
+            } finally {
                 phaseNs[phase] = (phaseNs[phase] ?: 0L) + System.nanoTime() - start
                 phaseCalls[phase] = (phaseCalls[phase] ?: 0L) + 1L
             }
@@ -205,9 +232,11 @@ internal object NumericalResidualProfile {
 
     private fun singleton(name: String): Any = Class.forName(name).getField("INSTANCE").get(null)
 
-    private fun field(owner: Any, name: String): Any = requireNotNull(owner.javaClass.getDeclaredField(name).apply {
+    private fun field(owner: Any, name: String): Any = requireNotNull(
+        owner.javaClass.getDeclaredField(name).apply {
         isAccessible = true
-    }.get(owner))
+    }.get(owner)
+    )
 
     private fun set(owner: Any, name: String, value: Any) {
         owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.set(owner, value)
@@ -221,6 +250,7 @@ internal object NumericalResidualProfile {
         return invoke(owner, method, arguments)
     }
 
+    @Suppress("SpreadOperator")
     private fun invoke(owner: Any, method: Method, arguments: Array<out Any?>): Any? = try {
         method.invoke(owner, *arguments)
     } catch (failure: InvocationTargetException) {
@@ -229,22 +259,33 @@ internal object NumericalResidualProfile {
 
     internal fun json(value: Any?, depth: Int = 0): JsonElement = when {
         value == null -> JsonNull
+
         value is Number -> JsonPrimitive(value)
+
         value is Boolean -> JsonPrimitive(value)
+
         value is String || value is Enum<*> -> JsonPrimitive(value.toString())
+
         depth >= 4 -> JsonPrimitive(value.toString())
+
         value is Map<*, *> -> buildJsonObject {
             value.forEach { (key, item) -> put(key.toString(), json(item, depth + 1)) }
         }
+
         value is Iterable<*> -> JsonArray(value.take(256).map { json(it, depth + 1) })
+
         value is IntArray -> JsonArray(value.take(256).map(::JsonPrimitive))
+
         value is DoubleArray -> JsonArray(value.take(256).map(::JsonPrimitive))
+
         else -> buildJsonObject {
             value.javaClass.methods.filter {
                 it.name.startsWith("get") && it.parameterCount == 0 && it.name != "getClass"
             }.sortedBy { it.name }.forEach { getter ->
-                put(getter.name.removePrefix("get").substringBefore('$').replaceFirstChar { it.lowercase() },
-                    json(invoke(value, getter, emptyArray()), depth + 1))
+                put(
+                    getter.name.removePrefix("get").substringBefore('$').replaceFirstChar { it.lowercase() },
+                    json(invoke(value, getter, emptyArray()), depth + 1),
+                )
             }
         }
     }
