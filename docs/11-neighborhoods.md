@@ -80,8 +80,8 @@ whole-source validation remain required.
 ## Board swap coverage
 
 After a strict feasible descent's sampled pick misses, the reserved structural draw
-keeps its existing elected-global selection. A selected AllDifferent board retains
-its pair progress; other elected globals keep their ordinary structured proposals.
+cycles through every elected global from a random start. A selected AllDifferent board
+retains its pair progress; other elected globals keep their ordinary structured proposals.
 Each board starts at a random unordered pair and visits cyclic pair ranks
 without repetition, using a random coprime stride to spread partial passes across ranks.
 A pick keeps the ordinary limit of four proposals and 24
