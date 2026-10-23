@@ -23,6 +23,21 @@ import kotlin.test.assertTrue
 
 class CliModePresolveTest {
     @Test
+    fun `automatic preparation weighting should preserve explicit work currency`() {
+        for ((setting, weight) in listOf(null to 3L, "687500000" to 10L, "0" to 10L)) {
+            val common = CommonOptions().apply {
+                timeLimitMs = 10_000L
+                setting?.let { engineParams.add("presolve-work-limit=$it") }
+            }
+
+            val budget = requireNotNull(common.sharedPresolveBudget())
+
+            assertEquals(weight, budget.sourceProbeWorkWeight)
+            assertEquals(setting?.toLong() ?: presolveWorkFor(2500L), budget.allowance)
+        }
+    }
+
+    @Test
     fun `comparison folding should publish a complete FlatZinc assignment satisfying both reifications`() {
         val fzn = File.createTempFile("comparison-indicators", ".fzn").apply {
             writeText("""

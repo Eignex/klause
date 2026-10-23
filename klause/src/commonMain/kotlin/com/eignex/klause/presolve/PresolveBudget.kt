@@ -30,7 +30,13 @@ private const val ROOT_PROPAGATION_WEIGHT = 53L
 class PresolveBudget(
     /** Work units the phase may spend in all. */
     val allowance: Long,
+    /** Phase units per open-range probe visit; explicit work allowances use the default currency. */
+    val sourceProbeWorkWeight: Long = 10L,
 ) : WorkMeter {
+    init {
+        require(sourceProbeWorkWeight in 1L..10L)
+    }
+
     private var spent = 0L
     internal var activeInvocation: PresolveInvocation? = null
     private val observations = ArrayList<PresolveInvocationStats>()

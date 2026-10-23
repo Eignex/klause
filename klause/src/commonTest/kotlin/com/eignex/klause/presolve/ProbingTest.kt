@@ -199,10 +199,14 @@ class ProbingTest {
             openIntHi = booleanArrayOf(true),
         )
 
-        val bounds = Presolve.probeSource(problem, cap, Cancellation.Never).bounds!!
+        for (weight in listOf(3L, 10L)) {
+            val budget = PresolveBudget(Long.MAX_VALUE, sourceProbeWorkWeight = weight)
 
-        assertFalse(bounds.isOpenUpper(0))
-        assertEquals(7L, bounds.upper(0))
+            val bounds = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never)).bounds!!
+
+            assertFalse(bounds.isOpenUpper(0))
+            assertEquals(7L, bounds.upper(0))
+        }
     }
 
     @Test
@@ -268,14 +272,17 @@ class ProbingTest {
             0, 8, Array(8) { IntDomain(0, 1) },
             List(8) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
         )
-        for (allowance in listOf(1L, 81L, 331L, 481L, 561L, 721L, 801L)) {
-            val budget = PresolveBudget(allowance)
+        for (weight in listOf(3L, 10L)) {
+            for (visits in listOf(0L, 8L, 33L, 48L, 56L, 72L, 80L)) {
+                val allowance = visits * weight + 1L
+                val budget = PresolveBudget(allowance, sourceProbeWorkWeight = weight)
 
-            val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+                val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
 
-            assertTrue(delta.isEmpty, "allowance=$allowance")
-            assertFalse(delta.infeasible)
-            assertTrue(budget.spent() in allowance..allowance + 639, "spent=${budget.spent()}")
+                assertTrue(delta.isEmpty, "allowance=$allowance weight=$weight")
+                assertFalse(delta.infeasible)
+                assertTrue(budget.spent() in allowance..allowance + 64L * weight - 1L, "spent=${budget.spent()}")
+            }
         }
     }
 

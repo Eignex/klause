@@ -150,6 +150,10 @@ discovery and stops posting chains when it fires.
 owns one deterministic phase allowance across routing, passes, probes and rebuilds.
 The CLI also bounds optional work by an elapsed ceiling; `presolve-work-limit=unlimited`
 removes only the work cap. Host speed can therefore affect which reductions finish.
+Automatic CLI budgets charge each open-range probe visit three phase units;
+explicit numeric work limits and library budgets retain ten. Other pass weights,
+the shared allowance and the elapsed ceiling keep their own accounting. Probe
+polling strides count visits independently of this price.
 [Resource configuration](06-sessions.md#configuration-and-lifetime) owns these controls.
 
 Root construction reports a size proxy over columns, factors and structural keys;

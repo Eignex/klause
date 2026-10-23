@@ -109,7 +109,9 @@ internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
             ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION
         val budgetMs = explicit ?: SolveCore.derivedPresolveBudgetMs(timeLimitMs, fraction)
         presolveBudget = when (val setting = takeAllowanceSetting(engineParams, "presolve-work-limit")) {
-            AllowanceSetting.Automatic -> if (budgetMs <= 0L) null else PresolveBudget(presolveWorkFor(budgetMs))
+            AllowanceSetting.Automatic -> if (budgetMs <= 0L) null else PresolveBudget(
+                presolveWorkFor(budgetMs), sourceProbeWorkWeight = 3L,
+            )
             AllowanceSetting.Unlimited -> null
             is AllowanceSetting.Remaining -> PresolveBudget(setting.units)
         }
