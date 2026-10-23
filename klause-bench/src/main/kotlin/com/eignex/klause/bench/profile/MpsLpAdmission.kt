@@ -26,6 +26,7 @@ import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
@@ -73,7 +74,7 @@ internal object MpsLpAdmission {
         ))
         val plan = requireNotNull(invocation.preparedPlan)
         val canonical = requireNotNull(plan.model)
-        val sourceObjective = plan.objective?.let { if (plan.maximize) it.negated() else it }
+        val sourceObjective = preparedObjective(plan)
         val budget = PresolveBudget(1_650_000_000L)
         val preparation = FinitePipeline.prepare(FinitePipelineRequest(
             canonical, FiniteEngine.BACKTRACK, sourceObjective,
@@ -97,6 +98,7 @@ internal object MpsLpAdmission {
             put("preparationCancelled", stop())
             put("preparationMaySolveBounds", true)
             put("canonicalFactors", canonical.factors.size)
+            put("preparedObjectivePresent", sourceObjective != null)
             put("sourceSemantics", original.semantics.toString())
             put("route", invocation.route::class.simpleName)
             put("compiledIntegers", problem.numIntVars)
@@ -124,6 +126,12 @@ internal object MpsLpAdmission {
         }
         out.resolve("admission.json").writeText("$report\n")
         println(report)
+    }
+
+    internal fun preparedObjective(plan: PreparedSourcePlan): LinearObjective? {
+        val method = plan.javaClass.methods.single { it.name.startsWith("getWorkingLinearObjective") }
+        val objective = method.invoke(plan) as LinearObjective?
+        return objective?.let { if (plan.maximize) it.negated() else it }
     }
 
     private fun recipes(problem: BakedProblem, objective: LinearObjective?, mix: EngineMix): JsonObject {
