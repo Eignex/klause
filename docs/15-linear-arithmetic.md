@@ -93,6 +93,10 @@ Each block uses the bounded repair path, and their summed squared dimensions mus
 the same elimination allowance. A block's certified infeasibility support maps back to its
 original selected rows and their Boolean premises. Every selected original row checks an
 assembled candidate point.
+Within residual real completion, independent components check graph and opposite
+parallel contradictions before any component consumes a source LP operation.
+Deferred LP components rebuild their local rows one at a time within the same
+temporary entry allowance; their certified points still pass the selected source rows.
 
 #### Disjunctions and disequalities
 

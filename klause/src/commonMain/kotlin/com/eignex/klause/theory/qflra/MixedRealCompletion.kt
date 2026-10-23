@@ -52,6 +52,8 @@ internal fun completeMixedRealComponents(
     if (stop()) return null
     val members = groups.groups()
     val point = MutableList(columns) { BigFraction.ZERO }
+    val multipleComponents = byRoot.size > 1
+    var deferredLp = 0
     for (component in members) {
         stop.charge(4L + component.size)
         if (stop()) return null
@@ -75,6 +77,7 @@ internal fun completeMixedRealComponents(
             if (result is RealDifferenceSystem.Result.Infeasible) {
                 val support = result.cycleEdges
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_GRAPH_CONFLICT")
+                if (deferredLp > 0) onStage?.invoke("RECOVERY_REAL_COMPONENT_CHEAP_CONFLICT_BEFORE_LP")
                 if (support != null) {
                     stop.charge(support.size.toLong() + 1L)
                     if (!stop() && support.isNotEmpty() && support.all { it in selected.indices }) {
@@ -94,30 +97,54 @@ internal fun completeMixedRealComponents(
                 stop.charge(conflict.size.toLong())
                 if (stop()) return null
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_PARALLEL_CONFLICT")
+                if (deferredLp > 0) onStage?.invoke("RECOVERY_REAL_COMPONENT_CHEAP_CONFLICT_BEFORE_LP")
                 if (!stop()) onInfeasible?.invoke(IntArray(conflict.size) { selected[conflict[it]] })
                 return null
             }
             onStage?.invoke("RECOVERY_REAL_COMPONENT_ROWS_${localRows.size}_${reduced.rows.size}")
+            if (multipleComponents) {
+                deferredLp++
+                onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_DEFERRED")
+                continue
+            }
             if (!budget.admitsDimensions(component.size, reduced.rows.size.toLong())) {
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_DIMENSION")
                 return null
             }
-            onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_REQUEST")
-            SourceLp(reduced.rows, component.size, budget).use { owner ->
-                val result = owner.solve(stop)
-                onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_${result?.verdict}")
-                if (result?.verdict == LpVerdict.INFEASIBLE && onInfeasible != null && !stop()) {
-                    val support = residualConflictRows(result.conflictSupport, component.size, reduced.rows.size, stop)
-                    if (support != null && !stop()) {
-                        stop.charge(support.size.toLong())
-                        val original = IntArray(support.size) { selected[reduced.origins[support[it]]] }
-                        onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_CONFLICT")
-                        if (!stop()) onInfeasible(original)
-                    }
-                }
-                result?.exactPrimal?.take(component.size)
-            }
+            solveMixedRealComponent(component.size, reduced, selected, budget, stop, onStage, onInfeasible)
         }
+        if (values == null || values.size != component.size || stop()) {
+            onStage?.invoke("RECOVERY_REAL_COMPONENT_NO_POINT")
+            return null
+        }
+        for (index in component.indices) point[component[index]] = values[index]
+        stop.charge(4L)
+        if (stop()) return null
+        byRoot.remove(groups.find(component.first()))
+    }
+    if (deferredLp > 0) onStage?.invoke("RECOVERY_REAL_COMPONENT_CHEAP_SWEEP_COMPLETE")
+    for (component in members) {
+        stop.charge(4L + component.size)
+        if (stop()) return null
+        val selected = byRoot[groups.find(component.first())] ?: continue
+        val local = component.withIndex().associate { it.value to it.index }
+        val localRows = ArrayList<ExactRationalInequality>(selected.size)
+        for (rowIndex in selected) {
+            val row = rows[rowIndex]
+            stop.charge(row.columns.size.toLong() + 1L)
+            if (stop()) return null
+            localRows += ExactRationalInequality(row.columns.map { local.getValue(it) }.toIntArray(),
+                row.coefficients, row.rhs, row.strict)
+        }
+        // Rebuilding one component keeps deferred rows inside the original temporary entry envelope.
+        val reduced = mergeParallelRealRows(localRows, stop)
+            ?: MixedRealRows(localRows, IntArray(localRows.size) { it })
+        if (stop()) return null
+        if (!budget.admitsDimensions(component.size, reduced.rows.size.toLong())) {
+            onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_DIMENSION")
+            return null
+        }
+        val values = solveMixedRealComponent(component.size, reduced, selected, budget, stop, onStage, onInfeasible)
         if (values == null || values.size != component.size || stop()) {
             onStage?.invoke("RECOVERY_REAL_COMPONENT_NO_POINT")
             return null
@@ -126,6 +153,33 @@ internal fun completeMixedRealComponents(
     }
     return point.takeIf { MixedPointArithmetic(stop).satisfies(it, rows) }
         ?.also { onStage?.invoke("RECOVERY_REAL_COMPONENTS_POINT") }
+}
+
+private fun solveMixedRealComponent(
+    columns: Int,
+    rows: MixedRealRows,
+    selected: List<Int>,
+    budget: SourceLpBudget,
+    stop: Cancellation,
+    onStage: ((String) -> Unit)?,
+    onInfeasible: ((IntArray) -> Unit)?,
+): List<BigFraction>? {
+    if (stop()) return null
+    onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_REQUEST")
+    return SourceLp(rows.rows, columns, budget).use { owner ->
+        val result = owner.solve(stop)
+        onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_${result?.verdict}")
+        if (result?.verdict == LpVerdict.INFEASIBLE && onInfeasible != null && !stop()) {
+            val support = residualConflictRows(result.conflictSupport, columns, rows.rows.size, stop)
+            if (support != null && !stop()) {
+                stop.charge(support.size.toLong())
+                val original = IntArray(support.size) { selected[rows.origins[support[it]]] }
+                onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_CONFLICT")
+                if (!stop()) onInfeasible(original)
+            }
+        }
+        result?.exactPrimal?.take(columns)
+    }
 }
 
 private class MixedRealRows(

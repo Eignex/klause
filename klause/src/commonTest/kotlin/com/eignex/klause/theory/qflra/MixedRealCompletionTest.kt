@@ -13,6 +13,70 @@ import kotlin.test.assertTrue
 
 class MixedRealCompletionTest {
     @Test
+    fun `later cheap conflicts should precede earlier component LP requests`() {
+        for (kind in listOf("graph", "parallel")) {
+            for (strict in listOf(false, true)) {
+                val parallel = kind == "parallel"
+                val columns = if (parallel) intArrayOf(3, 4, 5) else intArrayOf(3)
+                val rows = listOf(
+                    ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+                    ExactRationalInequality(columns, List(columns.size) { BigFraction.ONE },
+                        if (strict) BigFraction.ONE else BigFraction.ZERO, strict),
+                    ExactRationalInequality(columns, List(columns.size) { BigFraction.MINUS_ONE },
+                        BigFraction.MINUS_ONE),
+                )
+                val budget = SourceLpBudget(maxOperations = 0)
+                val stages = ArrayList<String>()
+                var support: IntArray? = null
+
+                val point = completeMixedRealComponents(6, rows, budget, Cancellation.Never,
+                    onStage = { stages += it }, onInfeasible = { support = it })
+
+                assertNull(point)
+                assertEquals(setOf(1, 2), assertNotNull(support).toSet())
+                assertEquals(0, budget.operations)
+                assertTrue("RECOVERY_REAL_COMPONENT_CHEAP_CONFLICT_BEFORE_LP" in stages)
+                assertTrue("RECOVERY_REAL_COMPONENT_LP_REQUEST" !in stages)
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation after cheap checks should prevent deferred LP requests`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(3), listOf(BigFraction.ONE), BigFraction.ONE),
+        )
+        val budget = SourceLpBudget()
+        var stopped = false
+        var support: IntArray? = null
+
+        val point = completeMixedRealComponents(4, rows, budget, Cancellation { stopped },
+            onStage = { if (it == "RECOVERY_REAL_COMPONENT_CHEAP_SWEEP_COMPLETE") stopped = true },
+            onInfeasible = { support = it })
+
+        assertTrue(stopped)
+        assertNull(point)
+        assertNull(support)
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
+    fun `deferred LP points should agree with independent graph points`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(3), listOf(BigFraction.ONE), BigFraction.ofLong(2)),
+            ExactRationalInequality(intArrayOf(3), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+        )
+        val budget = SourceLpBudget(maxOperations = 1)
+
+        val point = assertNotNull(completeMixedRealComponents(4, rows, budget, Cancellation.Never))
+
+        assertTrue(point.satisfiesSourceRows(rows))
+        assertEquals(1, budget.operations)
+    }
+
+    @Test
     fun `graph conflicts should cite their original component rows`() {
         for (strict in listOf(false, true)) {
             val rows = listOf(
