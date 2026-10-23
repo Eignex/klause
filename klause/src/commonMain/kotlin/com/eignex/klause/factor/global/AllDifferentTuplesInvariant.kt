@@ -96,7 +96,11 @@ internal class AllDifferentTuplesInvariant(private val tuples: List<IntArray>) :
         return maxOf(0, after - 1) - maxOf(0, before - 1)
     }
 
-    private class TupleState(val keys: Array<TupleValues>, val counts: MutableMap<TupleValues, Int>, var excess: Int = 0)
+    private class TupleState(
+        val keys: Array<TupleValues>,
+        val counts: MutableMap<TupleValues, Int>,
+        var excess: Int = 0,
+    )
 
     private companion object {
         const val REPAIR_CAP = 4

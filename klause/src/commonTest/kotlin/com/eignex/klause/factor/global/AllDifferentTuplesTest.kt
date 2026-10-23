@@ -28,9 +28,9 @@ class AllDifferentTuplesTest {
 
     @Test
     fun `structural identity should preserve row permutations and coordinate order`() {
-        val factor = AllDifferentTuples(listOf(intArrayOf(0, 0), intArrayOf(1, 2)))
-        val reordered = AllDifferentTuples(listOf(intArrayOf(1, 2), intArrayOf(0, 0)))
-        val reversed = AllDifferentTuples(listOf(intArrayOf(0, 0), intArrayOf(2, 1)))
+        val factor = AllDifferentTuples(listOf(intArrayOf(0, 1), intArrayOf(2, 3)))
+        val reordered = AllDifferentTuples(listOf(intArrayOf(2, 3), intArrayOf(0, 1)))
+        val reversed = AllDifferentTuples(listOf(intArrayOf(0, 1), intArrayOf(3, 2)))
 
         assertEquals(factor.structuralKey(), reordered.structuralKey())
         assertNotEquals(factor.structuralKey(), reversed.structuralKey())
