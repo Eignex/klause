@@ -259,6 +259,9 @@ interface SearchModelPolicy {
 
 /** Typed model disposition selected by [SearchModelPolicy]. */
 sealed interface SearchModelDisposition {
+    /** Retain this model and its trail, then retry the policy on the next [SearchRun.next] call. */
+    data object Pause : SearchModelDisposition
+
     /** Return this model from [SearchRun.next]. */
     data object Surface : SearchModelDisposition
 

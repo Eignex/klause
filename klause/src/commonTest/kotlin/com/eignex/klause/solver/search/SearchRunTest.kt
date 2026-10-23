@@ -1,11 +1,109 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 
 class SearchRunTest {
+    @Test
+    fun `paused completion should retry the same model before traversing siblings`() {
+        for (continuation in listOf(SearchModelContinuation.Chronological, SearchModelContinuation.BlockAtRoot)) {
+            var checks = 0
+            var observations = 0
+            var nodes = 0
+            val models = ArrayList<AssembledSearchModel>()
+            val session = SearchSession(listOf(object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck {
+                    checks++
+                    return ComponentCheck.Feasible
+                }
+            }))
+            session.initialize()
+            val run = session.openRun(
+                1,
+                modelContinuation = continuation,
+                observer = object : SearchRunObserver {
+                    override fun onModel(model: AssembledSearchModel) { observations++ }
+                },
+                nodePolicy = object : SearchNodePolicy {
+                    override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+                        nodes++
+                        return SearchNodeDisposition.Expand
+                    }
+                },
+                modelPolicy = object : SearchModelPolicy {
+                    override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
+                        models += model
+                        return if (models.size < 3) SearchModelDisposition.Pause else SearchModelDisposition.Surface
+                    }
+                },
+            )
+
+            assertIs<SearchRunEvent.Paused>(run.next())
+            val pendingLevel = session.decisionLevel
+            val pendingNodes = nodes
+            assertIs<SearchRunEvent.Paused>(run.next())
+            val first = assertIs<SearchRunEvent.Satisfied>(run.next())
+
+            assertSame(models.first(), first.model)
+            models.forEach { assertSame(first.model, it) }
+            assertEquals(pendingLevel, session.decisionLevel)
+            assertEquals(pendingNodes, nodes)
+            assertEquals(1, checks)
+            assertEquals(1, observations)
+            val second = assertIs<SearchRunEvent.Satisfied>(run.next())
+            assertEquals(false, first.model.valueOf(SearchBoolValue(0)))
+            assertEquals(true, second.model.valueOf(SearchBoolValue(0)))
+            assertIs<SearchRunEvent.Exhausted>(run.next())
+        }
+    }
+
+    @Test
+    fun `cancellation should stop pending completion before retrying the policy`() {
+        var cancelled = false
+        var retries = 0
+        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        session.initialize()
+        val run = session.openRun(0, modelPolicy = object : SearchModelPolicy {
+            override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
+                retries++
+                return SearchModelDisposition.Pause
+            }
+        })
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        cancelled = true
+        val result = run.next()
+
+        assertSame(SearchRunEvent.Indeterminate.Cancelled, result)
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun `root reset should discard a pending model`() {
+        var checks = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                checks++
+                return ComponentCheck.Feasible
+            }
+        }))
+        session.initialize()
+        val run = session.openRun(0, modelPolicy = object : SearchModelPolicy {
+            override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition =
+                SearchModelDisposition.Pause
+        })
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        run.reset()
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        assertEquals(2, checks)
+    }
+
     @Test
     fun `a learned backjump should preserve nested conditions`() {
         for (selection in listOf(

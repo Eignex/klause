@@ -35,6 +35,7 @@ class SearchRun internal constructor(
     private var learnedApplied = false
     private var resumeAfterSolution = false
     private var lastModel: AssembledSearchModel? = null
+    private var pendingModel: AssembledSearchModel? = null
     private var consumedModel = false
     private var terminal: SearchRunEvent? = null
     private var started = false
@@ -91,14 +92,14 @@ class SearchRun internal constructor(
             }
         }
         while (true) {
-            if (cancellationPoller.due()) {
+            if (pendingModel != null || cancellationPoller.due()) {
                 if (session.cancelled()) {
                     return lifecycle.onCancellation(session).toEvent()
                         ?: finish(SearchRunEvent.Indeterminate.Cancelled)
                 }
                 cancellationPoller.rearm()
             }
-            when (val node = nodePolicy.beforeBranch(session)) {
+            if (pendingModel == null) when (val node = nodePolicy.beforeBranch(session)) {
                 SearchNodeDisposition.Expand -> Unit
 
                 SearchNodeDisposition.Prune -> {
@@ -131,16 +132,25 @@ class SearchRun internal constructor(
                 // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
                 SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
             }
-            when (val alternatives = alternatives()) {
-                is Alternatives.Leaf -> when (val result = session.check()) {
+            when (val alternatives = if (pendingModel != null) Alternatives.Leaf else alternatives()) {
+                is Alternatives.Leaf -> when (val result = if (pendingModel != null) {
+                    ComponentCheck.Feasible
+                } else session.check()) {
                     ComponentCheck.Feasible -> {
-                        params.restart.onSolution()
-                        val model = session.model().also {
+                        val model = pendingModel ?: session.model().also {
+                            params.restart.onSolution()
                             lastModel = it
                             observer.onModel(it)
                         }
+                        pendingModel = null
                         resumeAfterSolution = true
                         when (modelPolicy.onModel(model, session)) {
+                            SearchModelDisposition.Pause -> {
+                                resumeAfterSolution = false
+                                pendingModel = model
+                                return SearchRunEvent.Paused
+                            }
+
                             SearchModelDisposition.Surface -> return SearchRunEvent.Satisfied(model)
 
                             SearchModelDisposition.Indeterminate -> {
@@ -511,6 +521,7 @@ class SearchRun internal constructor(
         sawIndeterminate = false
         resumeAfterSolution = false
         lastModel = null
+        pendingModel = null
         consumedModel = false
         terminal = null
         pendingAdvance = false
