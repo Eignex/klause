@@ -52,6 +52,34 @@ class RevisedSimplexTest {
     }
 
     @Test
+    fun `resuming a cursor should preserve the invocation work limit`() {
+        val model = halfIntegralModel()
+        val limit = RevisedSimplex(model).use { owner ->
+            owner.openSolve().use { cursor ->
+                assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = { true }))
+                owner.currentWork
+            }
+        }
+        assertTrue(limit > 0L)
+        RevisedSimplex(model, workLimit = limit).use { uninterrupted ->
+            val expected = uninterrupted.solve()
+            RevisedSimplex(model, workLimit = limit).use { sliced ->
+                sliced.openSolve().use { cursor ->
+                    assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = { true }))
+
+                    val result = assertIs<LpSolveStep.Completed<FloatLpResult?>>(cursor.advance()).value
+
+                    assertEquals(expected?.objective, result?.objective)
+                    assertEquals(expected?.primal?.toList(), result?.primal?.toList())
+                    assertEquals(LpFloatTermination.WORK, sliced.lastTermination)
+                    assertEquals(uninterrupted.lastMetrics.workOps, sliced.lastMetrics.workOps)
+                    assertEquals(uninterrupted.lastMetrics.pivots, sliced.lastMetrics.pivots)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `closing an unopened cursor should release the solve exclusion`() {
         RevisedSimplex(halfIntegralModel()).use { solver ->
             val cursor = solver.openSolve()
