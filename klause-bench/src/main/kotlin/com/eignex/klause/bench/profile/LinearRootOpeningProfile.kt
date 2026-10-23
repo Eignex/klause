@@ -41,9 +41,9 @@ internal object LinearRootOpeningProfile {
         }
         require(Runtime.getRuntime().availableProcessors() == 1)
         if (args.size == 1 && args[0].startsWith("batch64=")) {
-            val requests = Json.decodeFromString<List<List<String>>>(
-                Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString(),
-            )
+            val requestBytes = Base64.getDecoder().decode(args[0].substringAfter('='))
+            require(requestBytes.size <= 32 * 1024)
+            val requests = Json.decodeFromString<List<List<String>>>(requestBytes.decodeToString())
             require(requests.size in 1..4)
             requests.forEachIndexed { index, request -> inspect(request.toTypedArray(), out.resolve("$index")) }
         } else inspect(args, out)
