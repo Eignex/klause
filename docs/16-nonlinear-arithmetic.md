@@ -253,8 +253,8 @@ Boolean DAG retains original Boolean identities and the first numeric
 representative, including after graph substitution. Constant numeric atoms retain
 their exact polynomials; Boolean propagation evaluates their truth.
 
-Before probing or Boolean search, required equivalences defining Boolean variables
-by numeric predicates are substituted throughout the formula. Their tautologies
+The root reducer substitutes Boolean variables defined by required numeric
+equivalences throughout the formula. Their tautologies
 are removed, so a source implicant need not choose truth values for unused
 definitions. Numeric predicates retain their input order through this rewrite.
 An equivalence in an optional guarded branch cannot define a global
@@ -263,9 +263,9 @@ Boolean variable and condition pins, keep their numeric consequences. Reduced
 witnesses recover original Boolean values through the original normalized formula
 check, even when no real coordinate was eliminated.
 
-Mandatory numeric predicates are
-extracted with Boolean propagation. Their exact total graph equalities are
-substituted into every atom, including optional branches. Opposite weak bounds may
+The root reducer extracts mandatory numeric predicates with Boolean propagation.
+Their exact total graph equalities are substituted into every atom, including
+optional branches. Opposite weak bounds may
 supply such an equality; an unforced guarded equation or an equation with a
 variable-dependent leading coefficient cannot eliminate a coordinate. Completed
 substitutions retain reverse fibres. Existing arithmetic representation limits can
@@ -273,12 +273,22 @@ decline a substitution while preserving its completed prefix; cancellation and
 work exhaustion withhold the result. Expansion uses the caller's remaining work
 and representation limits.
 
-Root reduction exposes immutable committed snapshots. Each snapshot retains its
+Root reduction exposes the normalized formula and immutable committed snapshots.
+Each snapshot retains its
 own formula and persistent reverse-fibre chain; later substitutions cannot change
 an earlier reconstruction. A snapshot is available only after an entire Boolean
 rewrite or numeric substitution commits. An interrupted rewrite publishes no
 snapshot. Query progress records committed snapshots, root and search work, and
 the first regional entry separately from completed projection and lifting.
+
+Root reduction and exact search retain separate cursors under one arithmetic
+allowance. The cursor with less charged work advances at the next checkpoint;
+finished reduction leaves the remaining work to search. Search starts from the
+normalized formula and restarts when a new equivalent formula commits. Only the
+latest snapshot and one search cursor are retained, and discarded work remains
+charged. Regional refutations do not cross snapshot boundaries. A representation
+decline in search permits reduction to continue; a containing stop terminates both
+cursors. Optional probing shares one cumulative allowance across restarts.
 
 The procedure then runs in four stages; only the last two are needed for
 completeness.

@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
@@ -13,11 +14,48 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfNraSolverTest {
+    @Test
+    fun `a checked witness can complete before optional root reduction finishes`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) " +
+                "(assert (and (= x (+ (* y y) 1)) (= y 2)))",
+        )
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 100_000), PolynomialCondition())
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.ofLong(5), point.realValue(0).rational)
+        assertEquals(BigFraction.ofLong(2), point.realValue(1).rational)
+        assertNull(query.progress.rootFinishedWork)
+        assertTrue(query.progress.searchWork > 0)
+    }
+
+    @Test
+    fun `restarting snapshot search does not renew its optional probe allowance`() {
+        val work = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(work)
+        work.probe {
+            repeat(100_000) { arithmetic.step() }
+            null
+        }
+        val spent = work.spentWork
+        var entered = false
+
+        work.probe { entered = true; null }
+
+        assertFalse(entered)
+        assertEquals(spent, work.spentWork)
+    }
+
     private val algebraic = AlgebraicArithmetic()
 
     @Test
