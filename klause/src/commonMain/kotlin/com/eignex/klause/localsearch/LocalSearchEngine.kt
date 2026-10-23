@@ -1284,8 +1284,16 @@ internal class LocalSearchEngine(
         checkpoint: LocalSearchCheckpoint?,
         onPause: () -> Unit,
     ) = state.phaseTimer.inPhase("seeding") {
+        val coverageBoardVars = problem.factors.filterIsInstance<com.eignex.klause.factor.global.AllDifferent>()
+            .flatMap { it.intVars.asIterable() }.distinct()
+        val coverageBefore = coverageBoardVars.map { state.assignment.intValue(it) }
         restarts.restart(state, anchor)
         if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params, checkpoint, onPause)
+        val changed = coverageBoardVars.indices.count { state.assignment.intValue(coverageBoardVars[it]) != coverageBefore[it] }
+        val differsAnchor = anchor?.let { sample -> coverageBoardVars.count { state.assignment.intValue(it) != sample.intValue(it) } }
+        println("% structuredRestart policy=${configuredRestart::class.simpleName} " +
+            "seedImplicit=$seedImplicitOnRestart boardVars=${coverageBoardVars.size} changed=$changed " +
+            "differsBestAnchor=$differsAnchor cost=${state.cost}")
     }
 
     /** True when the problem is big enough that the post-restart greedy-repair sweep pays for
