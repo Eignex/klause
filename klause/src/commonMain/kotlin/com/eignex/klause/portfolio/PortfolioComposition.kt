@@ -485,7 +485,7 @@ internal object PortfolioComposition {
         val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-aggressive" }
             ?: return null
         return BacktrackWorkerConfig(
-            recipe.capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+            BacktrackCatalog.byLabel("conflictDriven").capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
             scenario.zeroObjectivePricing,
         )
     }
