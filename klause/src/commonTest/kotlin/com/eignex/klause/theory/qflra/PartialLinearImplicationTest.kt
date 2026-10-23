@@ -101,12 +101,27 @@ class PartialLinearImplicationTest {
     }
 
     @Test
-    fun `an interrupted interval supplies no implication`() {
+    fun `an interruption while reading a bound supplies no implication`() {
+        var stopped = false
         val implication = partialLinearImplication(unary(LinearOp.LE), { _, _ ->
+            stopped = true
             ExplainedLinearBound(BigFraction.ZERO, false, axiom)
-        }, Cancellation { true })
+        }, Cancellation { stopped })
 
         assertNull(implication)
+    }
+
+    @Test
+    fun `rational coefficient products preserve an exact comparison endpoint`() {
+        val half = BigFraction.ofLong(2).reciprocal()
+        val comparison = ExactComparison(mapOf(0 to BigFraction.ofLong(3).reciprocal()), half,
+            LinearOp.LE, strict = false, hasReals = true)
+
+        val implication = partialLinearImplication(comparison, { _, upper ->
+            if (upper) ExplainedLinearBound(BigFraction.ofLong(3) * half, false, axiom) else null
+        }, Cancellation.Never)
+
+        assertTrue(assertNotNull(implication).truth)
     }
 
     private fun unary(relation: LinearOp, strict: Boolean = false): ExactComparison = ExactComparison(
