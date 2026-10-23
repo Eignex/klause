@@ -10,16 +10,127 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PreparedSource
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.PresolvePass
+import com.eignex.klause.presolve.SourceRebuilds
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 class ResumableOpenTheoryTest {
+
+    @Test
+    fun `paused preparation should survive close and between slice cancellation`() {
+        for (cancel in listOf(false, true)) {
+            val source = preparedChain()
+            var stopped = false
+            val search = ResumableOpenTheory(
+                OpenTheoryEngine(source, Cancellation.Never, reuseOpeningBoundAttempt = true),
+                TheoryParams(),
+            )
+            val token = Cancellation { stopped }
+
+            assertNull(search.runSlice(token, sliceMillis = Long.MAX_VALUE, sliceWork = 1))
+            val paused = search.stats
+            assertEquals(source.prepared.stats, paused.presolve)
+            assertEquals(17.milliseconds, assertNotNull(paused.presolve?.effort).elapsed)
+            assertEquals(listOf(PresolvePass.PROBE_OPEN_RANGES.id), paused.presolve?.passes)
+            assertEquals(31L, paused.presolve?.effort?.work)
+            assertEquals(0L, paused.run.wallMs)
+            assertTrue(paused.openTheory.openWork > 0L)
+
+            stopped = cancel
+            search.close()
+            search.close()
+
+            assertEquals(paused, search.stats)
+        }
+    }
+
+    @Test
+    fun `cancelling a resumed search should retain preparation exactly once`() {
+        val source = preparedChain()
+        val search = ResumableOpenTheory(
+            OpenTheoryEngine(source, Cancellation.Never, reuseOpeningBoundAttempt = true),
+            TheoryParams(),
+        )
+        assertNull(search.runSlice(Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1))
+        val paused = search.stats
+
+        val result = assertIs<OpenTheoryResult.Unknown>(search.runSlice(
+            Cancellation { true }, sliceMillis = Long.MAX_VALUE, sliceWork = 1,
+        ))
+        search.close()
+
+        assertEquals(TerminationReason.Cancelled, result.reason)
+        assertEquals(paused.presolve, result.stats.presolve)
+        assertEquals(paused.openTheory, result.stats.openTheory)
+        assertEquals(paused.search, result.stats.search)
+        assertEquals(result.stats, search.stats)
+    }
+
+    @Test
+    fun `a decided search should retain its native preparation snapshot`() {
+        val source = preparedChain()
+        val search = ResumableOpenTheory(
+            OpenTheoryEngine(source, Cancellation.Never, reuseOpeningBoundAttempt = true),
+            TheoryParams(),
+        )
+
+        val result = assertIs<OpenTheoryResult.Sat>(search.runSlice(
+            Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = Long.MAX_VALUE,
+        ))
+        search.close()
+
+        assertEquals(source.prepared.stats, result.stats.presolve)
+        assertEquals(result.stats, search.stats)
+    }
+
+    @Test
+    fun `setup cancellation should retain completed preparation`() {
+        val source = preparedChain()
+        var stopped = false
+        val engine = OpenTheoryEngine(
+            source.route,
+            {
+                stopped = true
+                source
+            },
+            Cancellation.Never,
+            reuseOpeningBoundAttempt = true,
+            sourceSemantics = source.prepared.source.semantics,
+        )
+        val search = ResumableOpenTheory(engine, TheoryParams(cancellation = Cancellation { stopped }))
+
+        val result = assertIs<OpenTheoryResult.Unknown>(search.runSlice(
+            Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1,
+        ))
+        search.close()
+
+        assertEquals(TerminationReason.Cancelled, result.reason)
+        assertEquals(source.prepared.stats, result.stats.presolve)
+        assertEquals(0L, result.stats.openTheory.openWork)
+        assertEquals(result.stats, search.stats)
+    }
+
+    private fun preparedChain(): OpenSourcePreparation.Planned {
+        val problem = chain(8, total = 20)
+        val prepared = PreparedSource(
+            problem, problem, infeasible = false, objective = null,
+            passesFired = listOf(PresolvePass.PROBE_OPEN_RANGES), rebuild = SourceRebuilds.NONE,
+            budget = PresolveBudget(1_000).apply { charge(31) }, elapsed = 17.milliseconds,
+        )
+        return OpenSourcePreparation.Planned(prepared, problem, problem.componentPlan())
+    }
 
     @Test
     fun `mixed point guidance should keep finite holes`() {

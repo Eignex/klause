@@ -17,6 +17,7 @@ import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
+import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SolveStats
@@ -501,6 +502,8 @@ class OpenTheoryEngine internal constructor(
         private val params: TheoryParams,
     ) : AutoCloseable {
         private val witnesses = SourceWitnessAssembler(prepared.mapping.target, prepared.source)
+
+        val preparationStats: PresolveStats? get() = stats.presolve
 
         /** The search this run drives. */
         val session: com.eignex.klause.solver.search.SearchSession get() = planned.session
