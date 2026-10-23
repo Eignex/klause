@@ -79,6 +79,7 @@ internal class BoardSwapCoverage {
         private val initialized = LongArray(boards.size)
         private val finished = LongArray(boards.size)
         private val position = LongArray(boards.size)
+        private val stride = LongArray(boards.size)
         private val remaining = LongArray(boards.size)
         private var epoch = 1L
         private var board = 0
@@ -147,6 +148,7 @@ internal class BoardSwapCoverage {
                 initialized[id] = epoch
                 remaining[id] = pairs
                 position[id] = if (pairs > 0L) state.rng.nextLong(pairs) else 0L
+                stride[id] = if (pairs > 1L) coprimeStride(state, pairs) else 1L
             }
             if (picking) {
                 touched.add(id)
@@ -162,7 +164,7 @@ internal class BoardSwapCoverage {
                     invariant.proposeSwap(state, left, right, sink)
                 }
                 remaining[id]--
-                position[id] = (position[id] + pairStride(pairs)) % pairs
+                position[id] = (position[id] + stride[id]) % pairs
             } else {
                 remaining[id] = 0L
             }
@@ -182,8 +184,22 @@ internal class BoardSwapCoverage {
             return low
         }
 
-        // Coprime steps spread bounded picks over pair ranks without storing a quadratic shuffle.
-        private fun pairStride(pairs: Long): Long = pairs / 2 + if (pairs % 4L == 2L) 2L else 1L
+        private fun coprimeStride(state: LocalSearchState, pairs: Long): Long {
+            var step = state.rng.nextLong(1L, pairs)
+            while (gcd(step, pairs) != 1L) step++
+            return step
+        }
+
+        private fun gcd(first: Long, second: Long): Long {
+            var a = first
+            var b = second
+            while (b != 0L) {
+                val remainder = a % b
+                a = b
+                b = remainder
+            }
+            return a
+        }
 
         private fun pairsBefore(size: Int, left: Int): Long = left.toLong() * (2L * size - left - 1L) / 2
     }
