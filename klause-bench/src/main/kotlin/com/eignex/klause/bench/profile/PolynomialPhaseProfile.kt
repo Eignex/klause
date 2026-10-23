@@ -10,6 +10,7 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRealProblem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -26,6 +27,7 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.magnitudeBitLength
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
@@ -242,6 +244,13 @@ internal object PolynomialPhaseProfile {
         private val progress = queryType.methods.singleOrNull { it.name == "getProgress" }
         private val partialConflicts = progress?.returnType?.methods?.singleOrNull { it.name == "getPartialConflicts" }
         private val conflictObserver = queryType.methods.singleOrNull { it.name == "setPartialConflictObserver" }
+        private val atomType = Class.forName(prefix + "PolynomialAtom")
+        private val atomPolynomial = atomType.getMethod("getPolynomial")
+        private val atomRelation = atomType.getMethod("getRelation")
+        private val coefficients = Class.forName("com.eignex.klause.arithmetic.polynomial.Polynomial")
+            .getDeclaredField("coefficients").apply { isAccessible = true }
+        private val powers = Class.forName("com.eignex.klause.arithmetic.polynomial.Monomial")
+            .getDeclaredField("powers").apply { isAccessible = true }
         private val fixings = Class.forName(prefix + "PolynomialPointFixingsKt").methods.single {
             it.name == "polynomialPointFixings"
         }
@@ -329,9 +338,9 @@ internal object PolynomialPhaseProfile {
                     conflictPremises = premises.size
                     var complete = premises.size <= 16
                     conflictPreview = premises.take(16).map {
-                        val rendered = it.toString()
-                        if (rendered.length > 512) complete = false
-                        rendered.take(512)
+                        val (rendered, exact) = previewConflictAtom(requireNotNull(it))
+                        complete = complete && exact
+                        rendered
                     }
                     conflictPreviewComplete = complete
                 }
@@ -371,6 +380,25 @@ internal object PolynomialPhaseProfile {
                 nativeWork, charges - preparationCharges, preparationCharges, stop, source.second, source.third,
                 partialConflictPremises = conflictPremises, partialConflictPreview = conflictPreview,
                 partialConflictPreviewComplete = conflictPreviewComplete)
+        }
+
+        private fun previewConflictAtom(atom: Any): Pair<String, Boolean> {
+            val values = coefficients.get(atomPolynomial.invoke(atom)) as Map<*, *>
+            var complete = values.size <= 8
+            val terms = values.entries.take(8).map { (monomial, value) ->
+                val fraction = value as BigFraction
+                val factors = powers.get(monomial) as Map<*, *>
+                if (factors.size > 8) complete = false
+                val number = if (fraction.num.magnitudeBitLength() > 96 || fraction.den.magnitudeBitLength() > 96) {
+                    complete = false
+                    "[wide coefficient]"
+                } else fraction.toString()
+                val product = factors.entries.take(8).joinToString("*") { (variable, degree) -> "x$variable^$degree" }
+                if (product.isEmpty()) number else "$number*$product"
+            }
+            val polynomial = if (terms.isEmpty()) "0" else terms.joinToString(" + ")
+            if (polynomial.length > 480) complete = false
+            return "${polynomial.take(480)} ${atomRelation.invoke(atom)} 0" to complete
         }
     }
 }
