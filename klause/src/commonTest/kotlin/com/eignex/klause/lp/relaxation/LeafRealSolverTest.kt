@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
@@ -25,10 +26,39 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
+    @Test
+    fun `releasing pending completion should permit fresh pins without stale coordinates`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0L, 1L)),
+            arrayOf<Factor>(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(2.0), LinearOp.EQ, 2.0)),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val first = Sample(booleanArrayOf(), longArrayOf(0L))
+        val next = Sample(booleanArrayOf(), longArrayOf(1L))
+        LeafRealSolver(problem, objective).use { owner ->
+            val pending = owner.openSolve(first)
+            assertIs<LpSolveStep.Paused>(pending.advance(shouldPause = { true }))
+            assertFailsWith<IllegalStateException> { owner.solve(next) }
+
+            owner.releaseSolvers()
+            val result = owner.solve(next)
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            assertEquals(0.5, result.reals.single())
+            assertEquals(BigFraction.ofDouble(0.5), result.exactReals?.single())
+            assertFailsWith<IllegalStateException> { pending.advance() }
+        }
+    }
+
     @Test
     fun `leaf completion should enforce affine powers before accepting tolerance`() {
         for (exponent in listOf(0, 1)) {

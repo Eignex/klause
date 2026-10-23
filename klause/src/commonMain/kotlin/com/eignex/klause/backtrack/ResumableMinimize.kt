@@ -15,6 +15,8 @@ import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpSolveCursor
+import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LeafRealSolver
@@ -134,7 +136,7 @@ internal class ResumableMinimize(
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
-        get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending
+        get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending && pendingRealLeaf == null
     override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
     private var replaced = false
@@ -247,6 +249,7 @@ internal class ResumableMinimize(
     // is off.
     private lateinit var lpEngine: LpEngine
     private var leafSolver: LeafRealSolver? = null
+    private var pendingRealLeaf: LpSolveCursor<LeafRealResult>? = null
     private val rootLpDutyCycle = RootLpDutyCycle()
 
     private fun completeLeaf(
@@ -254,14 +257,39 @@ internal class ResumableMinimize(
         cancellation: Cancellation,
         workLimit: Long = 0L,
     ): LeafRealResult {
-        val owner = leafSolver ?: LeafRealSolver(
-            problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
-            LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
-        ).also {
-            resources.own(it)
-            leafSolver = it
+        val result = realLeafOwner().solve(sample, cancellation, params.toleranceCheck, workLimit)
+        return checkedLeafResult(sample, result)
+    }
+
+    private fun realLeafOwner(): LeafRealSolver = leafSolver ?: LeafRealSolver(
+        problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
+        LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
+    ).also {
+        resources.own(it)
+        resources.own(AutoCloseable {
+            val pending = pendingRealLeaf
+            pendingRealLeaf = null
+            pending?.close()
+        })
+        leafSolver = it
+    }
+
+    private fun advanceRealLeaf(sample: Sample): LeafRealResult? {
+        val cursor = pendingRealLeaf ?: realLeafOwner().openSolve(sample, runEndToken(), params.toleranceCheck)
+            .also { pendingRealLeaf = it }
+        val allowance = slice.remainingLpWork()
+        if (allowance == 0L) return null
+        return when (val step = cursor.advance(allowance ?: 0L, { !slice.workBounded && sliceExpired() })) {
+            LpSolveStep.Paused -> null
+            is LpSolveStep.Completed -> {
+                pendingRealLeaf = null
+                cursor.close()
+                checkedLeafResult(sample, step.value)
+            }
         }
-        val result = owner.solve(sample, cancellation, params.toleranceCheck, workLimit)
+    }
+
+    private fun checkedLeafResult(sample: Sample, result: LeafRealResult): LeafRealResult {
         if (problem.factorProjections?.requiresRealSourceCheck != true || result.verdict !in setOf(
                 LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM, LpVerdict.UNBOUNDED,
             )
@@ -582,6 +610,9 @@ internal class ResumableMinimize(
     fun rebind(assumptions: Assumptions, decisionBudget: Long) {
         check(rebindable) { "search is not rebindable" }
         check(!closed) { "search is closed" }
+        val pending = pendingRealLeaf
+        pendingRealLeaf = null
+        pending?.close()
         searchSession.popTo(0)
         val seeded = session.reseedFrom(assumptions)
         lpEngine.cpAdapter.resetRoot()
@@ -624,6 +655,7 @@ internal class ResumableMinimize(
             done?.let { return StepEvent.Terminal(it) }
             check(!closed) { "search is closed" }
             if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
+            if (pendingRealLeaf != null) return traversalEvent()
             if (!clausePrimalStarted) {
                 clausePrimalStarted = true
                 if (!rebindable && initialCandidate == null && externalCutoff() == Double.POSITIVE_INFINITY) {
@@ -671,37 +703,41 @@ internal class ResumableMinimize(
             }
             unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
             if (treeBudgetExhausted) return terminal(terminalBudget())
-            return when (val e = run.next()) {
-                is SearchRunEvent.Satisfied -> {
-                    unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
-                    val incumbent = checkNotNull(pendingIncumbent)
-                    pendingIncumbent = null
-                    StepEvent.Incumbent(incumbent.withSourceSemantics(problem.semantics))
-                }
-
-                SearchRunEvent.Exhausted -> terminal(terminalExhausted(null))
-
-                SearchRunEvent.Paused -> StepEvent.Paused
-
-                is SearchRunEvent.Indeterminate -> when {
-                    sawIndeterminateLeaf -> {
-                        val incumbent = pendingIncumbent
-                        pendingIncumbent = null
-                        if (incumbent != null) StepEvent.Incumbent(incumbent.withSourceSemantics(problem.semantics))
-                        else terminal(terminalExhausted(null))
-                    }
-
-                    pausable && sliceCancelled() -> StepEvent.Paused
-
-                    // A component that could not decide its part ends the run incomplete, not out of budget.
-                    e == SearchRunEvent.Indeterminate.Component -> terminal(terminalUndecided())
-
-                    else -> terminal(terminalBudget())
-                }
-            }
+            return traversalEvent()
         } catch (failure: Throwable) {
             closeAfter(failure)
             throw failure
+        }
+    }
+
+    private fun traversalEvent(): StepEvent {
+        return when (val e = run.next()) {
+            is SearchRunEvent.Satisfied -> {
+                unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
+                val incumbent = checkNotNull(pendingIncumbent)
+                pendingIncumbent = null
+                StepEvent.Incumbent(incumbent.withSourceSemantics(problem.semantics))
+            }
+
+            SearchRunEvent.Exhausted -> terminal(terminalExhausted(null))
+
+            SearchRunEvent.Paused -> StepEvent.Paused
+
+            is SearchRunEvent.Indeterminate -> when {
+                sawIndeterminateLeaf -> {
+                    val incumbent = pendingIncumbent
+                    pendingIncumbent = null
+                    if (incumbent != null) StepEvent.Incumbent(incumbent.withSourceSemantics(problem.semantics))
+                    else terminal(terminalExhausted(null))
+                }
+
+                pausable && sliceCancelled() -> StepEvent.Paused
+
+                // A component that could not decide its part ends the run incomplete, not out of budget.
+                e == SearchRunEvent.Indeterminate.Component -> terminal(terminalUndecided())
+
+                else -> terminal(terminalBudget())
+            }
         }
     }
 
@@ -1274,11 +1310,13 @@ internal class ResumableMinimize(
             // The leaf is the engine's own claim, re-derived here from every factor before it can become an
             // incumbent: an assignment the composed fixpoint refutes is an engine defect, never a solution. A check
             // the deadline cut short refutes nothing, so the leaf stands.
-            val verdict = composedFixpoint(problem, Candidate(sample, Unit), params.cancellation, params.assumptions)
-            if (verdict is Verification.Rejected) {
-                throw UnsoundnessException(
-                    "backtrack reached an optimization leaf its constraints refute: ${verdict.reason}",
-                )
+            if (pendingRealLeaf == null) {
+                val verdict = composedFixpoint(problem, Candidate(sample, Unit), params.cancellation, params.assumptions)
+                if (verdict is Verification.Rejected) {
+                    throw UnsoundnessException(
+                        "backtrack reached an optimization leaf its constraints refute: ${verdict.reason}",
+                    )
+                }
             }
             // What this leaf left open, apart from the run-wide record in sawIndeterminateLeaf.
             var unresolved = false
@@ -1286,9 +1324,9 @@ internal class ResumableMinimize(
             val incumbent = if (problem.numRealVars == 0) {
                 recordIfImproving(sample, objective.evaluate(sample))
             } else {
-                // Only the run's end may cut a leaf LP short. A slice boundary pauses at the next decision, and
-                // a leaf it cut would read as unresolved and be passed over, though a longer LP might have decided it.
-                val real = completeLeaf(sample, runEndToken())
+                val real = if (pausable) {
+                    advanceRealLeaf(sample) ?: return SearchModelDisposition.Pause
+                } else completeLeaf(sample, runEndToken())
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null
 

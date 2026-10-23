@@ -135,6 +135,14 @@ Ordinary admission and node preparation use the shared adaptive allowance.
 
 ### Leaf completion
 
+Finite optimization keeps a pinned real-leaf request across portfolio slices.
+The discrete assignment, assembled row authority, source encoding and required
+certification remain owned by that request. Numerical pauses preserve the live
+solve; a completed floating solve can wait for certification in a later slice.
+Neither pause consumes the discrete model or records an indeterminate region.
+Reseeding is deferred while completion is pending, and explicit rebind or close
+discards its numerical owners before changing the traversal.
+
 Mixed witness recovery can submit a connected real residual to `SourceLp` after
 fixing integer guesses, within its `SourceLpBudget`. Only exact primal coordinates
 are consumed, and a failed guess supplies no conflict or bound. Real array selection
@@ -174,6 +182,13 @@ owns headings, statuses and the lazy basis backend, and invalidates them on
 retirement even when close fails. `SimplexPricingState` owns Devex weights and
 `SimplexObservations` per-solve counters; `RevisedSimplex` coordinates allowance
 charging, recovery and publication.
+
+A retained numerical owner can expose a private solve cursor. It suspends between
+iterations, retaining the current phase, factors, artificial seats, pricing state
+and cumulative solve limits. A pause returns no numerical result or certificate.
+The owner rejects another solve or authority adoption while that cursor is live;
+closing it unwinds the suspended operation and retires its factors. Synchronous
+calls consume the same operation without suspension.
 
 Selected structural-column pricing passes the current owned CSC matrix to Koblas's
 validated column dot, reusing its support without copying columns. An unscaled
@@ -420,7 +435,7 @@ word-length squared.
 
 Reconstruction and refinement poll ordinary tokens every 64 calls or 4096 work,
 while resource caps are checked on every charge. Cancelled evidence is discarded.
-A continuous leaf that stays undecided is skipped without learning a nogood, and
+A completed continuous check that stays undecided is skipped without learning a nogood, and
 its incomplete flag prevents exhaustion or optimality publication. Numerical
 failure, singularity, work stops, precision declines and cancellation keep distinct
 diagnostics.
