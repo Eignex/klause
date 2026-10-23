@@ -1,44 +1,37 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toLinearSourceProblem
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearSourceObjective
+import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceTerm
+import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.pipeline.ExecutionOperation
-import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.solver.pipeline.SourceSetup
-import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.PreparedSourcePlan
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class MpsLpAdmissionTest {
     @Test
-    fun `prepared MPS objective should retain its coefficients and minimization direction`() {
-        for ((sense, expected) in listOf("MIN" to 7L, "MAX" to -7L)) {
-            val source = assertNotNull(Mps.parse("""
-                NAME objective
-                OBJSENSE
-                 $sense
-                ROWS
-                 N OBJ
-                 L LIM
-                COLUMNS
-                 X OBJ 7 LIM 1
-                RHS
-                 RHS1 LIM 1
-                BOUNDS
-                 BV BND X
-                ENDATA
-            """.trimIndent()).toLinearSourceProblem())
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
-                maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE,
-            ))
+    fun `prepared source objective should retain its coefficients and minimization direction`() {
+        val working = LinearObjective(intCoefficients = longArrayOf(7))
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyList())
+        val initial = model.prepareExecutionPlan(working, preferFinite = true)
+        val bind = initial.javaClass.methods.single { it.name.startsWith("withLinearSource") }
+        for ((sense, expected) in listOf(ObjectiveSense.MINIMIZE to 7L, ObjectiveSense.MAXIMIZE to -7L)) {
+            val source = LinearSourceProblem(
+                listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
+                emptyList(),
+                LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ofLong(7))), sense = sense),
+            )
+            val plan = bind.invoke(initial, source, listOf(0), emptyList<Int>(), working) as PreparedSourcePlan
 
-            val objective = assertNotNull(MpsLpAdmission.preparedObjective(assertNotNull(invocation.preparedPlan)))
+            val objective = assertNotNull(MpsLpAdmission.preparedObjective(plan))
 
             assertEquals(expected, objective.evaluateLong(Sample(BooleanArray(0), longArrayOf(1))))
         }
