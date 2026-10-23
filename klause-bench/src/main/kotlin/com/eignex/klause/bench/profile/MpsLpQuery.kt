@@ -13,6 +13,7 @@ import java.io.File
 import java.lang.management.ManagementFactory
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -60,13 +61,13 @@ internal object MpsLpQuery {
                 val active = owner ?: newOwner(problem, objective, plan, token).also { owner = it }
                 val setupNs = System.nanoTime() - startNs
                 val setupBytes = bean.getThreadAllocatedBytes(thread) - startBytes
-                val before = stats(active.second)
+                val before = stats(active.first, active.second)
                 val boundNs = System.nanoTime()
                 val boundBytes = bean.getThreadAllocatedBytes(thread)
                 val lower = checkedRootBound(active.first, token)
                 val boundElapsed = System.nanoTime() - boundNs
                 val boundAllocated = bean.getThreadAllocatedBytes(thread) - boundBytes
-                val afterBound = stats(active.second)
+                val afterBound = stats(active.first, active.second)
                 val pruneNs = System.nanoTime()
                 val pruneBytes = bean.getThreadAllocatedBytes(thread)
                 val session = PropagationSession(problem, token)
@@ -75,7 +76,7 @@ internal object MpsLpQuery {
                 ) as Boolean
                 val pruneElapsed = System.nanoTime() - pruneNs
                 val pruneAllocated = bean.getThreadAllocatedBytes(thread) - pruneBytes
-                val afterPrune = stats(active.second)
+                val afterPrune = stats(active.first, active.second)
                 val closeNs = System.nanoTime()
                 val closeBytes = bean.getThreadAllocatedBytes(thread)
                 if (mode != "full-retained" || repeat == 2) {
@@ -152,9 +153,13 @@ internal object MpsLpQuery {
         return method.invoke(null, owner, requireNotNull(relaxer), emptyList<Any>(), token) as Double
     }
 
-    private fun stats(sink: Any): JsonObject {
+    private fun stats(owner: AutoCloseable, sink: Any): JsonObject {
         val lp = (sink.javaClass.getMethod("snapshot").invoke(sink) as SolveStats).lp
         return buildJsonObject {
+            put("offeredNodeWork", owner.javaClass.methods.single {
+                it.name.startsWith("nodeWorkBudget") && it.parameterCount == 0
+            }.invoke(owner) as Long)
+            put("scopedPreparation", scopedPreparation(owner))
             put("nodePasses", lp.nodePasses.sum)
             put("nodeSolves", lp.solves.sum)
             put("nodePruned", lp.pruned.sum)
@@ -179,6 +184,21 @@ internal object MpsLpQuery {
                     "rational" to lp.rationalOutcome,
                 )) put(name, certifier(value))
             })
+        }
+    }
+
+    private fun scopedPreparation(owner: AutoCloseable): JsonElement {
+        val propagator = owner.javaClass.methods.single { it.name.startsWith("getPropagator") }.invoke(owner)
+        val metrics = propagator.javaClass.getMethod("getMetrics").invoke(propagator) ?: return JsonNull
+        return buildJsonObject {
+            for (name in listOf(
+                "EditAttempts", "EditDeclines", "PreparationAttempts", "PreparationDeclines", "PreparationWork",
+                "CreatedOwners", "ClosedOwners", "RetainedRows", "ActiveRows", "ReservedConstructionWork",
+                "ConstructionWork", "AppendBasisWork", "AppendUnknownWork",
+            )) {
+                val number = metrics.javaClass.getMethod("get$name").invoke(metrics) as Number
+                put(name.replaceFirstChar { it.lowercase() }, number.toLong())
+            }
         }
     }
 
