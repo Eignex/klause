@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.NativeClauseSearchComponent
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SmtStatsSink
@@ -102,8 +103,10 @@ internal class PreparedSearchComponents(
         val boolean = descriptors.firstOrNull { it.responsibility == ComponentResponsibility.BOOLEAN }
             ?: ExecutionComponentDescriptor("boolean", ComponentResponsibility.BOOLEAN, emptyList(),
                 emptyList(), emptyList())
-        selected += PreparedSearchRegistration(spec, boolean) {
-            listOf(ClauseSearchComponent(clauses)) + if (cardinalities.isEmpty()) emptyList()
+        selected += PreparedSearchRegistration(spec, boolean) { opening ->
+            val clauseComponent = if (clauses.isEmpty()) ClauseSearchComponent(clauses)
+                else NativeClauseSearchComponent(spec.numBoolVars, clauses, opening.cancellation)
+            listOf(clauseComponent) + if (cardinalities.isEmpty()) emptyList()
             else listOf(CardinalitySearchComponent(cardinalities))
         }
         plan.theoryComponentFactory(fragment) { exactSource }?.let { factory ->

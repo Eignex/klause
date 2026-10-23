@@ -91,6 +91,12 @@ variable. Learned clauses live in a growable side buffer with a wrapping
 replacement-scan cursor per clause, and reductions compact them in place. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
 
+The shared open-model clause participant uses a clause-only native projection with
+the original Boolean identifiers. Shared integer facts and registered arithmetic
+atoms stay with their owners. Native implications supply reasons to shared first-UIP;
+the shared database owns learned consequences. Retraction checkpoints include
+arithmetic-only levels, and an interrupted native fixpoint leaves checks indeterminate.
+
 ## Pseudo-Boolean learning
 
 On pure-Boolean models, conflict analysis can learn pseudo-Boolean constraints
