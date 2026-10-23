@@ -13,6 +13,9 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -31,6 +34,7 @@ import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.Base64
+import java.util.IdentityHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
 internal object NumericalResidualProfile {
@@ -56,8 +60,9 @@ internal object NumericalResidualProfile {
         val input = source.jsonObject
         val supplied = input["mps64"]?.jsonPrimitive?.content
         val catalogKeys = setOf("suite", "problem", "sha256")
+        val suppliedKeys = setOf("mps64", "problem", "sha256", "root")
         require(input.keys == catalogKeys || input.keys == catalogKeys + "root" ||
-            input.keys == setOf("mps64", "problem", "sha256", "root"))
+            input.keys == suppliedKeys || input.keys == suppliedKeys + "exact")
         val suite = input["suite"]?.jsonPrimitive?.content ?: "self-authored"
         val name = input.getValue("problem").jsonPrimitive.content
         val reference = if (supplied == null) Catalog.uncapped(suite).problems.single { it.name == name } else null
@@ -72,7 +77,12 @@ internal object NumericalResidualProfile {
         require(bytes.size <= 4 * 1024 * 1024 && sha256(bytes) == input.getValue("sha256").jsonPrimitive.content)
         out.resolve("source.mps").writeBytes(bytes)
         val entry = reference?.let { Runners.resolve(it) }
-        val compiled = if (entry == null) Mps.parse(bytes.decodeToString()).toProblem() else null
+        val overrides = if (input["exact"]?.jsonPrimitive?.content?.toBooleanStrict() == true) {
+            SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        } else SemanticOverrides()
+        val compiled = if (entry == null) {
+            Mps.parse(bytes.decodeToString()).toProblem(semanticOverrides = overrides)
+        } else null
         val problem = entry?.problem ?: requireNotNull(compiled).model
         val sourceObjective = entry?.objective ?: compiled?.objective?.toLinearObjective()?.let {
             if (compiled.maximize) it.negated() else it
@@ -134,11 +144,12 @@ internal object NumericalResidualProfile {
         arguments[count] = -4
         @Suppress("SpreadOperator")
         val builder = constructor.newInstance(*arguments)
-        val domains = Class.forName(prefix + "RootDomains").constructors.single().newInstance(problem)
+        val stop = Cancellation.after(2000.milliseconds)
+        val domains = PropagationSession(problem, cancellation = stop)
         val build = type.methods.single {
             it.name == "build" && it.parameterCount == 3 && it.parameterTypes.first().isInstance(domains)
         }
-        val relaxation = requireNotNull(build.invoke(builder, domains, emptyList<Any>(), Cancellation.Never))
+        val relaxation = requireNotNull(build.invoke(builder, domains, emptyList<Any>(), stop))
         val model = requireNotNull(call(relaxation, "getModel"))
         val authority = Class.forName(ENGINE + "LegacyLpModelKt").methods.single {
             it.name == "authoritativeModel" && it.parameterCount == 1
@@ -153,10 +164,11 @@ internal object NumericalResidualProfile {
         val report = buildJsonObject {
             put("revision", Reports.readGitSha())
             put("source", source)
-            put("entry", "diagnostic production root relaxation over declared domains; no traversal or presolve")
+            put("entry", "diagnostic production root relaxation after propagation; no traversal or optional presolve")
             put("sourceVerdictClaim", false)
             put("cliRoutingEquivalence", false)
             put("captureHashes", JsonArray(listOf(JsonPrimitive(sha256(bytes)))))
+            put("shape", shape(state))
         }
         out.resolve("capture.json").writeText(report.toString())
     }
@@ -173,7 +185,10 @@ internal object NumericalResidualProfile {
         val builds = ArrayList<JsonElement>()
         val captures = ArrayList<Any>()
         private var owners = 0
+        private val originals = IdentityHashMap<Any, Any>()
         val context: Any
+
+        fun unwrapped(owner: Any): Any = originals[owner] ?: owner
 
         init {
             val production = singleton(ENGINE + "ProductionLpEngineFactory")
@@ -286,7 +301,7 @@ internal object NumericalResidualProfile {
                     if (state != null && pivots >= 8 && captures.size < 2) captures += state
                 }
                 result
-            }
+            }.also { originals[it] = owner }
         }
 
         private fun <T> measured(phase: String, block: () -> T): T {
@@ -298,6 +313,12 @@ internal object NumericalResidualProfile {
                 phaseCalls[phase] = (phaseCalls[phase] ?: 0L) + 1L
             }
         }
+    }
+
+    internal fun shape(state: Any): JsonElement {
+        val inspector = ExactFeasibilityCapture.javaClass.getDeclaredMethod("shape", Any::class.java)
+            .apply { isAccessible = true }
+        return inspector.invoke(ExactFeasibilityCapture, state) as JsonElement
     }
 
     private fun encode(state: Any): ByteArray {
