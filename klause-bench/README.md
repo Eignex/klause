@@ -757,23 +757,25 @@ Use the captured dimensions, internal counters and terminal stacks to distinguis
 representations and stopped operations. Paired diagnostic timings establish no
 default-route performance gain, and direct results supply no shared-source acceptance.
 
-The retained-snapshot policy has a source-matched sequencing result in
-[run 7823](https://lab.eignex.com/jobs/7823): sorting and kissing reach completed
-projection/lifting in all three 10-second Mac/aarch64, P1, seed-3 repeats, while
-root-first completes neither counter. Both originals remain UNKNOWN. Keeping the
-active cursor avoids the discarded preparation from restarting at every commit.
-[Prepared captures 7808](https://lab.eignex.com/jobs/7808) and
-[7825](https://lab.eignex.com/jobs/7825) reduce sorting's first-region work from
-78,271,952 to 436,221 units, with zero search restarts. Global and regional graph
-elimination still repeat arithmetic; early search can use a less reduced formula.
+The final-root handoff policy at `d977903` has a source-matched sequencing result
+in [run 7838](https://lab.eignex.com/jobs/7838). Across three 10-second Mac/aarch64,
+P1, seed-3 repeats, sorting completes 110–180 projection polynomials and 541–688
+cells; kissing completes 144 polynomials and 5207–5258 cells. Root-first completes
+neither counter on either original, and both originals remain UNKNOWN. Counters
+accumulate actual attempts; replacing search with a finished root formula can
+repeat work. Intermediate commits retain the cursor, and the completed-root
+handoff preserves the existing fifth-order transition behavior.
 
-This tradeoff increases the tower SAT control from 14,795 to 28,607 native units.
-[Regression run 7830](https://lab.eignex.com/jobs/7830) preserves all 68 paired
+The tower SAT control increases from 14,795 to 28,607 native units; all nine SAT
+models in that comparison pass the Lab source checker. The Boolean UNSAT control
+matches root-first's 76,620 units and 3 polynomials/10 cells.
+[Regression run 7849](https://lab.eignex.com/jobs/7849) preserves all 68 paired
 outcomes across the complete core/heldout sets and additional original, mixed and
 Boolean controls. Each arm has 37 independently accepted SAT models, one unchecked
 DIMACS SAT and one SAT whose power syntax the checker cannot parse. Native UNSAT
 claims have no independent certificates. Single regression samples establish no
-timing comparison, and several small sources spend more native work.
+timing comparison. Small-case costs can rise substantially: strict-root
+contradiction spends 826→23,469 units and quartic no-real-root 1462→16,929.
 
 ### MPS LP admission capture
 
