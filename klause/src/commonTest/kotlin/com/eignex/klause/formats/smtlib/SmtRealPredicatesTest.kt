@@ -10,6 +10,46 @@ import kotlin.test.assertFailsWith
 
 class SmtRealPredicatesTest {
     @Test
+    fun `a full extrema table should retain shared results and leave new extrema independent`() {
+        val predicates = SmtRealPredicates(Cancellation.Never, maxEntries = 5)
+        val first = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)
+        val second = RealComb(emptyMap(), mapOf(1 to BigFraction.ONE), BigFraction.ZERO)
+        val third = RealComb(emptyMap(), mapOf(2 to BigFraction.ONE), BigFraction.ZERO)
+        var next = 3
+
+        val results = listOf(first to second, second to first, first to third, third to first, first to second)
+            .map { (left, right) ->
+                predicates.extremum(left, right, minimum = true) {
+                    RealComb(emptyMap(), mapOf(next++ to BigFraction.ONE), BigFraction.ZERO)
+                }.realCoeffs.keys.single()
+            }
+        var nextLiteral = 0
+        val literals = List(2) {
+            predicates.literal(first, LinearOp.LE, strict = false) { nextLiteral++ }
+        }
+
+        assertEquals(listOf(3, 3, 4, 5, 3), results)
+        assertEquals(listOf(0, 1), literals)
+    }
+
+    @Test
+    fun `an interrupted extrema lookup should not create a result coordinate`() {
+        val predicates = SmtRealPredicates(Cancellation { true })
+        val first = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)
+        val second = RealComb(emptyMap(), mapOf(1 to BigFraction.ONE), BigFraction.ZERO)
+        var definitions = 0
+
+        assertFailsWith<PolynomialSourceInterrupted> {
+            predicates.extremum(first, second, minimum = true) {
+                definitions++
+                first
+            }
+        }
+
+        assertEquals(0, definitions)
+    }
+
+    @Test
     fun `a full predicate table should retain names and still create uncached definitions`() {
         val predicates = SmtRealPredicates(Cancellation.Never, maxEntries = 2)
         val first = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)

@@ -202,6 +202,14 @@ private fun Compiler.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict:
 }
 
 internal class SmtRealPredicates(private val cancellation: Cancellation, private val maxEntries: Int = 65_536) {
+    private data class Arm(
+        val integers: Map<Int, BigFraction>,
+        val reals: Map<Int, BigFraction>,
+        val constant: BigFraction,
+    )
+
+    private data class Extremum(val first: Arm, val second: Arm, val minimum: Boolean)
+
     private data class Predicate(
         val integers: Map<Int, BigFraction>,
         val reals: Map<Int, BigFraction>,
@@ -211,10 +219,32 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
     )
 
     private val literals = HashMap<Predicate, Int>()
+    private val extrema = HashMap<Extremum, RealComb>()
     private var retainedEntries = 0
 
     init {
         require(maxEntries >= 0)
+    }
+
+    fun extremum(first: RealComb, second: RealComb, minimum: Boolean, create: () -> RealComb): RealComb {
+        val entries = first.intCoeffs.size.toLong() + first.realCoeffs.size +
+            second.intCoeffs.size + second.realCoeffs.size + 3L
+        cancellation.charge(4L * entries)
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        if (entries > maxEntries) return create()
+        val left = Arm(first.intCoeffs.filterValues { !it.isZero },
+            first.realCoeffs.filterValues { !it.isZero }, first.constant)
+        val right = Arm(second.intCoeffs.filterValues { !it.isZero },
+            second.realCoeffs.filterValues { !it.isZero }, second.constant)
+        val key = Extremum(left, right, minimum)
+        extrema[key]?.let { return it }
+        extrema[Extremum(right, left, minimum)]?.let { return it }
+        val result = create()
+        if (entries <= maxEntries - retainedEntries) {
+            extrema[key] = result
+            retainedEntries += entries.toInt()
+        }
+        return result
     }
 
     fun literal(term: RealComb, relation: LinearOp, strict: Boolean, create: () -> Int): Int {

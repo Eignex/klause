@@ -29,6 +29,53 @@ import kotlin.test.assertTrue
 
 class SmtLibSelectionTest {
     @Test
+    fun `equivalent real extrema should share their result coordinate`() {
+        for (maximum in listOf(false, true)) for (affine in listOf(false, true)) {
+            val left = if (affine) "(+ x (/ 1 3))" else "x"
+            val right = if (affine) "(- y (/ 1 3))" else "y"
+            val first = if (maximum) "(ite (< $left $right) $right $left)"
+                else "(ite (< $left $right) $left $right)"
+            val second = if (maximum) "(ite (<= $right $left) $left $right)"
+                else "(ite (<= $right $left) $right $left)"
+            val expected = if (maximum) "(/ 2 3)" else "(/ 1 3)"
+            val parsed = SmtLib.parse(
+                """
+                (declare-const x Real) (declare-const y Real)
+                (assert (= x (/ 1 3))) (assert (= y (/ 2 3)))
+                (assert (= $first $expected))
+                (assert (= $second $expected))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 1000))
+
+            assertEquals(0, parsed.model.numIntVars)
+            assertEquals(3, parsed.model.numRealVars)
+            assertIs<OpenTheoryResult.Sat>(result, result.toString())
+        }
+    }
+
+    @Test
+    fun `real minima and maxima should retain distinct result coordinates`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (assert (= x (/ 1 3))) (assert (= y (/ 2 3)))
+            (assert (= (ite (<= x y) x y) (/ 1 3)))
+            (assert (= (ite (<= x y) y x) (/ 2 3)))
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 1000))
+
+        assertEquals(0, parsed.model.numIntVars)
+        assertEquals(4, parsed.model.numRealVars)
+        assertIs<OpenTheoryResult.Sat>(result, result.toString())
+    }
+
+    @Test
     fun `ordered real branches should preserve strict signed extrema`() {
         for (op in listOf("<=", "<", ">=", ">")) for (negative in listOf(false, true)) {
             for ((first, second) in listOf(1 to 2, 2 to 1, 2 to 2)) {
@@ -73,6 +120,7 @@ class SmtLibSelectionTest {
                 (declare-const x Real) (declare-const y Real) (declare-const z Real)
                 (assert (= x (/ 1 3))) (assert (= y (/ 2 3)))
                 (assert (or b (< x y)))
+                (assert (= (ite (< x y) x y) (/ 1 3)))
                 (assert (= z (ite b x y)))
                 (assert ${if (branch) "b" else "(not b)"})
                 """.trimIndent(),

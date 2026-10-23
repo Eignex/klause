@@ -75,15 +75,17 @@ internal fun Compiler.Builder.realSelection(condition: Int, whenTrue: RealComb, 
     }
     val minimum = realExtremum(condition, whenTrue, whenFalse)
     if (minimum != null) {
-        val result = RealComb(emptyMap(), mapOf(nextReal++ to BigFraction.ONE), BigFraction.ZERO)
-        val relation = if (minimum) LinearOp.LE else LinearOp.GE
-        factors.add(realRow(result.plus(whenTrue.scaled(BigFraction.MINUS_ONE)), relation))
-        factors.add(realRow(result.plus(whenFalse.scaled(BigFraction.MINUS_ONE)), relation))
-        val opposite = if (minimum) ">=" else "<="
-        factors.add(Clause(intArrayOf(
-            reifyRealRel(opposite, result, whenTrue), reifyRealRel(opposite, result, whenFalse),
-        )))
-        return result
+        return realPredicates.extremum(whenTrue, whenFalse, minimum) {
+            val result = RealComb(emptyMap(), mapOf(nextReal++ to BigFraction.ONE), BigFraction.ZERO)
+            val relation = if (minimum) LinearOp.LE else LinearOp.GE
+            factors.add(realRow(result.plus(whenTrue.scaled(BigFraction.MINUS_ONE)), relation))
+            factors.add(realRow(result.plus(whenFalse.scaled(BigFraction.MINUS_ONE)), relation))
+            val opposite = if (minimum) ">=" else "<="
+            factors.add(Clause(intArrayOf(
+                reifyRealRel(opposite, result, whenTrue), reifyRealRel(opposite, result, whenFalse),
+            )))
+            result
+        }
     }
     val entries = intArrayOf(selectionRealColumn(whenFalse), selectionRealColumn(whenTrue))
     val index = selectionIndex(listOf(condition))

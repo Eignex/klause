@@ -329,12 +329,6 @@ class ExactLiraSearchComponent private constructor(
     internal val defaultMixedPointOwner: Boolean
         get() = completeTraversalObserved && mixedPointCompletion && defaultDisjunctionHints
 
-    internal fun currentUnverifiedRealPoint(): List<BigFraction>? = candidate?.takeIf {
-        !dirty && model.numIntVars == 0 && !hasPrivateReals && unassignedBooleans > 0 &&
-            node.sourceBranches.isEmpty() && node.rowAssertions.isEmpty() && node.disequalityDirections.isEmpty() &&
-            solveContext.certificationPolicy === ProductionLpCertificationPolicy
-    }
-
     internal fun useMixedPointCompletion() {
         check(context == null)
         mixedPointCompletion = true

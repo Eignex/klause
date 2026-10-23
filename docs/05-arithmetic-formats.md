@@ -218,6 +218,10 @@ bounds against both arms and a Boolean choice of the opposite bound. Strict guar
 reversed operands and negated guards retain ties without an integer selector.
 The predicate cache and its source cancellation token govern recognition; missing
 comparison evidence keeps the native selection.
+Equivalent extrema share a result coordinate for the same exact affine arms,
+independently of operand order; minima and maxima keep separate identities.
+Predicate and extremum entries share one 65,536-entry allowance, and a full table
+retains existing definitions while emitting new ones without caching them.
 Hard unit-weight counts of distinct Boolean indicators retain `Cardinality` when
 their threshold lies within the count's range. Signed guards and opposite `0`/`1`
 arms keep their polarity; repeated guards and other arithmetic retain exact integer

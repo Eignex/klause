@@ -86,20 +86,6 @@ Boolean premise in the retained support must be assigned. The same restricted th
 that conflict. A recovered partial point that passes every selected original row
 can guide unresolved guards through the existing point-reuse lifecycle. Complete
 source agreement still gates publication of a witness.
-For default pure-real traversal, the pipeline can complete Boolean truths from a
-partial exact point and check the entire source in isolation. The donor excludes
-private encoder coordinates, integer columns and registered arithmetic branch
-premises. Compiler-created min/max result columns belong to the source layout and
-must pass the same exact source check. Candidate completion admits only built-in
-linear rows, clauses and cardinalities, at most 65,536 Boolean and real coordinates
-and 64 point identities. Each attempt charges the caller token under a bounded
-operation allowance, a 16,777,216-unit work limit and 4,096-bit scalar limits.
-Rejected coordinates supply no arithmetic conflict or exhaustion authority.
-For a source containing cardinalities, the pipeline can separately resolve a
-failed Boolean completion through its source clause reasons. This proof retains
-all initial truth assumptions, visits at most 65,536 clause entries and emits at
-most 4,096 literals into the existing shared learned-clause policy. Cancellation
-withholds the clause, and no numerical guess becomes a source fact.
 An indexed point checks a single changed guard through its unique source-row index.
 Batches of changed guards and shared activators scan all pending source rows.
 Wide pure-real candidates can partition into independent blocks connected by selected rows.
