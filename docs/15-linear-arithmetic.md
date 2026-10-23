@@ -57,6 +57,9 @@ A check proceeds in four steps:
 2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
    the LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
+   Partial states retain a 128-row exact-continuation allowance. Boolean-complete
+   checks in complete search use the [kernel's storage admission](17-linear-programming.md#certification-mechanisms)
+   under the same cumulative work and allocation ceilings.
 3. **Explain.** An infeasible system produces a conflict from the certified
    infeasibility support: each cited row or bound contributes its premise literals.
    If a cited row or bound has changed in the live LP state, no conflict is

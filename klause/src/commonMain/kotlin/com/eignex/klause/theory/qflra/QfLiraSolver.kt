@@ -22,6 +22,7 @@ import com.eignex.klause.lp.SourceLp
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.asFraction
+import com.eignex.klause.lp.bounding.LpEffortProfile
 import com.eignex.klause.lp.bounding.LpPremisedBound
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
@@ -48,6 +49,7 @@ import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.lp.sourceDoubleBoundedSplit
 import com.eignex.klause.lp.sourceEqualityRows
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -253,6 +255,13 @@ class ExactLiraSearchComponent private constructor(
                 override fun check(context: SearchContext): ComponentCheck = outcome ?: ComponentCheck.Indeterminate
                 override fun nextBranch(context: SearchContext): List<SearchDecision>? = branch(context)
                 override fun retract(decisionLevel: Int) = retractSource(decisionLevel)
+            },
+            effort = {
+                LpEffortProfile(
+                    continuation = ExactContinuationLimits(
+                        maxRows = if (completeTraversalObserved && unassignedBooleans == 0) Int.MAX_VALUE else 128,
+                    ),
+                )
             },
             solveContext = solveContext,
             cancellation = lpStop,
