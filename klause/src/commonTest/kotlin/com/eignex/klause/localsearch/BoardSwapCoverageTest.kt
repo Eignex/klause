@@ -212,6 +212,51 @@ class BoardSwapCoverageTest {
         }
     }
 
+    @Test
+    fun `a restart retaining its assignment should begin fresh board coverage`() {
+        val initial = state()
+        var optima = 0
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {}
+            override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
+                optima++
+            }
+        }
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+        val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
+
+        engine.resumable(
+            LinearObjective(),
+            LocalSearchParams(maxFlips = 7L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
+        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(1, optima)
+    }
+
+    @Test
+    fun `implicit ownership reseeding should discard retained board progress`() {
+        val state = state()
+        val sink = MoveSink()
+        val source = SatisfiedStructured.structural(1)
+        source.generate(state, sink)
+        val first = sink.list
+        sink.clear()
+        source.generate(state, sink)
+        state.seedImplicitFeasible()
+        sink.clear()
+        sink.setOwners(state.seeding.ownerInt)
+
+        source.generate(state, sink)
+
+        assertEquals(first, sink.list)
+    }
+
     private fun state(): LocalSearchState {
         val problem = Problem(
             0, 10, Array(10) { IntDomain(0, 4) },
