@@ -133,6 +133,24 @@ class ImplicitSeeding(
         seedSteps(state).forEach { }
     }
 
+    internal fun implicitFeasible(state: LocalSearchState): Boolean = implicitSeedFactors.all { fid ->
+        !state.factors[fid].isViolated(state, fid) &&
+            problem.factors[fid].intVars.all { state.assignment.intValue(it) in state.rootDomains[it] }
+    }
+
+    internal fun retainFeasibleOwners(state: LocalSearchState): Boolean {
+        if (!implicitFeasible(state)) return false
+        val seeds = implicitSeedFactors
+        val current = ownerInt
+        if (current != null && seeds.all { fid -> problem.factors[fid].intVars.all { current[it] == fid } }) return true
+        val owners = current ?: IntArray(problem.numIntVars)
+        owners.fill(-1)
+        for (fid in seeds) for (variable in problem.factors[fid].intVars) owners[variable] = fid
+        ownerInt = owners
+        state.moveSink.setOwners(owners)
+        return true
+    }
+
     internal fun seedSteps(state: LocalSearchState): Sequence<Unit> = sequence {
         yieldAll(seedSetSteps())
         val seeds = checkNotNull(preparedSeedFactors)

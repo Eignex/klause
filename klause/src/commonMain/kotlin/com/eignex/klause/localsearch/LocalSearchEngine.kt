@@ -148,7 +148,7 @@ internal class LocalSearchEngine(
                 val preserve = seedImplicitOnRestart && ils?.preservesImplicitOnRestart == true
                 prepareAssignment(state, preserveImplicit = preserve)
                 state.recompute()
-                if (preserve && !RetainedBoardRestart.canPreserveOwners(state)) {
+                if (preserve && !state.seeding.retainFeasibleOwners(state)) {
                     prepareAssignment(state)
                     state.recompute()
                 }
