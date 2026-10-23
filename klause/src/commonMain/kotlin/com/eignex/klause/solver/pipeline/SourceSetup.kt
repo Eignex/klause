@@ -9,6 +9,15 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.Cancellation
 
+/** Preference among admitted source owners; declarations and completion obligations are unchanged. */
+enum class SourceRoutePreference {
+    /** Select ownership from the ordinary source policy. */
+    AUTOMATIC,
+
+    /** Prefer an admitted exact-linear owner while retaining finite integer membership. */
+    EXACT_LINEAR,
+}
+
 /** One operation binding over an attached source and its containing preparation allowance. */
 class SourceSetupRequest private constructor(
     /** Source identity, interpretation and neutral construction hints. */
@@ -30,6 +39,8 @@ class SourceSetupRequest private constructor(
     /** Original exact quadratic source objective, when the operation supplies one. */
     val quadraticObjective: QuadraticObjectiveSpec?,
     internal val requiresQuadraticCompletion: Boolean = false,
+    /** Optional preference among admitted finite and exact-linear owners. */
+    val routePreference: SourceRoutePreference = SourceRoutePreference.AUTOMATIC,
 ) {
     /** Bind an affine operation or the objective already embedded in a native formula. */
     constructor(
@@ -41,7 +52,9 @@ class SourceSetupRequest private constructor(
         providers: FactorProjectionProviders = source.providers,
         cancellation: Cancellation = Cancellation.Never,
         boundCancellation: Cancellation = cancellation,
-    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null)
+        routePreference: SourceRoutePreference = SourceRoutePreference.AUTOMATIC,
+    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null,
+        routePreference = routePreference)
 
     /** Bind an original exact quadratic objective and direction before native preparation. */
     constructor(
@@ -151,6 +164,7 @@ object SourceSetup {
             preparationCancellation = stop,
             polynomialCancellation = polynomialCancellation or stop,
             onLpStats = onLpStats,
+            routePreference = request.routePreference,
         )
         return PreparedSourceInvocation(request, route, stop)
     }

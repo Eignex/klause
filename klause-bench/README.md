@@ -390,6 +390,15 @@ can contain only declined preferences. Release counts a live default consultatio
 not avoided registration or capture work. These observations add no numerical
 invocation and establish neither a timing cause nor a whole-source witness gain.
 
+For bounded SMT ownership comparisons, pair `param.source-route=automatic` with
+`param.source-route=exact-linear` at the same revision, source, engine and resource
+settings. The preference only selects an admitted owner; inspect the actual
+`solvePipeline` and theory route before treating the arms as different ownership.
+Keep source preparation, finite propagation, exact checks, useful deductions, work,
+complete-state progress and source-checked verdicts separate. An absent route's
+counters are unknown rather than zero. `engine=cp` alone changes worker strategy
+without requesting an alternative source owner.
+
 ### Subprocess exit records
 
 Each returned subprocess record retains the actual child exit in `stats.exit`,

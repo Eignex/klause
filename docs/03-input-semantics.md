@@ -56,6 +56,11 @@ using a slice of the preparation allowance; failure to close a bound never repla
 it with a guessed domain. `--param open-bound-proof=false` disables that proof for
 MPS, SMT-LIB and exact FlatZinc.
 
+Source setup can prefer an admitted exact-linear owner over finite execution.
+That preference changes neither the semantic model nor its declarations: finite
+integer membership and required arithmetic completion remain enforced. Unsupported
+alternatives retain the ordinary route. See [source setup](19-api.md#source-setup).
+
 `-e` selects complete traversal, local search, ALNS or a mixed portfolio over the
 selected route. Supported linear and polynomial sources keep the same constraints
 and objective across those strategies. SMT-LIB can fall back to open local search

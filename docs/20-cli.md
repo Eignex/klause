@@ -34,6 +34,12 @@ Numerical kernel selection at run time is described in
 
 ## Formats and dispatch
 
+`--param source-route=exact-linear` requests an admitted exact-linear owner through
+shared source setup, including SMT-LIB. `automatic` retains ordinary selection.
+This preference preserves declared bounds and finite membership; unsupported
+alternatives keep their ordinary route. Engine selection still determines the
+strategy within the selected route.
+
 | Format name | Extensions | Output |
 |---|---|---|
 | `minizinc` | `.fzn` | FlatZinc solution separators and verdicts; `%%%mzn-stat` statistics |

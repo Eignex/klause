@@ -77,6 +77,12 @@ models keep finite execution. Native snapshots (`PolynomialRealProblem`,
 with explicit `ProblemSettings` and keep their exact formula and objective. Hints are
 described under [source definition materialization](10-local-search.md#source-definition-materialization).
 
+`SourceSetupRequest.routePreference` can prefer an admitted exact-linear owner over
+finite execution with `SourceRoutePreference.EXACT_LINEAR`. The pipeline retains
+the canonical source, declared bounds, finite membership and required completion.
+An unsupported alternate leaves the ordinary owner selected; interrupted admission
+withholds execution. The default is `AUTOMATIC`.
+
 `PreparedSourceInvocation` retains the selected route, source plan and operation
 admission. When preparation selects a private float grid, `FiniteSolveResult.outcome`
 reports source-qualified points and claims unless the consumer declares grid

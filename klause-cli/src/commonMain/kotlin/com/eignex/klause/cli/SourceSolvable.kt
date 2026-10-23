@@ -33,6 +33,7 @@ internal fun sourceSolvable(
     definitionHints: List<DefinitionHint> = emptyList(),
     searchHints: SearchHints? = null,
 ): Solvable {
+    val routePreference = common.takeSourceRoutePreference()
     val operation = when {
         minimizedObjective != null -> ExecutionOperation.OPTIMIZE
         common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
@@ -54,6 +55,7 @@ internal fun sourceSolvable(
                 maximize = maximize,
                 cancellation = stop,
                 boundCancellation = common.routingCancellation(),
+                routePreference = routePreference,
             ),
             onLpStats = { lpStats = it },
         )
@@ -79,6 +81,7 @@ internal fun attachedSourceSolvable(
     objective: LinearObjective? = null,
     renderFinite: (Sample) -> String = { error("source requires its exact coordinate renderer") },
 ): Solvable {
+    val routePreference = common.takeSourceRoutePreference()
     val start = TimeSource.Monotonic.markNow()
     var lpStats = LpStats()
     val invocation = common.routingPreparationCancellation().use { stop ->
@@ -105,6 +108,7 @@ internal fun attachedSourceSolvable(
                 maximize = sense == ObjectiveSense.MAXIMIZE,
                 cancellation = stop,
                 boundCancellation = common.routingCancellation(),
+                routePreference = routePreference,
             )
         }
         SourceSetup.prepare(request) { lpStats = it }
@@ -139,6 +143,7 @@ internal fun linearSourceSolvable(
     admissionElapsedMs: Long = 0L,
 ): Solvable {
     require(source.originalSource is com.eignex.klause.ir.LinearSourceProblem)
+    val routePreference = common.takeSourceRoutePreference()
     val start = TimeSource.Monotonic.markNow()
     val operation = when {
         source.embeddedObjectiveSense != null -> ExecutionOperation.OPTIMIZE
@@ -152,6 +157,7 @@ internal fun linearSourceSolvable(
             maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
             cancellation = stop,
             boundCancellation = common.routingCancellation(),
+            routePreference = routePreference,
         )
         SourceSetup.prepare(request, onLpStats = { lpStats = it })
     }

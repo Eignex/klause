@@ -221,11 +221,13 @@ internal fun Problem.pipelineRoute(
     preparationCancellation: Cancellation,
     polynomialCancellation: Cancellation = preparationCancellation,
     onLpStats: ((LpStats) -> Unit)? = null,
+    routePreference: SourceRoutePreference = SourceRoutePreference.AUTOMATIC,
 ): SourceProblemRoute = pipelineRouteObserved(
     objective, maximize, true, boundCancellation, onLpStats,
     requiresExactObjectiveRoute(objective, preparationCancellation),
     projections.providers, projections, polynomialCancellation = polynomialCancellation,
     preparationCancellation = preparationCancellation,
+    routePreference = routePreference,
 )
 
 internal fun Problem.pipelineRoute(
@@ -249,10 +251,20 @@ private fun Problem.pipelineRouteObserved(
     projectionCapture: PreparedFactorProjections? = null,
     polynomialCancellation: Cancellation = boundCancellation,
     preparationCancellation: Cancellation = boundCancellation,
+    routePreference: SourceRoutePreference = SourceRoutePreference.AUTOMATIC,
 ): SourceProblemRoute {
     val selection = projectionCapture ?: providers.prepare(this)
     if (!routeLinearToTheory && nativeFiniteSource(selection, preparationCancellation)) {
         onLpStats?.invoke(LpStatsSink(LpRoute.STANDALONE).snapshot())
+        if (routePreference == SourceRoutePreference.EXACT_LINEAR && !requiresPolynomialCompletion(selection)) {
+            val alternative = prepareExecutionPlan(
+                this, objective, maximize, false, providers, selection, preparationCancellation,
+            )
+            if (alternative.decline == PreparedPlanDecline.RESOURCE) {
+                return SourceProblemRoute.UnsupportedOpen(null, this, alternative)
+            }
+            alternative.exactLinearRoute(this, objective, maximize)?.let { return it }
+        }
         val prepared = prepareExecutionPlan(
             this,
             objective,
@@ -339,7 +351,7 @@ private fun Problem.pipelineRouteObserved(
             error("factor source requires polynomial execution")
     }
     val arithmeticRoute = arithmeticExecution.ownership.theoryPipeline
-    val preferExact = routeLinearToTheory &&
+    val preferExact = (routeLinearToTheory || routePreference == SourceRoutePreference.EXACT_LINEAR) &&
         (arithmeticRoute == ProblemPipeline.EXACT_LRA || arithmeticRoute == ProblemPipeline.EXACT_LIRA)
     val preferFinite = finiteIntegerRanges && !preferExact &&
         (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA) &&
@@ -372,6 +384,18 @@ private fun Problem.pipelineRouteObserved(
     } else {
         SourceProblemRoute.OpenTheory(request)
     }
+}
+
+private fun PreparedSourcePlan.exactLinearRoute(
+    problem: Problem,
+    objective: LinearObjective?,
+    maximize: Boolean,
+): SourceProblemRoute.OpenTheory? {
+    val plan = componentPlan ?: return null
+    if (plan.theoryPipeline != ProblemPipeline.EXACT_LRA && plan.theoryPipeline != ProblemPipeline.EXACT_LIRA) {
+        return null
+    }
+    return SourceProblemRoute.OpenTheory(OpenTheoryRequest(problem, objective, maximize, plan, preparedPlan = this))
 }
 
 private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, stop: Cancellation): Boolean {
