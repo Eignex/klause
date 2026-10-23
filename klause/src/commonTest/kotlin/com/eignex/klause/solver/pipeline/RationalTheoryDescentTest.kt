@@ -41,11 +41,11 @@ class RationalTheoryDescentTest {
             0,
             emptyArray(),
             emptyArray(),
-            numRealVars = 43,
-            realLower = DoubleArray(43),
-            realUpper = DoubleArray(43) { 1.0 },
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
         )
-        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
         val context = assertNotNull(
             source.linearAuthorityContext(
                 objective,
@@ -87,11 +87,11 @@ class RationalTheoryDescentTest {
             0,
             emptyArray(),
             emptyArray(),
-            numRealVars = 43,
-            realLower = DoubleArray(43),
-            realUpper = DoubleArray(43) { 1.0 },
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
         )
-        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
         var candidate: MinimizeResult.WithSample? = null
 
         RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8)).use {
@@ -222,11 +222,11 @@ class RationalTheoryDescentTest {
             0,
             emptyArray(),
             emptyArray(),
-            numRealVars = 43,
-            realLower = DoubleArray(43),
-            realUpper = DoubleArray(43) { 1.0 },
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
         )
-        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
         var candidate: MinimizeResult.WithSample? = null
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8))
 
@@ -255,11 +255,11 @@ class RationalTheoryDescentTest {
             0,
             emptyArray(),
             emptyArray(),
-            numRealVars = 43,
-            realLower = DoubleArray(43),
-            realUpper = DoubleArray(43) { 1.0 },
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
         )
-        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
 
         for (params in listOf(TheoryParams(openWorkLimit = 1), TheoryParams(openWorkLimit = 8, maxLeaves = 1))) {
             val result = RationalTheoryDescent(source, objective, params).use {
@@ -280,11 +280,11 @@ class RationalTheoryDescentTest {
             0,
             emptyArray(),
             emptyArray(),
-            numRealVars = 43,
-            realLower = DoubleArray(43),
-            realUpper = DoubleArray(43) { 1.0 },
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
         )
-        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
         var candidate: MinimizeResult.WithSample? = null
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8))
 
@@ -307,16 +307,16 @@ class RationalTheoryDescentTest {
             0,
             emptyArray(),
             emptyArray(),
-            numRealVars = 43,
-            realLower = DoubleArray(43),
-            realUpper = DoubleArray(43) { 1.0 },
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
         )
-        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
         val external = Sample(
             booleanArrayOf(),
             longArrayOf(),
-            DoubleArray(43) { 1.0 },
-            exactReals = List(43) { BigFraction.ONE },
+            DoubleArray(129) { 1.0 },
+            exactReals = List(129) { BigFraction.ONE },
         )
         val values = ArrayList<BigFraction>()
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8)) {
@@ -341,11 +341,11 @@ class RationalTheoryDescentTest {
             0,
             emptyArray(),
             emptyArray(),
-            numRealVars = 43,
-            realLower = DoubleArray(43),
-            realUpper = DoubleArray(43) { 1.0 },
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
         )
-        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8))
 
         assertFailsWith<IllegalStateException> {
@@ -365,11 +365,11 @@ class RationalTheoryDescentTest {
             0,
             emptyArray(),
             emptyArray(),
-            numRealVars = 43,
-            realLower = DoubleArray(43),
-            realUpper = DoubleArray(43) { 1.0 },
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
         )
-        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
         val original = assertNotNull(
             source.linearAuthorityContext(
                 objective,
@@ -416,11 +416,11 @@ class RationalTheoryDescentTest {
                         BigFraction.ofLong(2).reciprocal(),
                 ),
             ),
-            numRealVars = 43,
-            realLower = DoubleArray(43),
-            realUpper = DoubleArray(43) { 1.0 },
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
         )
-        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
         var published: MinimizeResult.WithSample? = null
 
         RationalTheoryDescent(source, objective, TheoryParams(maxDecisions = 4, openWorkLimit = 32)).use {
