@@ -47,7 +47,14 @@ internal class QuadraticNativeScope private constructor(
         params.maximumWork?.let { ledger.work >= it } == true ||
             maximumWorkerWork?.let { sum(polynomialWork, quadraticWork) >= it } == true
     }
-    val stopped: Boolean get() = exhausted || resource != null || root?.resource != null || stop()
+    val stopped: Boolean get() {
+        val limited = ledger.lock.withLock {
+            params.maximumWork?.let { ledger.work >= it } == true ||
+                maximumWorkerWork?.let { sum(polynomialWork, quadraticWork) >= it } == true ||
+                representationDecline != null || root?.representationDecline != null
+        }
+        return limited || stop()
+    }
     val polynomial: Cancellation = Token(quadratic = false)
     val numerical: Cancellation = Token(quadratic = true)
 
