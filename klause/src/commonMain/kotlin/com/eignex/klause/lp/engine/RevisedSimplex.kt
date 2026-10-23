@@ -122,7 +122,7 @@ internal class RevisedSimplex(
     private val reuseRationalOrder: Boolean = true,
     private val scalingOptions: LpScalingOptions = LpScalingOptions(),
     private val primalPricingTolerance: Double = TOL,
-    private val syntheticWorkEnabled: Boolean = true,
+    private val syntheticWorkEnabled: Boolean = false,
 ) : TableauCutSolver,
     PersistentLpSolver {
     internal val lastDevexWeightCorrections: Int get() = observations.lastDevexWeightCorrections
