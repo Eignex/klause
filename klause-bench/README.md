@@ -615,6 +615,10 @@ interventions; the report does not claim they are identical replay states.
 unchanged-input decline reuse. It requires identical source/search snapshots
 before and after continuation, and records arithmetic evaluations and reuse
 separately from candidate visits and elapsed traversal time.
+`inspect=partial-propagation-cached` compares ordinary propagation with the cached
+producer. Inspection records producer, source assertion and numerical-query time
+from after ordinary root initialization. These diagnostic clocks are disabled in
+default solver execution; they exclude root-opening and snapshot costs.
 
 `LinearSourceShape` accepts `suite=ID problem=NAME sha256=HEX` and retains the
 hash-matched original, build identity, declaration/lowered dimensions, factor kinds

@@ -36,7 +36,7 @@ import kotlinx.serialization.json.put
 internal object LinearPrefixInspection {
     fun inspect(
         compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false,
-        integrated: Boolean = false, cached: Boolean = false,
+        integrated: Boolean = false, cached: Boolean = false, reuse: Boolean = false,
     ) {
         val captures = (0..1).map { replay ->
             val stop = Cancellation.after(10.seconds)
@@ -61,10 +61,16 @@ internal object LinearPrefixInspection {
             val run = member(opening, "getRun")
             try {
                 val automatic = integrated && (replay == 1 || cached)
+                if (run != null) {
+                    val planned = field(run, "planned") as PlannedSearch
+                    call(requireNotNull(planned.theory), "observePartialLinearCost")
+                }
                 if (automatic && run != null) {
                     val planned = field(run, "planned") as PlannedSearch
                     call(requireNotNull(planned.theory), "usePartialLinearPropagation")
-                    if (cached && replay == 1) call(requireNotNull(planned.theory), "reusePartialLinearDeclines")
+                    if ((cached || reuse) && replay == 1) {
+                        call(requireNotNull(planned.theory), "reusePartialLinearDeclines")
+                    }
                 }
                 val result = run?.let { call(it, "advance") } ?: member(opening, "getResult")
                 val elapsed = System.nanoTime() - started
@@ -77,7 +83,7 @@ internal object LinearPrefixInspection {
                     put("visitedNonRootBoundaries", boundary.visits)
                     put("sourceVerdictClaim", false)
                     put("integrated", automatic)
-                    put("cached", cached && replay == 1)
+                    put("cached", (cached || reuse) && replay == 1)
                     put("cliEquivalence", "unverified-direct-library-diagnostic")
                     put("ready", ready)
                     put("stopped", stop())
@@ -115,7 +121,7 @@ internal object LinearPrefixInspection {
                     val observation = buildJsonObject {
                         put("treated", replay == 1)
                         put("integrated", automatic)
-                        put("cached", cached && replay == 1)
+                        put("cached", (cached || reuse) && replay == 1)
                         put("probeNs", probeElapsed)
                         put("continuationNs", continuationElapsed)
                         put("probe", LinearPrefixSnapshot(Cancellation.after(10.seconds)).record(deductions))
@@ -162,6 +168,7 @@ internal object LinearPrefixInspection {
             put("replaySha256", sha256(captures[1]))
             put("experiment", when {
                 cached -> "integrated-versus-cached"
+                reuse -> "plain-versus-integrated-cache"
                 integrated -> "plain-versus-integrated"
                 else -> "exact-prefix-replay"
             })
