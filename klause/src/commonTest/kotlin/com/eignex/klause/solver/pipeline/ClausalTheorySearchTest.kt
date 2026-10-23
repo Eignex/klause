@@ -11,6 +11,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -80,9 +81,9 @@ class ClausalTheorySearchTest {
 
         val result = assertIs<OpenTheoryResult.Sat>(engine.solve())
 
-        val sum = result.assignment.intValue(0).toLong() + result.assignment.intValue(1).toLong()
-        assertEquals(sum <= 0, result.assignment.boolValue(0))
-        assertEquals(sum >= 1, result.assignment.boolValue(1))
+        val sum = parseBigInt(result.assignment.intValue(0)) + parseBigInt(result.assignment.intValue(1))
+        assertEquals(sum.signum() <= 0, result.assignment.boolValue(0))
+        assertEquals(sum.signum() > 0, result.assignment.boolValue(1))
         assertTrue(result.assignment.boolValue(0) != result.assignment.boolValue(1))
         assertNotNull(result.stats.smt.completeSearchStages?.get("CLAUSAL_BOOLEAN_SAT"))
     }

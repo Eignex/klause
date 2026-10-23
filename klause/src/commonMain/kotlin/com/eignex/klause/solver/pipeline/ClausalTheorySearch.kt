@@ -110,7 +110,11 @@ internal class ClausalTheorySearch(
                     state.capture(root)
                     rootCaptured = true
                 }
-                val planned = open(checkNotNull(cube))
+                val planned = try {
+                    open(checkNotNull(cube))
+                } catch (_: CancellationException) {
+                    return finish(stopped(includeResources = true) ?: SearchRunEvent.Indeterminate.Cancelled)
+                }
                 completion = planned
                 observe("CLAUSAL_CUBE_OPENED")
                 when (planned.session.initialize()) {
