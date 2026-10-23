@@ -125,6 +125,7 @@ internal class LocalSearchEngine(
     // else the solver-level restartPolicy.
     private val configuredRestart: RestartPolicy =
         strategy.schedule.restart ?: restartPolicy
+    private var preparedBoardRestart: PreparedBoardRestart? = null
 
     // When a definitionalSweep is present or seedImplicitOnRestart is set, every restart is followed
     // by implicit feasible-init and/or the sweep plus a recompute, so all restart call sites get the
@@ -145,6 +146,7 @@ internal class LocalSearchEngine(
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 val previousBest = state.bestCostSeen
                 configuredRestart.restart(state, bestSoFar)
+                preparedBoardRestart?.afterPolicy(state)
                 prepareAssignment(state)
                 state.recompute()
                 state.bestCostSeen = minOf(previousBest, state.cost)
@@ -807,10 +809,15 @@ internal class LocalSearchEngine(
         ) else null
         var checkInitialCompletion = continuousCompletion || completedMoves != null
 
-        fun reportProgress() = progress.optimization(
-            totalFlips, restartCount, stallCount, bestObj, bestSample != null,
-            bestCostInfeasible, bestFoundAtMs, checkpoint,
-        )
+        fun reportProgress() {
+            (configuredRestart as? IteratedLocalSearchRestart)?.let {
+                sink.ls.recordBoardRestarts(it.changedBoardRestarts, it.declinedBoardRestarts)
+            }
+            progress.optimization(
+                totalFlips, restartCount, stallCount, bestObj, bestSample != null,
+                bestCostInfeasible, bestFoundAtMs, checkpoint,
+            )
+        }
 
         while (totalFlips < maxFlips || pendingCompletedMove) {
             progress.observeResidual()
@@ -1239,9 +1246,22 @@ internal class LocalSearchEngine(
         checkpoint: LocalSearchCheckpoint?,
         onPause: () -> Unit,
     ) = state.phaseTimer.inPhase("seeding") {
-        state.boardCoverage.invalidate()
-        restarts.restart(state, anchor)
-        if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params, checkpoint, onPause)
+        val policy = configuredRestart as? IteratedLocalSearchRestart
+        val observation = if (policy != null && (anchor != null || policy.incumbents.isNotEmpty())) {
+            PreparedBoardRestart.capture(state)
+        } else null
+        preparedBoardRestart = observation
+        try {
+            state.boardCoverage.invalidate()
+            restarts.restart(state, anchor)
+            if (definitionalSweep == null && !seedImplicitOnRestart) observation?.afterPolicy(state)
+            observation?.afterPreparation(state)
+            val repaired = !greedyRepairOnRestart || !isLargeEnoughForGreedy() ||
+                greedyRepairPass(state, params, checkpoint, onPause)
+            if (repaired && observation != null) policy?.recordBoardRestart(observation.finish(state))
+        } finally {
+            preparedBoardRestart = null
+        }
     }
 
     /** True when the problem is big enough that the post-restart greedy-repair sweep pays for
@@ -1273,16 +1293,16 @@ internal class LocalSearchEngine(
         params: LocalSearchParams,
         checkpoint: LocalSearchCheckpoint?,
         onPause: () -> Unit = {},
-    ) {
+    ): Boolean {
         if (checkpoint == null) {
-            greedyInit.run(state) { params.cancellation() }
-            return
+            return greedyInit.pass(state).advance { params.cancellation() }
         }
         val pass = preparedValue(greedyInit.preparation(state), params, checkpoint)
         while (!pass.advance { params.cancellation() }) {
             onPause()
             yield(null)
         }
+        return true
     }
 
     /** Undo [move] on [state] so it matches [baselineSnap] again. BoolFlip self-inverts;

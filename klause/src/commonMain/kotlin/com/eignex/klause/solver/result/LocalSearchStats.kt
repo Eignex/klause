@@ -29,6 +29,10 @@ data class LocalSearchStats(
     val bestResidual: LocalSearchResidual? = null,
     /** Active elapsed nanoseconds by phase, excluding suspended idle time. Empty when disabled. */
     val phaseNanos: Map<String, Long> = emptyMap(),
+    /** Retained ILS restarts with an admissible searched board input changed after preparation and repair. */
+    val boardRestartChanges: SumResult = ZERO_COUNT,
+    /** Retained ILS board restarts explicitly declined because prepared searched inputs did not change. */
+    val boardRestartDeclines: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers: moves/stalls add, earliest time-to-best wins, incumbent from the lower violation. */
     fun mergedWith(o: LocalSearchStats): LocalSearchStats = LocalSearchStats(
@@ -60,6 +64,8 @@ data class LocalSearchStats(
             val first = phaseNanos[phase] ?: 0L
             first + minOf(o.phaseNanos[phase] ?: 0L, Long.MAX_VALUE - first)
         },
+        boardRestartChanges = SumResult(boardRestartChanges.sum + o.boardRestartChanges.sum),
+        boardRestartDeclines = SumResult(boardRestartDeclines.sum + o.boardRestartDeclines.sum),
     )
 }
 
@@ -79,6 +85,8 @@ internal class LocalSearchStatsSink {
     private var completions: Long = 0L
     private var completionsRefuted: Long = 0L
     private var completionsUndecided: Long = 0L
+    private var boardRestartChanges = 0L
+    private var boardRestartDeclines = 0L
     var bestResidual: LocalSearchResidual? = null
     var phaseNanos: (() -> Map<String, Long>)? = null
 
@@ -94,6 +102,11 @@ internal class LocalSearchStatsSink {
         this.moves = moves
         this.restarts = restarts
         this.stalls = stalls
+    }
+
+    fun recordBoardRestarts(changes: Long, declines: Long) {
+        boardRestartChanges = changes
+        boardRestartDeclines = declines
     }
 
     /** Record the incumbent fingerprint: objective (NaN if never feasible), residual violation, and the
@@ -115,5 +128,7 @@ internal class LocalSearchStatsSink {
         completionsUndecided = SumResult(completionsUndecided.toDouble()),
         bestResidual = bestResidual,
         phaseNanos = phaseNanos?.invoke() ?: emptyMap(),
+        boardRestartChanges = SumResult(boardRestartChanges.toDouble()),
+        boardRestartDeclines = SumResult(boardRestartDeclines.toDouble()),
     )
 }

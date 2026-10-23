@@ -257,6 +257,10 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     out += "lsMoves" to "${moves.toLong()}"
     out += "lsRestarts" to "${stats.search.restarts.sum.toLong()}"
     out += "lsStalls" to "${stats.ls.stalls.sum.toLong()}"
+    if (stats.ls.boardRestartChanges.sum + stats.ls.boardRestartDeclines.sum > 0.0) {
+        out += "lsBoardRestartChanges" to "${stats.ls.boardRestartChanges.sum.toLong()}"
+        out += "lsBoardRestartDeclines" to "${stats.ls.boardRestartDeclines.sum.toLong()}"
+    }
     for ((phase, nanos) in stats.ls.phaseNanos.entries.sortedBy { it.key }) {
         out += "lsPhaseNanos.$phase" to nanos.toString()
     }
