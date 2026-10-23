@@ -249,12 +249,13 @@ single lane and seed do not make the schedule reproducible.
 
 ### Retained proof coverage
 
-After an accepted incumbent stops improving for one base time allowance of active
-work, retained non-restarting complete workers share half the active time since that
-improvement. The least-funded free worker runs before ordinary reward selection;
-each accepted improvement resets the accounting. Initial sibling probes, explicit
-minimum shares and bounded auxiliary trials retain precedence. Segment overruns can
-delay coverage.
+With an accepted incumbent, retained non-restarting complete workers share half the
+active time since its last improvement. The least-funded free worker runs before
+ordinary reward selection; each accepted improvement resets the accounting. Coverage
+accrues from that improvement without a catch-up delay, so long competing segments
+do not consume a short run's proof allocation before coverage begins. Initial sibling
+probes, explicit minimum shares and bounded auxiliary trials retain precedence.
+Segment overruns can delay coverage.
 
 This share protects exhaustive traversal whose progress can stay invisible until a
 proof completes. Only live resumable backtrack workers with source-proof authority

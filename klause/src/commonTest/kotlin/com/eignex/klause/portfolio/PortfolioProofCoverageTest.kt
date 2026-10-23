@@ -18,14 +18,15 @@ import kotlin.time.TestTimeSource
 
 class PortfolioProofCoverageTest {
     @Test
-    fun `silent retained traversal should prove a pooled incumbent despite competing deduction rewards`() {
+    fun `silent retained traversal should prove before long rewarded segments consume the remaining time`() {
         val clock = TestTimeSource()
         val visits = IntArray(2)
         var elapsed = 0L
         val finderBase = ScriptedSearch({ it == 0 }) {
+            val cost = if (visits[0] == 0) 500L else 1_500L
             visits[0]++
-            elapsed += 500L
-            clock += 500.milliseconds
+            elapsed += cost
+            clock += cost.milliseconds
         }
         val finder = object : ResumableSearch by finderBase {
             override val stats: SolveStats
@@ -56,7 +57,7 @@ class PortfolioProofCoverageTest {
 
         val result = Portfolio(workers, fixedBandit(2, 0), reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
-        }.use { it.minimize(Cancellation { elapsed >= 5_000L }) }
+        }.use { it.minimize(Cancellation { elapsed >= 3_000L }) }
 
         assertIs<MinimizeResult.Optimal>(result)
         assertTrue(result.stats.portfolio.arms[0].meanReward > result.stats.portfolio.arms[1].meanReward)
@@ -106,23 +107,24 @@ class PortfolioProofCoverageTest {
     }
 
     @Test
-    fun `retained proof coverage should wait for one base time allowance of stagnation`() {
+    fun `retained proof coverage should follow every initial sibling admission`() {
         val clock = TestTimeSource()
-        val visits = IntArray(2)
+        val visits = mutableListOf<Int>()
         var elapsed = 0L
-        val workers = List(2) { arm ->
+        val workers = List(3) { arm ->
             trackingWorker("worker$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) {
-                visits[arm]++
+                visits += arm
                 elapsed += 100L
                 clock += 100.milliseconds
-            }).also { it.restartingSearch = arm == 0 }
+            }).also { it.restartingSearch = arm != 1 }
         }
 
-        Portfolio(workers, fixedBandit(2, 0), reseedStaleThreshold = 0).also {
+        Portfolio(workers, fixedBandit(3, 0), reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
-        }.use { it.minimize(Cancellation { elapsed >= 2_000L }) }
+        }.use { it.minimize(Cancellation { elapsed >= 600L }) }
 
-        assertEquals(1, visits[1])
+        assertEquals(listOf(0, 1, 2), visits.take(3))
+        assertTrue(visits.drop(3).contains(1))
     }
 
     @Test

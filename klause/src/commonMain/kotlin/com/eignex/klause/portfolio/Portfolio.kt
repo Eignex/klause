@@ -43,8 +43,8 @@ import kotlin.time.TimeSource
  * Bandit-scheduled portfolio of [PortfolioWorker] arms built by [PortfolioBuilder], mixing local
  * search, backtrack and ALNS. Each lane claims an arm selected by [UnivariateBandit], runs one
  * segment and settles its reward. An arm runs on at most one lane at a time. Until a witness is
- * accepted, scheduled lanes owe complete-search arms their share of elapsed time. After incumbent stagnation,
- * retained non-restarting proof workers share half the elapsed time; other turns favor progress.
+ * accepted, scheduled lanes owe complete-search arms their share of elapsed time. With an incumbent, retained
+ * non-restarting proof workers share half the time since its last improvement; other turns favor progress.
  * With a lane per arm, each arm runs for the whole solve.
  *
  * The shared incumbent cutoff prunes backtrack arms and its assignment warm-starts local-search
@@ -926,9 +926,8 @@ class Portfolio(
             if (free.isEmpty()) return null
             val elapsed = active.associateWith { (elapsedNanos(it) - baseline[it]).coerceAtLeast(0.0) }
             val total = elapsed.values.sum()
-            if (total < baseSliceMillis.milliseconds.inWholeNanoseconds) return null
             // Retained exhaustive traversal can close a proof without earning a progress signal.
-            // After one base time allowance of stagnation, it receives half the epoch's active time.
+            // Fund it throughout the incumbent epoch so a long competing segment cannot consume its catch-up time.
             val owed = total / 2 / complete.size
             return free.minBy { elapsed.getValue(it) }.takeIf { elapsed.getValue(it) < owed }
         }
