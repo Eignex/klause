@@ -67,26 +67,23 @@ class QfLiraSolverLpTest {
     @Test
     fun `retained free coordinates should complete a full Boolean state before component LP`() {
         for (retained in listOf(false, true)) {
-            val scale = 1.0 / (1L shl 40).toDouble()
             val source = Problem(
                 numBoolVars = 2,
                 intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
                 numRealVars = 133,
                 realLower = DoubleArray(133) { Double.NEGATIVE_INFINITY },
                 realUpper = DoubleArray(133) { Double.POSITIVE_INFINITY },
-                factors = Array<Factor>(133) { index ->
+                factors = Array<Factor>(132) { index ->
                     when (index) {
-                        0 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
-                            doubleArrayOf(1.0, -scale, -1.0), LinearOp.EQ, 0.0)
-                        1 -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
-                            doubleArrayOf(1.0, 1.0), LinearOp.LE, scale / 2.0)
-                        2 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 3),
-                            doubleArrayOf(1.0, 1.0), LinearOp.GE, scale / 2.0)
-                        3 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1),
+                        0 -> ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 128),
+                            doubleArrayOf(1.0, 1.0), LinearOp.LE, 0.5)
+                        1 -> ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 128),
+                            doubleArrayOf(1.0, 1.0), LinearOp.GE, 0.5)
+                        2 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(132),
                             doubleArrayOf(-1.0), LinearOp.LE, 0.0, strict = true)
-                        4 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1, 2, 4),
-                            doubleArrayOf(-1.0, 1.0, 1.0), LinearOp.LE, 0.0, strict = true)
-                        else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3, index),
+                        3 -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(129, 130, 132),
+                            doubleArrayOf(1.0, 1.0, -1.0), LinearOp.LE, 0.0, strict = true)
+                        else -> Linear(intArrayOf(), doubleArrayOf(), intArrayOf(index - 4, 132),
                             doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
                     }
                 },
@@ -97,7 +94,7 @@ class QfLiraSolverLpTest {
                 if (result.primal.size <= 128) result else {
                     withheld++
                     val primal = DoubleArray(result.primal.size)
-                    if (repairableGuess) primal[1] = 0.25
+                    if (repairableGuess) primal[132] = 0.25
                     FloatLpResult(Basis(intArrayOf(), result.basis.status), result.objective, result.duals, primal,
                         optimal = result.optimal, exactState = result.exactState)
                 }
@@ -123,11 +120,13 @@ class QfLiraSolverLpTest {
                 val result = assertIs<SearchResult.Satisfied>(session.solve(2))
 
                 val point = assertNotNull(result.model.valueOf(component.realAssignmentKey)).reals
-                assertTrue(point[1] > BigFraction.ZERO)
-                assertEquals(assertNotNull(BigFraction.ofDouble(scale / 2.0)), point[0] + point[3])
-                if (retained) assertEquals(operations, stats.snapshot().sourceLp.operations)
-                else assertTrue(stats.snapshot().sourceLp.operations > operations)
+                assertTrue(point[132] > BigFraction.ZERO)
+                assertTrue(point[129] + point[130] < point[132])
+                for (alias in 0 until 128) assertEquals(point[132], point[alias])
+                assertEquals(assertNotNull(BigFraction.ofDouble(0.5)), point[0] + point[128])
                 val stages = stats.snapshot().completeSearchStages
+                if (retained) assertEquals(operations, stats.snapshot().sourceLp.operations, stages.toString())
+                else assertTrue(stats.snapshot().sourceLp.operations > operations, stages.toString())
                 if (retained) assertTrue((stages?.get("RECOVERY_RETAINED_EQUALITY_POINT") ?: 0L) > 0L,
                     stages.toString())
             }
