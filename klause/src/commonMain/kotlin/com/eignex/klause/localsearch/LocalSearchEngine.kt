@@ -1032,6 +1032,7 @@ internal class LocalSearchEngine(
                             continue
                         }
                         feasibleMisses = 0
+                        if (supportsBoardCoverage && !state.boardCoverage.requested) state.boardCoverage.request(state)
                         if (!state.boardCoverage.requested ||
                             (!state.boardCoverage.pending && feasibleStrategy.gradesAllBoardImprovements &&
                                 moveEvaluation == null && state.booleanRepairs == null)
