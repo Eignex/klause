@@ -22,9 +22,11 @@ import java.io.File
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
 import java.util.HexFormat
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -38,6 +40,17 @@ internal object LinearRootOpeningProfile {
             return
         }
         require(Runtime.getRuntime().availableProcessors() == 1)
+        if (args.size == 1 && args[0].startsWith("batch64=")) {
+            val requests = Json.decodeFromString<List<List<String>>>(
+                Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString(),
+            )
+            require(requests.size in 1..4)
+            requests.forEachIndexed { index, request -> inspect(request.toTypedArray(), out.resolve("$index")) }
+        } else inspect(args, out)
+    }
+
+    private fun inspect(args: Array<String>, out: File) {
+        out.mkdirs()
         val options = args.associate { argument ->
             require('=' in argument) { "expected key=value" }
             argument.substringBefore('=') to argument.substringAfter('=')
@@ -45,7 +58,7 @@ internal object LinearRootOpeningProfile {
         val required = setOf("suite", "problem", "sha256")
         require(options.keys == required || options.keys == required + "inspect")
         val inspection = options["inspect"]
-        require(inspection == null || inspection == "disjunction-names")
+        require(inspection == null || inspection in setOf("disjunction-names", "partial-arithmetic"))
         val expected = options.getValue("sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
         val reference = Catalog.uncapped(options.getValue("suite")).problems
@@ -58,10 +71,14 @@ internal object LinearRootOpeningProfile {
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val parsingStarted = System.nanoTime()
-        val admitted = SmtLib.parse(bytes.decodeToString())
+        val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = Cancellation.after(OPENING_BUDGET_MS.milliseconds))
         val compiled = admitted
         val parsingNs = System.nanoTime() - parsingStarted
         require(compiled.objective == null) { "only satisfaction openings are supported" }
+        if (inspection == "partial-arithmetic") {
+            LinearPrefixInspection.inspect(compiled, out, actual)
+            return
+        }
         val deadlineStarted = System.nanoTime()
         val stop = Cancellation.after(OPENING_BUDGET_MS.milliseconds)
         val params = TheoryParams(timeout = stop, randomSeed = SEED)

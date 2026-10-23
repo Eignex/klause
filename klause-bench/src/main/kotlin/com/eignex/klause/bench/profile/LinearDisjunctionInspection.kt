@@ -146,7 +146,7 @@ internal object LinearDisjunctionInspection {
         }
     }
 
-    private fun rowRecord(row: LinearRow): JsonObject = buildJsonObject {
+    internal fun rowRecord(row: LinearRow): JsonObject = buildJsonObject {
         put("relation", row.relation.name)
         put("strict", row.strict)
         put("activator", row.activator)
