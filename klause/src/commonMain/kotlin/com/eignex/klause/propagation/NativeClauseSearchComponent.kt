@@ -32,7 +32,10 @@ internal class NativeClauseSearchComponent(
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
         val result = when {
-            unavailable(context) -> ComponentResult.Indeterminate
+            unavailable(context) -> {
+                if (interruptedLevel == null) interruptedLevel = context.decisionLevel
+                ComponentResult.Indeterminate
+            }
             decision is SearchDecision.Bool && decision.literal ushr 1 in 0 until numBoolVars -> {
                 val complete = native.decisionLevel
                 val asserted = delegate.assert(decision, context)
