@@ -6915,6 +6915,23 @@ final class com.eignex.klause.factor.global/AllDifferent : com.eignex.klause.fac
     final fun structuralReduce(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.ir/FactorReduction // com.eignex.klause.factor.global/AllDifferent.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }
 
+final class com.eignex.klause.factor.global/AllDifferentTuples : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.global/AllDifferentTuples|null[0]
+    constructor <init>(kotlin.collections/List<kotlin/IntArray>) // com.eignex.klause.factor.global/AllDifferentTuples.<init>|<init>(kotlin.collections.List<kotlin.IntArray>){}[0]
+
+    final val structuralKeyWeight // com.eignex.klause.factor.global/AllDifferentTuples.structuralKeyWeight|{}structuralKeyWeight[0]
+        final fun <get-structuralKeyWeight>(): kotlin/Int // com.eignex.klause.factor.global/AllDifferentTuples.structuralKeyWeight.<get-structuralKeyWeight>|<get-structuralKeyWeight>(){}[0]
+    final val tuples // com.eignex.klause.factor.global/AllDifferentTuples.tuples|{}tuples[0]
+        final fun <get-tuples>(): kotlin.collections/List<kotlin/IntArray> // com.eignex.klause.factor.global/AllDifferentTuples.tuples.<get-tuples>|<get-tuples>(){}[0]
+    final val variables // com.eignex.klause.factor.global/AllDifferentTuples.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/IntVars // com.eignex.klause.factor.global/AllDifferentTuples.variables.<get-variables>|<get-variables>(){}[0]
+
+    final fun isValueAnonymous(): kotlin/Boolean // com.eignex.klause.factor.global/AllDifferentTuples.isValueAnonymous|isValueAnonymous(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.factor.global/AllDifferentTuples // com.eignex.klause.factor.global/AllDifferentTuples.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/AllDifferentTuples.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.ir/Factor // com.eignex.klause.factor.global/AllDifferentTuples.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/AllDifferentTuples.structuralKey|structuralKey(){}[0]
+}
+
 final class com.eignex.klause.factor.global/Distinct : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.global/Distinct|null[0]
     constructor <init>(kotlin.collections/List<com.eignex.klause.factor.global/Distinct.Operand>, kotlin/Int = ...) // com.eignex.klause.factor.global/Distinct.<init>|<init>(kotlin.collections.List<com.eignex.klause.factor.global.Distinct.Operand>;kotlin.Int){}[0]
 
