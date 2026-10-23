@@ -15,7 +15,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -66,11 +65,12 @@ internal object NumericalResidualProfile {
         val started = System.nanoTime()
         val result = solver.minimize(objective, params)
         val elapsed = System.nanoTime() - started
-        probe.captures.forEachIndexed { index, state ->
-            out.resolve("residual-$index.klexact").writeBytes(encode(state))
+        val captureHashes = probe.captures.mapIndexed { index, state ->
+            val capturedBytes = encode(state)
+            out.resolve("residual-$index.klexact").writeBytes(capturedBytes)
+            sha256(capturedBytes)
         }
-        out.resolve("capture.json").writeText(
-            buildJsonObject {
+        val report = buildJsonObject {
             put("revision", Reports.readGitSha())
             put("source", source)
             put("entry", "direct satOptimized worker, seed3, 2s, default exact leaf acceptance; diagnostic")
@@ -86,9 +86,9 @@ internal object NumericalResidualProfile {
             put("transformEntries", json(probe.transformEntries))
             put("solves", JsonArray(probe.solves))
             put("builds", JsonArray(probe.builds))
-            put("captureHashes", buildJsonArray { probe.captures.forEach { add(JsonPrimitive(sha256(encode(it)))) } })
-        }.toString()
-        )
+            put("captureHashes", JsonArray(captureHashes.map(::JsonPrimitive)))
+        }
+        out.resolve("capture.json").writeText(report.toString())
         println("captured $suite/$name: ${probe.solves.size} float invocations, ${probe.captures.size} residuals")
     }
 
@@ -138,20 +138,20 @@ internal object NumericalResidualProfile {
                     val phase = method.name
                     val observation = if (phase == "refactorize" && builds.size < 4096) {
                         buildJsonObject {
-                        put("owner", id)
-                        put("dimension", call(backend, "getN") as Int)
-                        put("updates", call(backend, "getUpdateCount") as Int)
-                        val headings = arguments.single() as IntArray
-                        var entries = 0
-                        for (column in headings) {
-                            for (entry in pointers[column] until pointers[column + 1]) {
-                                if (coefficients[entry] != 0.0) entries++
+                            put("owner", id)
+                            put("dimension", call(backend, "getN") as Int)
+                            put("updates", call(backend, "getUpdateCount") as Int)
+                            val headings = arguments.single() as IntArray
+                            var entries = 0
+                            for (column in headings) {
+                                for (entry in pointers[column] until pointers[column + 1]) {
+                                    if (coefficients[entry] != 0.0) entries++
+                                }
                             }
-                        }
-                        put("basisEntries", entries)
-                        put("basisDensity", entries.toDouble() / (headings.size.toDouble() * headings.size))
-                        put("policy", json(call(owner, "getLastRefactorPolicyMetrics")))
-                        put("backendWorkBefore", json(call(backend, "getBasisWork")))
+                            put("basisEntries", entries)
+                            put("basisDensity", entries.toDouble() / (headings.size.toDouble() * headings.size))
+                            put("policy", json(call(owner, "getLastRefactorPolicyMetrics")))
+                            put("backendWorkBefore", json(call(backend, "getBasisWork")))
                         }
                     } else {
                         null
@@ -171,11 +171,11 @@ internal object NumericalResidualProfile {
                     }
                     if (observation != null) {
                         builds += buildJsonObject {
-                        observation.forEach { (key, value) -> put(key, value) }
-                        put("accepted", result as Boolean)
-                        put("factorNnz", call(backend, "getNnz") as Int)
-                        put("kernel", json(call(backend, "getKernel")))
-                        put("backendWorkAfter", json(call(backend, "getBasisWork")))
+                            observation.forEach { (key, value) -> put(key, value) }
+                            put("accepted", result as Boolean)
+                            put("factorNnz", call(backend, "getNnz") as Int)
+                            put("kernel", json(call(backend, "getKernel")))
+                            put("backendWorkAfter", json(call(backend, "getBasisWork")))
                         }
                     }
                     result
@@ -234,8 +234,8 @@ internal object NumericalResidualProfile {
 
     private fun field(owner: Any, name: String): Any = requireNotNull(
         owner.javaClass.getDeclaredField(name).apply {
-        isAccessible = true
-    }.get(owner)
+            isAccessible = true
+        }.get(owner),
     )
 
     private fun set(owner: Any, name: String, value: Any) {

@@ -54,21 +54,20 @@ internal object NumericalResidualReplay {
             val ordered = if (round % 2 == 0) arms.reversed() else arms
             for (denseLimit in ordered) {
                 for (retained in listOf(false, true)) {
-                val result = measure(state, denseLimit, retained)
-                out.resolve("round-$round-dense-$denseLimit-retained-$retained.json").writeText(
-                    buildJsonObject {
-                    put("revision", Reports.readGitSha())
-                    put("input", input)
-                    put("warmup", round == -1)
-                    put("round", round)
-                    put("denseLimit", denseLimit)
-                    put("retained", retained)
-                    put("sourceVerdictClaim", false)
-                    put("captureContainsOriginalFactors", false)
-                    put("result", result)
-                }.toString()
-                )
-            }
+                    val result = measure(state, denseLimit, retained)
+                    val report = buildJsonObject {
+                        put("revision", Reports.readGitSha())
+                        put("input", input)
+                        put("warmup", round == -1)
+                        put("round", round)
+                        put("denseLimit", denseLimit)
+                        put("retained", retained)
+                        put("sourceVerdictClaim", false)
+                        put("captureContainsOriginalFactors", false)
+                        put("result", result)
+                    }
+                    out.resolve("round-$round-dense-$denseLimit-retained-$retained.json").writeText(report.toString())
+                }
             }
         }
         println("replayed residual ${sha256(bytes)}")
@@ -81,9 +80,9 @@ internal object NumericalResidualReplay {
         val observer = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, method, values ->
             if (observations.size < 256) {
                 observations += buildJsonObject {
-                put("method", method.name)
-                put("values", JsonArray(values.orEmpty().map { NumericalResidualProfile.json(it) }))
-            }
+                    put("method", method.name)
+                    put("values", JsonArray(values.orEmpty().map { NumericalResidualProfile.json(it) }))
+                }
             }
             null
         }
@@ -106,8 +105,8 @@ internal object NumericalResidualReplay {
                 val refinement = Class.forName(ENGINE + "LpRefinementLimits").getConstructor().newInstance()
                 val result = if (prepared) {
                     NumericalResidualProfile.call(
-                    active, "solve", null, stop, null, continuation, true, observer, refinement, false,
-                )
+                        active, "solve", null, stop, null, continuation, true, observer, refinement, false,
+                    )
                 } else {
                     null
                 }
