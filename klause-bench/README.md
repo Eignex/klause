@@ -905,6 +905,12 @@ units, sorting and kissing median full-process times fell from 2.105 to 2.037 s 
 2.074 to 2.027 s. Source/runtime identities, recorded work and outcomes matched in
 all twelve pairs. The two refutation controls have no independent proof check.
 
+[Lab 7828](https://lab.eignex.com/jobs/7828) repeats this fixed-work question with
+debug disabled at `840c3b0ad7` versus `77bfce26f0` on Linux/amd64, one Spot instance.
+Sorting and kissing median full-process times fell from 4.963 to 4.390 s and
+4.916 to 4.246 s, with matched work and outcomes in all twelve pairs. These platform
+and runtime scopes are separate measurements.
+
 Separate [baseline](https://lab.eignex.com/jobs/7799) and
 [candidate](https://lab.eignex.com/jobs/7800) pipeline diagnostics retain first
 expired-poll and return latency across linear and polynomial sources. Their small
