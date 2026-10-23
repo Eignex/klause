@@ -668,6 +668,12 @@ deadline, set by `timeoutMs` or the 60-second default, covers admission, prepara
 and execution. It records a
 pipeline trace instead of direct-query checkpoints or a separate gate inspection.
 Other execution families fail explicitly.
+Pipeline-only `repeats=1..9` retains independent invocations as `pipeline-N.json`
+when more than one repeat is requested. Deadline latency is recorded separately at
+the first expired poll and at pipeline return. Early returns have zero return
+overrun and no expired-poll observation. Stack capture and diagnostic result
+construction lie between these observations; the return overrun includes their
+cost and is not an uninstrumented CLI latency measurement.
 Pipeline caller charges include source/search preparation and are separate from
 the native arithmetic snapshot. This mode does not render a CLI model or independently
 validate a source witness. Keep ordinary CLI records for publication/control evidence.

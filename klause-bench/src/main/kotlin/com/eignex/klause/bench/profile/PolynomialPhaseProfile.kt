@@ -38,12 +38,14 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..3 && args[0].startsWith("request64="))
+        require(args.size in 1..4 && args[0].startsWith("request64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs") })
+        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs", "repeats") })
         require(options["pipeline"] == null || options["pipeline"] in setOf("true", "both"))
         val pipelineMode = options["pipeline"] != null
         val directMode = options["pipeline"] != "true"
+        val repeats = options["repeats"]?.toInt() ?: 1
+        require(repeats in 1..9 && (repeats == 1 || !directMode))
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
         require(timeoutMs > 0)
         val encoded = args[0].substringAfter('=')
@@ -64,6 +66,7 @@ internal object PolynomialPhaseProfile {
             "javaCores" to Runtime.getRuntime().availableProcessors().toString(),
             "jvmOptions" to ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "),
             "containingTimeoutMs" to timeoutMs.toString(),
+            "repeats" to repeats.toString(),
             "maximumWork" to "null",
             "representationLimits" to "default",
             "route" to if (pipelineMode && directMode) "paired direct query and default MIXED pipeline/P1/seed3"
@@ -80,7 +83,10 @@ internal object PolynomialPhaseProfile {
             directory.resolve("source.smt2").writeBytes(bytes)
             val text = bytes.decodeToString()
             if (pipelineMode) {
-                directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text, timeoutMs)))
+                repeat(repeats) { index ->
+                    val name = if (repeats == 1) "pipeline.json" else "pipeline-$index.json"
+                    directory.resolve(name).writeText(Json.encodeToString(pipeline(text, timeoutMs)))
+                }
             }
             if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
@@ -93,6 +99,14 @@ internal object PolynomialPhaseProfile {
 
     internal fun pipeline(text: String, timeoutMs: Long = 60_000L): PipelinePhaseTrace {
         val observation = DeadlineObservation(timeoutMs)
+        val result = pipeline(text, observation)
+        return result.copy(
+            deadlineOverrunAtFirstPollNs = observation.deadlineOverrunAtFirstPollNs,
+            deadlineOverrunAtReturnNs = maxOf(0L, observation.deadline().elapsedNow().inWholeNanoseconds),
+        )
+    }
+
+    private fun pipeline(text: String, observation: DeadlineObservation): PipelinePhaseTrace {
         val source = try {
             SmtLib.parse(text, cancellation = observation)
         } catch (_: CancellationException) {
@@ -158,12 +172,17 @@ internal object PolynomialPhaseProfile {
             private set
         var stack: List<String>? = null
             private set
-        override fun deadline() = clock.deadline()
+        var deadlineOverrunAtFirstPollNs: Long? = null
+            private set
+        override fun deadline() = checkNotNull(clock.deadline())
         override fun workMeter(): WorkMeter = this
         override fun charge(units: Long) { charges += units }
         override fun isCancelled(): Boolean {
             val stopped = clock()
-            if (stopped && stack == null) stack = Thread.currentThread().stackTrace.map { it.toString() }
+            if (stopped && stack == null) {
+                deadlineOverrunAtFirstPollNs = maxOf(0L, deadline().elapsedNow().inWholeNanoseconds)
+                stack = Thread.currentThread().stackTrace.map { it.toString() }
+            }
             return stopped
         }
     }
@@ -335,6 +354,8 @@ internal data class PipelinePhaseTrace(
     val executionCharges: Long,
     val containingDeadlineStack: List<String>?,
     val sourceShape: PipelineSourceShape? = null,
+    val deadlineOverrunAtFirstPollNs: Long? = null,
+    val deadlineOverrunAtReturnNs: Long? = null,
 )
 
 @Serializable
