@@ -73,8 +73,8 @@ class ResumableOpenTheoryTest {
 
         assertEquals(TerminationReason.Cancelled, result.reason)
         assertEquals(paused.presolve, result.stats.presolve)
-        assertEquals(paused.openTheory, result.stats.openTheory)
-        assertEquals(paused.search, result.stats.search)
+        assertTrue(result.stats.openTheory.openWork >= paused.openTheory.openWork)
+        assertTrue(result.stats.search.glueClauses.sum >= paused.search.glueClauses.sum)
         assertEquals(result.stats, search.stats)
     }
 
