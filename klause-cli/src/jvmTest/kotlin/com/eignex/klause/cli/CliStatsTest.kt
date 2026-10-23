@@ -41,6 +41,23 @@ import kotlin.time.Duration
 class CliStatsTest {
 
     @Test
+    fun `board restart outcomes should be emitted only after a completed observation`() {
+        for (observed in listOf(false, true)) {
+            val stats = SolveStats(
+                run = RunStats(backend = "ls"),
+                ls = if (observed) LocalSearchStats(
+                    boardRestartChanges = SumResult(2.0), boardRestartDeclines = SumResult(3.0),
+                ) else LocalSearchStats(),
+            )
+
+            val pairs = lsStatPairs(stats, 1L).toMap()
+
+            assertEquals(if (observed) "2" else null, pairs["lsBoardRestartChanges"])
+            assertEquals(if (observed) "3" else null, pairs["lsBoardRestartDeclines"])
+        }
+    }
+
+    @Test
     fun `complete traversal Boolean progress should stay absent until observed`() {
         for (observed in listOf(false, true)) {
             val stats = if (observed) {

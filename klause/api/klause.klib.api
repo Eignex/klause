@@ -238,6 +238,20 @@ final enum class com.eignex.klause.localsearch.strategy/FeasibleDescent : kotlin
     final fun values(): kotlin/Array<com.eignex.klause.localsearch.strategy/FeasibleDescent> // com.eignex.klause.localsearch.strategy/FeasibleDescent.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.localsearch/BoardRestartOutcome : kotlin/Enum<com.eignex.klause.localsearch/BoardRestartOutcome> { // com.eignex.klause.localsearch/BoardRestartOutcome|null[0]
+    enum entry ChangedInputs // com.eignex.klause.localsearch/BoardRestartOutcome.ChangedInputs|null[0]
+    enum entry DeclinedPreparation // com.eignex.klause.localsearch/BoardRestartOutcome.DeclinedPreparation|null[0]
+    enum entry DeclinedRepair // com.eignex.klause.localsearch/BoardRestartOutcome.DeclinedRepair|null[0]
+    enum entry DeclinedUnavailable // com.eignex.klause.localsearch/BoardRestartOutcome.DeclinedUnavailable|null[0]
+    enum entry DeclinedUnchanged // com.eignex.klause.localsearch/BoardRestartOutcome.DeclinedUnchanged|null[0]
+
+    final val entries // com.eignex.klause.localsearch/BoardRestartOutcome.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.localsearch/BoardRestartOutcome> // com.eignex.klause.localsearch/BoardRestartOutcome.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.localsearch/BoardRestartOutcome // com.eignex.klause.localsearch/BoardRestartOutcome.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.localsearch/BoardRestartOutcome> // com.eignex.klause.localsearch/BoardRestartOutcome.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.localsearch/PerturbationKind : kotlin/Enum<com.eignex.klause.localsearch/PerturbationKind> { // com.eignex.klause.localsearch/PerturbationKind|null[0]
     enum entry BasinHopping // com.eignex.klause.localsearch/PerturbationKind.BasinHopping|null[0]
     enum entry Uniform // com.eignex.klause.localsearch/PerturbationKind.Uniform|null[0]
@@ -9423,6 +9437,9 @@ final class com.eignex.klause.localsearch/IteratedLocalSearchRestart : com.eigne
     final val populationSize // com.eignex.klause.localsearch/IteratedLocalSearchRestart.populationSize|{}populationSize[0]
         final fun <get-populationSize>(): kotlin/Int // com.eignex.klause.localsearch/IteratedLocalSearchRestart.populationSize.<get-populationSize>|<get-populationSize>(){}[0]
 
+    final var lastBoardRestartOutcome // com.eignex.klause.localsearch/IteratedLocalSearchRestart.lastBoardRestartOutcome|{}lastBoardRestartOutcome[0]
+        final fun <get-lastBoardRestartOutcome>(): com.eignex.klause.localsearch/BoardRestartOutcome? // com.eignex.klause.localsearch/IteratedLocalSearchRestart.lastBoardRestartOutcome.<get-lastBoardRestartOutcome>|<get-lastBoardRestartOutcome>(){}[0]
+
     final var perturbationStrength // com.eignex.klause.localsearch/IteratedLocalSearchRestart.perturbationStrength|{}perturbationStrength[0]
         final fun <get-perturbationStrength>(): kotlin/Int // com.eignex.klause.localsearch/IteratedLocalSearchRestart.perturbationStrength.<get-perturbationStrength>|<get-perturbationStrength>(){}[0]
 
@@ -14909,10 +14926,14 @@ final class com.eignex.klause.solver.result/LocalSearchResidualFactor { // com.e
 }
 
 final class com.eignex.klause.solver.result/LocalSearchStats { // com.eignex.klause.solver.result/LocalSearchStats|null[0]
-    constructor <init>(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.klause.solver.result/LocalSearchResidual? = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ...) // com.eignex.klause.solver.result/LocalSearchStats.<init>|<init>(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;kotlin.Long;kotlin.Double;kotlin.Double;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.klause.solver.result.LocalSearchResidual?;kotlin.collections.Map<kotlin.String,kotlin.Long>){}[0]
+    constructor <init>(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.klause.solver.result/LocalSearchResidual? = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...) // com.eignex.klause.solver.result/LocalSearchStats.<init>|<init>(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;kotlin.Long;kotlin.Double;kotlin.Double;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.klause.solver.result.LocalSearchResidual?;kotlin.collections.Map<kotlin.String,kotlin.Long>;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
 
     final val bestResidual // com.eignex.klause.solver.result/LocalSearchStats.bestResidual|{}bestResidual[0]
         final fun <get-bestResidual>(): com.eignex.klause.solver.result/LocalSearchResidual? // com.eignex.klause.solver.result/LocalSearchStats.bestResidual.<get-bestResidual>|<get-bestResidual>(){}[0]
+    final val boardRestartChanges // com.eignex.klause.solver.result/LocalSearchStats.boardRestartChanges|{}boardRestartChanges[0]
+        final fun <get-boardRestartChanges>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.boardRestartChanges.<get-boardRestartChanges>|<get-boardRestartChanges>(){}[0]
+    final val boardRestartDeclines // com.eignex.klause.solver.result/LocalSearchStats.boardRestartDeclines|{}boardRestartDeclines[0]
+        final fun <get-boardRestartDeclines>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.boardRestartDeclines.<get-boardRestartDeclines>|<get-boardRestartDeclines>(){}[0]
     final val completions // com.eignex.klause.solver.result/LocalSearchStats.completions|{}completions[0]
         final fun <get-completions>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.completions.<get-completions>|<get-completions>(){}[0]
     final val completionsRefuted // com.eignex.klause.solver.result/LocalSearchStats.completionsRefuted|{}completionsRefuted[0]
@@ -14934,6 +14955,8 @@ final class com.eignex.klause.solver.result/LocalSearchStats { // com.eignex.kla
 
     final fun component1(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.component1|component1(){}[0]
     final fun component10(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/LocalSearchStats.component10|component10(){}[0]
+    final fun component11(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.component11|component11(){}[0]
+    final fun component12(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.component12|component12(){}[0]
     final fun component2(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.eignex.klause.solver.result/LocalSearchStats.component3|component3(){}[0]
     final fun component4(): kotlin/Double // com.eignex.klause.solver.result/LocalSearchStats.component4|component4(){}[0]
@@ -14942,7 +14965,7 @@ final class com.eignex.klause.solver.result/LocalSearchStats { // com.eignex.kla
     final fun component7(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.component7|component7(){}[0]
     final fun component8(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.component8|component8(){}[0]
     final fun component9(): com.eignex.klause.solver.result/LocalSearchResidual? // com.eignex.klause.solver.result/LocalSearchStats.component9|component9(){}[0]
-    final fun copy(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.klause.solver.result/LocalSearchResidual? = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ...): com.eignex.klause.solver.result/LocalSearchStats // com.eignex.klause.solver.result/LocalSearchStats.copy|copy(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;kotlin.Long;kotlin.Double;kotlin.Double;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.klause.solver.result.LocalSearchResidual?;kotlin.collections.Map<kotlin.String,kotlin.Long>){}[0]
+    final fun copy(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.klause.solver.result/LocalSearchResidual? = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...): com.eignex.klause.solver.result/LocalSearchStats // com.eignex.klause.solver.result/LocalSearchStats.copy|copy(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;kotlin.Long;kotlin.Double;kotlin.Double;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.klause.solver.result.LocalSearchResidual?;kotlin.collections.Map<kotlin.String,kotlin.Long>;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/LocalSearchStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchStats.hashCode|hashCode(){}[0]
     final fun mergedWith(com.eignex.klause.solver.result/LocalSearchStats): com.eignex.klause.solver.result/LocalSearchStats // com.eignex.klause.solver.result/LocalSearchStats.mergedWith|mergedWith(com.eignex.klause.solver.result.LocalSearchStats){}[0]
