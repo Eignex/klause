@@ -61,6 +61,15 @@ certified `objectiveBound`; unattained boundaries report `unattained-infimum` or
 `==========` terminator, which would assert an attained optimum. See
 [SMT-LIB result semantics](05-arithmetic-formats.md#smt-lib-source-semantics).
 
+## Finite Boolean publication
+
+WCNF and OPB/WBO optimization publish each accepted improving exact objective on an
+`o` line followed by its original-variable assignment on a `v` line. The pair is
+flushed before the callback returns, so interruption preserves the incumbent.
+`BufferedBestOutput` emits terminal status separately and does not repeat a streamed
+witness at completion. Satisfaction assignments without an objective remain buffered
+until the terminal status.
+
 ## Arithmetic publication adapter
 
 `OutputProtocol.onArithmeticIncumbent` accepts an already checked source witness and

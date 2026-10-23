@@ -10,9 +10,10 @@ import com.eignex.klause.solver.objective.toLinearObjective
  * DIMACS **WCNF** (MaxSAT) front-end (`.wcnf`). Soft clauses are relaxed with a fresh indicator and
  * the total weight of falsified soft clauses is minimised, so both new-format (`h` hard clauses,
  * `<weight>` soft) and old-format (`p wcnf … <top>`) instances are handled. Emits the MaxSAT-Evaluation
- * protocol: an `o <cost>` line per improving incumbent, a final `s OPTIMUM FOUND` / `s SATISFIABLE`
- * / `s UNSATISFIABLE` / `s UNKNOWN` status, and a `v` line giving each original variable's value as a
- * `0`/`1` bit-string (relaxation variables are not reported). `-s` statistics are `c` comment lines.
+ * protocol: an `o <cost>` line paired with a `v` line per improving incumbent, followed by a final
+ * `s OPTIMUM FOUND` / `s SATISFIABLE` / `s UNSATISFIABLE` / `s UNKNOWN` status. The `v` line gives
+ * each original variable's value as a `0`/`1` bit-string (relaxation variables are not reported).
+ * `-s` statistics are `c` comment lines.
  */
 internal object WcnfMode : CliMode {
     override val names = listOf("wcnf", "maxsat")
@@ -53,11 +54,12 @@ private fun renderWcnfModel(numOriginalVars: Int, boolValue: (Int) -> Boolean): 
     for (v in 0 until numOriginalVars) append(if (boolValue(v)) '1' else '0')
 }
 
-/** MaxSAT-Evaluation output protocol. Incumbent `o` costs stream live; the final `s` status and `v`
- *  model line are emitted together at completion, after the best solution is known. */
+/** MaxSAT-Evaluation output protocol. Each incumbent streams its `o` cost and `v` model together;
+ *  the final `s` status is emitted at completion. */
 internal class WcnfOutput : BufferedBestOutput() {
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true
+    override val streamFiniteWitness: Boolean = true
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.UNBOUNDED -> "s SATISFIABLE"
