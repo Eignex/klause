@@ -110,7 +110,7 @@ internal object NumericalResidualReplay {
         val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 2 }
             .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L)
         fun owner(): Any = Class.forName(ENGINE + "LpScopedSolver").constructors.single { it.parameterCount == 9 }
-            .newInstance(state, Cancellation.Never, probe.context, 64, 4096, 50_000_000L, false, Int.MAX_VALUE, pricing)
+            .newInstance(state, Cancellation.Never, probe.context, 64, 4096, 1_200_000_000L, false, Int.MAX_VALUE, pricing)
         val steps = ArrayList<JsonElement>()
         var current: Any? = null
         var setupNs = 0L
@@ -183,7 +183,7 @@ internal object NumericalResidualReplay {
             put("tieSeed", 3)
             put("perSolveTimeoutMs", 2000)
             put("pivotLimit", 4096)
-            put("workLimit", 50_000_000L)
+            put("workLimit", 1_200_000_000L)
             put("instrumentation", if (observed) "lab JFR, basis timing and certifier observer" else "lab JFR")
             put("steps", JsonArray(steps))
             put("phaseNs", NumericalResidualProfile.json(probe.phaseNs))
