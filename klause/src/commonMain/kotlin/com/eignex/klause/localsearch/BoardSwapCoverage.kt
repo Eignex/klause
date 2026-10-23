@@ -5,6 +5,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.binarySearchInt
 
 internal class BoardSwapCoverage {
     private var assumptions: Assumptions? = null
@@ -97,7 +98,7 @@ internal class BoardSwapCoverage {
 
         fun hasRemaining(board: Int): Boolean = finished[board] != epoch
 
-        fun boardIndex(factorId: Int): Int = boards.binarySearch(factorId)
+        fun boardIndex(factorId: Int): Int = boards.binarySearchInt(factorId)
 
         fun invalidate() {
             picking = false
