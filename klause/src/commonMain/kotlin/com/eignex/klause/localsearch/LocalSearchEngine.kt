@@ -2,11 +2,13 @@
 
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.global.AllDifferentInvariant
 import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.GreedyInit
 import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundAccumulator
@@ -772,6 +774,29 @@ internal class LocalSearchEngine(
         // re-sample before a restart (see [SourceDrivenStrategy.feasibleResampleCap]).
         val feasibleResampleCap = (descentStrategy ?: strategy).feasibleResampleCap
         var feasibleMisses = 0
+        fun coveredSwapImprovement(): Move? {
+            val proposals = MoveSink(state.assumptions)
+            proposals.setInvariants(state.invariants)
+            proposals.setOwners(state.seeding.ownerInt)
+            var tested = 0
+            var bestDelta = 0.0
+            var best: Move? = null
+            for (fid in state.seeding.electedImplicit) {
+                val invariant = state.factors[fid] as? AllDifferentInvariant ?: continue
+                proposals.clear()
+                proposals.proposer = fid
+                if (!invariant.coverageProbeMoves(state, proposals)) return null
+                for (move in proposals.list) {
+                    if (tested++ >= 8192 || params.cancellation()) return null
+                    val delta = state.feasibleObjectiveDelta(guide, move)
+                    if (delta < bestDelta) {
+                        bestDelta = delta
+                        best = move
+                    }
+                }
+            }
+            return best
+        }
         // The feasibility-fight strategy whose moves form the rounds (the unified descent strategy
         // when one drives both phases, else the satisfy strategy).
         val satisfyStrategy: SourceDrivenStrategy = if (unified) descentStrategy else strategy
@@ -1024,6 +1049,23 @@ internal class LocalSearchEngine(
                             continue
                         }
                         feasibleMisses = 0
+                        if (state.cost == 0L && liveCompletion == null &&
+                            (descentStrategy ?: strategy).feasibleAcceptance == AcceptanceRule.GreedyDescent
+                        ) {
+                            val rescue = coveredSwapImprovement()
+                            if (params.cancellation()) {
+                                cancelCountdown = 0
+                                continue
+                            }
+                            if (rescue != null) {
+                                val beforeObjective = objective.evaluate(state.assignment)
+                                state.apply(rescue)
+                                check(state.cost == 0L && objective.evaluate(state.assignment) < beforeObjective)
+                                flipsSinceRestart++
+                                totalFlips++
+                                continue
+                            }
+                        }
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
                         liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
