@@ -299,6 +299,19 @@ internal class AllDifferentInvariant(
         }
     }
 
+    internal fun coverageProbeMoves(state: LocalSearchState, sink: MoveSink) {
+        require(vars.size <= 64)
+        for (ai in vars.indices) for (bi in ai + 1 until vars.size) {
+            val a = vars[ai]
+            val b = vars[bi]
+            if (a == b || !presentInvFn(state, ai) || !presentInvFn(state, bi)) continue
+            val va = state.assignment.intValue(a)
+            val vb = state.assignment.intValue(b)
+            if (va == vb || vb !in state.rootDomains[a] || va !in state.rootDomains[b]) continue
+            sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+        }
+    }
+
     override fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         proposeRandomRotations(state, vars, sink, MAX_STRUCTURED_SWAPS, SWAP_ATTEMPT_STRIDE) { s, idx ->
             presentInvFn(s, idx)

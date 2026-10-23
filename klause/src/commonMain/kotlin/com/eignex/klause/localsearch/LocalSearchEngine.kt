@@ -3,6 +3,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.objective.MutableObjectiveBound
+import com.eignex.klause.factor.global.AllDifferentInvariant
 import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
@@ -772,6 +773,55 @@ internal class LocalSearchEngine(
         // re-sample before a restart (see [SourceDrivenStrategy.feasibleResampleCap]).
         val feasibleResampleCap = (descentStrategy ?: strategy).feasibleResampleCap
         var feasibleMisses = 0
+        val coverageRescue = false
+        var coverageChecks = 0
+        fun coverageHash(): Int {
+            var hash = 1
+            for (i in 0 until problem.numIntVars) hash = 31 * hash + state.assignment.intValue(i).hashCode()
+            for (i in 0 until problem.numBoolVars) hash = 31 * hash + state.assignment.boolValue(i).hashCode()
+            return hash
+        }
+        fun coverageProbe(): Move? {
+            val before = coverageHash()
+            val beforeCost = state.cost
+            val beforeObjective = objective.evaluate(state.assignment)
+            val proposals = MoveSink(state.assumptions)
+            proposals.setInvariants(state.invariants)
+            proposals.setOwners(state.seeding.ownerInt)
+            var tested = 0
+            var feasible = 0
+            var improving = 0
+            var bestDelta = 0.0
+            var best: Move? = null
+            var complete = true
+            for (fid in state.seeding.electedImplicit) {
+                val invariant = state.factors[fid] as? AllDifferentInvariant ?: continue
+                proposals.clear()
+                proposals.proposer = fid
+                invariant.coverageProbeMoves(state, proposals)
+                for (move in proposals.list) {
+                    if (tested >= 8192 || params.cancellation()) {
+                        complete = false
+                        break
+                    }
+                    tested++
+                    val delta = state.feasibleObjectiveDelta(guide, move)
+                    if (delta.isFinite()) feasible++
+                    if (delta < 0.0) improving++
+                    if (delta < bestDelta) {
+                        bestDelta = delta
+                        best = move
+                    }
+                }
+                if (!complete) break
+            }
+            check(before == coverageHash() && beforeCost == state.cost &&
+                beforeObjective == objective.evaluate(state.assignment))
+            println("% structuredCoverage check=${coverageChecks++} work=$totalFlips restart=$restartCount " +
+                "hash=$before objective=$beforeObjective tested=$tested feasible=$feasible improving=$improving " +
+                "bestDelta=$bestDelta complete=$complete rescue=$coverageRescue policy=${configuredRestart::class.simpleName}")
+            return best.takeIf { complete }
+        }
         // The feasibility-fight strategy whose moves form the rounds (the unified descent strategy
         // when one drives both phases, else the satisfy strategy).
         val satisfyStrategy: SourceDrivenStrategy = if (unified) descentStrategy else strategy
@@ -1024,6 +1074,17 @@ internal class LocalSearchEngine(
                             continue
                         }
                         feasibleMisses = 0
+                        if (state.cost == 0L && liveCompletion == null) {
+                            val rescue = coverageProbe()
+                            if (coverageRescue && rescue != null) {
+                                val beforeObjective = objective.evaluate(state.assignment)
+                                state.apply(rescue)
+                                check(state.cost == 0L && objective.evaluate(state.assignment) < beforeObjective)
+                                flipsSinceRestart++
+                                totalFlips++
+                                continue
+                            }
+                        }
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
                         liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
