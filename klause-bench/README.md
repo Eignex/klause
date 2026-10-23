@@ -572,7 +572,7 @@ and numerical compilation as catalog inputs.
 `{job, source, residual, sha256, dense}` capture references through the same argument.
 It checks retained local-job bytes and replays each state through the existing scoped
 solver and production certification, comparing cold and retained owners. Each solve
-has two seconds, 4096 pivots and 50 million work units, with pricing tie seed 3.
+has two seconds, 4096 pivots and 1.2 billion work units, with pricing tie seed 3.
 One warmup and three measured rounds disable per-operation observation; a separate
 observed round retains phase and certification details. Lab JFR remains enabled.
 Owner construction, preparation, solve, certification and close enter lifecycle
