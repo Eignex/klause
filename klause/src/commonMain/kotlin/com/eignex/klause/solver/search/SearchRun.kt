@@ -72,6 +72,14 @@ class SearchRun internal constructor(
             lifecycle.onStart(session).toEvent()?.let { return it }
         }
         lifecycle.onResume(session).toEvent()?.let { return it }
+        pendingModel?.let { model ->
+            if (session.cancelled()) {
+                return lifecycle.onCancellation(session).toEvent()
+                    ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+            }
+            cancellationPoller.rearm()
+            completeModel(model)?.let { return it }
+        }
         if (pendingAdvance) {
             pendingAdvance = false
             if (!backtrack()) return stopAfterBacktrack()
@@ -95,121 +103,55 @@ class SearchRun internal constructor(
             }
         }
         while (true) {
-            if (pendingModel != null || cancellationPoller.due()) {
+            if (cancellationPoller.due()) {
                 if (session.cancelled()) {
                     return lifecycle.onCancellation(session).toEvent()
                         ?: finish(SearchRunEvent.Indeterminate.Cancelled)
                 }
                 cancellationPoller.rearm()
             }
-            if (pendingModel == null) {
-                when (val node = nodePolicy.beforeBranch(session)) {
-                    SearchNodeDisposition.Expand -> Unit
+            when (val node = nodePolicy.beforeBranch(session)) {
+                SearchNodeDisposition.Expand -> Unit
 
-                    SearchNodeDisposition.Prune -> {
-                        observer.onConflict(null)
-                        if (!backtrack()) return stopAfterBacktrack()
-                        continue
-                    }
-
-                    is SearchNodeDisposition.Backjump -> {
-                        observer.onConflict(null)
-                        observer.onLearnedNodeBackjump()
-                        when (applyLearnedConflict(node.consequence)) {
-                            SearchLearnedConflictResult.Resume -> continue
-
-                            SearchLearnedConflictResult.Exhausted -> return finish(SearchRunEvent.Exhausted)
-
-                            SearchLearnedConflictResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
-
-                            SearchLearnedConflictResult.Indeterminate -> {
-                                return finish(SearchRunEvent.Indeterminate.Component)
-                            }
-
-                            is SearchLearnedConflictResult.Backjump -> {
-                                error("learned conflict cascade did not terminate")
-                            }
-                        }
-                        continue
-                    }
-
-                    SearchNodeDisposition.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
-
-                    // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
-                    SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
+                SearchNodeDisposition.Prune -> {
+                    observer.onConflict(null)
+                    if (!backtrack()) return stopAfterBacktrack()
+                    continue
                 }
-            }
-            when (val alternatives = if (pendingModel != null) Alternatives.Leaf else alternatives()) {
-                is Alternatives.Leaf -> when (
-                    val result = if (pendingModel != null) {
-                        ComponentCheck.Feasible
-                    } else {
-                        session.check()
+
+                is SearchNodeDisposition.Backjump -> {
+                    observer.onConflict(null)
+                    observer.onLearnedNodeBackjump()
+                    when (applyLearnedConflict(node.consequence)) {
+                        SearchLearnedConflictResult.Resume -> continue
+
+                        SearchLearnedConflictResult.Exhausted -> return finish(SearchRunEvent.Exhausted)
+
+                        SearchLearnedConflictResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
+
+                        SearchLearnedConflictResult.Indeterminate -> {
+                            return finish(SearchRunEvent.Indeterminate.Component)
+                        }
+
+                        is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
                     }
-                ) {
+                    continue
+                }
+
+                SearchNodeDisposition.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+
+                // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
+                SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
+            }
+            when (val alternatives = alternatives()) {
+                is Alternatives.Leaf -> when (val result = session.check()) {
                     ComponentCheck.Feasible -> {
-                        if (pendingModel == null) params.restart.onSolution()
-                        val model = pendingModel ?: session.model().also {
+                        params.restart.onSolution()
+                        val model = session.model().also {
                             lastModel = it
                             observer.onModel(it)
                         }
-                        pendingModel = null
-                        resumeAfterSolution = true
-                        when (modelPolicy.onModel(model, session)) {
-                            SearchModelDisposition.Pause -> {
-                                resumeAfterSolution = false
-                                pendingModel = model
-                                return SearchRunEvent.Paused
-                            }
-
-                            SearchModelDisposition.Surface -> return SearchRunEvent.Satisfied(model)
-
-                            SearchModelDisposition.Indeterminate -> {
-                                resumeAfterSolution = false
-                                lastModel = null
-                                return finish(SearchRunEvent.Indeterminate.Component)
-                            }
-
-                            SearchModelDisposition.Skip -> {
-                                resumeAfterSolution = false
-                                lastModel = null
-                                // A model is skipped when its check could not decide it, often because the deadline
-                                // cut that check short. Such a check costs far more than the nodes the polling cadence
-                                // was tuned on, so a skip polls at once rather than after the cadence's next interval.
-                                if (session.cancelled()) {
-                                    val event = lifecycle.onCancellation(session).toEvent()
-                                        ?: finish(SearchRunEvent.Indeterminate.Cancelled)
-                                    if (event == SearchRunEvent.Paused) pendingAdvance = true
-                                    return event
-                                }
-                                if (!backtrack()) return stopAfterBacktrack()
-                            }
-
-                            SearchModelDisposition.Continue -> {
-                                resumeAfterSolution = false
-                                when (modelContinuation) {
-                                    SearchModelContinuation.Chronological -> if (!backtrack()) {
-                                        return stopAfterBacktrack()
-                                    }
-
-                                    SearchModelContinuation.BlockAtRoot -> when (
-                                        session.blockModelAtRoot(checkNotNull(lastModel))
-                                    ) {
-                                        ComponentResult.Consistent -> {
-                                            frames.clear()
-                                            consumedModel = true
-                                            lifecycle.onModelBlocked(session).toEvent()?.let { return it }
-                                        }
-
-                                        is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
-
-                                        ComponentResult.Indeterminate -> return finish(
-                                            SearchRunEvent.Indeterminate.Component,
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        completeModel(model)?.let { return it }
                     }
 
                     is ComponentCheck.Infeasible -> {
@@ -273,6 +215,67 @@ class SearchRun internal constructor(
                 }
             }
         }
+    }
+
+    private fun completeModel(model: AssembledSearchModel): SearchRunEvent? {
+        pendingModel = null
+        resumeAfterSolution = true
+        when (modelPolicy.onModel(model, session)) {
+            SearchModelDisposition.Pause -> {
+                resumeAfterSolution = false
+                pendingModel = model
+                return SearchRunEvent.Paused
+            }
+
+            SearchModelDisposition.Surface -> return SearchRunEvent.Satisfied(model)
+
+            SearchModelDisposition.Indeterminate -> {
+                resumeAfterSolution = false
+                lastModel = null
+                return finish(SearchRunEvent.Indeterminate.Component)
+            }
+
+            SearchModelDisposition.Skip -> {
+                resumeAfterSolution = false
+                lastModel = null
+                // A model is skipped when its check could not decide it, often because the deadline
+                // cut that check short. Such a check costs far more than the nodes the polling cadence
+                // was tuned on, so a skip polls at once rather than after the cadence's next interval.
+                if (session.cancelled()) {
+                    val event = lifecycle.onCancellation(session).toEvent()
+                        ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+                    if (event == SearchRunEvent.Paused) pendingAdvance = true
+                    return event
+                }
+                if (!backtrack()) return stopAfterBacktrack()
+            }
+
+            SearchModelDisposition.Continue -> {
+                resumeAfterSolution = false
+                when (modelContinuation) {
+                    SearchModelContinuation.Chronological -> if (!backtrack()) {
+                        return stopAfterBacktrack()
+                    }
+
+                    SearchModelContinuation.BlockAtRoot -> when (
+                        session.blockModelAtRoot(checkNotNull(lastModel))
+                    ) {
+                        ComponentResult.Consistent -> {
+                            frames.clear()
+                            consumedModel = true
+                            lifecycle.onModelBlocked(session).toEvent()?.let { return it }
+                        }
+
+                        is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
+
+                        ComponentResult.Indeterminate -> return finish(
+                            SearchRunEvent.Indeterminate.Component,
+                        )
+                    }
+                }
+            }
+        }
+        return null
     }
 
     private fun alternatives(): Alternatives {
