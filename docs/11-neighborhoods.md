@@ -219,6 +219,18 @@ improvement, and each restart receives a fresh copy so a policy cannot alter the
 anchor. Fixed-cadence and Luby policies keep no copy. Anchored perturbations restore
 exact pins after their random draws and clear tabu state.
 
+Retained ILS restarts over unconditional AllDifferent boards report searched-input
+outcomes after ordinary preparation and the enabled greedy-repair pass. Changed
+inputs pass pin, fixed-domain, definition, root-membership and implicit-owner
+filters. An unchanged board explicitly declines diversification, distinguishing an
+unchanged policy result, preparation erasure, repair erasure and unavailable inputs.
+The outcome stays pending across a suspended repair and is omitted for an
+interrupted incomplete pass. Each decline consumes the ordinary restart work unit;
+the subsequent walk and anchor-adaptation rules retain their existing allowances.
+These outcomes describe input changes, not feasibility or arrival in a new basin.
+Snapshots contain one value per distinct board coordinate and are released when
+the restart transition completes or closes.
+
 ### ALNS incumbent acquisition
 
 ALNS alternates destroying part of an incumbent with repairing it. Adjacency

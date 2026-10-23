@@ -86,6 +86,16 @@ class IteratedLocalSearchRestart(
         private set
     private var stallCount: Int = 0
 
+    /** Last completed engine-prepared restart's input-change result for unconditional AllDifferent
+     *  boards. `null` denotes no completed observed restart, including unanchored and non-board runs.
+     *  The outcome is pending while a sliced greedy-repair pass is suspended. */
+    var lastBoardRestartOutcome: BoardRestartOutcome? = null
+        private set
+    internal var changedBoardRestarts = 0L
+        private set
+    internal var declinedBoardRestarts = 0L
+        private set
+
     // Pending bandit decision, rewarded at the next candidate anchor by whether the population best
     // improved since (delayed credit, the standard meta-bandit signal). -1 = nothing pending.
     private var pendingArm: Int = -1
@@ -113,6 +123,9 @@ class IteratedLocalSearchRestart(
     override fun reset() {
         population.clear()
         stallCount = 0
+        lastBoardRestartOutcome = null
+        changedBoardRestarts = 0L
+        declinedBoardRestarts = 0L
         perturbationStrength = initialPerturbationStrength
         pendingArm = -1
         pendingContext = null
@@ -183,6 +196,7 @@ class IteratedLocalSearchRestart(
     }
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+        lastBoardRestartOutcome = null
         // Crossover restart: recombine two random population members; skips perturbation since
         // crossover itself diversifies. Only fires with ≥2 incumbents.
         if (population.size >= 2 && state.rng.nextDouble() < crossoverRate) {
@@ -198,6 +212,11 @@ class IteratedLocalSearchRestart(
         } else {
             anchorAndPerturb(state, anchor, perturbationStrength, perturbationKind)
         }
+    }
+
+    internal fun recordBoardRestart(outcome: BoardRestartOutcome) {
+        lastBoardRestartOutcome = outcome
+        if (outcome == BoardRestartOutcome.ChangedInputs) changedBoardRestarts++ else declinedBoardRestarts++
     }
 
     private fun pickAnchor(state: LocalSearchState): Sample? {

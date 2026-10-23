@@ -1146,6 +1146,29 @@ solve seconds change from 2.760/2.789 to 2.677/2.815 on the small source and fro
 coexists with a small-source mean loss; this is not uniform optimization recovery
 or a general speedup.
 
+### Prepared board-restart outcomes
+
+The coordinate-changing treatment in [#3447](https://github.com/Eignex/klause/pull/3447)
+is rejected: its production-base default comparison
+[7827](https://lab.eignex.com/jobs/7827) loses eight of nine large-source pairs.
+This is negative evidence for that operator, not for explicit decline outcomes.
+
+[7852](https://lab.eignex.com/jobs/7852) extends the bounded restart diagnostic on
+accepted coverage, comparing main `840c3b0ad7` with observational trace `6c5e97dfc1`.
+Both original team sources retain fixed/ILS controls, seeds 1/3 and a 2000-unit
+allowance. All sixteen witnesses pass source checks; all eight main/trace pairs
+match final witness, objective and non-timing LS counters. Runtime, dependencies
+and compiler identity match. Instrumented timings establish no production cost claim.
+
+The first 24 ILS boundaries per case include 80 feasible-before boundaries. Twelve
+return the preceding searched board after repair: five ineffective kicks, three
+crossover no-ops and four kicks undone by greedy repair. Ordinary preparation adds
+no erasure with implicit restart seeding disabled. Two changed post-repair boards
+return during subsequent search; some unchanged post-repair boards later improve.
+These observations support explicit post-repair decline results while preserving
+the following walk. They establish neither absence of admissible moves nor a better
+restart operator. Diversity, ordinary-route quality and cost remain separate measures.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;

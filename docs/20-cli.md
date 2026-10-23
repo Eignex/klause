@@ -201,6 +201,12 @@ size depends on the pass/stage catalogue and outcomes, not the number of calls.
 `presolveWork`. Native totals remain separate and must not be added to that sum.
 `dry-run-presolve` prints the same keys on stderr alongside its model summary.
 
+Observed retained ILS board restarts report `lsBoardRestartChanges` and
+`lsBoardRestartDeclines`. They count completed post-preparation and post-repair
+input-change outcomes, including explicit declines for unchanged boards; a pending
+sliced repair contributes neither count. Changed inputs do not establish a new
+feasible basin. The counters merge across workers and require no debug mode.
+
 ### Source interpretation controls
 
 Source controls resolve against the selected format's declared semantics before
