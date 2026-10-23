@@ -241,6 +241,15 @@ Both row-rewrite passes discard unfinished attempts and keep completed replaceme
 with their unchanged equality premises.
 
 Bound fusion combines matching sides into an equality or refutes crossing bounds.
+Exact integral reified rows also supply bounds under their Boolean literals.
+Binary clause implications transfer these bounds to antecedents. A source clause,
+or a literal and its complement, covers all Boolean alternatives: the weakest
+upper bound of its alternatives holds unconditionally, as does the weakest lower
+bound. Fusion adds only bounds stronger than the existing unconditional sides,
+keeping the guarded relations and their source assignments intact. Normalization,
+integer complements and joins retain arbitrary-width constants. Strongest-first
+reachability visits each literal once per affine form and direction; graph and
+cover visits spend the pass token, and interrupted analysis publishes no delta.
 These reductions preserve the solution set. Affine singleton elimination and
 singleton inequality projection require reconstruction; projection stays off for
 solution-set-sensitive queries.

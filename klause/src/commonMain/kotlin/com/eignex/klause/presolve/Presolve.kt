@@ -117,8 +117,8 @@ object Presolve {
     internal fun dropSourceDependentEqualities(problem: Problem, cancellation: Cancellation): SourceDelta =
         DependentEqualities.dropImplied(problem, cancellation)
 
-    /** Cross-direction linear bound fusion (`≤`/`≥` over one vector → `=`, or infeasible when they
-     *  cross). See [LinearBoundFusion]. */
+    /** Derive unconditional affine bounds from Boolean guard covers and fuse matching opposite sides
+     *  into an equality, refuting crossing bounds. See [LinearBoundFusion]. */
     fun fuseLinearBounds(problem: Problem): PassDelta = LinearBoundFusion.fuseLinearBounds(problem)
 
     /** [fuseLinearBounds] in the source lane's change form. */

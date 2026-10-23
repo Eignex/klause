@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
@@ -18,8 +19,9 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.ScanMeter
 import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.ScanMeter
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.bigIntOf
@@ -49,8 +51,18 @@ internal object LinearBoundFusion {
     private class Group(val terms: Terms) {
         var upper: BigInt? = null
         var lower: BigInt? = null
+        var originalUpper: BigInt? = null
+        var originalLower: BigInt? = null
         var hasEquality = false
         val droppable = ArrayList<Int>()
+        var guards: GuardBounds? = null
+    }
+
+    private class Seed(val literal: Int, val bound: BigInt)
+
+    private class GuardBounds {
+        val upper = ArrayList<Seed>()
+        val lower = ArrayList<Seed>()
     }
 
     fun fuseLinearBounds(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
@@ -89,25 +101,196 @@ internal object LinearBoundFusion {
                     group.droppable.add(index)
                 }
             }
+            val conjunction = factor.linearForm as? LinearForm.Conjunction ?: continue
+            for (row in conjunction.rows) {
+                visit(scan)
+                if (row.activator !in 0 until problem.numBoolVars) continue
+                if (row.strict && (row.relation == LinearOp.EQ || row.relation == LinearOp.NE)) continue
+                val body = if (row.relation == LinearOp.NE) object : LinearRow by row {
+                    override val relation = LinearOp.EQ
+                } else row
+                val canonical = canonicalize(body, scan, allowActivated = true) ?: continue
+                val group = groups.getOrPut(canonical.terms) { Group(canonical.terms) }
+                val guards = group.guards ?: GuardBounds().also { group.guards = it }
+                val positive = Lit.make(row.activator, true)
+                when (row.relation) {
+                    LinearOp.EQ, LinearOp.NE -> {
+                        val literal = if (row.relation == LinearOp.EQ) positive else positive xor 1
+                        guards.upper.add(Seed(literal, canonical.bound))
+                        guards.lower.add(Seed(literal, canonical.bound))
+                    }
+                    LinearOp.LE, LinearOp.GE -> {
+                        if (canonical.upper) {
+                            guards.upper.add(Seed(positive, canonical.bound))
+                            guards.lower.add(Seed(positive xor 1, canonical.bound + BIG_ONE))
+                        } else {
+                            guards.lower.add(Seed(positive, canonical.bound))
+                            guards.upper.add(Seed(positive xor 1, canonical.bound - BIG_ONE))
+                        }
+                    }
+                }
+            }
+        }
+        for (group in groups.values) {
+            visit(scan)
+            group.originalUpper = group.upper
+            group.originalLower = group.lower
+        }
+        if (groups.values.any { it.guards != null } && problem.numBoolVars <= Int.MAX_VALUE / 2) {
+            GuardEnvelope(problem, scan).derive(groups.values)
         }
         val dropped = ArrayList<Int>()
         val added = ArrayList<Factor>()
         for (group in groups.values) {
             visit(scan)
-            val lower = group.lower ?: continue
-            val upper = group.upper ?: continue
-            if (lower > upper) return PassDelta(infeasible = true)
-            if (lower == upper && !group.hasEquality) {
+            val lower = group.lower
+            val upper = group.upper
+            if (lower != null && upper != null && lower > upper) return PassDelta(infeasible = true)
+            if (lower != null && lower == upper && !group.hasEquality) {
                 for (index in group.droppable) visit(scan)
                 for (variable in group.terms.vars) visit(scan)
                 dropped.addAll(group.droppable)
-                added.add(integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.EQ, upper) {
+                added.add(integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.EQ, lower) {
+                    visit(scan)
+                })
+                continue
+            }
+            if (upper != null && (group.originalUpper == null || upper < checkNotNull(group.originalUpper))) {
+                for (variable in group.terms.vars) visit(scan)
+                added.add(integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.LE, upper) {
+                    visit(scan)
+                })
+            }
+            if (lower != null && (group.originalLower == null || lower > checkNotNull(group.originalLower))) {
+                for (variable in group.terms.vars) visit(scan)
+                added.add(integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.GE, lower) {
                     visit(scan)
                 })
             }
         }
         if (!scan.check()) throw Interrupted()
         return PassDelta(droppedIndices = dropped.toIntArray(), addedFactors = added)
+    }
+
+    private class GuardEnvelope(problem: Problem, private val scan: ScanMeter) {
+        private val size = problem.numBoolVars * 2
+        private val reverse = arrayOfNulls<IntArrayList>(size)
+        private val occurrences = arrayOfNulls<IntArrayList>(size)
+        private val clauses = ArrayList<Clause>()
+        private val knownAt = IntArray(size)
+        private val facts = arrayOfNulls<BigInt>(size)
+        private val reached = IntArrayList()
+        private var generation = 0
+
+        init {
+            for (literal in 0 until size) visit(scan)
+            for (factor in problem.factors) {
+                visit(scan)
+                if (factor !is Clause) continue
+                val index = clauses.size
+                clauses.add(factor)
+                for (literal in factor.literals) {
+                    visit(scan)
+                    val list = occurrences[literal] ?: IntArrayList().also { occurrences[literal] = it }
+                    list.add(index)
+                }
+                if (factor.literals.size == 2) {
+                    val first = factor.literals[0]
+                    val second = factor.literals[1]
+                    antecedent(first, second xor 1)
+                    antecedent(second, first xor 1)
+                }
+            }
+        }
+
+        private fun antecedent(consequent: Int, premise: Int) {
+            visit(scan)
+            val list = reverse[consequent] ?: IntArrayList().also { reverse[consequent] = it }
+            list.add(premise)
+        }
+
+        fun derive(groups: Collection<Group>) {
+            for (group in groups) {
+                visit(scan)
+                val guards = group.guards ?: continue
+                derive(group, guards.upper, upper = true)
+                derive(group, guards.lower, upper = false)
+            }
+        }
+
+        private fun derive(group: Group, seeds: ArrayList<Seed>, upper: Boolean) {
+            if (seeds.isEmpty()) return
+            seeds.sortWith { left, right ->
+                visit(scan)
+                val order = if (upper) left.bound.compareTo(right.bound) else right.bound.compareTo(left.bound)
+                if (order == 0) left.literal.compareTo(right.literal) else order
+            }
+            if (generation == Int.MAX_VALUE) {
+                for (literal in knownAt.indices) {
+                    visit(scan)
+                    knownAt[literal] = 0
+                }
+                generation = 0
+            }
+            generation++
+            reached.clear()
+            // Strongest seeds run first: the first reaching path proves the strongest transferred bound.
+            for (seed in seeds) {
+                visit(scan)
+                if (knownAt[seed.literal] == generation) continue
+                var next = reached.size
+                remember(seed.literal, seed.bound)
+                while (next < reached.size) {
+                    visit(scan)
+                    val literal = reached[next++]
+                    val predecessors = reverse[literal] ?: continue
+                    for (i in 0 until predecessors.size) {
+                        visit(scan)
+                        val predecessor = predecessors[i]
+                        if (knownAt[predecessor] != generation) remember(predecessor, seed.bound)
+                    }
+                }
+            }
+            val covers = HashMap<Int, Cover>()
+            for (i in 0 until reached.size) {
+                visit(scan)
+                val literal = reached[i]
+                val bound = checkNotNull(facts[literal])
+                val opposite = literal xor 1
+                if (Lit.isPositive(literal) && knownAt[opposite] == generation) {
+                    accept(group, weakest(bound, checkNotNull(facts[opposite]), upper), upper)
+                }
+                val readers = occurrences[literal] ?: continue
+                for (j in 0 until readers.size) {
+                    visit(scan)
+                    val clause = readers[j]
+                    val cover = covers.getOrPut(clause) { Cover(bound) }
+                    cover.bound = weakest(cover.bound, bound, upper)
+                    cover.seen++
+                    if (cover.seen == clauses[clause].literals.size) accept(group, cover.bound, upper)
+                }
+            }
+        }
+
+        private fun remember(literal: Int, bound: BigInt) {
+            knownAt[literal] = generation
+            facts[literal] = bound
+            reached.add(literal)
+        }
+
+        private fun weakest(left: BigInt, right: BigInt, upper: Boolean): BigInt =
+            if (upper) maxOf(left, right) else minOf(left, right)
+
+        private fun accept(group: Group, bound: BigInt, upper: Boolean) {
+            visit(scan)
+            // A cover has a true literal, whose bound implies this weakest common consequence.
+            if (upper) group.upper = group.upper?.let { minOf(it, bound) } ?: bound
+            else group.lower = group.lower?.let { maxOf(it, bound) } ?: bound
+        }
+
+        private class Cover(var bound: BigInt) {
+            var seen = 0
+        }
     }
 
     private class Terms(
@@ -130,9 +313,9 @@ internal object LinearBoundFusion {
 
     private class Canonical(val terms: Terms, val bound: BigInt, val upper: Boolean)
 
-    private fun canonicalize(row: LinearRow, scan: ScanMeter): Canonical? {
+    private fun canonicalize(row: LinearRow, scan: ScanMeter, allowActivated: Boolean = false): Canonical? {
         val constants = row.constants as? IntegralConstants ?: return null
-        if (row.activator != LinearRow.ALWAYS || row.relation == LinearOp.NE) return null
+        if ((!allowActivated && row.activator != LinearRow.ALWAYS) || row.relation == LinearOp.NE) return null
         if ((0 until row.size).any {
             visit(scan)
             !Term.isInt(row.ref(it))
