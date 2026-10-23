@@ -620,6 +620,13 @@ producer. Inspection records producer, source assertion and numerical-query time
 from after ordinary root initialization. These diagnostic clocks are disabled in
 default solver execution; they exclude root-opening and snapshot costs.
 
+The [partial arithmetic investigation](https://github.com/Eignex/klause/issues/3426#issuecomment-6375588869)
+retains matching source/search states for cached and uncached PWD and myget prefixes.
+PWD publishes 37 explained guards over sixteen boundary visits; decline reuse reduces
+arithmetic evaluations from 67,100 to 3,656 while preserving those states. Myget has no
+deductions and reduces evaluations from 24,007 to 1,213. These diagnostic results support
+the opt-in mechanism; they do not establish a default-policy or source-verdict improvement.
+
 `LinearSourceShape` accepts `suite=ID problem=NAME sha256=HEX` and retains the
 hash-matched original, build identity, declaration/lowered dimensions, factor kinds
 and exact-row predicate counts. Predicate identity removes only the activator before
