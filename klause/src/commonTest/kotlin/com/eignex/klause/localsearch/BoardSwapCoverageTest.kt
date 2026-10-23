@@ -169,7 +169,7 @@ class BoardSwapCoverageTest {
                 acceptance = AcceptanceRule.GreedyDescent,
                 feasibleAcceptance = AcceptanceRule.GreedyDescent,
                 feasibleDescent = FeasibleDescent.SelfOwned,
-                feasibleResampleCap = 0,
+                feasibleResampleCap = 5,
             )
             val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
             engine.resumable(
@@ -236,6 +236,7 @@ class BoardSwapCoverageTest {
             acceptance = AcceptanceRule.GreedyDescent,
             feasibleAcceptance = AcceptanceRule.GreedyDescent,
             feasibleDescent = FeasibleDescent.SelfOwned,
+            feasibleResampleCap = 4,
         )
         val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
 
@@ -319,14 +320,17 @@ class BoardSwapCoverageTest {
     }
 
     @Test
-    fun `the sampled resample window should precede retained board coverage`() {
+    fun `incomplete coverage should preserve the existing restart boundary`() {
         val initial = state()
-        var optima = 0
+        val events = mutableListOf<String>()
         val policy = object : RestartPolicy {
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) = Unit
+            override fun onFeasibleStall(state: LocalSearchState, sample: Sample, objective: Double) {
+                events.add("stall")
+            }
             override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
-                optima++
+                events.add("optimum")
             }
         }
         val strategy = SourceDrivenStrategy(
@@ -336,18 +340,20 @@ class BoardSwapCoverageTest {
             feasibleDescent = FeasibleDescent.SelfOwned,
             feasibleResampleCap = 2,
         )
-        val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
+        val engine = LocalSearchEngine(
+            initial.model, strategy = strategy, restartPolicy = policy, seedImplicitOnRestart = true,
+        )
 
         engine.resumable(
             LinearObjective(),
             LocalSearchParams(maxFlips = 6L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
         ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
 
-        assertEquals(0, optima)
+        assertEquals(listOf("stall", "stall"), events)
     }
 
     @Test
-    fun `a deferred board pass should preserve sampled candidates and random draws`() {
+    fun `disabled retained generation should preserve sampled candidates and random draws`() {
         val sampled = state()
         val deferred = state()
         val sampledSink = MoveSink()
@@ -388,7 +394,7 @@ class BoardSwapCoverageTest {
 
     @Test
     fun `cyclic pair coverage should include every unordered pair once`() {
-        for (size in listOf(2, 3, 5, 7)) {
+        for (size in listOf(2, 3, 4, 5, 7, 8)) {
             val problem = Problem(
                 0, size, Array(size) { IntDomain(0, (size - 1).toLong()) },
                 arrayOf<Factor>(AllDifferent(IntArray(size) { it }, 0, size)),
@@ -413,6 +419,62 @@ class BoardSwapCoverageTest {
             assertEquals(count, pairs.size)
             assertFalse(state.boardCoverage.pending)
         }
+    }
+
+    @Test
+    fun `configuration filtered coverage should not report a board optimum`() {
+        val problem = Problem(
+            0, 3, Array(3) { IntDomain(0, 2) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
+        )
+        val initial = freshState(problem, 7L)
+        repeat(3) { initial.assignment.setInt(it, it.toLong()) }
+        initial.recompute()
+        var optima = 0
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) = Unit
+            override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
+                optima++
+            }
+        }
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            configurationChecking = true,
+            perturbation = { state ->
+                state.intConfChange[2] = false
+                null
+            },
+        )
+        val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
+
+        engine.resumable(
+            LinearObjective(intCoefficients = longArrayOf(0, 0, 1)),
+            LocalSearchParams(maxFlips = 1L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
+        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(0, optima)
+    }
+
+    @Test
+    fun `an unchanged move should retain board coverage progress`() {
+        val state = state()
+        val source = SatisfiedStructured.structural(1)
+        val sink = MoveSink()
+        source.generate(state, sink)
+        state.apply(Move.IntSet(0, state.assignment.intValue(0)))
+
+        repeat(4) {
+            sink.clear()
+            source.generate(state, sink)
+        }
+        sink.clear()
+        source.generate(state, sink)
+
+        assertTrue(sink.list.isEmpty())
     }
 
     private fun state(size: Int = 5): LocalSearchState {

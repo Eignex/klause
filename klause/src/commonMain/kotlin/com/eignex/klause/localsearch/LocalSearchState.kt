@@ -468,13 +468,14 @@ class LocalSearchState private constructor(
      *  affected definitional cone is propagated afterwards through the same primitives. */
     fun apply(move: Move) {
         check(!probeActive && !moveActive) { "local-search moves cannot be nested" }
-        boardCoverage.invalidate()
+        val revisionBefore = assignmentRevision
         moveActive = true
         trackedMoveStarted = false
         try {
             apply(move, null)
             if (cost < bestCostSeen) bestCostSeen = cost
         } finally {
+            if (assignmentRevision != revisionBefore) boardCoverage.invalidate()
             moveActive = false
         }
     }
