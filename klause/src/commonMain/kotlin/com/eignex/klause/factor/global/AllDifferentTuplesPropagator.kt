@@ -17,6 +17,7 @@ internal class AllDifferentTuplesPropagator(private val factor: AllDifferentTupl
         }
         val fixed = HashMap<TupleValues, Int>()
         for ((index, tuple) in factor.tuples.withIndex()) {
+            state.work += 1L + tuple.size
             if (tuple.any { state.intDomains[it].min != state.intDomains[it].max }) continue
             val key = TupleValues(LongArray(tuple.size) { state.intDomains[tuple[it]].min })
             val previous = fixed.put(key, index) ?: continue

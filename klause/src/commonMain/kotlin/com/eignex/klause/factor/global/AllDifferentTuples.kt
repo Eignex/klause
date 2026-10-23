@@ -22,6 +22,9 @@ class AllDifferentTuples(
 
     override val variables: IntVars = IntVars(tuples.flatMap { it.asIterable() }.distinct().toIntArray())
 
+    override val structuralKeyWeight: Int = tuples.fold(tuples.size.toLong()) { size, row -> size + row.size }
+        .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+
     internal val repeatedTuple: Boolean = run {
         val seen = HashSet<List<Int>>()
         tuples.any { !seen.add(it.toList()) }
