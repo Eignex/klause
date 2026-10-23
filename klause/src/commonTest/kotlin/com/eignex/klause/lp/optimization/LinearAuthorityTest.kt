@@ -69,6 +69,27 @@ class LinearAuthorityTest {
     }
 
     @Test
+    fun `an attained source optimum should fit one numerical operation`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(real),
+            mapOf(
+                "lower" to SourcePremise(
+                    SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
+
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, Cancellation.Never)
+
+        val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ONE), claim.value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence))
+    }
+
+    @Test
     fun `inclusive bound should supply an attained optimum`() {
         val source = SourceProofContext(
             scope,
