@@ -210,6 +210,7 @@ internal object PolynomialPhaseProfile {
         private val condition = conditionType.getConstructor(Map::class.java, Map::class.java, Map::class.java)
         private val next = queryType.getMethod("next")
         private val stats = queryType.getMethod("getStats")
+        private val progress = queryType.methods.singleOrNull { it.name == "getProgress" }
         private val fixings = Class.forName(prefix + "PolynomialPointFixingsKt").methods.single {
             it.name == "polynomialPointFixings"
         }
@@ -272,17 +273,25 @@ internal object PolynomialPhaseProfile {
             val start = System.nanoTime()
             var calls = 0L
             var lastProjected = 0L
+            var lastStage: Pair<Long, Long>? = null
             var result: Any?
             do {
                 result = next.invoke(owner)
                 calls++
                 val snapshot = stats.invoke(owner)
                 val projected = snapshot.javaClass.getMethod("getProjectedPolynomials").invoke(snapshot) as Long
-                if (calls <= 2 || projected != lastProjected || result != null) {
+                val observed = progress?.invoke(owner)
+                val stage = observed?.let {
+                    (it.javaClass.getMethod("getSnapshots").invoke(it) as Long) to
+                        (it.javaClass.getMethod("getRegions").invoke(it) as Long)
+                }
+                if (result != null || (checkpoints.size < 128 &&
+                        (calls <= 2 || projected != lastProjected || stage != lastStage))) {
                     checkpoints += PhaseCheckpoint(calls, (System.nanoTime() - start) / 1_000_000,
-                        result?.javaClass?.simpleName ?: "Pending", snapshot.toString())
+                        result?.javaClass?.simpleName ?: "Pending", snapshot.toString(), observed?.toString())
                 }
                 lastProjected = projected
+                lastStage = stage
             } while (result == null)
             val snapshot = stats.invoke(owner)
             val nativeWork = snapshot.javaClass.getMethod("getWorkSpent").invoke(snapshot) as Long
@@ -309,7 +318,13 @@ internal data class PhaseGate(
 )
 
 @Serializable
-internal data class PhaseCheckpoint(val nextCall: Long, val elapsedMs: Long, val result: String, val stats: String)
+internal data class PhaseCheckpoint(
+    val nextCall: Long,
+    val elapsedMs: Long,
+    val result: String,
+    val stats: String,
+    val progress: String? = null,
+)
 
 @Serializable
 internal data class PhaseTrace(

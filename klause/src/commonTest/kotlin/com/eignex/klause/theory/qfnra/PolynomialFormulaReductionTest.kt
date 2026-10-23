@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
@@ -15,6 +16,57 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialFormulaReductionTest {
+    @Test
+    fun `committed snapshots retain their own reconstruction fibres`() {
+        for (length in listOf(1, 2, 4)) {
+            val declarations = (0..length).joinToString(" ") { "(declare-const x$it Real)" }
+            val equations = (0 until length).joinToString(" ") { "(= x$it (+ x${it + 1} 1))" }
+            val source = SmtLibPolynomial.parse("$declarations (assert (and $equations))")
+            val arithmetic = PolynomialArithmetic()
+            val algebraic = AlgebraicArithmetic(arithmetic)
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+            val snapshots = PolynomialFormulaReduction.stages(formula, source.realCount, arithmetic)
+                .asSequence().filterNotNull().toList()
+
+            assertEquals(0, snapshots.first().eliminatedCount)
+            assertFalse(snapshots.first().finished)
+            assertTrue(snapshots.last().finished)
+            assertEquals(length, snapshots.last().eliminatedCount)
+            for (snapshot in snapshots.drop(1)) {
+                val values = (0 until source.realCount).map { id ->
+                    val active = snapshot.formula.atoms.any { id in it.polynomial.variables }
+                    algebraic.rational(BigFraction.ofLong(if (active) (length - id).toLong() else 0))
+                }
+                val point = snapshot.reconstruct(QfNraAssignment(booleanArrayOf(), values), arithmetic, algebraic)
+                for (id in 0 until length) {
+                    assertEquals(BigFraction.ONE,
+                        point.getValue(id).rational!! - point.getValue(id + 1).rational!!)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `an interrupted rewrite leaves its last committed snapshot intact`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (assert (and (= x 0) (> y x)))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        var stopped = false
+        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val preparing = PolynomialFormulaReduction.stages(formula, source.realCount, arithmetic)
+        val initial = requireNotNull(preparing.next())
+        assertNull(preparing.next())
+
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { preparing.next() }
+        assertEquals(0, initial.eliminatedCount)
+        assertEquals(formula.atoms, initial.formula.atoms)
+        assertFalse(initial.inconsistent)
+    }
+
     @Test
     fun `a reduced probe reconstructs every original coordinate before publication`() {
         val source = SmtLibPolynomial.parse(
