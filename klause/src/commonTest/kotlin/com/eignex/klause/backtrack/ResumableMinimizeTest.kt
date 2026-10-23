@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
@@ -399,6 +400,85 @@ class ResumableMinimizeTest {
             assertTrue(weights.indices.sumOf { weights[it] * restricted.sample.ints[it] } <= 25L)
             assertEquals(-36L, objective.evaluateLong(restricted.sample))
         }
+    }
+
+    @Test
+    fun `a starting witness equal to the shared cutoff should tighten the first root`() {
+        var firstMaximum: Long? = null
+        val selector = object : VariableSelector {
+            override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                if (firstMaximum == null) firstMaximum = session.intDomain(0).max
+                return SmallestDomain.pick(session, rng)
+            }
+
+            override fun fresh(): VariableSelector = this
+        }
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(
+            variableSelector = selector,
+            valueSelector = IndomainMin,
+            lpPlan = LpPlan(bounding = false),
+            objectiveBoundSupplier = { 5.0 },
+        )
+
+        ResumableMinimize(
+            BacktrackSolver(problem), objective, params,
+            initialCandidate = Sample(BooleanArray(0), longArrayOf(5L)),
+        ).use { search ->
+            val result = assertIs<MinimizeResult.BestFound>(
+                search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {},
+            )
+
+            assertEquals(4L, firstMaximum)
+            assertEquals(0.0, result.objective)
+            assertEquals(TerminationReason.SearchExhausted, result.reason)
+        }
+    }
+
+    @Test
+    fun `a starting witness at the shared cutoff should still pass source validation`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 4)),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(
+            valueSelector = IndomainMin,
+            lpPlan = LpPlan(bounding = false),
+            objectiveBoundSupplier = { 5.0 },
+        )
+        val offers = mutableListOf<Double>()
+
+        ResumableMinimize(
+            BacktrackSolver(problem), objective, params,
+            initialCandidate = Sample(BooleanArray(0), longArrayOf(5L)),
+        ).use { search ->
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
+        }
+
+        assertEquals(listOf(0.0), offers)
+    }
+
+    @Test
+    fun `a rebindable search should reject a starting witness equal to its cutoff`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(
+            valueSelector = IndomainMin,
+            lpPlan = LpPlan(bounding = false),
+            objectiveBoundSupplier = { 5.0 },
+        )
+        val offers = mutableListOf<Double>()
+
+        ResumableMinimize(
+            BacktrackSolver(problem), objective, params, rebindable = true,
+            initialCandidate = Sample(BooleanArray(0), longArrayOf(5L)),
+        ).use { search ->
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
+        }
+
+        assertEquals(listOf(0.0), offers)
     }
 
     @Test
