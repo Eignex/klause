@@ -10,6 +10,46 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `rebound open sides should reseat nonbasic coordinates`() {
+        val initial = ExactContinuationInput(
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
+            emptyList(), listOf(ContinuationStatus.LOWER),
+        )
+        val session = ExactContinuation(initial)
+        assertNotNull(session.resume().values)
+        val upperOnly = ExactContinuationInput(
+            listOf(emptyList()), emptyList(), listOf(null), listOf(BigFraction.MINUS_ONE),
+            emptyList(), listOf(ContinuationStatus.UPPER), upperStrict = listOf(true),
+        )
+
+        val result = session.resume(replacement = upperOnly)
+
+        assertTrue(assertNotNull(result.values).single() < BigFraction.MINUS_ONE)
+        assertNull(result.ray)
+    }
+
+    @Test
+    fun `a changed exact matrix should decline retained feasibility`() {
+        val initial = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE)), listOf(BigFraction.ONE),
+            listOf(null, BigFraction.ZERO), listOf(null, BigFraction.ZERO),
+            listOf(0), listOf(ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+        )
+        val session = ExactContinuation(initial)
+        assertNotNull(session.resume().values)
+        val changed = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ofLong(2))), initial.rhs, initial.lower, initial.upper,
+            initial.headings, initial.statuses,
+        )
+
+        val result = session.resume(replacement = changed)
+
+        assertEquals(ContinuationDecline.INVALID_INPUT, result.metrics.decline)
+        assertNull(result.values)
+        assertNull(result.ray)
+    }
+
+    @Test
     fun `strict endpoints should materialize interior coordinates in either direction`() {
         for (upper in listOf(false, true)) {
             val input = ExactContinuationInput(
