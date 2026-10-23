@@ -4865,6 +4865,7 @@ public final class com/eignex/klause/localsearch/IteratedLocalSearchRestart : co
 	public final fun getCrossoverRate ()D
 	public final fun getIncumbents ()Ljava/util/List;
 	public final fun getInitialPerturbationStrength ()I
+	public final fun getLastBoardDiversificationChanged ()Ljava/lang/Boolean;
 	public final fun getLinkageAware ()Z
 	public final fun getMaxFlipsBeforeRestart ()I
 	public final fun getMaxPerturbationStrength ()I

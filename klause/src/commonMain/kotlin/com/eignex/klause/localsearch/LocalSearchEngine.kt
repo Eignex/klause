@@ -126,9 +126,8 @@ internal class LocalSearchEngine(
     private val configuredRestart: RestartPolicy =
         strategy.schedule.restart ?: restartPolicy
 
-    // When a definitionalSweep is present or seedImplicitOnRestart is set, every restart is followed
-    // by implicit feasible-init and/or the sweep plus a recompute, so all restart call sites get the
-    // same post-randomization treatment.
+    // Restart preparation reconciles definitions and implicit ownership. A valid retained owner
+    // assignment survives preparation so feasible-init cannot erase its structural perturbation.
     private val restarts: RestartPolicy = if (definitionalSweep == null && !seedImplicitOnRestart) {
         configuredRestart
     } else {
@@ -142,15 +141,22 @@ internal class LocalSearchEngine(
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 val previousBest = state.bestCostSeen
                 configuredRestart.restart(state, bestSoFar)
-                prepareAssignment(state)
+                val ils = configuredRestart as? IteratedLocalSearchRestart
+                val preserve = seedImplicitOnRestart && ils?.preservesImplicitOnRestart == true
+                prepareAssignment(state, preserveImplicit = preserve)
                 state.recompute()
+                if (preserve && !RetainedBoardRestart.canPreserveOwners(state)) {
+                    prepareAssignment(state)
+                    state.recompute()
+                }
+                ils?.finishRestart(state)
                 state.bestCostSeen = minOf(previousBest, state.cost)
             }
         }
     }
 
-    private fun prepareAssignment(state: LocalSearchState) {
-        if (seedImplicitOnRestart) state.seedImplicitFeasible()
+    private fun prepareAssignment(state: LocalSearchState, preserveImplicit: Boolean = false) {
+        if (seedImplicitOnRestart && !preserveImplicit) state.seedImplicitFeasible()
         definitionalSweep?.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
     }
 

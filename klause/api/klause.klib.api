@@ -9405,6 +9405,8 @@ final class com.eignex.klause.localsearch/IteratedLocalSearchRestart : com.eigne
     final val populationSize // com.eignex.klause.localsearch/IteratedLocalSearchRestart.populationSize|{}populationSize[0]
         final fun <get-populationSize>(): kotlin/Int // com.eignex.klause.localsearch/IteratedLocalSearchRestart.populationSize.<get-populationSize>|<get-populationSize>(){}[0]
 
+    final var lastBoardDiversificationChanged // com.eignex.klause.localsearch/IteratedLocalSearchRestart.lastBoardDiversificationChanged|{}lastBoardDiversificationChanged[0]
+        final fun <get-lastBoardDiversificationChanged>(): kotlin/Boolean? // com.eignex.klause.localsearch/IteratedLocalSearchRestart.lastBoardDiversificationChanged.<get-lastBoardDiversificationChanged>|<get-lastBoardDiversificationChanged>(){}[0]
     final var perturbationStrength // com.eignex.klause.localsearch/IteratedLocalSearchRestart.perturbationStrength|{}perturbationStrength[0]
         final fun <get-perturbationStrength>(): kotlin/Int // com.eignex.klause.localsearch/IteratedLocalSearchRestart.perturbationStrength.<get-perturbationStrength>|<get-perturbationStrength>(){}[0]
 
