@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class RefactorPolicyTest {
     @Test
     fun `cumulative solve work should request a rebuild after the adaptive minimum`() {
-        val policy = RefactorPolicy()
+        val policy = RefactorPolicy(RefactorPolicyConfig(syntheticWorkEnabled = true))
         policy.recordFactorization(factorNnz = 100, buildWork = 100L, pivotSpread = 0.5)
         repeat(8) {
             policy.recordBasisSolve(20L)
@@ -21,8 +21,8 @@ class RefactorPolicyTest {
     }
 
     @Test
-    fun `disabled cumulative work should not request a rebuild for unchanged solve costs`() {
-        val policy = RefactorPolicy(RefactorPolicyConfig(syntheticWorkEnabled = false))
+    fun `unchanged solve costs should not request a rebuild by default`() {
+        val policy = RefactorPolicy()
         policy.recordFactorization(factorNnz = 100, buildWork = 100L, pivotSpread = 0.5)
         repeat(8) {
             policy.recordBasisSolve(20L)
@@ -83,7 +83,7 @@ class RefactorPolicyTest {
 
     @Test
     fun `unknown and saturated work should not create a synthetic trigger`() {
-        val unknown = RefactorPolicy()
+        val unknown = RefactorPolicy(RefactorPolicyConfig(syntheticWorkEnabled = true))
         unknown.recordFactorization(factorNnz = 10, buildWork = null, pivotSpread = Double.NaN)
         repeat(8) {
             unknown.recordBasisSolve(null, boundUpdateFtran = true)
@@ -94,7 +94,7 @@ class RefactorPolicyTest {
         assertEquals(16L, unknown.metrics.unknownWorkEvents)
         assertNull(unknown.metrics.pivotSpread)
 
-        val saturated = RefactorPolicy()
+        val saturated = RefactorPolicy(RefactorPolicyConfig(syntheticWorkEnabled = true))
         saturated.recordFactorization(factorNnz = 10, buildWork = 100L, pivotSpread = 1.0)
         repeat(8) { saturated.recordAcceptedUpdate(0L) }
         saturated.recordBasisSolve(Long.MAX_VALUE)
@@ -105,7 +105,7 @@ class RefactorPolicyTest {
 
     @Test
     fun `aggregate overflow should disable adaptive work triggers`() {
-        val policy = RefactorPolicy()
+        val policy = RefactorPolicy(RefactorPolicyConfig(syntheticWorkEnabled = true))
         policy.recordFactorization(factorNnz = 10, buildWork = 100L, pivotSpread = 1.0)
         repeat(8) { policy.recordAcceptedUpdate(0L) }
         policy.recordBasisSolve(Long.MAX_VALUE - 10L)

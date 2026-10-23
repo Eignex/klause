@@ -19,7 +19,7 @@ internal data class RefactorPolicyConfig(
     val fillGrowthFactor: Double = 5.0,
     val solveWorkGrowthFactor: Double = 2.0,
     val minimumUpdatesForAdaptiveTrigger: Int = 8,
-    val syntheticWorkEnabled: Boolean = true,
+    val syntheticWorkEnabled: Boolean = false,
 ) {
     init {
         require(hardUpdateCap > 0 && residualSampleInterval > 0 && minimumUpdatesForAdaptiveTrigger >= 0)
