@@ -22,6 +22,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BoardSwapCoverageTest {
@@ -57,6 +58,7 @@ class BoardSwapCoverageTest {
         )
         var polls = 0
 
+        resumed.boardCoverage.request(resumed)
         strategy.pickMove(resumed, Cancellation { ++polls >= 3 })
         val resumedMoves = MoveSink()
         val expectedMoves = MoveSink()
@@ -268,6 +270,87 @@ class BoardSwapCoverageTest {
         assertEquals(4, sink.list.size)
         for (move in sink.list) {
             assertTrue((move as Move.Compound).parts.all { (it as Move.IntSet).varId >= 5 })
+        }
+    }
+
+    @Test
+    fun `definition scoring probes should retain unchanged board coverage`() {
+        val problem = Problem(
+            0, 11, Array(11) { IntDomain(0, if (it == 10) 16L else 4L) },
+            arrayOf<Factor>(
+                AllDifferent(intArrayOf(0, 1, 2, 3, 4), 0, 5),
+                AllDifferent(intArrayOf(5, 6, 7, 8, 9), 0, 5),
+                Product(0, 1, 10),
+            ),
+        )
+        val state = freshState(problem, 7L)
+        repeat(10) { state.assignment.setInt(it, (it % 5).toLong()) }
+        state.assignment.setInt(10, 0)
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
+            .network(problem.numIntVars, problem.numBoolVars)
+        state.shaping.objective = LinearObjective(intCoefficients = LongArray(11) { if (it == 10) 1L else 0L })
+        state.recompute()
+        val before = state.assignment.snapshot()
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+
+        state.boardCoverage.request(state)
+        repeat(5) { assertNull(strategy.pickMove(state)) }
+
+        assertEquals(before, state.assignment.snapshot())
+        assertEquals(0L, state.cost)
+        assertFalse(state.boardCoverage.pending)
+    }
+
+    @Test
+    fun `the sampled resample window should precede retained board coverage`() {
+        val initial = state()
+        var optima = 0
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) = Unit
+            override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
+                optima++
+            }
+        }
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(SatisfiedStructured.structural(1))),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            feasibleResampleCap = 2,
+        )
+        val engine = LocalSearchEngine(initial.model, strategy = strategy, restartPolicy = policy)
+
+        engine.resumable(
+            LinearObjective(),
+            LocalSearchParams(maxFlips = 6L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
+        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(0, optima)
+    }
+
+    @Test
+    fun `a deferred board pass should preserve sampled candidates and random draws`() {
+        val sampled = state()
+        val deferred = state()
+        val sampledSink = MoveSink()
+        val deferredSink = MoveSink()
+
+        repeat(3) {
+            sampledSink.clear()
+            deferredSink.clear()
+            SatisfiedStructured.sampled(1).generate(sampled, sampledSink)
+            SatisfiedStructured.structural(1).generate(
+                deferred, deferredSink, Cancellation.Never, retainCoverage = false,
+            )
+
+            assertEquals(sampledSink.list, deferredSink.list)
+            assertEquals(sampled.rng.nextLong(), deferred.rng.nextLong())
         }
     }
 

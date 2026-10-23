@@ -83,15 +83,12 @@ class SourceDrivenStrategy(
     /** Acceptance used only in the feasible (`cost == 0`) phase, when the objective is scored, in place
      *  of [acceptance]. Lets a strategy fight infeasibility with noise but descend the objective
      *  strictly: CBLS sets [AcceptanceRule.GreedyDescent] so it takes only objective-improving moves and
-     *  otherwise returns `null` (a local optimum → restart). `null` reuses [acceptance] in both phases. */
+     *  otherwise returns `null` to resample or finish retained coverage. `null` reuses [acceptance] in both phases. */
     val feasibleAcceptance: AcceptanceRule? = null,
-    /** Re-sample budget for the [FeasibleDescent.SelfOwned] feasible walk: consecutive picks that find no
-     *  move (a `null` pick) tolerated before the engine restarts. `0` restarts on the first miss — correct
-     *  when the strategy generates exhaustively, so a `null` is a genuine local optimum. A positive cap
-     *  suits a *sampled* strategy, where a `null` is usually just a draw that missed an existing improving
-     *  move: re-drawing the same basin this many times (letting the stall machinery engage) keeps one
-     *  unlucky draw from discarding a good partial solution. An unfinished retained board pass delays
-     *  the local-optimum callback independently of this cap, within the containing work allowance. */
+    /** Consecutive sampled misses before requesting bounded retained board coverage or restarting.
+     *  A positive cap preserves the sampled descent before coverage; `0` starts coverage directly for
+     *  [AcceptanceRule.GreedyDescent]. Without a retained source, zero restarts on the first miss.
+     *  Incomplete coverage delays the local-optimum callback within the containing work allowance. */
     val feasibleResampleCap: Int = 0,
 ) {
 
@@ -132,6 +129,11 @@ class SourceDrivenStrategy(
     }
 
     internal var prioritizePrimaryRepairs: Boolean = false
+
+    internal val supportsBoardCoverage: Boolean get() = sources.any {
+        it.enabled && it.cap > 0 && !it.stallGated && it.effectivePhase.appliesAt(0L) &&
+            (it.source as? SatisfiedStructured)?.supportsBoardCoverage == true
+    }
 
     private data class CompletionSeed(val sink: MoveSink, val remaining: Int)
 
@@ -289,7 +291,9 @@ class SourceDrivenStrategy(
 
     private fun generate(cs: ConfiguredSource, state: LocalSearchState, sink: MoveSink, cancellation: Cancellation) {
         val source = cs.source
-        if (source is SatisfiedStructured) source.generate(state, sink, cancellation) else source.generate(state, sink)
+        if (source is SatisfiedStructured) {
+            source.generate(state, sink, cancellation, retainCoverage = state.boardCoverage.requested)
+        } else source.generate(state, sink)
     }
 
     private fun selectMove(

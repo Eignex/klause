@@ -7,6 +7,7 @@ import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.GreedyInit
 import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundAccumulator
@@ -767,10 +768,13 @@ internal class LocalSearchEngine(
         // The explicit feasible-phase descent mode — the optimize strategy's when present, else the
         // satisfy strategy's. The cost==0 branch dispatches on it exhaustively (no fall-through), so an
         // arm always optimizes the way it declared and never lands in a default descent by accident.
-        val feasibleMode = (descentStrategy ?: strategy).feasibleDescent
+        val feasibleStrategy = descentStrategy ?: strategy
+        val feasibleMode = feasibleStrategy.feasibleDescent
         // Sampling-miss tolerance for a SelfOwned feasible walk: how many consecutive null picks to
         // re-sample before a restart (see [SourceDrivenStrategy.feasibleResampleCap]).
-        val feasibleResampleCap = (descentStrategy ?: strategy).feasibleResampleCap
+        val feasibleResampleCap = feasibleStrategy.feasibleResampleCap
+        val immediateBoardCoverage = feasibleResampleCap == 0 &&
+            (feasibleStrategy.feasibleAcceptance ?: feasibleStrategy.acceptance) == AcceptanceRule.GreedyDescent
         var feasibleMisses = 0
         // The feasibility-fight strategy whose moves form the rounds (the unified descent strategy
         // when one drives both phases, else the satisfy strategy).
@@ -970,11 +974,14 @@ internal class LocalSearchEngine(
                     // engine commits whatever feasibility-preserving move it picks — CBLS descends greedily
                     // on its objective / structured / pair-swap sources, SA anneals through worse-objective
                     // states. Best-feasible is snapshotted above, so wandering never loses the incumbent. A
-                    // feasibility-breaking pick is reverted and retried; a null pick is a local optimum.
+                    // feasibility-breaking pick is reverted and retried; misses spend resampling or retained coverage.
                     FeasibleDescent.SelfOwned -> {
+                        if (immediateBoardCoverage && feasibleStrategy.supportsBoardCoverage &&
+                            !state.boardCoverage.requested
+                        ) state.boardCoverage.request(state)
                         val moveEvaluation = completedMoves?.takeIf { liveCompletion is Completion.Witness }
                         val m = timing.inPhase("selection") {
-                            (descentStrategy ?: strategy).pickMove(state, params.cancellation, moveEvaluation)
+                            feasibleStrategy.pickMove(state, params.cancellation, moveEvaluation)
                         }
                         if (m != null) {
                             feasibleMisses = 0
@@ -1013,12 +1020,17 @@ internal class LocalSearchEngine(
                             liveCompletion = null
                             continue
                         }
-                        // No move this draw. For a sampled strategy that is usually an unlucky draw rather
-                        // than a true local optimum, so re-sample (and let the stall machinery engage) up to
-                        // feasibleResampleCap times before diversifying — a restart here discards the current
-                        // feasible solution. cap == 0 restarts immediately (exhaustive-generation semantics).
+                        // Sampling misses do not establish a local optimum; retained coverage must finish
+                        // before notifying the restart policy.
                         if (state.boardCoverage.pending || feasibleMisses < feasibleResampleCap) {
                             if (feasibleMisses < feasibleResampleCap) feasibleMisses++
+                            flipsSinceRestart++
+                            totalFlips++
+                            continue
+                        }
+                        if (!state.boardCoverage.requested && feasibleStrategy.supportsBoardCoverage &&
+                            state.boardCoverage.request(state)
+                        ) {
                             flipsSinceRestart++
                             totalFlips++
                             continue

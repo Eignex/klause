@@ -53,16 +53,23 @@ class SatisfiedStructured private constructor(
     override val phase: Phase = Phase.Feasible
     override val pool: Pool = Pool.NoiseEligible
 
+    internal val supportsBoardCoverage: Boolean get() = structuralFirst && sampleCount > 0
+
     override fun generate(state: LocalSearchState, sink: MoveSink) = generate(state, sink, Cancellation.Never)
 
-    internal fun generate(state: LocalSearchState, sink: MoveSink, cancellation: Cancellation) {
+    internal fun generate(
+        state: LocalSearchState,
+        sink: MoveSink,
+        cancellation: Cancellation,
+        retainCoverage: Boolean = true,
+    ) {
         val total = state.problem.numFactors
         if (total == 0) return
         when (scope) {
             Scope.Sampled -> {
                 val elected = if (structuralFirst && sampleCount > 0) state.seeding.electedImplicit else null
                 repeat(sampleCount) { draw ->
-                    if (draw == 0 && elected != null && state.cost == 0L &&
+                    if (retainCoverage && draw == 0 && elected != null && state.cost == 0L &&
                         state.boardCoverage.generate(state, sink, cancellation)
                     ) return@repeat
                     val fid = if (draw == 0 && elected != null && elected.isNotEmpty()) {

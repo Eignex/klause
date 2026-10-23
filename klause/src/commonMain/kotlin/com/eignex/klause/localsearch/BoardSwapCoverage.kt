@@ -17,17 +17,28 @@ internal class BoardSwapCoverage {
     private var complete = false
     private var savedComplete = false
 
+    var requested: Boolean = false
+        private set
+
     var consulted: Boolean = false
         private set
 
     val pending: Boolean get() = started && !complete
 
     fun invalidate() {
+        requested = false
         board = 0
         left = 0
         right = 1
         started = false
         complete = false
+    }
+
+    fun request(state: LocalSearchState): Boolean {
+        if (state.seeding.electedImplicit.none { state.factors[it] is AllDifferentInvariant }) return false
+        syncAssumptions(state)
+        requested = true
+        return true
     }
 
     fun beginPick(state: LocalSearchState) {
