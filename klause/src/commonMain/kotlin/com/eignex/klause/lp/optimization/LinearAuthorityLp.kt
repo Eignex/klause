@@ -67,7 +67,10 @@ internal class LinearAuthorityLp(
                     ExactLpColumn(ExactLpBounds(ExactLpSide(zero, it.strict)), integral = false)
                 },
                 workingRows.map { ExactLpRow(strict = it.strict) },
-                ExactLpObjective(costs.map(ExactLpNumber::of) + List(workingRows.size) { zero }, ExactLpNumber.of(constant)),
+                ExactLpObjective(
+                    costs.map(ExactLpNumber::of) + List(workingRows.size) { zero },
+                    ExactLpNumber.of(constant),
+                ),
             )
             val owner = LpScopedSolver(LpExactState(model), token, context = budget.context,
                 iterationLimit = 1024, workLimit = 2_000_000L)
