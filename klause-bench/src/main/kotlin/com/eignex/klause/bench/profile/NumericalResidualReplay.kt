@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -38,7 +39,9 @@ internal object NumericalResidualReplay {
     private fun replay(input: JsonElement, out: File) {
         val spec = input.jsonObject
         val keys = setOf("job", "source", "residual", "sha256", "dense")
-        require(spec.keys == keys || spec.keys == keys + "synthetic")
+        require(spec.keys.containsAll(keys) && (spec.keys - keys).all { it in setOf("synthetic", "entry") })
+        val entry = spec["entry"]?.jsonPrimitive?.content ?: "scoped"
+        require(entry == "scoped" || entry == "session")
         val compareSynthetic = spec["synthetic"]?.jsonPrimitive?.content?.also { require(it == "compare") } != null
         val job = spec.getValue("job").jsonPrimitive.content.toLong().also { require(it > 0L) }
         val source = spec.getValue("source").jsonPrimitive.content.toInt().also { require(it in 0..7) }
@@ -51,6 +54,7 @@ internal object NumericalResidualReplay {
         val companion = Class.forName(ENGINE + "LpExactCapture").getField("Companion").get(null)
         val capture = requireNotNull(NumericalResidualProfile.call(companion, "decode", bytes))
         val state = requireNotNull(NumericalResidualProfile.call(capture, "getInitialState"))
+        out.resolve("shape.json").writeText(NumericalResidualProfile.shape(state).toString())
         out.resolve("residual.klexact").writeBytes(bytes)
         val dense = spec.getValue("dense").jsonPrimitive.content.toBooleanStrict()
         require(!dense || !compareSynthetic)
@@ -64,7 +68,7 @@ internal object NumericalResidualReplay {
             for ((denseLimit, syntheticWorkEnabled) in ordered) {
                 for (retained in listOf(false, true)) {
                     val observed = round == 3
-                    val result = measure(state, denseLimit, retained, observed, syntheticWorkEnabled)
+                    val result = measure(state, denseLimit, retained, observed, syntheticWorkEnabled, entry)
                     val report = buildJsonObject {
                         put("revision", Reports.readGitSha())
                         put("input", input)
@@ -74,6 +78,7 @@ internal object NumericalResidualReplay {
                         put("retained", retained)
                         put("observed", observed)
                         put("syntheticWorkEnabled", syntheticWorkEnabled)
+                        put("entry", entry)
                         put("sourceVerdictClaim", false)
                         put("captureContainsOriginalFactors", false)
                         put("result", result)
@@ -93,6 +98,7 @@ internal object NumericalResidualReplay {
         retained: Boolean,
         observed: Boolean,
         syntheticWorkEnabled: Boolean,
+        entry: String,
     ): JsonElement {
         val probe = NumericalResidualProfile.Probe(denseLimit, observed, syntheticWorkEnabled)
         val observerType = Class.forName(ENGINE + "LpCertificationObserver")
@@ -109,12 +115,25 @@ internal object NumericalResidualReplay {
         val observer = recording.takeIf { observed }
         val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 2 }
             .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L)
-        val ownerType = Class.forName(ENGINE + "LpScopedSolver")
-        val constructor = ownerType.constructors.single { it.parameterCount == 9 }
-        val prepare = ownerType.methods.single { it.name == "prepare" && it.parameterCount == 1 }
+        val session = entry == "session"
+        val ownerType = Class.forName(ENGINE + if (session) "LpSolveSession" else "LpScopedSolver")
+        val constructor = ownerType.constructors.single { it.parameterCount == if (session) 3 else 9 }
+        val prepare = if (session) null else ownerType.methods.single {
+            it.name == "prepare" && it.parameterCount == 1
+        }
         val defaultSolve = ownerType.methods.single { it.name == "solve\$default" && it.parameterCount == 11 }
-        fun owner(): Any = constructor
-            .newInstance(state, Cancellation.Never, probe.context, 64, 4096, 1_200_000_000L, false, Int.MAX_VALUE, pricing)
+        val solverField = if (session) ownerType.getDeclaredField("solver").apply { isAccessible = true } else null
+        val model = if (session) {
+            val meter = Class.forName(ENGINE + "LpProjectionMeter").getConstructor().newInstance()
+            requireNotNull(NumericalResidualProfile.call(state, "toWorkingModel", meter))
+        } else null
+        fun owner(): Any = if (session) {
+            constructor.newInstance(probe.context, pricing, false)
+        } else {
+            constructor.newInstance(
+                state, Cancellation.Never, probe.context, 64, 4096, 1_200_000_000L, false, Int.MAX_VALUE, pricing,
+            )
+        }
         val steps = ArrayList<JsonElement>()
         var current: Any? = null
         var setupNs = 0L
@@ -130,17 +149,24 @@ internal object NumericalResidualReplay {
                 val active = requireNotNull(current)
                 val stop = Cancellation.after(2000.milliseconds)
                 val solveStarted = System.nanoTime()
-                val prepared = prepare.invoke(active, stop) as Boolean
+                val prepared = prepare?.invoke(active, stop) as? Boolean ?: true
                 val prepareNs = System.nanoTime() - solveStarted
                 val result = if (prepared) {
-                    defaultSolve.invoke(
-                        null, active, null, stop, null, null, true, observer, null, false, 221, null,
-                    )
+                    if (session) {
+                        defaultSolve.invoke(
+                            null, active, model, stop, 1_200_000_000L, observer, null, null, 0.0, null, 240, null,
+                        )
+                    } else {
+                        defaultSolve.invoke(
+                            null, active, null, stop, null, null, true, observer, null, false, 221, null,
+                        )
+                    }
                 } else {
                     null
                 }
                 val elapsed = System.nanoTime() - solveStarted
                 solveNs += elapsed
+                val metricsOwner = if (session) solverField?.get(active)?.let { probe.unwrapped(it) } else active
                 steps += buildJsonObject {
                     put("step", index)
                     put("prepared", prepared)
@@ -152,15 +178,21 @@ internal object NumericalResidualReplay {
                     put("point", result?.let { NumericalResidualProfile.call(it, "getExactPrimal")?.toString() })
                     put(
                         "floatTermination",
-                        NumericalResidualProfile.call(active, "getLastFloatTermination")?.toString(),
+                        metricsOwner?.let {
+                            val getter = if (session) "getLastTermination" else "getLastFloatTermination"
+                            NumericalResidualProfile.call(it, getter)
+                        }?.toString(),
                     )
                     put(
                         "metrics",
-                        NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getLastMetrics")),
+                        NumericalResidualProfile.json(metricsOwner?.let {
+                            NumericalResidualProfile.call(it, "getLastMetrics")
+                        }),
                     )
                     put(
                         "scopeMetrics",
-                        NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getMetrics")),
+                        if (session) JsonNull else
+                            NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getMetrics")),
                     )
                 }
                 if (!retained) {
@@ -183,7 +215,8 @@ internal object NumericalResidualReplay {
             put("processors", Runtime.getRuntime().availableProcessors())
             put("tieSeed", 3)
             put("perSolveTimeoutMs", 2000)
-            put("pivotLimit", 4096)
+            put("pivotLimit", if (session) 0 else 4096)
+            put("inputProjectionExcluded", session)
             put("workLimit", 1_200_000_000L)
             put("instrumentation", if (observed) "lab JFR, basis timing and certifier observer" else "lab JFR")
             put("steps", JsonArray(steps))
