@@ -15,6 +15,46 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverTest {
     @Test
+    fun `empty solves should retain zero support without visiting updated factors`() {
+        val source = ftSource("dense", 3)
+        KotlinBasisSolver(source).use { solver ->
+            assertTrue(solver.refactorize(intArrayOf(0, 1, 2)))
+            val spike = IndexedVector(3).also { it.scatterColumn(source, 4) }
+            solver.ftran(spike)
+            assertEquals(BasisUpdate.APPLIED, solver.update(1, 4, spike))
+            for (transpose in listOf(false, true)) {
+                val vector = IndexedVector(3)
+                val before = if (transpose) solver.basisWork.btran else solver.basisWork.ftran
+
+                if (transpose) solver.btran(vector, 1.0) else solver.ftran(vector, 1.0)
+
+                assertContentEquals(DoubleArray(3), vector.toDoubleArray())
+                val after = if (transpose) solver.basisWork.btran else solver.basisWork.ftran
+                assertEquals(before.attempts + 1, after.attempts)
+                assertEquals(before.successes + 1, after.successes)
+                assertEquals(before.units, after.units)
+                assertEquals(0L, assertNotNull(solver.lastSolveWork).units)
+            }
+        }
+    }
+
+    @Test
+    fun `empty solves should require usable open factors`() {
+        val source = ftSource("dense", 3)
+        val solver = KotlinBasisSolver(source)
+        val vector = IndexedVector(3)
+        assertFailsWith<IllegalStateException> { solver.ftran(vector) }
+        assertFailsWith<IllegalStateException> { solver.btran(vector) }
+        assertTrue(solver.refactorize(intArrayOf(0, 1, 2)))
+        assertFalse(solver.refactorize(intArrayOf(0, 0, 0)))
+        assertFailsWith<IllegalStateException> { solver.ftran(vector) }
+        assertFailsWith<IllegalStateException> { solver.btran(vector) }
+        solver.close()
+        assertFailsWith<IllegalStateException> { solver.ftran(vector) }
+        assertFailsWith<IllegalStateException> { solver.btran(vector) }
+    }
+
+    @Test
     fun `declined solve work should be retained until the next build`() {
         val source = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1e-200)))
         val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))

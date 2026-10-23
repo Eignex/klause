@@ -182,8 +182,12 @@ copy; an artificial box never authorizes a source proof, ray or bound.
 [simplex.basis](../klause/src/commonMain/kotlin/com/eignex/klause/simplex/basis)
 owns sparse and small dense elimination, DFS reach, Forrest-Tomlin updates, logical
 repair, indexed forward/transpose solves and rational factors. Each owner has fixed
-dimension, both permutations and three-valued update results. Dense partial-pivot
-LU is selected only for dimensions 2–6 with at least 50% density in the selected
+dimension, both permutations and three-valued update results.
+
+Empty indexed right-hand sides return zero after checking the owner and factors;
+the basis meter records a successful solve with zero entry visits. The engine's
+backend-independent allowance charge still follows the requested solve.
+Dense partial-pivot LU is selected only for dimensions 2–6 with at least 50% density in the selected
 basis; it produces the same CSC factors as sparse LU, and a numerical decline
 retries sparse. Rational factors reuse orderings but never approximate numeric
 factors, and only complete exact rank determination establishes singularity. Koblas
