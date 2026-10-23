@@ -70,6 +70,12 @@ segment time and live propagation counters; it is not included in opening time.
 [Search statistics](09-learning.md#statistics) define propagation and conflict
 accounting.
 
+Open worker stage counts record the reason and search stop cause when a run returns
+unknown, together with whether its containing token was cancelled. A worker closed
+while still pending records a separate event before its final snapshot. These
+events describe the worker's lifecycle; the portfolio's final reason remains the
+invocation's result.
+
 ## Witnesses and proof scope
 
 A portfolio is only as sound as what it lets workers share. Every publication

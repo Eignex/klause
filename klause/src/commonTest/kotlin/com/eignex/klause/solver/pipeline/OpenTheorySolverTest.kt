@@ -348,6 +348,10 @@ class OpenTheorySolverTest {
         val unknown = assertIs<OpenTheoryResult.Unknown>(result)
         assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
         assertEquals(0L, unknown.stats.openTheory.openBoolDecisions)
+        val stages = unknown.stats.smt.completeSearchStages
+        assertEquals(1L, stages?.get("OPEN_RUN_UNKNOWN_REASON_BudgetExhausted"))
+        assertEquals(1L, stages?.get("OPEN_RUN_UNKNOWN_STOP_DecisionAllowance"))
+        assertEquals(1L, stages?.get("OPEN_RUN_UNKNOWN_CANCELLED_false"))
     }
 
     @Test

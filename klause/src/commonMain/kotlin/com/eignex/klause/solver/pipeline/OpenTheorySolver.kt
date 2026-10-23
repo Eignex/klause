@@ -514,6 +514,11 @@ class OpenTheoryEngine internal constructor(
                 } else if (params.timeout() || params.cancellation() || state.work.exhausted) {
                     unknown(params.timeout(), stats = stats, state = state, session = planned.session)
                 } else {
+                    state.observeUnknown(
+                        TerminationReason.Unsupported,
+                        planned.session.executionControls.stopCause,
+                        planned.session.cancelled(),
+                    )
                     OpenTheoryResult.Unknown(TerminationReason.Unsupported, stats.finish(state, planned.session))
                 }
             }
@@ -559,22 +564,21 @@ class OpenTheoryEngine internal constructor(
         cause: SearchStopCause? = null,
     ): OpenTheoryResult.Unknown {
         stats.timedOut = timedOut || cause == SearchStopCause.Timeout
-        return OpenTheoryResult.Unknown(
-            when {
-                timedOut || cause == SearchStopCause.Timeout -> TerminationReason.Timeout
+        val reason = when {
+            timedOut || cause == SearchStopCause.Timeout -> TerminationReason.Timeout
 
 
-                budgetExhausted || state.work.exhausted || cause == SearchStopCause.WorkAllowance ||
-                    cause == SearchStopCause.CheckAllowance || cause == SearchStopCause.DecisionAllowance ||
-                    cause == SearchStopCause.OperationAllowance -> TerminationReason.BudgetExhausted
+            budgetExhausted || state.work.exhausted || cause == SearchStopCause.WorkAllowance ||
+                cause == SearchStopCause.CheckAllowance || cause == SearchStopCause.DecisionAllowance ||
+                cause == SearchStopCause.OperationAllowance -> TerminationReason.BudgetExhausted
 
-                cause == SearchStopCause.Cancelled -> TerminationReason.Cancelled
-                cause == SearchStopCause.RepresentationDecline -> TerminationReason.Unsupported
+            cause == SearchStopCause.Cancelled -> TerminationReason.Cancelled
+            cause == SearchStopCause.RepresentationDecline -> TerminationReason.Unsupported
 
-                else -> TerminationReason.Cancelled
-            },
-            stats.finish(state, session),
-        )
+            else -> TerminationReason.Cancelled
+        }
+        state.observeUnknown(reason, cause ?: session?.executionControls?.stopCause, session?.cancelled())
+        return OpenTheoryResult.Unknown(reason, stats.finish(state, session))
     }
 
     private fun SolveStatsSink.finish(
@@ -665,6 +669,12 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
         val counting = candidate?.let { CountingCandidateHints(it.hints()) }
         steering = counting
         return counting ?: SearchCandidateHints.None
+    }
+
+    fun observeUnknown(reason: TerminationReason, cause: SearchStopCause?, cancelled: Boolean?) {
+        smt.observeOpenRunEvent("OPEN_RUN_UNKNOWN_REASON_${reason.name}")
+        smt.observeOpenRunEvent("OPEN_RUN_UNKNOWN_STOP_${cause?.name ?: "NONE"}")
+        smt.observeOpenRunEvent("OPEN_RUN_UNKNOWN_CANCELLED_${cancelled?.toString() ?: "UNOBSERVED"}")
     }
 
     fun remainingDecisions(): Long {

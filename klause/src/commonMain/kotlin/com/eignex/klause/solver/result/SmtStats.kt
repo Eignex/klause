@@ -213,6 +213,11 @@ internal class SmtStatsSink {
         outcomes[key] = (outcomes[key] ?: 0L) + 1L
     }
 
+    internal fun observeOpenRunEvent(key: String) {
+        val stages = completeSearchStages ?: linkedMapOf<String, Long>().also { completeSearchStages = it }
+        stages[key] = (stages[key] ?: 0L) + 1L
+    }
+
     fun observeCompleteSearchStage(key: String) {
         val stages = checkNotNull(completeSearchStages)
         stages[key] = (stages[key] ?: 0L) + 1L

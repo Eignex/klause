@@ -142,6 +142,15 @@ class ResumableOpenTheoryTest {
         search.close()
         search.close()
 
-        assertEquals(before, search.stats)
+        val after = search.stats
+        assertEquals(
+            before.smt.completeSearchStages.orEmpty() + mapOf(
+                "OPEN_RUN_CLOSED_PENDING" to 1L,
+                "OPEN_RUN_CLOSED_PENDING_STOP_NONE" to 1L,
+                "OPEN_RUN_CLOSED_PENDING_CANCELLED_false" to 1L,
+            ),
+            after.smt.completeSearchStages,
+        )
+        assertEquals(before, after.copy(smt = after.smt.copy(completeSearchStages = before.smt.completeSearchStages)))
     }
 }

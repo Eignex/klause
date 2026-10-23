@@ -93,7 +93,14 @@ internal class ResumableOpenTheory(
     override fun close() {
         val current = run ?: return
         try {
-            if (verdict == null) state.capture(current.session)
+            if (verdict == null) {
+                state.smt.observeOpenRunEvent("OPEN_RUN_CLOSED_PENDING")
+                val controls = current.session.executionControls
+                val cause = controls.stopCause?.name ?: "NONE"
+                state.smt.observeOpenRunEvent("OPEN_RUN_CLOSED_PENDING_STOP_$cause")
+                state.smt.observeOpenRunEvent("OPEN_RUN_CLOSED_PENDING_CANCELLED_${current.session.cancelled()}")
+                state.capture(current.session)
+            }
             current.close()
         } finally {
             run = null
