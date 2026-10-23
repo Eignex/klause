@@ -560,6 +560,10 @@ triggers, basis phase timings and up to two immutable exact residual snapshots.
 The profile uses reflection over existing private seams; observations add overhead.
 Its exact leaf acceptance differs from ordinary configured-tolerance CLI execution.
 It establishes neither a source result nor default portfolio equivalence.
+An entry with `root=true` captures the existing production relaxation over declared
+root domains without traversal or presolve. That root projection is labelled
+separately from an observed continuous leaf and retains its normalized numerical
+authority, rather than asserting original MPS decimal equivalence.
 
 `NumericalResidualReplay` accepts an array of
 `{job, source, residual, sha256, dense}` capture references through the same argument.
