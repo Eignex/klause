@@ -77,6 +77,21 @@ with integer deltas, respecting aliases, domain holes and channel ownership. Exa
 grid membership supplies no continuous-source witness; approximation metadata and
 whole-source validation remain required.
 
+## Board swap coverage
+
+At feasibility, the reserved structural draw in CBLS and SA walks elected
+AllDifferent boards and their unordered pairs. Each pick keeps the ordinary limit
+of four proposals and 24 pair visits. Both inputs must pass the pin, definition,
+domain and proposing-owner filters; the complete compound enters ordinary generated
+move scoring and acceptance.
+
+The live state retains its board and pair cursor between picks and suspended slices.
+A cancelled selection restores its cursor before resumption, so ungraded candidates
+remain eligible. Committed assignment changes, recomputation, definition changes and
+implicit ownership reseeding discard coverage. Incomplete coverage keeps the feasible
+walk sampling within its existing work allowance instead of reporting a local optimum
+to its restart policy. Exhausting this neighborhood grants no global proof authority.
+
 ## NValue neighborhoods
 
 A satisfied NValue factor offers count-preserving coordinate moves and bounded

@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch.movesource
 
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.util.Cancellation
 
 /**
  * Feasibility-preserving structured moves drawn from currently-satisfied factors. Each satisfied
@@ -52,13 +53,18 @@ class SatisfiedStructured private constructor(
     override val phase: Phase = Phase.Feasible
     override val pool: Pool = Pool.NoiseEligible
 
-    override fun generate(state: LocalSearchState, sink: MoveSink) {
+    override fun generate(state: LocalSearchState, sink: MoveSink) = generate(state, sink, Cancellation.Never)
+
+    internal fun generate(state: LocalSearchState, sink: MoveSink, cancellation: Cancellation) {
         val total = state.problem.numFactors
         if (total == 0) return
         when (scope) {
             Scope.Sampled -> {
                 val elected = if (structuralFirst && sampleCount > 0) state.seeding.electedImplicit else null
                 repeat(sampleCount) { draw ->
+                    if (draw == 0 && elected != null && state.cost == 0L &&
+                        state.boardCoverage.generate(state, sink, cancellation)
+                    ) return@repeat
                     val fid = if (draw == 0 && elected != null && elected.isNotEmpty()) {
                         elected[state.rng.nextInt(elected.size)]
                     } else {
