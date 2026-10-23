@@ -41,8 +41,8 @@ class ImplicitSeeding(
      *  `v`, or `-1` if `v` is searched freely. A variable is owned after seeding or validation of a
      *  retained feasible assignment establishes its [implicitSeedFactors] global. Only that global's
      *  structure-preserving [Invariant.proposeStructuredMoves] may change it, so the generic
-     *  neighbourhood cannot break the implicitly-solved constraint. `null` until seeding or retained assignment validation
-     *  establishes ownership. The [MoveSink] enforces the filter via
+     *  neighbourhood cannot break the implicitly-solved constraint. `null` until seeding or retained
+     *  assignment validation establishes ownership. The [MoveSink] enforces the filter via
      *  [MoveSink.setOwners]. */
     var ownerInt: IntArray? = null
         private set
