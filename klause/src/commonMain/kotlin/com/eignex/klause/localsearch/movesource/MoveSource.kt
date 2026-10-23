@@ -11,9 +11,9 @@ import kotlin.jvm.JvmInline
  * generation loops.
  *
  * Contract:
- *  - Pure with respect to search state. A source reads the assignment, domains, violated set, and
- *    factor degree from the supplied [LocalSearchState]; it does not mutate the state. Its only
- *    output is the moves it pushes into the supplied [MoveSink].
+ *  - Pure with respect to the assignment, domains, violations and factor degrees. Candidates enter
+ *    the supplied [MoveSink]. Retained enumeration progress belongs to the supplied [LocalSearchState],
+ *    never a shared source or projection.
  *  - Allocation-free on the hot path. A source fills the caller-owned sink and reuses any private
  *    scratch it needs; a fill–clear cycle touches no per-move objects for primitives.
  *  - Deterministic. All randomness is drawn from [LocalSearchState.rng]; a source never reads a
