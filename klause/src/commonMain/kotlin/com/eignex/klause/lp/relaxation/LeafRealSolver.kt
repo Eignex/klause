@@ -2,10 +2,13 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveSession
+import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.solver.Sample
@@ -33,6 +36,7 @@ internal class LeafRealSolver(
     private var integers = arrayOfNulls<IntDomain>(problem.numIntVars)
     private var nextWitness = 0L
     private var closed = false
+    private var activeSolve: LpSolveCursor<LeafRealResult>? = null
 
     fun solve(
         sample: Sample,
@@ -41,6 +45,7 @@ internal class LeafRealSolver(
         workLimit: Long = 0L,
     ): LeafRealResult {
         check(!closed) { "real leaf solver is closed" }
+        check(activeSolve == null) { "real leaf solver is suspended" }
         require(sample.numIntVars == problem.numIntVars && sample.numBoolVars == problem.numBoolVars)
         if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val encoded = encoders.finiteLinearModel(sample, cancellation)
@@ -62,6 +67,44 @@ internal class LeafRealSolver(
         )
         return relaxation.leafResult(certified, problem, objective, sample, sink)
             .checkedEncoding(encoded, sample, cancellation)
+    }
+
+    fun openSolve(
+        sample: Sample,
+        cancellation: Cancellation = Cancellation.Never,
+        toleranceCheck: ((Sample) -> Boolean)? = null,
+    ): LpSolveCursor<LeafRealResult> {
+        check(!closed && activeSolve == null) { "real leaf solver is closed or suspended" }
+        require(sample.numIntVars == problem.numIntVars && sample.numBoolVars == problem.numBoolVars)
+        return LpSolveCursor<LeafRealResult>(completed = { activeSolve = null }) {
+            if (cancellation()) return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            val encoded = encoders.finiteLinearModel(sample, cancellation)
+                ?: return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            val relaxation = try {
+                relaxation(sample, cancellation)
+            } catch (_: LpAssemblyCancelled) {
+                null
+            } ?: return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            val certified = solvers.openSolve(
+                relaxation.model,
+                cancellation = cancellation,
+                observer = sink?.certificationObserver(LpRoute.STANDALONE),
+                floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
+                    { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
+                },
+                floatOffset = relaxation.objectiveConstant.toDouble(),
+            ).use { cursor ->
+                var step = cursor.advance(shouldPause = { shouldPause(cursor.work) })
+                while (step is LpSolveStep.Paused) {
+                    pauseAt(cursor.work)
+                    step = cursor.advance(shouldPause = { shouldPause(cursor.work) })
+                }
+                (step as LpSolveStep.Completed<CertifiedLpResult>).value
+            }
+            val result = relaxation.leafResult(certified, problem, objective, sample, sink)
+                .checkedEncoding(encoded, sample, cancellation)
+            if (cancellation()) LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray) else result
+        }.also { activeSolve = it }
     }
 
     private fun relaxation(sample: Sample, cancellation: Cancellation): LpRelaxation? {
@@ -103,11 +146,29 @@ internal class LeafRealSolver(
         return sources.relaxation(trail.state, domains)
     }
 
-    fun releaseSolvers() = solvers.releaseSolvers()
+    fun releaseSolvers() = release(false)
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun release(close: Boolean) {
+        val pending = activeSolve
+        activeSolve = null
+        var failure: Throwable? = null
+        try {
+            if (pending?.isAdvancing != true) pending?.close()
+        } catch (cleanup: Throwable) {
+            failure = cleanup
+        }
+        try {
+            if (close) solvers.close() else solvers.releaseSolvers()
+        } catch (cleanup: Throwable) {
+            if (failure == null) failure = cleanup else if (failure !== cleanup) failure.addSuppressed(cleanup)
+        }
+        failure?.let { throw it }
+    }
 
     override fun close() {
         if (closed) return
         closed = true
-        solvers.close()
+        release(true)
     }
 }

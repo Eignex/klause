@@ -27,7 +27,10 @@ internal class ComponentLpSolver(
     private var parts: List<LpNeighborhood>,
     private val solvers: List<LpSolver>,
     private val isolated: IntArray,
-) : RetainedComponentLpSolverCapability {
+) : RetainedComponentLpSolverCapability,
+    ResumableLpSolver {
+    private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
+    private var activeChild: LpSolver? = null
     private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
@@ -36,11 +39,17 @@ internal class ComponentLpSolver(
     override var recessionDirection: DoubleArray? = null
         private set
     override var solvedExactState: LpExactState? = null
+        get() = field.takeIf { activeSolve == null }
         private set
     override var lastTermination: LpFloatTermination? = null
         private set
 
-    override val lastMetrics: LpSolveMetrics get() = metrics
+    override val lastMetrics: LpSolveMetrics get() = activeChild?.let { metrics + it.lastMetrics } ?: metrics
+    override val currentWork: Long get() = metrics.workOps + when (val child = activeChild) {
+        is ResumableLpSolver -> child.currentWork
+        null -> 0L
+        else -> child.lastMetrics.workOps
+    }
 
     override fun deferUnscaledSourceDiagnostics() {
         for (solver in solvers) solver.deferUnscaledSourceDiagnostics()
@@ -49,24 +58,81 @@ internal class ComponentLpSolver(
     override var infeasibleRay: DoubleArray? = null
         private set
 
+    @Suppress("TooGenericExceptionCaught")
     override fun close() {
         if (closed) return
         closed = true
+        val pending = activeSolve
+        activeSolve = null
+        var failure: Throwable? = null
+        try {
+            if (pending?.isAdvancing != true) pending?.close()
+        } catch (cleanup: Throwable) {
+            failure = cleanup
+        }
         clearEvidence()
-        closeComponentSolvers(solvers)
+        closeComponentSolvers(solvers, failure)
+        failure?.let { throw it }
     }
 
-    override fun solve(warm: Basis?): FloatLpResult? = invoke { s -> s.solve(null) }
+    override fun solve(warm: Basis?): FloatLpResult? {
+        check(activeSolve == null) { "LP solve is suspended" }
+        return immediateLpSolve { invoke { s -> s.solve(null) } }
+    }
 
-    override fun solvePrimal(warm: Basis?): FloatLpResult? = invoke { s -> s.solvePrimal(null) }
+    override fun solvePrimal(warm: Basis?): FloatLpResult? {
+        check(activeSolve == null) { "LP solve is suspended" }
+        return immediateLpSolve { invoke { s -> s.solvePrimal(null) } }
+    }
 
-    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = invoke { solver ->
-        check(solver is RetainedLpSolver)
-        solver.resolveBounds(allowance)
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+        check(activeSolve == null) { "LP solve is suspended" }
+        return immediateLpSolve {
+            invoke { solver ->
+                check(solver is RetainedLpSolver)
+                solver.resolveBounds(allowance)
+            }
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    override fun openSolve(allowance: LpFloatAllowance?): LpSolveCursor<FloatLpResult?> {
+        check(!closed && activeSolve == null) { "LP solve is closed or suspended" }
+        return LpSolveCursor<FloatLpResult?>(completed = { activeSolve = null }) {
+            invoke { child ->
+                checkpoint(metrics.workOps)
+                var started = false
+                try {
+                    if (child is ResumableLpSolver) {
+                        child.openSolve(allowance).use { cursor ->
+                            activeChild = child
+                            started = true
+                            var step = cursor.advance(shouldPause = { shouldPause(currentWork) })
+                            while (step is LpSolveStep.Paused) {
+                                pauseAt(currentWork)
+                                step = cursor.advance(shouldPause = { shouldPause(currentWork) })
+                            }
+                            (step as LpSolveStep.Completed<FloatLpResult?>).value
+                        }
+                    } else {
+                        check(child is RetainedLpSolver)
+                        activeChild = child
+                        started = true
+                        child.resolveBounds(allowance)
+                    }
+                } catch (failure: Throwable) {
+                    if (started) metrics += child.lastMetrics
+                    throw failure
+                } finally {
+                    activeChild = null
+                }
+            }
+        }.also { activeSolve = it }
     }
 
     @Suppress("TooGenericExceptionCaught") // Retire every child when adoption fails, including native failures.
     override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+        if (activeSolve != null) return false
         val previous = model.exactState ?: return false
         if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
         val nextModel = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
@@ -111,7 +177,7 @@ internal class ComponentLpSolver(
     }
 
     @Suppress("TooGenericExceptionCaught") // Clear the invocation reason for any child failure.
-    private inline fun invoke(op: (LpSolver) -> FloatLpResult?): FloatLpResult? = try {
+    private suspend fun invoke(op: suspend (LpSolver) -> FloatLpResult?): FloatLpResult? = try {
         stitch(op)
     } catch (primary: Throwable) {
         lastTermination = null
@@ -122,7 +188,7 @@ internal class ComponentLpSolver(
         throw primary
     }
 
-    private inline fun stitch(op: (LpSolver) -> FloatLpResult?): FloatLpResult? {
+    private suspend fun stitch(op: suspend (LpSolver) -> FloatLpResult?): FloatLpResult? {
         check(!closed)
         lastTermination = null
         infeasibleRay = null

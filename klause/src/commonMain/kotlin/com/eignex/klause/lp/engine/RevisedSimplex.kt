@@ -124,7 +124,11 @@ internal class RevisedSimplex(
     private val primalPricingTolerance: Double = TOL,
     private val syntheticWorkEnabled: Boolean = false,
 ) : TableauCutSolver,
-    PersistentLpSolver {
+    PersistentLpSolver,
+    ResumableLpSolver {
+    private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
+    private var solveStarted = false
+    override val currentWork: Long get() = work.ops
     internal val lastDevexWeightCorrections: Int get() = observations.lastDevexWeightCorrections
     internal val lastHarrisMinistepSelections: Int get() = observations.lastHarrisMinistepSelections
     internal val lastTheoryPricingAttempts: Int get() = observations.lastTheoryPricingAttempts
@@ -329,6 +333,7 @@ internal class RevisedSimplex(
     }
 
     override fun continuationBasis(model: LpModel): Basis? {
+        if (activeSolve?.isAdvancing == false) return null
         if (!continuationAvailable) return null
         val state = model.exactState ?: return null
         if (this.model.exactState !== state || constructionState?.sameMatrix(state) != true ||
@@ -349,6 +354,7 @@ internal class RevisedSimplex(
     }
 
     override fun rejectSingularBasis(model: LpModel, basis: Basis): Boolean {
+        if (activeSolve != null) return false
         val matches = if (model.exactState == null) this.model === model else this.model.exactState === model.exactState
         if (!matches || !basis.basicVars.contentEquals(basicVar)) return false
         rejectedExactBasis = basis.basicVars.copyOf()
@@ -468,7 +474,17 @@ internal class RevisedSimplex(
 
     private fun solver(): BasisSolver = basisLifecycle.solver(columns, basisSolverFactory)
 
+    @Suppress("TooGenericExceptionCaught")
     override fun close() {
+        val pending = activeSolve
+        activeSolve = null
+        var cleanup: Throwable? = null
+        try {
+            // An advancing operation unwinds through its own failure path.
+            if (pending?.isAdvancing != true) pending?.close()
+        } catch (failure: Throwable) {
+            cleanup = failure
+        }
         continuationAvailable = false
         stoppedContinuationBasis = null
         exactBasisCache.clear()
@@ -484,7 +500,10 @@ internal class RevisedSimplex(
         cachedNumerical = null
         cachedStatus = null
         solvedExactState = null
-        if (failure != null) throw failure
+        if (failure != null) {
+            if (cleanup == null) cleanup = failure else if (cleanup !== failure) cleanup.addSuppressed(failure)
+        }
+        cleanup?.let { throw it }
     }
 
     private var repairStop: BasisRepairStop? = null
@@ -869,10 +888,31 @@ internal class RevisedSimplex(
      * sound regardless of how the basis was obtained.
      */
     override fun solve(warm: Basis?): FloatLpResult? {
+        check(activeSolve == null) { "LP solve is suspended" }
         val progress = SolveProgress()
-        return runNumericalSolve(
-            progress,
-        ) { reset -> solveCore(warm, reuse = false, reset = reset, progress = progress) }
+        return immediateLpSolve {
+            runNumericalSolve(progress) { reset -> solveCore(warm, reuse = false, reset = reset, progress = progress) }
+        }
+    }
+
+    override fun openSolve(allowance: LpFloatAllowance?): LpSolveCursor<FloatLpResult?> {
+        check(activeSolve == null) { "LP solve is suspended" }
+        return LpSolveCursor<FloatLpResult?>(completed = { activeSolve = null }) {
+            val previous = floatAllowance
+            floatAllowance = allowance
+            val reuse = solveStarted
+            val progress = SolveProgress()
+            try {
+                runNumericalSolve(progress) { reset -> solveCore(null, reuse = reuse, reset = reset, progress = progress) }
+            } finally {
+                floatAllowance = previous
+            }
+        }.also { activeSolve = it }
+    }
+
+    private suspend fun pauseAtIteration() {
+        chargeWork()
+        activeSolve?.checkpoint(work.ops)
     }
 
     /**
@@ -890,9 +930,12 @@ internal class RevisedSimplex(
      * ordinary cold start — whose all-slack basis has every unenforced slack basic already.
      */
     override fun resolveGated(enforced: BooleanArray): FloatLpResult? {
+        check(activeSolve == null) { "LP solve is suspended" }
         val progress = SolveProgress()
-        return runNumericalSolve(progress) { reset ->
-            solveCore(null, reuse = true, enforced = enforced, reset = reset, progress = progress)
+        return immediateLpSolve {
+            runNumericalSolve(progress) { reset ->
+                solveCore(null, reuse = true, enforced = enforced, reset = reset, progress = progress)
+            }
         }
     }
 
@@ -901,6 +944,7 @@ internal class RevisedSimplex(
     override fun prepareBasis(basis: Basis, token: Cancellation): Basis? = prepareSourceBasis(basis, token)
 
     override fun retainedBasis(): Basis? {
+        if (activeSolve != null) return null
         if (!basisLifecycle.kept || !basisLifecycle.factorized || basicVar.distinct().size != m ||
             status.count { it == VarStatus.BASIC } != m ||
             basicVar.any { it !in status.indices || status[it] != VarStatus.BASIC }
@@ -911,6 +955,7 @@ internal class RevisedSimplex(
     }
 
     private fun prepareSourceBasis(warm: Basis?, token: Cancellation): Basis? {
+        if (activeSolve != null) return null
         observations.termination = null
         continuationAvailable = false
         stoppedContinuationBasis = null
@@ -949,6 +994,7 @@ internal class RevisedSimplex(
     }
 
     override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+        if (activeSolve != null) return false
         observations.termination = null
         val current = model.exactState ?: return false
         if (!current.sameMatrix(state) || token()) return false
@@ -1044,11 +1090,14 @@ internal class RevisedSimplex(
 
     /** Re-solve after [adopt], continuing from the kept basis and factorization. */
     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+        check(activeSolve == null) { "LP solve is suspended" }
         val previous = floatAllowance
         floatAllowance = allowance
         return try {
             val progress = SolveProgress()
-            runNumericalSolve(progress) { reset -> solveCore(null, reuse = true, reset = reset, progress = progress) }
+            immediateLpSolve {
+                runNumericalSolve(progress) { reset -> solveCore(null, reuse = true, reset = reset, progress = progress) }
+            }
         } finally {
             floatAllowance = previous
         }
@@ -1102,7 +1151,10 @@ internal class RevisedSimplex(
         return result
     }
 
-    private fun runNumericalSolve(progress: SolveProgress, block: (reset: Boolean) -> FloatLpResult?): FloatLpResult? =
+    private suspend fun runNumericalSolve(
+        progress: SolveProgress,
+        block: suspend (reset: Boolean) -> FloatLpResult?,
+    ): FloatLpResult? =
         try {
             runChargedSolve(progress, block)
         } finally {
@@ -1110,7 +1162,10 @@ internal class RevisedSimplex(
         }
 
     @Suppress("TooGenericExceptionCaught")
-    private fun runChargedSolve(progress: SolveProgress, block: (reset: Boolean) -> FloatLpResult?): FloatLpResult? {
+    private suspend fun runChargedSolve(
+        progress: SolveProgress,
+        block: suspend (reset: Boolean) -> FloatLpResult?,
+    ): FloatLpResult? {
         observations.termination = null
         observations.numericalMetrics = SimplexNumericalMetrics()
         numericalFailure = false
@@ -1153,9 +1208,9 @@ internal class RevisedSimplex(
 
     // A checked basis failure cannot supply a terminal claim or a factorization safe to keep.
     @Suppress("TooGenericExceptionCaught")
-    private fun numericalSolve(
+    private suspend fun numericalSolve(
         progress: SolveProgress,
-        block: (reset: Boolean) -> FloatLpResult?,
+        block: suspend (reset: Boolean) -> FloatLpResult?,
         allowUnscaledFallback: Boolean,
         reset: Boolean = true,
     ): FloatLpResult? = try {
@@ -1248,6 +1303,7 @@ internal class RevisedSimplex(
     }
 
     private fun resetSolveState(warmAttempted: Boolean) {
+        solveStarted = true
         clearArtificialBounds()
         repairStop = null
         repairCallbackFailure = null
@@ -1266,7 +1322,7 @@ internal class RevisedSimplex(
         observations.warmStarted = false
     }
 
-    private fun solveCore(
+    private suspend fun solveCore(
         warm: Basis?,
         reuse: Boolean,
         enforced: BooleanArray? = null,
@@ -1382,6 +1438,7 @@ internal class RevisedSimplex(
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.
         var haveBeta = false
         iterations@ while (progress.iterations < maxIter) {
+            if (activeSolve != null) pauseAtIteration()
             val iteration = progress.dualIterations++
             // Cooperative deadline, phased off the first iteration so a spent budget never starts.
             if (iteration % CANCEL_POLL == 0 && cancellation()) {
@@ -1685,7 +1742,7 @@ internal class RevisedSimplex(
         }
     }
 
-    private fun restartDual(enforced: BooleanArray?, progress: SolveProgress): FloatLpResult? {
+    private suspend fun restartDual(enforced: BooleanArray?, progress: SolveProgress): FloatLpResult? {
         if (cancellation()) return stopped(LpFloatTermination.CANCELLED)
         if (progress.restarts >= MAX_SOLVE_RESTARTS) return stopped(LpFloatTermination.NUMERICAL)
         progress.restarts++
@@ -1978,7 +2035,7 @@ internal class RevisedSimplex(
      * The boxed solve cannot settle the real LP. Its basis rests on artificial seats the primal would only reseat
      * arbitrarily, so the primal restarts from the slack start the solve had before boxing.
      */
-    private fun handArtificialBasisToPrimal(progress: SolveProgress): FloatLpResult? {
+    private suspend fun handArtificialBasisToPrimal(progress: SolveProgress): FloatLpResult? {
         observations.numericalMetrics.artificialHandoffs++
         clearArtificialBounds()
         coldStart()
@@ -2585,7 +2642,7 @@ internal class RevisedSimplex(
      * caller to restart. Mutates [basicVar] / [status].
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
-    private fun primalPhase1(progress: SolveProgress): IterationResult {
+    private suspend fun primalPhase1(progress: SolveProgress): IterationResult {
         val beta = basicValues(phaseOneBeta)
         if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
             observations.termination = LpFloatTermination.WORK
@@ -2596,6 +2653,7 @@ internal class RevisedSimplex(
         val alphaBuf = alphaValues
         val maxIter = maxIterations
         while (progress.iterations < maxIter) {
+            if (activeSolve != null) pauseAtIteration()
             val iteration = progress.primalIterations++
             if (iteration % CANCEL_POLL == 0 && cancellation()) {
                 observations.termination = LpFloatTermination.CANCELLED
@@ -2746,12 +2804,15 @@ internal class RevisedSimplex(
      * reached.
      */
     override fun solvePrimal(warm: Basis?): FloatLpResult? {
+        check(activeSolve == null) { "LP solve is suspended" }
         val progress = SolveProgress()
-        return runNumericalSolve(progress) { reset -> solvePrimalCore(warm, reset = reset, progress = progress) }
+        return immediateLpSolve {
+            runNumericalSolve(progress) { reset -> solvePrimalCore(warm, reset = reset, progress = progress) }
+        }
     }
 
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
-    private fun solvePrimalCore(
+    private suspend fun solvePrimalCore(
         warm: Basis?,
         reuse: Boolean = false,
         reset: Boolean = true,
@@ -2802,6 +2863,7 @@ internal class RevisedSimplex(
         val blandStall = 2 * (m + numVars) + BLAND_STALL_BASE
         val alphaBuf = alphaValues
         while (progress.iterations < maxIter) {
+            if (activeSolve != null) pauseAtIteration()
             val iteration = progress.primalIterations++
             if (iteration % CANCEL_POLL == 0 && cancellation()) return stopped(LpFloatTermination.CANCELLED)
             if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return stopped(LpFloatTermination.WORK)
@@ -2909,7 +2971,7 @@ internal class RevisedSimplex(
         return stopped(LpFloatTermination.PIVOTS) // budget exhausted
     }
 
-    private fun restartPrimal(progress: SolveProgress): FloatLpResult? {
+    private suspend fun restartPrimal(progress: SolveProgress): FloatLpResult? {
         if (cancellation()) return stopped(LpFloatTermination.CANCELLED)
         if (progress.restarts >= MAX_SOLVE_RESTARTS) return stopped(LpFloatTermination.NUMERICAL)
         progress.restarts++

@@ -78,6 +78,9 @@ internal interface LpCertificationObserver {
     fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost)
     fun observeExactInput(accepted: Boolean)
     fun observeSolve(metrics: LpSolveMetrics, component: Boolean)
+    fun observeSolveProgress(metrics: LpSolveMetrics, component: Boolean, finished: Boolean) {
+        observeSolve(metrics, component)
+    }
     fun observeBasisVerification(metrics: ExactBasisMetrics) {}
     fun observeContinuation(metrics: com.eignex.klause.simplex.exact.ExactContinuationMetrics) {}
     fun observePhase(metrics: LpPhaseMetrics) {}
@@ -110,6 +113,30 @@ internal data class LpSolveMetrics(
     val sourceResidualNanos: Long = 0L,
     val sourceResidualScaledCalls: Long = 0L,
 ) {
+    operator fun minus(previous: LpSolveMetrics) = LpSolveMetrics(
+        pivots = pivots - previous.pivots,
+        workOps = workOps - previous.workOps,
+        warmAttempts = warmAttempts - previous.warmAttempts,
+        warmHits = warmHits - previous.warmHits,
+        singularRefactorizations = singularRefactorizations - previous.singularRefactorizations,
+        smallPivotBails = smallPivotBails - previous.smallPivotBails,
+        initialRefactorizations = initialRefactorizations - previous.initialRefactorizations,
+        warmStartRefactorizations = warmStartRefactorizations - previous.warmStartRefactorizations,
+        singularRecoveryRefactorizations = singularRecoveryRefactorizations - previous.singularRecoveryRefactorizations,
+        updateLimitRefactorizations = updateLimitRefactorizations - previous.updateLimitRefactorizations,
+        backendRequestedRefactorizations = backendRequestedRefactorizations - previous.backendRequestedRefactorizations,
+        reconcileRecoveryRefactorizations = reconcileRecoveryRefactorizations - previous.reconcileRecoveryRefactorizations,
+        numericalRecoveryRefactorizations = numericalRecoveryRefactorizations - previous.numericalRecoveryRefactorizations,
+        primalRefactorizations = primalRefactorizations - previous.primalRefactorizations,
+        objectiveWarmAttempts = objectiveWarmAttempts - previous.objectiveWarmAttempts,
+        objectiveWarmHits = objectiveWarmHits - previous.objectiveWarmHits,
+        objectiveWarmRepairs = objectiveWarmRepairs - previous.objectiveWarmRepairs,
+        preparationOps = preparationOps - previous.preparationOps,
+        sourceResidualCalls = sourceResidualCalls - previous.sourceResidualCalls,
+        sourceResidualNanos = sourceResidualNanos - previous.sourceResidualNanos,
+        sourceResidualScaledCalls = sourceResidualScaledCalls - previous.sourceResidualScaledCalls,
+    )
+
     operator fun plus(other: LpSolveMetrics) = LpSolveMetrics(
         pivots + other.pivots, workOps + other.workOps, warmAttempts + other.warmAttempts,
         warmHits + other.warmHits, singularRefactorizations + other.singularRefactorizations,
@@ -305,6 +332,11 @@ internal interface RetainedLpSolver : LpSolver {
     fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
 
     fun resolveBounds(allowance: LpFloatAllowance? = null): FloatLpResult?
+}
+
+internal interface ResumableLpSolver : RetainedLpSolver {
+    val currentWork: Long
+    fun openSolve(allowance: LpFloatAllowance? = null): LpSolveCursor<FloatLpResult?>
 }
 
 internal interface RetainedComponentLpSolverCapability :

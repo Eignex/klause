@@ -7,10 +7,37 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
 class RevisedSimplexLifecycleTest {
+    @Test
+    fun `closing a paused solve should retire its basis once`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE)
+        var closes = 0
+        val solver = RevisedSimplex(model, basisSolverFactory = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun close() {
+                    closes++
+                    delegate.close()
+                }
+            }
+        })
+        val cursor = solver.openSolve()
+        assertIs<LpSolveStep.Paused>(cursor.advance(1L))
+
+        solver.close()
+        solver.close()
+
+        assertEquals(1, closes)
+        assertFailsWith<IllegalStateException> { cursor.advance() }
+    }
+
     @Test
     fun `a failed basis close should retire the owner once and retain its work`() {
         val model = LpBuilder().apply {
