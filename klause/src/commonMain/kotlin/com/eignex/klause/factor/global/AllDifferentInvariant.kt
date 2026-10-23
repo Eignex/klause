@@ -301,6 +301,10 @@ internal class AllDifferentInvariant(
 
     internal val swapCoordinateCount: Int get() = vars.size
 
+    internal fun allowsSwapCoordinate(state: LocalSearchState, index: Int, sink: MoveSink): Boolean =
+        presentInvFn(state, index) && sink.allowsInt(vars[index]) &&
+            state.rootDomains[vars[index]].min != state.rootDomains[vars[index]].max
+
     internal fun proposeSwap(state: LocalSearchState, ai: Int, bi: Int, sink: MoveSink) {
         val a = vars[ai]
         val b = vars[bi]
