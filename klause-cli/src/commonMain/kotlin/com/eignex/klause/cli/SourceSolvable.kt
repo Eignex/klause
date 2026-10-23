@@ -9,6 +9,7 @@ import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.LinearTraversal
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.SourceAttachment
@@ -149,6 +150,7 @@ internal fun linearSourceSolvable(
     val invocation = common.routingPreparationCancellation().use { stop ->
         val request = SourceSetupRequest(
             source, operation, common.resolvedEngine(),
+            linearTraversal = common.takeLinearTraversal(),
             maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
             cancellation = stop,
             boundCancellation = common.routingCancellation(),
@@ -166,6 +168,20 @@ internal fun linearSourceSolvable(
         routingElapsedMs = admissionElapsedMs + elapsed,
         sourceInvocation = invocation,
     )
+}
+
+private fun CommonOptions.takeLinearTraversal(): LinearTraversal {
+    val entries = engineParams.filter { it.startsWith("linear-traversal=") }
+    engineParams.removeAll(entries)
+    val choices = entries.map { entry ->
+        when (entry.substringAfter('=')) {
+            "automatic" -> LinearTraversal.AUTOMATIC
+            "numerical" -> LinearTraversal.NUMERICAL
+            else -> usageError("linear-traversal expects automatic or numerical")
+        }
+    }.distinct()
+    if (choices.size > 1) usageError("linear-traversal cannot be set to conflicting values")
+    return choices.singleOrNull() ?: LinearTraversal.AUTOMATIC
 }
 
 internal fun preparedSourceSolvable(

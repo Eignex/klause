@@ -43,6 +43,26 @@ internal class LinearAuthorityTraversal(
     private val root = CoverageNode(source.scope.condition)
     private val path = arrayListOf(0 to root)
     private val current: CoverageNode get() = path.last().second
+    private val observations = linkedMapOf<String, Long>()
+    private var pending = 1L
+    private var peakPending = 1L
+    private var retained = 1L
+
+    fun observations(): Map<String, Long> = observations + mapOf(
+        "numericalPendingLeaves" to pending,
+        "numericalPeakPendingLeaves" to peakPending,
+        "numericalRetainedNodes" to retained,
+    )
+
+    private fun observe(stage: String) {
+        observations[stage] = (observations[stage] ?: 0L) + 1L
+    }
+
+    private fun splitCreated() {
+        pending++
+        retained += 2
+        peakPending = maxOf(peakPending, pending)
+    }
     var ray: SourceEvidence? = null
         private set
     var rootBound: SourceEvidence? = null
@@ -60,7 +80,10 @@ internal class LinearAuthorityTraversal(
         val child = when (decision) {
             is SearchDecision.Bool -> {
                 val id = Lit.variable(decision.literal)
-                val split = current.split ?: CoverageSplit.Boolean(id, current.condition).also { current.split = it }
+                val split = current.split ?: CoverageSplit.Boolean(id, current.condition).also {
+                    current.split = it
+                    splitCreated()
+                }
                 check(split is CoverageSplit.Boolean && split.id == id)
                 if (Lit.isPositive(decision.literal)) split.above else split.below
             }
@@ -93,6 +116,24 @@ internal class LinearAuthorityTraversal(
         val branch = source.atScope(source.scope.copy(condition = current.condition))
         val result = authority.check(branch, cancellation)
         current.result = result
+        observe("numericalChecks")
+        if (result.bound != null) {
+            observe("numericalCertifiedBounds")
+            val parent = path.getOrNull(path.lastIndex - 1)?.second?.result?.bound?.claim as? SourceClaim.Bound
+            val bound = result.bound.claim as SourceClaim.Bound
+            if (parent != null) {
+                val before = (parent.value as SourceValue.Rational).value
+                val after = (bound.value as SourceValue.Rational).value
+                val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
+                if (if (minimizes) after > before else after < before) observe("numericalChildBoundGains")
+            }
+        }
+        if (result.evidence != null) {
+            observe("numericalClosedLeaves")
+            pending--
+        } else if (result.split == null) {
+            observe("numericalUnavailableGuidance")
+        }
         result.incumbent?.let(onIncumbent)
         if (current === root) rootBound = result.bound
         if (result.evidence?.claim is SourceClaim.Ray) {
@@ -101,6 +142,8 @@ internal class LinearAuthorityTraversal(
         }
         result.split?.let { (coordinate, threshold) ->
             current.split = CoverageSplit.Integer(coordinate, threshold, current.condition)
+            splitCreated()
+            observe("numericalFractionalSplits")
             return SearchNodeDisposition.Expand
         }
         if (result.evidence != null) return SearchNodeDisposition.Prune
@@ -113,6 +156,8 @@ internal class LinearAuthorityTraversal(
             if (premise.guards.any { (id, value) -> current.condition.bools[id] != value }) continue
             integerBounds.split(premise.integerPins)?.let { (coordinate, threshold) ->
                 current.split = CoverageSplit.Integer(coordinate, threshold, current.condition)
+                splitCreated()
+                observe("numericalIndicatorSplits")
                 return SearchNodeDisposition.Expand
             }
         }
