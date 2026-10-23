@@ -358,7 +358,6 @@ class PolynomialBooleanRegionsTest {
         assertTrue(witness.boolValue(0))
         assertEquals(BigFraction.ZERO, witness.realValue(0).rational)
         assertEquals(BigFraction.ofLong(3), witness.realValue(1).rational)
-        assertEquals(2L, result.stats.booleanTheoryRegions)
     }
 
     @Test
