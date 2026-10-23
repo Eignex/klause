@@ -401,6 +401,12 @@ source into a supported fragment. Source rewrites reselect encoders against the 
 canonical factors; original value sets, reconstruction and assertion premises stay
 authoritative after selection.
 
+An unchanged source can reuse its captured open component plan only with the
+identical model object and factor-projection binding. Rewrites, appended objective
+rows, different bindings and resource-declined captures require fresh planning.
+Only immutable selections cross this boundary; each execution opens private search
+state.
+
 Factor-backed polynomial execution runs the same source-safe schedule before
 rebuilding polynomial ownership and encodings. Its typed source mapping reconstructs
 Boolean and integer coordinates before original-source checking and publication,

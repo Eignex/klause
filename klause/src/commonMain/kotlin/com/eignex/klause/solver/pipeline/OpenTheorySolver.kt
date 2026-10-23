@@ -246,10 +246,10 @@ internal fun OpenTheoryResult.withSourceSemantics(semantics: EffectiveSourceSema
 /**
  * Executes the complete theory route selected for a prepared open source model.
  *
- * The route and the ownership plan come from the prepared source, never from the model a caller handed
- * in: source-safe preparation is the one phase ahead of them, and it may rewrite the factors ownership
- * is indexed by. Frontends consume this uniform result rather than importing or dispatching to
- * individual theory implementations.
+ * The route and ownership plan describe the prepared source. Source-safe preparation may rewrite the
+ * factors ownership is indexed by; only an unchanged model and projection binding retain a captured
+ * plan. Frontends consume this uniform result rather than importing or dispatching to individual
+ * theory implementations.
  */
 class OpenTheoryEngine internal constructor(
     // The route the caller's source model declared, which is all there is to name a backend by when
@@ -289,6 +289,7 @@ class OpenTheoryEngine internal constructor(
         presolveCancellation: Cancellation,
         presolveBudget: PresolveBudget?,
         projections: PreparedFactorProjections? = null,
+        capturedPlan: ComponentPlan? = null,
     ) : this(
         route,
         { cancellation ->
@@ -299,6 +300,7 @@ class OpenTheoryEngine internal constructor(
                 budget = presolveBudget,
                 projections = projections,
                 presolveCancellation = presolveCancellation or cancellation,
+                capturedPlan = capturedPlan,
             )
         },
         presolveCancellation,

@@ -49,8 +49,8 @@ class OpenTheoryRequest internal constructor(
     /**
      * Decomposition of the untransformed [model], which is what a frontend routes and renders by.
      *
-     * The plan the theory executes under is selected again after source-safe preparation, from the model
-     * that phase produced — see [OpenSourcePreparation].
+     * Source-safe preparation retains this plan only for the identical model and projection binding;
+     * transformed sources select their own plan — see [OpenSourcePreparation].
      */
     internal val componentPlan: ComponentPlan,
     /** Source-safe presolve configuration. */
@@ -168,6 +168,7 @@ object OpenTheoryPipeline {
             request.presolveCancellation,
             request.presolveBudget,
             request.preparedPlan.factorProjections,
+            capturedPlan = request.componentPlan,
         )
         val prepared = source.prepared
         val sourceStats = prepared.stats
@@ -276,6 +277,7 @@ object OpenTheoryPipeline {
         request.presolveCancellation,
         request.presolveBudget,
         request.preparedPlan.factorProjections,
+        request.componentPlan,
     )
 
     /**

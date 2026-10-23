@@ -40,8 +40,8 @@ internal sealed interface OpenSourcePreparation {
 /**
  * Prepare this source model, then select its complete open route from what preparation produced.
  *
- * Planning after preparation is what lets a source rewrite move factor ownership with the factors: a
- * plan selected ahead of the phase is indexed by factors the prepared model may not have.
+ * A source rewrite requires fresh planning because factor ownership is indexed by the selected model.
+ * An unchanged model can retain the captured plan under its identical projection binding.
  */
 internal fun Problem.prepareOpenSource(
     objective: LinearObjective? = null,
@@ -51,6 +51,7 @@ internal fun Problem.prepareOpenSource(
     budget: PresolveBudget? = null,
     projections: PreparedFactorProjections? = null,
     presolveCancellation: Cancellation = cancellation,
+    capturedPlan: ComponentPlan? = null,
 ): OpenSourcePreparation {
     projections?.requireSource(this)
     val mark = TimeSource.Monotonic.markNow()
@@ -63,7 +64,7 @@ internal fun Problem.prepareOpenSource(
         budget,
     )
     if (prepared.infeasible) return OpenSourcePreparation.Refuted(prepared)
-    return prepared.planned(prepared.problem, projections, cancellation).also {
+    return prepared.planned(prepared.problem, projections, cancellation, capturedPlan).also {
         prepared.elapsed = mark.elapsedNow()
     }
 }
@@ -79,10 +80,13 @@ internal fun PreparedSource.planned(
     model: Problem,
     projections: PreparedFactorProjections? = null,
     cancellation: Cancellation = Cancellation.Never,
+    capturedPlan: ComponentPlan? = null,
 ): OpenSourcePreparation.Planned = budget.observePreparation(
     PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, model, cancellation,
 ) { token, observation ->
-    val selected = projections?.forEngineView(model)?.let { model.componentPlan(it, cancellation = token) }
+    val selected = capturedPlan?.takeIf { it.reusableFor(model, projections) }
+        ?.takeUnless { token.charge(1L); token() }
+        ?: projections?.forEngineView(model)?.let { model.componentPlan(it, cancellation = token) }
         ?: model.componentPlan(cancellation = token)
     val plan = if (!token() && selected.theoryPipeline == ProblemPipeline.FINITE_CP) {
         requireNotNull(selected.forLinearConditions(model, retainEmptyTheory = true, cancellation = token)) {

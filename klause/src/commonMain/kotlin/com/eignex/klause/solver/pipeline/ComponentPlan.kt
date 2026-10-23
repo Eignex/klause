@@ -309,6 +309,10 @@ class ComponentPlan internal constructor(
 
     internal fun requireSource(spec: Problem) = requireBelongsTo(spec)
 
+    internal fun reusableFor(spec: Problem, projections: PreparedFactorProjections?): Boolean =
+        source === spec && factorProjections === projections && hasTheoryComponent &&
+            encodingDecline != EncoderDecline.RESOURCE
+
     private fun requireBelongsTo(spec: Problem) {
         require(spec === source) {
             "component plan belongs to a different source model"
