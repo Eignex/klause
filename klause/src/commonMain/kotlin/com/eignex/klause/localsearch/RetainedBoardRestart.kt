@@ -1,6 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.global.AllDifferentInvariant
+import com.eignex.klause.util.binarySearchInt
 
 internal class RetainedBoardRestart private constructor(
     private val boards: IntArray,
@@ -12,7 +13,7 @@ internal class RetainedBoardRestart private constructor(
         return inputs.indices.any {
             val variable = inputs[it]
             val owner = owners?.get(variable) ?: -1
-            (owner < 0 || boards.binarySearch(owner) >= 0) &&
+            (owner < 0 || boards.binarySearchInt(owner) >= 0) &&
                 state.assignment.intValue(variable) in state.rootDomains[variable] &&
                 state.assignment.intValue(variable) != before[it]
         }
