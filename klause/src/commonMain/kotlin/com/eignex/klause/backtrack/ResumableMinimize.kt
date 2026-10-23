@@ -984,6 +984,9 @@ internal class ResumableMinimize(
     }
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
+        if (initialCandidate == null && pausable && !rebindable && externalShared) {
+            initialCandidate = params.pooledIncumbents?.current()?.assignment
+        }
         revalidateInitialCandidate()?.let {
             if (applyObjectiveBound() == SearchRunDisposition.Exhausted) rootIsExhausted = true
             return it
