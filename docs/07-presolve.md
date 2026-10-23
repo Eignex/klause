@@ -167,6 +167,11 @@ when preparation changes nothing or stops. Source preparation excludes theory se
 polynomial encoder rebuilding is preparation, and routes without factor preparation
 retain their counters with zero phase time.
 
+Paused open-theory workers retain the completed preparation snapshot through close
+or cancellation between slices. Decisions and setup cancellation carry the native
+result's snapshot. Reading these observations neither adds preparation time again
+nor charges theory time to preparation.
+
 `PresolveInvocationStats` records each pass's lane, exclusive elapsed time and
 phase work, including its construction/propagation share. Outcomes distinguish an
 eligibility skip, completed empty analysis, retained reductions, refutation and

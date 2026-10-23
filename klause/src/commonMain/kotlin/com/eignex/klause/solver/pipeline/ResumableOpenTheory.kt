@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.SearchContext
@@ -34,6 +35,7 @@ internal class ResumableOpenTheory(
     private var expandedThisSlice = false
     private var run: OpenTheoryEngine.OpenTheoryRun? = null
     private var verdict: OpenTheoryResult? = null
+    private var preparationStats: PresolveStats? = null
 
     private val pausing = object : SearchNodePolicy {
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
@@ -54,8 +56,10 @@ internal class ResumableOpenTheory(
     /** The search's root fixings and glue clauses so far, counted over [state]. */
     val progress: SearchStats get() = state.progress(run?.session)
 
-    /** The verdict's stats once decided, else the work and progress counters so far. */
-    val stats: SolveStats get() = verdict?.stats ?: SolveStats(openTheory = state.work.snapshot(), search = progress)
+    /** The verdict's stats once decided, else retained preparation and live work and progress counters. */
+    val stats: SolveStats get() = verdict?.stats ?: SolveStats(
+        presolve = preparationStats, openTheory = state.work.snapshot(), search = progress,
+    )
 
     /**
      * Advance until a verdict, [global] firing, or the slice ending: after [sliceWork] `openWork` units when
@@ -71,7 +75,10 @@ internal class ResumableOpenTheory(
         expandedThisSlice = false
         val current = run ?: when (val begun = begin()) {
             is OpenTheoryStart.Decided -> return decide(begun.result)
-            is OpenTheoryStart.Running -> begun.run.also { run = it }
+            is OpenTheoryStart.Running -> begun.run.also {
+                preparationStats = it.preparationStats
+                run = it
+            }
         }
         val result = current.advance() ?: return null
         return decide(result)
