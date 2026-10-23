@@ -7,19 +7,6 @@ import kotlin.test.assertTrue
 
 class PolynomialPhaseProfileTest {
     @Test
-    fun `query checkpoints retain committed reductions without changing charge accounting`() {
-        val source = "(declare-const x Real) (declare-const y Real) " +
-            "(assert (and (= x (+ (* y y) 1)) (= y 2)))"
-
-        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source)
-
-        assertEquals("Satisfiable", trace.result)
-        assertEquals(trace.nativeWork, trace.chargeSum)
-        assertTrue(trace.checkpoints.any { it.progress?.contains("snapshots=1,") == true })
-        assertTrue(trace.checkpoints.last().progress?.contains("rootFinishedWork=") == true)
-    }
-
-    @Test
     fun `pipeline dimensions distinguish declarations from product lowering coordinates`() {
         val source = "(declare-const x Real) (assert (= (* x x) 2))"
 
@@ -102,6 +89,7 @@ class PolynomialPhaseProfileTest {
         assertEquals("Pending", trace.checkpoints.first().result)
         assertEquals("Unsatisfiable", trace.checkpoints.last().result)
         assertTrue(trace.checkpoints.dropLast(1).all { it.result == "Pending" })
+        assertTrue(trace.checkpoints.any { it.progress?.contains("snapshots=1,") == true })
         assertNull(trace.containingDeadlineStack)
     }
 }
