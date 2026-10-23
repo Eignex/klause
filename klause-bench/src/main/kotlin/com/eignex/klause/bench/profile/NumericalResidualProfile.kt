@@ -118,7 +118,10 @@ internal object NumericalResidualProfile {
                 val type = Class.forName(BASIS + "KotlinBasisSolver")
                 val constructor = type.constructors.single { it.parameterCount == 10 }
                 val backend = measured("basis-setup") {
-                    constructor.newInstance(matrix, null, 0, 0.0, 0.0, false, denseLimit, if (denseLimit == 64) 0.0 else 0.5, 62, null)
+                    constructor.newInstance(
+                        matrix, null, 0, 0.0, 0.0, false,
+                        denseLimit, if (denseLimit == 64) 0.0 else 0.5, 62, null,
+                    )
                 }
                 val pointers = call(matrix, "copyColumnPointers") as IntArray
                 val coefficients = call(matrix, "getValues") as DoubleArray
@@ -140,7 +143,8 @@ internal object NumericalResidualProfile {
                         put("policy", json(call(owner, "getLastRefactorPolicyMetrics")))
                         put("backendWorkBefore", json(call(backend, "getBasisWork")))
                     } else null
-                    val result = if (phase in setOf("refactorize", "ftran", "btran", "update", "close", "repair", "solveQuality")) {
+                    val timed = setOf("refactorize", "ftran", "btran", "update", "close", "repair", "solveQuality")
+                    val result = if (phase in timed) {
                         measured(phase) { invoke(backend, method, arguments) }
                     } else invoke(backend, method, arguments)
                     if (observation != null) builds += buildJsonObject {
@@ -229,7 +233,9 @@ internal object NumericalResidualProfile {
         value is Boolean -> JsonPrimitive(value)
         value is String || value is Enum<*> -> JsonPrimitive(value.toString())
         depth >= 4 -> JsonPrimitive(value.toString())
-        value is Map<*, *> -> buildJsonObject { value.forEach { (key, item) -> put(key.toString(), json(item, depth + 1)) } }
+        value is Map<*, *> -> buildJsonObject {
+            value.forEach { (key, item) -> put(key.toString(), json(item, depth + 1)) }
+        }
         value is Iterable<*> -> JsonArray(value.take(256).map { json(it, depth + 1) })
         value is IntArray -> JsonArray(value.take(256).map(::JsonPrimitive))
         value is DoubleArray -> JsonArray(value.take(256).map(::JsonPrimitive))
