@@ -598,6 +598,17 @@ and supplies no route or verdict claim. For up to eight sources,
 `batch64=<base64 JSON array of argument arrays>` retains each inspection in a
 numbered directory.
 
+### Shared Boolean dispatch
+
+`bench.profile.BooleanDispatchProfile` compares shared watched clauses with a
+clause-only native SAT participant over the same lowered SMT clauses. Pass
+`suite=ID problem=NAME sha256=HEX` through the maintained Lab profile client. Four
+alternating rounds include one warmup, fixed root probes over at most 256 source
+ids in both polarities, and an optional inert peer. Output retains source/clause
+hashes, initialization cost, push/pop cost excluding snapshots, callback counts
+and consistent-fixpoint observation hashes. The projection omits arithmetic;
+these controls establish no source verdict or default-route coverage gain.
+
 ### Polynomial phases and witness checkpoints
 
 `com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
