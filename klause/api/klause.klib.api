@@ -4973,6 +4973,12 @@ sealed interface com.eignex.klause.solver.search/SearchModelDisposition { // com
         final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchModelDisposition.Indeterminate.toString|toString(){}[0]
     }
 
+    final object Pause : com.eignex.klause.solver.search/SearchModelDisposition { // com.eignex.klause.solver.search/SearchModelDisposition.Pause|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchModelDisposition.Pause.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchModelDisposition.Pause.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchModelDisposition.Pause.toString|toString(){}[0]
+    }
+
     final object Skip : com.eignex.klause.solver.search/SearchModelDisposition { // com.eignex.klause.solver.search/SearchModelDisposition.Skip|null[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchModelDisposition.Skip.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchModelDisposition.Skip.hashCode|hashCode(){}[0]

@@ -43,6 +43,12 @@ Four owners divide the work:
   contains the single traversal loop and owns frames, decisions, restarts,
   cancellation cadence and resumable/terminal state.
 
+A model policy can pause required completion with `SearchModelDisposition.Pause`.
+The run retains the assembled model and its decision trail, and retries that policy
+before node pruning, branching or complete checks. Pausing neither blocks the model
+nor records an indeterminate region. Cancellation still bounds each retry; a root
+reset discards pending completion with the old traversal.
+
 Retraction removes trail facts and restores integer premises before notifying
 components; a root rebuild keeps learned clauses. Components obtain their token,
 accounting and stop diagnostics from `SearchContext.executionControls`; see
