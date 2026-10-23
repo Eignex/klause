@@ -70,6 +70,12 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 
+An opt-in partial-state probe can imply a uniquely represented comparison guard
+from exact intervals over its terms. Coefficient signs select the bounding sides;
+strict endpoints and every active bound premise enter the explanation. Missing
+bounds or ambiguous guards decline. The probe publishes through the shared Boolean
+trail, and retraction removes consequences whose premises leave that trail.
+
 #### Disjunctions and disequalities
 
 A source disjunction is registered with search as one atom per disjunct; a disjunct

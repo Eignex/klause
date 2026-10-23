@@ -408,6 +408,61 @@ class ExactLiraSearchComponent private constructor(
         pointHintStop = Cancellation.Never
     }
 
+    internal fun probePartialLinearImplications(): PartialLinearProbe {
+        val current = checkNotNull(context)
+        beginOperation()
+        var visited = 0
+        var eligible = 0
+        var unexplained = 0
+        val deductions = ArrayList<PartialLinearDeduction>()
+        try {
+            val state = lp.state ?: return PartialLinearProbe(0, 0, 0, false, emptyList())
+            operationStop.charge(preparedRows.size.toLong() + 1L)
+            if (operationStop()) return PartialLinearProbe(0, 0, 0, true, emptyList())
+            val heads = preparedRows.groupingBy { it.row.activator }.eachCount()
+            for (prepared in preparedRows) {
+                operationStop.charge(1)
+                if (operationStop()) break
+                visited++
+                val variable = prepared.row.activator
+                if (prepared.disjunction || variable == LinearRow.ALWAYS || heads[variable] != 1 ||
+                    current.boolValue(variable) != null
+                ) continue
+                val row = prepared.row
+                operationStop.charge(row.size.toLong() + prepared.booleans.size)
+                if ((0 until row.size).any { Term.isBool(row.ref(it)) &&
+                        (Lit.variable(Term.lit(row.ref(it))) == variable ||
+                            bools[Lit.variable(Term.lit(row.ref(it)))] == UNASSIGNED)
+                    }
+                ) continue
+                eligible++
+                val comparison = prepared.form.comparison(true) { bools[it] == TRUE }
+                val implication = partialLinearImplication(comparison, { column, upper ->
+                    state.activeSide(column, upper)?.let { active ->
+                        ExplainedLinearBound(active.side.number.value, active.side.strict,
+                            lp.activeBoundPremise(column, upper) ?: SearchAtomPremise.Unavailable)
+                    }
+                }, operationStop) ?: continue
+                val rhs = prepared.booleans.filter { it != variable }.map { input ->
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(input, bools[input] == TRUE)))
+                }
+                val decision = SearchDecision.Bool(Lit.make(variable, implication.truth))
+                val reason = current.explainAtoms(SearchAtomPremise.All(rhs + implication.premise), decision)
+                if (reason == null) {
+                    unexplained++
+                    continue
+                }
+                if (operationStop()) break
+                if (current.imply(decision.literal, reason) !is ComponentResult.Consistent) break
+                deductions += PartialLinearDeduction(prepared.address.factor, prepared.address.row,
+                    variable, implication.truth, reason.literals.copyOf())
+            }
+            return PartialLinearProbe(visited, eligible, unexplained, operationStop(), deductions)
+        } finally {
+            endOperation(current)
+        }
+    }
+
     private fun capturePointHints(point: List<BigFraction>, context: SearchContext, graph: Boolean = false) {
         pointHintValues = null
         val rows = pointHintRows ?: return
