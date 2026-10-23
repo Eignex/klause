@@ -892,6 +892,30 @@ Retain the finite schedule's base 5000, maximum 150000 and growth 1.5; alternati
 helped specific workloads without a general replacement. See
 [portfolio scheduling](../docs/12-portfolio.md#slice-accounting-and-coverage).
 
+### Linear recipe coverage
+
+Propagator-only symmetry preserves the existing integer-linear LP companion.
+[Current-main comparison 7836](https://lab.eignex.com/jobs/7836), at `840c3b0ad7d`,
+uses 60 seconds, one processor, seeds 3/17 and three repeats. CoinsGrid's CP pool
+proves 200 in six runs; mixed proves none and lacks the LP recipe. Wordpress
+returns checked 1442 without proof in all twelve runs, so its historical CP proof
+advantage does not reproduce. Mixed gives its default LP worker 14.0–17.4 seconds
+versus CP's 4.6–4.8 seconds; one CP tree worker reports `LpAssemblyCancelled`.
+
+The CoinsGrid cohort in [causal comparison 7855](https://lab.eignex.com/jobs/7855)
+uses 20 seconds with the same seeds and repeats. Admission at `a906cdd52` recovers
+six proofs at 200 versus none for baseline or the companion with the same position
+and seed but LP disabled. The LP worker uses one segment, 228 work units and 77–82 ms per run;
+process elapsed is 1.138–1.303 seconds. All eighteen target witnesses pass source
+checking. An extra worker alone does not recover these proofs.
+
+All 39 final witnesses in comparison 7836 pass original-source checking. Mixed finds WordGolf witnesses
+in 3/6 runs versus CP's 0/6 and has better LowAutocorrelation objectives in all six
+pairs. These controls support neither replacing mixed search with CP nor a general
+timing claim. The comparison uses matched source/build/runtime identities on
+Mac/aarch64 with lab debug statistics enabled. Source-witness checks do not
+independently certify native optimality.
+
 ### Numerical kernel decisions
 
 Retained exact feasibility reuses a fully imported tableau across compatible bound
