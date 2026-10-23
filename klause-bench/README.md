@@ -852,9 +852,10 @@ and 4026 ms. Work and elapsed-driven restart variation limit equivalence claims.
 
 ### Feasible board-swap coverage
 
-Retain the sampled production route pending
-[bounded retained coverage](https://github.com/Eignex/klause/issues/3421) and
-[effective ILS perturbations](https://github.com/Eignex/klause/issues/3422).
+Board-swap evidence separates missed improving swaps, genuine swap-local optima
+and ineffective ILS perturbations. Measure
+[bounded retained coverage](https://github.com/Eignex/klause/issues/3421) separately
+from [effective ILS perturbations](https://github.com/Eignex/klause/issues/3422).
 [Lab 7701](https://lab.eignex.com/jobs/7701), based on `b00ecc68ac`, compares sampling,
 a read-only complete swap audit and best-swap rescue on both original
 team-assignment sources, reduced_UD6-gbac and the seven-position photo permutation.
@@ -891,97 +892,43 @@ promotion. A retained bounded cursor still needs cancellation/resume, cost and
 default-route validation; fixed-work gains establish neither whole-solver recovery
 nor a general speedup.
 
-[Lab 7735](https://lab.eignex.com/jobs/7735) tests a bounded cursor at `6bdac2f7dd`
-in the first reserved structural draw from the start of feasibility. Under the
-same fixed-work controls, all sixteen original-team pairs lose; gbac and photo
-tie in all sixteen control pairs. All 64 witnesses pass original-source checking.
-[7736](https://lab.eignex.com/jobs/7736) keeps the default mixed/P1 route: the
-small source has one win/eight losses, the large source nine losses, gbac six
-wins/three losses and photo nine ties. All 72 witnesses pass source checking,
-with matching source, installed dependency, compiler and runtime identities.
-This placement is unsuitable for promotion: bounded enumeration alone does not
-establish optimization recovery.
+Bounded variants starting at first feasibility, extending the restart boundary or
+changing only pair order remain unsupported by their default-route outcomes:
+[7736](https://lab.eignex.com/jobs/7736), [7747](https://lab.eignex.com/jobs/7747),
+[7754](https://lab.eignex.com/jobs/7754), [7756](https://lab.eignex.com/jobs/7756).
+First-miss strict-descent variants retain source tradeoffs in the complete
+consecutive-seed checks [7761](https://lab.eignex.com/jobs/7761),
+[7764](https://lab.eignex.com/jobs/7764) and [7767](https://lab.eignex.com/jobs/7767).
+Keeping the original sampled elected-global draw loses mean objective on both
+team sources in [7769](https://lab.eignex.com/jobs/7769). The four-way comparison
+[7772](https://lab.eignex.com/jobs/7772)/[7773](https://lab.eignex.com/jobs/7773)
+preserves fixed-restart controls but retains all nine small-source combined losses.
 
-[7746](https://lab.eignex.com/jobs/7746) preserves the sampled resample window before
-starting the cursor at `c2657f344a`. Fixed work has ten original-team wins and six
-losses, with all sixteen control pairs tied. All 64 witnesses pass source checking.
-The unchanged default route in [7747](https://lab.eignex.com/jobs/7747) still has
-nine small-source losses; large-source pairs have four wins/five losses, gbac two
-wins/four losses/three ties and photo nine ties. All 72 witnesses pass source
-checking. Preserving the sampled prefix alone does not support promotion.
+Fair elected-global cycles at `54bc980fb6` retain the original resample window and
+candidate/visit allowances, with ILS perturbations unchanged. Fixed-work
+[7776](https://lab.eignex.com/jobs/7776) has ten team wins/six losses and all sixteen
+control pairs tied at 1600 moves. All four team/policy mean changes are positive.
+Default [7777](https://lab.eignex.com/jobs/7777), mixed/P1/10 s with seeds 1/2/3
+three times, has three small-source wins/five losses/one tie and seven large-source
+wins/two losses. Mean changes are -114.7 and +3493.4 respectively.
 
-[7753](https://lab.eignex.com/jobs/7753) rotates boards and randomizes initial pair
-ranks at `6a480af1ee`, retaining the completion requirement before restart. Fixed
-work has ten original-team wins and six losses; all sixteen control pairs tie.
-All 64 witnesses pass source checking. The default route in
-[7754](https://lab.eignex.com/jobs/7754) has nine small-source losses, one large-source
-win/eight losses, four gbac wins/five losses and nine photo ties. All 72 witnesses
-pass source checking. Completing coverage before restart changes basin cadence;
-these results do not support that policy.
+Default [7778](https://lab.eignex.com/jobs/7778) uses every consecutive seed from
+one through ten, twice, at the same case budget. Improvements are signed in the
+source optimization direction; repetitions are not independent seed samples.
 
-[7755](https://lab.eignex.com/jobs/7755) keeps the existing restart boundary at
-`c0a0b55951` and reports incomplete passes as feasible stalls with unchanged ILS
-anchor acceptance. Fixed work has eight small-source wins and four large-source
-wins/four losses; all sixteen control pairs tie. All 64 witnesses pass source
-checking. The default route in [7756](https://lab.eignex.com/jobs/7756) has five
-small-source wins/four losses, three large-source wins/six losses, three gbac
-wins/four losses/two ties and nine photo ties. All 72 witnesses pass source
-checking. Replacing sampled descent from first feasibility remains unsupported.
+| Source | Wins/losses/ties | Mean improvement | Median objective, baseline → coverage |
+|---|---:|---:|---:|
+| `data2_6_12` | 11/9/0 | -706.55 | 15839.5 → 15340.5 |
+| `data3_4_31` | 16/4/0 | +2941.05 | 13099.5 → 16044.5 |
+| `reduced_UD6-gbac` | 11/9/0 | -0.5 | 340.5 → 302.5 |
+| `photo_hkj` | 0/0/20 | 0 | 6 → 6 |
 
-[7757](https://lab.eignex.com/jobs/7757) starts coverage at the first sampled miss,
-inside the original resample window. Its fixed-work original-team pairs have ten
-wins/six losses; controls tie throughout. Default [7758](https://lab.eignex.com/jobs/7758)
-has six small-source wins/three losses and four large-source wins/five losses.
-All 136 witnesses pass source checking.
-
-Restricting coverage to strict descent at `46de073f60` preserves sampled annealing.
-Fixed-work [7759](https://lab.eignex.com/jobs/7759) reproduces those paired objectives
-at 1600 moves per case, with all control pairs tied. Default
-[7760](https://lab.eignex.com/jobs/7760) has seven small-source wins/one loss/one tie,
-four large-source wins/five losses, one gbac win/five losses/three ties and nine
-photo ties. All 136 witnesses pass source checking. The broader default check
-[7761](https://lab.eignex.com/jobs/7761) uses every seed from one through ten, twice:
-small-source pairs have ten wins/nine losses/one tie and mean improvement 14;
-large-source pairs have eleven wins/nine losses but mean loss 572.6. Gbac has
-eight wins/nine losses/three ties and photo twenty ties. All 160 witnesses pass
-source checking. These tradeoffs do not support a default improvement claim.
-
-Random coprime strides at `88d9769671` keep ten original-team fixed-work wins/six
-losses with all controls tied in [7762](https://lab.eignex.com/jobs/7762).
-Default [7763](https://lab.eignex.com/jobs/7763) has six small-source wins/three
-losses and five large-source wins/four losses. All 136 witnesses pass source
-checking. Across every seed from one through ten, twice, default
-[7764](https://lab.eignex.com/jobs/7764) has eight small-source wins/twelve losses
-and mean loss 994.8, eleven large-source wins/nine losses and mean gain 734.85,
-seven gbac wins/eleven losses/two ties and twenty photo ties. All 160 witnesses
-pass source checking. The small-source loss rejects promotion despite the
-large-source gain; pair ordering alone does not preserve sampled descent quality.
-
-Keeping one productive board per reserved draw at `83c1bf1e97` passes CI and has ten
-original-team fixed-work wins/six losses with all controls tied in
-[7765](https://lab.eignex.com/jobs/7765). Default
-[7766](https://lab.eignex.com/jobs/7766) has four small-source wins/five losses,
-eight large-source wins/one loss, seven gbac wins/two ties and nine photo ties.
-All 136 witnesses pass source checking. Across every seed from one through ten,
-twice, [7767](https://lab.eignex.com/jobs/7767) has nine small-source wins/eleven
-losses and mean loss 735.9, fifteen large-source wins/five losses and mean gain
-3337.4, nine gbac wins/eleven losses and twenty photo ties. All 160 witnesses pass
-source checking. Grouping alone leaves a small-source quality tradeoff.
-
-Retaining the original sampled elected-global selection at `ab03ecc47f` keeps ten
-team fixed-work wins/six losses and all control ties in
-[7768](https://lab.eignex.com/jobs/7768). Default
-[7769](https://lab.eignex.com/jobs/7769) has one small-source win/eight losses and
-five large-source wins/four losses, with mean losses on both sources. All 136
-witnesses pass source checking; this selection remains unsupported for promotion.
-
-The complete baseline/coverage/perturbation/combined comparison in
-[7772](https://lab.eignex.com/jobs/7772) preserves fixed-restart controls exactly.
-Adding perturbation to coverage loses all eight ILS team pairs. Default
-[7773](https://lab.eignex.com/jobs/7773) loses all nine small-source combined pairs
-against both baseline and coverage; large-source combined pairs have five wins
-and four losses against baseline. All 272 witnesses pass source checks. Combining
-the two interventions does not resolve the small-source loss.
+All 296 witnesses across these three jobs pass original-source checking with one
+runtime/options, non-solver dependency and compiler identity. Fixed/ILS median
+solve seconds change from 2.760/2.789 to 2.677/2.815 on the small source and from
+7.399/8.179 to 7.806/8.115 on the large source. The large-source default gain
+coexists with a small-source mean loss; this is not uniform optimization recovery
+or a general speedup.
 
 ### Source-scoped derivation admission
 
