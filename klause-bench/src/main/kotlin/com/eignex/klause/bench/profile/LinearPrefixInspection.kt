@@ -35,7 +35,8 @@ import kotlinx.serialization.json.put
 
 internal object LinearPrefixInspection {
     fun inspect(
-        compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false, integrated: Boolean = false,
+        compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false,
+        integrated: Boolean = false, cached: Boolean = false,
     ) {
         val captures = (0..1).map { replay ->
             val stop = Cancellation.after(10.seconds)
@@ -59,9 +60,11 @@ internal object LinearPrefixInspection {
             val opening = requireNotNull(begin.invoke(engine, params, state, boundary))
             val run = member(opening, "getRun")
             try {
-                if (integrated && replay == 1 && run != null) {
+                val automatic = integrated && (replay == 1 || cached)
+                if (automatic && run != null) {
                     val planned = field(run, "planned") as PlannedSearch
                     call(requireNotNull(planned.theory), "usePartialLinearPropagation")
+                    if (cached && replay == 1) call(requireNotNull(planned.theory), "reusePartialLinearDeclines")
                 }
                 val result = run?.let { call(it, "advance") } ?: member(opening, "getResult")
                 val elapsed = System.nanoTime() - started
@@ -73,7 +76,8 @@ internal object LinearPrefixInspection {
                     put("targetNonRootBoundaries", 8)
                     put("visitedNonRootBoundaries", boundary.visits)
                     put("sourceVerdictClaim", false)
-                    put("integrated", integrated && replay == 1)
+                    put("integrated", automatic)
+                    put("cached", cached && replay == 1)
                     put("cliEquivalence", "unverified-direct-library-diagnostic")
                     put("ready", ready)
                     put("stopped", stop())
@@ -102,14 +106,18 @@ internal object LinearPrefixInspection {
                     val propagation = if (probe) planned.session.propagate() else ComponentResult.Consistent
                     val probeElapsed = System.nanoTime() - probeStarted
                     boundary.resume()
+                    val continuationStarted = System.nanoTime()
                     val continuation = if (propagation is ComponentResult.Consistent && !stop()) {
                         call(run, "advance")
                     } else null
+                    val continuationElapsed = System.nanoTime() - continuationStarted
                     val after = work.snapshot()
                     val observation = buildJsonObject {
                         put("treated", replay == 1)
-                        put("integrated", integrated && replay == 1)
+                        put("integrated", automatic)
+                        put("cached", cached && replay == 1)
                         put("probeNs", probeElapsed)
+                        put("continuationNs", continuationElapsed)
                         put("probe", LinearPrefixSnapshot(Cancellation.after(10.seconds)).record(deductions))
                         put("propagation", propagation.javaClass.simpleName)
                         put("continuation", continuation?.javaClass?.simpleName)
@@ -136,6 +144,9 @@ internal object LinearPrefixInspection {
                             planned, run, compiled, out.resolve("after-$replay.exact"),
                         )
                         out.resolve("after-$replay.json").writeText("$afterCapture\n")
+                        if (cached && replay == 1) check(out.resolve("after-0.json").readText() == "$afterCapture\n") {
+                            "decline cache changed the continued source state"
+                        }
                     }
                 }
                 bytes
@@ -149,13 +160,18 @@ internal object LinearPrefixInspection {
             put("sourceSha256", sourceSha256)
             put("snapshotSha256", sha256(captures[0]))
             put("replaySha256", sha256(captures[1]))
-            put("experiment", if (integrated) "plain-versus-integrated" else "exact-prefix-replay")
-            put("exactReplay", if (integrated) JsonNull else JsonPrimitive(captures[0].contentEquals(captures[1])))
+            put("experiment", when {
+                cached -> "integrated-versus-cached"
+                integrated -> "plain-versus-integrated"
+                else -> "exact-prefix-replay"
+            })
+            put("exactReplay", if (integrated && !cached) JsonNull
+                else JsonPrimitive(captures[0].contentEquals(captures[1])))
             put("sourceVerdictClaim", false)
         }
         out.resolve("replay.json").writeText("$report\n")
         println(report)
-        if (!integrated) check(captures[0].contentEquals(captures[1])) { "fresh prefix replay differs" }
+        if (!integrated || cached) check(captures[0].contentEquals(captures[1])) { "fresh prefix replay differs" }
     }
 
     private class PrefixBoundary : SearchNodePolicy {

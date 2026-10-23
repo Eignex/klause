@@ -611,6 +611,10 @@ enabled after root initialization and before the first decision. The producer
 uses a cached list of eligible guards and returns to the shared fixpoint before
 an LP query when it publishes a consequence. Its snapshots represent different
 interventions; the report does not claim they are identical replay states.
+`inspect=partial-propagation-cache` compares that producer without and with
+unchanged-input decline reuse. It requires identical source/search snapshots
+before and after continuation, and records arithmetic evaluations and reuse
+separately from candidate visits and elapsed traversal time.
 
 `LinearSourceShape` accepts `suite=ID problem=NAME sha256=HEX` and retains the
 hash-matched original, build identity, declaration/lowered dimensions, factor kinds
