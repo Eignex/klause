@@ -3,19 +3,13 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.global.AllDifferentInvariant
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 internal class BoardSwapCoverage {
-    private var board = 0
-    private var left = 0
-    private var right = 1
-    private var started = false
     private var assumptions: Assumptions? = null
-    private var savedBoard = 0
-    private var savedLeft = 0
-    private var savedRight = 1
-    private var savedStarted = false
-    private var complete = false
-    private var savedComplete = false
+    private var cursor: Cursor? = null
+    private var checked = false
 
     var requested: Boolean = false
         private set
@@ -23,32 +17,31 @@ internal class BoardSwapCoverage {
     var consulted: Boolean = false
         private set
 
-    val pending: Boolean get() = started && !complete
+    val pending: Boolean get() = requested && cursor?.hasRemaining == true
 
     fun invalidate() {
         requested = false
-        board = 0
-        left = 0
-        right = 1
-        started = false
-        complete = false
+        cursor?.invalidate()
     }
 
     fun request(state: LocalSearchState): Boolean {
-        if (state.seeding.electedImplicit.none { state.factors[it] is AllDifferentInvariant }) return false
         syncAssumptions(state)
+        if (!checked) {
+            val boards = state.seeding.electedImplicit.filter { state.factors[it] is AllDifferentInvariant }
+            if (boards.isNotEmpty()) cursor = Cursor(boards.toIntArray())
+            checked = true
+        }
+        val live = cursor ?: return false
+        if (!requested) live.start(state)
         requested = true
         return true
     }
 
     fun beginPick(state: LocalSearchState) {
         consulted = false
+        if (!requested) return
         syncAssumptions(state)
-        savedBoard = board
-        savedLeft = left
-        savedRight = right
-        savedStarted = started
-        savedComplete = complete
+        if (requested) cursor?.beginPick()
     }
 
     private fun syncAssumptions(state: LocalSearchState) {
@@ -58,59 +51,134 @@ internal class BoardSwapCoverage {
     }
 
     fun finishPick(cancelled: Boolean) {
-        if (!cancelled) return
-        board = savedBoard
-        left = savedLeft
-        right = savedRight
-        started = savedStarted
-        complete = savedComplete
+        if (consulted) cursor?.finishPick(cancelled)
     }
 
     fun generate(state: LocalSearchState, sink: MoveSink, cancellation: Cancellation): Boolean {
-        val elected = state.seeding.electedImplicit
-        if (elected.none { state.factors[it] is AllDifferentInvariant }) return false
-        syncAssumptions(state)
+        if (!request(state)) return false
         consulted = true
-        started = true
-        var visits = 0
+        val live = checkNotNull(cursor)
         val before = sink.size
+        var visits = 0
         val cap = AllDifferentInvariant.MAX_STRUCTURED_SWAPS
         try {
-            while (board < elected.size && visits < cap * AllDifferentInvariant.SWAP_ATTEMPT_STRIDE &&
+            while (live.hasRemaining && visits < cap * AllDifferentInvariant.SWAP_ATTEMPT_STRIDE &&
                 sink.size - before < cap
             ) {
                 if (cancellation()) return true
                 visits++
-                val fid = elected[board]
-                val invariant = state.factors[fid] as? AllDifferentInvariant
-                if (invariant == null || right >= invariant.swapCoordinateCount || state.violated.contains(fid)) {
-                    board++
-                    left = 0
-                    right = 1
-                    continue
-                }
-                sink.proposer = fid
-                if (!invariant.allowsSwapCoordinate(state, left, sink)) {
-                    left++
-                    right = left + 1
-                    continue
-                }
-                invariant.proposeSwap(state, left, right, sink)
-                right++
-                if (right >= invariant.swapCoordinateCount) {
-                    left++
-                    right = left + 1
-                    if (right >= invariant.swapCoordinateCount) {
-                        board++
-                        left = 0
-                        right = 1
-                    }
-                }
+                live.visit(state, sink)
             }
-            complete = board == elected.size
             return true
         } finally {
             sink.proposer = MoveSink.NO_PROPOSER
         }
+    }
+
+    private class Cursor(private val boards: IntArray) {
+        private val initialized = LongArray(boards.size)
+        private val finished = LongArray(boards.size)
+        private val position = LongArray(boards.size)
+        private val remaining = LongArray(boards.size)
+        private var epoch = 1L
+        private var board = 0
+        private var boardsLeft = 0
+        private var savedBoard = 0
+        private var savedBoardsLeft = 0
+        private var savedEpoch = 0L
+        private var picking = false
+        private val touched = IntArrayList()
+        private val savedPosition = LongArrayList()
+        private val savedRemaining = LongArrayList()
+        private val savedFinished = LongArrayList()
+
+        val hasRemaining: Boolean get() = boardsLeft > 0
+
+        fun invalidate() {
+            picking = false
+            epoch++
+            boardsLeft = 0
+        }
+
+        fun start(state: LocalSearchState) {
+            board = state.rng.nextInt(boards.size)
+            boardsLeft = boards.size
+        }
+
+        fun beginPick() {
+            picking = true
+            savedBoard = board
+            savedBoardsLeft = boardsLeft
+            savedEpoch = epoch
+            touched.clear()
+            savedPosition.clear()
+            savedRemaining.clear()
+            savedFinished.clear()
+        }
+
+        fun finishPick(cancelled: Boolean) {
+            picking = false
+            if (!cancelled || savedEpoch != epoch) return
+            for (i in touched.size - 1 downTo 0) {
+                val id = touched[i]
+                position[id] = savedPosition[i]
+                remaining[id] = savedRemaining[i]
+                finished[id] = savedFinished[i]
+            }
+            board = savedBoard
+            boardsLeft = savedBoardsLeft
+        }
+
+        fun visit(state: LocalSearchState, sink: MoveSink) {
+            val id = board
+            board = (board + 1) % boards.size
+            if (finished[id] == epoch) return
+            val fid = boards[id]
+            val invariant = state.factors[fid] as AllDifferentInvariant
+            val size = invariant.swapCoordinateCount
+            val pairs = size.toLong() * (size - 1) / 2
+            if (initialized[id] != epoch) {
+                initialized[id] = epoch
+                remaining[id] = pairs
+                position[id] = if (pairs > 0L) state.rng.nextLong(pairs) else 0L
+            }
+            if (picking) {
+                touched.add(id)
+                savedPosition.add(position[id])
+                savedRemaining.add(remaining[id])
+                savedFinished.add(finished[id])
+            }
+            if (remaining[id] > 0L && !state.violated.contains(fid)) {
+                val left = leftCoordinate(size, position[id])
+                val right = left + 1 + (position[id] - pairsBefore(size, left)).toInt()
+                sink.proposer = fid
+                val skipped = if (invariant.allowsSwapCoordinate(state, left, sink)) {
+                    invariant.proposeSwap(state, left, right, sink)
+                    1L
+                } else {
+                    minOf(remaining[id], (size - right).toLong())
+                }
+                remaining[id] -= skipped
+                position[id] = (position[id] + skipped) % pairs
+            } else {
+                remaining[id] = 0L
+            }
+            if (remaining[id] == 0L) {
+                finished[id] = epoch
+                boardsLeft--
+            }
+        }
+
+        private fun leftCoordinate(size: Int, pair: Long): Int {
+            var low = 0
+            var high = size - 1
+            while (low + 1 < high) {
+                val middle = low + (high - low) / 2
+                if (pairsBefore(size, middle) <= pair) low = middle else high = middle
+            }
+            return low
+        }
+
+        private fun pairsBefore(size: Int, left: Int): Long = left.toLong() * (2L * size - left - 1L) / 2
     }
 }

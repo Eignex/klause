@@ -196,6 +196,7 @@ class SourceDrivenStrategy(
         val greedyFallback = evaluation != null && feasibleAcceptance == AcceptanceRule.GreedyDescent
         var completionSeed = collectMoves(state, cancellation, stalled,
             if (evaluation == null || greedyFallback) state.cost else 0L, completionSeeds = evaluation != null)
+        if (state.boardCoverage.consulted && cancellation()) return null
         if (evaluation != null) {
             if (greedyFallback) {
                 val ordinary = selectMove(state, stall, stalled, null)
@@ -281,6 +282,7 @@ class SourceDrivenStrategy(
                 closure.closeInto(state, raw.list, sink, cancellation)
                 if (alternatives != null) closure.closeInto(state, alternatives.list, alternativeSink, cancellation)
             }
+            if (state.boardCoverage.consulted && cancellation()) break
             if (objectiveSeed) {
                 val remaining = cs.cap - (sink.list.size - before)
                 if (remaining > 0) completionSeed = CompletionSeed(sink, remaining)
