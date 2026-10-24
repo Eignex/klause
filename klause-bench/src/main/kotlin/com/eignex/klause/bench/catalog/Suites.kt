@@ -32,7 +32,7 @@ internal object Suites {
         ) + QfNraSuites.all + QfNraCanonicalSuite.suite + QfNraPartialConflictSuite.suite +
             NonlinearIntegerSuite.suite + DivModSuite.suite + AbsSuite.suite +
             ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
-            SourceOwnershipSuite.suite + ExactGlobalsSuite.suite
+            SourceOwnershipSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the
