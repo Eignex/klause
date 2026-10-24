@@ -7,6 +7,19 @@ import kotlin.test.assertTrue
 
 class SourceLpFundingTest {
     @Test
+    fun `all numerical and certificate stages should debit the same cumulative allowance`() {
+        val funding = SourceLpFunding(20, 100)
+        val budget = SourceLpBudget(funding = funding)
+        funding.grant(20)
+
+        budget.observe(preparation = 1, floatWork = 2, continuation = 3, refinement = 4,
+            boundCertification = 5, conflictCertification = 6)
+
+        assertEquals(21L, funding.spent)
+        assertTrue(funding.exhausted)
+    }
+
+    @Test
     fun `a spent grant pauses without exhausting the containing allowance`() {
         val funding = SourceLpFunding(10, 10)
         funding.grant(3)
