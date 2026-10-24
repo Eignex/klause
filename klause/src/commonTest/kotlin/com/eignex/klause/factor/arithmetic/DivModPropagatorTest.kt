@@ -20,6 +20,21 @@ import kotlin.test.assertTrue
 
 class DivModPropagatorTest {
     @Test
+    fun `exhausted support retention should preserve domain filtering`() {
+        val source = Problem(0, 3, arrayOf(
+            intDomainFromSurvivors(longArrayOf(1, 5)), IntDomain(0, 2), IntDomain(0, 1),
+        ), arrayOf(DivMod(0, bigIntOf(2), 1, 2)))
+        val state = PropagationState(source, Assumptions.None)
+        state.divModSupportCells = 1 shl 20
+        val propagator = DivModPropagator(source.factors[0] as DivMod)
+
+        assertTrue(propagator.propagate(state, 0))
+
+        assertEquals(IntDomain(0, 2).excludeValue(1), state.intDomains[1])
+        assertEquals(1 shl 20, state.divModSupportCells)
+    }
+
+    @Test
     fun `restored output holes should recover their signed supports`() {
         for (convention in DivisionConvention.entries) {
             val source = Problem(0, 4, arrayOf(

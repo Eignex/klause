@@ -23,6 +23,7 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
     private val dividendIndices = MutableLongIntMap()
     private val dividendOffsets: IntArray
     private val tuples: LongArray
+    val storageCells: Int = 64 + sourceDividend.span().size * (sourceDivisor?.span()?.size ?: 1) * roles.size
 
     init {
         val dividends = sourceDividend.span()

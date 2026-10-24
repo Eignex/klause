@@ -265,6 +265,10 @@ restored operand values outside its construction domains require rebuilding it.
 Larger products keep bounds filtering without tuple enumeration, and a later small
 branch can construct its own bounded relation. Deductions cite the current bound
 and hole premises rather than retained branch assumptions.
+Retention reserves the operand product times arity plus 64 cells per payload from
+a 1,048,576-cell state allowance. Replacements reuse their reservation; tombstoning
+can leave unused reservation. Exhaustion keeps complete small-product filtering
+with temporary supports, bounding retained storage without weakening deductions.
 
 An inert descriptor requires an explicit reason and cannot claim an exact check, so
 its absent mechanism needs an enforcing peer or separate source certification.
