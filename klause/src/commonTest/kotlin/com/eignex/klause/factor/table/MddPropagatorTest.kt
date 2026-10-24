@@ -124,6 +124,22 @@ class MddPropagatorTest {
 
             assertEquals(!hole, 1L in state.intDomains[1])
             if (step == 0) assertNull(index.rootSnapshot) else assertNotNull(index.rootSnapshot)
+            if (step == 3) {
+                state.undoLogging = true
+                val mark = state.mark()
+                state.currentLevel = 1
+                check(state.excludeIntValue(0, 1))
+                assertTrue(inc.propagate(state, 0))
+                assertFalse(1L in state.intDomains[1])
+                state.undoTo(mark)
+                state.currentLevel = 1
+                check(state.excludeIntValue(0, 2))
+
+                assertTrue(inc.propagate(state, 0))
+
+                assertTrue(1L in state.intDomains[1])
+                assertFalse(2L in state.intDomains[1])
+            }
         }
     }
 
