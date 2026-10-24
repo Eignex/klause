@@ -33,6 +33,7 @@ internal class JointLinearRepair(
     private val objective: LinearObjective?,
     private val params: TheoryParams,
     guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
+    private val boundOrdered: Boolean = false,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val stop = params.timeout or params.cancellation
     private val state = OpenTheorySolveState(params)
@@ -76,6 +77,7 @@ internal class JointLinearRepair(
             when (key) {
                 "numericalRetainedNodes" -> "jointRepairPeakRetainedNodes"
                 "numericalPendingLeaves" -> "jointRepairUnresolvedLeaves"
+                "numericalFrontierPending" -> "jointRepairFrontierUnresolved"
                 else -> "jointRepair" + key.removePrefix("numerical")
             }
         }
@@ -181,7 +183,8 @@ internal class JointLinearRepair(
             }
             pending = condition
             query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)), params,
-                external = { anchor }, state = state, borrowedAuthority = authority, guidance = true)
+                external = { anchor }, state = state, borrowedAuthority = authority,
+                boundOrdered = boundOrdered, guidance = true)
             observe("jointRepairCandidates")
         }
         val active = requireNotNull(query)
