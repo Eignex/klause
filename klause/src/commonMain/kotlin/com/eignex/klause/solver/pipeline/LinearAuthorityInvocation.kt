@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
@@ -74,7 +75,7 @@ internal class LinearAuthorityInvocation(
     private var importedIncumbents = 0L
     private var result: LinearInvocationResult? = null
     val isDone: Boolean get() = result != null
-    val work: Long get() = state.work.spent + funding.spent / 600L
+    val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
     val stats: SolveStats get() = SolveStats(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
@@ -149,7 +150,7 @@ internal class LinearAuthorityInvocation(
                 else TerminationReason.Cancelled)
             if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)
             funding.grant(if (work < 0) 20_000_000L else maxOf(20_000_000L,
-                work.coerceIn(1L, 150_000L) * 600L))
+                work.coerceIn(1L, 150_000L) * LP_WORK_PER_NODE))
             if (!initialized) {
                 initialized = true
                 if (session.initialize() !is ComponentResult.Consistent) {

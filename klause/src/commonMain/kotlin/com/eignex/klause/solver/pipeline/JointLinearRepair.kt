@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SourceLpBudget
@@ -62,7 +63,7 @@ internal class JointLinearRepair(
     val exhausted: Boolean get() = declined || funding.exhausted || budget.operations >= params.sourceLpOperations ||
         (!rootPreparationPending && pending == null && (!state.work.hasAllowance() ||
             state.work.acceptedChecks >= params.maxLeaves))
-    val work: Long get() = state.work.spent + funding.spent + preparationWork +
+    val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE + preparationWork +
         (selection?.visitedEntries ?: 0)
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot().copy(
         completeSearchStages = observations() + mapOf(
