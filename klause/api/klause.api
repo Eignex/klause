@@ -3161,9 +3161,13 @@ public final class com/eignex/klause/formats/xcsp3/UnsupportedXcsp3Exception : c
 public final class com/eignex/klause/formats/xcsp3/Xcsp3 {
 	public static final field INSTANCE Lcom/eignex/klause/formats/xcsp3/Xcsp3;
 	public final fun parse (Lcom/eignex/klause/util/CharSource;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public final fun parse (Lcom/eignex/klause/util/CharSource;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
 	public final fun parse (Ljava/lang/String;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public final fun parse (Ljava/lang/String;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
 	public static synthetic fun parse$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3;Lcom/eignex/klause/util/CharSource;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public static synthetic fun parse$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3;Lcom/eignex/klause/util/CharSource;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
 	public static synthetic fun parse$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3;Ljava/lang/String;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public static synthetic fun parse$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3;Ljava/lang/String;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
 }
 
 public final class com/eignex/klause/formats/xcsp3/Xcsp3Kt {
