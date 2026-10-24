@@ -95,7 +95,7 @@ internal class PolynomialFormula private constructor(
         maximumTerms: Int,
         maximumBits: Int,
     ): Boolean {
-        if (booleanVariables.isEmpty()) return false
+        if (booleanVariables.isEmpty() && (nodes[root] as? FormulaNode.Constant)?.value != false) return false
         return refutePolynomialBooleans(nodes, root, atoms, arithmetic, maximumAtoms, maximumTerms, maximumBits)
     }
 

@@ -444,7 +444,7 @@ class QfNraSolverRepairTest {
     @Test
     fun `conflicting effective relations should reject every monomial proposal`() {
         for (negated in listOf(false, true)) {
-            val upper = if (negated) "(not (> (* x y) 1))" else "(<= (* x y) 1)"
+            val upper = if (negated) "(not (> (* x y) 0))" else "(<= (* x y) 0)"
             val source = SmtLibPolynomial.parse(
                 """
                 (declare-const x Real)
