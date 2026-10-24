@@ -7,6 +7,7 @@ import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioTerminalPublication
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SharedObjectiveBound
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -15,12 +16,15 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.stream.lock
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.math.nextDown
@@ -34,9 +38,11 @@ internal class OpenLinearPortfolioResults(
     private val timeout: Cancellation = Cancellation.Never,
 ) : PortfolioTerminalCheck {
     private data class Accepted(val result: LinearOptimizationResult, val rayValue: BigFraction?)
-    private data class SharedBound(val evidence: SourceEvidence, val value: Double)
     private val accepted = AtomicReference<Accepted?>(null)
-    private val sharedBound = AtomicReference<SharedBound?>(null)
+    private val sharedBound = AtomicReference<SourceEvidence?>(null)
+    private val boundExchange = SharedObjectiveBound(Concurrency.Strict.lock(), binding.model).also {
+        it.bindInvocation(binding)
+    }
     private val handles = ArrayList<Pair<PortfolioWorker, AtomicReference<LinearPortfolioSearch?>>>()
 
     fun retain(worker: PortfolioWorker, handle: AtomicReference<LinearPortfolioSearch?>) {
@@ -44,8 +50,8 @@ internal class OpenLinearPortfolioResults(
     }
 
     fun sharedLowerBound(): Double {
-        val bound = strongestBound() ?: return Double.NEGATIVE_INFINITY
-        sharedBound.load()?.takeIf { it.evidence === bound }?.let { return it.value }
+        val bound = strongestBound() ?: return boundExchange.current()
+        if (sharedBound.load() === bound) return boundExchange.current()
         if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(bound, cancellation) !=
             SourceEvidenceCheck.Checked) return Double.NEGATIVE_INFINITY
         val claim = bound.claim as? SourceClaim.Bound ?: return Double.NEGATIVE_INFINITY
@@ -55,8 +61,9 @@ internal class OpenLinearPortfolioResults(
         if (!rounded.isFinite()) return Double.NEGATIVE_INFINITY
         val conservative = if (BigFraction.ofDouble(rounded)?.let { it <= minimized } == true) rounded
             else rounded.nextDown()
-        sharedBound.store(SharedBound(bound, conservative))
-        return conservative
+        boundExchange.publish(CompletedEnginePublication.ObjectiveBound(binding, conservative))
+        sharedBound.store(bound)
+        return boundExchange.current()
     }
 
     override fun check(worker: PortfolioWorker, search: ResumableSearch?): PortfolioTerminalPublication? {
