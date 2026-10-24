@@ -16,6 +16,7 @@ import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -81,8 +82,12 @@ class MddPropagatorTest {
         check(state.excludeIntValue(0, 1))
         state.beginSeedFixpoint().forEach { }
         var polls = 0
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = ++polls >= 2
+            override fun workMeter(): WorkMeter = WorkMeter { }
+        }
 
-        assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= 2 }))
+        assertNull(state.advanceRootFixpoint(cancellation))
 
         assertTrue(state.rootFixpointPending)
         while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))

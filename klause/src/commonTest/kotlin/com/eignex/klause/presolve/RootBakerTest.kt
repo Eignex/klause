@@ -318,7 +318,7 @@ class RootBakerTest {
     }
 
     @Test
-    fun `hole probe exhaustion should keep the hole without entering repair`() {
+    fun `stopping after a hole refutation should keep the hole without entering repair`() {
         val source = Problem(
             0,
             2,
@@ -331,14 +331,16 @@ class RootBakerTest {
         val root = source.bake(reference.orSpent(Cancellation.Never))
         RootBaker.bake(root, BakeConfig(probeIntBounds = true))
         assertIs<PropagationResult.Unsat>(root.propagate(Assumptions.None.withInt(0, 1), root.cancellation))
-        val budget = PresolveBudget(reference.spent())
-        val problem = source.bake(budget.orSpent(Cancellation.Never))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val token = budget.orSpent(Cancellation { budget.rootPropagationWork >= reference.rootPropagationWork })
+        val problem = source.bake(token)
 
         val result = assertIs<PropagationResult.Implied>(RootBaker.bake(problem, BakeConfig(probeIntHoles = true)))
 
         assertEquals(listOf(1L), result.intHoleValues.toList())
         assertEquals(reference.probeCalls + 1L, budget.probeCalls)
-        assertEquals(0L, budget.remaining())
+        assertEquals(reference.rootPropagationWork, budget.rootPropagationWork)
+        assertTrue(token())
     }
 
     @Test
