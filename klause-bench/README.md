@@ -1054,6 +1054,19 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### XCSP3 constant-distance disequalities
+
+[Lab 7970](https://lab.eignex.com/jobs/7970) compares `2a9718f55f` with `c99c067c23`
+on BlockedQueens and Fischer: mixed/P1, 10 seconds, seeds 1/3, three repeats,
+debug enabled, no JFR, Mac/aarch64. All 24 cases remain UNKNOWN, with no witness
+claim to check. Source hashes, runtime, options and non-solver dependencies match.
+
+BlockedQueens integers fall from 3136 to 56 and factors from 7355 to 5815.
+Preparation takes 344–387 ms versus 160–173 ms, and CP node counts rise from
+385–737 to 5184–6053. Peak depth is mixed: 19–24 versus 21–25. Fischer retains
+its source shape. These diagnostics support reduced preparation cost and more
+search progress, without establishing source recovery or an end-to-end speedup.
+
 ### XCSP3 native scalar distinctness
 
 [Lab 7951](https://lab.eignex.com/jobs/7951) compares `5a8c2b0c13` with native
