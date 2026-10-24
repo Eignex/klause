@@ -68,6 +68,18 @@ class ParityInputRevisionTest {
     }
 
     @Test
+    fun `a unit matching an established root pin should keep the input revision`() {
+        val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
+        val inputs = ParityInputRevision(source, Cancellation.Never)
+        val before = inputs.current({ v -> if (v == 2) true else null }) { null to null }
+
+        inputs.recordDelta(source.factors, intArrayOf(), listOf(Clause(intArrayOf(Lit.make(2, true)))))
+        val after = inputs.current({ v -> if (v == 2) true else null }) { null to null }
+
+        assertEquals(before, after)
+    }
+
+    @Test
     fun `changed parity rows should invalidate the input revision`() {
         val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
         val inputs = ParityInputRevision(source, Cancellation.Never)
