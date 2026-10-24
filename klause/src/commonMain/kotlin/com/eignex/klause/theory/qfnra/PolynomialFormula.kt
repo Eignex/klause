@@ -54,9 +54,6 @@ internal class PolynomialFormula private constructor(
     ): PolynomialFormula {
         val sharing = PolynomialPredicateSharing(nodes, atoms, arithmetic, definitions)
         val rewrittenRoot = sharing.rewrite(root)
-        if (definitions.isEmpty()) {
-            return PolynomialFormula(sharing.nodes, rewrittenRoot, sharing.atoms, booleanVariables)
-        }
         val sharedRoot = sharing.compact(rewrittenRoot)
         return PolynomialFormula(sharing.nodes, sharedRoot, sharing.atoms, sharing.booleanVariables())
     }
