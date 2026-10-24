@@ -22,13 +22,28 @@ class DivModRelationTest {
 
             repeat(4) { offset ->
                 val reused = index.retain(0, 10 + offset, IntDomain(-7, 7), IntDomain(divisor, divisor),
-                    null, null, { error("unexpected allocation") })
+                    if (offset % 2 == 0) first.quotient else null, first.remainder,
+                    { error("unexpected allocation") })
 
                 assertEquals(first.quotient, reused.quotient)
                 assertEquals(first.remainder, reused.remainder)
                 assertTrue(reused.factors.isEmpty())
             }
         }
+    }
+
+    @Test
+    fun `variable divisors should reuse outputs only within their compilation`() {
+        val index = DivModRelationIndex()
+        val first = index.retain(0, 1, IntDomain(-7, 7), IntDomain(-3, 3), 2, 3,
+            { error("unexpected allocation") })
+
+        val reused = index.retain(0, 1, IntDomain(-7, 7), IntDomain(-3, 3), null, null,
+            { error("unexpected allocation") })
+
+        assertEquals(first.quotient, reused.quotient)
+        assertEquals(first.remainder, reused.remainder)
+        assertTrue(reused.factors.isEmpty())
     }
 
     @Test
