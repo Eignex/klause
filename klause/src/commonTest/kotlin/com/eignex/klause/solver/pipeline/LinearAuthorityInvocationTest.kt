@@ -51,8 +51,9 @@ class LinearAuthorityInvocationTest {
         assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), assertIs<SourceClaim.Optimal>(terminal.claim).value)
         assertEquals(SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
-        assertEquals(2L, result.stats.smt.completeSearchStages["numericalCoordinateConflicts"])
-        assertEquals(1L, result.stats.smt.completeSearchStages["numericalLpPreparations"])
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(2L, stages["numericalCoordinateConflicts"])
+        assertEquals(1L, stages["numericalLpPreparations"])
     }
 
     @Test
