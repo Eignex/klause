@@ -1,5 +1,7 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.factor.table.internals.ExtensionalSupportIndex
+import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.factor.table.internals.TableLsState
 import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.ir.floorOrNull
@@ -23,6 +25,7 @@ internal class TableInvariant(
     /** Per-cell upper bound for a short-support table (see [com.eignex.klause.factor.table.Table.hi]);
      *  null when every cell is a point (a ground table). */
     private val hi: LongArray?,
+    private val supportCache: TableGroupCache = TableGroupCache(arity, tuples, hi),
 ) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
@@ -33,28 +36,21 @@ internal class TableInvariant(
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val dist = IntArray(numTuples)
-        var minD = arity
         for (row in 0 until numTuples) {
             var d = 0
             for (col in 0 until arity) {
                 if (!tableCellContains(tuples, hi, arity, row, col, state.assignment.intValue(xs[col]))) d++
             }
             dist[row] = d
-            if (d < minD) minD = d
         }
-        state.refPayload[factorId] = TableLsState(dist, minD)
+        supportCache.supports {}
+        state.refPayload[factorId] = TableLsState(dist, arity)
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as TableLsState
-        data class Scored(val row: Int, val distance: Int)
-        val scored = ArrayList<Scored>(numTuples)
-        for (row in 0 until numTuples) scored.add(Scored(row, s.dist[row]))
-        scored.sortBy { it.distance }
-        val topK = minOf(2, scored.size)
-        for (k in 0 until topK) {
-            val row = scored[k].row
+        for (row in s.closestRows()) {
             for (col in 0 until arity) {
                 val cur = state.assignment.intValue(xs[col])
                 // Already inside the cell's interval (covers points that already match and wildcards).
@@ -124,10 +120,18 @@ internal class TableInvariant(
         val s = state.refPayload[factorId] as TableLsState
         val old = state.assignment.intValue(intVar)
         if (old == newValue) return 0
-        return tableRescanForChange(
-            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi, intVar, old, newValue,
-            commit = false,
-        ) - s.minDist
+        val before = s.minDist
+        val index = supportCache.supports {}
+        if (index == null) {
+            return tableRescanForChange(
+                s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi, intVar, old, newValue,
+                commit = false,
+            ) - before
+        }
+        indexedChange(s, index, intVar, old, newValue)
+        val after = s.minDist
+        indexedChange(s, index, intVar, newValue, old)
+        return after - before
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
@@ -135,12 +139,32 @@ internal class TableInvariant(
         val newVal = state.assignment.intValue(intVar)
         if (newVal == oldValue) return 0
         val before = s.minDist
-        val minD = tableRescanForChange(
-            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi, intVar, oldValue, newVal,
-            commit = true,
-        )
-        s.minDist = minD
-        return minD - before
+        val index = supportCache.supports {}
+        if (index == null) {
+            tableRescanForChange(
+                s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi, intVar, oldValue, newVal,
+                commit = true,
+            )
+        } else {
+            indexedChange(s, index, intVar, oldValue, newVal)
+        }
+        return s.minDist - before
+    }
+
+    private fun indexedChange(
+        s: TableLsState,
+        index: ExtensionalSupportIndex,
+        intVar: Int,
+        oldValue: Long,
+        newValue: Long,
+    ) {
+        fun column(col: Int) {
+            val posting = index.columns[col]
+            posting.forEachRow(oldValue, oldValue, { row -> s.setDistance(row, s.dist[row] + 1) })
+            posting.forEachRow(newValue, newValue, { row -> s.setDistance(row, s.dist[row] - 1) })
+        }
+        val col = singleColumnByVar[intVar]
+        if (col >= 0) column(col) else for (position in multiColumnsByVar.getValue(intVar)) column(position)
     }
 }
 
@@ -171,7 +195,7 @@ internal fun tableRescanForChange(
             val miss = if (tableCellContains(tuples, hi, arity, row, col, newV)) 0 else 1
             val was = if (tableCellContains(tuples, hi, arity, row, col, oldV)) 0 else 1
             val d = s.dist[row] + miss - was
-            if (commit) s.dist[row] = d
+            if (commit) s.setDistance(row, d)
             if (d < minD) minD = d
         }
     } else {
@@ -183,7 +207,7 @@ internal fun tableRescanForChange(
                 val was = if (tableCellContains(tuples, hi, arity, row, c, oldV)) 0 else 1
                 d += miss - was
             }
-            if (commit) s.dist[row] = d
+            if (commit) s.setDistance(row, d)
             if (d < minD) minD = d
         }
     }
