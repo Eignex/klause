@@ -32,6 +32,12 @@ Ground table deductions record their bound or excluded value at the actual pin's
 trail position. Historical cell checks consider only tuples whose target cells fall
 in that removal and choose one blocking cell per tuple. Interval deductions and table
 conflicts reconstruct the general historical support relation.
+Ground relations share a value-to-row index across projection siblings and sessions.
+Each value uses a primitive row posting or a tuple mask, whichever needs fewer bytes.
+Index construction admits at most 32 MiB of primitive buffers including sort scratch;
+larger relations keep the scan path. A reason visits only the target value or bound
+range's postings, then checks the deduction's historical domains. Mutable live
+prefixes and explanation caches remain state-local.
 Several unsupported interior values commit as one domain mutation. Their individual
 lazy reasons refer to the pre-batch trail boundary, and each removal retains its
 own carve witness for existing and late equality atoms. Undo restores the prior

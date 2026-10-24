@@ -4,6 +4,7 @@ import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.factor.table.internals.TableStr2State
+import com.eignex.klause.factor.table.internals.TableSupportIndex
 import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -39,6 +40,9 @@ internal class TablePropagator(
 ) : Propagator {
 
     private val unarySupports = boundedUnarySupports()
+    private val supportIndex by lazy {
+        if (groupCache != null) groupCache.supportIndex else if (hi == null) TableSupportIndex.build(tuples, arity) else null
+    }
 
     override val expensiveBake: Boolean get() = unarySupports == null
 
@@ -99,15 +103,8 @@ internal class TablePropagator(
         val out = LitSet()
         if (kind != VALUE) columnLiterals(state, col, snapshot, out)
         val pick = IntArrayList()
-        for (row in 0 until numTuples) {
-            val own = cellLo(row, col)
-            val removed = when (kind) {
-                LOWER -> own < value
-                UPPER -> own > value
-                else -> own == value
-            }
-            if (!removed) continue
-            if (kind != VALUE && cellAt(state, row, col, snapshot, null) == Cell.KILLED) continue
+        visitRemovedRows(col, kind, value) { row ->
+            if (kind != VALUE && cellAt(state, row, col, snapshot, null) == Cell.KILLED) return@visitRemovedRows
             var chosen = Lit.NONE
             var killed = false
             for (c in 0 until arity) {
@@ -125,6 +122,18 @@ internal class TablePropagator(
             if (chosen != Lit.NONE) out.add(chosen)
         }
         return out.toArray()
+    }
+
+    private fun visitRemovedRows(col: Int, kind: Int, value: Long, visit: (Int) -> Unit) {
+        if ((kind == LOWER && value == Long.MIN_VALUE) || (kind == UPPER && value == Long.MAX_VALUE)) return
+        val lower = if (kind == LOWER) Long.MIN_VALUE else if (kind == UPPER) value + 1 else value
+        val upper = if (kind == UPPER) Long.MAX_VALUE else if (kind == LOWER) value - 1 else value
+        val column = supportIndex?.columns?.get(col)
+        if (column != null) {
+            column.forEachRow(lower, upper, visit)
+        } else {
+            for (row in 0 until numTuples) if (cellLo(row, col) in lower..upper) visit(row)
+        }
     }
 
     /**

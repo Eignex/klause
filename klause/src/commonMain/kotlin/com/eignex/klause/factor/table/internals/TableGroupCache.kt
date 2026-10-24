@@ -16,7 +16,11 @@ package com.eignex.klause.factor.table.internals
  * Written at most once with an immutable value; a benign race under parallel search recomputes the same
  * verdict. Mirrors [MddTransitionIndex.rootSnapshot].
  */
-internal class TableGroupCache {
+internal class TableGroupCache(arity: Int, tuples: LongArray, hi: LongArray?) {
+    val supportIndex: TableSupportIndex? by lazy {
+        if (hi == null) TableSupportIndex.build(tuples, arity) else null
+    }
+
     /** Per-column `[min, max]` bounds under which a full sweep of the shared relation prunes nothing.
      *  Null until the first eligible row establishes it. */
     var noopMins: LongArray? = null
