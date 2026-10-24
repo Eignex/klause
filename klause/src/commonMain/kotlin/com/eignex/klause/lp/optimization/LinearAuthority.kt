@@ -28,6 +28,7 @@ internal data class LinearAuthorityResult(
     val fractional: List<Pair<SourceCoordinate, BigFraction>> = emptyList(),
     val relaxedPoint: Map<SourceCoordinate, Double> = emptyMap(),
     val paused: Boolean = false,
+    val coordinateConflict: Boolean = false,
 )
 
 internal class LinearAuthority(
@@ -143,6 +144,10 @@ internal class LinearAuthority(
         val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive)
             ?: return LinearAuthorityResult() else null
         if (guide?.paused == true) return LinearAuthorityResult(paused = true)
+        guide?.coordinateConflictWeights?.let { weights ->
+            val evidence = checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
+            return LinearAuthorityResult(evidence = evidence, coordinateConflict = evidence != null)
+        }
         val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive)
             ?: return LinearAuthorityResult()
         val closure = solved.result
@@ -162,11 +167,11 @@ internal class LinearAuthority(
             val point = guide.point?.map { BigFraction.ofDouble(it) ?: return LinearAuthorityResult(bound = bound) }
             val fractionalCoordinates = fractional(coordinates, point)
             val fractions = fractionalCoordinates.filter { candidate ->
-                val column = prepared.indices.getValue(candidate.first)
                 val threshold = candidate.floorSplit().second
-                val bounds = guide.bounds[column]
-                (bounds.lower?.let { threshold >= it.number.value } != false) &&
-                    (bounds.upper?.let { threshold + BigFraction.ONE <= it.number.value } != false)
+                val lower = source.scope.condition.lower[candidate.first]
+                val upper = source.scope.condition.upper[candidate.first]
+                (lower == null || threshold + BigFraction.ONE > lower) &&
+                    (upper == null || threshold < upper)
             }
             val candidate = point?.takeIf { fractionalCoordinates.isEmpty() }
                 ?.let { sample(source, coordinates, it) }?.takeIf {

@@ -14,7 +14,6 @@ import com.eignex.klause.util.Cancellation
 internal class LinearAuthorityQuery private constructor(
     private val source: SourceProofContext,
     val coordinates: List<SourceCoordinate>,
-    val indices: Map<SourceCoordinate, Int>,
     val cited: List<Pair<SourceInequality, SourceDerivation>>,
     val rows: List<ExactRationalInequality>,
     val inactive: Set<Int>,
@@ -69,7 +68,7 @@ internal class LinearAuthorityQuery private constructor(
             val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
-            return LinearAuthorityQuery(source, coordinates, indices, cited, rows, inactive,
+            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive,
                 costs, numeric.objectiveConstant * sign, sign)
         }
     }

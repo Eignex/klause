@@ -214,7 +214,9 @@ bound-certificate policy through that same scoped owner. One admitted operation
 survives unchanged consultations; changed source scope, sides or active rows revoke
 its admission and numerical cursor before another query. A pause publishes no
 coordinates or certificate. Completed coordinates propose exhaustive integer splits
-only where both sides tighten the current coordinate bounds. Integral-looking
+that add new scoped restrictions, including fractional source-bound endpoints.
+Opposed coordinate sides refute a branch through checked source combinations
+without another numerical query. Integral-looking
 points require original-source witness checking, and checked bounds are lifted into
 the current source scope. Small unresolved queries can use bounded exact completion;
 wide guidance does not acquire exact-primal or infeasibility authority.
