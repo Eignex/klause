@@ -913,8 +913,9 @@ internal class RevisedSimplex(
     }
 
     private suspend fun pauseAtIteration() {
+        val cursor = activeSolve ?: return
         chargeWork()
-        activeSolve?.checkpoint(work.ops)
+        cursor.checkpoint(work.ops)
     }
 
     /**
