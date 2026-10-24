@@ -57,9 +57,21 @@ internal class JointLinearRepair(
 
     private fun observe(stage: String) { stages[stage] = (stages[stage] ?: 0) + 1 }
 
+    private fun queryObservations(): Map<String, Long> =
+        query?.stats?.smt?.completeSearchStages.orEmpty().mapKeys { (key, _) ->
+            when (key) {
+                "numericalRetainedNodes" -> "jointRepairPeakRetainedNodes"
+                "numericalPendingLeaves" -> "jointRepairUnresolvedLeaves"
+                else -> "jointRepair" + key.removePrefix("numerical")
+            }
+        }
+
+    private fun combine(key: String, before: Long, after: Long): Long =
+        if ("Max" in key || "Peak" in key) maxOf(before, after) else before + after
+
     private fun observations(): Map<String, Long> {
-        val current = query?.stats?.smt?.completeSearchStages.orEmpty()
-        return (stages.keys + current.keys).associateWith { (stages[it] ?: 0) + (current[it] ?: 0) }
+        val current = queryObservations()
+        return (stages.keys + current.keys).associateWith { combine(it, stages[it] ?: 0, current[it] ?: 0) }
     }
 
     fun search(adaptive: Boolean, seed: Long = params.randomSeed): ExactNeighborhood = ExactNeighborhood(
@@ -177,8 +189,8 @@ internal class JointLinearRepair(
     }
 
     private fun retire() {
-        val observations = query?.stats?.smt?.completeSearchStages.orEmpty()
-        for ((key, value) in observations) stages[key] = (stages[key] ?: 0) + value
+        val observations = queryObservations()
+        for ((key, value) in observations) stages[key] = combine(key, stages[key] ?: 0, value)
         val active = query
         query = null
         pending = null
