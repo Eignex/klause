@@ -4,6 +4,7 @@ import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableLongIntMap
 
 internal object MddTableComposition {
     fun intersect(
@@ -62,22 +63,21 @@ internal object MddTableComposition {
         columns: IntArray,
         visit: () -> Boolean,
         maxStates: Int,
-    ): List<Map<Long, Int>>? {
+    ): List<MutableLongIntMap>? {
         val selected = columns.filter { it >= 0 }
-        val nodes = arrayListOf(HashMap<Long, Int>())
+        val nodes = arrayListOf(MutableLongIntMap())
         for (row in 0 until table.numTuples) {
             var node = 0
             for ((depth, column) in selected.withIndex()) {
                 if (!visit()) return null
                 val value = table.tuples[row * table.arity + column]
-                val next = nodes[node][value] ?: if (depth == selected.lastIndex) {
-                    0.also { nodes[node][value] = it }
-                } else {
-                    if (nodes.size >= maxStates) return null
-                    nodes.size.also {
-                        nodes[node][value] = it
-                        nodes.add(HashMap())
+                var next = nodes[node].getOrDefault(value, -1)
+                if (next < 0) {
+                    next = if (depth == selected.lastIndex) 0 else {
+                        if (nodes.size >= maxStates) return null
+                        nodes.size.also { nodes.add(MutableLongIntMap()) }
                     }
+                    nodes[node].put(value, next)
                 }
                 node = next
             }
@@ -91,7 +91,7 @@ internal object MddTableComposition {
         index: MddTransitionIndex,
         suffix: Array<BooleanArray>,
         columns: IntArray,
-        trie: List<Map<Long, Int>>,
+        trie: List<MutableLongIntMap>,
         visit: () -> Boolean,
         limits: ExtensionalComposition.Limits,
     ): ExtensionalIntersection? {
@@ -105,7 +105,7 @@ internal object MddTableComposition {
         for (layer in mdd.seq.indices) {
             starts[layer] = records.size
             val next = ArrayList<Long>()
-            val ids = HashMap<Long, Int>()
+            val ids = MutableLongIntMap()
             for ((source, key) in current.withIndex()) {
                 if (!visit()) return null
                 val original = (key ushr 32).toInt()
@@ -116,16 +116,19 @@ internal object MddTableComposition {
                     val target = mdd.transitions[pointer + 2].toInt()
                     if (target !in suffix[layer + 1].indices || !suffix[layer + 1][target]) continue
                     val value = mdd.transitions[pointer + 1]
-                    val child = if (columns[layer] < 0) node else trie[node][value]
-                    if (child == null) {
+                    val child = if (columns[layer] < 0) node else trie[node].getOrDefault(value, -1)
+                    if (child < 0) {
                         restricted = true
                         continue
                     }
                     val nextKey = pair(target, child)
-                    val destination = ids[nextKey] ?: run {
+                    var destination = ids.getOrDefault(nextKey, -1)
+                    if (destination < 0) {
                         if (states >= limits.states) return null
                         states++
-                        next.size.also { ids[nextKey] = it; next.add(nextKey) }
+                        destination = next.size
+                        ids.put(nextKey, destination)
+                        next.add(nextKey)
                     }
                     if (records.size / mdd.recordStride >= limits.records) return null
                     records.add(source.toLong())
