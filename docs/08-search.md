@@ -298,8 +298,14 @@ construction branch. Interval Tables and storage declines keep the full STR2 sca
 
 `val-selector=max-sd` ranks small integer domains by completed extensional support
 fractions, with at most 65,536 row/word visits for one ordering. Tables count live
-tuples through the bitmap or the small STR2 prefix; MDDs count live edges joining
-forward and backward reachable states, including shared-root reachability. These
+tuples through the bitmap or the small STR2 prefix. Deterministic, unweighted MDDs
+with distinct sequence variables cache prefix and suffix path counts, multiplying
+them at each live edge to count accepted assignments for a value. Admission allows
+at most 8,192 states and edges per diagram and 1,048,576 retained cells per state.
+Domain identity checks invalidate counts after narrowing or undo; interrupted
+rebuilds publish nothing. Counts exceeding signed 32-bit capacity, ambiguous or
+aliased diagrams, cost diagrams and storage declines retain live-edge counts
+joining forward and backward reachable states, including shared-root reachability. These
 counts describe relation structure and have no deduction authority. Unavailable
 or incomplete counters and larger domains retain residual-domain probing. The
 ordering keeps every candidate, including zero-count alternatives.
