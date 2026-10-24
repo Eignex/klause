@@ -55,6 +55,7 @@ class LinearSourceExecutionTest {
             )
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+                maximize = sense == ObjectiveSense.MAXIMIZE,
                 linearTraversal = traversal))
 
             val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(
