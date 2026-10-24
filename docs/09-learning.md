@@ -34,6 +34,10 @@ model and need not be minimal; an interrupted seeding cannot certify the full se
 Table filtering keeps STR2 explanations, built from build-local caches of historical
 domains that never cross propagation or undo. The reversible live prefix is committed
 once per completed sweep, and sibling branches restore filtering from trailed state.
+Ground cells reuse historical membership by column and value within one explanation
+build. Each rejected ground tuple needs at most one exclusion literal; supported
+values and unconditional root exclusions need no blocker premise. Interval cells
+retain their range and hole explanations.
 Root propagation folds unary Table restrictions with at most 4096 expanded supports,
 so local search samples from the same restrictions.
 

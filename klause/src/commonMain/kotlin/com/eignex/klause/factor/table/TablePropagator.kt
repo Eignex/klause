@@ -93,16 +93,14 @@ internal class TablePropagator(
         val snapshot = ExplanationSnapshot(state, xs, atTrail)
         val out = LitSet()
         if (col >= 0) columnLiterals(state, col, snapshot, out)
+        if (hi == null) return groundSupportLoss(state, col, snapshot, out)
         val ruledOut = IntArrayList()
         val kept = ArrayList<LongRange>()
-        val groundSupport = if (hi == null && col >= 0) LongHashSet() else null
         for (row in 0 until numTuples) {
             if (col >= 0 && cellAt(state, row, col, snapshot, null) == Cell.KILLED) continue
             val stood = (0 until arity).all { c -> c == col || cellAt(state, row, c, snapshot, null) == Cell.LIVE }
             when {
                 !stood -> ruledOut.add(row)
-
-                groundSupport != null -> groundSupport.add(cellLo(row, col))
 
                 col >= 0 -> kept.add(ownCell(row, col, snapshot))
 
@@ -115,12 +113,7 @@ internal class TablePropagator(
         for (k in 0 until ruledOut.size) {
             val row = ruledOut[k]
             if (col >= 0) {
-                val supported = if (groundSupport != null) {
-                    cellLo(row, col) in groundSupport
-                } else {
-                    covers(support, ownCell(row, col, snapshot))
-                }
-                if (supported) continue
+                if (covers(support, ownCell(row, col, snapshot))) continue
             }
             var covered = false
             var best = -1
@@ -142,6 +135,51 @@ internal class TablePropagator(
             pick.clear()
             cellAt(state, row, best, snapshot, pick)
             for (i in 0 until pick.size) out.add(pick[i])
+        }
+        return out.toArray()
+    }
+
+    // Ground cells need at most one premise. Cache membership by column/value within this historical
+    // build, then select a cached blocker directly instead of reconstructing its antecedents again.
+    private fun groundSupportLoss(
+        state: PropagationState,
+        col: Int,
+        snapshot: ExplanationSnapshot,
+        out: LitSet,
+    ): IntArray {
+        val ruledOut = IntArrayList()
+        val supported = LongHashSet()
+        for (row in 0 until numTuples) {
+            if (col >= 0 && snapshot.pointState(col, cellLo(row, col)) != POINT_LIVE) continue
+            val stood = (0 until arity).all { c ->
+                c == col || snapshot.pointState(c, cellLo(row, c)) == POINT_LIVE
+            }
+            when {
+                !stood -> ruledOut.add(row)
+                col >= 0 -> supported.add(cellLo(row, col))
+                else -> {
+                    for (c in 0 until arity) columnLiterals(state, c, snapshot, out)
+                    return out.toArray()
+                }
+            }
+        }
+        for (k in 0 until ruledOut.size) {
+            val row = ruledOut[k]
+            if (col >= 0 && cellLo(row, col) in supported) continue
+            var chosen = Lit.NONE
+            for (c in 0 until arity) {
+                if (c == col) continue
+                val value = cellLo(row, c)
+                val kind = snapshot.pointState(c, value)
+                if (kind == POINT_LIVE) continue
+                val lit = snapshot.pointLiteral(c, value, kind)
+                if (lit == Lit.NONE || out.has(lit)) {
+                    chosen = Lit.NONE
+                    break
+                }
+                if (chosen == Lit.NONE) chosen = lit
+            }
+            if (chosen != Lit.NONE) out.add(chosen)
         }
         return out.toArray()
     }
@@ -240,6 +278,36 @@ internal class TablePropagator(
         private val holes = Array(xs.size) { MutableLongIntMap() }
         private val lower = IntArray(xs.size) { -1 }
         private val upper = IntArray(xs.size) { -1 }
+        private val points by lazy(LazyThreadSafetyMode.NONE) { Array(xs.size) { MutableLongIntMap() } }
+
+        fun pointState(col: Int, value: Long): Int {
+            val cached = points[col].getOrDefault(value, POINT_MISSING)
+            if (cached != POINT_MISSING) return cached
+            val d = domains[col]
+            val root = state.rootDomains[xs[col]]
+            val kind = when {
+                value < d.min -> if (value >= root.min) POINT_LOWER else POINT_ROOT
+                value > d.max -> if (value <= root.max) POINT_UPPER else POINT_ROOT
+                value in d -> POINT_LIVE
+                else -> {
+                    val pos = carvedAt(col, value)
+                    when {
+                        pos > atTrail -> POINT_LIVE
+                        pos >= 0 -> POINT_HOLE
+                        else -> POINT_ROOT
+                    }
+                }
+            }
+            points[col].put(value, kind)
+            return kind
+        }
+
+        fun pointLiteral(col: Int, value: Long, kind: Int): Int = when (kind) {
+            POINT_LOWER -> lowerLiteral(col)
+            POINT_UPPER -> upperLiteral(col)
+            POINT_HOLE -> holeLiteral(col, value)
+            else -> Lit.NONE
+        }
 
         fun lowerLiteral(col: Int): Int {
             if (lower[col] < 0) lower[col] = Lit.make(state.atomVarGe(xs[col], domains[col].min), false)
@@ -582,6 +650,13 @@ internal class TablePropagator(
         }
 
     private companion object {
+        const val POINT_LIVE = -2
+        const val POINT_ROOT = -3
+        const val POINT_LOWER = -4
+        const val POINT_UPPER = -5
+        const val POINT_HOLE = -6
+        const val POINT_MISSING = -7
+
         /** [ranges] sorted and merged where they touch or overlap. */
         private fun mergeRanges(ranges: List<LongRange>): List<LongRange> {
             val merged = ArrayList<LongRange>()
