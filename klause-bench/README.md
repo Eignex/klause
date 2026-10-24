@@ -1816,3 +1816,19 @@ on `db40ae3` with retained continuous-leaf and LP lifecycle changes. It preserve
 the proof and feasibility outcomes, including all six gr4x6 closure proofs and
 their 107 checks; all 96 reported witnesses pass independent checking. Finite
 p0201 remains unproved with wall-budget-dependent values from 7665 to 7755.
+
+Fractional-state [7974](https://lab.eignex.com/jobs/7974) retains multiple eligible
+coordinates at 126 of p0033's 132 actual splits. Directional-history
+[7982](https://lab.eignex.com/jobs/7982) reaches incumbent 3447 at check 201 instead
+of 249, but retains nine pending alternatives at the same 256-operation allowance.
+The matched exact-policy [7983 pilot](https://lab.eignex.com/jobs/7983), with seed 3,
+P1, presolve off, debug enabled and three repeats on Mac/aarch64, rejects default
+activation: gr4x6 grows from 107 to 163 checks and from 10,715,823 to 17,300,008
+floating work units. Physical CLI wall time rises from 0.76 s to 0.91–0.96 s;
+p0033 floating work also increases, from 576,285 to 618,076. All twelve reported
+witnesses pass solchecker; native proofs are not independently checked.
+The twelve same-parent [7992 root queries](https://lab.eignex.com/jobs/7992) keep
+source order's first coordinate under the estimator, supplying no justification
+for production probing. These results retain source order as the default and the
+history mechanism as an internal research option; earlier incumbent progress is
+separate from total search cost and proof completion.
