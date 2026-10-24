@@ -18,6 +18,9 @@ restores the saved inputs and outputs directly. Feasible grading reads hard cost
 objective from the same probe, rejecting a hard violation before valuing the
 objective. Probes record no activity or best-cost observations, and weighted probes
 rescan only factors whose degrees change, in the order a full scan would use.
+Cancellation between reconciled primitive edits or definition outputs restores the
+saved coordinates before returning. A primitive probe edit and its restoration
+remain atomic; read-only extensional scores poll within their scans.
 
 A functional objective whose every cone definition is a node of the live network
 scores as the linear form of its terms: the probe has already propagated the cone, so
@@ -279,12 +282,17 @@ authority.
 
 ### Handles and exclusive ownership
 
-Optimization handles retain assignment, RNG, factor payloads, restart progress and
+Local-search handles retain assignment, RNG, factor payloads, restart progress and
 incumbent across slices. The scheduler charges each observed instruction delta once;
 closing or reseeding discards the state. A cancelled slice stays paused and keeps
 exclusive solver ownership. Other searches throw until completion, failure or close;
 portfolio workers use separate solvers. [Sessions](06-sessions.md) define the outer
 lifetime contract.
+
+A selected extensional move retains its application cursor across slices. Partial
+payload and definition updates stay private until reconciliation finishes. An
+unfinished application contributes no move instruction and supplies no publishable
+candidate.
 
 [LocalSearchEngine](../klause/src/commonMain/kotlin/com/eignex/klause/localsearch/LocalSearchEngine.kt)
 owns model preparation, exclusive acquisition, strategies and restart policies. Each
