@@ -179,6 +179,28 @@ class MixedExactLinearScoreTest {
     }
 
     @Test
+    fun `integer endpoint proposals should preserve the sign of the replacement product`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+            listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ZERO)
+        val state = LocalSearchState(LocalSearchModel.open(Problem(0, 1,
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)), arrayOf(row), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))), Random(3))
+        state.assignment.setInt(0, Long.MAX_VALUE)
+        state.recompute()
+        val before = state.cost
+        val move = Move.IntSet(0, Long.MIN_VALUE)
+
+        val delta = state.netDelta(move)
+        state.apply(move)
+
+        assertTrue(before > 0L)
+        assertEquals(-before, delta)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
     fun `nonfinite activities should stay violated for every relation and reifier`() {
         for (relation in LinearOp.entries) {
             val row = ExactLinear.of(IntArray(3) { Term.ofRealVar(it) }, List(3) { BigFraction.ONE },
