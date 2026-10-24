@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.WIDE_DOMAIN_DRAWS
+import com.eignex.klause.localsearch.movesource.PairSwap
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -15,6 +16,7 @@ import com.eignex.klause.util.plus
 
 internal class AffineDistinctInvariant(private val vars: IntArray, private val offsets: List<BigInt>) : Invariant {
     private val positions = vars.indices.groupBy { vars[it] }
+    private val sources = positions.keys.toIntArray()
 
     private class Counts {
         val values = HashMap<BigInt, Int>()
@@ -87,6 +89,7 @@ internal class AffineDistinctInvariant(private val vars: IntArray, private val o
             (state.factors[owner] as? AllDifferentInvariant)?.proposeOwnedSwaps(state, owner, variable, sink)
             return
         }
+        proposeSourceSwaps(state, variable, sink)
         val domain = state.rootDomains[variable]
         val targets = LongArray(AllDifferentInvariant.MAX_REPAIR_TARGETS)
         var filled = 0
@@ -111,5 +114,20 @@ internal class AffineDistinctInvariant(private val vars: IntArray, private val o
         val current = state.assignment.intValue(variable)
         if (current < domain.max) sink.addChannelingIntSet(state, variable, domain.higher(current))
         if (current > domain.min) sink.addChannelingIntSet(state, variable, domain.lower(current))
+    }
+
+    private fun proposeSourceSwaps(state: LocalSearchState, variable: Int, sink: MoveSink) {
+        if (!sink.allowsInt(variable)) return
+        val before = sink.size
+        val start = state.rng.nextInt(sources.size)
+        val attempts = minOf(sources.size, AllDifferentInvariant.MAX_STRUCTURED_SWAPS *
+            AllDifferentInvariant.SWAP_ATTEMPT_STRIDE)
+        for (step in 0 until attempts) {
+            val other = sources[(start + step) % sources.size]
+            if (!sink.allowsInt(other)) continue
+            val move = PairSwap.intSwapMove(state, variable, other, sameShape = false, checkOwner = true) ?: continue
+            sink.addCompound(move.parts)
+            if (sink.size - before >= AllDifferentInvariant.MAX_STRUCTURED_SWAPS) break
+        }
     }
 }

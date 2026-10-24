@@ -41,6 +41,8 @@ A source move updates every operand reading that coordinate, including aliases;
 probes restore the counts and discard zero-count keys. Its excess grade matches
 full exact collision grading. Bounded repair proposals choose unused affine values
 through source-domain moves and the ordinary move sink's ownership filters.
+Atomic source-value swaps use the pair-swap kernel and are scored against every
+affected factor; they do not require implicit seeding.
 When a plain seeded `AllDifferent` owns the chosen source, repair delegates bounded
 swaps to that owner's existing kernel. Reciprocal domains, pins and defined
 coordinates still filter both endpoints, and the owner's feasibility is preserved.
