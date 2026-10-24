@@ -40,10 +40,12 @@ internal object NumericalResidualReplay {
     private fun replay(input: JsonElement, out: File) {
         val spec = input.jsonObject
         val keys = setOf("job", "source", "residual", "sha256", "dense")
-        val options = setOf("synthetic", "entry", "workLimit", "observedOnly")
+        val options = setOf("synthetic", "entry", "workLimit", "observedOnly", "quantum")
         require(spec.keys.containsAll(keys) && (spec.keys - keys).all { it in options })
         val entry = spec["entry"]?.jsonPrimitive?.content ?: "scoped"
-        require(entry == "scoped" || entry == "session")
+        require(entry in setOf("scoped", "session", "cursor"))
+        val quantum = spec["quantum"]?.jsonPrimitive?.content?.toLong() ?: 0L
+        require(quantum >= 0L && (entry == "cursor" || "quantum" !in spec))
         val workLimit = spec["workLimit"]?.jsonPrimitive?.content?.toLong() ?: 1_200_000_000L
         require(workLimit in 0L..1_200_000_000L)
         val compareSynthetic = spec["synthetic"]?.jsonPrimitive?.content?.also { require(it == "compare") } != null
@@ -74,7 +76,9 @@ internal object NumericalResidualReplay {
             for ((denseLimit, syntheticWorkEnabled) in ordered) {
                 for (retained in listOf(false, true)) {
                     val observed = round == 3
-                    val result = measure(state, denseLimit, retained, observed, syntheticWorkEnabled, entry, workLimit)
+                    val result = measure(
+                        state, denseLimit, retained, observed, syntheticWorkEnabled, entry, workLimit, quantum,
+                    )
                     val report = buildJsonObject {
                         put("revision", Reports.readGitSha())
                         put("input", input)
@@ -85,6 +89,7 @@ internal object NumericalResidualReplay {
                         put("observed", observed)
                         put("syntheticWorkEnabled", syntheticWorkEnabled)
                         put("entry", entry)
+                        put("quantum", quantum)
                         put("sourceVerdictClaim", false)
                         put("captureContainsOriginalFactors", false)
                         put("result", result)
@@ -106,6 +111,7 @@ internal object NumericalResidualReplay {
         syntheticWorkEnabled: Boolean,
         entry: String,
         workLimit: Long,
+        quantum: Long,
     ): JsonElement {
         val probe = NumericalResidualProfile.Probe(denseLimit, observed, syntheticWorkEnabled)
         val observerType = Class.forName(ENGINE + "LpCertificationObserver")
@@ -122,7 +128,7 @@ internal object NumericalResidualReplay {
         val observer = recording.takeIf { observed }
         val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 2 }
             .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L)
-        val session = entry == "session"
+        val session = entry != "scoped"
         val ownerType = Class.forName(ENGINE + if (session) "LpSolveSession" else "LpScopedSolver")
         val constructor = ownerType.constructors.single { it.parameterCount == if (session) 3 else 9 }
         val prepare = if (session) null else ownerType.methods.single {
@@ -158,8 +164,15 @@ internal object NumericalResidualReplay {
                 val solveStarted = System.nanoTime()
                 val prepared = prepare?.invoke(active, stop) as? Boolean ?: true
                 val prepareNs = System.nanoTime() - solveStarted
+                var cursorResult: CursorResult? = null
                 val result = if (prepared) {
-                    if (session) {
+                    if (entry == "cursor") {
+                        val driven = driveCursor(
+                            active, requireNotNull(model), stop, workLimit, observer, quantum, observed,
+                        ) { solverField?.get(active)?.let { probe.unwrapped(it) } }
+                        cursorResult = driven
+                        driven.result
+                    } else if (session) {
                         defaultSolve.invoke(
                             null, active, model, stop, workLimit, observer, null, null, 0.0, null, 240, null,
                         )
@@ -173,13 +186,17 @@ internal object NumericalResidualReplay {
                 }
                 val elapsed = System.nanoTime() - solveStarted
                 solveNs += elapsed
-                val metricsOwner = if (session) solverField?.get(active)?.let { probe.unwrapped(it) } else active
+                val metricsOwner = if (session) {
+                    solverField?.get(active)?.let { probe.unwrapped(it) } ?: cursorResult?.metricsOwner
+                } else active
                 steps += buildJsonObject {
                     put("step", index)
                     put("prepared", prepared)
                     put("prepareNs", prepareNs)
                     put("elapsedNs", elapsed)
                     put("cancelled", stop())
+                    put("cursor", cursorResult?.report() ?: JsonNull)
+                    put("finalMetricsUnavailable", metricsOwner == null)
                     put("verdict", result?.let { NumericalResidualProfile.call(it, "getVerdict").toString() })
                     put("bound", result?.let { NumericalResidualProfile.call(it, "getLowerBound")?.toString() })
                     put("point", result?.let { NumericalResidualProfile.call(it, "getExactPrimal")?.toString() })
@@ -235,6 +252,88 @@ internal object NumericalResidualReplay {
             put("floatSolves", JsonArray(probe.solves))
             put("builds", JsonArray(probe.builds))
             put("certification", JsonArray(observations))
+        }
+    }
+
+    private data class CursorResult(
+        val result: Any,
+        val metricsOwner: Any?,
+        val advances: Int,
+        val quantum: Long,
+        val observed: Boolean,
+        val maximumAdvanceNs: Long,
+        val maximumCheckpointWork: Long,
+        val lastCheckpointWork: Long,
+        val samples: List<JsonElement>,
+        val omitted: Int,
+    ) {
+        fun report(): JsonElement = buildJsonObject {
+            put("advances", advances)
+            put("quantum", quantum)
+            put("observed", observed)
+            put("maximumAdvanceNs", if (observed) JsonPrimitive(maximumAdvanceNs) else JsonNull)
+            put("maximumCheckpointWork", if (observed) JsonPrimitive(maximumCheckpointWork) else JsonNull)
+            put("lastCheckpointWork", if (observed) JsonPrimitive(lastCheckpointWork) else JsonNull)
+            put("workScope", "floating checkpoint deltas; atomic certification is in observer records")
+            put("samples", JsonArray(samples))
+            put("samplesOmitted", omitted)
+        }
+    }
+
+    private fun driveCursor(
+        owner: Any,
+        model: Any,
+        cancellation: Cancellation,
+        workLimit: Long,
+        observer: Any?,
+        quantum: Long,
+        observed: Boolean,
+        metrics: () -> Any?,
+    ): CursorResult {
+        val open = owner.javaClass.methods.single {
+            it.name.substringBefore('$') == "openSolve" && it.parameterCount == 6
+        }
+        val cursor = requireNotNull(open.invoke(owner, model, cancellation, workLimit, observer, null, 0.0))
+        val advance = cursor.javaClass.methods.single { it.name == "advance" && it.parameterCount == 2 }
+        var advances = 0
+        var maximumNs = 0L
+        var maximumWork = 0L
+        var lastWork = 0L
+        var metricsOwner: Any? = null
+        val samples = ArrayList<JsonElement>()
+        var omitted = 0
+        return (cursor as AutoCloseable).use {
+            var result: Any? = null
+            while (result == null) {
+                val started = if (observed) System.nanoTime() else 0L
+                val step = requireNotNull(advance.invoke(cursor, quantum, { false }))
+                val elapsed = if (observed) System.nanoTime() - started else 0L
+                advances++
+                val completed = step.javaClass.simpleName == "Completed"
+                require(completed || step.javaClass.simpleName == "Paused")
+                if (observed) {
+                    val work = NumericalResidualProfile.call(cursor, "getWork") as Long
+                    check(work >= lastWork)
+                    maximumNs = maxOf(maximumNs, elapsed)
+                    maximumWork = maxOf(maximumWork, work - lastWork)
+                    lastWork = work
+                    metricsOwner = metrics() ?: metricsOwner
+                    if (samples.size < 256) {
+                        samples += buildJsonObject {
+                            put("advance", advances)
+                            put("completed", completed)
+                            put("elapsedNs", elapsed)
+                            put("checkpointWork", work)
+                            put("metrics", NumericalResidualProfile.json(metricsOwner?.let {
+                                NumericalResidualProfile.call(it, "getLastMetrics")
+                            }))
+                        }
+                    } else omitted++
+                }
+                if (completed) result = requireNotNull(NumericalResidualProfile.call(step, "getValue"))
+            }
+            CursorResult(result, metricsOwner, advances, quantum, observed, maximumNs,
+                maximumWork, lastWork, samples, omitted)
         }
     }
 }
