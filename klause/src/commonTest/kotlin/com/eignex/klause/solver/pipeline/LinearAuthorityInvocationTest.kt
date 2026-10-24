@@ -60,6 +60,27 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `borrowed source cut work should be reported only by the traversal that spent it`() {
+        val source = SourceProofContext(scope, setOf(integer), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(integer to BigFraction.ONE))
+
+        LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use { authority ->
+            val first = LinearAuthorityInvocation(source, TheoryParams(), borrowedAuthority = authority,
+                boundOrdered = true).use { it.run { _, _ -> } }
+            val second = LinearAuthorityInvocation(source, TheoryParams(), borrowedAuthority = authority,
+                boundOrdered = true).use { it.run { _, _ -> } }
+
+            val initial = assertNotNull(first.stats.smt.completeSearchStages)
+            val reused = assertNotNull(second.stats.smt.completeSearchStages)
+            assertTrue(initial.getValue("numericalCutPreparationWork") > 0L)
+            assertEquals(0L, reused["numericalCutPreparationWork"])
+            assertEquals(0L, reused["numericalCutVerificationWork"])
+        }
+    }
+
+    @Test
     fun `unsliced numerical execution should resume sparse guidance pauses`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(real, other), mapOf(
