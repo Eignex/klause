@@ -1,6 +1,9 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.factor.table.internals.MddLsIndex
+import com.eignex.klause.factor.table.internals.MddLsRelation
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -47,6 +50,7 @@ class LocalSearchProblem private constructor(
                 selection?.requireSource(problem)
                 val invariants = arrayOfNulls<Invariant>(problem.numFactors)
                 val tableCaches = HashMap<Int, MutableMap<LongArray, TableGroupCache>>()
+                val diagramCaches = HashMap<MddLsRelation, MddLsIndex>()
                 yield(null)
                 val boolCounts = IntArray(problem.numBoolVars)
                 yield(null)
@@ -70,6 +74,14 @@ class LocalSearchProblem private constructor(
                                 TableGroupCache(factor.arity, factor.tuples, null)
                             }
                             factor.tableInvariantProjection(cache)
+                        } else if (factor is Mdd && (selection == null || selection.usesBuiltInScoring(fid))) {
+                            val cache = diagramCaches.getOrPut(MddLsRelation(factor)) {
+                                MddLsIndex(
+                                    factor.numStatesPerLayer, factor.layerStarts,
+                                    factor.transitions, factor.recordStride,
+                                )
+                            }
+                            factor.mddInvariantProjection(cache)
                         } else {
                             selection?.invariant(fid, domains) ?: factor.invariantProjection(domains)
                         }

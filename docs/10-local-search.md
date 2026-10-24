@@ -219,6 +219,14 @@ cost gap. A single-position
 candidate recombines one layer, while repeated-position candidates recompute the
 distance with every occurrence substituted.
 
+Within admitted diagrams, shared immutable adjacency and symbol postings identify
+the states affected by an edited symbol or a changed neighbouring distance.
+Worker-private dirty words and changed-state lists propagate those differences.
+The estimated incoming-edge work selects a state frontier or a full layer; both
+reconcile the same distance vectors. Adjacency admission uses a 32 MiB storage
+estimate per relation, with symbol postings under their own shared 32 MiB budget.
+Diagrams outside admission retain full-layer updates.
+
 Satisfaction slices adapt their cancellation polling to elapsed move cost, with
 clock checks inside the polling window. Read-only extensional scoring and repair
 scans poll in work batches; interruption discards their candidate scratch without

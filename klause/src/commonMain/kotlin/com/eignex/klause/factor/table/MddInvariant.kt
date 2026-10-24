@@ -1,10 +1,14 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.factor.table.internals.MddLsFrontier
+import com.eignex.klause.factor.table.internals.MddLsIndex
+import com.eignex.klause.factor.table.internals.MddLsRelationIndex
 import com.eignex.klause.localsearch.LOCAL_SEARCH_OPERATION_BATCH
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.SteppedIntInvariant
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 
 internal class MddInvariant(
@@ -16,6 +20,7 @@ internal class MddInvariant(
     private val accepting: IntArray,
     private val recordStride: Int,
     private val cost: Int,
+    private val indexCache: MddLsIndex = MddLsIndex(numStatesPerLayer, layerStarts, transitions, recordStride),
 ) : SteppedIntInvariant {
 
     /** Positions in [seq] each variable occupies — usually one, so a single-symbol move recombines a
@@ -29,6 +34,7 @@ internal class MddInvariant(
     }
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
+        indexCache.get()
         val st = buildState(state)
         state.refPayload[factorId] = st
         state.factorDegree[factorId] = violationDegree(state, factorId)
@@ -58,23 +64,8 @@ internal class MddInvariant(
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
-        if (state.assignment.intValue(intVar) == oldValue) return 0
         val before = state.factorDegree[factorId]
-        val st = state.refPayload[factorId] as MddLsState
-        positionsByVar[intVar]?.let { positions ->
-            val first = positions.first()
-            val last = positions.last()
-            for (layer in first until seq.size) {
-                val changed = updateLayer(state, st, layer, forward = true)
-                if (!changed && layer >= last) break
-            }
-            for (layer in last downTo 0) {
-                val changed = updateLayer(state, st, layer, forward = false)
-                if (!changed && layer <= first) break
-            }
-            st.distance = acceptingDistance(st.forward)
-            st.weight = currentWeight(state, st.distance)
-        }
+        applyIntSetSteps(state, factorId, intVar, oldValue).forEach { }
         return violationDegree(state, factorId) - before
     }
 
@@ -87,31 +78,142 @@ internal class MddInvariant(
         return if (value > weight) value - weight else weight - value
     }
 
-    private fun updateLayer(state: LocalSearchState, st: MddLsState, layer: Int, forward: Boolean): Boolean {
-        val source = if (forward) st.forward[layer] else st.backward[layer + 1]
-        val target = if (forward) st.forward[layer + 1] else st.backward[layer]
-        val scratch = st.scratch
-        val inf = seq.size + 1
-        scratch.fill(inf, 0, target.size)
-        val symbol = state.assignment.intValue(seq[layer])
-        var record = layerStarts[layer]
-        while (record < layerStarts[layer + 1]) {
-            val from = transitions[record].toInt()
-            val to = transitions[record + 2].toInt()
-            val input = if (forward) from else to
-            val output = if (forward) to else from
-            val distance = source[input] + if (transitions[record + 1] == symbol) 0 else 1
-            if (distance < scratch[output]) scratch[output] = distance
-            record += recordStride
+    private suspend fun SequenceScope<Unit>.updateMoveLayer(
+        state: LocalSearchState,
+        st: MddLsState,
+        index: MddLsRelationIndex?,
+        layer: Int,
+        forward: Boolean,
+        intVar: Int,
+        oldValue: Long,
+    ): Boolean {
+        if (index != null) {
+            val frontier = st.frontier ?: MddLsFrontier(st.scratch.size).also { st.frontier = it }
+            updateFrontier(state, st, index, frontier, layer, forward, intVar, oldValue)
+            yield(Unit)
+            return !frontier.changed.isEmpty()
         }
         var changed = false
-        for (q in target.indices) {
-            if (target[q] != scratch[q]) {
-                target[q] = scratch[q]
-                changed = true
-            }
+        for (step in updateLayerSteps(state, st, layer, forward)) {
+            if (step == null) yield(Unit) else changed = step
         }
         return changed
+    }
+
+    private suspend fun SequenceScope<Unit>.updateFrontier(
+        state: LocalSearchState,
+        st: MddLsState,
+        index: MddLsRelationIndex,
+        frontier: MddLsFrontier,
+        layer: Int,
+        forward: Boolean,
+        intVar: Int,
+        oldValue: Long,
+    ) {
+        val target = if (forward) st.forward[layer + 1] else st.backward[layer]
+        val targetHead = if (forward) index.graph.bwdHead[layer] else index.graph.fwdHead[layer]
+        val directlyChanged = seq[layer] == intVar
+        val symbols = index.symbols?.get(layer)
+        if (directlyChanged && symbols == null) {
+            frontier.changed.clear()
+            for (step in updateLayerSteps(state, st, layer, forward, frontier.changed)) {
+                if (step == null) yield(Unit)
+            }
+            return
+        }
+        val sourceHead = if (forward) index.graph.fwdHead[layer] else index.graph.bwdHead[layer]
+        var work = 0
+        for (position in 0 until frontier.changed.size) {
+            val q = frontier.changed[position]
+            for (edge in sourceHead[q] until sourceHead[q + 1]) {
+                val output = if (forward) {
+                    transitions[index.graph.fwdPtr[layer][edge] + 2].toInt()
+                } else index.graph.bwdSrc[layer][edge]
+                frontier.mark(output, targetHead[output + 1] - targetHead[output])
+                if (++work == LOCAL_SEARCH_OPERATION_BATCH) {
+                    yield(Unit)
+                    work = 0
+                }
+            }
+        }
+        if (directlyChanged) {
+            val posting = checkNotNull(symbols)
+            fun mark(row: Int) {
+                val record = index.graph.fwdPtr[layer][row]
+                val output = transitions[record + if (forward) 2 else 0].toInt()
+                frontier.mark(output, targetHead[output + 1] - targetHead[output])
+            }
+            val newValue = state.assignment.intValue(intVar)
+            yieldAll(posting.forEachRowSteps(oldValue, oldValue, ::mark))
+            yieldAll(posting.forEachRowSteps(newValue, newValue, ::mark))
+        }
+        frontier.changed.clear()
+        val fullWork = (layerStarts[layer + 1] - layerStarts[layer]).toLong() / recordStride + target.size
+        if (frontier.edgeWork >= fullWork) {
+            for (word in frontier.firstWord..frontier.lastWord) {
+                frontier.dirtyWords[word] = 0L
+                if (++work == LOCAL_SEARCH_OPERATION_BATCH) {
+                    yield(Unit)
+                    work = 0
+                }
+            }
+            frontier.resetBounds()
+            for (step in updateLayerSteps(state, st, layer, forward, frontier.changed)) {
+                if (step == null) yield(Unit)
+            }
+            return
+        }
+        updateDirtyStates(state, st, index, frontier, layer, forward)
+    }
+
+    private suspend fun SequenceScope<Unit>.updateDirtyStates(
+        state: LocalSearchState,
+        st: MddLsState,
+        index: MddLsRelationIndex,
+        frontier: MddLsFrontier,
+        layer: Int,
+        forward: Boolean,
+    ) {
+        val source = if (forward) st.forward[layer] else st.backward[layer + 1]
+        val target = if (forward) st.forward[layer + 1] else st.backward[layer]
+        val head = if (forward) index.graph.bwdHead[layer] else index.graph.fwdHead[layer]
+        val symbol = state.assignment.intValue(seq[layer])
+        var work = 0
+        for (word in frontier.firstWord..frontier.lastWord) {
+            var bits = frontier.dirtyWords[word]
+            frontier.dirtyWords[word] = 0L
+            while (bits != 0L) {
+                val q = (word shl 6) + bits.countTrailingZeroBits()
+                bits = bits and (bits - 1)
+                var distance = seq.size + 1
+                for (edge in head[q] until head[q + 1]) {
+                    val input: Int
+                    val edgeSymbol: Long
+                    if (forward) {
+                        input = index.graph.bwdSrc[layer][edge]
+                        edgeSymbol = index.graph.bwdSym[layer][edge]
+                    } else {
+                        val record = index.graph.fwdPtr[layer][edge]
+                        input = transitions[record + 2].toInt()
+                        edgeSymbol = transitions[record + 1]
+                    }
+                    distance = minOf(distance, source[input] + if (edgeSymbol == symbol) 0 else 1)
+                    if (++work == LOCAL_SEARCH_OPERATION_BATCH) {
+                        yield(Unit)
+                        work = 0
+                    }
+                }
+                if (target[q] != distance) {
+                    target[q] = distance
+                    frontier.changed.add(q)
+                }
+            }
+            if (++work == LOCAL_SEARCH_OPERATION_BATCH) {
+                yield(Unit)
+                work = 0
+            }
+        }
+        frontier.resetBounds()
     }
 
     override fun applyIntSetSteps(
@@ -125,18 +227,19 @@ internal class MddInvariant(
         val st = state.refPayload[factorId] as MddLsState
         val first = positions.first()
         val last = positions.last()
+        val index = indexCache.get()
+        st.frontier?.changed?.clear()
         for (layer in first until seq.size) {
-            var changed = false
-            for (step in updateLayerSteps(state, st, layer, forward = true)) {
-                if (step == null) yield(Unit) else changed = step
-            }
+            val changed = updateMoveLayer(
+                state, st, index, layer, forward = true, intVar = intVar, oldValue = oldValue,
+            )
             if (!changed && layer >= last) break
         }
+        st.frontier?.changed?.clear()
         for (layer in last downTo 0) {
-            var changed = false
-            for (step in updateLayerSteps(state, st, layer, forward = false)) {
-                if (step == null) yield(Unit) else changed = step
-            }
+            val changed = updateMoveLayer(
+                state, st, index, layer, forward = false, intVar = intVar, oldValue = oldValue,
+            )
             if (!changed && layer <= first) break
         }
         var best = seq.size + 1
@@ -185,6 +288,7 @@ internal class MddInvariant(
         st: MddLsState,
         layer: Int,
         forward: Boolean,
+        changedStates: IntArrayList? = null,
     ): Sequence<Boolean?> = sequence {
         val source = if (forward) st.forward[layer] else st.backward[layer + 1]
         val target = if (forward) st.forward[layer + 1] else st.backward[layer]
@@ -214,6 +318,7 @@ internal class MddInvariant(
         for (q in target.indices) {
             if (target[q] != scratch[q]) {
                 target[q] = scratch[q]
+                changedStates?.add(q)
                 changed = true
             }
             if (q % LOCAL_SEARCH_OPERATION_BATCH == 0) yield(null)
@@ -699,6 +804,7 @@ internal fun mddRepairPath(
 internal class MddLsState(val forward: Array<IntArray>, val backward: Array<IntArray>, var distance: Int) {
     val scratch = IntArray(forward.maxOf { it.size })
     var weight: Long? = null
+    var frontier: MddLsFrontier? = null
 }
 
 /** `forward(i)(q)` = min symbol changes over layers `0 until i` to reach state `q` from [initial],

@@ -14,6 +14,7 @@ import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.*
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.*
+import com.eignex.klause.factor.table.internals.MddLsIndex
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -117,7 +118,7 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
         )
     } ?: NoInvariant
 
-    is Mdd -> MddInvariant(seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost)
+    is Mdd -> mddInvariantProjection()
 
     is NValue -> NValueInvariant(
         n, xs, mode, presents, exceptSet.toSet(),
@@ -223,6 +224,12 @@ internal fun Table.tableInvariantProjection(cache: TableGroupCache = TableGroupC
     val (single, multi) = tableColumnMaps(xs, arity)
     return TableInvariant(xs, tuples, arity, numTuples, single, multi, hi, cache)
 }
+
+internal fun Mdd.mddInvariantProjection(
+    cache: MddLsIndex = MddLsIndex(numStatesPerLayer, layerStarts, transitions, recordStride),
+): Invariant = MddInvariant(
+    seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost, cache,
+)
 
 private fun AllDifferent.allDifferentInvariantProjection(): Invariant {
     val counts = MutableIntIntMap()

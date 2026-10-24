@@ -1,12 +1,16 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.factor.table.internals.ExtensionalSupportIndex
+import com.eignex.klause.factor.table.internals.MddLsIndex
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.SteppedIntInvariant
+import com.eignex.klause.localsearch.mddInvariantProjection
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
@@ -15,6 +19,52 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MddInvariantTest {
+
+    @Test
+    fun `frontier and fallback updates should preserve exact distances across state word boundaries`() {
+        val width = 70
+        val transitions = LongArray(width * 9)
+        for (layer in 0 until 3) {
+            for (word in 0 until width) {
+                val record = (layer * width + word) * 3
+                transitions[record] = if (layer == 0) 0L else word.toLong()
+                transitions[record + 1] = ((word + layer) % width).toLong()
+                transitions[record + 2] = if (layer == 2) 0L else word.toLong()
+            }
+        }
+        val factor = Mdd(intArrayOf(0, 1, 2), intArrayOf(1, width, width, 1),
+            intArrayOf(0, width * 3, width * 6, width * 9), transitions, 0, intArrayOf(0), 3)
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, (width - 1).toLong()) }, arrayOf<Factor>(factor))
+        for (budget in listOf(0L, ExtensionalSupportIndex.MAX_BYTES)) {
+            for (stepped in listOf(false, true)) {
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+                val invariant = factor.mddInvariantProjection(MddLsIndex(
+                    factor.numStatesPerLayer, factor.layerStarts, factor.transitions, factor.recordStride, budget,
+                )) as SteppedIntInvariant
+                for (variable in 0..2) state.assignment.setInt(variable, 0)
+                invariant.initialize(state, 0)
+                val targets = listOf(63L, 64L, 65L, 64L, 65L, 66L, 0L, 1L, 2L, 69L, 0L, 1L)
+                for ((position, value) in targets.withIndex()) {
+                    val variable = position % 3
+                    val old = state.assignment.intValue(variable)
+                    val before = invariant.violationDegree(state, 0)
+                    val delta = invariant.deltaIfIntSet(state, 0, variable, value)
+
+                    state.assignment.setInt(variable, value)
+                    if (stepped) invariant.applyIntSetSteps(state, 0, variable, old).forEach { }
+                    else invariant.applyIntSet(state, 0, variable, old)
+
+                    val degree = invariant.violationDegree(state, 0)
+                    val expected = (0 until width).minOf { word ->
+                        (0..2).count { (word + it) % width != state.assignment.intValue(it).toInt() }
+                    }
+                    assertEquals(expected, degree)
+                    assertEquals(degree - before, delta)
+                    state.factorDegree[0] = degree
+                }
+            }
+        }
+    }
 
     @Test
     fun `a path cost aliased to a repeated symbol should stay exact through stepped edits`() {
