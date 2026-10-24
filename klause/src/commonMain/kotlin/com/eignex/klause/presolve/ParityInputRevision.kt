@@ -118,10 +118,13 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
             is Xor -> {
                 revision++
                 dirty = true
+                val columns = HashSet<Int>()
                 for (lit in factor.literals) {
                     if (!work.visit(1L)) return false
-                    update(boolColumns, Lit.variable(lit), direction)
+                    val v = Lit.variable(lit)
+                    if (!columns.add(v)) columns.remove(v)
                 }
+                if (!recordColumns(boolColumns, columns, direction, work)) return false
             }
             is Linear -> {
                 if (factor.op != LinearOp.EQ || factor.realVars.isNotEmpty()) return true
@@ -129,13 +132,31 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
                 val wide = factor.integralConstants ?: return true
                 revision++
                 dirty = true
+                val columns = HashSet<Int>()
                 for (k in factor.vars.indices) {
                     if (!work.visit(1L)) return false
                     val odd = narrow?.let { it.coeff(k) and 1L != 0L }
                         ?: !wide.exactCoeff(k).rem(bigIntOf(2)).isZero()
-                    if (odd) update(intColumns, factor.vars[k], direction)
+                    if (odd) {
+                        val v = factor.vars[k]
+                        if (!columns.add(v)) columns.remove(v)
+                    }
                 }
+                if (!recordColumns(intColumns, columns, direction, work)) return false
             }
+        }
+        return true
+    }
+
+    private fun recordColumns(
+        counts: MutableMap<Int, Int>,
+        columns: Set<Int>,
+        direction: Int,
+        work: ScanMeter,
+    ): Boolean {
+        for (v in columns) {
+            if (!work.visit(1L)) return false
+            update(counts, v, direction)
         }
         return true
     }

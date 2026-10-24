@@ -55,6 +55,19 @@ class ParityInputRevisionTest {
     }
 
     @Test
+    fun `pins canceled from parity rows should keep the input revision`() {
+        val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 0, 2, 4), 0)))
+        val inputs = ParityInputRevision(source, Cancellation.Never)
+        val before = assertNotNull(inputs.current(source))
+        val delta = SourceDelta(addedFactors = listOf(Clause(intArrayOf(Lit.make(0, true)))))
+
+        inputs.recordDelta(source.factors, delta.droppedIndices, delta.addedFactors)
+        val after = inputs.current(assertNotNull(source.withSourcePassDelta(delta)))
+
+        assertEquals(before, after)
+    }
+
+    @Test
     fun `finite root pins should invalidate parity without a new unit factor`() {
         val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
         val inputs = ParityInputRevision(source, Cancellation.Never)
