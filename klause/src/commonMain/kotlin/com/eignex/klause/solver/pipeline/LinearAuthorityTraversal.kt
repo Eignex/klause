@@ -66,6 +66,8 @@ internal class LinearAuthorityTraversal(
     private val branchHistory = LinearBranchHistory()
     private val path = arrayListOf(0 to root)
     private val current: CoverageNode get() = path.last().second
+    private var queriedNode: CoverageNode? = null
+    private var queriedSource: SourceProofContext? = null
     private val observations = linkedMapOf(
         "numericalIncumbentDominatedSplits" to 0L,
         "numericalIncumbentBoundClosures" to 0L,
@@ -174,7 +176,11 @@ internal class LinearAuthorityTraversal(
             }
         }
         if (!current.pending && !context.consumeCheck()) return SearchNodeDisposition.Indeterminate
-        val branch = source.atScope(source.scope.copy(condition = current.condition))
+        val branch = if (queriedNode === current) checkNotNull(queriedSource) else
+            source.atScope(source.scope.copy(condition = current.condition)).also {
+                queriedNode = current
+                queriedSource = it
+            }
         val result = if (useGuidance) authority.advance(branch, cancellation) else authority.check(branch, cancellation)
         if (result.paused) {
             current.pending = true

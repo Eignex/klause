@@ -50,6 +50,9 @@ internal class LinearAuthorityLp(
     private val guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
 ) : AutoCloseable {
     private var session = if (retain) LinearAuthoritySession(budget) else null
+    private var guidanceRows: List<ExactRationalInequality>? = null
+    private var guidanceInactive: Set<Int> = emptySet()
+    private var guidancePacked: LinearAuthorityModel? = null
     val preparations: Long get() = session?.preparations ?: 0L
     val reuses: Long get() = session?.reuses ?: 0L
     private val observer = object : LpCertificationObserver {
@@ -141,7 +144,13 @@ internal class LinearAuthorityLp(
             retained.close()
             return null
         }
-        val packed = LinearAuthorityModel.prepare(rows, costs.size, cancellation, inactive) ?: return null
+        val packed = guidancePacked?.takeIf {
+            guidanceRows === rows && guidanceInactive == inactive && it.columns.size == costs.size
+        } ?: LinearAuthorityModel.prepare(rows, costs.size, cancellation, inactive)?.also {
+            guidanceRows = rows
+            guidanceInactive = inactive
+            guidancePacked = it
+        } ?: return null
         var phase: String? = null
         return retained.advance(packed, costs, constant, scope, cancellation, guidancePolicy, observer) { guide, token ->
             phase = guide.phase.name
@@ -158,6 +167,9 @@ internal class LinearAuthorityLp(
     }
 
     override fun close() {
+        guidanceRows = null
+        guidanceInactive = emptySet()
+        guidancePacked = null
         session?.close()
     }
 

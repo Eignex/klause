@@ -119,6 +119,20 @@ class LinearAuthorityTest {
     }
 
     @Test
+    fun `retained queries should reject absent affine authority after a zero objective`() {
+        val source = SourceProofContext(scope, setOf(real), emptyMap(), emptyMap())
+        val unavailable = SourceProofContext(scope, setOf(real), emptyMap())
+
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            assertNotNull(authority.check(source, Cancellation.Never).evidence)
+            val result = authority.check(unavailable, Cancellation.Never)
+
+            assertNull(result.evidence)
+            assertNull(result.bound)
+        }
+    }
+
+    @Test
     fun `retained branch bounds should match cold queries after sibling retraction`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(real, other), mapOf(
