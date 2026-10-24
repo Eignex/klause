@@ -25,6 +25,17 @@ class SourceEvidenceVerifierTest {
     private val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
 
     @Test
+    fun `batched consequences should share one proof allowance`() {
+        val evidence = SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))
+
+        val checks = SourceEvidenceVerifier(context, maximumSteps = 4)
+            .verifyAll(listOf(evidence, evidence), Cancellation.Never)
+
+        assertEquals(SourceEvidenceCheck.Checked, checks.first())
+        assertIs<SourceEvidenceCheck.Unavailable>(checks.last())
+    }
+
+    @Test
     fun `integer rounding should respect signs and strict endpoints`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val half = BigFraction.ofLong(2).reciprocal()
