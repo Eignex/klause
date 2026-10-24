@@ -903,7 +903,7 @@ separate.
 The frozen `cap6000`, `rentacar` and `misc04inf` comparison rejects an automatic
 admission bypass based on sparsity or successful preparation alone
 ([diagnosis](https://lab.eignex.com/jobs/7846),
-[node-only qualification](https://lab.eignex.com/jobs/7893)). Their emitted
+[node-only qualification](https://lab.eignex.com/jobs/7903)). Their emitted
 rows/columns/nonzeros are 2171/6000/18243, 15801/17818/100772 and
 6305/9733/43195. The latter two exceed the admission proxy ceiling; their dominant
 components retain almost all rows and columns. The existing objective cone emits
@@ -913,10 +913,10 @@ Separating preparation and retaining one root owner clears the construction
 barrier. With work-stop feedback and no standalone diagnostic probes, each large
 model exhausts the existing cumulative allowance after eight node solves, all
 ending on work without a guide, checked bound, fixing or prune. Node work is
-149.25M/149.69M, with one preparation and one warm hit in eight attempts each;
+149.47M/149.94M, with one preparation and one warm hit in eight attempts each;
 retaining an owner does not establish retained factor progress. The control
-reaches the checked native lower bound -2451537 before governor demotion.
-The large node sequences take 0.477/0.464 s and allocate 1.96/1.59 GB on the
+reaches the checked native lower bound -2555534 before work exhaustion.
+The large node sequences take 0.228/0.113 s and allocate 0.665/0.314 GB on the
 measured thread, under the profile's actual 6 GiB maximum heap on Mac/aarch64,
 Java 25.0.4.1 with JFR. These phase observations establish neither physical peak
 memory nor an end-to-end speedup.
