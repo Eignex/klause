@@ -1561,6 +1561,22 @@ reduction, alongside its minimum model-change threshold. It reduced charged
 preparation work on the controls without a general speedup claim. See
 [presolve](../docs/07-presolve.md#pipeline).
 
+### Completed root refutations
+
+Completed root refutations remain terminal through finite preparation; see
+[presolve](../docs/07-presolve.md#rebuild-ownership).
+[Lab 8105](https://lab.eignex.com/jobs/8105) compares `f59091a21a` with
+`a2d2274258` on original `ChainReaction-20-020_c25`, CP/P1, LP off,
+`default,+probe-int-holes`, seeds 3/17 and 20 s. Both complete 2636 probes and
+report the same integer-hole refutation. Baseline then searches 11444/11674 nodes
+and returns UNKNOWN; retained incremental and fresh-round controls return native
+UNSAT before search in 3.73–3.99 s. The 10 s interrupted controls complete
+1626/1502 probes and remain UNKNOWN. All eight cases share source SHA-256
+`ae25fdbc0ebeb4d2a38ce455792f241208b32c83eb6deec5ae003ba221b22d93`,
+one Linux/amd64 c7i.2xlarge spot node, runtime, dependency identities and JVM
+options. These are native refutations without independent proof checking; the
+single repeats establish handoff behavior, not general throughput.
+
 ### Source preparation reuse and polling
 
 Reuse captured open plans only for the identical model and projection binding, and
