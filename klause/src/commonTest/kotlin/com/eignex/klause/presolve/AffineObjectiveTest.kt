@@ -71,11 +71,11 @@ class AffineObjectiveTest {
             val normalized = if (maximize) objective.negated() else objective
             val preparation = FinitePipeline.prepare(
                 FinitePipelineRequest(
-                source,
-                FiniteEngine.BACKTRACK,
-                normalized,
-                PresolveConfig.parse("affine"),
-            )
+                    source,
+                    FiniteEngine.BACKTRACK,
+                    normalized,
+                    PresolveConfig.parse("affine"),
+                ),
             )
             val result = BacktrackSolver(preparation.problem.bake()).minimize(assertNotNull(preparation.objective))
             val reduced = assertIs<MinimizeResult.Optimal>(result).sample
@@ -91,21 +91,21 @@ class AffineObjectiveTest {
         for (maximize in listOf(false, true)) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.BACKTRACK,
-                objective,
-                maximize,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.OPTIMIZE,
+                    FiniteEngine.BACKTRACK,
+                    objective,
+                    maximize,
+                ),
             )
 
             val result = assertIs<SourceExecutionResult.Finite>(
                 SourceSetup.execute(
                     SourceExecutionRequest(
-                invocation,
-                presolveConfig = PresolveConfig.parse("affine"),
-            )
-                )
+                        invocation,
+                        presolveConfig = PresolveConfig.parse("affine"),
+                    ),
+                ),
             )
 
             val optimum = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
@@ -124,12 +124,12 @@ class AffineObjectiveTest {
     fun `supplemental objective consumers should keep their original coordinates`() {
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-            source,
-            FiniteEngine.BACKTRACK,
-            objective,
-            PresolveConfig.parse("affine"),
-            transformObjective = false,
-        )
+                source,
+                FiniteEngine.BACKTRACK,
+                objective,
+                PresolveConfig.parse("affine"),
+                transformObjective = false,
+            ),
         )
 
         assertEquals(objective, preparation.objective)
@@ -139,12 +139,13 @@ class AffineObjectiveTest {
     @Test
     fun `translation should carry finite domain holes into the retained coordinate`() {
         val model = Problem(
-            0, 2,
+            0,
+            2,
             arrayOf(
-            IntDomain(1, 4).excludeValues(longArrayOf(2))!!,
-            IntDomain(0, 3).excludeValues(longArrayOf(2))!!,
-        ),
-            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1))
+                IntDomain(1, 4).excludeValues(longArrayOf(2))!!,
+                IntDomain(0, 3).excludeValues(longArrayOf(2))!!,
+            ),
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)),
         ).bake()
         val cost = LinearObjective(intCoefficients = longArrayOf(2, 3))
         val outcome = PresolvePipeline.run(model, cost, PresolveConfig.parse("affine"), false)

@@ -12568,10 +12568,11 @@ final class com.eignex.klause.presolve/PassDelta { // com.eignex.klause.presolve
         final fun <get-infeasible>(): kotlin/Boolean // com.eignex.klause.presolve/PassDelta.infeasible.<get-infeasible>|<get-infeasible>(){}[0]
     final val isEmpty // com.eignex.klause.presolve/PassDelta.isEmpty|{}isEmpty[0]
         final fun <get-isEmpty>(): kotlin/Boolean // com.eignex.klause.presolve/PassDelta.isEmpty.<get-isEmpty>|<get-isEmpty>(){}[0]
-    final var objective // com.eignex.klause.presolve/PassDelta.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.presolve/PassDelta.objective.<get-objective>|<get-objective>(){}[0]
     final val reconstruct // com.eignex.klause.presolve/PassDelta.reconstruct|{}reconstruct[0]
         final fun <get-reconstruct>(): kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>? // com.eignex.klause.presolve/PassDelta.reconstruct.<get-reconstruct>|<get-reconstruct>(){}[0]
+
+    final var objective // com.eignex.klause.presolve/PassDelta.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.presolve/PassDelta.objective.<get-objective>|<get-objective>(){}[0]
 }
 
 final class com.eignex.klause.presolve/PresolveBudget : com.eignex.klause.util/WorkMeter { // com.eignex.klause.presolve/PresolveBudget|null[0]
@@ -12734,14 +12735,15 @@ final class com.eignex.klause.presolve/Presolved { // com.eignex.klause.presolve
 
     final val infeasible // com.eignex.klause.presolve/Presolved.infeasible|{}infeasible[0]
         final fun <get-infeasible>(): kotlin/Boolean // com.eignex.klause.presolve/Presolved.infeasible.<get-infeasible>|<get-infeasible>(){}[0]
-    final var objective // com.eignex.klause.presolve/Presolved.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.presolve/Presolved.objective.<get-objective>|<get-objective>(){}[0]
     final val passesFired // com.eignex.klause.presolve/Presolved.passesFired|{}passesFired[0]
         final fun <get-passesFired>(): kotlin.collections/List<com.eignex.klause.presolve/PresolvePass> // com.eignex.klause.presolve/Presolved.passesFired.<get-passesFired>|<get-passesFired>(){}[0]
     final val problem // com.eignex.klause.presolve/Presolved.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.presolve/Presolved.problem.<get-problem>|<get-problem>(){}[0]
     final val reconstruct // com.eignex.klause.presolve/Presolved.reconstruct|{}reconstruct[0]
         final fun <get-reconstruct>(): kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample> // com.eignex.klause.presolve/Presolved.reconstruct.<get-reconstruct>|<get-reconstruct>(){}[0]
+
+    final var objective // com.eignex.klause.presolve/Presolved.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.presolve/Presolved.objective.<get-objective>|<get-objective>(){}[0]
 }
 
 final class com.eignex.klause.presolve/SharedIntOccurrence // com.eignex.klause.presolve/SharedIntOccurrence|null[0]
