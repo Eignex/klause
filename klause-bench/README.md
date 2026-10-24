@@ -1288,32 +1288,37 @@ source feasibility; they do not certify the CP optimum reports.
 state-local bounded tuple cache, restored-operand coverage checks and live dividend
 buckets. This is separate from the compilation relation index.
 The state-wide retention allowance keeps large families of small relations from
-materializing every tuple product; unretained relations still filter completely.
+materializing every tuple product; unretained relations use complete full scanning
+without constructing bucket metadata.
 
 Ordinary [7986](https://lab.eignex.com/jobs/7986) compares main `3b34027` with
 retained full scanning `a75c892`: nine sources, CP/LP off/P1, seed 3, 20 seconds,
-three repeats, debug off, on Mac/aarch64 with matching sources and runtime.
-All 54 outcomes agree. Median ChainReaction-20 nodes rise 16,189→20,370;
-the 10,000-pair-root ChainReaction-70 control rises 5,001→5,844. Both remain
-unknown. Coprime-08 retains objective 31 and 167 nodes; median propagation falls
-600→502 ms and process elapsed time 1.384→1.211 s. All six Coprime witnesses
-and six linear SMT witnesses pass independent checking. Twelve division-bearing
-SMT witnesses are declined and twelve vendored witnesses lack checker source
-resolution; native proof reports are not independently certified.
+three repeats, debug off, on Mac/aarch64. All 54 outcomes agree; median original
+ChainReaction nodes rise 16,189→20,370. Separate matched JFR
+[7981](https://lab.eignex.com/jobs/7981) estimates search allocation weight of
+27.83→13.95 GB in its first pair. Weights are statistical, not exact allocation.
 
-Separate JFR [7981](https://lab.eignex.com/jobs/7981) retains the same original
-ChainReaction source and settings. In its first pair, sampled search allocation
-weight falls 27.83→13.95 GB while reached nodes increase. Weights are statistical
-estimates, and sample shares alone establish no speedup. The ordinary elapsed
-portfolio runs do not establish identical search trajectories. The focused
-[7995 JFR](https://lab.eignex.com/jobs/7995) comparison isolates dividend-indexed
-filtering against retained full scanning on AWS/Linux/amd64. Its median node
-increase is about 0.5%, while sampled search allocation rises 8.43→9.10 GB;
-the lower filtering sample share establishes no whole-solver speedup. Ordinary
-[8009](https://lab.eignex.com/jobs/8009) compares bounded full scanning and indexed
-retention with main, including the large Coprime-40 resource control. Keep its
-actual platform cohorts separate.
-These focused measurements establish no corpus-wide speed or verdict gain.
+The AWS/Linux/amd64 index isolation [7995](https://lab.eignex.com/jobs/7995) has
+about 0.5% more median nodes but higher allocation weight, 8.43→9.10 GB;
+its lower filtering sample share establishes no whole-solver speedup. Ordinary
+[8009](https://lab.eignex.com/jobs/8009) compares main, bounded full scanning and
+bounded indexing across ten sources with the same settings. All 90 outcomes agree.
+The single-host AWS ChainReaction-20 cohort reaches median 10,574/12,408/12,922
+nodes; Mac Coprime-08 retains objective 31 and 167 nodes, with propagation medians
+632/505/475 ms. Wide-root Mac indexing trades away nodes against full scanning.
+All 18 Coprime and linear SMT witnesses pass independent checking. Eighteen
+division-bearing SMT witnesses are declined and eighteen vendored witnesses lack
+checker source resolution; native proof reports are not independently certified.
+
+Retain bucket metadata only for admitted caches. Mac
+[8015](https://lab.eignex.com/jobs/8015) compares `47726fa` with `84274bb` at the
+same settings: all 24 outcomes agree and all six Coprime witnesses pass checking.
+The 10,000-pair-root ChainReaction-70 median rises 5,556→6,377 nodes; the original
+changes 21,275→21,102 and Coprime propagation 476→477 ms at matching work.
+Large Coprime-40 remains unknown in preparation, supplying no search-throughput
+or cache-hit evidence. Sources, runtime, options and dependencies match within each
+actual platform cohort. These fixed-seed, elapsed-dependent portfolio runs establish
+neither identical trajectories nor a corpus-wide speed or verdict gain.
 
 ### Elective LP harvest controls
 
