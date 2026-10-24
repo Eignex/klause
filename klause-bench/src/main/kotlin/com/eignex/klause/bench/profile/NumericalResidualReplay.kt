@@ -78,7 +78,8 @@ internal object NumericalResidualReplay {
                 for (retained in listOf(false, true)) {
                     val observed = round == 3
                     val result = measure(
-                        state, denseLimit, retained, observed, syntheticWorkEnabled, entry, workLimit, quantum, auditBasis,
+                        state, denseLimit, retained, observed, syntheticWorkEnabled,
+                        entry, workLimit, quantum, auditBasis,
                     )
                     val report = buildJsonObject {
                         put("revision", Reports.readGitSha())
