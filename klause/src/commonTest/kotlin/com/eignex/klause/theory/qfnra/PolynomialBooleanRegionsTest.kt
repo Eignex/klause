@@ -10,6 +10,7 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,6 +20,115 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
+    @Test
+    fun `disjoint pairs retain their ordered regions through repeated backtracking`() {
+        for (length in listOf(1, 2, 3)) {
+            val declarations = (0 until 2 * length).joinToString(" ") { "(declare-const b$it Bool)" }
+            val pairs = (0 until length).joinToString(" ") { "(or b${2 * it} b${2 * it + 1})" }
+            val source = SmtLibPolynomial.parse("$declarations (assert (and $pairs))")
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+            val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+            val expected = (0 until (1 shl length)).map { mask ->
+                (0 until length).associate { pair ->
+                    val first = mask and (1 shl (length - pair - 1)) != 0
+                    (2 * pair + if (first) 0 else 1) to true
+                }
+            }
+            assertEquals(expected, regions.map { it.bools })
+            assertTrue(regions.all { it.atoms.isEmpty() })
+        }
+    }
+
+    @Test
+    fun `charged first region work grows linearly across disjoint pair families`() {
+        val work = listOf(8, 16, 32, 64).map { length ->
+            val declarations = (0 until 2 * length).joinToString(" ") { "(declare-const b$it Bool)" }
+            val pairs = (0 until length).joinToString(" ") { "(or b${2 * it} b${2 * it + 1})" }
+            val source = SmtLibPolynomial.parse("$declarations (assert (and $pairs))")
+            val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            var spent = 0L
+            val meter = WorkMeter { spent += it }
+            val cancellation = object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = meter
+            }
+
+            val first = formula.booleanRegions(PolynomialArithmetic(cancellation))
+                .asSequence().filterNotNull().first()
+
+            assertEquals((0 until length).associate { (2 * it + 1) to true }, first.bools)
+            spent
+        }
+
+        for ((smaller, larger) in work.zipWithNext()) {
+            assertTrue(larger <= 2 * smaller + 32, "first region work: $work")
+        }
+    }
+
+    @Test
+    fun `shared compound supports retain their first child tie order after retraction`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) (declare-const c Bool) (declare-const d Bool) " +
+                "(assert (or (and (or a b) c) (and (or a b) d)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+        assertEquals(listOf(mapOf(1 to true, 3 to true), mapOf(1 to true, 2 to true),
+            mapOf(0 to true, 3 to true), mapOf(0 to true, 2 to true)), regions.map { it.bools })
+    }
+
+    @Test
+    fun `negated conjunction support retains false premises through retraction`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) (assert (not (and a b)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+        assertEquals(listOf(mapOf(0 to false), mapOf(1 to false)), regions.map { it.bools })
+    }
+
+    @Test
+    fun `Boolean leaves retain priority over earlier numeric leaves`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const b Bool) (assert (or (> x 0) b))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+        assertEquals(listOf(PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
+            PolynomialBooleanRegion(emptyMap(), mapOf(0 to true))), regions)
+    }
+
+    @Test
+    fun `cancelling pending witness work leaves fresh region traversal intact`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) (declare-const c Bool) (declare-const d Bool) " +
+                "(assert (and (or a b) (or c d)))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        var stopped = false
+        val pending = formula.booleanRegions(PolynomialArithmetic(Cancellation { stopped }))
+        assertNull(pending.next())
+
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { pending.next() }
+        val regions = formula.booleanRegions(PolynomialArithmetic()).asSequence().filterNotNull().toList()
+        assertEquals(listOf(mapOf(1 to true, 3 to true), mapOf(1 to true, 2 to true),
+            mapOf(0 to true, 3 to true), mapOf(0 to true, 2 to true)), regions.map { it.bools })
+    }
+
     @Test
     fun `numeric sign retraction retains guarded zero and positive regions`() {
         val source = SmtLibPolynomial.parse(
