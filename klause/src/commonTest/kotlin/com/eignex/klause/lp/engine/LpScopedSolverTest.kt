@@ -116,6 +116,20 @@ class LpScopedSolverTest {
     }
 
     @Test
+    fun `cancellation while preparing an advance should retire the paused owner`() {
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+            var polls = 0
+            val token = Cancellation { ++polls >= 2 }
+
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100), token))
+
+            assertFalse(owner.floatPaused)
+            assertEquals(owner.metrics.createdOwners, owner.metrics.closedOwners)
+        }
+    }
+
+    @Test
     fun `retraction should discard a paused scoped solve`() {
         for (reset in listOf(false, true)) {
             LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
