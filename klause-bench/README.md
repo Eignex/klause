@@ -1832,3 +1832,21 @@ source order's first coordinate under the estimator, supplying no justification
 for production probing. These results retain source order as the default and the
 history mechanism as an internal research option; earlier incumbent progress is
 separate from total search cost and proof completion.
+
+[7997](https://lab.eignex.com/jobs/7997) completes 120 numerical controls over ten
+sources with default/exact policies and three repeats on one Linux spot host.
+All 24 reported witnesses pass solchecker. Gain history preserves outcomes and
+reduces pending alternatives on enlight4 from seven to three and flugplinf from
+fifteen to five, with slightly less floating work, while reproducing the gr4x6
+cost regression. The lseu and markshare1 holdouts have unavailable roots in both
+arms. A separate checked-refutation-priority
+[8007 prototype](https://lab.eignex.com/jobs/8007) reaches p0033's incumbent at
+check 143 but increases floating work to 647,201 and pending alternatives to
+eleven; it is rejected rather than integrated. The instrumented capture proves
+no whole-CLI timing or source verdict.
+
+[7999](https://lab.eignex.com/jobs/7999) completes 24 paired exact-policy default
+controls on a second Linux spot host. Source-order numerical gr4x6 retains its
+107-check proof, while automatic finite p0033 retains its 3089 proof. All 24
+reported witnesses pass solchecker. These controls preserve routing and outcomes;
+the native proof claims remain separate from independent witness checks.
