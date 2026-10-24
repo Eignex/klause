@@ -100,7 +100,7 @@ class MddIncrementalStateTest {
 
         assertContentEquals(intArrayOf(2, 1), counts.supporting)
         assertEquals(3, counts.total)
-}
+    }
 
     @Test
     fun `aliased diagrams should retain edge count fallback`() {
