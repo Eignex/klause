@@ -22,8 +22,8 @@ import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.Cancellation
 
 internal data class LinearAuthorityLpShape(
@@ -214,6 +214,7 @@ internal class LinearAuthorityLp(
     fun recover(
         coordinates: List<SourceCoordinate>, point: List<BigFraction>, rows: List<ExactRationalInequality>,
         inactive: Set<Int>, cancellation: Cancellation, observe: (String, Long) -> Unit,
+        progress: LinearPrimalRecoveryProgress,
     ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
         recoverLinearPrimal(coordinates, point, rows, inactive, token, complete = { residual, columns, active ->
             LinearAuthorityLp(budget, onShape).use { completion ->
@@ -223,7 +224,7 @@ internal class LinearAuthorityLp(
         }, observe = { stage, count ->
             if (stage == "PrimalRecoveryWork") budget.observe(refinement = count)
             observe(stage, count)
-        })
+        }, progress = progress)
     }
 
     fun combination(

@@ -15,6 +15,12 @@ internal data class LinearPrimalRecoveryLimits(
     val entries: Long = 65_536L,
 )
 
+internal class LinearPrimalRecoveryProgress {
+    var work: Long = 0L
+    var allocation: Long = 0L
+    val completed = mutableMapOf<Int, List<BigFraction>>()
+}
+
 // Recovered coordinates remain proposals; the original-source checker owns witness admission.
 internal fun recoverLinearPrimal(
     coordinates: List<SourceCoordinate>,
@@ -25,11 +31,14 @@ internal fun recoverLinearPrimal(
     complete: (List<ExactRationalInequality>, Int, Cancellation) -> List<BigFraction>?,
     observe: (String, Long) -> Unit,
     limits: LinearPrimalRecoveryLimits = LinearPrimalRecoveryLimits(),
+    progress: LinearPrimalRecoveryProgress = LinearPrimalRecoveryProgress(),
 ): List<BigFraction>? {
-    val meter = LinearPrimalMeter(limits, cancellation)
+    val initialWork = progress.work
+    val initialAllocation = progress.allocation
+    val meter = LinearPrimalMeter(limits, cancellation, progress)
     observe("PrimalRecoveryAttempts", 1L)
     return try {
-        meter.reserve(coordinates.size.toLong() + rows.size, 64L * coordinates.size + 32L * rows.size)
+        meter.reserve(coordinates.size.toLong() + rows.size, 256L * coordinates.size + 96L * rows.size)
         if (coordinates.size != point.size) return null
         for (id in coordinates.indices) {
             meter.number(point[id])
@@ -121,6 +130,8 @@ internal fun recoverLinearPrimal(
                     }
                 }
             }
+            meter.reserve(members.size.toLong() * (Int.SIZE_BITS - members.size.countLeadingZeroBits()))
+            members.sort()
             for (index in members.indices) local[members[index]] = index
             val localRows = componentRows.map { id ->
                 val row = residual[id]
@@ -130,13 +141,18 @@ internal fun recoverLinearPrimal(
             }
             if (meter.satisfies(members.map { recovered[it] }, localRows)) continue
             observe("PrimalRecoveryComponents", 1L)
-            val values = complete(localRows, members.size, cancellation)
+            val values = progress.completed[root]?.also { observe("PrimalRecoveryComponentReused", 1L) }
+                ?: complete(localRows, members.size, cancellation)
             meter.reserve(1L)
             if (values == null || values.size != members.size) {
                 observe("PrimalRecoveryComponentUnavailable", 1L)
                 return null
             }
             for (index in members.indices) recovered[members[index]] = meter.number(values[index])
+            if (root !in progress.completed) {
+                meter.reserve(values.size.toLong(), 32L * values.size)
+                progress.completed[root] = values.toList()
+            }
         }
         if (meter.satisfies(recovered, active)) {
             observe("PrimalRecoveryResidual", 1L)
@@ -146,25 +162,29 @@ internal fun recoverLinearPrimal(
         observe("PrimalRecovery${stop.reason}", 1L)
         null
     } finally {
-        observe("PrimalRecoveryWork", meter.work)
-        observe("PrimalRecoveryAllocation", meter.allocation)
+        observe("PrimalRecoveryWork", progress.work - initialWork)
+        observe("PrimalRecoveryAllocation", progress.allocation - initialAllocation)
     }
 }
 
 private class LinearPrimalStop(val reason: String) : RuntimeException()
 
-private class LinearPrimalMeter(private val limits: LinearPrimalRecoveryLimits, private val token: Cancellation) {
-    var work = 0L
-        private set
-    var allocation = 0L
-        private set
+private class LinearPrimalMeter(
+    private val limits: LinearPrimalRecoveryLimits,
+    private val token: Cancellation,
+    private val progress: LinearPrimalRecoveryProgress,
+) {
 
     fun reserve(units: Long, bytes: Long = 0L) {
-        if (token()) throw LinearPrimalStop("Stopped")
-        if (units > limits.work - work) throw LinearPrimalStop("WorkLimit")
-        if (bytes > limits.allocation - allocation) throw LinearPrimalStop("AllocationLimit")
-        work += units
-        allocation += bytes
+        val reason = when {
+            token() -> "Stopped"
+            units > limits.work - progress.work -> "WorkLimit"
+            bytes > limits.allocation - progress.allocation -> "AllocationLimit"
+            else -> null
+        }
+        if (reason != null) throw LinearPrimalStop(reason)
+        progress.work += units
+        progress.allocation += bytes
         token.charge(units)
         if (token()) throw LinearPrimalStop("Stopped")
     }
