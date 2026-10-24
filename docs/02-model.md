@@ -150,8 +150,9 @@ linear scans between the engine's cancellation polls.
 ### Distinct-value counts
 
 `NValue` retains its counted positions, target, comparison mode, optional presence
-literals and excluded values. Reductions to equality or all-different apply only
-without exclusions or optional positions. Finite propagation bounds the count of
+literals and excluded values. Exact fixed targets reduce to equality at one and
+to `AllDifferent` at the list arity, independently of numeric span; these reductions
+require mandatory positions and no exclusions. Finite propagation bounds the count of
 definitely-present non-excluded values, using matching and kernel filters for the
 mandatory form, and checks the exact count at a complete assignment. Local search
 maintains exact counts and move deltas. The optional LP value hull is a relaxation;
