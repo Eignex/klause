@@ -25,6 +25,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -148,6 +149,7 @@ class LocalSearchState private constructor(
 
     /** The problem's invariants, aliased so the hot LS loops read `factors` directly. */
     val factors: Array<out Invariant> = projection.invariants
+    internal val hasSteppedInvariants: Boolean = factors.any { it is SteppedIntInvariant }
 
     private val cumulativeFactors: IntArray by lazy(LazyThreadSafetyMode.NONE) {
         problem.factors.indices.filter { problem.factors[it] is Cumulative }.toIntArray()
@@ -250,6 +252,27 @@ class LocalSearchState private constructor(
     private var definitionTraversal: DefinitionTraversal? = null
     private var definitionValues: DefinitionValues? = null
     private var moveActive = false
+    private var scoringCancellation: Cancellation = Cancellation.Never
+    private var scoringCountdown = 0
+
+    internal fun scoringPick(cancellation: Cancellation, pick: () -> Move?): Move? {
+        scoringCancellation = cancellation
+        scoringCountdown = 0
+        return try {
+            pick()
+        } catch (_: LocalSearchScoringInterrupted) {
+            null
+        } finally {
+            scoringCancellation = Cancellation.Never
+        }
+    }
+
+    internal fun checkScoringWork() {
+        if (moveActive || scoringCancellation === Cancellation.Never) return
+        if (scoringCountdown-- > 0) return
+        scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
+        if (scoringCancellation()) throw LocalSearchScoringInterrupted
+    }
 
     // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
     // degree changes during a probe's forward apply, snapshotting its pre-probe violated status on
@@ -484,6 +507,90 @@ class LocalSearchState private constructor(
         applyCore(move)
         val net = invariants ?: return
         propagateInvariants(net, move, affected)
+    }
+
+    internal fun applySteps(move: Move): Sequence<Unit> = sequence {
+        check(!probeActive && !moveActive) { "local-search moves cannot be nested" }
+        val revisionBefore = assignmentRevision
+        moveActive = true
+        trackedMoveStarted = false
+        try {
+            applyCoreSteps(move)
+            val net = invariants
+            if (net != null) {
+                collectMoveSeeds(move)
+                val nodes = affectedDefinitions(net)
+                val values = definitionValues ?: DefinitionValues(net).also { definitionValues = it }
+                val traversal = checkNotNull(definitionTraversal)
+                if (traversal.prefersNodeScan()) {
+                    for (position in 0 until nodes.size) {
+                        val idx = nodes[position]
+                        if (values.pending.get(idx)) propagateDefinitionSteps(net, values, idx)
+                        if (position % LOCAL_SEARCH_OPERATION_BATCH == 0) yield(Unit)
+                    }
+                } else {
+                    var next = traversal.nextPending(values.pending, 0)
+                    while (next >= 0) {
+                        val idx = next
+                        propagateDefinitionSteps(net, values, idx)
+                        next = traversal.nextPending(values.pending, idx + 1)
+                        yield(Unit)
+                    }
+                }
+            }
+            if (cost < bestCostSeen) bestCostSeen = cost
+        } finally {
+            if (assignmentRevision != revisionBefore) boardCoverage.invalidate()
+            moveActive = false
+        }
+    }
+
+    private suspend fun SequenceScope<Unit>.applyCoreSteps(move: Move) {
+        when (move) {
+            is Move.IntSet -> yieldAll(applyIntSetSteps(move.varId, move.newValue))
+            is Move.Compound -> for (part in move.parts) applyCoreSteps(part)
+            else -> applyCore(move)
+        }
+    }
+
+    private suspend fun SequenceScope<Unit>.propagateDefinitionSteps(
+        net: InvariantNetwork,
+        values: DefinitionValues,
+        idx: Int,
+    ) {
+        val node = net.node(idx)
+        if (if (node.outIsBool) assumptions.isFrozenBool(node.out) else !moveSink.allowsDefinedInt(node.out)) return
+        val value = values.eval(idx, assignment, rootDomains)
+        if (value != DefinitionalSweep.SweepNode.NO_WRITE) {
+            if (node.outIsBool) {
+                if (assignment.boolValue(node.out) != (value != 0L)) applyBoolFlip(node.out)
+            } else if (assignment.intValue(node.out) != value) {
+                yieldAll(applyIntSetSteps(node.out, value))
+            }
+        }
+        values.pending.clear(idx)
+    }
+
+    private fun applyIntSetSteps(intVar: Int, newValue: Long): Sequence<Unit> = sequence {
+        val old = assignment.intValue(intVar)
+        if (old == newValue) return@sequence
+        definitionValues?.intChanged(intVar)
+        val touched = projection.intOccurrences[intVar]
+        retractForIntSet(touched)
+        assignmentRevision++
+        assignment.setInt(intVar, newValue)
+        for (factorId in touched) {
+            val factor = factors[factorId]
+            if (factor is SteppedIntInvariant) {
+                yieldAll(factor.applyIntSetSteps(this@LocalSearchState, factorId, intVar, old))
+                updateViolation(factorId, factor.violationDegree(this@LocalSearchState, factorId))
+            } else {
+                updateViolation(factorId, refreshIntFactor(factorId, intVar, old))
+            }
+            yield(Unit)
+        }
+        settleForIntSet(touched, intVar, old)
+        trackMove(touched, problem.numBoolVars + intVar) { intConfChange[intVar] = false }
     }
 
     private fun applyCore(move: Move): Unit = when (move) {
@@ -978,6 +1085,10 @@ class LocalSearchState private constructor(
         commit()
         refresh()
         settle()
+        trackMove(touchedFactors, slot, markMovedVar)
+    }
+
+    private inline fun trackMove(touchedFactors: IntArray, slot: Int, markMovedVar: () -> Unit) {
         if (activityTracking) {
             if (!trackedMoveStarted) {
                 tabu.step++
@@ -1077,12 +1188,16 @@ class LocalSearchState private constructor(
         retractBruteForce(touched) { it.maintainsIntBreakMakeIncrementallyForIntSet }
 
     private fun refreshForIntSet(touched: IntArray, intVar: Int, old: Long) = refreshFactors(touched) {
-        val factor = factors[it]
-        if (factor is DegreeUpdatingInvariant) {
-            factor.applyIntSetDegree(this, it, intVar, old)
+        refreshIntFactor(it, intVar, old)
+    }
+
+    private fun refreshIntFactor(factorId: Int, intVar: Int, old: Long): Int {
+        val factor = factors[factorId]
+        return if (factor is DegreeUpdatingInvariant) {
+            factor.applyIntSetDegree(this, factorId, intVar, old)
         } else {
-            factor.applyIntSet(this, it, intVar, old)
-            factor.violationDegree(this, it)
+            factor.applyIntSet(this, factorId, intVar, old)
+            factor.violationDegree(this, factorId)
         }
     }
 
