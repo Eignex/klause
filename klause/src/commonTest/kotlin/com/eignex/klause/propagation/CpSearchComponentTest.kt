@@ -76,6 +76,10 @@ class CpSearchComponentTest {
             val cp = CpSearchComponent(native)
             var publications = 0
             val context = object : SearchContext by SearchSession(emptyList()) {
+                override fun publish(literal: Int): ComponentResult {
+                    publications++
+                    return ComponentResult.Consistent
+                }
                 override fun publish(decision: SearchDecision, premise: SearchAtomPremise): ComponentResult {
                     publications++
                     return ComponentResult.Consistent
