@@ -2,6 +2,7 @@ package com.eignex.klause.factor.table.internals
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.ExtensionalSupportCounts
 import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
@@ -230,7 +231,7 @@ internal class MddIncrementalState(
             val off = s - minSym
             val alive = off in 0 until symSpan &&
                 ((survives[(off ushr 6).toInt()] ushr (off and 63L).toInt()) and 1L) != 0L
-            if (!alive && !state.excludeIntValue(seq[i], s, reason(state, PRUNE, i, ant))) return false
+            if (!alive && !state.excludeIntValue(seq[i], s, reason(state, PRUNE, i, ant, s))) return false
         }
         return true
     }
@@ -284,7 +285,7 @@ internal class MddIncrementalState(
                 owner.checkFiniteWork()
                 val off = s - d.min
                 if (((survives[(off ushr 6).toInt()] ushr (off and 63L).toInt()) and 1L) == 0L) {
-                    if (!state.excludeIntValue(seq[i], s, reason(state, PRUNE, i, ant))) return false
+                    if (!state.excludeIntValue(seq[i], s, reason(state, PRUNE, i, ant, s))) return false
                 }
             }
         }
@@ -344,10 +345,55 @@ internal class MddIncrementalState(
     }
 
     // A pruned position's reason, or the cost bound's (argument 1 for the lower bound), recorded lazily.
-    private fun reason(state: PropagationState, kind: Int, arg: Int, coarse: IntArray?): IntArray? = when {
+    private fun reason(
+        state: PropagationState,
+        kind: Int,
+        arg: Int,
+        coarse: IntArray?,
+        value: Long? = null,
+    ): IntArray? = when {
         state.currentLevel == 0 -> null
-        state.undoLogging -> state.lazyReason(intArrayOf(kind, arg))
+        state.undoLogging -> state.lazyReason(
+            if (value == null) intArrayOf(kind, arg) else {
+                intArrayOf(kind, arg, (value ushr 32).toInt(), value.toInt())
+            },
+        )
         else -> coarse
+    }
+
+    fun supportCounts(variable: Int, values: LongArray, visit: () -> Boolean): ExtensionalSupportCounts? {
+        if (valid.value == 0) return null
+        val pos = seq.indexOf(variable)
+        if (pos < 0) return null
+        val snapshot = if (snapshotOnly.value == 1) idx.rootSnapshot ?: return null else null
+        val counts = IntArray(values.size)
+        val domain = owner.intDomains[seq[pos]]
+        val head = fwdHead[pos]
+        val ptr = fwdPtr[pos]
+        var total = 0
+        for (k in 0 until layerWords[pos]) {
+            if (!visit()) return null
+            var word = if (snapshot == null) fwd[layerBase[pos] + k] else snapshot.fwd[layerBase[pos] + k]
+            while (word != 0L) {
+                val src = (k shl 6) + word.countTrailingZeroBits()
+                word = word and (word - 1)
+                if (src >= numStatesPerLayer[pos]) continue
+                for (edge in head[src] until head[src + 1]) {
+                    if (!visit()) return null
+                    val p = ptr[edge]
+                    val sym = transitions[p + 1]
+                    val dst = transitions[p + 2].toInt()
+                    if (sym !in domain || dst !in 0 until numStatesPerLayer[pos + 1]) continue
+                    val slot = layerBase[pos + 1] + (dst ushr 6)
+                    val backward = if (snapshot == null) bwd[slot] else snapshot.bwd[slot]
+                    if (backward and (1L shl (dst and 63)) == 0L) continue
+                    total++
+                    val candidate = values.binarySearch(sym)
+                    if (candidate >= 0) counts[candidate]++
+                }
+            }
+        }
+        return if (total == 0) null else ExtensionalSupportCounts(counts, total)
     }
 
     fun propagate(state: PropagationState, factorId: Int): Boolean {

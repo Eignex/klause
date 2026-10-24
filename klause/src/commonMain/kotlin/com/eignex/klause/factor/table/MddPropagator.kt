@@ -6,6 +6,8 @@ import com.eignex.klause.factor.table.internals.MddIncrementalState
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.ExtensionalSupportCounts
+import com.eignex.klause.propagation.ExtensionalSupportProvider
 import com.eignex.klause.propagation.InterruptiblePropagator
 
 internal class MddPropagator(
@@ -20,7 +22,16 @@ internal class MddPropagator(
     private val recordStride: Int,
     private val cost: Int,
     private val transitionIndex: MddTransitionIndex? = null,
-) : InterruptiblePropagator {
+) : InterruptiblePropagator, ExtensionalSupportProvider {
+
+    override fun supportCounts(
+        state: PropagationState,
+        factorId: Int,
+        variable: Int,
+        values: LongArray,
+        visit: () -> Boolean,
+    ): ExtensionalSupportCounts? =
+        (state.refPayload[factorId] as? MddIncrementalState)?.supportCounts(variable, values, visit)
 
     override fun interrupted(state: PropagationState, factorId: Int) {
         (state.refPayload[factorId] as? MddIncrementalState)?.invalidate()
@@ -47,7 +58,10 @@ internal class MddPropagator(
 
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
         if (payload[0] == MddIncrementalState.PRUNE) {
-            explainer.prune(state, payload[1], atTrail)
+            val value = if (payload.size < 4) null else {
+                (payload[2].toLong() shl 32) or (payload[3].toLong() and 0xFFFFFFFFL)
+            }
+            explainer.prune(state, payload[1], atTrail, value)
         } else {
             explainer.costBound(state, lower = payload[1] == 1, atTrail)
         }

@@ -9,6 +9,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.ExtensionalSupportCounts
+import com.eignex.klause.propagation.ExtensionalSupportProvider
 import com.eignex.klause.propagation.InterruptiblePropagator
 import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.carvedAt
@@ -37,7 +39,7 @@ internal class TablePropagator(
      *  nothing" verdict so later rows with the same column bounds skip re-sweeping the shared table.
      *  Null for a lone table — then every fire sweeps. */
     private val groupCache: TableGroupCache? = null,
-) : InterruptiblePropagator {
+) : InterruptiblePropagator, ExtensionalSupportProvider {
 
     private val unarySupports = boundedUnarySupports()
     private val supportCache = groupCache ?: TableGroupCache(arity, tuples, hi)
@@ -46,6 +48,35 @@ internal class TablePropagator(
 
     override fun interrupted(state: PropagationState, factorId: Int) {
         (state.refPayload[factorId] as? TableStr2State)?.started = false
+    }
+
+    override fun supportCounts(
+        state: PropagationState,
+        factorId: Int,
+        variable: Int,
+        values: LongArray,
+        visit: () -> Boolean,
+    ): ExtensionalSupportCounts? {
+        val support = state.refPayload[factorId] as? TableStr2State ?: return null
+        if (hi != null || !support.started || support.numValid == 0) return null
+        val col = xs.indexOf(variable)
+        if (col < 0) return null
+        val index = support.index
+        val counts = IntArray(values.size)
+        if (index != null) {
+            if (!support.baselineMatches(visit)) return null
+            val live = requireNotNull(support.live)
+            for (i in values.indices) {
+                counts[i] = index.columns[col].countLive(values[i], { live[it] }, visit) ?: return null
+            }
+        } else {
+            for (i in 0 until support.numValid) {
+                if (!visit()) return null
+                val candidate = values.binarySearch(cellLo(support.validTuples[i], col))
+                if (candidate >= 0) counts[candidate]++
+            }
+        }
+        return ExtensionalSupportCounts(counts, support.numValid)
     }
 
     /** Lower/upper bound the cell at (row, col) accepts; equal for a point, `[MIN, MAX]` for a `*`. */
@@ -405,13 +436,13 @@ internal class TablePropagator(
                 // This row sweeps nothing, so it has nothing to filter and needs no live set. A group's
                 // rows share one relation but each would otherwise allocate its own O(numTuples) tuple
                 // index — the dominant term in the build's peak memory on the largest table instances.
-                if (existing != null) existing.started = true else state.refPayload[factorId] = NoopStarted
+                if (existing == null) state.refPayload[factorId] = NoopStarted
                 return true
             }
             val s = existing ?: newLiveSet(state, factorId)
             val ok = propagateBitset(state, s)
             if (ok) {
-                s.started = true
+                s.commit()
                 // Record the verdict once: under full contiguous bounds the sweep pruned no domain value
                 // iff every column still spans its bounds (any tuple removal doesn't change a domain).
                 if (contiguous && gc.noopMins == null) {
@@ -430,14 +461,17 @@ internal class TablePropagator(
         }
         val s = existing ?: newLiveSet(state, factorId)
         val ok = if (bitsetEligible) propagateBitset(state, s) else propagateWide(state, s)
-        if (ok) s.started = true
+        if (ok) s.commit()
         return ok
     }
 
     /** The STR2 live set for this factor, installed on first genuine use. Every tuple starts live, which
      *  is exactly the state a sweep would have left: a row reaching here has filtered nothing yet. */
     private fun newLiveSet(state: PropagationState, factorId: Int): TableStr2State {
-        val fresh = TableStr2State(IntArray(numTuples) { state.checkFiniteWork(); it }, numTuples, state)
+        val index = if (hi == null && numTuples >= 128) supportCache.supports { state.checkFiniteWork() } else null
+        val fresh = TableStr2State(
+            IntArray(numTuples) { state.checkFiniteWork(); it }, numTuples, state, xs, index,
+        )
         state.refPayload[factorId] = fresh
         return fresh
     }
@@ -452,6 +486,7 @@ internal class TablePropagator(
     /** STR2 sweep + support filtering with a per-column span-sized bitset — the fast path for columns
      *  whose domain is within Int range and narrow ([MAX_BITSET_SPAN]). */
     private fun propagateBitset(state: PropagationState, s: TableStr2State): Boolean {
+        val delta = s.beginSweep()
         val domLo = LongArray(arity)
         val domHi = LongArray(arity)
         val supportBits = arrayOfNulls<LongArray>(arity)
@@ -473,12 +508,12 @@ internal class TablePropagator(
         while (i < numValid) {
             state.checkFiniteWork()
             val row = s.validTuples[i]
-            var feasible = true
-            for (col in 0 until arity) {
-                state.checkFiniteWork()
-                if (!cellFeasible(state, row, col, state.intDomains[xs[col]])) {
-                    feasible = false
-                    break
+            val feasible = if (delta) {
+                requireNotNull(s.live)[row ushr 6] and (1L shl (row and 63)) != 0L
+            } else {
+                (0 until arity).all { col ->
+                    state.checkFiniteWork()
+                    cellFeasible(state, row, col, state.intDomains[xs[col]])
                 }
             }
             if (!feasible) {
@@ -520,6 +555,7 @@ internal class TablePropagator(
         }
         // The sparse-set permutation restores every removed row when the prefix size is undone.
         s.numValid = numValid
+        if (!delta) s.rebuildLive()
         if (numValid == 0) return false
         if (fullySupported.all { it }) return true
         val coarse by lazy(LazyThreadSafetyMode.NONE) { collectHoleAndBoundAntecedents(state, xs) }
@@ -583,6 +619,7 @@ internal class TablePropagator(
      *  supported value directly. (A column over a *contiguous* wide domain still enumerates it in the
      *  removal sweep below; the realistic wide case is a small-cardinality set domain — a bucket table.) */
     private fun propagateWide(state: PropagationState, s: TableStr2State): Boolean {
+        val delta = s.beginSweep()
         val supported = Array(arity) { LongHashSet(numTuples) }
         val minSup = LongArray(arity) { Long.MAX_VALUE }
         val maxSup = LongArray(arity) { Long.MIN_VALUE }
@@ -592,12 +629,12 @@ internal class TablePropagator(
         while (i < numValid) {
             state.checkFiniteWork()
             val row = s.validTuples[i]
-            var feasible = true
-            for (col in 0 until arity) {
-                state.checkFiniteWork()
-                if (!cellFeasible(state, row, col, state.intDomains[xs[col]])) {
-                    feasible = false
-                    break
+            val feasible = if (delta) {
+                requireNotNull(s.live)[row ushr 6] and (1L shl (row and 63)) != 0L
+            } else {
+                (0 until arity).all { col ->
+                    state.checkFiniteWork()
+                    cellFeasible(state, row, col, state.intDomains[xs[col]])
                 }
             }
             if (!feasible) {
@@ -633,6 +670,7 @@ internal class TablePropagator(
         }
         // The sparse-set permutation restores every removed row when the prefix size is undone.
         s.numValid = numValid
+        if (!delta) s.rebuildLive()
         if (numValid == 0) return false
         val coarse by lazy(LazyThreadSafetyMode.NONE) { collectHoleAndBoundAntecedents(state, xs) }
         for (col in 0 until arity) {

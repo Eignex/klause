@@ -1,5 +1,7 @@
 package com.eignex.klause.factor.table.internals
 
+import kotlin.concurrent.Volatile
+
 /**
  * Immutable root reachability for a layered diagram, valid for any factor whose positions all still admit
  * the whole alphabet (so the per-position domain filter is a no-op and reachability is purely structural).
@@ -37,6 +39,30 @@ internal class MddTransitionIndex(
     val minSym: Long,
     val maxSym: Long,
 ) {
+    private class PreparedSymbols(val columns: Array<ExtensionalSupportIndex.Column>?)
+    @Volatile
+    private var preparedSymbols: PreparedSymbols? = null
+
+    fun symbolSupports(transitions: LongArray, poll: () -> Unit): Array<ExtensionalSupportIndex.Column>? {
+        preparedSymbols?.let { return it.columns }
+        val columns = ArrayList<ExtensionalSupportIndex.Column>(fwdPtr.size)
+        var remaining = ExtensionalSupportIndex.MAX_BYTES
+        for (layer in fwdPtr.indices) {
+            val pointers = fwdPtr[layer]
+            val column = ExtensionalSupportIndex.buildColumn(pointers.size, remaining, poll) { row ->
+                transitions[pointers[row] + 1]
+            }
+            if (column == null) {
+                preparedSymbols = PreparedSymbols(null)
+                return null
+            }
+            remaining -= column.retainedBytes
+            columns.add(column)
+        }
+        poll()
+        return columns.toTypedArray().also { preparedSymbols = PreparedSymbols(it) }
+    }
+
     /**
      * Root reachability shared across a `<group>`'s factors, computed once by the first factor whose
      * positions all still admit the whole alphabet and reused by the rest instead of re-scanning the

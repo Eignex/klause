@@ -54,6 +54,9 @@ MDD explanations reconstruct full symbol membership at the deduction's trail
 position. A cut path cites the bound or interior removal that excludes its symbol;
 later carves cannot become premises of an earlier deduction. Weighted path reasons
 use the same historical membership.
+Each value removal records its symbol. Shared sparse/dense symbol postings select
+that symbol's edges for the cut; storage declines retain the indexed graph scan.
+Table values and MDD symbols use the same bounded immutable posting representation.
 
 ### LP explanations
 
