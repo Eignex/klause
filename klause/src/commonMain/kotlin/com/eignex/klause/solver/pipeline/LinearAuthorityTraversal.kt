@@ -78,7 +78,7 @@ internal class LinearAuthorityTraversal(
     private var peakPending = 1L
     private var retained = 1L
 
-    fun observations(): Map<String, Long> = observations + mapOf(
+    fun observations(): Map<String, Long> = observations + authority.cutObservations() + mapOf(
         "numericalPendingLeaves" to pending,
         "numericalPeakPendingLeaves" to peakPending,
         "numericalRetainedNodes" to retained,
@@ -188,7 +188,8 @@ internal class LinearAuthorityTraversal(
                 queriedNode = current
                 queriedSource = it
             }
-        val result = if (useGuidance) authority.advance(branch, cancellation) else authority.check(branch, cancellation)
+        val result = if (useGuidance) authority.advance(branch, cancellation, cuts = true)
+            else authority.check(branch, cancellation)
         if (result.paused) {
             current.pending = true
             observe("numericalLpPauses")

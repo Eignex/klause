@@ -25,6 +25,56 @@ class SourceEvidenceVerifierTest {
     private val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
 
     @Test
+    fun `integer rounding should respect signs and strict endpoints`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val half = BigFraction.ofLong(2).reciprocal()
+        val cases = listOf(
+            Triple(half, false, BigFraction.ZERO),
+            Triple(half.negated(), false, BigFraction.MINUS_ONE),
+            Triple(BigFraction.ONE, true, BigFraction.ZERO),
+            Triple(BigFraction.MINUS_ONE, true, BigFraction.ofLong(-2)),
+            Triple(half, true, BigFraction.ZERO),
+        )
+        for ((rhs, strict, expected) in cases) {
+            val source = SourceProofContext(scope, setOf(integer), mapOf("row" to SourcePremise(
+                SourceInequality(mapOf(integer to BigFraction.ONE), rhs, strict))))
+            val proof = SourceDerivation.IntegerRounding(SourceDerivation.Premise("row"))
+            val claim = SourceClaim.Consequence(SourceInequality(mapOf(integer to BigFraction.ONE), expected))
+
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source).verify(SourceEvidence(scope, claim, proof)))
+        }
+    }
+
+    @Test
+    fun `integer rounding should reject nonintegral activities`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        for ((coordinate, coefficient) in listOf(x to BigFraction.ONE,
+            integer to BigFraction.ofLong(2).reciprocal())) {
+            val source = SourceProofContext(scope, setOf(coordinate), mapOf("row" to SourcePremise(
+                SourceInequality(mapOf(coordinate to coefficient), BigFraction.ofLong(2).reciprocal()))))
+            val claim = SourceClaim.Consequence(SourceInequality(mapOf(coordinate to coefficient), BigFraction.ZERO))
+
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
+                claim, SourceDerivation.IntegerRounding(SourceDerivation.Premise("row")))))
+        }
+    }
+
+    @Test
+    fun `rounding should not establish its source activation premise`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val source = SourceProofContext(scope, setOf(integer, bool), mapOf("row" to SourcePremise(
+            SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ofLong(2).reciprocal()),
+            mapOf(0 to true))))
+        val evidence = SourceEvidence(scope,
+            SourceClaim.Consequence(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO)),
+            SourceDerivation.IntegerRounding(SourceDerivation.Premise("row")))
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+    }
+
+    @Test
     fun `integer premise pins should retain their captured source values`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val pins = mutableMapOf(integer to BigFraction.ONE)

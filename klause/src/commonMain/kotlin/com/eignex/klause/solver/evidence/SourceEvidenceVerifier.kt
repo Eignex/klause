@@ -327,6 +327,19 @@ class SourceEvidenceVerifier(
                     }
                     SourceInequality(coefficients, rhs, strict)
                 }
+                is SourceDerivation.IntegerRounding -> {
+                    val row = inequality(derivation.inequality, scope, depth + 1)
+                    val coefficients = row.coefficients
+                    for ((coordinate, coefficient) in coefficients) {
+                        step(depth)
+                        if (coordinate !in coordinates || coordinate.kind != SourceCoordinate.Kind.Integer ||
+                            coefficient.den != BIG_ONE
+                        ) rejectProof("integer rounding requires integral activity over declared integers")
+                    }
+                    val rhs = if (row.strict) BigFraction.of(row.rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
+                        else BigFraction.of(row.rhs.negated().ceilInteger(), BIG_ONE).negated()
+                    SourceInequality(coefficients, rhs)
+                }
                 is SourceDerivation.Import -> {
                     val consequence = derivation.evidence.claim as? SourceClaim.Consequence
                         ?: rejectProof("inequality import requires a proved consequence")

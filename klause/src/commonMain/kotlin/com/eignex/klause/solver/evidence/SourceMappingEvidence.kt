@@ -184,6 +184,8 @@ private class MappingProofTranslation(
                 step(depth)
                 SourceDerivation.Combination.Term(it.weight, translate(it.derivation, transformation, scope, depth + 1))
             })
+            is SourceDerivation.IntegerRounding -> SourceDerivation.IntegerRounding(
+                translate(proof.inequality, transformation, scope, depth + 1))
             is SourceDerivation.Import -> {
                 val imported = proof.evidence
                 if (imported.scope.revision != scope.revision || imported.scope.objective != scope.objective ||

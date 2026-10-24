@@ -43,6 +43,14 @@ internal class LinearAuthority(
     val reuses: Long get() = lp.reuses
     private var template: LinearAuthorityTemplate? = null
     private var query: LinearAuthorityQuery? = null
+    private var cutPreparationWork = 0L
+    private var cutVerificationWork = 0L
+    fun cutObservations(): Map<String, Long> = mapOf(
+        "numericalCutPreparationWork" to cutPreparationWork,
+        "numericalCutVerificationWork" to cutVerificationWork,
+        "numericalRetainedCuts" to (template?.cuts?.rows?.size?.toLong() ?: 0L),
+        "numericalActiveCuts" to (query?.activeCuts?.toLong() ?: 0L),
+    )
 
     fun invalidateGuidance() = lp.invalidateGuidance()
 
@@ -66,13 +74,13 @@ internal class LinearAuthority(
         return result.copy(relaxedPoint = relaxedPoint)
     }
 
-    fun advance(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
+    fun advance(source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false): LinearAuthorityResult {
         relaxedPoint = emptyMap()
         if (cancellation()) {
             lp.close()
             return LinearAuthorityResult()
         }
-        val result = checkSource(source, cancellation, guidance = true)
+        val result = checkSource(source, cancellation, guidance = true, cuts = cuts)
         if (cancellation()) {
             lp.close()
             return LinearAuthorityResult()
@@ -82,7 +90,7 @@ internal class LinearAuthority(
 
     private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
 
-    private fun prepareQuery(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityQuery? {
+    private fun prepareQuery(source: SourceProofContext, cancellation: Cancellation, cuts: Boolean): LinearAuthorityQuery? {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return null
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
                 it !in source.coordinates
@@ -94,18 +102,26 @@ internal class LinearAuthority(
                 it.kind == SourceCoordinate.Kind.Boolean && it.id !in source.scope.condition.bools
             }
         ) return null
-        val prepared = if (retainLp) {
-            template?.takeIf { it.matches(source) } ?: LinearAuthorityTemplate.prepare(source, cancellation)
-                ?.also { template = it } ?: return null
+        val prepared = if (retainLp || cuts) {
+            template?.takeIf { it.matches(source) && (it.cuts != null) == cuts }
+                ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts)
+                    ?.also {
+                        template = it
+                        val work = it.cuts?.work ?: 0L
+                        cutPreparationWork += work
+                        budget.observe(preparation = work)
+                    } ?: return null
         } else null
         return LinearAuthorityQuery.prepare(source, prepared, cancellation)
     }
 
     private fun checkSource(
-        source: SourceProofContext, cancellation: Cancellation, guidance: Boolean = false,
+        source: SourceProofContext, cancellation: Cancellation, guidance: Boolean = false, cuts: Boolean = false,
     ): LinearAuthorityResult {
-        val cached = if (retainLp || guidance) query?.takeIf { it.matches(source) } else null
-        val prepared = cached ?: prepareQuery(source, cancellation)?.also {
+        val cached = if (retainLp || guidance) query?.takeIf { it.matches(source, cuts) } else null
+        val prepared = cached ?: prepareQuery(source, cancellation, cuts)?.also {
+            cutVerificationWork += it.cutVerificationWork
+            budget.observe(boundCertification = it.cutVerificationWork)
             if (retainLp || guidance) query = it
         } ?: return LinearAuthorityResult()
         val coordinates = prepared.coordinates
@@ -204,7 +220,7 @@ internal class LinearAuthority(
             if (fractions.isNotEmpty()) return LinearAuthorityResult(bound = bound, incumbent = candidate,
                 split = fractions.first().floorSplit(), fractional = fractions)
             if (budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
-                val exact = checkSource(source, cancellation)
+                val exact = checkSource(source, cancellation, cuts = cuts)
                 return exact.copy(bound = exact.bound ?: bound, incumbent = exact.incumbent ?: candidate)
             }
             return LinearAuthorityResult(bound = bound, incumbent = candidate)

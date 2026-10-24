@@ -12,6 +12,7 @@ internal class LinearAuthorityTemplate private constructor(
     val coordinates: List<SourceCoordinate>,
     val indices: Map<SourceCoordinate, Int>,
     val rows: List<ExactRationalInequality>,
+    val cuts: LinearAuthorityCuts?,
 ) {
     fun matches(other: SourceProofContext): Boolean = source.scope.revision == other.scope.revision &&
         source.scope.objective == other.scope.objective &&
@@ -20,7 +21,7 @@ internal class LinearAuthorityTemplate private constructor(
         source.objectiveConstant == other.objectiveConstant
 
     companion object {
-        fun prepare(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityTemplate? {
+        fun prepare(source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false): LinearAuthorityTemplate? {
             val numeric = source.numericContext()
             val coordinates = source.numericCoordinates()
             val indices = coordinates.withIndex().associate { it.value to it.index }
@@ -29,7 +30,8 @@ internal class LinearAuthorityTemplate private constructor(
                 if (cancellation()) return null
                 rows += premise.inequality.row(indices)
             }
-            return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows)
+            val separated = if (cuts) LinearAuthorityCuts.prepare(numeric, cancellation) ?: return null else null
+            return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, separated)
         }
     }
 }

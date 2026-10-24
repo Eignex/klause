@@ -5,8 +5,12 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.IntegerPinStatus
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.util.Cancellation
@@ -21,19 +25,22 @@ internal class LinearAuthorityQuery private constructor(
     val costs: List<BigFraction>,
     val constant: BigFraction,
     val sign: BigFraction,
+    val cuts: Boolean,
+    val activeCuts: Int,
+    val cutVerificationWork: Long,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
         ExactRationalInequality(it.columns, it.coefficients, it.rhs)
     }
 
-    fun matches(other: SourceProofContext): Boolean = source === other ||
+    fun matches(other: SourceProofContext, cuts: Boolean = false): Boolean = this.cuts == cuts && (source === other ||
         (source.scope == other.scope &&
             source.coordinates == other.coordinates &&
             source.premises == other.premises &&
             source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
             source.objective == other.objective && source.objectiveConstant == other.objectiveConstant &&
-            source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker)
+            source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker))
 
     companion object {
         fun prepare(
@@ -60,6 +67,19 @@ internal class LinearAuthorityQuery private constructor(
                     cited += premise.inequality to SourceDerivation.Premise(id)
                 }
             }
+            var activeCuts = 0
+            var cutVerificationWork = 0L
+            val verifier = SourceEvidenceVerifier(numeric.atScope(source.scope))
+            for (cut in template?.cuts?.rows.orEmpty()) {
+                if (cancellation()) return null
+                val active = cut.owner !in inactive && verifier.verify(SourceEvidence(source.scope,
+                    SourceClaim.Consequence(cut.inequality), cut.derivation), Cancellation {
+                        cutVerificationWork++
+                        cancellation()
+                    }) == SourceEvidenceCheck.Checked
+                if (active) activeCuts++ else inactive += cited.size
+                cited += cut.inequality to cut.derivation
+            }
             val condition = source.scope.condition
             for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
                 val sign = if (upper) BigFraction.ONE else BigFraction.MINUS_ONE
@@ -73,7 +93,7 @@ internal class LinearAuthorityQuery private constructor(
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional,
-                costs, numeric.objectiveConstant * sign, sign)
+                costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, cutVerificationWork)
         }
     }
 }
