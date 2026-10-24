@@ -168,24 +168,26 @@ class AffineDistinctPropagatorTest {
 
     @Test
     fun `Hall explanations should lift source bounds across other occupied values`() {
-        val factor = Distinct(listOf(0L, 1L, 0L).mapIndexed { i, offset ->
+        val factor = Distinct(listOf(0L, 1L, 0L, 0L).mapIndexed { i, offset ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
         })
-        val problem = Problem(0, 3, arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(-1, 4)), arrayOf(factor))
+        val domains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4), IntDomain(-1, 4))
+        val problem = Problem(0, 4, domains, arrayOf(factor))
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         state.currentLevel = 1
         state.tightenIntMax(0, 1)
-        state.tightenIntMax(1, 0)
+        state.tightenIntMax(1, 1)
+        state.tightenIntMax(2, 2)
         state.currentFactor = 0
 
         assertTrue(state.factorAt(0).propagate(state, 0))
-        val cited = requireNotNull(state.reasonOf(state.holeReasonFor(2, 0))).map { lit ->
+        val cited = requireNotNull(state.reasonOf(state.holeReasonFor(3, 0))).map { lit ->
             val atom = Lit.variable(lit)
             Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
         }.toSet()
 
-        assertEquals(setOf(Triple(0, AtomKind.LE, 1L), Triple(1, AtomKind.LE, 0L)), cited)
+        assertEquals(setOf(Triple(0, AtomKind.LE, 2L), Triple(1, AtomKind.LE, 1L), Triple(2, AtomKind.LE, 2L)), cited)
     }
 
     @Test
