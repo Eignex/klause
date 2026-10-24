@@ -61,7 +61,7 @@ internal object LinearPrefixInspection {
             val run = member(opening, "getRun")
             try {
                 val automatic = integrated && (replay == 1 || cached || batching)
-                val cachedProducer = automatic && ((cached || reuse) && replay == 1 || batching)
+                val cachedProducer = automatic && (((cached || reuse) && replay == 1) || batching)
                 if (run != null) {
                     val planned = field(run, "planned") as PlannedSearch
                     call(requireNotNull(planned.theory), "observePartialLinearCost")
@@ -154,8 +154,10 @@ internal object LinearPrefixInspection {
                             planned, run, compiled, out.resolve("after-$replay.exact"),
                         )
                         out.resolve("after-$replay.json").writeText("$afterCapture\n")
-                        if ((cached || batching) && replay == 1) check(out.resolve("after-0.json").readText() == "$afterCapture\n") {
-                            "intervention changed the continued source state"
+                        if ((cached || batching) && replay == 1) {
+                            check(out.resolve("after-0.json").readText() == "$afterCapture\n") {
+                                "intervention changed the continued source state"
+                            }
                         }
                     }
                 }
@@ -183,7 +185,9 @@ internal object LinearPrefixInspection {
         }
         out.resolve("replay.json").writeText("$report\n")
         println(report)
-        if (!integrated || cached || batching) check(captures[0].contentEquals(captures[1])) { "fresh prefix replay differs" }
+        if (!integrated || cached || batching) {
+            check(captures[0].contentEquals(captures[1])) { "fresh prefix replay differs" }
+        }
     }
 
     private class PrefixBoundary : SearchNodePolicy {
