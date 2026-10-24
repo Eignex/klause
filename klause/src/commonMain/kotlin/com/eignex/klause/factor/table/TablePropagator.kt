@@ -24,6 +24,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.klause.util.binarySearchLong
 
 internal class TablePropagator(
     val boolVars: IntArray,
@@ -72,7 +73,7 @@ internal class TablePropagator(
         } else {
             for (i in 0 until support.numValid) {
                 if (!visit()) return null
-                val candidate = values.binarySearch(cellLo(support.validTuples[i], col))
+                val candidate = values.binarySearchLong(cellLo(support.validTuples[i], col))
                 if (candidate >= 0) counts[candidate]++
             }
         }
