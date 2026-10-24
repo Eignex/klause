@@ -1286,6 +1286,28 @@ uses Compact-Table-style mask invalidation with a retained STR2 prefix; the MDD
 comparison retains CSR reachability and adds indexed symbol cuts. It does not
 evaluate a complete Compact-MDD replacement.
 
+Reject the bounded Compact-MDD continuation evaluated in
+[8066](https://lab.eignex.com/jobs/8066) and [8070](https://lab.eignex.com/jobs/8070).
+It retains shared CSR root preparation, then uses reversible sparse live-arc words,
+shared sparse/dense symbol/head/tail supports and checked incoming/outgoing
+residues. Admission covers unweighted diagrams with at most 4096 enumerable root
+values per position and 32 MiB primitive index/state estimates. The second variant
+limits propagation and support filtering to changed arc layers. Both experiments
+pair parent `e36eb235ac` with the prototype (`0804c57cab`, then `dc17a5a896`) on
+Mac/aarch64: CP/LP-off, random ordering, 2000 nodes, 20 seconds, seed 3 and three
+repeats over the same five sources. All 60 commands return, all 24 reported
+witnesses pass independent source checks, and source/runtime/options/non-solver
+dependency identities match within each comparison.
+
+The full-pass prototype reaches six WordDesign nodes instead of 70–77; the
+changed-layer variant reaches 8–9 instead of 70–77. All remain unknown at
+20 seconds. Changed-layer peak RSS is 1620016–1632864 KiB instead of
+1191856–1203760 KiB. Table/Regular holdouts preserve nodes and failures, while
+WordSquare remains unknown. The prototype passes JVM/native historical-reason,
+cancellation and sparse-arc restoration controls, but its measured continuation
+cost does not justify replacing CSR. This rejects the tested bounded variant;
+other Compact-MDD implementations and table-to-sMDD conversion are not covered.
+
 Retain cooperative Table/MDD visits and incomplete-reason suppression.
 [8046](https://lab.eignex.com/jobs/8046) pairs `2f228a33b2` with `0b087c2a89`
 under matching 2-second and 20-second controls on the same five sources. All 60
