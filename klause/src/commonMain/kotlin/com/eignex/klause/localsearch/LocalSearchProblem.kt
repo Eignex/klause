@@ -1,5 +1,7 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.table.Table
+import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
@@ -44,6 +46,7 @@ class LocalSearchProblem private constructor(
             sequence<LocalSearchProblem?> {
                 selection?.requireSource(problem)
                 val invariants = arrayOfNulls<Invariant>(problem.numFactors)
+                val tableCaches = HashMap<Int, MutableMap<LongArray, TableGroupCache>>()
                 yield(null)
                 val boolCounts = IntArray(problem.numBoolVars)
                 yield(null)
@@ -60,7 +63,16 @@ class LocalSearchProblem private constructor(
                 for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
                     for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
                         val factor = problem.factors[fid]
-                        invariants[fid] = selection?.invariant(fid, domains) ?: factor.invariantProjection(domains)
+                        invariants[fid] = if (factor is Table && factor.hi == null &&
+                            (selection == null || selection.usesBuiltInScoring(fid))
+                        ) {
+                            val cache = tableCaches.getOrPut(factor.arity) { HashMap() }.getOrPut(factor.tuples) {
+                                TableGroupCache(factor.arity, factor.tuples, null)
+                            }
+                            factor.tableInvariantProjection(cache)
+                        } else {
+                            selection?.invariant(fid, domains) ?: factor.invariantProjection(domains)
+                        }
                         if (invariants[fid] === NoInvariant) continue
                         factor.boolVars.forEachVariableOnce(boolSeen, fid) { boolCounts[it]++ }
                         factor.intVars.forEachVariableOnce(intSeen, fid) { intCounts[it]++ }
