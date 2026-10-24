@@ -32,9 +32,12 @@ internal fun Distinct.affinePropagationView(): Propagator? {
     if (activator != LinearRow.ALWAYS) return null
     val positions = operands
     if (positions.any {
-        it.size != 1 || !Term.isInt(it.references.single()) ||
-            it.coefficients.single() != BigFraction.ONE || it.constant.den != BIG_ONE
-    }) return null
+            it.size != 1 || !Term.isInt(it.references.single()) ||
+                it.coefficients.single() != BigFraction.ONE || it.constant.den != BIG_ONE
+        }
+    ) {
+            return null
+        }
     return AffineDistinctPropagator(
         IntArray(positions.size) { Term.intVar(positions[it].references.single()) },
         positions.map { it.constant.num },
@@ -51,9 +54,17 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = state.propagatorFailures[this]
 
-    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int): IntArray {
+    override fun explain(
+        state: PropagationState,
+        factorId: Int,
+        payload: IntArray,
+        atTrail: Int,
+        atLevel: Int,
+    ): IntArray {
         val out = linkedSetOf<Int>()
-        fun add(lit: Int) { if (lit != Lit.NONE) out.add(lit) }
+        fun add(lit: Int) {
+            if (lit != Lit.NONE) out.add(lit)
+        }
         for (v in payload.distinct()) {
             val d = state.domainAt(v, atTrail)
             val root = state.rootDomains[v]
@@ -73,14 +84,20 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
     private fun reason(state: PropagationState, positions: IntArray): IntArray? {
         if (state.currentLevel == 0) return null
         val sources = IntArray(positions.size) { vars[positions[it]] }
-        return if (state.undoLogging) state.lazyReason(sources)
-        else explain(state, state.currentFactor, sources, state.undo.size, state.currentLevel)
+        return if (state.undoLogging) {
+            state.lazyReason(sources)
+        } else {
+            explain(state, state.currentFactor, sources, state.undo.size, state.currentLevel)
+        }
     }
 
     private fun fail(state: PropagationState, positions: IntArray): Boolean {
         state.propagatorFailures[this] = explain(
-            state, state.currentFactor, IntArray(positions.size) { vars[positions[it]] },
-            state.undo.size, state.currentLevel,
+            state,
+            state.currentFactor,
+            IntArray(positions.size) { vars[positions[it]] },
+            state.undo.size,
+            state.currentLevel,
         )
         return false
     }
@@ -90,7 +107,11 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
         val n = vars.size
         if (n < 2) return true
         val cache = (state.refPayload[factorId] as? Cache) ?: Cache().also { state.refPayload[factorId] = it }
-        if (cache.domains?.let { old -> vars.indices.all { old[it] === state.intDomains[vars[it]] } } == true) return true
+        if (cache.domains?.let { old -> vars.indices.all { old[it] === state.intDomains[vars[it]] } } ==
+            true
+        ) {
+                return true
+            }
         val domains = Array(n) { state.intDomains[vars[it]] }
         val lo = List(n) { bigIntOf(domains[it].min) + offsets[it] }
         val hi = List(n) { bigIntOf(domains[it].max) + offsets[it] }
@@ -106,7 +127,13 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
         return result
     }
 
-    private fun bounds(state: PropagationState, lo: List<BigInt>, hi: List<BigInt>, origin: BigInt, compact: Boolean): Boolean {
+    private fun bounds(
+        state: PropagationState,
+        lo: List<BigInt>,
+        hi: List<BigInt>,
+        origin: BigInt,
+        compact: Boolean,
+    ): Boolean {
         val all = IntArray(vars.size) { it }
         if (!compact) return fixed(state, lo, hi)
         val lower = LongArray(vars.size) { (lo[it] - origin).toLongExact() }
@@ -115,10 +142,22 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
         val newUpper = upper.copyOf()
         if (!computeBoundsAllDifferent(lower, upper, newLower, newUpper)) return fail(state, all)
         for (i in vars.indices) {
-            if (newLower[i] > lower[i] && !state.tightenIntMin(vars[i],
-                    (origin + bigIntOf(newLower[i]) - offsets[i]).toLongExact(), reason(state, all))) return fail(state, all)
-            if (newUpper[i] < upper[i] && !state.tightenIntMax(vars[i],
-                    (origin + bigIntOf(newUpper[i]) - offsets[i]).toLongExact(), reason(state, all))) return fail(state, all)
+            if (newLower[i] > lower[i] && !state.tightenIntMin(
+                    vars[i],
+                    (origin + bigIntOf(newLower[i]) - offsets[i]).toLongExact(),
+                    reason(state, all),
+                )
+            ) {
+                    return fail(state, all)
+                }
+            if (newUpper[i] < upper[i] && !state.tightenIntMax(
+                    vars[i],
+                    (origin + bigIntOf(newUpper[i]) - offsets[i]).toLongExact(),
+                    reason(state, all),
+                )
+            ) {
+                    return fail(state, all)
+                }
         }
         return fixed(state, lo, hi)
     }
@@ -134,7 +173,12 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
             for (i in vars.indices) {
                 if (i == owner) continue
                 val source = value - offsets[i]
-                if (source.fitsLong() && !state.excludeIntValue(vars[i], source.toLongExact(), reason(state, intArrayOf(owner)))) {
+                if (source.fitsLong() && !state.excludeIntValue(
+                        vars[i],
+                        source.toLongExact(),
+                        reason(state, intArrayOf(owner)),
+                    )
+                ) {
                     return fail(state, intArrayOf(owner, i))
                 }
             }

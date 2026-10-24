@@ -25,10 +25,15 @@ class AffineDistinctPropagatorTest {
     @Test
     fun `matching should distinguish values beyond both signed word endpoints`() {
         for (offset in listOf("9223372036854775808", "-9223372036854775809")) {
-            val factor = Distinct((0..2).map { i ->
-                Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE),
-                    BigFraction.of(parseBigInt(offset), BIG_ONE))
-            })
+            val factor = Distinct(
+                (0..2).map { i ->
+                Distinct.Operand(
+                    intArrayOf(Term.ofIntVar(i)),
+                    listOf(BigFraction.ONE),
+                    BigFraction.of(parseBigInt(offset), BIG_ONE),
+                )
+            }
+            )
             val problem = Problem(0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)), arrayOf(factor))
 
             val session = PropagationSession(problem)
@@ -39,9 +44,11 @@ class AffineDistinctPropagatorTest {
 
     @Test
     fun `a wide value universe should preserve exact matching collisions`() {
-        val factor = Distinct((0..2).map { i ->
+        val factor = Distinct(
+            (0..2).map { i ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE))
-        })
+        }
+        )
         val domain = intDomainFromSurvivors(longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE))
 
         val session = PropagationSession(Problem(0, 3, Array(3) { domain }, arrayOf(factor)))
@@ -51,9 +58,11 @@ class AffineDistinctPropagatorTest {
 
     @Test
     fun `bounds filtering should translate a Hall interval into source bounds`() {
-        val factor = Distinct((0..2).map { i ->
+        val factor = Distinct(
+            (0..2).map { i ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(i.toLong()))
-        })
+        }
+        )
         val problem = Problem(0, 3, arrayOf(IntDomain(1, 2), IntDomain(0, 1), IntDomain(-1, 1000000)), arrayOf(factor))
 
         val session = PropagationSession(problem)
@@ -64,9 +73,11 @@ class AffineDistinctPropagatorTest {
 
     @Test
     fun `matching reasons should exclude later bounds and holes`() {
-        val factor = Distinct(listOf(0L, 1L, -1L, 20L).mapIndexed { i, offset ->
+        val factor = Distinct(
+            listOf(0L, 1L, -1L, 20L).mapIndexed { i, offset ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
-        })
+        }
+        )
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 4) }, arrayOf(factor))
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -89,15 +100,25 @@ class AffineDistinctPropagatorTest {
             Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
         }.toSet()
 
-        assertEquals(setOf(Triple(0, AtomKind.GE, 1L), Triple(0, AtomKind.LE, 3L), Triple(0, AtomKind.EQ, 2L),
-            Triple(1, AtomKind.LE, 2L), Triple(1, AtomKind.EQ, 1L)), cited)
+        assertEquals(
+            setOf(
+            Triple(0, AtomKind.GE, 1L),
+            Triple(0, AtomKind.LE, 3L),
+            Triple(0, AtomKind.EQ, 2L),
+            Triple(1, AtomKind.LE, 2L),
+            Triple(1, AtomKind.EQ, 1L),
+        ),
+            cited
+        )
     }
 
     @Test
     fun `historical Hall reasons should ignore later holes in a source operand`() {
-        val factor = Distinct(listOf(0L, 1L, -1L, 0L).mapIndexed { i, offset ->
+        val factor = Distinct(
+            listOf(0L, 1L, -1L, 0L).mapIndexed { i, offset ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
-        })
+        }
+        )
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 4) }, arrayOf(factor))
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -119,15 +140,24 @@ class AffineDistinctPropagatorTest {
             Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
         }.toSet()
 
-        assertEquals(setOf(Triple(0, AtomKind.GE, 1L), Triple(0, AtomKind.LE, 3L),
-            Triple(1, AtomKind.LE, 2L), Triple(2, AtomKind.GE, 2L)), cited)
+        assertEquals(
+            setOf(
+            Triple(0, AtomKind.GE, 1L),
+            Triple(0, AtomKind.LE, 3L),
+            Triple(1, AtomKind.LE, 2L),
+            Triple(2, AtomKind.GE, 2L),
+        ),
+            cited
+        )
     }
 
     @Test
     fun `affine Hall reasons should imply each removed source value`() {
-        val factor = Distinct(listOf(0L, 1L, -1L).mapIndexed { i, offset ->
+        val factor = Distinct(
+            listOf(0L, 1L, -1L).mapIndexed { i, offset ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
-        })
+        }
+        )
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, arrayOf(factor))
 
         PropagationReasonOracle.assertReasonsImply(problem, "source Hall holes") { state ->
@@ -138,11 +168,13 @@ class AffineDistinctPropagatorTest {
 
     @Test
     fun `aliased affine operands should preserve their satisfying assignments`() {
-        val factor = Distinct(listOf(
+        val factor = Distinct(
+            listOf(
             Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
             Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE), BigFraction.ONE),
             Distinct.Operand(intArrayOf(Term.ofIntVar(1)), listOf(BigFraction.ONE)),
-        ))
+        )
+        )
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 3) }, arrayOf(factor))
 
         PropagationReasonOracle.assertReasonsImply(problem, "aliased source Hall") { state ->
