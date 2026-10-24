@@ -35,6 +35,7 @@ import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.lowering.wideConstHolds
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
@@ -103,10 +104,12 @@ internal object Compiler {
     internal class Builder(
         private val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         private val semantics: EffectiveSourceSemantics = xcsp3Semantics.resolve(),
+        private val recoveryCancellation: Cancellation = Cancellation.Never,
     ) : CnfLowering {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
         internal val domains = ArrayList<IntDomain>()
+        private val affineDistinctness = Xcsp3AffineDistinctness()
         private val divModOperands = HashMap<FExpr, Int>()
         private val divModRelations = com.eignex.klause.lowering.DivModRelationIndex()
         override val factors = ArrayList<Factor>()
@@ -321,6 +324,7 @@ internal object Compiler {
         }
 
         fun constraint(e: XmlElement) {
+            requireHardConstraint(e)
             when (e.tag) {
                 "allDifferent" -> allDifferent(e)
                 "sum" -> sum(e)
@@ -564,10 +568,17 @@ internal object Compiler {
         }
 
         private fun postDistanceDisequality(distance: FExpr, constant: FExpr): Boolean {
-            if (distance !is FExpr.Call || distance.fn != "dist" || distance.args.size != 2 ||
-                constant !is FExpr.Num
-            ) return false
-            val arguments = distance.args.map { linear(it) }
+            if (distance !is FExpr.Call || constant !is FExpr.Num) return false
+            val operands = when {
+                distance.fn == "dist" && distance.args.size == 2 -> distance.args
+                distance.fn == "abs" && distance.args.size == 1 -> {
+                    val difference = distance.args[0] as? FExpr.Call ?: return false
+                    if (difference.fn != "sub" || difference.args.size != 2) return false
+                    difference.args
+                }
+                else -> return false
+            }
+            val arguments = operands.map { linear(it) }
             if (constant.value < 0) return true
             val difference = sumIntCombs(arguments, negateTail = true)
             val bound = IntComb.Narrow(LinComb(emptyMap(), constant.value.toLong()))
@@ -581,6 +592,7 @@ internal object Compiler {
         /** Post a lowered relation as a top-level factor: a [Linear] when it carries variable terms, else a
          *  contradiction clause when the constant relation `0 op bound` is false (a true one is dropped). */
         private fun postRel(r: RelParts) {
+            affineDistinctness.record(r.rel, r.op)
             when (val rel = r.rel) {
                 is LinRelation.LongRel ->
                     if (rel.vars.isNotEmpty()) {
@@ -1276,12 +1288,19 @@ internal object Compiler {
         // An `<intension>` template over scalar `%i` placeholders is parsed once and reused: substitute the
         // args into the expression tree per row instead of re-expanding and re-parsing the string, which
         // otherwise dominates the parse of group-heavy models (millions of rows, one template).
-        private fun intensionTemplateOf(template: XmlElement): FExpr? =
-            if (template.tag == "intension" && FExpr.isScalarTemplate(template.textContent)) {
+        private fun intensionTemplateOf(template: XmlElement): FExpr? {
+            requireHardConstraint(template)
+            return if (template.tag == "intension" && FExpr.isScalarTemplate(template.textContent)) {
                 FExpr.parse(template.textContent.trim())
             } else {
                 null
             }
+        }
+
+        private fun requireHardConstraint(element: XmlElement) {
+            if (element.attributes.keys.any { it in GUARDED_ATTRIBUTES } || element.attr("type") == "soft"
+            ) throw UnsupportedXcsp3Exception("reified or soft constraint '${element.tag}'")
+        }
 
         private fun argsTokens(args: XmlElement): List<String> = args.textContent.splitWs().flatMap { expandNames(it) }
 
@@ -1316,25 +1335,29 @@ internal object Compiler {
             return op to (k + delta)
         }
 
-        fun build(): Xcsp3Problem = Xcsp3Problem(
-            Problem(
-                settings = settings,
-                semantics = semantics,
-                numBoolVars = nextBool,
-                numIntVars = domains.size,
-                intDomains = domains.toTypedArray(),
-                factors = factors.toTypedArray(),
-                // A raw problem: the base bake is deferred to presolve step 0 (`Problem.bake`); construction
-                // is pure parse. The pipeline folds it (and can LP-tighten a wide domain first).
-            ),
-            objective,
-            intVarNames = LinkedHashMap(varIds),
-            sense = if (objectiveMaximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
-            definedVars = definedVars.toIntArray(),
-            definitionHints = definitionHints.toList(),
-        )
+        fun build(): Xcsp3Problem {
+            recoverAffineDistinctness(affineDistinctness, recoveryCancellation)
+            return Xcsp3Problem(
+                Problem(
+                    settings = settings,
+                    semantics = semantics,
+                    numBoolVars = nextBool,
+                    numIntVars = domains.size,
+                    intDomains = domains.toTypedArray(),
+                    factors = factors.toTypedArray(),
+                    // A raw problem: the base bake is deferred to presolve step 0 (`Problem.bake`); construction
+                    // is pure parse. The pipeline folds it (and can LP-tighten a wide domain first).
+                ),
+                objective,
+                intVarNames = LinkedHashMap(varIds),
+                sense = if (objectiveMaximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
+                definedVars = definedVars.toIntArray(),
+                definitionHints = definitionHints.toList(),
+            )
+        }
 
         companion object {
+            private val GUARDED_ATTRIBUTES = setOf("reifiedBy", "hreifiedFrom", "hreifiedTo", "violationCost")
             internal val REL = setOf("eq", "ne", "le", "lt", "ge", "gt")
             internal val BOOL_FNS = setOf("and", "or", "not", "imp", "iff", "xor")
         }
