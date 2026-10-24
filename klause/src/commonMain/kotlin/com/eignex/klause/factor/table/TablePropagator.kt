@@ -78,8 +78,45 @@ internal class TablePropagator(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         if (state.undoLogging) supportLoss(state, -1, state.undo.size) else collectHoleAndBoundAntecedents(state, xs)
 
-    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
-        supportLoss(state, payload[0], atTrail)
+    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int): IntArray {
+        if (payload.size == 1) return supportLoss(state, payload[0], atTrail)
+        val value = (payload[2].toLong() shl 32) or (payload[3].toLong() and 0xFFFFFFFFL)
+        return groundSupportLoss(state, payload[0], payload[1], value, atTrail)
+    }
+
+    // The conclusion identifies the ground cells that lost support. Other values' surviving tuples
+    // cannot justify this deduction, so they need no historical support reconstruction.
+    private fun groundSupportLoss(state: PropagationState, col: Int, kind: Int, value: Long, atTrail: Int): IntArray {
+        val snapshot = ExplanationSnapshot(state, xs, atTrail)
+        val out = LitSet()
+        columnLiterals(state, col, snapshot, out)
+        val pick = IntArrayList()
+        for (row in 0 until numTuples) {
+            val own = cellLo(row, col)
+            val removed = when (kind) {
+                LOWER -> own < value
+                UPPER -> own > value
+                else -> own == value
+            }
+            if (!removed || cellAt(state, row, col, snapshot, null) == Cell.KILLED) continue
+            var chosen = Lit.NONE
+            var killed = false
+            for (c in 0 until arity) {
+                if (c == col) continue
+                pick.clear()
+                if (cellAt(state, row, c, snapshot, pick) == Cell.LIVE) continue
+                killed = true
+                if (pick.size == 0 || out.has(pick[0])) {
+                    chosen = Lit.NONE
+                    break
+                }
+                if (chosen == Lit.NONE) chosen = pick[0]
+            }
+            check(killed) { "a removed ground value must have no historical support" }
+            if (chosen != Lit.NONE) out.add(chosen)
+        }
+        return out.toArray()
+    }
 
     /**
      * Reason for column [col]'s prune as of undo-log position [atTrail], or with [col] = -1 for the table running
@@ -450,7 +487,7 @@ internal class TablePropagator(
         val coarse by lazy(LazyThreadSafetyMode.NONE) { collectHoleAndBoundAntecedents(state, xs) }
         for (col in 0 until arity) {
             if (fullySupported[col]) continue
-            val ant = columnReason(state, col) { coarse }
+            val ant = if (hi == null) null else columnReason(state, col) { coarse }
             val bits = requireNotNull(supportBits[col])
             var firstSet = -1
             for (w in bits.indices) {
@@ -469,8 +506,12 @@ internal class TablePropagator(
             }
             val minSup = domLo[col] + firstSet
             val maxSup = domLo[col] + lastSet
-            if (!state.tightenIntMin(xs[col], minSup, ant)) return false
-            if (!state.tightenIntMax(xs[col], maxSup, ant)) return false
+            if (minSup > state.intDomains[xs[col]].min &&
+                !state.tightenIntMin(xs[col], minSup, deductionReason(state, col, LOWER, minSup, ant) { coarse })
+            ) return false
+            if (maxSup < state.intDomains[xs[col]].max &&
+                !state.tightenIntMax(xs[col], maxSup, deductionReason(state, col, UPPER, maxSup, ant) { coarse })
+            ) return false
             val d = state.intDomains[xs[col]]
             val colLo = domLo[col]
             val colHi = domHi[col]
@@ -485,7 +526,10 @@ internal class TablePropagator(
                 }
             }
             for (k in 0 until toRemoveCount) {
-                if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
+                val value = toRemove[k]
+                if (!state.excludeIntValue(xs[col], value, deductionReason(state, col, VALUE, value, ant) { coarse })) {
+                    return false
+                }
             }
         }
         return true
@@ -547,11 +591,15 @@ internal class TablePropagator(
         val coarse by lazy(LazyThreadSafetyMode.NONE) { collectHoleAndBoundAntecedents(state, xs) }
         for (col in 0 until arity) {
             if (fullySupported[col]) continue
-            val ant = columnReason(state, col) { coarse }
+            val ant = if (hi == null) null else columnReason(state, col) { coarse }
             // Every surviving tuple contributed to every column, so numValid > 0 leaves each column with
             // at least one supported value (minSup/maxSup are set).
-            if (!state.tightenIntMin(xs[col], minSup[col], ant)) return false
-            if (!state.tightenIntMax(xs[col], maxSup[col], ant)) return false
+            if (minSup[col] > state.intDomains[xs[col]].min &&
+                !state.tightenIntMin(xs[col], minSup[col], deductionReason(state, col, LOWER, minSup[col], ant) { coarse })
+            ) return false
+            if (maxSup[col] < state.intDomains[xs[col]].max &&
+                !state.tightenIntMax(xs[col], maxSup[col], deductionReason(state, col, UPPER, maxSup[col], ant) { coarse })
+            ) return false
             val sup = supported[col]
             // A column too large to walk keeps its bounds tightening above; skip the per-value support
             // removal rather than walking the span. Sound: such a domain is never a full assignment, and
@@ -562,7 +610,10 @@ internal class TablePropagator(
                     if (value !in sup) toRemove.add(value)
                 }
                 for (k in 0 until toRemove.size) {
-                    if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
+                    val value = toRemove[k]
+                    if (!state.excludeIntValue(xs[col], value, deductionReason(state, col, VALUE, value, ant) { coarse })) {
+                        return false
+                    }
                 }
             }
         }
@@ -581,7 +632,25 @@ internal class TablePropagator(
             coarse()
         }
 
+    private inline fun deductionReason(
+        state: PropagationState,
+        col: Int,
+        kind: Int,
+        value: Long,
+        intervalReason: IntArray?,
+        coarse: () -> IntArray?,
+    ): IntArray? = when {
+        hi != null -> intervalReason
+        state.currentLevel == 0 -> null
+        state.undoLogging -> state.lazyReason(intArrayOf(col, kind, (value ushr 32).toInt(), value.toInt()))
+        else -> coarse()
+    }
+
     private companion object {
+        const val LOWER = 0
+        const val UPPER = 1
+        const val VALUE = 2
+
         /** [ranges] sorted and merged where they touch or overlap. */
         private fun mergeRanges(ranges: List<LongRange>): List<LongRange> {
             val merged = ArrayList<LongRange>()

@@ -336,7 +336,39 @@ class TablePropagatorTest {
             val atom = Lit.variable(lit) - problem.numBoolVars
             Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
         }
-        assertEquals(setOf(Triple(0, AtomKind.EQ, 2L), Triple(0, AtomKind.LE, 3L)), cited.toSet())
+        assertEquals(setOf(Triple(0, AtomKind.EQ, 2L)), cited.toSet())
+    }
+
+    @Test
+    fun `historical ground support should ignore later removals in repeated cells`() {
+        for (shortSupport in listOf(false, true)) {
+            val tuples = longArrayOf(0, 0, 0, 1, 1, 1, 2, 1, 2, 3, 2, 3)
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
+                intDomains = Array(3) { IntDomain(0, 3) },
+                factors = arrayOf<Factor>(
+                    Table(intArrayOf(0, 1, 2), tuples, hi = if (shortSupport) tuples else null),
+                ),
+            )
+            val state = PropagationState(problem, Assumptions.None)
+            assertNull(state.runToFixpoint(allFactors = true))
+            state.undoLogging = true
+            state.levelToDecisionVar.add(0)
+            state.currentLevel = 1
+            check(state.excludeIntValue(0, 1))
+            assertNull(state.runToFixpoint(allFactors = false))
+            val reason = assertNotNull(state.holeReasonFor(2, 1))
+            check(state.excludeIntValue(0, 2))
+            assertNull(state.runToFixpoint(allFactors = false))
+
+            val cited = assertNotNull(state.reasonOf(reason)).map { lit ->
+                val atom = Lit.variable(lit) - problem.numBoolVars
+                Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+            }
+
+            assertEquals(listOf(Triple(0, AtomKind.EQ, 1L)), cited)
+        }
     }
 
     @Test

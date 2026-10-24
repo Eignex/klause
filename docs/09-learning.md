@@ -34,6 +34,10 @@ model and need not be minimal; an interrupted seeding cannot certify the full se
 Table filtering keeps STR2 explanations, built from build-local caches of historical
 domains that never cross propagation or undo. The reversible live prefix is committed
 once per completed sweep, and sibling branches restore filtering from trailed state.
+Ground table deductions record their bound or excluded value at the actual pin's
+trail position. Their explanations visit only tuples whose target cells fall in
+that removal and choose one blocking cell per tuple. Interval deductions and table
+conflicts reconstruct the general historical support relation.
 Root propagation folds unary Table restrictions with at most 4096 expanded supports,
 so local search samples from the same restrictions.
 
