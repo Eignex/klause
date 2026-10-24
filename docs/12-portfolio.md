@@ -164,8 +164,11 @@ elapsed-time cap. The finite CLI exposes `slice-work`, `slice-max-work` and
 Backtrack arms charge decisions, propagation visits and LP work to their scheduler
 at the [slice prices](06-sessions.md#resource-allowances); the solve-wide decision/move cap keeps its
 separate currency. Slices yield before consuming an alternative or after a completed
-node, and a pending sibling is never skipped. The conversion is not an elapsed-time
-guarantee: a fixpoint, factor call or LP solve can overrun a slice. Local-search arms
+node. Large finite scans inside a fresh shared decision assertion poll the containing
+slice; interruption retracts that assertion and retains its alternative for retry.
+Completed propagation visits are charged at these polls, and a pending sibling is
+never skipped. The conversion is not an elapsed-time guarantee: atomic domain
+maintenance, retained-level deductions or LP setup can overrun a slice. Local-search arms
 follow the
 [retained handle contract](11-neighborhoods.md#handles-and-exclusive-ownership).
 
