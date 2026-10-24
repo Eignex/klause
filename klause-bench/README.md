@@ -1959,6 +1959,8 @@ instrumented owner-state capture; ordinary matched CLI experiments measure cost.
 
 The capture retains the original bytes, native affine system and build/runtime
 identity. `incumbents.jsonl` flushes accepted incumbent values and branch conditions.
+`bounds.jsonl` flushes changed global bounds after cooperative slices, recording
+their native-owner check separately from independent proof validation.
 `frontier.json` records remaining alternatives with their strongest retained
 ancestor or local bound, its original scope and a fresh source-evidence check.
 Bound-closed subtrees remain explicit. Inspection has a separate ten-second,
@@ -1976,6 +1978,9 @@ Optional `history=true` enables the internal directional-gain prototype for that
 capture. It requires two nonnegative finite gain observations per direction,
 normalized by movement, before ranking a coordinate. Missing, unusable or all-zero
 estimates retain source order. The production default uses source order.
+Optional `frontier=true` selects bound-ordered traversal and retained sparse
+guidance. Wider contexts use the sparse preparation policy rather than the small
+exact-primal admission; unresolved alternatives retain the same capture checks.
 Optional `probe=true` checks both child relaxations for every eligible root
 coordinate under a separate ten-second diagnostic allowance. Each child has one
 theory check and a fresh source-adapter allowance; completed entries flush to

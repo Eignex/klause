@@ -55,9 +55,10 @@ internal object MpsProofFrontier {
         require(Runtime.getRuntime().availableProcessors() == 1)
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
-            (options.keys - setOf("suite", "problem", "sha256", "exact", "probe", "history")).isEmpty())
+            (options.keys - setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier")).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
         val historyEnabled = options["history"]?.toBooleanStrict() ?: false
+        val frontierEnabled = options["frontier"]?.toBooleanStrict() ?: false
         val exact = options.getValue("exact").toBooleanStrict()
         val selected = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -74,7 +75,8 @@ internal object MpsProofFrontier {
         val prepared = SourceSetup.prepare(SourceSetupRequest(
             SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
             maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE,
-            cancellation = preparationStop, linearTraversal = LinearTraversal.NUMERICAL,
+            cancellation = preparationStop, linearTraversal = if (frontierEnabled) LinearTraversal.NUMERICAL_FRONTIER
+                else LinearTraversal.NUMERICAL,
         ))
         require(prepared.route is SourceProblemRoute.NativeFormula)
         val execution = checkNotNull(field(prepared.route, "execution"))
@@ -85,18 +87,37 @@ internal object MpsProofFrontier {
             it.name == "authorityContext" && it.parameterCount == 2
         }.apply { isAccessible = true }
         val context = authority.invoke(request, checkNotNull(request.objective), solveStop) as SourceProofContext
-        require(context.coordinates.size <= 128)
+        require(frontierEnabled || context.coordinates.size <= 128)
         val linear = checkNotNull(field(prepared, "linearSource"))
         val view = checkNotNull(field(linear, "view"))
         val scale = field(view, "objectiveScale") as BigFraction
         val system = NumericalFrontierSnapshot.system(context)
         Reports.writeJson(out.resolve("native-system.json").path, system)
-        val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled)
+        val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled)
         val history = ArrayList<JsonObject>()
         out.resolve("incumbents.jsonl").writeText("")
+        out.resolve("bounds.jsonl").writeText("")
         val started = System.nanoTime()
+        var lastBound: String? = null
         try {
-            val result = NumericalFrontierSnapshot.run(invocation) { _, value ->
+            val result = NumericalFrontierSnapshot.run(invocation, onProgress = progress@{ owner ->
+                val component = checkNotNull(field(owner, "component"))
+                val bound = field(component, "rootBound") as SourceEvidence? ?: return@progress
+                val value = ((bound.claim as SourceClaim.Bound).value as SourceValue.Rational).value
+                if (lastBound == value.toString()) return@progress
+                lastBound = value.toString()
+                val progress = stats(owner)
+                val entry = buildJsonObject {
+                    put("elapsedNs", System.nanoTime() - started)
+                    put("checks", progress.openTheory.openTheoryChecks)
+                    put("adapterOperations", progress.smt.sourceLp.operations)
+                    put("nativeValue", value.toString())
+                    put("sourceUnitValue", (value * scale.reciprocal()).toString())
+                    put("checkedByNativeOwner", true)
+                    put("independentProofCheck", false)
+                }
+                out.resolve("bounds.jsonl").appendText(entry.toString() + "\n")
+            }) { _, value ->
                 val node = current(invocation)
                 val nodeResult = checkNotNull(field(node, "result"))
                 val bound = field(nodeResult, "bound") as SourceEvidence?
@@ -142,6 +163,7 @@ internal object MpsProofFrontier {
                 put("scope", NumericalFrontierSnapshot.scope(context.scope))
                 put("measurement", "numerical-owner-state-capture")
                 put("branchHistory", historyEnabled)
+                put("boundOrdered", frontierEnabled)
                 put("wholeCliTimingClaim", false)
                 put("sourceVerdictClaim", false)
                 put("independentWitnessCheck", false)
