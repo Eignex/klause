@@ -200,6 +200,23 @@ coordinate. Product residuals are computed exactly, with a private 128-bit
 temporary on overflow, so an overflowing product cannot satisfy a signed-word
 endpoint.
 
+Ground Table invariants share bounded immutable relation postings across factors
+using the same relation arrays. A coordinate edit updates distances only for rows
+matching its old or new value in each occurrence column. Worker-private distance
+buckets maintain the exact minimum and select the two closest repair rows, with
+ties ordered by row index. Candidate scoring reverses its posting updates before
+returning; compound probes use the same accepted-edit maintenance and restoration.
+Interval tables and relations outside the index budget retain exact row scans.
+Each live Table payload holds three integers per row plus bucket heads and counts.
+
+MDD invariants retain forward and backward minimum-Hamming-distance layers. An
+accepted coordinate edit propagates from its first and last occurrence until the
+layers stabilize beyond all changed positions. A reusable widest-layer scratch
+buffer avoids rebuilding the lattice. Cost-only edits keep the distance lattice;
+the accepted path's weight still determines the exact cost gap. A single-position
+candidate recombines one layer, while repeated-position candidates recompute the
+distance with every occurrence substituted.
+
 Preparation is resumable. A handle keeps private cursors for buffers, assignment
 loading, implicit seeding, definition readers, repair graphs, warm weights and
 factor payloads, and advances in batches of at most 256 items between cancellation

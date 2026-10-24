@@ -23,6 +23,51 @@ import kotlin.test.assertTrue
 class TableInvariantTest {
 
     @Test
+    fun `indexed and interval scores should remain exact across repeated coordinates and compound probes`() {
+        val xs = intArrayOf(0, 1, 0)
+        val tuples = longArrayOf(0, 0, 0, 1, 2, 1, 2, 1, 2, 0, 2, 1, 1, 1, 1)
+        for (intervals in listOf(false, true)) {
+            val hi = if (intervals) longArrayOf(1, 0, 0, 1, 2, 2, 2, 2, 2, 0, 2, 1, 1, 1, 2) else null
+            val table = Table(xs, tuples, hi)
+            val state = LocalSearchState(
+                LocalSearchModel.open(Problem(0, 2, Array(2) { IntDomain(0, 3) }, arrayOf<Factor>(table))),
+                Random(0),
+            )
+            state.assignment.setInt(0, 3)
+            state.assignment.setInt(1, 3)
+            state.recompute()
+            fun degree(): Long = (0 until table.numTuples).minOf { row ->
+                xs.indices.count { col ->
+                    !tableCellContains(tuples, hi, xs.size, row, col, state.assignment.intValue(xs[col]))
+                }
+            }.toLong()
+
+            val random = Random(19)
+            repeat(40) {
+                val move = Move.Compound(listOf(Move.IntSet(0, random.nextLong(4)), Move.IntSet(1, random.nextLong(4))))
+                val before = state.assignment.snapshot()
+                val cost = state.cost
+                val predicted = state.netDelta(move)
+                assertEquals(before, state.assignment.snapshot())
+                assertEquals(cost, state.cost)
+                for (variable in 0..1) {
+                    for (value in 0L..3L) {
+                        val primitive = Move.IntSet(variable, value)
+                        val delta = state.netDelta(primitive)
+                        val old = state.assignment.intValue(variable)
+                        state.assignment.setInt(variable, value)
+                        assertEquals(degree() - cost, delta)
+                        state.assignment.setInt(variable, old)
+                    }
+                }
+                state.apply(move)
+                assertEquals(degree(), state.cost)
+                assertEquals(state.cost - cost, predicted)
+            }
+        }
+    }
+
+    @Test
     fun `tuple moves should coordinate indicators and their channel product outputs`() {
         for (structured in listOf(false, true)) {
             for (bound in listOf(0, 1)) {

@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.bake
@@ -14,6 +15,70 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MddInvariantTest {
+
+    @Test
+    fun `weighted repeated coordinates should retain exact scores across compound edits and restoration`() {
+        val records = ArrayList<Long>()
+        val starts = IntArray(5)
+        for (layer in 0 until 4) {
+            starts[layer] = records.size
+            for (from in 0 until if (layer == 0) 1 else 2) {
+                for (symbol in 0..1) {
+                    records.addAll(listOf(from.toLong(), symbol.toLong(), (from xor symbol).toLong(), 2L + from + symbol))
+                }
+            }
+        }
+        starts[4] = records.size
+        val seq = intArrayOf(0, 1, 0, 2)
+        val factor = Mdd(seq, intArrayOf(1, 2, 2, 2, 2), starts, records.toLongArray(), 0, intArrayOf(0), 4, 3)
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 20) }, arrayOf<Factor>(factor))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        for (variable in 0..3) state.assignment.setInt(variable, 2)
+        state.recompute()
+        val words = (0 until 16).filter { it.countOneBits() % 2 == 0 }.map { mask ->
+            val word = LongArray(4) { ((mask ushr it) and 1).toLong() }
+            var parity = 0
+            var weight = 0L
+            for (symbol in word) {
+                weight += 2 + parity + symbol
+                parity = parity xor symbol.toInt()
+            }
+            word to weight
+        }
+        fun degree(): Long {
+            val distance = words.minOf { (word, _) ->
+                seq.indices.count { word[it] != state.assignment.intValue(seq[it]) }
+            }
+            val accepted = words.firstOrNull { (word, _) ->
+                seq.indices.all { word[it] == state.assignment.intValue(seq[it]) }
+            }
+            return distance + if (accepted == null) 0L else kotlin.math.abs(state.assignment.intValue(3) - accepted.second)
+        }
+
+        val random = Random(29)
+        repeat(40) {
+            val move = Move.Compound(listOf(
+                Move.IntSet(random.nextInt(3), random.nextLong(3)),
+                Move.IntSet(3, random.nextLong(21)),
+            ))
+            val before = state.assignment.snapshot()
+            val cost = state.cost
+            val predicted = state.netDelta(move)
+            assertEquals(before, state.assignment.snapshot())
+            assertEquals(cost, state.cost)
+            for (variable in 0..3) {
+                val value = random.nextLong(3)
+                val delta = state.netDelta(Move.IntSet(variable, value))
+                val old = state.assignment.intValue(variable)
+                state.assignment.setInt(variable, value)
+                assertEquals(degree() - cost, delta)
+                state.assignment.setInt(variable, old)
+            }
+            state.apply(move)
+            assertEquals(degree(), state.cost)
+            assertEquals(state.cost - cost, predicted)
+        }
+    }
 
     // Accepts exactly (1, 2) and (2, 1).
     private fun mddFactor(): Factor = Mdd(

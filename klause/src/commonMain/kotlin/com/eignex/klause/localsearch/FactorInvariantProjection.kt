@@ -14,6 +14,7 @@ import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.*
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.*
+import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.lowering.gridAbsoluteValueTable
@@ -218,9 +219,9 @@ private fun Cumulative.cumulativeInvariantProjection(): Invariant {
     }
 }
 
-private fun Table.tableInvariantProjection(): Invariant {
+internal fun Table.tableInvariantProjection(cache: TableGroupCache = TableGroupCache(arity, tuples, hi)): Invariant {
     val (single, multi) = tableColumnMaps(xs, arity)
-    return TableInvariant(xs, tuples, arity, numTuples, single, multi, hi)
+    return TableInvariant(xs, tuples, arity, numTuples, single, multi, hi, cache)
 }
 
 private fun AllDifferent.allDifferentInvariantProjection(): Invariant {
