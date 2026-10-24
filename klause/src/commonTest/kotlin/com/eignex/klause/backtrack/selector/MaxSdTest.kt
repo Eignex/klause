@@ -8,12 +8,34 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class MaxSdTest {
+    @Test
+    fun `support discovery should observe cancellation before an unsupported fallback`() {
+        var cancelled = false
+        val cancellation = object : Cancellation {
+            override fun isCancelled() = cancelled
+            override fun workMeter(): WorkMeter = WorkMeter { }
+        }
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 2) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)),
+        )
+        val session = PropagationSession(problem, cancellation = cancellation)
+        cancelled = true
+
+        val values = MaxSd(fallback = IndomainRandom).values(session, VarRef.IntVar(0), Random(0L)).toSet()
+
+        assertTrue(session.probeCancelled)
+        assertEquals(setOf(0L, 1L, 2L), values)
+    }
+
     @Test
     fun `a cheap fallback should preserve unsupported alternatives without probes`() {
         val problem = Problem(
