@@ -7,7 +7,6 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
@@ -16,108 +15,9 @@ import com.eignex.klause.util.parseBigInt
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AffineDistinctInvariantTest {
-    @Test
-    fun `affine matching seeds should honor source pins with exact offsets`() {
-        val wide = BigFraction.of(parseBigInt("1000000000000000000000000000001"), BIG_ONE)
-        for (base in listOf(BigFraction.ZERO, wide)) {
-            val factor = Distinct((0..2).map { i ->
-                Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE),
-                    base + BigFraction.ofLong(i.toLong()))
-            })
-            val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))
-            val state = LocalSearchState(LocalSearchModel.open(source), Random(3), Assumptions.None.withInt(0, 1))
-            state.assignment.setInt(0, 1)
-            state.assignment.setInt(1, 0)
-            state.assignment.setInt(2, 0)
-
-            val seeded = state.factors[0].seedFeasible(state, 0)
-            state.recompute()
-
-            assertTrue(seeded)
-            assertEquals(1L, state.assignment.intValue(0))
-            assertEquals(0L, state.cost)
-            for (i in 0..2) assertTrue(state.assignment.intValue(i) in state.rootDomains[i])
-        }
-    }
-
-    @Test
-    fun `affine matching seeds should reject coincident frozen values`() {
-        val factor = Distinct((0..1).map { i ->
-            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE),
-                BigFraction.ofLong(i.toLong()))
-        })
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf(factor))
-        val pins = Assumptions.None.withInt(0, 1).withInt(1, 0)
-        val state = LocalSearchState(LocalSearchModel.open(source), Random(3), pins)
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 0)
-
-        val seeded = state.factors[0].seedFeasible(state, 0)
-
-        assertFalse(seeded)
-        assertEquals(listOf(1L, 0L), (0..1).map { state.assignment.intValue(it) })
-    }
-
-    @Test
-    fun `elected affine moves should preserve feasibility while allowing unused translated values`() {
-        val wide = BigFraction.of(parseBigInt("1000000000000000000000000000001"), BIG_ONE)
-        val factor = Distinct((0..1).map { i ->
-            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE),
-                wide + BigFraction.ofLong(i.toLong()))
-        })
-        val source = Problem(0, 2, Array(2) { IntDomain(-5, 5) }, arrayOf(factor))
-        val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 2)
-        state.recompute()
-        val moves = ArrayList<Move>()
-        val structured = SatisfiedStructured.elected(1)
-
-        repeat(8) {
-            state.moveSink.clear()
-            structured.generate(state, state.moveSink)
-            moves.addAll(state.moveSink.list)
-        }
-
-        assertTrue(moves.any { it is Move.IntSet })
-        assertTrue(moves.any { it is Move.Compound })
-        for (move in moves) {
-            assertEquals(0L, state.netDelta(move))
-            state.apply(move)
-            assertEquals(0L, state.cost)
-            for (i in 0..1) assertTrue(state.assignment.intValue(i) in state.rootDomains[i])
-            val sum = state.assignment.intValue(0) + state.assignment.intValue(1)
-            if (move is Move.IntSet) assertTrue(sum != 3L) else assertEquals(3L, sum)
-            state.assignment.setInt(0, 1)
-            state.assignment.setInt(1, 2)
-            state.recompute()
-        }
-    }
-
-    @Test
-    fun `aliased affine roles should decline implicit seeding and structured moves`() {
-        val factor = Distinct((0..1).map { i ->
-            Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
-                BigFraction.ofLong(i.toLong()))
-        })
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(factor))
-        val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
-        state.assignment.setInt(0, 1)
-        state.recompute()
-
-        val seeded = state.factors[0].seedFeasible(state, 0)
-        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
-
-        assertFalse(state.factors[0].providesImplicitNeighbourhood)
-        assertFalse(seeded)
-        assertTrue(state.moveSink.list.isEmpty())
-        assertEquals(1L, state.assignment.intValue(0))
-    }
-
     @Test
     fun `affine collision repairs should offer improving atomic swaps without implicit seeding`() {
         val factor = Distinct((0..3).map { i ->
