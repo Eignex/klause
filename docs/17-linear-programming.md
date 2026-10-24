@@ -270,6 +270,7 @@ operation allowance. Recovery bounds input entries, scalar width, work and model
 allocation, and retains its result only for an unchanged query and guide. Every
 recovered point requires a fresh complete original-source witness check. Frontier
 leaves and joint repair consume those checked incumbents through the same authority.
+Residual completion seeks feasibility; attainment still requires checked objective agreement.
 Small unresolved queries can use bounded exact completion; recovery declines supply
 neither a conflict nor exhaustion authority.
 Source reconstruction restores exact fixed coordinates and matching projected
