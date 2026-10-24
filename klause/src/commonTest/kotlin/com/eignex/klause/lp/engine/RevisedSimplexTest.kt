@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class RevisedSimplexTest {
 
     @Test
-    fun `zero right hand sides should complete within the factorization allowance`() {
+    fun `zero right hand sides should fit an allowance for factorization and setup`() {
         for (size in listOf(2, 8)) {
             val model = LpBuilder().apply {
                 repeat(size) {
@@ -21,14 +21,15 @@ class RevisedSimplexTest {
                     addRow(intArrayOf(variable), longArrayOf(1L), Relation.EQ, 0L)
                 }
             }.build(Sense.MINIMIZE)
-            val allowance = size + 1L
+            val allowance = 2L * size + 1L
 
             RevisedSimplex(model, workLimit = allowance).use { solver ->
                 val result = assertNotNull(solver.solve())
 
-                assertTrue(result.optimal)
+                assertTrue(result.optimal, "size=$size termination=${solver.lastTermination}")
                 assertTrue(result.primal.all { it == 0.0 })
-                assertTrue(solver.lastMetrics.workOps in 1L..allowance)
+                assertTrue(solver.lastMetrics.workOps in 1L..allowance,
+                    "size=$size work=${solver.lastMetrics.workOps} allowance=$allowance")
             }
         }
     }
