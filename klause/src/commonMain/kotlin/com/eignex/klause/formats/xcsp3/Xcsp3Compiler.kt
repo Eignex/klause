@@ -535,6 +535,9 @@ internal object Compiler {
                         factors.add(it)
                         return
                     }
+                if (postDeclaredExtreme(node.args[0], node.args[1]) ||
+                    postDeclaredExtreme(node.args[1], node.args[0])
+                ) return
             }
             // n-ary eq (x = y = z = …) is the conjunction of its consecutive pairwise equalities, posted
             // directly as top-level factors (cf. allEqual) rather than reified onto an aux literal.
@@ -697,6 +700,26 @@ internal object Compiler {
 
         /** The var id when [e] is a plain variable reference, else null. Emits no factors either way. */
         private fun plainVar(e: FExpr): Int? = if (e is FExpr.Ref) ref(e.name) else null
+
+        private fun postDeclaredExtreme(output: FExpr, expression: FExpr): Boolean {
+            if (output !is FExpr.Ref || expression !is FExpr.Call ||
+                (expression.fn != "min" && expression.fn != "max") || expression.args.isEmpty() ||
+                readsVariable(expression, output.name)
+            ) return false
+            val result = ref(output.name)
+            val inputs = expression.args.map { materializeVar(linear(it)) }.toIntArray()
+            val maximum = expression.fn == "max"
+            factors.add(ArrayMinMax(result, inputs, max = maximum))
+            definedVars.add(result)
+            defineExtreme(result, inputs, maximum)
+            return true
+        }
+
+        private fun readsVariable(expression: FExpr, name: String): Boolean = when (expression) {
+            is FExpr.Ref -> expression.name == name
+            is FExpr.Call -> expression.args.any { readsVariable(it, name) }
+            else -> false
+        }
 
         private fun directProduct(vSide: FExpr, mulSide: FExpr): Product? {
             if (mulSide !is FExpr.Call || mulSide.fn != "mul" || mulSide.args.size != 2) return null
