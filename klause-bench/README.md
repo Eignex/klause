@@ -1319,12 +1319,12 @@ single regression samples establish no uniform runtime speedup.
 The first-region control in `PolynomialBooleanRegionsTest` excludes normalization
 and includes enumerator setup. At test-only `e05e934cd`,
 [JVM CI](https://github.com/Eignex/klause/actions/runs/40071689348) charges
-983/2779/8867/31027 units for 8/16/32/64 independent two-leaf disjunctions.
+983/2779/8867/31027 units for 8/16/32/64 independent Boolean two-leaf disjunctions.
 The incremental witness and leaf-cursor implementation is guarded by a bound of
 twice the preceding family work plus 32 units at each doubling, and fewer than
 10,000 units at 64 pairs. Small ordered-region controls cover shared compounds,
-retraction, negative premises, support ties, leaf order and interruption. These
-controls isolate Boolean bookkeeping; whole-source quality and hard-source
+retraction, numeric alternatives, negative premises, support ties, leaf order and
+interruption. These controls isolate Boolean bookkeeping; whole-source quality and hard-source
 throughput remain unmeasured.
 
 ### State ownership

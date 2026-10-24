@@ -43,6 +43,28 @@ class PolynomialBooleanRegionsTest {
     }
 
     @Test
+    fun `numeric pairs retain ordered regions through signed premise retraction`() {
+        for (length in listOf(1, 2)) {
+            val declarations = (0 until 2 * length).joinToString(" ") { "(declare-const x$it Real)" }
+            val pairs = (0 until length).joinToString(" ") { "(or (> x${2 * it} 0) (> x${2 * it + 1} 0))" }
+            val source = SmtLibPolynomial.parse("$declarations (assert (and $pairs))")
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+            val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+            val expected = (0 until (1 shl length)).map { mask ->
+                (0 until length).associate { pair ->
+                    val first = mask and (1 shl (length - pair - 1)) != 0
+                    (2 * pair + if (first) 0 else 1) to true
+                }
+            }
+            assertEquals(expected, regions.map { it.atoms })
+            assertTrue(regions.all { it.bools.isEmpty() })
+        }
+    }
+
+    @Test
     fun `charged first region work grows linearly across disjoint pair families`() {
         val work = listOf(8, 16, 32, 64).map { length ->
             val declarations = (0 until 2 * length).joinToString(" ") { "(declare-const b$it Bool)" }
