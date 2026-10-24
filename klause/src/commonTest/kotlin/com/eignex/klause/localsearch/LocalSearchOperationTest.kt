@@ -104,25 +104,27 @@ class LocalSearchOperationTest {
         var polls = 0
         val strategy = SourceDrivenStrategy(emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
             perturbation = {
-                selected = true
                 picks++
-                Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1)))
+                selected = picks == 2
+                if (picks == 1) Move.IntSet(0, 1) else {
+                    Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1)))
+                }
             })
         val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy, greedyRepairOnRestart = false)
-        val params = LocalSearchParams(maxFlips = 2L, randomSeed = 0L,
+        val params = LocalSearchParams(maxFlips = 3L, randomSeed = 0L,
             initialAssignment = Sample(booleanArrayOf(), longArrayOf(2, 2)))
         engine.resumableSolve(params).use { handle ->
             assertNull(handle.runSlice(Cancellation { selected && ++polls >= 2 }, Long.MAX_VALUE, -1L))
-            assertEquals(1, picks)
-            assertEquals(0.0, handle.stats.ls.moves.sum)
+            assertEquals(2, picks)
+            assertEquals(1.0, handle.stats.ls.moves.sum)
 
             val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
 
             val sample = assertIs<SolveResult.Sat>(result).assignment
             assertEquals(1L, sample.intValue(0))
             assertEquals(1L, sample.intValue(1))
-            assertEquals(1, picks)
-            assertEquals(1.0, handle.stats.ls.moves.sum)
+            assertEquals(2, picks)
+            assertEquals(2.0, handle.stats.ls.moves.sum)
         }
     }
 }
