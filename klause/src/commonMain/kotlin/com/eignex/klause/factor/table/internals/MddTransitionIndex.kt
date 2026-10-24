@@ -43,6 +43,41 @@ internal class MddTransitionIndex(
     @Volatile
     private var preparedSymbols: PreparedSymbols? = null
 
+    private class PreparedCompact(val layers: Array<CompactMddLayer>?)
+    @Volatile
+    private var preparedCompact: PreparedCompact? = null
+
+    fun compactSupports(transitions: LongArray, poll: () -> Unit): Array<CompactMddLayer>? {
+        preparedCompact?.let { return it.layers }
+        val symbols = symbolSupports(transitions, poll)
+        if (symbols == null) {
+            preparedCompact = PreparedCompact(null)
+            return null
+        }
+        var remaining = ExtensionalSupportIndex.MAX_BYTES - symbols.sumOf { it.retainedBytes }
+        val layers = ArrayList<CompactMddLayer>(fwdPtr.size)
+        for (layer in fwdPtr.indices) {
+            val pointers = fwdPtr[layer]
+            val tails = ExtensionalSupportIndex.buildColumn(pointers.size, remaining, poll) { row ->
+                transitions[pointers[row]].toInt().toLong()
+            } ?: run {
+                preparedCompact = PreparedCompact(null)
+                return null
+            }
+            remaining -= tails.retainedBytes
+            val heads = ExtensionalSupportIndex.buildColumn(pointers.size, remaining, poll) { row ->
+                transitions[pointers[row] + 2].toInt().toLong()
+            } ?: run {
+                preparedCompact = PreparedCompact(null)
+                return null
+            }
+            remaining -= heads.retainedBytes
+            layers.add(CompactMddLayer(symbols[layer], tails, heads))
+        }
+        poll()
+        return layers.toTypedArray().also { preparedCompact = PreparedCompact(it) }
+    }
+
     fun symbolSupports(transitions: LongArray, poll: () -> Unit): Array<ExtensionalSupportIndex.Column>? {
         preparedSymbols?.let { return it.columns }
         val columns = ArrayList<ExtensionalSupportIndex.Column>(fwdPtr.size)

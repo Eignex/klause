@@ -61,11 +61,16 @@ internal class MddIncrementalState(
 
     /** Whether this factor has had to build its own reachability bitsets — false while it is still
      *  standing on the group's shared root snapshot. */
-    internal val layersBuilt: Boolean get() = fwdLazy.isInitialized()
+    internal val layersBuilt: Boolean get() = fwdLazy.isInitialized() || compact != null
     private val valid = RevInt(state, 0)
+    private var compact: CompactMddState? = null
+    private val compactEligible = cost < 0 && seq.all { state.rootDomains[it].spanOrNull(4096) != null } &&
+        numStatesPerLayer.sumOf { it.toLong() } * 8 +
+        (transitions.size.toLong() / recordStride / 64 + seq.size) * 12 <= ExtensionalSupportIndex.MAX_BYTES
 
     fun invalidate() {
         valid.set(0)
+        compact = null
     }
 
     /** 1 while this factor's reachability is exactly the shared root snapshot and [fwd]/[bwd] therefore
@@ -363,6 +368,7 @@ internal class MddIncrementalState(
     }
 
     fun supportCounts(variable: Int, values: LongArray, visit: () -> Boolean): ExtensionalSupportCounts? {
+        compact?.let { return it.supportCounts(variable, values, visit) }
         if (valid.value == 0) return null
         val pos = seq.indexOf(variable)
         if (pos < 0) return null
@@ -400,6 +406,13 @@ internal class MddIncrementalState(
     fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (initial < 0 || initial >= numStatesPerLayer[0]) return false
         val dirty = state.drainIntEventDirtyVars(factorId)
+        if (state.undoLogging && compactEligible) {
+            val candidate = compact ?: idx.compactSupports(transitions, state::checkFiniteWork)?.let { supports ->
+                CompactMddState(state, seq, numStatesPerLayer, transitions, initial, accepting, fwdPtr, supports)
+                    .also { compact = it }
+            }
+            if (candidate != null) return candidate.propagate()
+        }
         if (valid.value == 1 && dirty.isEmpty()) return true
         // With the undo log each deduction's reason is built only if analysis reads it ([MddExplainer]); without
         // one every variable's holes and bounds stand in.

@@ -11,6 +11,27 @@ internal class ExtensionalSupportIndex private constructor(val columns: Array<Co
         private val words: Int,
         val retainedBytes: Long,
     ) {
+        fun firstLiveWord(value: Long, residue: Int, live: (Int) -> Long, poll: () -> Unit): Int {
+            val bucket = lowerBound(value)
+            if (bucket == values.size || values[bucket] != value) return -1
+            val start = starts[bucket]
+            if (start >= 0) {
+                for (i in start until sparseLimit(bucket)) {
+                    poll()
+                    val row = rows[i]
+                    if (live(row ushr 6) and (1L shl (row and 63)) != 0L) return row ushr 6
+                }
+            } else {
+                val base = -start - 1
+                if (residue in 0 until words && live(residue) and masks[base + residue] != 0L) return residue
+                for (i in 0 until words) {
+                    poll()
+                    if (live(i) and masks[base + i] != 0L) return i
+                }
+            }
+            return -1
+        }
+
         fun valueCount(lower: Long, upper: Long): Int {
             var lo = 0
             var hi = values.size
