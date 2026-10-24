@@ -55,9 +55,9 @@ internal class JointLinearRepair(
     private var closed = false
     private var declined = false
     private var preparationWork = 0L
-    val exhausted: Boolean get() = declined ||
+    val exhausted: Boolean get() = declined || budget.operations >= SOURCE_OPERATION_LIMIT ||
         (!rootPreparationPending && pending == null && (!state.work.hasAllowance() ||
-            state.work.acceptedChecks >= params.maxLeaves || budget.operations >= SOURCE_OPERATION_LIMIT))
+            state.work.acceptedChecks >= params.maxLeaves))
     val work: Long get() = state.work.spent + budget.measuredPreparationWork + budget.measuredFloatWork +
         budget.measuredContinuationWork + budget.measuredBoundCertificationWork + preparationWork +
         (selection?.visitedEntries ?: 0)
