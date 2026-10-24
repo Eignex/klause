@@ -38,6 +38,7 @@ internal class LinearAuthorityTraversal(
     private val pause: () -> Boolean,
     private val onIncumbent: (Sample) -> Unit,
     private val incumbent: () -> Pair<Sample, BigFraction>?,
+    private val useBranchHistory: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -156,7 +157,7 @@ internal class LinearAuthorityTraversal(
                 if (if (minimizes) after > before else after < before) observe("numericalChildBoundGains")
                 val parentNode = path.getOrNull(path.lastIndex - 1)?.second
                 val split = parentNode?.split as? CoverageSplit.Integer
-                split?.fractional?.let { candidate ->
+                split?.fractional?.takeIf { useBranchHistory }?.let { candidate ->
                     branchHistory.observe(candidate, current === split.below,
                         if (minimizes) after - before else before - after)
                 }
@@ -176,7 +177,8 @@ internal class LinearAuthorityTraversal(
         }
         if (current.coveredBound != null) return SearchNodeDisposition.Prune
         result.split?.let { (coordinate, threshold) ->
-            val candidate = branchHistory.select(result.fractional, cancellation)
+            val candidate = if (useBranchHistory) branchHistory.select(result.fractional, cancellation)
+                else result.fractional.firstOrNull()
             val selected = candidate?.floorSplit() ?: (coordinate to threshold)
             if (selected != result.split) observe("numericalHistorySelections")
             current.split = CoverageSplit.Integer(selected.first, selected.second, current.condition, candidate)

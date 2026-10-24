@@ -40,6 +40,7 @@ internal class LinearAuthorityInvocation(
     private val params: TheoryParams,
     private val external: () -> Sample? = { null },
     private val state: OpenTheorySolveState = OpenTheorySolveState(params),
+    useBranchHistory: Boolean = false,
 ) : AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
@@ -66,7 +67,7 @@ internal class LinearAuthorityInvocation(
         search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
         SourceLpBudget(onWork = state.smt::observeSourceLp), stop, ::paused, ::offer,
-        { incumbent?.let { sample -> value?.let { sample to it } } })
+        { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)
     }
