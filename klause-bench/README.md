@@ -2097,6 +2097,7 @@ The finite control proves p0033 at 3089 but leaves gr4x6 at 229.05 after its
 allowance. This comparison supports preparation reuse with complete source
 coverage, alongside higher retained memory and no observed wall-time improvement;
 it does not measure the sparse bound-ordered consumer.
+
 Numerical `engine=ls|alns` selects joint integer/real repair. Compare
 `param.max-flips=1` for its initial fixed-discrete rounding with the ordinary
 candidate allowance, and retain automatic finite LS and LP/pumping controls at the
@@ -2183,6 +2184,36 @@ finite LS 311.55–375.4. Joint repair finds no flugpl incumbent, where finite L
 proves 1201500. Four wider roots supply no scalar guide. Each gr4x6 joint run uses
 one LP preparation and 255 reuses; the operation allowance ends search before
 the finite controls' wall allowance, so elapsed times establish no general speedup.
+
+[Sparse consumer qualification 8056](https://lab.eignex.com/jobs/8056) compares
+that scalar control with `4f4d29ef72` on the same eight sources plus bell5, pp08a
+and rgn: 231 runs with matching source hashes, runtime, dependencies and JVM
+options under the same policy on Mac/aarch64. All 34 reported final witnesses
+pass independent solchecker. The gr4x6 outcomes repeat across all three seeds:
+
+| Repair | Final objective | Distinct checked incumbents |
+| --- | ---: | ---: |
+| Initial rounding | None | 0 |
+| Scalar LS | 210 | 5 |
+| Sparse depth-first LS | 230.85 | 3 |
+| Sparse ALNS | 214.8 | 4 |
+| Sparse frontier LS | 206.5 | 3 |
+
+Sparse frontier's trajectory is 226.85 → 214.8 → 206.5. Sparse ALNS closes four
+nonimproving neighborhoods with checked cutoffs. Each joint arm spends 256 source
+LP operations; depth-first LS and ALNS admit 161 and 177 theory checks, respectively,
+with mixed guidance/fallback operation costs. Frontier uses 11,636 preparation,
+7,478,399 floating and 924,881 bound-certification work units, with one preparation
+and 255 reuses. These are work counters, not physical allocation measurements.
+The weaker depth-first objectives reject a general improvement claim.
+
+All seven wider sources receive sparse root guides, but none yields a joint
+incumbent. Bell3a completes 241 depth-first candidates as undecided, with no checked
+refutation; wide scoped Farkas evidence remains outside the shared service.
+Finite LP retains flugpl's proof and feasible egout, pp08a and rgn points; finite
+LS also finds bell5 points. The evidence supports the explicit joint operator and
+frontier option, while retaining automatic routing and the wide-neighborhood
+certification boundary. Native proofs remain separate from independent point checks.
 
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
