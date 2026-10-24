@@ -22,8 +22,9 @@ class LinearPrimalRecoveryTest {
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), third.negated()),
         )
 
-        val point = recoverLinearPrimal(listOf(real, integer), listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3)), wide),
-            rows, emptySet(), Cancellation.Never, complete = { _, _, _ -> error("completion unnecessary") },
+        val guess = listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3)), wide)
+        val point = recoverLinearPrimal(listOf(real, integer), guess, rows, emptySet(), Cancellation.Never,
+            complete = { _, _, _ -> error("completion unnecessary") },
             observe = { _, _ -> })
 
         assertEquals(listOf(third, wide), point)
@@ -71,10 +72,52 @@ class LinearPrimalRecoveryTest {
         )
 
         for (value in listOf(BigFraction.ZERO, BigFraction.ONE)) {
-            val point = recoverLinearPrimal(listOf(real), listOf(BigFraction.ZERO), rows, emptySet(), Cancellation.Never,
+            val point = recoverLinearPrimal(listOf(real), listOf(BigFraction.ZERO), rows, emptySet(),
+                Cancellation.Never,
                 complete = { _, _, _ -> listOf(value) }, observe = { _, _ -> })
 
             if (value.isZero) assertNull(point) else assertEquals(listOf(value), assertNotNull(point))
         }
+    }
+
+    @Test
+    fun `an unfinished recovery should retain completed continuous components`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val rows = (0..1).map {
+            ExactRationalInequality(intArrayOf(it), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true)
+        }
+        val progress = LinearPrimalRecoveryProgress()
+        val stages = mutableMapOf<String, Long>()
+        var calls = 0
+        val complete: (List<ExactRationalInequality>, Int, Cancellation) -> List<BigFraction>? = { _, _, _ ->
+            calls++
+            if (calls == 2) null else listOf(BigFraction.ONE)
+        }
+        val observe: (String, Long) -> Unit = { stage, count -> stages[stage] = (stages[stage] ?: 0L) + count }
+
+        val first = recoverLinearPrimal(listOf(real, other), List(2) { BigFraction.ZERO }, rows, emptySet(),
+            Cancellation.Never, complete, observe, progress = progress)
+        val resumed = recoverLinearPrimal(listOf(real, other), List(2) { BigFraction.ZERO }, rows, emptySet(),
+            Cancellation.Never, complete, observe, progress = progress)
+
+        assertNull(first)
+        assertEquals(listOf(BigFraction.ONE, BigFraction.ONE), resumed)
+        assertEquals(3, calls)
+        assertEquals(1L, stages["PrimalRecoveryComponentReused"])
+        assertEquals(progress.work, stages["PrimalRecoveryWork"])
+    }
+
+    @Test
+    fun `connected residual rows should preserve source column order`() {
+        val coordinates = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val rows = listOf(2, 1).map {
+            ExactRationalInequality(intArrayOf(0, it), List(2) { BigFraction.MINUS_ONE },
+                BigFraction.ZERO, strict = true)
+        }
+
+        val point = recoverLinearPrimal(coordinates, List(3) { BigFraction.ZERO }, rows, emptySet(), Cancellation.Never,
+            complete = { _, columns, _ -> List(columns) { BigFraction.ONE } }, observe = { _, _ -> })
+
+        assertEquals(List(3) { BigFraction.ONE }, point)
     }
 }

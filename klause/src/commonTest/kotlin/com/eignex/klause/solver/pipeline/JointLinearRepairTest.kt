@@ -67,9 +67,16 @@ class JointLinearRepairTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
         val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1))
-        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO), mapOf(0 to BigFraction.ZERO))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
+            mapOf(0 to BigFraction.ZERO))
 
-        val result = repair.use { it.check(condition, Cancellation.Never) }
+        val result = repair.use {
+            var result = it.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = it.check(condition, Cancellation.Never)
+            }
+            result
+        }
 
         val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
         val reals = assertNotNull(sample.exactReals)

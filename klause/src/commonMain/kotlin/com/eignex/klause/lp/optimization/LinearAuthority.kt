@@ -57,8 +57,12 @@ internal class LinearAuthority(
         "numericalMaxActiveCuts" to activeCutPeak,
     )
     private class PrimalAttempt(
-        val query: LinearAuthorityQuery, val point: List<BigFraction>, val recovered: List<BigFraction>?,
-    )
+        val query: LinearAuthorityQuery, val point: List<BigFraction>,
+    ) {
+        val progress = LinearPrimalRecoveryProgress()
+        var recovered: List<BigFraction>? = null
+        var finished = false
+    }
     private var primalAttempt: PrimalAttempt? = null
 
     fun invalidateGuidance() = lp.invalidateGuidance()
@@ -115,13 +119,18 @@ internal class LinearAuthority(
     private fun recover(
         prepared: LinearAuthorityQuery, point: List<BigFraction>, cancellation: Cancellation,
     ): List<BigFraction>? {
-        primalAttempt?.takeIf { it.query === prepared && it.point == point }?.let {
+        val attempt = primalAttempt?.takeIf { it.query === prepared && it.point == point }
+            ?: PrimalAttempt(prepared, point).also { primalAttempt = it }
+        if (attempt.finished) {
             observePrimal("PrimalRecoveryReused")
-            return it.recovered
+            return attempt.recovered
         }
         val recovered = lp.recover(prepared.coordinates, point, prepared.rows, prepared.inactive,
-            cancellation, ::observePrimal)
-        if (!cancellation()) primalAttempt = PrimalAttempt(prepared, point, recovered)
+            cancellation, ::observePrimal, attempt.progress)
+        if (!cancellation()) {
+            attempt.recovered = recovered
+            attempt.finished = true
+        }
         return recovered
     }
 
@@ -265,7 +274,8 @@ internal class LinearAuthority(
             }
             fun witness(values: List<BigFraction>): Sample? {
                 val proposed = sample(source, coordinates, values)
-                val evidence = SourceEvidence(source.scope, SourceClaim.Witness(proposed), SourceDerivation.SourceWitness)
+                val evidence = SourceEvidence(source.scope, SourceClaim.Witness(proposed),
+                    SourceDerivation.SourceWitness)
                 return when (SourceEvidenceVerifier(context).verify(evidence, cancellation)) {
                     SourceEvidenceCheck.Checked -> proposed
                     is SourceEvidenceCheck.Rejected -> {

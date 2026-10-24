@@ -384,6 +384,24 @@ class LinearAuthorityTest {
     }
 
     @Test
+    fun `wide strict recovery should preserve the gap between a feasible point and its bound`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+        ), mapOf(real to BigFraction.ONE))
+
+        val result = LinearAuthority(SourceLpBudget(), retainLp = true).use {
+            it.advance(source, Cancellation.Never)
+        }
+
+        assertTrue(assertNotNull(assertNotNull(result.incumbent).exactReals).first() > BigFraction.ZERO)
+        assertEquals(SourceValue.Rational(BigFraction.ZERO), assertIs<SourceClaim.Bound>(
+            assertNotNull(result.bound).claim).value)
+        assertNull(result.evidence)
+    }
+
+    @Test
     fun `changed source conditions should discard a suspended guidance cursor`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(real, other), mapOf(
