@@ -262,8 +262,9 @@ dimension-sized touched storage needs no capacity-counting prepass. A failed
 arithmetic operation leaves every modified slot registered for cleanup.
 
 Empty indexed right-hand sides return zero after checking the owner and factors;
-the basis meter records a successful solve with zero entry visits. The engine's
-backend-independent allowance charge still follows the requested solve.
+the basis meter records a successful solve with zero entry visits. They consume
+no basis-transformation allowance; nonempty requests retain the engine's
+backend-independent shape and update charge.
 Dense partial-pivot LU is selected only for dimensions 2–6 with at least 50% density in the selected
 basis; it produces the same CSC factors as sparse LU, and a numerical decline
 retries sparse. Rational factors reuse orderings but never approximate numeric
