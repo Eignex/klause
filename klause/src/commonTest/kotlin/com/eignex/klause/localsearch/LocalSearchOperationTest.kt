@@ -22,6 +22,34 @@ import kotlin.test.assertTrue
 
 class LocalSearchOperationTest {
     @Test
+    fun `interrupted definition scoring should restore outputs and invalidate their cached values`() {
+        val problem = Problem(0, 3, arrayOf(IntDomain(0, 2), IntDomain(2, 2), IntDomain(0, 4)),
+            arrayOf<Factor>(Product(0, 1, 2), Table(intArrayOf(2), longArrayOf(0))))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.invariants = checkNotNull(DefinitionalSweep.infer(problem)).network(3, 0)
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 2)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+        state.weights.factorWeights[1] = 3.0
+        val before = state.assignment.snapshot()
+        val move = Move.IntSet(0, 1)
+
+        val interrupted = state.scoringPick(Cancellation { state.assignment.intValue(2) == 2L }) {
+            state.weightedNetDelta(move)
+            move
+        }
+
+        assertNull(interrupted)
+        assertEquals(before, state.assignment.snapshot())
+        assertEquals(0L, state.cost)
+        assertEquals(3.0, state.weightedNetDelta(move))
+        state.apply(move)
+        assertEquals(2L, state.assignment.intValue(2))
+        assertEquals(1L, state.cost)
+    }
+
+    @Test
     fun `interrupted compound scoring should restore completed primitive edits before returning`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))))
