@@ -1073,6 +1073,39 @@ These summaries record current design decisions. The contracts live in the linke
 [docs](../docs/README.md) chapters; measurements behind them were klause-lab
 experiments and stay outside the repository.
 
+### Table and MDD historical domains
+
+Retain full-domain MDD reachability and historical hole premises. The initial
+[comparison 7954](https://lab.eignex.com/jobs/7954), against `5a8c2b0c1`, leaves
+all 18 WordDesign2, Eternity and BlockedQueens runs unknown. WordDesign2 reaches
+50 nodes and depth 17 in both arms, with additional watcher work. The hole,
+snapshot and undo regressions establish the stronger contract; these candidate
+measurements establish no solve gain.
+
+Retain ground table reasons tied to the actual bound or value deduction and its
+trail position. [Comparison 7959](https://lab.eignex.com/jobs/7959) rejects a
+per-column/value membership cache: Eternity's work matches, while median process
+time changes from 4.220 s to 4.432 s. The earlier
+[profile 7946](https://lab.eignex.com/jobs/7946) attributes cost to support-loss
+reconstruction; its execution-sample share is not a predicted speedup.
+
+[Comparison 7966](https://lab.eignex.com/jobs/7966) pairs `81ea84064` with
+`4e876bfb2` on Mac/aarch64, CP/LP-off, one conflict-driven arm, seed 3, three
+repeats, 2000 nodes and a 20-second deadline. External time measures ordinary
+CLI runs with debug statistics and no JFR. Eternity's median process time falls
+from 4.078 s to 3.233 s; failures change from 6051 to 5701, propagation work from
+68236618 to 56687826, and peak depth from 25 to 28. All remain unknown. Search
+paths differ, so this does not isolate explanation time. Recorded peak RSS ranges
+are 235872–273120 KiB and 236784–237920 KiB respectively.
+
+The table Nonogram control takes 613 rather than 375 nodes, with median process
+time 1.258 s rather than 1.087 s. All twelve table/Regular witnesses pass original
+source checking. Regular and BlockedQueens work match; deadline-limited MDD runs
+reach 39–41 nodes and remain unknown. These controls support the focused reason
+change with a search tradeoff, not a general speedup. The measured Table source
+is unchanged by its rebase onto the MDD contract. See
+[explanation lifetime](../docs/09-learning.md#table-explanations).
+
 ### Division relation lookup
 
 Retain the compilation-owned index described in [integer division relations](../docs/02-model.md#integer-division-relations).
