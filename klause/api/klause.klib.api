@@ -779,6 +779,7 @@ final enum class com.eignex.klause.solver.pipeline/SourceExecutionKind : kotlin/
 
 final enum class com.eignex.klause.solver.pipeline/ValSelectorKind : kotlin/Enum<com.eignex.klause.solver.pipeline/ValSelectorKind> { // com.eignex.klause.solver.pipeline/ValSelectorKind|null[0]
     enum entry MAX // com.eignex.klause.solver.pipeline/ValSelectorKind.MAX|null[0]
+    enum entry MAX_SD // com.eignex.klause.solver.pipeline/ValSelectorKind.MAX_SD|null[0]
     enum entry MEDIAN // com.eignex.klause.solver.pipeline/ValSelectorKind.MEDIAN|null[0]
     enum entry MIDDLE // com.eignex.klause.solver.pipeline/ValSelectorKind.MIDDLE|null[0]
     enum entry MIN // com.eignex.klause.solver.pipeline/ValSelectorKind.MIN|null[0]
