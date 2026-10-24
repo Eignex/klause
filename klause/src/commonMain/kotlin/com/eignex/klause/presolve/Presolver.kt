@@ -522,7 +522,7 @@ object Presolver {
             transformed,
             { mapping.reconstructFrom(transformed, it) },
             rounds.fired,
-            rounds.infeasible || session.infeasible,
+            rounds.infeasible || session.infeasible || transformed.baked is PropagationResult.Unsat,
         ).also { it.mapping = mapping }
     }
 
