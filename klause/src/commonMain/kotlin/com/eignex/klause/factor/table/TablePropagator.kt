@@ -41,7 +41,11 @@ internal class TablePropagator(
 
     private val unarySupports = boundedUnarySupports()
     private val supportIndex by lazy {
-        if (groupCache != null) groupCache.supportIndex else if (hi == null) TableSupportIndex.build(tuples, arity) else null
+        when {
+            groupCache != null -> groupCache.supportIndex
+            hi == null -> TableSupportIndex.build(tuples, arity)
+            else -> null
+        }
     }
 
     override val expensiveBake: Boolean get() = unarySupports == null
