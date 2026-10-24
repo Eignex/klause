@@ -268,6 +268,8 @@ internal object MpsSparseRoot {
                         put("simplexProgress", NumericalResidualProfile.json(call(numericalOwner, "getProgressTrace")))
                         put("refactorPolicy", NumericalResidualProfile.json(
                             call(numericalOwner, "getLastRefactorPolicyMetrics")))
+                        put("devexWeightCorrections", call(numericalOwner, "getLastDevexWeightCorrections") as Int)
+                        put("harrisMinisteps", call(numericalOwner, "getLastHarrisMinistepSelections") as Int)
                         put("floatMetrics", NumericalResidualProfile.json(call(owner, "getLastMetrics")))
                         put("ownerMetrics", NumericalResidualProfile.json(call(owner, "getMetrics")))
                     }
