@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -17,11 +18,39 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
+    @Test
+    fun `paused guidance should keep its check allowance through incumbent publication`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val repair = JointLinearRepair(model, source, objective,
+            TheoryParams(maxFlips = 1, maxLeaves = 2, openWorkLimit = 2), SparseSourceLpPolicy(quantum = 1L))
+
+        val result = repair.use {
+            it.search(adaptive = false).use { search ->
+                assertFalse(search.advance(Cancellation.Never, 1))
+                assertEquals(0.0, search.stats.ls.completions.sum)
+                var done = false
+                repeat(64) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                assertTrue(done)
+                search.minimizeResult(TerminationReason.BudgetExhausted)
+            }
+        }
+
+        assertEquals(1L, assertNotNull(result.assignment).intValue(0))
+        assertEquals(2L, result.stats.openTheory.openTheoryChecks)
+        assertTrue((result.stats.smt.completeSearchStages?.get("jointRepairRootPauses") ?: 0) > 0)
+    }
+
     @Test
     fun `the first repair should round the LP guide rather than the declared lower bound`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),

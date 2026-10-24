@@ -230,7 +230,10 @@ Each candidate runs the shared numerical traversal with a borrowed source LP
 authority. Candidate coverage and compatible LP state survive slice boundaries;
 changed pins retire candidate coverage before opening another query. Search and LP
 allowances span candidates, and the driver charges native work as heuristic
-instructions. A completed candidate must pass the original-source witness check
+instructions, including sparse preparation and bound certification. Root and
+candidate consultations advance bounded quanta under the invocation's cancellation
+token; a paused consultation retains its admitted operation and check allowance.
+A completed candidate must pass the original-source witness check
 before it can update the center or publish an incumbent. Local bounds, refutations
 and exhausted alternatives never leave the heuristic as global claims.
 
