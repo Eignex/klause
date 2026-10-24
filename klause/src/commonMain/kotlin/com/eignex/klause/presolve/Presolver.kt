@@ -362,7 +362,10 @@ object Presolver {
             { mapping.reconstructFrom(host.current, it) },
             rounds.fired,
             rounds.infeasible || host.current.baked is PropagationResult.Unsat,
-        ).also { it.mapping = mapping; it.objective = ctx.linearObjective }
+        ).also {
+            it.mapping = mapping
+            it.objective = ctx.linearObjective
+        }
     }
 
     /**
@@ -533,7 +536,10 @@ object Presolver {
             { mapping.reconstructFrom(transformed, it) },
             rounds.fired,
             rounds.infeasible || session.infeasible || transformed.baked is PropagationResult.Unsat,
-        ).also { it.mapping = mapping; it.objective = ctx.linearObjective }
+        ).also {
+            it.mapping = mapping
+            it.objective = ctx.linearObjective
+        }
     }
 
     /** Compose per-pass reconstructs (application order) into the single solution-mapping function,
