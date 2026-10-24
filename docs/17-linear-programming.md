@@ -436,7 +436,7 @@ Fractional branching retains every eligible exact integer coordinate and selects
 source order. An internal opt-in history records nonnegative checked immediate-child
 bound gains per unit movement,
 separately for the lower and upper split. Two observations in each direction permit
-a balanced gain estimate to choose a coordinate; absent, nonfinite or zero estimates
+a balanced gain estimate to choose a coordinate; absent, nonfinite or all-zero estimates
 retain source order. These estimates guide exhaustive splits only and supply no
 pruning or proof authority. Indicator splits and integral strict-limit proposals
 do not train fractional history.
