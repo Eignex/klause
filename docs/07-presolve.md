@@ -344,7 +344,10 @@ At-most-one merging replaces pairwise exclusions with a cardinality when at leas
 two factors drop. Default clausal optimization retains exclusions for native SAT
 propagation and learning; `+amo-clique` or aggressive emphasis permits conversion.
 XOR unit derivation uses bounded GF(2) elimination and emits only forced values and
-refutations.
+refutations. Source units and established finite root pins substitute into signed
+parity rows before elimination, alongside fixed integer values. Constant odd rows
+refute even when no columns remain; interrupted collection or elimination publishes
+no deductions, and established pins are not emitted again.
 
 ### Symmetry and probing
 
