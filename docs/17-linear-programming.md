@@ -121,7 +121,8 @@ shared proof allowance and premise view; inactive
 Boolean guards or integer pins disable the owner and its cuts together. Retraction
 restores those activation masks. LP certificates cite the nested source rounding
 derivation, and final source checking repeats Boolean substitution independently.
-Preparation and proof traversal have separate work observations. Separation and
+Preparation and proof traversal report separate work observations, including
+interrupted queries. Separation and
 proof policy belong to the adapter, outside `lp.engine`.
 
 ### Root preparation

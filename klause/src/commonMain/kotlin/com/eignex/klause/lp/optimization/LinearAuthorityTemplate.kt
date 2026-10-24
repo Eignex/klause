@@ -23,6 +23,7 @@ internal class LinearAuthorityTemplate private constructor(
     companion object {
         fun prepare(
             source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false,
+            onCutWork: (Long) -> Unit = {},
         ): LinearAuthorityTemplate? {
             val numeric = source.numericContext()
             val coordinates = source.numericCoordinates()
@@ -32,7 +33,9 @@ internal class LinearAuthorityTemplate private constructor(
                 if (cancellation()) return null
                 rows += premise.inequality.row(indices)
             }
-            val separated = if (cuts) LinearAuthorityCuts.prepare(numeric, cancellation) ?: return null else null
+            val separated = if (cuts) {
+                LinearAuthorityCuts.prepare(numeric, cancellation, onCutWork) ?: return null
+            } else null
             return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, separated)
         }
     }
