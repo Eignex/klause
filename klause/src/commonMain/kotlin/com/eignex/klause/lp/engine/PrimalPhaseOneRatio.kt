@@ -18,7 +18,7 @@ internal class PrimalPhaseOneRatio(rows: Int) {
     private val scratch = IntArray(2 * rows)
     private var count = 0
 
-    @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+    @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod", "ReturnCount")
     fun choose(
         model: LpModel,
         numerical: LpScalingView,

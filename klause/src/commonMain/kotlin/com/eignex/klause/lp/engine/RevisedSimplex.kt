@@ -2688,8 +2688,8 @@ internal class RevisedSimplex(
      * Primal **phase-1**: drive an infeasible basis to primal feasibility by minimizing the total bound
      * infeasibility `w = Σ max(0, l_i − β_i) + max(0, β_i − u_i)` over the same primal pivot machinery. The
      * phase-1 gradient `γ` (−1 for a basic below its lower bound, +1 above its upper, 0 feasible) gives
-     * the phase-1 duals `π = B⁻ᵀγ`; entering by the column that most reduces `w`, leaving by the first
-     * basic to reach a bound (an infeasible basic crossing into feasibility is a valid leave).
+     * the phase-1 duals `π = B⁻ᵀγ`. Pricing selects an improving column; the ratio test minimizes the
+     * piecewise-linear violation along its edge, passing crossings that leave a negative slope.
      * [IterationResult.CONTINUE] once feasible; [IterationResult.FAILED] when no improving column remains
      * while `w > 0` (an infeasibility candidate) or on a singular pivot / cancellation / budget;
      * [IterationResult.RESTART] or [IterationResult.BASIS_CHANGED] when a refactorization requires the
