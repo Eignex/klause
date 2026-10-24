@@ -980,8 +980,9 @@ admission bypass based on sparsity or successful preparation alone
 [node-only qualification](https://lab.eignex.com/jobs/7903)). Their emitted
 rows/columns/nonzeros are 2171/6000/18243, 15801/17818/100772 and
 6305/9733/43195. The latter two exceed the admission proxy ceiling; their dominant
-components retain almost all rows and columns. The existing objective cone emits
-zero rows on all three, so its box bounds do not replace the full relaxation.
+components retain almost all rows and columns. At that diagnosis revision the
+objective cone emits zero rows on all three, so its box bounds do not replace the
+full relaxation.
 
 Separating preparation and retaining one root owner clears the construction
 barrier. With work-stop feedback and no standalone diagnostic probes, each large
@@ -1002,6 +1003,23 @@ return unknown without witnesses. Ordinary admission stays unchanged; the
 internal bounded comparison remains available. This decision concerns the tested
 root-query policies and resources, not every LP representation or numerical
 kernel.
+
+[Cone fidelity capture 7975](https://lab.eignex.com/jobs/7975), at `bf5a595916`,
+retains the same three source hashes and preparation/query controls. Closure through
+exact rows and real coordinates emits 2171/6000/18243 rows/columns/nonzeros on
+cap6000, 14566/16584/99538 on rentacar and 6294/9719/43173 on misc04inf.
+Each cone is one connected component; cap6000 matches its full LP and the other
+two keep the dominant full component. Ordinary admission stays unchanged.
+
+The three cold full/cone probes agree on cap6000's checked native lower bound
+-3598896 with 1051576 root work units. Both large sources decline checked bounds
+in all three probes. Cone/full root work is 1071026/1072896 on rentacar and
+1126811/1221906 on misc04inf. Checked-bound thread allocations span 33.7–34.1 MB
+for the cap6000 cone, 50.1–50.2 MB for rentacar and 100.5 MB for misc04inf;
+these are JFR diagnostic phase allocations on Mac/aarch64, Java 25.0.4.1 with
+a 6 GiB maximum heap, excluding physical RSS and any end-to-end speed claim.
+Restored support establishes projection fidelity; dominant-component size and
+missing large-source deductions still withhold an automatic admission bypass.
 
 ### CLI profile tables
 
