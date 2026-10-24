@@ -19,13 +19,13 @@ import kotlin.concurrent.Volatile
  * verdict. Mirrors [MddTransitionIndex.rootSnapshot].
  */
 internal class TableGroupCache(private val arity: Int, private val tuples: LongArray, private val hi: LongArray?) {
-    private class Prepared(val index: TableSupportIndex?)
+    private class Prepared(val index: ExtensionalSupportIndex?)
     @Volatile
     private var prepared: Prepared? = null
 
-    fun supports(poll: () -> Unit): TableSupportIndex? {
+    fun supports(poll: () -> Unit): ExtensionalSupportIndex? {
         prepared?.let { return it.index }
-        val index = if (hi == null) TableSupportIndex.build(tuples, arity, poll = poll) else null
+        val index = if (hi == null) ExtensionalSupportIndex.build(tuples, arity, poll = poll) else null
         poll()
         prepared = Prepared(index)
         return index

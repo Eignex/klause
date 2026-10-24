@@ -6,14 +6,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class TableSupportIndexTest {
+class ExtensionalSupportIndexTest {
     @Test
     fun `mixed sparse and dense supports should visit exactly the requested rows`() {
         val tuples = LongArray(256 * 2) { cell ->
             val row = cell / 2
             if (cell % 2 == 0) row.toLong() else if (row < 128) -1 else row.toLong()
         }
-        val index = assertNotNull(TableSupportIndex.build(tuples, 2))
+        val index = assertNotNull(ExtensionalSupportIndex.build(tuples, 2))
 
         for (col in 0..1) {
             for ((lower, upper) in listOf(-1L to -1L, 127L to 132L, -1L to 255L, 300L to 400L)) {
@@ -29,7 +29,7 @@ class TableSupportIndexTest {
     @Test
     fun `support bounds should preserve both signed endpoints`() {
         val tuples = longArrayOf(Long.MAX_VALUE, 0, Long.MIN_VALUE, Long.MAX_VALUE)
-        val index = assertNotNull(TableSupportIndex.build(tuples, 1))
+        val index = assertNotNull(ExtensionalSupportIndex.build(tuples, 1))
 
         for (value in listOf(Long.MIN_VALUE, 0, Long.MAX_VALUE)) {
             val rows = ArrayList<Int>()
@@ -43,14 +43,14 @@ class TableSupportIndexTest {
     fun `insufficient storage should decline the complete index`() {
         val tuples = LongArray(128) { it.toLong() }
 
-        val index = TableSupportIndex.build(tuples, 2, maxBytes = 1024)
+        val index = ExtensionalSupportIndex.build(tuples, 2, maxBytes = 1024)
 
         assertNull(index)
     }
 
     @Test
     fun `empty supports should visit no rows`() {
-        val index = assertNotNull(TableSupportIndex.build(longArrayOf(), 2))
+        val index = assertNotNull(ExtensionalSupportIndex.build(longArrayOf(), 2))
         val rows = ArrayList<Int>()
 
         index.columns[0].forEachRow(Long.MIN_VALUE, Long.MAX_VALUE, rows::add)

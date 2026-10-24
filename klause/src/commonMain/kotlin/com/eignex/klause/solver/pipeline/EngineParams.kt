@@ -18,6 +18,7 @@ import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.IndomainRandom
 import com.eignex.klause.backtrack.selector.IndomainSplit
+import com.eignex.klause.backtrack.selector.MaxSd
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.LargestDomain
 import com.eignex.klause.backtrack.selector.LargestUpperBound
@@ -781,8 +782,8 @@ enum class VarSelectorKind(val id: String) {
 }
 
 /** `val-selector` `--param` values for the `cp` engine's override pool (each maps to a [ValueSelector]).
- *  Covers the public no-argument value selectors; IndomainBest (needs the objective) and the
- *  `internal` ones (IndomainSet, MaxSd, Impact) are not exposable as a bare value here. */
+ *  Covers no-argument selectors and bounded MaxSd with its default probe cap.
+ *  IndomainBest, IndomainSet and Impact require other context. */
 enum class ValSelectorKind(val id: String) {
     RANDOM("random"),
     MIN("min"),
@@ -791,6 +792,7 @@ enum class ValSelectorKind(val id: String) {
     MEDIAN("median"),
     SPLIT("split"),
     SOLUTION_GUIDED("solution-guided"),
+    MAX_SD("max-sd"),
     ;
 
     /** The value selector for this kind; the stateful [SolutionGuided] is constructed fresh per call so
@@ -803,6 +805,7 @@ enum class ValSelectorKind(val id: String) {
         MEDIAN -> IndomainMedian
         SPLIT -> IndomainSplit
         SOLUTION_GUIDED -> SolutionGuided(IndomainMin)
+        MAX_SD -> MaxSd()
     }
 
     companion object {

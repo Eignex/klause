@@ -12,6 +12,7 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import kotlin.math.ln
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */
 enum class VarKind {
@@ -161,6 +162,33 @@ class PropagationSession private constructor(
      *  decision — see [com.eignex.klause.backtrack.selector.probeAndOrder], which spends a fixpoint per
      *  candidate value — since the engine only polls between nodes and cannot see past them. */
     internal val cancelRequested: Boolean get() = cancellation()
+
+    internal fun extensionalDensities(variable: Int, values: LongArray): DoubleArray? {
+        if (fixpointCancelled || state.propQueue.isNotEmpty() || state.dirtyBools.isNotEmpty() ||
+            state.dirtyInts.isNotEmpty()
+        ) return null
+        val occurrences = projection.intOccurrences[variable]
+        if (occurrences.none { projection.propagators[it] is ExtensionalSupportProvider }) return null
+        var remaining = 65_536
+        val visit = {
+            state.checkFiniteWork()
+            remaining-- > 0
+        }
+        val scores = DoubleArray(values.size)
+        state.finiteWork.begin()
+        try {
+            for (fid in occurrences) {
+                if (!visit()) return null
+                val provider = projection.propagators[fid] as? ExtensionalSupportProvider ?: continue
+                val counts = provider.supportCounts(state, fid, variable, values, visit) ?: return null
+                for (i in values.indices) scores[i] += ln(counts.supporting[i].toDouble() / counts.total)
+            }
+        } catch (_: FinitePropagationInterrupted) {
+            probeCancelled = true
+            return null
+        }
+        return scores
+    }
 
     /** True once a fixpoint was cut short by the [cancellation] deadline (sticky). The engine must
      *  then abort to `BudgetCapped` rather than read the partial state as a solved leaf. */

@@ -34,9 +34,34 @@ internal class MddExplainer(
     private val n = seq.size
 
     /** Reason for the symbols position [pos] lost as of [atTrail]. */
-    fun prune(state: PropagationState, pos: Int, atTrail: Int): IntArray {
+    fun prune(state: PropagationState, pos: Int, atTrail: Int, value: Long? = null): IntArray {
         val cut = Cut(state, atTrail)
         val idx = index()
+        if (value != null) {
+            val symbols = idx.symbolSupports(transitions) { state.checkFiniteWork() }
+            val explain: (Int, Long, Int, Long) -> Unit = { src, sym, dst, _ ->
+                if (cut.contains(pos, sym)) {
+                    check(!cut.fwd[pos][src] || !cut.bwd[pos + 1][dst]) {
+                        "a removed mdd value must have no historical support"
+                    }
+                    if (!cut.fwd[pos][src]) cut.unreachable(pos, src) else cut.dead(pos + 1, dst)
+                }
+            }
+            if (symbols == null) {
+                cut.forEachRecord(pos) { src, sym, dst, weight ->
+                    if (sym == value) explain(src, sym, dst, weight)
+                }
+            } else {
+                symbols[pos].forEachRow(value, value, { row ->
+                    val p = idx.fwdPtr[pos][row]
+                    val dst = transitions[p + 2].toInt()
+                    if (dst in 0 until numStatesPerLayer[pos + 1]) {
+                        explain(transitions[p].toInt(), value, dst, 0L)
+                    }
+                }) { state.checkFiniteWork() }
+            }
+            return cut.literals()
+        }
         val supported = HashSet<Long>()
         cut.forEachRecord(pos) { src, sym, dst, _ ->
             if (cut.contains(pos, sym) && cut.fwd[pos][src] && cut.bwd[pos + 1][dst]) supported.add(sym)

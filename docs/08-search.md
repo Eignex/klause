@@ -273,6 +273,21 @@ projection uses the general CP lane. AllDifferent tries its cached incremental p
 before full matching. Assignment-dependent payloads such as live tuples and diagram
 reachability stay state-owned.
 
+Ground Tables with at least 128 rows and an admitted support index keep a reversible
+tuple bitmap beside the STR2 prefix. Immutable domain baselines identify changed
+columns; sparse postings and dense masks union the newly excluded values' rows
+before the prefix is compacted. A completed cold sweep builds the bitmap. The
+started marker and baselines follow undo, including restoration above a payload's
+construction branch. Interval Tables and storage declines keep the full STR2 scan.
+
+`val-selector=max-sd` ranks small integer domains by completed extensional support
+fractions, with at most 65,536 row/word visits for one ordering. Tables count live
+tuples through the bitmap or the small STR2 prefix; MDDs count live edges joining
+forward and backward reachable states, including shared-root reachability. These
+counts describe relation structure and have no deduction authority. Unavailable
+or incomplete counters and larger domains retain residual-domain probing. The
+ordering keeps every candidate, including zero-count alternatives.
+
 DivMod retains complete signed tuples for at most 4096 live operand pairs in each
 state's factor payload. Each fire recomputes live supports in reusable primitive
 sets against all operand and output domains, including holes and aliased roles.

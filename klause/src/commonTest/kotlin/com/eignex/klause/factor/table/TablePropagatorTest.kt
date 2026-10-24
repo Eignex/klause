@@ -34,6 +34,67 @@ import kotlin.test.assertTrue
 class TablePropagatorTest {
 
     @Test
+    fun `aliased table positions should filter the domains changed by their own pruning`() {
+        val relation = longArrayOf(0, 1, 1, 0, 2, 1)
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf<Factor>(Table(intArrayOf(0, 0), LongArray(384) { relation[it % relation.size] })),
+        )
+        val session = PropagationSession(problem)
+
+        val result = session.pinInt(0, 1)
+
+        assertIs<PropagationResult.Unsat>(result)
+    }
+
+    @Test
+    fun `indexed live supports should cold start after restoring above their construction branch`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 3) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(512) { (it / 2 % 4).toLong() })),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true, skipExpensiveBake = true))
+        state.undoLogging = true
+        val root = state.mark()
+        state.currentLevel = 1
+        check(state.setInt(0, 0))
+        assertNull(state.runToFixpoint(allFactors = false))
+        assertEquals(IntDomain(0, 0), state.intDomains[1])
+        state.undoTo(root)
+        state.currentLevel = 1
+        check(state.setInt(0, 3))
+
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertEquals(IntDomain(3, 3), state.intDomains[1])
+    }
+
+    @Test
+    fun `indexed delta filtering should restore interior supports in a sibling branch`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 3) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(512) { (it / 2 % 4).toLong() })),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.undoLogging = true
+        val root = state.mark()
+        state.currentLevel = 1
+        check(state.excludeIntValue(0, 1))
+        assertNull(state.runToFixpoint(allFactors = false))
+        assertTrue(1L !in state.intDomains[1])
+        state.undoTo(root)
+        state.currentLevel = 1
+        check(state.excludeIntValue(0, 2))
+
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertTrue(1L in state.intDomains[1])
+        assertTrue(2L !in state.intDomains[1])
+    }
+
+    @Test
     fun `interrupted cold table preparation should resume its required filtering`() {
         for (limit in listOf(3, 6, 10)) {
             val problem = Problem(
