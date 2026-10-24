@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.withLinearAuthority
@@ -29,23 +30,33 @@ internal class JointLinearRepair(
     private val source: SourceProofContext,
     private val objective: LinearObjective?,
     private val params: TheoryParams,
+    guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val stop = params.timeout or params.cancellation
     private val state = OpenTheorySolveState(params)
     private val budget = SourceLpBudget(maxOperations = SOURCE_OPERATION_LIMIT, onWork = state.smt::observeSourceLp)
-    private val authority = LinearAuthority(budget, retainLp = true)
+    private val stages = linkedMapOf<String, Long>()
+    private val authority = LinearAuthority(budget, onLpShape = { shape ->
+        if (shape.sparse) observe("jointRepairLpPhase_${shape.phase ?: "PREPARATION"}")
+        if (!shape.admitted) observe("jointRepairLpAdmissionDeclines")
+        stages["jointRepairLpMaxRows"] = maxOf(stages["jointRepairLpMaxRows"] ?: 0, shape.rows.toLong())
+        stages["jointRepairLpMaxColumns"] = maxOf(stages["jointRepairLpMaxColumns"] ?: 0, shape.columns.toLong())
+    }, retainLp = true, guidancePolicy = guidancePolicy)
     private var selection: JointRepairNeighborhood? = null
     private var rootPoint: Map<SourceCoordinate, Double>? = null
+    private var rootStarted = false
+    private var rootPreparationPending = false
     private var query: LinearAuthorityInvocation? = null
     private var pending: ExactNeighborhoodCondition? = null
-    private val stages = linkedMapOf<String, Long>()
     private var closed = false
     private var declined = false
     private var preparationWork = 0L
-    val exhausted: Boolean get() = declined || !state.work.hasAllowance() ||
-        state.work.acceptedChecks >= params.maxLeaves || budget.operations >= SOURCE_OPERATION_LIMIT
+    val exhausted: Boolean get() = declined ||
+        (!rootPreparationPending && pending == null && (!state.work.hasAllowance() ||
+            state.work.acceptedChecks >= params.maxLeaves || budget.operations >= SOURCE_OPERATION_LIMIT))
     val work: Long get() = state.work.spent + budget.measuredPreparationWork + budget.measuredFloatWork +
-        budget.measuredContinuationWork + preparationWork + (selection?.visitedEntries ?: 0)
+        budget.measuredContinuationWork + budget.measuredBoundCertificationWork + preparationWork +
+        (selection?.visitedEntries ?: 0)
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot().copy(
         completeSearchStages = observations() + mapOf(
             "jointRepairSelectedIntegers" to (selection?.selectedIntegers ?: 0),
@@ -84,6 +95,7 @@ internal class JointLinearRepair(
         nativeWork = { work }, completionStats = { stats }, onClose = ::close,
         prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
         completionExhausted = { exhausted },
+        centerPreparationPending = { rootPreparationPending },
         proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
             requireNotNull(selection).propose(centers, bools, count, round, radius, cutoff)
         },
@@ -109,12 +121,21 @@ internal class JointLinearRepair(
             }
         }
         if (rootPoint == null) {
-            if (!state.work.theoryCheck()) return false
-            val result = authority.check(source, stop or cancellation)
-            if (cancellation()) return false
+            if (!rootStarted) {
+                if (!state.work.theoryCheck()) return false
+                rootStarted = true
+                observe("jointRepairRootQueries")
+            }
+            val result = authority.advance(source, stop)
+            observe("jointRepairRootConsultations")
+            rootPreparationPending = result.paused
+            if (rootPreparationPending) {
+                observe("jointRepairRootPauses")
+                return false
+            }
+            if (stop()) return false
             rootPoint = result.relaxedPoint
             requireNotNull(selection).guide(result.relaxedPoint)
-            observe("jointRepairRootQueries")
             stages["jointRepairGuidedIntegers"] = result.relaxedPoint.keys.count {
                 it.kind == SourceCoordinate.Kind.Integer
             }.toLong()
@@ -157,7 +178,7 @@ internal class JointLinearRepair(
             }
             pending = condition
             query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)), params,
-                state = state, borrowedAuthority = authority)
+                state = state, borrowedAuthority = authority, guidance = true)
             observe("jointRepairCandidates")
         }
         val active = requireNotNull(query)
