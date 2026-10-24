@@ -35,24 +35,28 @@ class LinearAuthorityInvocationTest {
     @Test
     fun `bound frontier should preserve complete sibling proofs across slices`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        val source = SourceProofContext(scope, setOf(integer, other), mapOf(
-            "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
-                BigFraction.MINUS_ONE)),
-            "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ofLong(-2)),
-                BigFraction.MINUS_ONE)),
-        ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
+        for (sense in ObjectiveSense.entries) {
+            val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
+            val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", sense)),
+                setOf(integer, other), mapOf(
+                    "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2) * direction),
+                        BigFraction.MINUS_ONE)),
+                    "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ofLong(-2) * direction),
+                        BigFraction.MINUS_ONE)),
+                ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
-        LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
-            var result: LinearInvocationResult? = null
-            repeat(32) {
-                if (result == null) result = invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+            LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
+                var result: LinearInvocationResult? = null
+                repeat(32) {
+                    if (result == null) result = invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+                }
+
+                val terminal = assertNotNull(assertNotNull(result).terminal)
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(2) * direction),
+                    assertIs<SourceClaim.Optimal>(terminal.claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
             }
-
-            val terminal = assertNotNull(assertNotNull(result).terminal)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
-                assertIs<SourceClaim.Optimal>(terminal.claim).value)
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         }
     }
 
