@@ -197,17 +197,17 @@ internal class LinearAuthorityTraversal(
             }
         val result = if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
             else authority.check(branch, cancellation)
+        for ((stage, count) in result.primalStages) {
+            val key = "numerical$stage"
+            observations[key] = (observations[key] ?: 0L) + count
+        }
         if (result.paused) {
             current.pending = true
             observe("numericalLpPauses")
             return SearchNodeDisposition.Pause
         }
         current.pending = false
-        current.result = result
-        for ((stage, count) in result.primalStages) {
-            val key = "numerical$stage"
-            observations[key] = (observations[key] ?: 0L) + count
-        }
+        current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
         observe("numericalChecks")
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")
         if (result.lpConflict) observe("numericalLpConflicts")
