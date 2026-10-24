@@ -1571,3 +1571,9 @@ five remaining bounds already dominate it. The p0033 candidate reaches 3447 at
 check 249, but all nine remaining bounds are weaker, ranging from 1159463/460 to
 68893/20. Scoped closure cannot discharge those alternatives. No probing or
 bound-ordered queue policy is adopted from these observations.
+
+Integration rerun [7942](https://lab.eignex.com/jobs/7942) repeats the 192 cases
+on `db40ae3` with retained continuous-leaf and LP lifecycle changes. It preserves
+the proof and feasibility outcomes, including all six gr4x6 closure proofs and
+their 107 checks; all 96 reported witnesses pass independent checking. Finite
+p0201 remains unproved with wall-budget-dependent values from 7665 to 7755.
