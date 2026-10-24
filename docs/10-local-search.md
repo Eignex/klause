@@ -204,8 +204,9 @@ Ground Table invariants share bounded immutable relation postings across factors
 using the same relation arrays. A coordinate edit updates distances only for rows
 matching its old or new value in each occurrence column. Worker-private distance
 buckets maintain the exact minimum and select the two closest repair rows, with
-ties ordered by row index. Candidate scoring reverses its posting updates before
-returning; compound probes use the same accepted-edit maintenance and restoration.
+ties ordered by row index. Candidate scoring uses a private count histogram and
+visits each affected row once; repeated-coordinate probes retain a row-stamp array.
+Compound probes use accepted-edit maintenance and restoration.
 Interval tables and relations outside the index budget retain exact row scans.
 Each live Table payload holds three integers per row plus bucket heads and counts.
 
@@ -216,6 +217,20 @@ buffer avoids rebuilding the lattice. Cost-only edits keep the distance lattice;
 the accepted path's weight still determines the exact cost gap. A single-position
 candidate recombines one layer, while repeated-position candidates recompute the
 distance with every occurrence substituted.
+
+Satisfaction slices adapt their cancellation polling to elapsed move cost, with
+clock checks inside the polling window. Read-only extensional scoring and repair
+scans poll in work batches; interruption discards their candidate scratch without
+changing the committed assignment. Reversible compound probes finish their atomic
+maintenance and restoration before observing interruption.
+
+Retained runs apply extensional integer moves through a private operation cursor.
+Table postings and interval scans, MDD distance layers, factor reconciliation and
+maintained definition outputs advance between cancellation checks. A suspended
+operation owns the assignment exclusively, retains its selected move, and supplies
+no candidate or committed-move count until all payloads, degrees and definitions
+agree. Closing the run discards its cursor and private state. Other invariant kinds,
+allocations and individual definition evaluations remain cooperative atomic work.
 
 Preparation is resumable. A handle keeps private cursors for buffers, assignment
 loading, implicit seeding, definition readers, repair graphs, warm weights and
