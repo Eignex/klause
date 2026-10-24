@@ -3,6 +3,7 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.SparseSourceLpRowPolicy
 import com.eignex.klause.lp.engine.ReconstructionLimits
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -143,6 +144,94 @@ class LinearAuthorityTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(disabled.withLinearAuthority()).verify(evidence))
         }
+    }
+
+    @Test
+    fun `compacted sparse refutations should lift either equality orientation to original premises`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
+            val coefficients = mapOf(real to sign, coordinates[1] to sign)
+            val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+                "first" to SourcePremise(SourceInequality(coefficients, sign.negated())),
+                "opposite" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() }, sign)),
+                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+            ), mapOf(real to BigFraction.ONE))
+            val shapes = ArrayList<LinearAuthorityLpShape>()
+
+            LinearAuthority(SourceLpBudget(maxOperations = 1), shapes::add, retainLp = true,
+                guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES))
+                .use { authority ->
+                    val result = authority.advance(source, Cancellation.Never)
+
+                    val evidence = assertNotNull(result.evidence)
+                    assertEquals(SourceClaim.Refutation, evidence.claim)
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
+                    assertEquals(1, shapes.single().rows)
+                }
+        }
+    }
+
+    @Test
+    fun `compacted sparse bounds should lift either equality orientation to the original objective`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
+            val coefficients = mapOf(real to sign, coordinates[1] to sign)
+            val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+                "first" to SourcePremise(SourceInequality(coefficients, sign)),
+                "opposite" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                    sign.negated())),
+                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+            ), mapOf(real to BigFraction.ONE, coordinates[1] to BigFraction.ONE))
+
+            LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true,
+                guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES))
+                .use { authority ->
+                    val result = authority.advance(source, Cancellation.Never)
+
+                    val evidence = assertNotNull(result.evidence)
+                    val optimum = assertIs<SourceClaim.Optimal>(evidence.claim)
+                    assertEquals(SourceValue.Rational(BigFraction.ONE), optimum.value)
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
+                }
+        }
+    }
+
+    @Test
+    fun `enabled guarded equality templates should retain identity rows before sibling retraction`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val coefficients = mapOf(real to BigFraction.ONE, coordinates[1] to BigFraction.ONE)
+        val source = SourceProofContext(scope, (coordinates + bool).toSet(), mapOf(
+            "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ONE)),
+            "guarded" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                BigFraction.MINUS_ONE), guards = mapOf(0 to true)),
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+        ), coefficients)
+        val shapes = ArrayList<LinearAuthorityLpShape>()
+
+        LinearAuthority(SourceLpBudget(maxOperations = 2), shapes::add, retainLp = true,
+            guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES))
+            .use { authority ->
+                for (enabled in listOf(true, false)) {
+                    val branch = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to enabled))))
+                    val result = authority.advance(branch, Cancellation.Never)
+
+                    val evidence = assertNotNull(result.evidence)
+                    val expected = if (enabled) BigFraction.ONE else BigFraction.ZERO
+                    assertEquals(SourceValue.Rational(expected), assertIs<SourceClaim.Optimal>(evidence.claim).value)
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(branch.withLinearAuthority()).verify(evidence))
+                }
+                assertEquals(listOf(2, 2), shapes.map { it.rows })
+            }
     }
 
     @Test

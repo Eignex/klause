@@ -2,6 +2,7 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.SparseSourceLpRowPolicy
 import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.ExactLpBounds
@@ -139,6 +140,7 @@ internal class LinearAuthorityLp(
         scope: SourceScope,
         cancellation: Cancellation,
         inactive: Set<Int>,
+        unconditionalRows: Boolean,
     ): LinearAuthorityLpGuidance? {
         val retained = session ?: LinearAuthoritySession(budget).also { session = it }
         if (cancellation()) {
@@ -159,18 +161,24 @@ internal class LinearAuthorityLp(
                 packed.rows.size, false, weights)
         }
         var phase: String? = null
+        var workingRows = packed.rows.size
+        val policy = if (unconditionalRows) guidancePolicy else
+            guidancePolicy.copy(rowPolicy = SparseSourceLpRowPolicy.IDENTITY)
         return retained.advance(
-            packed, costs, constant, scope, cancellation, guidancePolicy, observer,
-        ) guideResult@{ guide, token ->
+            packed, costs, constant, scope, cancellation, policy, observer,
+        ) guideResult@{ guide, prepared, token ->
             phase = guide.phase.name
+            workingRows = prepared.emittedRowCount
             val bound = guide.bound?.takeIf { listOf(it.value).admittedSourcePoint() }
             val weights = bound?.dualMultipliers?.map { it.negated() }
+                ?.let { prepared.sourceRowWeights(it, token) }
                 ?.let { packed.lift(it, costs.map { cost -> cost.negated() }, token) }
             val conflict = guide.conflict
             val conflictWeights = conflict?.let {
-                val multipliers = MutableList(packed.rows.size) { BigFraction.ZERO }
+                val multipliers = MutableList(prepared.emittedRowCount) { BigFraction.ZERO }
                 for (id in it.rows.indices) multipliers[it.rows[id]] += it.multipliers[id]
-                packed.lift(multipliers, List(costs.size) { BigFraction.ZERO }, token)
+                prepared.sourceRowWeights(multipliers, token)
+                    ?.let { expanded -> packed.lift(expanded, List(costs.size) { BigFraction.ZERO }, token) }
             }
             val result = CertifiedLpResult(null, bound, null, null, conflict, false, { null },
                 conflictSupport = guide.conflictSupport)
@@ -188,9 +196,9 @@ internal class LinearAuthorityLp(
                 }
             }
             LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, conflictWeights), point,
-                packed.rows.size, guide.paused)
+                workingRows, guide.paused)
         }.also {
-            onShape(LinearAuthorityLpShape(rows.size, packed.rows.size, costs.size, it != null,
+            onShape(LinearAuthorityLpShape(rows.size, workingRows, costs.size, it != null,
                 sparse = true, phase = phase))
         }
     }
