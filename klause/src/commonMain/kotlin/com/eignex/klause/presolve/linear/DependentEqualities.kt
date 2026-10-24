@@ -24,7 +24,7 @@ import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 
-/**
+/*
  * Exact sparse elimination over unconditional source equalities. Tagged coordinates keep integer and
  * real namespaces disjoint. Only a whole single-equality factor can be dropped; implied rows from
  * larger factors remain premises. Binary partition equations retain finite search structure.
