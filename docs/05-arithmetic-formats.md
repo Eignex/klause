@@ -117,8 +117,9 @@ integral recession step, so an unbounded relaxation alone never proves MIP
 unboundedness. Unresolved indicator triggers split into the regions below, at and
 above their integer value. Representation, resource or certification limits return
 an incomplete result with any checked incumbent and root bound; they never fall
-back to an open theory. Open numerical execution has no heuristic worker, so LS
-and ALNS return unsupported there.
+back to an open theory. Numerical LS and ALNS use
+[joint linear repair](11-neighborhoods.md#joint-linear-repair), publishing checked
+incumbents without global bounds or terminal claims.
 
 Every candidate is checked against original rows, bounds, indicators and
 integrality before publication, with its objective recomputed from original

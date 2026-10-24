@@ -221,8 +221,9 @@ same retained neighborhood driver. A source LP point guides the initial integer
 rounding and orders fractional seed coordinates. Later proposals follow source
 row connectivity, including paths through real columns, to free at most 32 related
 integers. Each walk visits at most 8,192 adjacency entries; its index admits at most
-1,048,576 source entries. Other integers stay pinned to the current center, while
-the continuous residual remains free under every source row.
+1,048,576 coordinates, rows and coefficient entries in total. Other integers stay
+pinned to the current center, while the continuous residual remains free under
+every source row.
 
 Each candidate runs the shared numerical traversal with a borrowed source LP
 authority. Candidate coverage and compatible LP state survive slice boundaries;

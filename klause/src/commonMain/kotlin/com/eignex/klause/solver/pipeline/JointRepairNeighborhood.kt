@@ -11,7 +11,6 @@ internal class JointRepairNeighborhood private constructor(
     private val integers: Int,
     private val rows: List<IntArray>,
     private val occurrences: Array<IntArray>,
-    val preparationEntries: Long,
 ) : ExactNeighborhoodProposal {
     private var seeds = (0 until integers).toList()
     var selectedIntegers: Long = 0
@@ -69,12 +68,15 @@ internal class JointRepairNeighborhood private constructor(
         fun prepare(
             source: SourceProofContext, integers: Int, reals: Int, cancellation: Cancellation,
         ): JointRepairNeighborhood? {
+            if (cancellation() || integers.toLong() + reals > MAX_INDEX_ENTRIES) return null
+            cancellation.charge(integers.toLong() + reals)
             if (cancellation()) return null
             val rows = ArrayList<IntArray>()
             val occurrences = Array(integers + reals) { ArrayList<Int>() }
-            var entries = 0
+            var entries = integers + reals
             for (premise in source.premises.values) {
-                if (cancellation()) return null
+                cancellation.charge(1)
+                if (cancellation() || ++entries > MAX_INDEX_ENTRIES) return null
                 val columns = ArrayList<Int>()
                 for ((coordinate, coefficient) in premise.inequality.coefficients) {
                     cancellation.charge(1)
@@ -89,8 +91,7 @@ internal class JointRepairNeighborhood private constructor(
                 rows += columns.toIntArray()
             }
             return if (cancellation()) null else
-                JointRepairNeighborhood(integers, rows, Array(occurrences.size) { occurrences[it].toIntArray() },
-                    entries.toLong())
+                JointRepairNeighborhood(integers, rows, Array(occurrences.size) { occurrences[it].toIntArray() })
         }
     }
 }

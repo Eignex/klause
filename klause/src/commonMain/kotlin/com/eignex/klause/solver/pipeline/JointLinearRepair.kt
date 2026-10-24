@@ -17,8 +17,10 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.math.round
 import kotlin.time.TimeSource
 
@@ -38,15 +40,17 @@ internal class JointLinearRepair(
     private var pending: ExactNeighborhoodCondition? = null
     private val stages = linkedMapOf<String, Long>()
     private var closed = false
-    val exhausted: Boolean get() = !state.work.hasAllowance() || state.work.acceptedChecks >= params.maxLeaves ||
-        budget.operations >= SOURCE_OPERATION_LIMIT
+    private var declined = false
+    private var preparationWork = 0L
+    val exhausted: Boolean get() = declined || !state.work.hasAllowance() ||
+        state.work.acceptedChecks >= params.maxLeaves || budget.operations >= SOURCE_OPERATION_LIMIT
     val work: Long get() = state.work.spent + budget.measuredPreparationWork + budget.measuredFloatWork +
-        budget.measuredContinuationWork + (selection?.preparationEntries ?: 0) + (selection?.visitedEntries ?: 0)
+        budget.measuredContinuationWork + preparationWork + (selection?.visitedEntries ?: 0)
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot().copy(
         completeSearchStages = observations() + mapOf(
             "jointRepairSelectedIntegers" to (selection?.selectedIntegers ?: 0),
             "jointRepairConnectivityVisits" to (selection?.visitedEntries ?: 0),
-            "jointRepairPreparationEntries" to (selection?.preparationEntries ?: 0),
+            "jointRepairPreparationEntries" to preparationWork,
             "jointRepairLpPreparations" to authority.preparations,
             "jointRepairLpReuses" to authority.reuses,
         )))
@@ -67,6 +71,7 @@ internal class JointLinearRepair(
         maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
         nativeWork = { work }, completionStats = { stats }, onClose = ::close,
         prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
+        completionExhausted = { exhausted },
         proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
             requireNotNull(selection).propose(centers, bools, count, round, radius, cutoff)
         },
@@ -75,8 +80,22 @@ internal class JointLinearRepair(
     private fun prepare(cancellation: Cancellation): Boolean {
         check(!closed)
         if (stop() || exhausted || cancellation()) return false
-        if (selection == null) selection = JointRepairNeighborhood.prepare(source, model.numIntVars,
-            model.numRealVars, stop or cancellation) ?: return false
+        if (selection == null) {
+            val token = stop or cancellation
+            val construction = object : Cancellation {
+                override fun isCancelled(): Boolean = token()
+                override fun deadline() = token.deadline()
+                override fun workMeter(): WorkMeter = WorkMeter { units ->
+                    preparationWork += units
+                    token.charge(units)
+                }
+            }
+            selection = JointRepairNeighborhood.prepare(source, model.numIntVars, model.numRealVars, construction)
+            if (selection == null) {
+                declined = !stop() && !cancellation()
+                return false
+            }
+        }
         if (rootPoint == null) {
             if (!state.work.theoryCheck()) return false
             val result = authority.check(source, stop or cancellation)
@@ -160,15 +179,19 @@ internal class JointLinearRepair(
     private fun retire() {
         val observations = query?.stats?.smt?.completeSearchStages.orEmpty()
         for ((key, value) in observations) stages[key] = (stages[key] ?: 0) + value
-        query?.close()
+        val active = query
         query = null
         pending = null
+        active?.close()
     }
 
     override fun close() {
         if (closed) return
         closed = true
-        try { retire() } finally { authority.close() }
+        val resources = SearchInvocationResources()
+        resources.own(authority)
+        resources.own(AutoCloseable { retire() })
+        resources.close()
     }
 }
 

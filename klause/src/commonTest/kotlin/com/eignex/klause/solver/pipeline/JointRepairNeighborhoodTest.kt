@@ -15,6 +15,13 @@ import kotlin.test.assertNull
 
 class JointRepairNeighborhoodTest {
     @Test
+    fun `oversized coordinate indexes should decline before allocation`() {
+        val source = SourceProofContext(SourceScope(SourceRevision("large", "exact")), emptySet(), emptyMap())
+
+        assertNull(JointRepairNeighborhood.prepare(source, 1_048_577, 0, Cancellation.Never))
+    }
+
+    @Test
     fun `repair should free related integers through a real bridge and retain unrelated pins`() {
         val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)

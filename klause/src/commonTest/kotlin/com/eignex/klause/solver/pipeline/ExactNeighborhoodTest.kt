@@ -17,6 +17,42 @@ import kotlin.test.assertTrue
 
 class ExactNeighborhoodTest {
     @Test
+    fun `a paused root operation should resume without spending a candidate allowance`() {
+        var preparations = 0
+        var checks = 0
+        val search = ExactNeighborhood(0, emptyList(), ExactNeighborhoodCompletion { _, _ ->
+            checks++
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1,
+            prepareBooleanCenter = { ++preparations > 1 }, centerPreparationPending = { preparations == 1 })
+
+        assertFalse(search.advance(Cancellation.Never, 10))
+        assertEquals(0.0, search.stats.ls.completions.sum)
+        assertTrue(search.advance(Cancellation.Never, 10))
+
+        assertEquals(2, preparations)
+        assertEquals(1, checks)
+    }
+
+    @Test
+    fun `completion exhaustion should stop retries after preparation spends its allowance`() {
+        var exhausted = false
+        var checks = 0
+        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { _, _ ->
+            checks++
+            ExactNeighborhoodResult.Undecided
+        }, coordinateValues = { emptyList() }, prepareBooleanCenter = {
+            exhausted = true
+            false
+        }, completionExhausted = { exhausted })
+
+        assertTrue(search.advance(Cancellation.Never, Long.MAX_VALUE))
+
+        assertEquals(0, checks)
+        assertIs<SolveResult.Unknown>(search.solveResult(TerminationReason.BudgetExhausted))
+    }
+
+    @Test
     fun `a paused completion should resume the same candidate before drawing another move`() {
         val conditions = ArrayList<ExactNeighborhoodCondition>()
         val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { condition, _ ->

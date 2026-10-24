@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 class JointLinearRepairTest {
     @Test
     fun `joint repair should change coupled integers and complete their real residual after rounding fails`() {
-        val model = Problem(0, intBounds = IntBounds.closed(longArrayOf(0, 0), longArrayOf(1, 1)),
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
             factors = arrayOf(
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
                 Linear(intArrayOf(1), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
@@ -51,7 +51,7 @@ class JointLinearRepairTest {
 
     @Test
     fun `exhausted joint neighborhoods should keep an unknown source result`() {
-        val model = Problem(0, intBounds = IntBounds.closed(longArrayOf(0), longArrayOf(0)),
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
             factors = arrayOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
         val source = assertNotNull(model.linearAuthorityContext(LinearObjective(), ObjectiveSense.MINIMIZE,
             Cancellation.Never))
