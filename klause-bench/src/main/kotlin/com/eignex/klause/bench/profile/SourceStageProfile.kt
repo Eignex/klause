@@ -12,6 +12,7 @@ import java.io.File
 import java.io.PrintStream
 import java.util.Base64
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -110,12 +111,32 @@ internal object SourceStageProfile {
                         "OMP_NUM_THREADS")) put(name, "1")
                 }
             }.start()
+        val snapshots = thread(isDaemon = true, name = "source-profile-snapshots") {
+            repeat(3) { index ->
+                Thread.sleep(2000)
+                if (process.isAlive) {
+                    runCatching {
+                        val dump = ProcessBuilder(File(System.getProperty("java.home"), "bin/jcmd").absolutePath,
+                            process.pid().toString(), "Thread.print", "-l")
+                            .redirectOutput(out.resolve("threads-$index.txt"))
+                            .redirectError(out.resolve("threads-$index.stderr")).start()
+                        val complete = dump.waitFor(3, TimeUnit.SECONDS)
+                        if (dump.isAlive) {
+                            dump.destroyForcibly()
+                            dump.waitFor()
+                        }
+                        out.resolve("threads-$index.exit").writeText("${dump.exitValue()} complete=$complete\n")
+                    }.onFailure { out.resolve("threads-$index.error").writeText(it.toString()) }
+                }
+            }
+        }
         val completed = process.waitFor(45, TimeUnit.SECONDS)
         if (process.isAlive) {
             process.destroyForcibly()
             process.waitFor()
         }
         out.resolve("cli.exit").writeText("${process.exitValue()}\n")
+        snapshots.join(5000)
         check(completed && process.exitValue() == 0) { "CLI profile did not finish successfully" }
         PrintStream(out.resolve("profile-summary.txt")).use { CliProfile.summarizeCli(recording, it) }
     }
