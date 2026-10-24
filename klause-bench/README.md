@@ -1134,6 +1134,33 @@ seed 3 and five-second limits. The maintained [7962 recheck](https://lab.eignex.
 accepted all four original-source instantiations. These witness checks establish
 source feasibility; they do not certify the CP optimum reports.
 
+### Division propagation supports
+
+[Search propagation](../docs/08-search.md#selected-propagation-projections) owns the
+state-local bounded tuple cache, restored-operand coverage checks and live dividend
+buckets. This is separate from the compilation relation index.
+
+Ordinary [7986](https://lab.eignex.com/jobs/7986) compares main `3b34027` with
+retained full scanning `a75c892`: nine sources, CP/LP off/P1, seed 3, 20 seconds,
+three repeats, debug off, on Mac/aarch64 with matching sources and runtime.
+All 54 outcomes agree. Median ChainReaction-20 nodes rise 16,189→20,370;
+the 10,000-pair-root ChainReaction-70 control rises 5,001→5,844. Both remain
+unknown. Coprime-08 retains objective 31 and 167 nodes; median propagation falls
+600→502 ms and process elapsed time 1.384→1.211 s. All six Coprime witnesses
+and six linear SMT witnesses pass independent checking. Twelve division-bearing
+SMT witnesses are declined and twelve vendored witnesses lack checker source
+resolution; native proof reports are not independently certified.
+
+Separate JFR [7981](https://lab.eignex.com/jobs/7981) retains the same original
+ChainReaction source and settings. In its first pair, sampled search allocation
+weight falls 27.83→13.95 GB while reached nodes increase. Weights are statistical
+estimates, and sample shares alone establish no speedup. The ordinary elapsed
+portfolio runs do not establish identical search trajectories. The focused
+[7994 ordinary](https://lab.eignex.com/jobs/7994) and
+[7995 JFR](https://lab.eignex.com/jobs/7995) comparisons isolate dividend-indexed
+filtering against retained full scanning; they are separate from the main control.
+These focused measurements establish no corpus-wide speed or verdict gain.
+
 ### Elective LP harvest controls
 
 `sets/lp-harvest-controls-v1.txt` fixes the SAT and positive controls for the
