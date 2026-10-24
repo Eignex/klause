@@ -152,7 +152,7 @@ internal class JointLinearRepair(
                 rootStarted = true
                 observe("jointRepairRootQueries")
             }
-            val result = authority.advance(source, stop)
+            val result = authority.advance(source, stop, cuts = boundOrdered)
             for ((stage, count) in result.primalStages) {
                 val key = "jointRepairRoot$stage"
                 stages[key] = combine(key, stages[key] ?: 0L, count)
