@@ -123,7 +123,7 @@ class SourceEvidenceVerifier(
         private val integerScopes = mutableMapOf<SourceCondition, SourceIntegerBounds>()
         private val coordinates by lazy { context.coordinates }
         private val premises by lazy { context.premises }
-        private val objective by lazy { context.objective }
+        private val objectiveCoefficients by lazy { context.objective }
 
         private fun step(depth: Int) {
             if (cancellation() || !allowance.consume(depth)) {
@@ -217,7 +217,7 @@ class SourceEvidenceVerifier(
                     if (!context.affineObjectiveAvailable) {
                         return SourceEvidenceCheck.Unavailable("original affine objective derivation unavailable")
                     }
-                    if (derived.coefficients != objective.mapValues { (_, value) -> sign * value }) {
+                    if (derived.coefficients != objectiveCoefficients.mapValues { (_, value) -> sign * value }) {
                         return reject("derivation does not establish the source objective coefficients")
                     }
                     val algebraic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
