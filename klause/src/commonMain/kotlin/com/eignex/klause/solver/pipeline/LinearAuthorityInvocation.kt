@@ -65,7 +65,8 @@ internal class LinearAuthorityInvocation(
         openTheory = state.work.snapshot(),
         search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
-        SourceLpBudget(onWork = state.smt::observeSourceLp), stop, ::paused, ::offer, { value })
+        SourceLpBudget(onWork = state.smt::observeSourceLp), stop, ::paused, ::offer,
+        { incumbent?.let { sample -> value?.let { sample to it } } })
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)
     }

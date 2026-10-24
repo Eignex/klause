@@ -1,10 +1,13 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourcePremise
@@ -30,31 +33,36 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
-    fun `a dominated fractional sibling should remain open in diagnostic traversal`() {
-        val source = SourceProofContext(
-            scope,
-            setOf(bool, integer),
-            mapOf(
-                "false" to SourcePremise(
-                    SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
-                    mapOf(0 to false),
+    fun `a checked incumbent should close a dominated fractional sibling`() {
+        for (sense in ObjectiveSense.entries) {
+            val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
+            val source = SourceProofContext(
+                scope.copy(objective = SourceObjective("x", sense)),
+                setOf(bool, integer),
+                mapOf(
+                    "false" to SourcePremise(
+                        SourceInequality(mapOf(integer to direction.negated()), BigFraction.MINUS_ONE),
+                        mapOf(0 to false),
+                    ),
+                    "true" to SourcePremise(
+                        SourceInequality(mapOf(integer to BigFraction.ofLong(-2) * direction), BigFraction.ofLong(-3)),
+                        mapOf(0 to true),
+                    ),
                 ),
-                "true" to SourcePremise(
-                    SourceInequality(mapOf(integer to BigFraction.ofLong(-2)), BigFraction.ofLong(-3)),
-                    mapOf(0 to true),
-                ),
-            ),
-            mapOf(integer to BigFraction.ONE),
-        )
+                mapOf(integer to BigFraction.ONE),
+            )
 
-        val result = assertNotNull(LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 2)).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
-        })
+            val result = assertNotNull(LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 2)).use {
+                it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            })
 
-        assertNull(result.terminal)
-        assertEquals(BigFraction.ONE, result.value)
-        assertEquals(TerminationReason.BudgetExhausted, result.reason)
-        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalIncumbentDominatedSplits"))
+            val terminal = assertNotNull(result.terminal)
+            val claim = assertIs<SourceClaim.Optimal>(terminal.claim)
+            assertEquals(SourceValue.Rational(direction), claim.value)
+            assertEquals(TerminationReason.SearchExhausted, result.reason)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        }
     }
 
     @Test

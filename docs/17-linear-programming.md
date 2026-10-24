@@ -425,6 +425,10 @@ search session. A branch optimum becomes global only after every required Boolea
 and integer alternative has a checked bound or refutation; an improving source ray
 needs no siblings. When numerical authority declines, the exact descent of the
 [linear theories](15-linear-arithmetic.md) continues in the same state and allowance.
+A checked incumbent can close a numerical node whose scoped bound excludes a
+better objective. Coverage retains that bound without requiring a local optimum
+or another split; a global optimum still requires the checked root witness and
+the complete composed bound. Missing bounds and uncovered siblings remain unresolved.
 `NumericalLinearRequest.solve` serves MPS through the same numerical authority, and
 these adapters never confer source semantics on a rounded or tolerance model.
 

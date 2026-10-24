@@ -168,7 +168,10 @@ component per session.
 
 Exact affine optimization records Boolean and integer coverage alongside checked
 bounds; only a complete coverage tree proves a global optimum, while a checked
-source ray can finish existentially. See
+source ray can finish existentially. A checked node bound that excludes improvement
+over the invocation's checked incumbent closes that unexpanded subtree. Its scoped
+derivation remains in the coverage tree; global optimality rechecks the composed
+bound with the original-source witness after every alternative is covered. See
 [linear certification](17-linear-programming.md#refinement-and-strict-inequalities).
 
 Complete assignments use typed source-keyed values from each owner, assembled only
