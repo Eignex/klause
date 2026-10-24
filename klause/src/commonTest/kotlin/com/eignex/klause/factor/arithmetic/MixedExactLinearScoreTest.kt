@@ -164,7 +164,7 @@ class MixedExactLinearScoreTest {
         val expected = state.netDelta(move)
         val objective = object : Objective {
             override fun evaluate(sample: Sample): Double {
-                if (sample.realValue(0) == 2.0) throw CancellationException("grading cancelled")
+                if (sample.approximateRealValue(0) == 2.0) throw CancellationException("grading cancelled")
                 return 0.0
             }
         }
