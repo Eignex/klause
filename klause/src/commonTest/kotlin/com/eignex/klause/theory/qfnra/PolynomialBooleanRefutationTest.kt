@@ -130,7 +130,8 @@ class PolynomialBooleanRefutationTest {
     @Test
     fun `full input admission precedes a Boolean refutation`() {
         val source = SmtLibPolynomial.parse(
-            "(declare-const a Bool) (declare-const x Real) (assert (and a (not a) (> (* x x) 4)))",
+            "(declare-const a Bool) (declare-const b Bool) (declare-const x Real) " +
+                "(assert (and (or a b) (or a (not b)) (or (not a) b) (or (not a) (not b)) (> (* x x) 4)))",
         )
         val arithmetic = PolynomialArithmetic()
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)

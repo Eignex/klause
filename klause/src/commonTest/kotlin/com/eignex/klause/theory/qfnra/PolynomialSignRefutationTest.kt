@@ -26,7 +26,7 @@ class PolynomialSignRefutationTest {
             "(not (> x 0)) (= (* x x) 0)" to false,
             "(> x 0) (> y 0) (= (- (* x x) (* y y)) 0)" to false,
             "(> x 0) (< x 0)" to true,
-            "(= (- x) 0) (distinct x 0)" to true,
+            "(= (- x) 0) (distinct (* x x) 0)" to true,
             "(< (* x x) 0)" to true,
             "(<= (* x x) 0)" to false,
         )) {
