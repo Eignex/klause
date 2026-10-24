@@ -312,7 +312,12 @@ enumerates source implicants: assignments of Boolean leaves and signed numeric
 predicates that make the formula true. Initial exact sign propagation derives
 numeric consequences and retains their premises for supporting regions. Numeric
 assignment or retraction during Boolean search triggers another exact sign check
-before further decisions. A completed contradiction learns a private exclusion
+before further decisions. A completed feasible sign fixpoint retains its domains,
+constraints and variable adjacency while additional signed predicates are appended.
+Retracting or changing a retained premise rebuilds that state from the current
+numeric conjunction; a contradictory or unfinished check cannot supply reusable
+state. An unchanged numeric conjunction reuses its completed fixpoint.
+A completed contradiction learns a private exclusion
 containing every assigned signed numeric premise; that arithmetic impossibility
 holds under every Boolean prefix. A feasible sign overapproximation learns nothing.
 Pure Boolean changes do not repeat the numeric check, and interrupted or declined

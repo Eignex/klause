@@ -21,6 +21,8 @@ internal class PolynomialBooleanRegions(
     private val exclusions = ArrayList<Exclusion>()
     private val signs = PolynomialBooleanSigns(nodes, atoms, state, arithmetic)
     private var partialAvailable = true
+    private var partialSigns: PolynomialSignPropagation? = null
+    private val partialValues = HashMap<Int, Int>()
 
     fun prepare(): Iterator<PolynomialBooleanRegion?> = sequence<PolynomialBooleanRegion?> {
         if (!initialize()) return@sequence
@@ -140,11 +142,35 @@ internal class PolynomialBooleanRegions(
                 premises.add(Literal(index, value))
             }
             if (premises.isEmpty()) {
+                discardPartial()
+                yield(true)
+                return@sequence
+            }
+            val retracted = partialValues.any { (node, value) ->
+                arithmetic.step()
+                state.value(node) != value
+            }
+            if (retracted) discardPartial()
+            val added = ArrayList<PolynomialAtom>()
+            for ((index, premise) in premises.withIndex()) {
+                arithmetic.step()
+                if (partialValues[premise.node] != premise.value) added.add(required[index])
+            }
+            if (added.isEmpty()) {
                 yield(true)
                 return@sequence
             }
             progress?.let { it.partialChecks++ }
-            val checking = preparePolynomialSignRefutation(required, signs.realCount, arithmetic)
+            val retained = partialSigns
+            val propagation = retained ?: PolynomialSignPropagation(signs.realCount, arithmetic).also {
+                partialSigns = it
+                progress?.let { observed -> observed.partialBuilds++ }
+            }
+            progress?.let {
+                if (retained != null) it.partialExtensions++
+                it.partialInputAtoms += added.size
+            }
+            val checking = propagation.prepare(added)
             var conflict: Boolean? = null
             while (conflict == null) {
                 conflict = checking.next()
@@ -152,6 +178,7 @@ internal class PolynomialBooleanRegions(
             }
             arithmetic.step()
             if (conflict) {
+                discardPartial()
                 // A completed arithmetic contradiction excludes these signed predicates under every Boolean prefix.
                 exclusions.add(Exclusion(premises, numeric = true))
                 progress?.let {
@@ -159,14 +186,25 @@ internal class PolynomialBooleanRegions(
                     it.partialConflictPremises += premises.size
                 }
                 onConflict?.invoke(required.toList())
+            } else {
+                for (premise in premises) {
+                    arithmetic.step()
+                    partialValues[premise.node] = premise.value
+                }
             }
             yield(!conflict)
         } catch (_: PolynomialResourceLimit) {
+            discardPartial()
             partialAvailable = false
             progress?.let { it.partialDeclines++ }
             yield(true)
         }
     }.iterator()
+
+    private fun discardPartial() {
+        partialSigns = null
+        partialValues.clear()
+    }
 
     private fun proof(): Proof? {
         val witnessed = BooleanArray(nodes.size)
