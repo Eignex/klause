@@ -221,8 +221,10 @@ distance with every occurrence substituted.
 Satisfaction slices adapt their cancellation polling to elapsed move cost, with
 clock checks inside the polling window. Read-only extensional scoring and repair
 scans poll in work batches; interruption discards their candidate scratch without
-changing the committed assignment. Reversible compound probes finish their atomic
-maintenance and restoration before observing interruption.
+changing the committed assignment. Reversible compound probes observe interruption
+between fully reconciled primitive edits and definition outputs, then restore
+their saved coordinates without interruption. Individual primitive probe edits
+and restoration remain atomic work.
 
 Retained runs apply extensional integer moves through a private operation cursor.
 Table postings and interval scans, MDD distance layers, factor reconciliation and
