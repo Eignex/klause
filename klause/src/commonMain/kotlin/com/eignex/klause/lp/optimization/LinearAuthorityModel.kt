@@ -15,10 +15,12 @@ internal class LinearAuthorityModel private constructor(
     val rowIds: List<Int>,
     private val lower: List<Side?>,
     private val upper: List<Side?>,
+    inactive: Set<Int>,
 ) {
     private class Side(val row: Int, val value: BigFraction)
 
     val rows: List<ExactRationalInequality> = rowIds.map { original[it] }
+    val inactiveRows: Set<Int> = rowIds.indices.filterTo(HashSet()) { rowIds[it] in inactive }
     val columns: List<ExactLpColumn> = lower.indices.map { id ->
         ExactLpColumn(ExactLpBounds(
             lower[id]?.let { ExactLpSide(ExactLpNumber.of(it.value)) },
@@ -83,9 +85,10 @@ internal class LinearAuthorityModel private constructor(
             rows: List<ExactRationalInequality>,
             variables: Int,
             cancellation: Cancellation,
+            inactive: Set<Int> = emptySet(),
         ): LinearAuthorityModel? {
             fun identity() = LinearAuthorityModel(rows, rows.indices.toList(), List(variables) { null },
-                List(variables) { null })
+                List(variables) { null }, inactive)
             if (variables > 128) return identity()
             val lower = MutableList<Side?>(variables) { null }
             val upper = MutableList<Side?>(variables) { null }
@@ -98,6 +101,7 @@ internal class LinearAuthorityModel private constructor(
                     continue
                 }
                 val column = row.columns.single()
+                if (id in inactive) continue
                 val coefficient = row.coefficients.single()
                 if (column !in 0 until variables || !listOf(coefficient, row.rhs).admittedSourcePoint()) {
                     return identity()
@@ -112,7 +116,7 @@ internal class LinearAuthorityModel private constructor(
             if (lower.indices.any { id -> lower[id]?.let { lo -> upper[id]?.let { lo.value > it.value } } == true }) {
                 return identity()
             }
-            return LinearAuthorityModel(rows, retained, lower, upper)
+            return LinearAuthorityModel(rows, retained, lower, upper, inactive)
         }
     }
 }

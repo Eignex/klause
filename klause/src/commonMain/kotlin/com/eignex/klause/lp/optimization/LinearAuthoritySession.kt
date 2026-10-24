@@ -14,6 +14,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
     private var owner: LpScopedSolver? = null
     private var objective: ExactLpObjective? = null
     private var sides: List<ExactLpColumn>? = null
+    private var inactive: Set<Int> = emptySet()
     private var currentToken: Cancellation = Cancellation.Never
     private val token = object : Cancellation {
         override fun isCancelled(): Boolean = currentToken()
@@ -52,8 +53,9 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
                 objective = costs
             }
         }
-        if (sides != packed.columns) {
+        if (sides != packed.columns || inactive != packed.inactiveRows) {
             if (!current.pop(0, token) || !current.push(token)) return null
+            if (!current.suspend(packed.inactiveRows.mapTo(HashSet()) { it.toLong() }, token)) return null
             var witness = 0L
             for ((id, column) in packed.columns.withIndex()) {
                 for ((upper, side) in listOf(false to column.bounds.lower, true to column.bounds.upper)) {
@@ -61,6 +63,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
                 }
             }
             sides = packed.columns
+            inactive = packed.inactiveRows
         }
         return current
     }
@@ -71,6 +74,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
         rows = emptyList()
         objective = null
         sides = null
+        inactive = emptySet()
         budget.closeOwner(current)
     }
 }
