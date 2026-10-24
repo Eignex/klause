@@ -1571,8 +1571,8 @@ no ordinary whole-source speedup or source proof.
 [Session replay 7872](https://lab.eignex.com/jobs/7872) compares cumulative-work
 rebuilds on identical MPS residuals. Disabling that trigger reduces cap64's median
 two-cold-query lifecycle from 1.623 s to 0.793 s, retaining its native feasible
-package while charging 2.5 times the LP work. The engine keeps its existing
-backend-independent allowance price. These Mac/aarch64 JFR timings establish no
+package while charging 2.5 times the LP work. The nonempty solve allowance uses
+the backend-independent shape price. These Mac/aarch64 JFR timings establish no
 ordinary source gain. With source-matched unbounded work,
 [7875](https://lab.eignex.com/jobs/7875) reaches 3150 dsbmip pivots per two seconds
 against about 1696; both remain indeterminate.
@@ -1617,6 +1617,39 @@ Solchecker accepted 81 witnesses. Another 63 checks were unsupported, nine were
 undecided and 18 infeasibility claims had no witness check. CLI elapsed time includes
 startup and preparation; full case intervals and separate build/setup logs retain
 the remaining setup costs. The mixed timings establish no solver or SIMD speedup.
+
+### LP query allowance recovery
+
+[Requalification 8026](https://lab.eignex.com/jobs/8026) reproduces the six named
+[MPS losses](https://github.com/Eignex/klause/issues/3518) on `3e8ac3841` against
+`0cdb35141`. [8027](https://lab.eignex.com/jobs/8027) isolates four feasibility
+losses to the observed-degradation refactor switch. The first post-baseline
+snapshot in [8039](https://lab.eignex.com/jobs/8039) also loses misc05inf's native
+result; both dcmulti sources vary across those
+intermediate revisions. Those controls support no single offending commit for
+dcmulti. The [empty-transform control 8032](https://lab.eignex.com/jobs/8032)
+leaves all seven sources undecided.
+
+[8041](https://lab.eignex.com/jobs/8041) compares integrated `3e8ac3841` with
+bounded query feedback at `b97239a4a2`: ten original identities, Mac/aarch64,
+P1, seed 3, three repeats and 60 seconds. Original hashes, runtime, options and
+non-solver dependencies match; all 21 final witnesses pass solchecker. Native
+proofs are not independently proof-checked, and repeats are not independent seeds.
+Both dcmulti sources and egout change from zero to three feasible runs; misc05inf
+changes from UNKNOWN to native infeasibility in all three. gr4x6 retains 202.35
+and gains three native optimality reports. f2gap201600 retains 76453 and mod008inf
+retains its three native refutations in each arm.
+
+Node LP conflicts increase from zero to 9–10 on each dcmulti source, 42 on egout
+and 71 on misc05inf. Both Gesa2 originals remain UNKNOWN but gain four explained
+LP conflicts per repeat; gesa3_o remains UNKNOWN without an LP conflict. These
+are scoped deductions, not completed refutations of the remaining sources.
+Median node LP time increases from 0.329 to 1.218 s on miplib2017/dcmulti, 0.243
+to 0.452 s on egout, 2.262 to 9.742 s on gesa2-o and 0.423 to 5.386 s on gesa3_o.
+The last control spends more LP time without a recovered verdict or conflict.
+These LP clocks exclude root work and establish no general throughput gain;
+allocation and peak memory are unmeasured. Retain the refactor policy and existing
+allowances while funding progressing queries before assessing their utility.
 
 ### Native arithmetic cancellation
 
