@@ -2493,6 +2493,22 @@ Traversal work deltas and maximum retained/active-cut gauges avoid that repeated
 sum. Interrupted cut preparation and checking report their consumed work. The
 rounding family and proof rules are unchanged by those accounting corrections.
 
+#### Checked sparse primal recovery
+
+`numericalPrimalUnavailable`, `numericalPrimalFractional` and
+`numericalPrimalIntegral` classify completed sparse proposals per consultation.
+`PrimalSourceRejected` and `PrimalSourceUnavailable` distinguish source-check
+outcomes; `PrimalExactDimension` records the full query's small exact-fallback
+boundary. `PrimalRecoveryReconstructed` and `PrimalRecoveryResidual` identify
+candidate production, while `PrimalRecoverySourceChecked` requires original-source
+acceptance. Recovery limits and unavailable residual components leave alternatives
+unresolved. `PrimalRecoveryWork` and `PrimalRecoveryAllocation` report modeled
+recovery preparation/arithmetic deltas; nested source LP costs remain in their
+existing counters. These are distinct from physical time, RSS and allocation.
+Frontier observations use the `numerical` prefix; joint candidate traversals use
+`jointRepair`, and root preparation uses `jointRepairRoot`. Retained attempt or
+component reuse has its own counter, and consultations are not distinct incumbents.
+
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
 invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.

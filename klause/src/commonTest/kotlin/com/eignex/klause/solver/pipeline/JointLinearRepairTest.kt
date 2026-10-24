@@ -70,10 +70,10 @@ class JointLinearRepairTest {
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
             mapOf(0 to BigFraction.ZERO))
 
-        val result = repair.use {
-            var result = it.check(condition, Cancellation.Never)
+        val result = repair.use { current ->
+            var result = current.check(condition, Cancellation.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = it.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = current.check(condition, Cancellation.Never)
             }
             result
         }
