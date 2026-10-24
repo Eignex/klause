@@ -54,7 +54,8 @@ internal class NumericalFrontierSnapshot(
                 val child = SourceProofContext(context.scope.copy(condition = childCondition), context.coordinates,
                     context.premises, context.objective, context.objectiveConstant,
                     LinearAuthoritySemantics(context), context.semantics)
-                val probe = open(child, TheoryParams(maxLeaves = 1, timeout = stop, cancellation = stop, randomSeed = 3L))
+                val probe = open(child,
+                    TheoryParams(maxLeaves = 1, timeout = stop, cancellation = stop, randomSeed = 3L))
                 try {
                     run(probe) { _, _ -> }
                     val node = checkNotNull(field(checkNotNull(field(probe, "component")), "root"))
@@ -73,7 +74,8 @@ internal class NumericalFrontierSnapshot(
                         bound?.let { put("bound", bound(it)) }
                         evidence?.let {
                             put("claim", it.claim::class.simpleName)
-                            put("check", SourceEvidenceVerifier(child.withLinearAuthority()).verify(it, stop).toString())
+                            put("check", SourceEvidenceVerifier(child.withLinearAuthority())
+                                .verify(it, stop).toString())
                         }
                     })
                 } finally {
