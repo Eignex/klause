@@ -12,9 +12,43 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ExactNeighborhoodTest {
+    @Test
+    fun `a paused completion should resume the same candidate before drawing another move`() {
+        val conditions = ArrayList<ExactNeighborhoodCondition>()
+        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { condition, _ ->
+            conditions += condition
+            if (conditions.size == 1) ExactNeighborhoodResult.Paused else ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1)
+
+        assertFalse(search.advance(Cancellation.Never, 10))
+        assertEquals(0.0, search.stats.ls.completions.sum)
+        assertTrue(search.advance(Cancellation.Never, 10))
+
+        assertSame(conditions[0], conditions[1])
+        assertEquals(1.0, search.stats.ls.completionsRefuted.sum)
+        assertEquals(2L, search.work)
+    }
+
+    @Test
+    fun `root coordinate copying should resume before proposing a joint repair`() {
+        val conditions = ArrayList<ExactNeighborhoodCondition>()
+        val search = ExactNeighborhood(0, List(2) { BigFraction.ZERO }, ExactNeighborhoodCompletion { condition, _ ->
+            conditions += condition
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1, prepareBooleanCenter = { true },
+            rootCoordinateValue = { BigFraction.ofLong(it + 3L) })
+
+        assertFalse(search.advance(Cancellation.Never, 1))
+        assertTrue(conditions.isEmpty())
+        assertTrue(search.advance(Cancellation.Never, 10))
+
+        assertEquals(mapOf(0 to BigFraction.ofLong(3), 1 to BigFraction.ofLong(4)), conditions.single().lower)
+    }
+
     @Test
     fun `root Boolean copying should resume without checking a partial center`() {
         val visited = ArrayList<Int>()
