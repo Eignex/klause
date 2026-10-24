@@ -2283,6 +2283,9 @@ rows, domains and objectives. Default and exact source policies each compare
 objective substitution enabled and disabled through the full finite preparation.
 Preparation work, elapsed time and interruption are diagnostic observations;
 source-matched ordinary lab solves and witness checks qualify search outcomes.
+The `scan=SUITE` form inspects original MPS integer translations across a complete
+catalog suite under a two-minute deadline, retaining source hashes, objective reads
+and candidate bytes without preparing or solving the models.
 
 The scalar session [qualification 8040](https://lab.eignex.com/jobs/8040) compares
 cold `3e8ac384` with retained `6aef3fdd` and an automatic finite control over

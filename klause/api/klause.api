@@ -11658,7 +11658,7 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public final fun getExplicitPresolveConfig ()Z
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Z
+	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun getPresolveConfig ()Lcom/eignex/klause/presolve/PresolveConfig;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;

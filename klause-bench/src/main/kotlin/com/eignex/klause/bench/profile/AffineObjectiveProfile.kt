@@ -21,6 +21,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -29,6 +30,8 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.util.Base64
@@ -43,6 +46,10 @@ import kotlinx.serialization.json.put
 internal object AffineObjectiveProfile {
     @JvmStatic
     fun main(args: Array<String>) {
+        if (args.size == 1 && args[0].startsWith("scan=")) {
+            scan(args[0].substringAfter('='))
+            return
+        }
         require(args.size == 1 && args[0].startsWith("batch64="))
         val requests = Json.decodeFromString<List<List<String>>>(
             Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString(),
@@ -116,6 +123,62 @@ internal object AffineObjectiveProfile {
                 }
             }
         }
+    }
+
+    private fun scan(suite: String) {
+        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
+        val stop = Cancellation.after(120.seconds)
+        out.resolve("scan.jsonl").bufferedWriter().use { output ->
+            for ((index, reference) in Catalog.uncapped(suite).problems.withIndex()) {
+                if (stop()) break
+                val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readBytes() }
+                val source = Mps.parse(bytes.decodeToString()).toLinearSourceProblem(
+                    SemanticOverrides(feasibilityTolerance = SourceTolerance()), cancellation = stop,
+                ) ?: break
+                val variables = source.variables
+                val objective = source.objective?.terms.orEmpty().associate { it.column to it.coefficient }
+                val translations = source.rows.mapIndexedNotNull { index, row ->
+                    val terms = row.terms
+                    if (row.indicator != null || row.lower == null || row.lower != row.upper || terms.size != 2 ||
+                        terms.any { !variables[it.column].integer }
+                    ) return@mapIndexedNotNull null
+                    val a = BigFraction.of(terms[0].coefficient.numerator, terms[0].coefficient.denominator)
+                    val b = BigFraction.of(terms[1].coefficient.numerator, terms[1].coefficient.denominator)
+                    if (a == BigFraction.ZERO || a != b.negated()) return@mapIndexedNotNull null
+                    val rhs = requireNotNull(row.lower)
+                    val offset = BigFraction.of(rhs.numerator, rhs.denominator) * a.reciprocal()
+                    if (offset.den != BIG_ONE) return@mapIndexedNotNull null
+                    buildJsonObject {
+                        put("row", index)
+                        put("offset", offset.toString())
+                        put("columns", JsonArray(terms.map { JsonPrimitive(it.column) }))
+                        put("names", JsonArray(terms.map { JsonPrimitive(variables[it.column].name) }))
+                        put("weights", JsonArray(terms.map {
+                            JsonPrimitive(objective[it.column]?.toString() ?: "0")
+                        }))
+                        put("bothObjectiveColumns", terms.all {
+                            objective[it.column]?.numerator?.let { value -> value != BIG_ZERO } == true
+                        })
+                    }
+                }
+                if (translations.isNotEmpty()) out.resolve("$index.mps").writeBytes(bytes)
+                val report = buildJsonObject {
+                    put("revision", Reports.readGitSha())
+                    put("suite", suite)
+                    put("index", index)
+                    put("problem", reference.name)
+                    put("sourceSha256", sha256(bytes))
+                    put("translationRows", JsonArray(translations))
+                    put("searchExecuted", false)
+                    put("sourceVerdictClaim", false)
+                }
+                output.appendLine(report.toString())
+                output.flush()
+                println(report)
+            }
+        }
+        out.resolve("interrupted.txt").writeText(stop().toString())
     }
 
     private fun snapshot(model: Problem, objective: LinearObjective) = buildJsonObject {

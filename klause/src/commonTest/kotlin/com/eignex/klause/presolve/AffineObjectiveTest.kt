@@ -18,6 +18,7 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceExecutionPolicy
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
@@ -82,7 +83,7 @@ class AffineObjectiveTest {
             val original = preparation.reconstruct(reduced)
 
             assertEquals(if (maximize) 13L else 7L, objective.evaluateLong(original))
-            assertEquals(normalized.evaluateLong(original), preparation.objective?.evaluateLong(reduced))
+            assertEquals(normalized.evaluateLong(original), preparation.objective.evaluateLong(reduced))
         }
     }
 
@@ -98,12 +99,16 @@ class AffineObjectiveTest {
                     maximize,
                 ),
             )
+            val policy = SourceExecutionPolicy(portfolioArms = 1, explicitPresolve = true)
 
             val result = assertIs<SourceExecutionResult.Finite>(
                 SourceSetup.execute(
                     SourceExecutionRequest(
                         invocation,
                         presolveConfig = PresolveConfig.parse("affine"),
+                        finiteRequest = { shape ->
+                            policy.finiteRequest(shape, FiniteEngine.BACKTRACK, PresolveConfig.parse("affine"))
+                        },
                     ),
                 ),
             )
