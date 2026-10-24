@@ -2,6 +2,7 @@
 
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioTerminalPublication
@@ -12,7 +13,6 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
-import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.EngineInvocation

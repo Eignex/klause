@@ -2,14 +2,15 @@
 
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchEngine
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.relaxation.lpSeed
 import com.eignex.klause.portfolio.AcceptedPortfolioIncumbent
 import com.eignex.klause.portfolio.ArmFamily
@@ -22,7 +23,7 @@ import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.kind
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -42,7 +43,6 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyOpenWitness
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation

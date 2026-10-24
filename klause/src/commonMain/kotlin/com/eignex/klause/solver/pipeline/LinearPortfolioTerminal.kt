@@ -6,11 +6,11 @@ import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioTerminalPublication
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.ResumableSearch
-import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LinearOptimizationResult
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
