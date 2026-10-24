@@ -1265,23 +1265,31 @@ iterations, including factor-view construction and cold preparation. JFR phase
 observations establish neither a source verdict nor ordinary solve throughput.
 No WordDesign recovery or larger-product admission follows from this capture.
 
-[Lab 8130](https://lab.eignex.com/jobs/8130) isolates `off` versus
-`off,+extensional` at the same revision on Linux/amd64 spot, CP/satOptimized/P1,
-15 seconds, seed 3 and three repeats. All five source hashes and the build,
-runtime and JVM options match between arms. Table/table and table/MDD
-contradictions refute in source presolve, avoiding two native failures and
-194/238 CP propagation visits respectively; preparation work falls from
-852/1647 to 169/337. These are native refutations, without independent proof
-checking. All six satisfiable-control witnesses pass the external XCSP3 checker.
-Both arms use two nodes there, while composition raises preparation work from
-2,178 to 5,949 and CP propagation visits from 257 to 262.
+[Lab 8169](https://lab.eignex.com/jobs/8169), at `cc93562ee0`, isolates `off`
+versus `off,+extensional` on Linux/amd64 spot, CP/satOptimized/P1, 15 seconds,
+seed 3 and three repeats. All five source hashes, build, runtime and JVM options
+match between arms. All 30 cases complete without errors. Table/table and
+table/MDD contradictions refute in source presolve, avoiding two native failures
+and 194/238 units of CP propagation work respectively; charged presolve work
+falls from 852/1647 to 29/47. These are native refutations, without independent
+proof checking. All six satisfiable-control witnesses pass the external XCSP3
+checker. Both arms use two nodes there, while composition raises presolve work
+from 2,178 to 5,129 and CP propagation work from 257 to 262.
 
-Both original word sources remain unknown without witnesses. WordDesign reaches
-11 nodes with composition versus 11–12 without; WordSquare reaches 35–37 in both
-arms. Deadline prefixes establish no throughput equivalence. WordDesign's pass
-interrupts on payload-wide entry accounting before relation admission. The
-composition pass meters its own visits so declined diagrams need no payload-wide
-entry charge; the bounded relation and product limits remain independent.
+Both original word sources remain unknown without witnesses. WordDesign uses six
+nodes in both arms and completes its bounded decline with 4,198 charged units;
+its root CP work is unchanged. WordSquare uses 29–31 nodes without composition
+and 29–30 with it. Its pass spends 202 units without a rewrite, while total
+charged preparation work increases from 611,670,614 to 1,223,317,369. Deadline
+prefixes establish no throughput equivalence. Retain the exact root inference and
+bounded fallback as an opt-in capability, with these preparation costs and no
+WordDesign recovery or general speedup claim.
+
+[8130](https://lab.eignex.com/jobs/8130) identifies payload-wide entry charging
+before relation admission. The self-metered pass charges its own visits and uses
+unit-weight scheduling normalization. The scheduling failures in
+[8164](https://lab.eignex.com/jobs/8164) are errors and supply no UNKNOWN verdict
+or search evidence.
 
 ### XCSP3 declared intension extrema
 
