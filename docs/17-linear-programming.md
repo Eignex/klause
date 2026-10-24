@@ -48,6 +48,13 @@ indicator records both bound premises and retires when the pin retracts. Bounds
 retract with the search scope while definitions stay available to siblings. These
 definitions supply no witness authority: publication checks the original rows.
 
+The objective-cone relaxation follows integer, Boolean and real objective support
+through supported linear and Boolean factors. Ordinary, exact and continuous rows
+extend the same closure; pinned real atoms and integer indicators retain their
+activation premises when emitted. Integer big-M reifications and optional hull
+families stay outside this projection. Disconnected rows are omitted, while a
+connected dominant component remains subject to the ordinary size and work guards.
+
 ## Numerical authority
 
 The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
