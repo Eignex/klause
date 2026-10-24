@@ -1444,6 +1444,25 @@ adds state memory proportional to row width. Exactly representable inputs isolat
 mechanism cost; balanced and sequential floating sums can otherwise round
 differently. These profiles establish no whole-solver speed or quality gain.
 
+[Cold comparison 7987](https://lab.eignex.com/jobs/7987) compares `1fcc42f00c`
+with `aac5628111` in 192 runs over eight frozen source identities, with mixed/LS
+and exact/declared modes separate, seed 3, three repeats, ten seconds and one
+processor. Debug is off and physical CLI resources are retained. All pairs match
+original hashes, actual Mac/aarch64 runtime/options and host. There is no paired
+feasibility loss; 66 witnesses pass independent source checking. Six exact mixed
+cap64 points remain unsupported because the checker reads decimals only.
+
+Checked objective pairs have nine wins, three losses and 21 ties; the remaining
+three native improvements are those unsupported cap64 pairs. Sixty pairs remain
+undecided in both arms. Declared LS cap64 completion attempts rise from 55 to 68,
+with accepted attempts from 47 to 54 and identical final objectives. Exact LS
+cap64 instead retains 57 attempts while accepted attempts fall from 48 to 45.
+These counts do not identify distinct points, and LS work counters include
+completion work. Deadline-dependent mixed objectives and these one-seed repeats
+establish no uniform quality or whole-CLI speed improvement. The completed
+144-identity reference baseline remains the coverage denominator; native proof
+claims have no independent proof certificate here.
+
 ### Numerical kernel decisions
 
 [Owned-scatter controls 7989](https://lab.eignex.com/jobs/7989) and
