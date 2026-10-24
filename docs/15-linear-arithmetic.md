@@ -46,6 +46,13 @@ first seen under an activator, branch or disjunct get their definition row appen
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
 
+At positive search depth, compatible source sides share one premised bound batch.
+Each side retains its work debit and exact witness. Pending sides commit before a
+new definition is appended and before disequality inference reads active bounds.
+Only fully committed source comparisons receive assertion markers; a declined
+batch publishes neither its staged witnesses nor its markers. Root comparisons
+remain sequential so that later rows can substitute earlier root fixings.
+
 #### A check
 
 A check proceeds in four steps:

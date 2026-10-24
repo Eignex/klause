@@ -704,6 +704,17 @@ producer. Inspection records producer, source assertion and numerical-query time
 from after ordinary root initialization. These diagnostic clocks are disabled in
 default solver execution; they exclude root-opening and snapshot costs.
 
+`inspect=partial-source-batching` compares individual source edits with positive-depth
+batching at the same revision, enabling the cached partial producer in both openings.
+`inspect=partial-source-batching-plain` makes that comparison under ordinary propagation.
+Both require identical source/search snapshots at boundaries eight and sixteen.
+Post-root diagnostic counters separate definition-appending time and attempts from
+bound-assertion time, calls and strengthened sides. Bound time covers the existing
+snapshot/adoption path; preparation of normalized terms remains in the containing
+source-assertion time. Calls include redundant individual assertions; strengthened
+sides retain the per-bound work debit even when one call shares their snapshot.
+These clocks are opt-in and establish neither ordinary CLI timing nor source verdicts.
+
 The [partial arithmetic investigation](https://github.com/Eignex/klause/issues/3426#issuecomment-6375588869)
 retains matching source/search states for cached and uncached PWD and myget prefixes.
 PWD publishes 37 explained guards over sixteen boundary visits; decline reuse reduces

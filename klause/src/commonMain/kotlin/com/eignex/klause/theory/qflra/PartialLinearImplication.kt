@@ -43,6 +43,11 @@ internal data class PartialLinearPropagationStats(
     val producerNs: Long,
     val sourceAssertionNs: Long,
     val numericalQueryNs: Long,
+    val sourceDefinitionAppends: Long,
+    val sourceDefinitionNs: Long,
+    val sourceBoundCalls: Long,
+    val sourceBoundSides: Long,
+    val sourceBoundNs: Long,
 )
 
 internal data class PartialLinearSide(val value: BigFraction, val strict: Boolean)

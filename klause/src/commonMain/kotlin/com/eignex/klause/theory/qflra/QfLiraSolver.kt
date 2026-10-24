@@ -444,11 +444,19 @@ class ExactLiraSearchComponent private constructor(
         get() = PartialLinearPropagationStats(partialLinearCandidates?.size ?: 0,
             partialLinearInvocations, partialLinearVisited, partialLinearEligible,
             partialLinearDeductions, partialLinearDeferrals, partialLinearEvaluations, partialLinearUnchanged,
-            partialLinearProducerNs, partialLinearAssertionNs, partialLinearNumericalNs)
+            partialLinearProducerNs, partialLinearAssertionNs, partialLinearNumericalNs,
+            system.assertionCost.definitionAppends, system.assertionCost.definitionNs,
+            system.assertionCost.boundCalls, system.assertionCost.boundSides, system.assertionCost.boundNs)
 
     internal fun observePartialLinearCost() {
         check(context == null || context?.decisionLevel == 0)
         partialLinearCost = true
+        system.observeAssertionCost = true
+    }
+
+    internal fun useIndividualSourceBounds() {
+        check(context == null || context?.decisionLevel == 0)
+        system.batchSourceBounds = false
     }
 
     private inline fun <T> measurePartialLinearPhase(record: (Long) -> Unit, action: () -> T): T {
@@ -1173,7 +1181,10 @@ class ExactLiraSearchComponent private constructor(
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
+        val comparisons = ArrayList<PremisedSmtComparison>()
+        val indices = ArrayList<Int>()
         for ((index, prepared) in preparedRows.withIndex()) {
+            if (operationStop()) return false
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
             if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
@@ -1190,10 +1201,15 @@ class ExactLiraSearchComponent private constructor(
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
-                if (!system.assertComparison(comparison, null, premise)) return false
-                sourceAssertionLevels[index] = context.decisionLevel
+                comparisons += PremisedSmtComparison(comparison, premise)
+                indices += index
             }
         }
+        if (!system.assertComparisons(comparisons, operationStop) { index ->
+                sourceAssertionLevels[indices[index]] = context.decisionLevel
+            }
+        ) return false
+        if (lp.state?.conflict != null) return true
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
             if (!system.assertAtom(atom, premise)) return false
