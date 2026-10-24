@@ -363,6 +363,9 @@ class PropagationState private constructor(
 
     internal var work: Long = 0L
     internal val finiteWork = FinitePropagationWork()
+    internal var finiteMutationInterruptible = false
+    internal var finiteMaintenanceActive = false
+    internal var pendingFiniteMutation: FiniteDomainCompletion? = null
     internal var propagationNanos: Long = 0L
 
     /** Set once [runToFixpoint]'s cancellation poll fires — the deadline passed mid-fixpoint, so the
@@ -1187,6 +1190,12 @@ class PropagationState private constructor(
         cancelIsPause: Boolean = false,
     ): IntArray? {
         var fireCount = 0
+        try {
+            completePendingFiniteMutation()
+        } catch (_: FinitePropagationInterrupted) {
+            runCancelled = !cancelIsPause
+            return null
+        }
         while (propQueue.isNotEmpty()) {
             if (maxFires != Int.MAX_VALUE && fireCount >= maxFires) return null
             // Only a single fixpoint that itself runs away — an O(span) reified-linear bound crawl
@@ -1213,13 +1222,17 @@ class PropagationState private constructor(
             currentFactor = fid
             conflictLevels = null
             val propagated = try {
+                finiteMutationInterruptible = f is InterruptiblePropagator
                 f.propagate(this, fid)
             } catch (_: FinitePropagationInterrupted) {
                 (f as? InterruptiblePropagator)?.interrupted(this, fid)
                 propEnq(fid)
-                if (!cancelIsPause) runCancelled = true
+                if (pendingFiniteMutation != null) runCancelled = !cancelIsPause
+                else if (!cancelIsPause) runCancelled = true
                 conflictLevels = null
                 return null
+            } finally {
+                finiteMutationInterruptible = false
             }
             if (!propagated) {
                 // The failing factor is always in the core, regardless of whether it
