@@ -269,6 +269,7 @@ Retention reserves the operand product times arity plus 64 cells per payload fro
 a 1,048,576-cell state allowance. Replacements reuse their reservation; tombstoning
 can leave unused reservation. Exhaustion keeps complete small-product filtering
 with temporary supports, bounding retained storage without weakening deductions.
+Temporary supports use full scanning and omit dividend-index construction.
 
 An inert descriptor requires an explicit reason and cannot claim an exact check, so
 its absent mechanism needs an enforcing peer or separate source certification.
