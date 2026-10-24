@@ -79,6 +79,11 @@ Participation and completeness are separate. A batch service can be sound and
 incomplete; `TheoryCheck.Cancelled` leaves the fragment undecided, and an
 indeterminate required leaf cannot justify source exhaustion.
 
+Relations installed by one linear encoding request share one immutable snapshot
+of its complete integer and Boolean conditions. The snapshot owns its maps, and
+attribution access returns defensive copies. Sharing conditions preserves every
+premise without copying the entire assignment for each installed factor.
+
 ## Shared composition contract
 
 The [factor and ownership contract](02-model.md#factor-projection-selection)

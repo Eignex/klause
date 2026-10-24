@@ -30,6 +30,29 @@ import kotlin.test.assertTrue
 
 class SelectedEncoderRequestTest {
     @Test
+    fun `editing returned conditions should not change installed relations`() {
+        val source = Problem(2, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+            Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+        ))
+        val integers = mapOf(SourceIntId(0) to bigIntOf(1), SourceIntId(1) to bigIntOf(2))
+        val booleans = mapOf(SourceBoolId(0) to true, SourceBoolId(1) to false)
+        val selected = FactorProjectionProviders.Default.prepare(source)
+        val model = assertNotNull(selected.linearTheoryModel(EncodingTarget.LINEAR,
+            fixedIntegers = integers, fixedBooleans = booleans))
+        val first = assertIs<EncodedTheoryFactor>(model.factors.first()).attribution
+
+        (first.integerConditions as MutableMap).clear()
+        (first.booleanConditions as MutableMap).clear()
+
+        for (factor in model.factors) {
+            val attribution = assertIs<EncodedTheoryFactor>(factor).attribution
+            assertEquals(integers, attribution.integerConditions)
+            assertEquals(booleans, attribution.booleanConditions)
+        }
+    }
+
+    @Test
     fun `an ineligible selected scope should not install any supported prefix`() {
         for (support in listOf(EncoderSupport.UNSUPPORTED, EncoderSupport.RELAXATION_ONLY)) {
             for (reverse in listOf(false, true)) {
