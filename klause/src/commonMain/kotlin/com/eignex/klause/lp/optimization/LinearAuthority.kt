@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
@@ -39,6 +40,7 @@ internal class LinearAuthority(
     guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
 ) : AutoCloseable {
     private val lp = LinearAuthorityLp(budget, onLpShape, retainLp, guidancePolicy)
+    val funding: SourceLpFunding? get() = budget.funding
     val preparations: Long get() = lp.preparations
     val reuses: Long get() = lp.reuses
     private var template: LinearAuthorityTemplate? = null
