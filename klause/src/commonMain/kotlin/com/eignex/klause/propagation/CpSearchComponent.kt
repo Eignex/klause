@@ -95,12 +95,11 @@ class CpSearchComponent(
         sharedContext = context
         if (session.fixpointCancelled) return ComponentResult.Indeterminate
         if (session.isUnsatAtRoot) return ComponentResult.Conflict()
-        var result: ComponentResult = ComponentResult.Consistent
         for (variable in 0 until session.problem.numBoolVars) {
             checkPublication()
             val value = session.boolValue(variable) ?: continue
             val publication = context.publish(Lit.make(variable, value))
-            if (publication !is ComponentResult.Consistent) result = publication
+            if (publication !is ComponentResult.Consistent) return publication
         }
         for (variable in 0 until session.problem.numIntVars) {
             checkPublication()
@@ -111,7 +110,7 @@ class CpSearchComponent(
                 SearchDecision.IntAtLeast(sourceIntId(variable), domain.min),
                 lowerPremise,
             )
-            if (lower !is ComponentResult.Consistent) result = lower
+            if (lower !is ComponentResult.Consistent) return lower
             checkPublication()
             val upperPremise = session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel)
             checkCompleteFixpoint()
@@ -119,9 +118,9 @@ class CpSearchComponent(
                 SearchDecision.IntAtMost(sourceIntId(variable), domain.max),
                 upperPremise,
             )
-            if (upper !is ComponentResult.Consistent) result = upper
+            if (upper !is ComponentResult.Consistent) return upper
         }
-        return if (session.fixpointCancelled) ComponentResult.Indeterminate else result
+        return if (session.fixpointCancelled) ComponentResult.Indeterminate else ComponentResult.Consistent
     }
 
     internal fun prepareInitialization(
@@ -136,12 +135,14 @@ class CpSearchComponent(
             yield(ComponentResult.Conflict())
             return@sequence
         }
-        var result: ComponentResult = ComponentResult.Consistent
         for (variable in 0 until session.problem.numBoolVars) {
             if ((variable + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             val value = session.boolValue(variable) ?: continue
             val publication = context.publish(Lit.make(variable, value))
-            if (publication !is ComponentResult.Consistent) result = publication
+            if (publication !is ComponentResult.Consistent) {
+                yield(publication)
+                return@sequence
+            }
         }
         for (variable in 0 until session.problem.numIntVars) {
             if ((variable + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
@@ -150,14 +151,20 @@ class CpSearchComponent(
                 SearchDecision.IntAtLeast(sourceIntId(variable), domain.min),
                 session.sharedBoundPremise(variable, false, context, ::sourceIntId, sharedRootLevel),
             )
-            if (lower !is ComponentResult.Consistent) result = lower
+            if (lower !is ComponentResult.Consistent) {
+                yield(lower)
+                return@sequence
+            }
             val upper = context.publish(
                 SearchDecision.IntAtMost(sourceIntId(variable), domain.max),
                 session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel),
             )
-            if (upper !is ComponentResult.Consistent) result = upper
+            if (upper !is ComponentResult.Consistent) {
+                yield(upper)
+                return@sequence
+            }
         }
-        yield(if (session.fixpointCancelled) ComponentResult.Indeterminate else result)
+        yield(if (session.fixpointCancelled) ComponentResult.Indeterminate else ComponentResult.Consistent)
     }.iterator()
 
     override fun assert(
@@ -319,17 +326,16 @@ class CpSearchComponent(
         publish: (SearchDecision, SearchAtomPremise) -> ComponentResult,
     ): ComponentResult {
         propagationObserver?.invoke(result)
-        var published: ComponentResult = ComponentResult.Consistent
         result.forEachBool { variable, value ->
             checkPublication()
             if (variable != skippedVariable) {
                 val publication = publish(
                     SearchDecision.Bool(Lit.make(variable, value)), SearchAtomPremise.Unavailable,
                 )
-                if (publication !is ComponentResult.Consistent) published = publication
+                if (publication !is ComponentResult.Consistent) return publication
             }
         }
-        if (session.problem.numIntVars == 0) return published
+        if (session.problem.numIntVars == 0) return ComponentResult.Consistent
         // Queued assertions are delivered after this callback, keeping the native point fixed.
         val premises = CpPublicationPremises(session, context, ::sourceIntId, sharedRootLevel)
         result.forEachInt { variable, value ->
@@ -339,23 +345,23 @@ class CpSearchComponent(
             )
             checkCompleteFixpoint()
             val publication = publish(SearchDecision.IntEqual(sourceIntId(variable), value), premise)
-            if (publication !is ComponentResult.Consistent) published = publication
+            if (publication !is ComponentResult.Consistent) return publication
         }
         result.forEachIntMin { variable, value ->
             checkPublication()
             val premise = premises.bound(variable, false)
             checkCompleteFixpoint()
             val publication = publish(SearchDecision.IntAtLeast(sourceIntId(variable), value), premise)
-            if (publication !is ComponentResult.Consistent) published = publication
+            if (publication !is ComponentResult.Consistent) return publication
         }
         result.forEachIntMax { variable, value ->
             checkPublication()
             val premise = premises.bound(variable, true)
             checkCompleteFixpoint()
             val publication = publish(SearchDecision.IntAtMost(sourceIntId(variable), value), premise)
-            if (publication !is ComponentResult.Consistent) published = publication
+            if (publication !is ComponentResult.Consistent) return publication
         }
-        return if (session.fixpointCancelled) ComponentResult.Indeterminate else published
+        return if (session.fixpointCancelled) ComponentResult.Indeterminate else ComponentResult.Consistent
     }
 
     override val retainsOwnExplanations: Boolean get() = true
