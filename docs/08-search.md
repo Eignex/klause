@@ -252,6 +252,7 @@ reachability stay state-owned.
 DivMod retains complete signed tuples for at most 4096 live operand pairs in each
 state's factor payload. Each fire recomputes live supports in reusable primitive
 sets against all operand and output domains, including holes and aliased roles.
+Dividend-indexed tuple buckets skip rows whose dividend is absent.
 Output narrowing does not remove stored tuples. The payload survives retraction;
 restored operand values outside its construction domains require rebuilding it.
 Larger products keep bounds filtering without tuple enumeration, and a later small
