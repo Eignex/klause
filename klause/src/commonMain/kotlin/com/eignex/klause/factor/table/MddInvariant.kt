@@ -64,9 +64,56 @@ internal class MddInvariant(
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
+        if (indexCache.get() != null) {
+            val before = state.factorDegree[factorId]
+            applyIntSetSteps(state, factorId, intVar, oldValue).forEach { }
+            return violationDegree(state, factorId) - before
+        }
+        if (state.assignment.intValue(intVar) == oldValue) return 0
         val before = state.factorDegree[factorId]
-        applyIntSetSteps(state, factorId, intVar, oldValue).forEach { }
+        val st = state.refPayload[factorId] as MddLsState
+        positionsByVar[intVar]?.let { positions ->
+            val first = positions.first()
+            val last = positions.last()
+            for (layer in first until seq.size) {
+                val changed = updateLayer(state, st, layer, forward = true)
+                if (!changed && layer >= last) break
+            }
+            for (layer in last downTo 0) {
+                val changed = updateLayer(state, st, layer, forward = false)
+                if (!changed && layer <= first) break
+            }
+            st.distance = acceptingDistance(st.forward)
+            st.weight = currentWeight(state, st.distance)
+        }
         return violationDegree(state, factorId) - before
+    }
+
+    private fun updateLayer(state: LocalSearchState, st: MddLsState, layer: Int, forward: Boolean): Boolean {
+        val source = if (forward) st.forward[layer] else st.backward[layer + 1]
+        val target = if (forward) st.forward[layer + 1] else st.backward[layer]
+        val scratch = st.scratch
+        val inf = seq.size + 1
+        scratch.fill(inf, 0, target.size)
+        val symbol = state.assignment.intValue(seq[layer])
+        var record = layerStarts[layer]
+        while (record < layerStarts[layer + 1]) {
+            val from = transitions[record].toInt()
+            val to = transitions[record + 2].toInt()
+            val input = if (forward) from else to
+            val output = if (forward) to else from
+            val distance = source[input] + if (transitions[record + 1] == symbol) 0 else 1
+            if (distance < scratch[output]) scratch[output] = distance
+            record += recordStride
+        }
+        var changed = false
+        for (q in target.indices) {
+            if (target[q] != scratch[q]) {
+                target[q] = scratch[q]
+                changed = true
+            }
+        }
+        return changed
     }
 
     private fun currentWeight(state: LocalSearchState, distance: Int): Long? =

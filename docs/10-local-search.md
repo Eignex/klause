@@ -225,7 +225,8 @@ Worker-private dirty words and changed-state lists propagate those differences.
 The estimated incoming-edge work selects a state frontier or a full layer; both
 reconcile the same distance vectors. Adjacency admission uses a 32 MiB storage
 estimate per relation, with symbol postings under their own shared 32 MiB budget.
-Diagrams outside admission retain full-layer updates.
+Diagrams outside admission retain full-layer updates, with direct synchronous
+loops for atomic probe edits and batched cursors for accepted edits.
 
 Satisfaction slices adapt their cancellation polling to elapsed move cost, with
 clock checks inside the polling window. Read-only extensional scoring and repair
