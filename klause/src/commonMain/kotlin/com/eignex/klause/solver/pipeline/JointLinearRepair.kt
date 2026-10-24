@@ -112,11 +112,13 @@ internal class JointLinearRepair(
                 (model.numRealVars == 0 || sample.exactReals?.size == model.numRealVars) &&
                     (cutoff == null || (value != null && value < cutoff)) &&
                     SourceEvidenceVerifier(source.withLinearAuthority()).verify(SourceEvidence(source.scope,
-                        SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop) == SourceEvidenceCheck.Checked
+                        SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop) ==
+                    SourceEvidenceCheck.Checked
             }
             val from = pooled?.let { sample ->
                 observe("jointRepairImportedCenters")
-                List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } + sample.exactReals.orEmpty()
+                List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
+                    sample.exactReals.orEmpty()
             } ?: centers
             requireNotNull(selection).propose(from, pooled?.bools ?: bools, count, round, radius,
                 pooled?.let { objective?.evaluateExact(it) } ?: cutoff)

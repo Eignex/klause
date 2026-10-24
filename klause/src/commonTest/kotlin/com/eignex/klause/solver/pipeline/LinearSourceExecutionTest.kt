@@ -62,7 +62,7 @@ class LinearSourceExecutionTest {
 
             val expected = BigFraction.of(bigIntOf(if (sense == ObjectiveSense.MAXIMIZE) 8L else 3L), bigIntOf(10))
             assertEquals(expected, assertNotNull(result.linearSource?.incumbent).objective)
-            assertEquals(LinearSourceConclusion.SATISFIABLE, result.linearSource?.conclusion)
+            assertEquals(LinearSourceConclusion.SATISFIABLE, result.linearSource.conclusion)
             assertNull(result.result.terminal)
         }
     }
