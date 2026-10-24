@@ -46,7 +46,7 @@ internal object CliProfile {
         ),
     )
 
-    fun summarizeCli(file: File, output: PrintStream = System.out) {
+    fun summarizeCli(file: File, output: PrintStream = System.out, label: String = "whole CLI") {
         val cpu = HashMap<String, Long>()
         val phases = HashMap<String, Long>()
         val allocation = HashMap<String, Long>()
@@ -81,21 +81,21 @@ internal object CliProfile {
                 }
             }
         }
-        printTable("whole CLI: CPU samples by phase (stack attribution)", phases, 40, output)
-        printTable("whole CLI: CPU self-samples", cpu, 60, output)
-        printTable("whole CLI: CPU samples by captured callers", cpuCallers, 60, output)
-        printTable("whole CLI: CPU samples by captured polynomial checkpoint callers",
+        printTable("$label: CPU samples by phase (stack attribution)", phases, 40, output)
+        printTable("$label: CPU self-samples", cpu, 60, output)
+        printTable("$label: CPU samples by captured callers", cpuCallers, 60, output)
+        printTable("$label: CPU samples by captured polynomial checkpoint callers",
             cpuPolynomialCheckpoints, Int.MAX_VALUE, output)
-        printTable("whole CLI: sampled allocation weight by phase (estimated bytes)", allocation, 40, output)
-        printTable("whole CLI: sampled allocation weight by captured callers (estimated bytes)",
+        printTable("$label: sampled allocation weight by phase (estimated bytes)", allocation, 40, output)
+        printTable("$label: sampled allocation weight by captured callers (estimated bytes)",
             allocationCallers, 60, output)
-        printTable("whole CLI: CPU samples by captured model-facing callers", cpuModelCallers, 60, output)
-        printTable("whole CLI: sampled allocation weight by captured model-facing callers (estimated bytes)",
+        printTable("$label: CPU samples by captured model-facing callers", cpuModelCallers, 60, output)
+        printTable("$label: sampled allocation weight by captured model-facing callers (estimated bytes)",
             allocationModelCallers, 60, output)
-        printTable("whole CLI: CPU samples by captured context markers and model-facing callers",
+        printTable("$label: CPU samples by captured context markers and model-facing callers",
             cpuContexts, Int.MAX_VALUE, output)
         printTable(
-            "whole CLI: sampled allocation weight by captured context markers and " +
+            "$label: sampled allocation weight by captured context markers and " +
                 "model-facing callers (estimated bytes)",
             allocationContexts, Int.MAX_VALUE, output,
         )
