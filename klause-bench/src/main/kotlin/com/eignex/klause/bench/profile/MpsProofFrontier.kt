@@ -1,0 +1,191 @@
+package com.eignex.klause.bench.profile
+
+import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.sha256
+import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.condition
+import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.current
+import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.field
+import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.stats
+import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toLinearSourceProblem
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.lp.optimization.withLinearAuthority
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
+import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.LinearTraversal
+import com.eignex.klause.solver.pipeline.NumericalLinearRequest
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.util.Cancellation
+import java.io.File
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+internal object MpsProofFrontier {
+    @JvmStatic
+    fun main(args: Array<String>) {
+        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        if (System.getenv("KLAUSE_FRONTIER_MEASURED_JVM") != "1") {
+            launch(args, out)
+            return
+        }
+        require(Runtime.getRuntime().availableProcessors() == 1)
+        val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(options.keys == setOf("suite", "problem", "sha256", "exact"))
+        val exact = options.getValue("exact").toBooleanStrict()
+        val selected = Catalog.uncapped(options.getValue("suite")).problems
+            .single { it.name == options.getValue("problem") }
+        val bytes = CorpusFiles.open(CorpusFetcher.resolve(selected.source)).use { it.readNBytes(16 * 1024 * 1024 + 1) }
+        require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
+        out.resolve("source.mps").writeBytes(bytes)
+        Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
+        val preparationStop = Cancellation.after(20.seconds)
+        val parsed = Mps.parse(bytes.decodeToString())
+        val original = checkNotNull(parsed.toLinearSourceProblem(
+            if (exact) SemanticOverrides(feasibilityTolerance = SourceTolerance()) else SemanticOverrides(),
+            preparationStop,
+        ))
+        val prepared = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+            maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE,
+            cancellation = preparationStop, linearTraversal = LinearTraversal.NUMERICAL,
+        ))
+        require(prepared.route is SourceProblemRoute.NativeFormula)
+        val execution = checkNotNull(field(prepared.route, "execution"))
+        val request = field(execution, "request") as NumericalLinearRequest
+        val solveStop = preparationStop or Cancellation.after(10.seconds)
+        val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L)
+        val authority = request.javaClass.declaredMethods.single {
+            it.name == "authorityContext" && it.parameterCount == 2
+        }.apply { isAccessible = true }
+        val context = authority.invoke(request, checkNotNull(request.objective), solveStop) as SourceProofContext
+        require(context.coordinates.size <= 128)
+        val linear = checkNotNull(field(prepared, "linearSource"))
+        val view = checkNotNull(field(linear, "view"))
+        val scale = field(view, "objectiveScale") as BigFraction
+        val system = NumericalFrontierSnapshot.system(context)
+        Reports.writeJson(out.resolve("native-system.json").path, system)
+        val invocation = NumericalFrontierSnapshot.open(context, params)
+        val history = ArrayList<kotlinx.serialization.json.JsonObject>()
+        val started = System.nanoTime()
+        try {
+            val result = NumericalFrontierSnapshot.run(invocation) { _, value ->
+                val node = current(invocation)
+                val nodeResult = checkNotNull(field(node, "result"))
+                val bound = field(nodeResult, "bound") as SourceEvidence?
+                val progress = stats(invocation)
+                val entry = buildJsonObject {
+                    put("elapsedNs", System.nanoTime() - started)
+                    put("checks", progress.openTheory.openTheoryChecks)
+                    put("adapterOperations", progress.smt.sourceLp.operations)
+                    put("nativeValue", value.toString())
+                    put("sourceUnitValue", (value * scale.reciprocal()).toString())
+                    put("condition", condition(field(node, "condition") as SourceCondition))
+                    put("acceptedBy", "LinearAuthorityInvocation.offer")
+                    bound?.let {
+                        put("nodeBoundNative", ((it.claim as SourceClaim.Bound).value as SourceValue.Rational)
+                            .value.toString())
+                    }
+                }
+                history += entry
+                out.resolve("incumbents.jsonl").appendText(entry.toString() + "\n")
+            }
+            val captureStop = Cancellation.after(10.seconds)
+            val snapshot = NumericalFrontierSnapshot(context, captureStop, scale)
+            val frontier = snapshot.capture(invocation)
+            val terminal = field(result, "terminal") as SourceEvidence?
+            Reports.writeJson(out.resolve("frontier.json").path, buildJsonObject {
+                put("revision", Reports.readGitSha())
+                put("suite", options.getValue("suite"))
+                put("problem", options.getValue("problem"))
+                put("sourceSha256", sha256(bytes))
+                put("nativeSystemSha256", sha256(system.toString().toByteArray()))
+                put("sourceSemantics", original.semantics.toString())
+                put("exactRequested", exact)
+                put("randomSeed", params.randomSeed)
+                put("solveDeadlineSeconds", 10)
+                put("captureDeadlineSeconds", 10)
+                put("captureNodeAllowance", 4096)
+                put("processors", Runtime.getRuntime().availableProcessors())
+                put("os", System.getProperty("os.name"))
+                put("arch", System.getProperty("os.arch"))
+                put("objectiveScale", scale.toString())
+                put("claimsCoverTolerance", field(linear, "claimsCoverTolerance") as Boolean)
+                put("scope", NumericalFrontierSnapshot.scope(context.scope))
+                put("measurement", "numerical-owner-state-capture")
+                put("wholeCliTimingClaim", false)
+                put("sourceVerdictClaim", false)
+                put("independentWitnessCheck", false)
+                put("reason", field(result, "reason").toString())
+                put("maxLeaves", params.maxLeaves)
+                put("maxDecisions", params.maxDecisions)
+                put("openWorkLimit", params.openWorkLimit)
+                put("incumbents", JsonArray(history))
+                put("frontier", frontier)
+                put("stages", buildJsonObject {
+                    stats(invocation).smt.completeSearchStages.orEmpty().forEach { (key, value) -> put(key, value) }
+                })
+                terminal?.let {
+                    put("nativeTerminal", it.claim::class.simpleName)
+                    put("nativeTerminalCheck", SourceEvidenceVerifier(context.withLinearAuthority())
+                        .verify(it, captureStop).toString())
+                }
+            })
+        } finally {
+            (invocation as AutoCloseable).close()
+        }
+    }
+
+    private fun launch(args: Array<String>, out: File) {
+        val command = arrayListOf(
+            File(System.getProperty("java.home"), "bin/java").path,
+            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
+            "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
+            "-XX:StartFlightRecording=filename=${out.resolve("measured-profile.jfr")},settings=profile,dumponexit=true",
+        )
+        for (name in listOf("klause.workspace.root", "klause.bench.corpusCache")) {
+            System.getProperty(name)?.let { command += "-D$name=$it" }
+        }
+        command += listOf("-cp", System.getProperty("java.class.path"), javaClass.name)
+        command += args
+        val builder = ProcessBuilder(command).redirectOutput(out.resolve("measured.stdout"))
+            .redirectError(out.resolve("measured.stderr"))
+        builder.environment()["KLAUSE_FRONTIER_MEASURED_JVM"] = "1"
+        out.resolve("launcher.json").writeText(buildJsonObject {
+            put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
+        }.toString() + "\n")
+        val process = builder.start()
+        try {
+            check(process.waitFor(120, TimeUnit.SECONDS)) { "frontier JVM transport timeout" }
+            check(process.exitValue() == 0) { "frontier JVM failed" }
+        } finally {
+            if (process.isAlive) {
+                process.destroyForcibly()
+                process.waitFor()
+            }
+            out.resolve("measured.exit").writeText("${process.exitValue()}\n")
+        }
+    }
+}

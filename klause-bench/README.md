@@ -1515,3 +1515,20 @@ are rechecked together before an optimum can be reported.
 `nativeNominalObjectiveBound` is the checked native bound in original objective
 units; it does not certify the feasible set enlarged by a positive tolerance.
 Independent source witness validation remains separate from solver proof claims.
+
+`bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
+for one hash-matched original source. It uses the same numerical source setup and
+invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.
+Submit through the lab with `profile.runTimeoutSec: 180` for a bounded local Mac
+capture. A child JVM uses one processor, a 3 GiB heap, Serial GC and JFR. This is an
+instrumented owner-state capture; ordinary matched CLI experiments measure cost.
+
+The capture retains the original bytes, native affine system and build/runtime
+identity. `incumbents.jsonl` flushes accepted incumbent values and branch conditions.
+`frontier.json` records remaining alternatives with their strongest retained
+ancestor or local bound, its original scope and a fresh source-evidence check.
+Bound-closed subtrees remain explicit. Inspection has a separate ten-second,
+4096-node allowance, makes no LP query and checks tree counts against the ordinary
+stage counters. Reflection fails on an internal shape mismatch. The report does
+not claim an independently validated witness, proof or configured-tolerance source
+verdict; retain ordinary source validation and native/source conclusions alongside it.
