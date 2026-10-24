@@ -1,11 +1,12 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableLongIntMap
 
 internal class PropagationBuffers(
     val boolAssigned: Bits,
@@ -29,6 +30,7 @@ internal class PropagationBuffers(
     val boundMovePriorMin: Array<LongArrayList?>,
     val boundMovePriorMax: Array<LongArrayList?>,
     val holeHistVal: Array<LongArrayList?>,
+    val holeHistIndex: Array<MutableLongIntMap?>,
     val holeHistLvl: Array<IntArrayList?>,
     val holeHistPos: Array<IntArrayList?>,
     val rootHoleHist: Array<RootHoleHistory?>,
@@ -131,6 +133,8 @@ internal class PropagationBuffers(
             yield(null)
             val holeHistVal = arrayOfNulls<LongArrayList>(problem.numIntVars)
             yield(null)
+            val holeHistIndex = arrayOfNulls<MutableLongIntMap>(problem.numIntVars)
+            yield(null)
             val holeHistLvl = arrayOfNulls<IntArrayList>(problem.numIntVars)
             yield(null)
             val holeHistPos = arrayOfNulls<IntArrayList>(problem.numIntVars)
@@ -191,6 +195,7 @@ internal class PropagationBuffers(
                 boundMovePriorMin,
                 boundMovePriorMax,
                 holeHistVal,
+                holeHistIndex,
                 holeHistLvl,
                 holeHistPos,
                 rootHoleHist,

@@ -17,6 +17,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.MutableLongIntMap
 import kotlin.time.TimeSource
 
 /** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
@@ -247,6 +248,7 @@ class PropagationState private constructor(
     // Built lazy reasons, keyed by their marker array (identity); see [reasonOf].
     internal val lazyReasonMemo = HashMap<IntArray, IntArray?>()
     internal val holeHistVal: Array<LongArrayList?> = prepared?.holeHistVal ?: (arrayOfNulls(problem.numIntVars))
+    internal val holeHistIndex: Array<MutableLongIntMap?> = prepared?.holeHistIndex ?: arrayOfNulls(problem.numIntVars)
     internal val holeHistLvl: Array<IntArrayList?> = prepared?.holeHistLvl ?: (arrayOfNulls(problem.numIntVars))
 
     // The undo-log size when each carve was recorded, so a lazy reason can tell a hole that predates its
