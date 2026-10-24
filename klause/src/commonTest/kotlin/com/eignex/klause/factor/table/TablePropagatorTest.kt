@@ -34,7 +34,7 @@ import kotlin.test.assertTrue
 class TablePropagatorTest {
 
     @Test
-    fun `indexed delta deductions should be implied by their historical reasons`() {
+    fun `indexed table deductions should be implied by their historical reasons`() {
         val tuples = LongArray(9 * 16 * 3) { cell ->
             val row = cell / 3 % 9
             when (cell % 3) {
@@ -48,9 +48,6 @@ class TablePropagatorTest {
         )
 
         PropagationReasonOracle.assertReasonsImply(problem, "indexed-delta") { state ->
-            state.currentFactor = 0
-            check(state.factorAt(0).propagate(state, 0))
-            state.currentFactor = -1
             state.setInt(0, 0) && state.excludeIntValue(1, 1)
         }
     }
