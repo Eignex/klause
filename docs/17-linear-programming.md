@@ -156,8 +156,10 @@ The scoped root-guidance operation advances the existing floating cursor under
 finite cumulative and per-consultation work limits. Pauses publish no coordinates
 or proofs. A completed point remains heuristic even when bound certification declines.
 Dual-only certification checks exact Lagrangian evidence under its own sparse input,
-arithmetic and allocation limits; it runs no primal recovery or exact feasibility
-continuation. Its accepted bound retains row multipliers for source lifting and
+arithmetic and allocation limits. A refused binary dual candidate enters the bounded
+dual-vector rational reconstruction schedule under the same work, allocation and
+attempt limits. The first checked bound ends that schedule without primal recovery
+or exact feasibility continuation. Its accepted bound retains row multipliers for source lifting and
 rechecking. Preparation, floating stops, certificate declines and completed checked
 bounds have separate outcomes and costs; factor fill and density describe the
 completed numerical solve. Sparse preparation alone does not authorize ordinary

@@ -633,6 +633,31 @@ private fun reconstructIeee(values: DoubleArray, meter: ReconstructionMeter): Li
     meter.fraction(exactDouble(it))
 }
 
+private enum class ReconstructionGoal { ATTAINMENT, BOUND }
+
+private fun repairBoundMultipliers(
+    authority: ReconstructionAuthority,
+    candidate: List<BigFraction>,
+    meter: ReconstructionMeter,
+): List<BigFraction> {
+    var repaired: MutableList<BigFraction>? = null
+    for (row in candidate.indices) {
+        meter.step()
+        val slack = authority.n + row
+        val cost = authority.costs[slack]
+        val sides = authority.bounds[slack]
+        val multiplier = candidate[row]
+        if ((sides.lower == null && multiplier < cost) || (sides.upper == null && multiplier > cost)) {
+            val current = repaired ?: run {
+                meter.storage(candidate.size.toLong() * 8L)
+                candidate.toMutableList().also { repaired = it }
+            }
+            current[row] = cost
+        }
+    }
+    return repaired ?: candidate
+}
+
 private fun reconstructCandidates(
     model: LpModel,
     primalSize: Int,
@@ -644,6 +669,7 @@ private fun reconstructCandidates(
     basis: Basis?,
     cancellation: Cancellation,
     limits: ReconstructionLimits,
+    goal: ReconstructionGoal = ReconstructionGoal.ATTAINMENT,
     validate: (ReconstructionMeter) -> Unit = {},
 ): ReconstructedCertificate {
     val meter = ReconstructionMeter(limits, cancellation)
@@ -664,7 +690,9 @@ private fun reconstructCandidates(
         val x = primal?.let { values ->
             values(meter).mapIndexed { j, value -> meter.fraction(value - authority.origins[j]) }
         }
-        val y = duals?.invoke(meter)
+        val y = duals?.invoke(meter)?.let {
+            if (goal == ReconstructionGoal.BOUND) repairBoundMultipliers(authority, it, meter) else it
+        }
         val rho = ray?.invoke(meter)
         if (x != null) {
             current.point(x, basis)
@@ -675,7 +703,9 @@ private fun reconstructCandidates(
             current.dual(rho, ray = true)
             if (current.conflict == null) current.dual(rho.map { meter.fraction(it.negated()) }, ray = true)
         }
-        if (!current.attained() && current.conflict == null) {
+        if (!current.attained() && current.conflict == null &&
+            (goal != ReconstructionGoal.BOUND || (current.bound == null && limits.maxAttempts > 0))
+        ) {
             val violation = reconstructionViolation(authority, x, y ?: rho, ray = y == null && rho != null, meter)
             var correction = BigFraction.ofLong(2L)
             var previous: BigInt? = null
@@ -698,7 +728,12 @@ private fun reconstructCandidates(
                     reconstructExactVector(x, denominator, meter)?.let { current.point(it, basis) }
                     current.reconstructedSeated(x, basis, denominator)?.let { current.point(it, basis) }
                 }
-                if (y != null) reconstructExactVector(y, denominator, meter)?.let { current.dual(it, ray = false) }
+                if (y != null) reconstructExactVector(y, denominator, meter)?.let {
+                    val candidate = if (goal == ReconstructionGoal.BOUND) {
+                        repairBoundMultipliers(authority, it, meter)
+                    } else it
+                    current.dual(candidate, ray = false)
+                }
                 if (rho != null && current.point == null) {
                     reconstructExactVector(rho, denominator, meter)?.let {
                         current.dual(it, ray = true)
@@ -710,7 +745,9 @@ private fun reconstructCandidates(
                         }
                     }
                 }
-                if (current.attained() || current.conflict != null) break
+                if (current.attained() || current.conflict != null ||
+                    (goal == ReconstructionGoal.BOUND && current.bound != null)
+                ) break
                 val next = nextReconstructionRound(round)
                 repeat(
                     next - round,
@@ -870,43 +907,20 @@ internal fun certifyLpBoundOnly(
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
     val timer = LpPhaseTimer(observer, LpSolvePhase.BOUND_CERTIFICATE)
-    val meter = ReconstructionMeter(limits, cancellation)
-    var run: ReconstructionRun? = null
-    var decline: ReconstructionDecline? = null
-    try {
-        meter.poll()
-        meter.step()
-        if (duals.size != model.m) throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
-        val authority = ReconstructionAuthority(model, meter)
-        meter.phase = ReconstructionPhase.DUAL
-        meter.storage(model.m.toLong() * 32L)
-        val candidate = duals.mapIndexed { row, value ->
-            meter.step()
-            var multiplier = meter.fraction(BigFraction.ofDouble(value)
-                ?: throw ReconstructionStop(ReconstructionDecline.NONFINITE))
-            val slack = model.n + row
-            val cost = authority.costs[slack]
-            val sides = authority.bounds[slack]
-            if ((sides.lower == null && multiplier < cost) || (sides.upper == null && multiplier > cost)) {
-                multiplier = cost
-            }
-            multiplier
-        }
-        val current = ReconstructionRun(authority, meter)
-        run = current
-        current.dual(candidate, ray = false)
-        if (current.bound == null) decline = ReconstructionDecline.CANDIDATE
-    } catch (stop: ReconstructionStop) {
-        decline = stop.reason
-    }
-    if (decline == ReconstructionDecline.CANCELLED || cancellation()) {
-        decline = ReconstructionDecline.CANCELLED
-        run = null
-    }
-    val metrics = meter.snapshot(decline)
-    val bound = run?.bound
+    val checked = reconstructCandidates(
+        model, 0, duals.size, 0, null,
+        { meter -> reconstructIeee(duals, meter) }, null, null, cancellation, limits,
+        goal = ReconstructionGoal.BOUND,
+        validate = { meter ->
+            meter.poll()
+            meter.step(duals.size.toLong())
+            if (duals.any { !it.isFinite() }) throw ReconstructionStop(ReconstructionDecline.NONFINITE)
+        },
+    )
+    val metrics = checked.metrics
+    val bound = checked.bound
     val accepted = policy.acceptNullable(LpCertifier.RATIONAL, bound)
     observer?.observe(LpCertifier.RATIONAL, bound != null, LpCertifierCost.Metered(metrics.work))
-    timer.finish(decline?.name ?: if (accepted != null) "BOUND" else "REFUSED", metrics.work)
+    timer.finish(metrics.decline?.name ?: if (accepted != null) "BOUND" else "REFUSED", metrics.work)
     return ReconstructedCertificate(null, accepted, null, null, false, false, metrics)
 }

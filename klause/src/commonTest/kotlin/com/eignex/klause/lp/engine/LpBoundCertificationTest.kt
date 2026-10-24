@@ -10,6 +10,54 @@ import kotlin.test.assertTrue
 
 class LpBoundCertificationTest {
     @Test
+    fun `dual only certification should reconstruct fractional multipliers without recovering a primal`() {
+        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1))
+        val bound = assertNotNull(result.bound)
+
+        assertEquals(BigFraction.ofLong(-3L).reciprocal(), bound.value)
+        assertEquals(listOf(BigFraction.ofLong(-3L).reciprocal()), bound.dualMultipliers)
+        assertNull(result.witness)
+        assertNull(result.conflict)
+        assertEquals(0, result.metrics.pointChecks)
+        assertEquals(1, result.metrics.attempts)
+        assertEquals(2, result.metrics.dualChecks)
+    }
+
+    @Test
+    fun `zero reconstruction attempts should retain only the binary dual candidate`() {
+        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 0))
+
+        assertNull(result.bound)
+        assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+        assertEquals(0, result.metrics.attempts)
+        assertEquals(1, result.metrics.dualChecks)
+        assertEquals(0, result.metrics.pointChecks)
+    }
+
+    @Test
+    fun `dual reconstruction should share the direct candidate work and allocation allowances`() {
+        val source = model(upper = null, coefficient = 3L, rhs = 1L)
+        val duals = doubleArrayOf(-1.0 / 3.0)
+        val direct = certifyLpBoundOnly(source, duals, ReconstructionLimits(maxAttempts = 0))
+        val allowances = listOf(
+            ReconstructionLimits(maxAttempts = 1, maxWork = direct.metrics.work) to ReconstructionDecline.WORK,
+            ReconstructionLimits(maxAttempts = 1, maxAllocation = direct.metrics.allocation) to
+                ReconstructionDecline.ALLOCATION,
+        )
+        for ((limits, reason) in allowances) {
+            val result = certifyLpBoundOnly(source, duals, limits)
+
+            assertNull(result.bound)
+            assertEquals(reason, result.metrics.decline)
+            assertTrue(result.metrics.work <= limits.maxWork)
+            assertTrue(result.metrics.allocation <= limits.maxAllocation)
+            assertEquals(0, result.metrics.pointChecks)
+        }
+    }
+
+    @Test
     fun `dual only certification should produce a bound without primal or basis work`() {
         val result = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits())
 
@@ -19,6 +67,7 @@ class LpBoundCertificationTest {
         assertEquals(0, result.metrics.pointChecks)
         assertEquals(1, result.metrics.dualChecks)
         assertEquals(1, result.metrics.dualSuccesses)
+        assertEquals(0, result.metrics.attempts)
     }
 
     @Test
@@ -84,13 +133,13 @@ class LpBoundCertificationTest {
         assertEquals("REFUSED", phase?.outcome)
     }
 
-    private fun model(): LpModel {
+    private fun model(upper: Long? = 10L, coefficient: Long = 1L, rhs: Long = 5L): LpModel {
         val zero = ExactLpNumber.of(0L)
         return assertNotNull(LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
-            listOf(ExactLpNumber.of(5L)),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(coefficient)))),
+            listOf(ExactLpNumber.of(rhs)),
             listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), upper?.let { ExactLpSide(ExactLpNumber.of(it)) })),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
             ),
             listOf(ExactLpRow()),
