@@ -322,9 +322,9 @@ class RootBakerTest {
         val source = Problem(
             0,
             2,
-            arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            arrayOf(IntDomain(0, 3), IntDomain(0, 1)),
             listOf(
-                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 0, 3, 3)),
+                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 0, 3, 1)),
             ),
         )
         val reference = PresolveBudget(Long.MAX_VALUE)
