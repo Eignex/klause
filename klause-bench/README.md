@@ -1864,6 +1864,14 @@ complete owner. Engine selection alone does not select traversal ownership.
 Retain actual routing, source tolerance, objective scale, seeds, deadlines and
 platform. Default and `exact=true` are separate comparisons.
 
+`param.linear-traversal=numerical-frontier` selects the retained bound-ordered
+consumer with the same source semantics. Compare it with both numerical traversal
+and the automatic finite control. `numericalFrontierPending` includes the selected,
+queued and unresolved alternatives; `numericalFrontierPeakPending` records their
+maximum retained count. `numericalLpPreparations` and `numericalLpReuses` distinguish
+source matrix preparations from compatible scoped queries. Record their checked
+bound/incumbent trajectories and replay work alongside memory and wall time.
+
 Numerical traversal's `smtCompleteSearchStage_numerical*` fields count checked nodes,
 certified bounds, strict child-bound improvements, fractional/indicator splits,
 closed leaves and missing guidance. LP shape maxima and

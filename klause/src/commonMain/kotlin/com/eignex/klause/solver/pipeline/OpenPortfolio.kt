@@ -80,6 +80,7 @@ internal class OpenPortfolio(
     preparedSource: PreparedSourcePlan? = null,
     private val completeOnly: Boolean = false,
     private val numericalOnly: Boolean = false,
+    private val boundOrdered: Boolean = false,
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
     private val lifetime = theoryParams.cancellation or theoryParams.timeout
@@ -247,6 +248,7 @@ internal class OpenPortfolio(
                                 context,
                                 publicationInvocation = binding,
                                 numericalOnly = numericalOnly,
+                                boundOrdered = boundOrdered,
                             ) {
                                 incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
                             }

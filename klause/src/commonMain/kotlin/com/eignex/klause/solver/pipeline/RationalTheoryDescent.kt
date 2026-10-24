@@ -43,6 +43,7 @@ internal class RationalTheoryDescent(
     ),
     private val publicationInvocation: EngineInvocation? = null,
     private val numericalOnly: Boolean = false,
+    private val boundOrdered: Boolean = false,
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
     init {
@@ -64,7 +65,8 @@ internal class RationalTheoryDescent(
 
     private val state = OpenTheorySolveState(params)
     private var linear = context?.let {
-        LinearAuthorityInvocation(it, params, external = { external()?.first }, state = state)
+        LinearAuthorityInvocation(it, params, external = { external()?.first }, state = state,
+            boundOrdered = boundOrdered)
     }
     private var proofDeclined = false
     private var checkedIncumbent: Sample? = null

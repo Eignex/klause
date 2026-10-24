@@ -38,7 +38,8 @@ internal fun prepareLinearSource(
     if (stop()) return interrupted()
     val prepared = PreparedLinearSource(view, objective, covers, acceptedBound)
     val maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE
-    val native = NumericalLinearRequest(view.model, objective, maximize, stop)
+    val native = NumericalLinearRequest(view.model, objective, maximize, stop,
+        boundOrdered = request.linearTraversal == LinearTraversal.NUMERICAL_FRONTIER)
     val route = if (request.linearTraversal == LinearTraversal.AUTOMATIC && native.numericalRowsSupported(stop)) {
         val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
         if (finite is SourceProblemRoute.Finite && finite.problem.requiresExactObjectiveRoute(objective, stop)) {

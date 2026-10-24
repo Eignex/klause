@@ -33,6 +33,50 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `bound frontier should preserve complete sibling proofs across slices`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val source = SourceProofContext(scope, setOf(integer, other), mapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE)),
+            "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
+
+        LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
+            var result: LinearInvocationResult? = null
+            repeat(32) {
+                if (result == null) result = invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+            }
+
+            val terminal = assertNotNull(assertNotNull(result).terminal)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        }
+    }
+
+    @Test
+    fun `bound frontier should withhold a global bound for an unchecked Boolean sibling`() {
+        val source = SourceProofContext(scope, setOf(bool, real), mapOf(
+            "false" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE), mapOf(0 to false)),
+            "true" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ofLong(-10)), mapOf(0 to true)),
+        ), mapOf(real to BigFraction.ONE))
+
+        LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
+            invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+            invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+            val snapshot = invocation.snapshot(TerminationReason.BudgetExhausted)
+
+            assertNotNull(snapshot.incumbent)
+            assertNull(snapshot.bound)
+            assertNull(snapshot.terminal)
+        }
+    }
+
+    @Test
     fun `directional history should preserve exhaustive fractional sibling proofs`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         for (sense in ObjectiveSense.entries) {

@@ -19,6 +19,7 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchFrontierRun
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.Vsids
@@ -43,6 +44,7 @@ internal class LinearAuthorityInvocation(
     private val state: OpenTheorySolveState = OpenTheorySolveState(params),
     useBranchHistory: Boolean = false,
     borrowedAuthority: LinearAuthority? = null,
+    private val boundOrdered: Boolean = false,
 ) : AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
@@ -58,13 +60,16 @@ internal class LinearAuthorityInvocation(
     private var callback: (Sample, BigFraction) -> Unit = { _, _ -> }
     private var incumbent: Sample? = null
     private var value: BigFraction? = null
+    private var incumbentRevision = 0L
     private var result: LinearInvocationResult? = null
     val isDone: Boolean get() = result != null
     val work: Long get() = state.work.spent
     val stats: SolveStats get() = SolveStats(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
-        smt = state.smt.snapshot().copy(completeSearchStages = component.observations()),
+        smt = state.smt.snapshot().copy(completeSearchStages = component.observations() +
+            (frontier?.let { mapOf("numericalFrontierPending" to it.pending.toLong(),
+                "numericalFrontierPeakPending" to it.peakPending.toLong()) } ?: emptyMap())),
         openTheory = state.work.snapshot(),
         search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
@@ -80,10 +85,21 @@ internal class LinearAuthorityInvocation(
         }) else HeuristicBooleanBranching(Vsids(), context.coordinates.count {
             it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
         })
-    private val run = session.openRun(context.coordinates.count {
+    private val run = if (boundOrdered) null else session.openRun(context.coordinates.count {
         it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
     }, SearchSolveParams(state.remainingDecisions()), decisionBudget = state.decisionBudget,
         booleanBranching = branching, nodePolicy = component)
+    private val frontier = if (!boundOrdered) null else SearchFrontierRun(
+        session, SearchSolveParams(state.remainingDecisions()), branching, component, state.decisionBudget,
+        component::frontierRank, Comparator { left, right ->
+            when {
+                left == null && right == null -> 0
+                left == null -> -1
+                right == null -> 1
+                else -> left.compareTo(right)
+            }
+        }, ::paused, { incumbentRevision },
+    )
 
     @Suppress("TooGenericExceptionCaught") // Callback failure retires the invocation and preserves cleanup failures.
     fun runSlice(
@@ -112,7 +128,8 @@ internal class LinearAuthorityInvocation(
                     return finish(null, TerminationReason.Unsupported)
                 }
             }
-            val event = run.next()
+            val event = frontier?.next() ?: checkNotNull(run).next()
+            if (boundOrdered) component.updateGlobalBound()
             component.ray?.let { return finish(it, TerminationReason.SearchExhausted) }
             return when (event) {
                 SearchRunEvent.Paused -> null
@@ -161,6 +178,7 @@ internal class LinearAuthorityInvocation(
         if (standing != null && if (minimizes) exact >= standing else exact <= standing) return
         incumbent = sample
         value = exact
+        incumbentRevision++
         callback(sample, exact)
     }
 

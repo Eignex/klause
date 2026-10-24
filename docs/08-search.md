@@ -20,7 +20,7 @@ See [theory roles](14-theories.md#extension-roles-and-completeness). The session
 exchanges Boolean literals, semantic integer bounds and opaque theory decisions
 rather than native CP domains.
 
-Four owners divide the work:
+Five owners divide the work:
 
 - [SearchSession](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)
   coordinates component callbacks, conflicts and complete checks.
@@ -32,8 +32,23 @@ Four owners divide the work:
   reduction. Clause identifiers and watch-list order remain stable across index
   growth and rebuilds.
 - [SearchRun](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchRun.kt)
-  contains the single traversal loop and owns frames, decisions, restarts,
+  owns depth-first frames, decisions, restarts,
   cancellation cadence and resumable/terminal state.
+- [SearchFrontierRun](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchFrontierRun.kt)
+  retains ordered alternatives and replays their shared decision prefixes through
+  the session. Pauses retain the selected alternative and its replay position.
+
+Numerical frontier traversal orders alternatives by inherited checked objective
+bounds, visiting unbounded alternatives first. It keeps both children of every
+split, including unresolved leaves. Improved checked incumbents reawaken those
+leaves for dominance closure. Replayed decisions charge the ordinary work and
+decision allowances; the retained queue is capped at 4,096 alternatives. A failed
+required check or exhausted queue allowance withholds completion.
+
+The numerical consumer keeps source conditions and derivations in a separate
+coverage tree. Global bounds combine every remaining alternative, including
+unvisited siblings and refuted regions; a region without a bound or refutation
+withholds a global bound. Queue rank alone supplies no proof authority.
 
 A model policy can pause required completion with `SearchModelDisposition.Pause`.
 The run retains the assembled model and its decision trail, and retries that policy
