@@ -299,14 +299,21 @@ internal class LpScopedSolver(
             discardFloatProgress()
             return null
         }
-        if (!prepare(token)) return null
+        if (!prepare(token)) {
+            discardFloatProgress()
+            return null
+        }
         val current = requireNotNull(solver)
         if (current !is ResumableLpSolver) {
             return solveFloat(token = token, allowance = allowance.copy(work = minOf(quantum, allowance.work)))
         }
         var pending = pendingFloat
         if (pending == null) {
-            if (!current.adopt(state, token)) return null
+            if (!current.adopt(state, token)) {
+                solver = null
+                closeOwner(current)
+                return null
+            }
             pending = PendingFloat(current.openSolve(allowance))
             pendingFloat = pending
         }
@@ -315,7 +322,10 @@ internal class LpScopedSolver(
             val actual = current.lastMetrics
             lastMetrics = actual - pending.reported
             pending.reported = actual
-            if (step is LpSolveStep.Paused) return null
+            if (step is LpSolveStep.Paused) {
+                if (token() || cancellation()) discardFloatProgress()
+                return null
+            }
             pendingFloat = null
             pending.cursor.close()
             lastFloatTermination = current.lastTermination
@@ -340,11 +350,15 @@ internal class LpScopedSolver(
         pendingFloat = null
         val current = solver
         solver = null
+        var failure: Throwable? = null
         try {
             pending.cursor.close()
             if (current != null) recordPendingAppendSolve(current)
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
         } finally {
-            if (current != null) closeOwner(current)
+            if (current != null) closeOwner(current, failure)
         }
     }
 
