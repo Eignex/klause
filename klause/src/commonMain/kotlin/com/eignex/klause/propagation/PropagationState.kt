@@ -1190,12 +1190,14 @@ class PropagationState private constructor(
         cancelIsPause: Boolean = false,
     ): IntArray? {
         var fireCount = 0
+        val completingMutation = pendingFiniteMutation != null
         try {
             completePendingFiniteMutation()
         } catch (_: FinitePropagationInterrupted) {
             runCancelled = !cancelIsPause
             return null
         }
+        if (completingMutation) drainDirtyIntoQueue(atomFactorCap = Int.MAX_VALUE)
         while (propQueue.isNotEmpty()) {
             if (maxFires != Int.MAX_VALUE && fireCount >= maxFires) return null
             // Only a single fixpoint that itself runs away — an O(span) reified-linear bound crawl

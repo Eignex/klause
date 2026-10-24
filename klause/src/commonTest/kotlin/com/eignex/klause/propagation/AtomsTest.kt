@@ -8,15 +8,39 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AtomsTest {
+    @Test
+    fun `resuming atom maintenance should wake every pending clause`() {
+        val state = freshState(numVars = 1, hi = 255, numBoolVars = 1)
+        val thresholds = IntArray(128) { state.atomVarGe(0, it.toLong() + 1) }
+        for (atom in thresholds) {
+            state.addLearnedClause(Clause(intArrayOf(Lit.make(atom, false), Lit.make(0, true))), lbd = 2)
+        }
+        state.beginLevel(0, fid = -1)
+        state.finiteMutationInterruptible = true
+        state.finiteWork.cancellation = Cancellation {
+            state.pendingFiniteMutation != null && state.atoms.truth[thresholds[15] - 1] == 1
+        }
+
+        assertFailsWith<FinitePropagationInterrupted> { state.tightenIntMin(0, 129) }
+        assertNotNull(state.pendingFiniteMutation)
+        state.finiteWork.cancellation = Cancellation.Never
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertNull(state.pendingFiniteMutation)
+        assertEquals(true, state.boolValues[0])
+    }
+
     private fun freshState(numVars: Int, hi: Int, numBoolVars: Int = 0): PropagationState {
         val problem = Problem(
             numBoolVars = numBoolVars,

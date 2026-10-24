@@ -4,11 +4,60 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class MutatorsTest {
+
+    @Test
+    fun `interrupted batched hole history should complete before later propagation`() {
+        for (logging in listOf(false, true)) {
+            val state = freshState(255)
+            state.undoLogging = logging
+            state.finiteMutationInterruptible = true
+            state.finiteWork.cancellation = Cancellation {
+                state.pendingFiniteMutation != null && state.holeHistHas(0, 16)
+            }
+
+            assertFailsWith<FinitePropagationInterrupted> {
+                state.excludeInteriorIntValues(0, LongArray(128) { it.toLong() + 1 }) { null }
+            }
+            assertNotNull(state.pendingFiniteMutation)
+            state.finiteWork.cancellation = Cancellation.Never
+            assertNull(state.runToFixpoint(allFactors = false))
+
+            assertNull(state.pendingFiniteMutation)
+            for (value in 1L..128L) assertTrue(state.holeHistHas(0, value))
+            assertEquals(129L, state.intDomains[0].withMinAtLeast(1).min)
+        }
+    }
+
+    @Test
+    fun `undoing an interrupted hole batch should discard its pending completion`() {
+        val state = freshState(255)
+        val root = state.mark()
+        state.currentLevel = 1
+        state.finiteMutationInterruptible = true
+        state.finiteWork.cancellation = Cancellation {
+            state.pendingFiniteMutation != null && state.holeHistHas(0, 16)
+        }
+        assertFailsWith<FinitePropagationInterrupted> {
+            state.excludeInteriorIntValues(0, LongArray(128) { it.toLong() + 1 }) { null }
+        }
+
+        state.undoTo(root)
+        state.finiteWork.cancellation = Cancellation.Never
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertNull(state.pendingFiniteMutation)
+        assertEquals(IntDomain(0, 255), state.intDomains[0])
+        assertEquals(false, state.holeHistHas(0, 16))
+    }
 
     private fun freshState(hi: Int): PropagationState {
         val problem = Problem(
