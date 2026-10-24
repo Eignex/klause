@@ -40,7 +40,7 @@ internal object NumericalResidualReplay {
     private fun replay(input: JsonElement, out: File) {
         val spec = input.jsonObject
         val keys = setOf("job", "source", "residual", "sha256", "dense")
-        val options = setOf("synthetic", "entry", "workLimit", "observedOnly", "quantum")
+        val options = setOf("synthetic", "entry", "workLimit", "observedOnly", "quantum", "auditBasis")
         require(spec.keys.containsAll(keys) && (spec.keys - keys).all { it in options })
         val entry = spec["entry"]?.jsonPrimitive?.content ?: "scoped"
         require(entry in setOf("scoped", "session", "cursor"))
@@ -70,6 +70,7 @@ internal object NumericalResidualReplay {
             else -> listOf(6 to false)
         }
         val observedOnly = spec["observedOnly"]?.jsonPrimitive?.content?.toBooleanStrict() == true
+        val auditBasis = spec["auditBasis"]?.jsonPrimitive?.content?.toBooleanStrict() == true
         val rounds = if (observedOnly) listOf(-1, 3) else (-1..3).toList()
         for (round in rounds) {
             val ordered = if (round % 2 == 0) arms.reversed() else arms
@@ -77,7 +78,7 @@ internal object NumericalResidualReplay {
                 for (retained in listOf(false, true)) {
                     val observed = round == 3
                     val result = measure(
-                        state, denseLimit, retained, observed, syntheticWorkEnabled, entry, workLimit, quantum,
+                        state, denseLimit, retained, observed, syntheticWorkEnabled, entry, workLimit, quantum, auditBasis,
                     )
                     val report = buildJsonObject {
                         put("revision", Reports.readGitSha())
@@ -112,8 +113,9 @@ internal object NumericalResidualReplay {
         entry: String,
         workLimit: Long,
         quantum: Long,
+        auditBasis: Boolean,
     ): JsonElement {
-        val probe = NumericalResidualProfile.Probe(denseLimit, observed, syntheticWorkEnabled)
+        val probe = NumericalResidualProfile.Probe(denseLimit, observed, syntheticWorkEnabled, auditBasis && observed)
         val observerType = Class.forName(ENGINE + "LpCertificationObserver")
         val observations = ArrayList<JsonElement>()
         val recording = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, method, values ->
@@ -248,6 +250,8 @@ internal object NumericalResidualReplay {
             put("phaseCalls", NumericalResidualProfile.json(probe.phaseCalls))
             put("transformEntries", NumericalResidualProfile.json(probe.transformEntries))
             put("basisSolveWork", NumericalResidualProfile.json(probe.basisSolveWork))
+            put("basisResiduals", JsonArray(probe.basisResiduals))
+            put("basisSlices", JsonArray(probe.basisSlices))
             put("minimumPivotSpread", probe.minimumPivotSpread?.let(::JsonPrimitive) ?: JsonNull)
             put("floatSolves", JsonArray(probe.solves))
             put("builds", JsonArray(probe.builds))

@@ -608,6 +608,10 @@ Optional `observedOnly=true` retains the warmup and observed rounds for a subseq
 attribution question. It supplies no observation-disabled timing sample. Observed
 solve records aggregate actual RHS/output support, density hints, sparse triangular
 selection and visits separately for FTRAN and BTRAN.
+Optional `auditBasis=true` adds at most 128 source-matrix solve residuals and 16
+current upper-factor slice samples to the observed round. Each slice records its
+window, dimension, support checks and up to 64 entries. Auditing runs outside
+per-operation timing; its overhead still enters the observed lifecycle total.
 Owner construction, preparation, solve, certification and close enter lifecycle
 timing; result serialization follows each timed call.
 `dense=true` pairs sparse construction with the existing dense LU builder on bases
