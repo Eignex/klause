@@ -4,6 +4,7 @@ import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.LinRelation
@@ -80,6 +81,35 @@ class Xcsp3AffineDistinctnessTest {
         session.pinIntAtMost(0, 2)
         session.pinIntAtLeast(1, 2)
         assertEquals(0L, session.intDomain(2).min)
+    }
+
+    @Test
+    fun `noncontiguous affine Hall sets should prune source domains collectively`() {
+        val source = """<instance><variables><var id="x">1 3</var><var id="y">0 2</var>
+            <var id="z">-1..1</var></variables><constraints>
+            <intension>ne(x,add(y,1))</intension><intension>ne(x,add(z,2))</intension>
+            <intension>ne(add(y,1),add(z,2))</intension></constraints></instance>"""
+        val pairwise = PropagationSession(Xcsp3.parse(source, recoveryCancellation = Cancellation { true }).problem)
+        val collective = PropagationSession(Xcsp3.parse(source).problem)
+
+        assertEquals(-1L, pairwise.intDomain(2).min)
+        assertEquals(1L, pairwise.intDomain(2).max)
+        assertEquals(0L, collective.intDomain(2).min)
+        assertEquals(0L, collective.intDomain(2).max)
+    }
+
+    @Test
+    fun `wide affine channels should retain exact rows without enumerating their span`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><array id="x" size="[3]">0..1000000000000</array></variables>
+                <constraints><intension>ne(x[0],add(x[1],1))</intension>
+                <intension>ne(x[0],add(x[2],2))</intension>
+                <intension>ne(add(x[1],1),add(x[2],2))</intension></constraints></instance>""",
+        )
+
+        assertEquals(5, parsed.problem.numIntVars)
+        assertEquals(1, parsed.problem.factors.count { it is AllDifferent })
+        assertTrue(parsed.problem.factors.none { it is Element })
     }
 
     @Test

@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.xcsp3
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lowering.IntComb
-import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.LinRelation
 import com.eignex.klause.util.Cancellation
 
@@ -124,6 +124,7 @@ private fun subtractExact(left: Long, right: Long): Long? {
 }
 
 internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistinctness, cancellation: Cancellation) {
+    var remainingValues = 65_536
     for (group in index.groups(cancellation)) {
         if (cancellation()) return
         // Every channel must fit before any auxiliary is emitted. The source rows remain authoritative.
@@ -133,10 +134,37 @@ internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistin
             if (offset >= 0) domain.max > Long.MAX_VALUE - offset else domain.min < Long.MIN_VALUE - offset
         }) continue
         val channels = IntArray(group.vars.size) { i ->
-            materializeVar(IntComb.Narrow(
-                LinComb(mapOf(group.vars[i] to 1L), group.offsets[i]),
-            ))
+            val variable = group.vars[i]
+            val offset = group.offsets[i]
+            if (offset == 0L) return@IntArray variable
+            val domain = domains[variable]
+            val width = if (domain.min >= Int.MIN_VALUE && domain.max <= Int.MAX_VALUE) {
+                domain.max - domain.min + 1
+            } else {
+                0L
+            }
+            val values = if (width in 1L..4096L && width <= remainingValues) {
+                remainingValues -= width.toInt()
+                LongArray(width.toInt()) { domain.min + it + offset }
+            } else {
+                null
+            }
+            affineDistinctnessChannel(variable, offset, values)
         }
         postAllDifferent(channels)
     }
+}
+
+private fun Compiler.Builder.affineDistinctnessChannel(variable: Int, offset: Long, values: LongArray?): Int {
+    val domain = domains[variable]
+    val result = newAuxVar(domain.min + offset, domain.max + offset)
+    val vars = intArrayOf(variable, result)
+    val coefficients = longArrayOf(-1, 1)
+    factors.add(
+        if (values == null) Linear(coefficients, vars, LinearOp.EQ, offset)
+        else Element(variable, result, values, arrIsVars = false, indexOffset = domain.min.toInt()),
+    )
+    definedVars.add(result)
+    defineLinear(result, coefficients, vars, offset)
+    return result
 }
