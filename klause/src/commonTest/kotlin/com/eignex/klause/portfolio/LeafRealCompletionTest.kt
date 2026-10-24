@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
@@ -57,7 +58,7 @@ class LeafRealCompletionTest {
     @Test
     fun `closing an owned session should end its private completion lifetime`() {
         val completion = LeafRealCompletion(problem, null, null, retained = true)
-        val session = completion.ownSession(LocalSearchSolver(problem).session())
+        val session = completion.ownSession(LocalSearchSolver(problem.bake()).session())
         assertIs<Completion.Witness>(completion.complete(candidate(2, 0.4), Cancellation.Never))
 
         session.close()
