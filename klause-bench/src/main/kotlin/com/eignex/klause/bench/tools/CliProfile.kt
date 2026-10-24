@@ -13,6 +13,9 @@ import java.util.Locale
 internal object CliProfile {
     private const val CLI_CALLER_DEPTH = 3
     private const val MODEL_CALLER_DEPTH = 4
+    private val timedEvents = setOf("jdk.GarbageCollection", "jdk.GCPhasePause", "jdk.ThreadPark",
+        "jdk.ThreadSleep", "jdk.JavaMonitorEnter", "jdk.JavaMonitorWait", "jdk.Compilation",
+        "jdk.SafepointBegin", "jdk.ExecuteVMOperation")
     private val mechanismPackages = listOf(
         "com.eignex.klause.util.",
         "com.eignex.klause.bench.",
@@ -66,10 +69,7 @@ internal object CliProfile {
                 val event = recording.readEvent()
                 val type = event.eventType.name
                 eventCounts.merge(type, 1L, Long::plus)
-                if (type in setOf("jdk.GarbageCollection", "jdk.GCPhasePause", "jdk.ThreadPark",
-                    "jdk.ThreadSleep", "jdk.JavaMonitorEnter", "jdk.JavaMonitorWait", "jdk.Compilation",
-                    "jdk.SafepointBegin", "jdk.ExecuteVMOperation")
-                ) {
+                if (type in timedEvents) {
                     val millis = event.duration.toMillis()
                     runtimeMaxMillis.merge(type, millis, ::maxOf)
                     runtimeMillis.merge(type, millis, Long::plus)

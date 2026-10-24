@@ -635,7 +635,10 @@ at seed 3 with one active processor, a 3 GiB heap, Serial GC and debug statistic
 then runs the existing JFR phase/caller analyzer. It retains the command, source,
 streams and recording. These instrumented runs diagnose stages without a throughput
 or source-verdict claim. A `{job, sha256}` request instead checks and summarizes an
-existing profile job's `cases/0/out/profile.jfr` without executing a solver. Use a
+existing profile job's `cases/0/out/profile.jfr` without executing a solver. An
+optional `recording` selects `cli.jfr` or `profile.jfr`, optionally beneath a
+single output index from 0 through 7. The summary includes runtime event durations
+and native-method samples alongside the execution samples and allocations. Use a
 local profile job with an explicit `profile.runTimeoutSec` for either form.
 
 `CoefficientLiftingProfile` records Java thread allocations for the coefficient
