@@ -238,6 +238,7 @@ assertion retracts to its completed parent and retains the same alternative for 
 pausing traversal to retry. Retraction clears native incompleteness only after it
 has removed the interrupted native level. Publication stops before visiting another
 deduction or constructing its premise; a partial publication cannot certify a leaf.
+A conflict or indeterminate publication result ends the callback immediately.
 Slice polls charge completed native propagation visits before deciding whether the
 slice has expired.
 
