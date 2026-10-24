@@ -1929,6 +1929,9 @@ counts advance on changed authority, while work fields contain only new work fro
 each continuation.
 `numericalCoordinateConflicts` counts source-checked contradictions between opposed
 coordinate sides; these closures spend no floating solve operation.
+`numericalInheritedBoundClosures` counts queued children closed by an ancestor's
+bound after checking its derivation in the child scope against the current
+incumbent; these closures spend no LP query.
 
 Numerical traversal's `smtCompleteSearchStage_numerical*` fields count checked nodes,
 certified bounds, strict child-bound improvements, fractional/indicator splits,

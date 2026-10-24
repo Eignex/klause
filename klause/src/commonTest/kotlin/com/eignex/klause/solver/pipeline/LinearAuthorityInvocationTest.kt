@@ -33,6 +33,28 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `frontier should close inherited bounds after an incumbent improves without new LP checks`() {
+        val source = SourceProofContext(scope, setOf(bool, integer), mapOf(
+            "false" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                BigFraction.ofLong(-21)), mapOf(0 to false)),
+            "true" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE), mapOf(0 to true)),
+        ), mapOf(integer to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 2), boundOrdered = true).use {
+            assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.ONE), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(2L, stages["numericalChecks"])
+        assertEquals(2L, stages["numericalInheritedBoundClosures"])
+    }
+
+    @Test
     fun `sparse frontier should close coordinate conflicts outside exact primal admission`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         val reals = (0 until 127).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }

@@ -41,6 +41,7 @@ internal class LinearAuthorityTraversal(
     private val useBranchHistory: Boolean = false,
     borrowedAuthority: LinearAuthority? = null,
     private val useGuidance: Boolean = false,
+    private val inheritBounds: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -68,6 +69,7 @@ internal class LinearAuthorityTraversal(
     private val current: CoverageNode get() = path.last().second
     private var queriedNode: CoverageNode? = null
     private var queriedSource: SourceProofContext? = null
+    private val proofSource by lazy { source.withLinearAuthority() }
     private val observations = linkedMapOf(
         "numericalIncumbentDominatedSplits" to 0L,
         "numericalIncumbentBoundClosures" to 0L,
@@ -156,6 +158,9 @@ internal class LinearAuthorityTraversal(
                 it.kind == SourceCoordinate.Kind.Boolean && context.boolValue(it.id) == null
             }
         ) return SearchNodeDisposition.Expand
+        if (inheritBounds && current.result == null && current.split == null && closeInheritedBound()) {
+            return SearchNodeDisposition.Prune
+        }
         current.result?.let {
             if (it.evidence == null && current.coveredBound == null && current.split == null) {
                 val bound = it.bound
@@ -264,6 +269,30 @@ internal class LinearAuthorityTraversal(
         }
     }
 
+    private fun closeInheritedBound(): Boolean {
+        val standing = incumbent()?.second ?: return false
+        val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
+        for ((_, ancestor) in path.dropLast(1).asReversed()) {
+            if (cancellation()) return false
+            val inherited = ancestor.coveredBound ?: ancestor.result?.bound ?: continue
+            val claim = inherited.claim as? SourceClaim.Bound ?: continue
+            val value = (claim.value as? SourceValue.Rational)?.value ?: continue
+            if (if (minimizes) value < standing else value > standing) continue
+            val branch = proofSource.atScope(source.scope.copy(condition = current.condition))
+            val evidence = SourceEvidence(branch.scope, claim, inherited.derivation)
+            if (SourceEvidenceVerifier(branch).verify(evidence, cancellation) != SourceEvidenceCheck.Checked) continue
+            authority.invalidateGuidance()
+            current.pending = false
+            current.result = LinearAuthorityResult(bound = evidence)
+            current.coveredBound = evidence
+            pending--
+            observe("numericalInheritedBoundClosures")
+            observe("numericalClosedLeaves")
+            return true
+        }
+        return false
+    }
+
     fun completed(): SourceEvidence? {
         ray?.let { return it }
         val leaves = root.completedLeaves() ?: return null
@@ -304,7 +333,7 @@ internal class LinearAuthorityTraversal(
     private fun checked(claim: SourceClaim, proof: SourceDerivation): SourceEvidence? {
         val evidence = SourceEvidence(source.scope, claim, proof)
         return evidence.takeIf {
-            SourceEvidenceVerifier(source.withLinearAuthority()).verify(it, cancellation) == SourceEvidenceCheck.Checked
+            SourceEvidenceVerifier(proofSource).verify(it, cancellation) == SourceEvidenceCheck.Checked
         }
     }
 }
