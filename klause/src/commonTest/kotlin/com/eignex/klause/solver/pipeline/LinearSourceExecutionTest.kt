@@ -42,12 +42,17 @@ import kotlin.test.assertTrue
 class LinearSourceExecutionTest {
     @Test
     fun `a finite companion should supply an original source incumbent after numerical funding stops`() {
-        val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
-            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
-        )
-        for (traversal in listOf(LinearTraversal.NUMERICAL_COMPANIONS,
-            LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT)) {
+        val cases = ObjectiveSense.entries.flatMap { sense ->
+            listOf(LinearTraversal.NUMERICAL_COMPANIONS, LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT)
+                .map { sense to it }
+        }
+        for ((sense, traversal) in cases) {
+            val source = LinearSourceProblem(
+                listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
+                emptyList(), LinearSourceObjective(
+                    listOf(LinearSourceTerm(0, SemanticRational.of(BIG_ONE, bigIntOf(2)))),
+                    SemanticRational.of(bigIntOf(3), bigIntOf(10)), sense),
+            )
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
                 linearTraversal = traversal))
@@ -55,7 +60,8 @@ class LinearSourceExecutionTest {
             val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(
                 invocation, ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0), ExecutionOption.maxFlips(0)))))
 
-            assertEquals(BigFraction.ZERO, assertNotNull(result.linearSource?.incumbent).objective)
+            val expected = BigFraction.of(bigIntOf(if (sense == ObjectiveSense.MAXIMIZE) 8L else 3L), bigIntOf(10))
+            assertEquals(expected, assertNotNull(result.linearSource?.incumbent).objective)
             assertEquals(LinearSourceConclusion.SATISFIABLE, result.linearSource?.conclusion)
             assertNull(result.result.terminal)
         }

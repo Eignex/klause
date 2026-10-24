@@ -2,7 +2,6 @@
 
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
@@ -10,10 +9,10 @@ import com.eignex.klause.localsearch.LocalSearchEngine
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
-import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.relaxation.lpSeed
 import com.eignex.klause.portfolio.AcceptedPortfolioIncumbent
 import com.eignex.klause.portfolio.ArmFamily
+import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioEvidence
@@ -332,13 +331,14 @@ internal class OpenPortfolio(
         finiteCompanion?.let { finite ->
             add(PortfolioArmFactory(preparedPlan, firstArm, ArmFamily.Backtrack) { slot ->
                 val local = workerParams(slot)
-                PortfolioWorker.ofMinimize("finite/linear-companion", firstArm, resumable = {
+                PortfolioWorker.ofMinimize("finite/lp-default-companion", firstArm, resumable = {
                     var cutoffReads = 0L
                     var floorReads = 0L
                     val solver = BacktrackSolver(finite.bake(cancellation = lifetime or slot.cancellation))
-                    val params = BacktrackParams(randomSeed = slot.seed, nodeBudget = slot.nodeBudget,
+                    val params = BacktrackCatalog.byLabel("lp-default").build(
+                        slot.baseSeed + 1000L + slot.index, null).copy(nodeBudget = slot.nodeBudget,
                         maxDecisions = local.maxDecisions,
-                        cancellation = lifetime or slot.cancellation, lpConfig = LpConfig.AUTO,
+                        cancellation = lifetime or slot.cancellation,
                         objectiveBoundSupplier = if (!shareCompanions) null else ({
                             val exact = incumbents.exchange.current()?.objective?.execution
                             val value = exact?.toDouble() ?: Double.POSITIVE_INFINITY
