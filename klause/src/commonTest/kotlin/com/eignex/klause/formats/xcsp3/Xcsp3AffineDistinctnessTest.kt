@@ -151,6 +151,19 @@ class Xcsp3AffineDistinctnessTest {
     }
 
     @Test
+    fun `recovered channels should have zero objective coefficients`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><array id="x" size="[3]">0..3</array></variables>
+                <constraints><intension>ne(x[0],add(x[1],1))</intension>
+                <intension>ne(x[0],add(x[2],2))</intension>
+                <intension>ne(add(x[1],1),add(x[2],2))</intension></constraints>
+                <objectives><minimize type="sum"><list>x[]</list></minimize></objectives></instance>""",
+        )
+
+        assertContentEquals(longArrayOf(1, 1, 1, 0, 0), parsed.objective!!.intCoefficients)
+    }
+
+    @Test
     fun `unsafe shifted domains should keep their exact source rows`() {
         val parsed = Xcsp3.parse(
             """<instance><variables><array id="x" size="[3]">0..${Long.MAX_VALUE}</array></variables>
