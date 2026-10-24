@@ -112,7 +112,10 @@ class MddPropagatorTest {
             diagonal.transitions, diagonal.layerStarts, diagonal.numStatesPerLayer, diagonal.recordStride,
         )
         for ((step, hole) in listOf(true, false, true, false).withIndex()) {
-            val problem = Problem(0, 2, Array(2) { IntDomain(0, 3) }, arrayOf<Factor>(diagonal))
+            val domains = Array(2) {
+                if (hole) IntDomain(0, 3) else IntDomain(-2, 5).excludeValue(-1).excludeValue(4)
+            }
+            val problem = Problem(0, 2, domains, arrayOf<Factor>(diagonal))
             val state = PropagationState(problem, Assumptions.None)
             if (hole) check(state.excludeIntValue(0, 1))
             val inc = MddIncrementalState(

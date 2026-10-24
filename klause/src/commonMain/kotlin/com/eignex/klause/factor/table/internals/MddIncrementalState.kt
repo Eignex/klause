@@ -198,12 +198,13 @@ internal class MddIncrementalState(
      *  and can be shared through the root snapshot. */
     private fun domainsCoverAlphabet(state: PropagationState): Boolean {
         if (symSpan <= 0) return false
+        val maxSym = minSym + symSpan - 1
         for (i in 0 until n) {
             val d = state.intDomains[seq[i]]
-            if (d.min > minSym || d.max < minSym + symSpan - 1) return false
-            var hole = false
-            d.forEachHoleInRange(minSym, minSym + symSpan - 1) { hole = true }
-            if (hole) return false
+            if (d.min > minSym || d.max < maxSym) return false
+            if (d.holeCount == 0L) continue
+            if (minSym !in d || maxSym !in d) return false
+            if (d.withMinAtLeast(minSym).withMaxAtMost(maxSym).holeCount != 0L) return false
         }
         return true
     }
