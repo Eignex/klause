@@ -92,7 +92,8 @@ objective. Source and finite rounds, LP harvest and search use the replacement;
 later passes protect its remaining nonzero columns. The adjustment stays identity,
 so bounds and incumbents retain their original units and normalized direction.
 Checked coefficient and constant arithmetic declines overflow and the non-negatable
-signed minimum. Wider affine expressions, approximate semantics, open-theory
+signed minimum, then permits an objective-free pivot of the same equality.
+Wider affine expressions, approximate semantics, open-theory
 preparation and protection-only objectives retain objective-column protection.
 Finite holes and projected hints follow the same reconstruction as factor substitution.
 Independent source evaluation checks the composed adjustment against reconstructed
