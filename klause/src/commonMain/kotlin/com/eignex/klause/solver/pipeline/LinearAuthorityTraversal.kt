@@ -39,10 +39,12 @@ internal class LinearAuthorityTraversal(
     private val onIncumbent: (Sample) -> Unit,
     private val incumbent: () -> Pair<Sample, BigFraction>?,
     private val useBranchHistory: Boolean = false,
-) : SearchBrancher, SearchBranchProposal, SearchNodePolicy {
+    borrowedAuthority: LinearAuthority? = null,
+) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
-    private val authority = LinearAuthority(budget) { shape ->
+    private val ownsAuthority = borrowedAuthority == null
+    private val authority = borrowedAuthority ?: LinearAuthority(budget, { shape ->
         observations["numericalLpInputMaxRows"] =
             maxOf(observations["numericalLpInputMaxRows"] ?: 0L, shape.inputRows.toLong())
         observations["numericalLpMaxRows"] = maxOf(observations["numericalLpMaxRows"] ?: 0L, shape.rows.toLong())
@@ -51,6 +53,10 @@ internal class LinearAuthorityTraversal(
         observations["numericalLpExtractedBoundRows"] =
             (observations["numericalLpExtractedBoundRows"] ?: 0L) + shape.inputRows - shape.rows
         if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
+    }, retainLp = true)
+
+    override fun close() {
+        if (ownsAuthority) authority.close()
     }
     private val root = CoverageNode(source.scope.condition)
     private val branchHistory = LinearBranchHistory()
@@ -68,6 +74,8 @@ internal class LinearAuthorityTraversal(
         "numericalPendingLeaves" to pending,
         "numericalPeakPendingLeaves" to peakPending,
         "numericalRetainedNodes" to retained,
+        "numericalLpPreparations" to authority.preparations,
+        "numericalLpReuses" to authority.reuses,
     )
 
     private fun observe(stage: String) {

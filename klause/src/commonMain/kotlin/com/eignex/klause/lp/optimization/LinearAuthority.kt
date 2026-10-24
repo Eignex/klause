@@ -30,15 +30,28 @@ internal data class LinearAuthorityResult(
     val incumbent: Sample? = null,
     val split: Pair<SourceCoordinate, BigFraction>? = null,
     val fractional: List<Pair<SourceCoordinate, BigFraction>> = emptyList(),
+    val relaxedPoint: Map<SourceCoordinate, Double> = emptyMap(),
 )
 
 internal class LinearAuthority(
     private val budget: SourceLpBudget,
     onLpShape: (LinearAuthorityLpShape) -> Unit = {},
-) {
-    private val lp = LinearAuthorityLp(budget, onLpShape)
+    retainLp: Boolean = false,
+) : AutoCloseable {
+    private val lp = LinearAuthorityLp(budget, onLpShape, retainLp)
+    val preparations: Long get() = lp.preparations
+    val reuses: Long get() = lp.reuses
+
+    override fun close() = lp.close()
 
     fun check(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
+        relaxedPoint = emptyMap()
+        return checkSource(source, cancellation).copy(relaxedPoint = relaxedPoint)
+    }
+
+    private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
+
+    private fun checkSource(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return LinearAuthorityResult()
         val coordinates = source.numericCoordinates()
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
@@ -101,6 +114,9 @@ internal class LinearAuthority(
         val closureRows = rows.map { ExactRationalInequality(it.columns, it.coefficients, it.rhs) }
         val solved = lp.solve(closureRows, costs, constant, cancellation) ?: return LinearAuthorityResult()
         val closure = solved.result
+        closure.float?.primal?.takeIf { it.size == coordinates.size && it.all(Double::isFinite) }?.let { point ->
+            relaxedPoint = coordinates.indices.associate { coordinates[it] to point[it] }
+        }
         val bound = closure.lowerBound?.let { value ->
             fun checkBound(weights: List<BigFraction>): SourceEvidence? =
                 checked(SourceClaim.Bound(value * sign), LinearPinnedObjective(derivation(weights)))

@@ -33,7 +33,11 @@ internal data class LinearAuthorityLpResult(
 internal class LinearAuthorityLp(
     private val budget: SourceLpBudget,
     private val onShape: (LinearAuthorityLpShape) -> Unit = {},
-) {
+    retain: Boolean = false,
+) : AutoCloseable {
+    private val session = if (retain) LinearAuthoritySession(budget) else null
+    val preparations: Long get() = session?.preparations ?: 0L
+    val reuses: Long get() = session?.reuses ?: 0L
     private val observer = object : LpCertificationObserver {
         override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
         override fun observeExactInput(accepted: Boolean) = Unit
@@ -56,24 +60,30 @@ internal class LinearAuthorityLp(
             val packed = checkNotNull(prepared)
             val workingRows = packed.rows
             val zero = ExactLpNumber.of(0L)
-            val model = ExactLpModel(
+            val objective = ExactLpObjective(
+                costs.map(ExactLpNumber::of) + List(workingRows.size) { zero },
+                ExactLpNumber.of(constant),
+            )
+            fun model() = ExactLpModel(
                 costs.indices.map { column -> workingRows.mapIndexedNotNull { index, row ->
                     row.columns.indexOf(column).takeIf { it >= 0 }?.let {
                         ExactLpEntry(index, ExactLpNumber.of(row.coefficients[it]))
                     }
                 } },
                 workingRows.map { ExactLpNumber.of(it.rhs) },
-                packed.columns + workingRows.map {
+                (if (session == null) packed.columns else packed.columns.map {
+                    it.copy(bounds = ExactLpBounds())
+                }) + workingRows.map {
                     ExactLpColumn(ExactLpBounds(ExactLpSide(zero, it.strict)), integral = false)
                 },
                 workingRows.map { ExactLpRow(strict = it.strict) },
-                ExactLpObjective(
-                    costs.map(ExactLpNumber::of) + List(workingRows.size) { zero },
-                    ExactLpNumber.of(constant),
-                ),
+                objective,
             )
-            val owner = LpScopedSolver(LpExactState(model), token, context = budget.context,
-                iterationLimit = 1024, workLimit = 2_000_000L)
+            val owner = if (session != null) session.bind(packed, objective, token, ::model)
+                ?: return@runPrepared null else LpScopedSolver(LpExactState(model()), token, context = budget.context,
+                    iterationLimit = 1024, workLimit = 2_000_000L)
+            val preparation = owner.metrics.preparationWork
+            val refinement = owner.refinementCache.work
             try {
                 val solved = owner.solve(token = token, observer = observer)
                 val result = solved?.takeIf { result -> result.exactPrimal?.admittedSourcePoint() != false &&
@@ -91,15 +101,19 @@ internal class LinearAuthorityLp(
                 }
                 LinearAuthorityLpResult(result, boundWeights, conflictWeights)
             } finally {
-                budget.observe(preparation = owner.metrics.preparationWork, floatWork = owner.lastMetrics.workOps,
-                    refinement = owner.refinementCache.work)
-                budget.closeOwner(owner)
+                budget.observe(preparation = owner.metrics.preparationWork - preparation,
+                    floatWork = owner.lastMetrics.workOps, refinement = owner.refinementCache.work - refinement)
+                if (session == null) budget.closeOwner(owner)
             }
         }.also {
             val workingRows = prepared?.rows?.size ?: rows.size
             onShape(LinearAuthorityLpShape(rows.size, workingRows, costs.size,
                 budget.admitsDimensions(costs.size, workingRows.toLong())))
         }
+    }
+
+    override fun close() {
+        session?.close()
     }
 
     fun combination(
@@ -109,6 +123,9 @@ internal class LinearAuthorityLp(
         strict: Boolean,
         cancellation: Cancellation,
     ): List<BigFraction>? {
+        if (session != null) return LinearAuthorityLp(budget, onShape).use {
+            it.combination(rows, coefficients, rhs, strict, cancellation)
+        }
         val count = rows.size
         val constraints = ArrayList<ExactRationalInequality>()
         fun equality(values: List<BigFraction>, bound: BigFraction) {

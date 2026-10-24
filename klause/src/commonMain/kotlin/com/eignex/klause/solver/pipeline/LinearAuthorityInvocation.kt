@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.linearCoordinatesSupported
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -41,6 +42,7 @@ internal class LinearAuthorityInvocation(
     private val external: () -> Sample? = { null },
     private val state: OpenTheorySolveState = OpenTheorySolveState(params),
     useBranchHistory: Boolean = false,
+    borrowedAuthority: LinearAuthority? = null,
 ) : AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
@@ -67,7 +69,7 @@ internal class LinearAuthorityInvocation(
         search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
         SourceLpBudget(onWork = state.smt::observeSourceLp), stop, ::paused, ::offer,
-        { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory)
+        { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)
     }
@@ -179,7 +181,11 @@ internal class LinearAuthorityInvocation(
         if (closed) return
         closed = true
         state.capture(session)
-        session.popTo(0)
-        callback = { _, _ -> }
+        try {
+            session.popTo(0)
+        } finally {
+            component.close()
+            callback = { _, _ -> }
+        }
     }
 }
