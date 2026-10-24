@@ -171,7 +171,7 @@ internal object AffineSingletons {
         // partner, which the loop below restricts to the values keeping `x` off its holes. Where every
         // column is closed and contiguous and binary substitution has already run, there is nothing to
         // refuse, so the finite lane pays no predicate.
-        val pivotable: ((Int, Int) -> Boolean)? = when {
+        val domainPivotable: ((Int, Int) -> Boolean)? = when {
             domains == null -> { x: Int, _: Int ->
                 ranges.isClosed(x) && !ranges.isBinary(x) && (problem.intDomainOrNull(x)?.holeCount ?: 0L) == 0L
             }
@@ -181,6 +181,12 @@ internal object AffineSingletons {
             }
 
             else -> null
+        }
+        val pivotable: ((Int, Int) -> Boolean)? = if (objectiveRewrite == null) domainPivotable else {
+            { variable, partners ->
+                objectiveRewrite.permits(variable, partners) &&
+                    (domainPivotable?.invoke(variable, partners) ?: true)
+            }
         }
         val subs = ArrayList<AffineSub>()
         // Before any fold the working set is byte-for-byte the pristine input, so the first candidate scan
@@ -237,6 +243,7 @@ internal object AffineSingletons {
             val replacement = objectiveRewrite?.substitute(cand)
             if (objectiveRewrite != null && replacement == null) {
                 objVars.add(cand.x)
+                order.onRejected(cand.defIdx)
                 continue
             }
             val holed = domains != null && domains[cand.x].holeCount > 0L
@@ -244,6 +251,7 @@ internal object AffineSingletons {
             if (holed && partnerDomain == null) {
                 // The holes have nowhere to go, so `x` stays; holding it keeps the gate from offering it again.
                 objVars.add(cand.x)
+                order.onRejected(cand.defIdx)
                 continue
             }
             val foldCost = ws.degreeOf(cand.x).toLong() * cand.termVars.size
@@ -289,6 +297,9 @@ internal object AffineSingletons {
 
         /** Record that the fold just made rewrote factors from stable id [minRewrittenId] upward. */
         fun onFolded(minRewrittenId: Int)
+
+        /** Reconsider an equality after its selected pivot becomes protected. */
+        fun onRejected(definitionId: Int)
     }
 
     /** The `Int` value window; a single-partner global's affine view (an index/position shift) is only

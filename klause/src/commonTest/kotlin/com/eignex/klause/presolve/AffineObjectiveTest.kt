@@ -197,6 +197,26 @@ class AffineObjectiveTest {
     }
 
     @Test
+    fun `objective overflow should retain an available objective free pivot`() {
+        val model = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)),
+        )
+        val cost = LinearObjective(intCoefficients = longArrayOf(1), constant = Long.MAX_VALUE)
+
+        val outcome = PresolvePipeline.run(model, cost, PresolveConfig.parse("affine"), false)
+        val assignments = BacktrackSolver(outcome.problem.bake()).enumerate().map { reduced ->
+            outcome.mapping.requireObjectivePreserved(cost, outcome.objective ?: cost, reduced)
+            outcome.reconstruct(reduced).ints.toList()
+        }.toSet()
+
+        assertTrue(outcome.mapping.rebuild.steps.any { it is RebuildStep.AffineValue })
+        assertEquals(setOf(listOf(1L, 0L), listOf(2L, 1L)), assignments)
+    }
+
+    @Test
     fun `translation should extend a partial objective to its retained partner`() {
         val model = Problem(
             0,
