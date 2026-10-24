@@ -3,6 +3,8 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchEngine
 import com.eignex.klause.localsearch.LocalSearchModel
@@ -19,6 +21,8 @@ import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.kind
 import com.eignex.klause.propagation.PropagationProblem
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -38,6 +42,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyOpenWitness
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
@@ -50,6 +55,7 @@ import com.eignex.klause.util.toLongExact
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.math.abs
+import kotlin.math.nextUp
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -81,6 +87,9 @@ internal class OpenPortfolio(
     private val completeOnly: Boolean = false,
     private val numericalOnly: Boolean = false,
     private val boundOrdered: Boolean = false,
+    private val finiteCompanion: Problem? = null,
+    private val jointCompanion: Boolean = false,
+    private val shareCompanions: Boolean = true,
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
     private val lifetime = theoryParams.cancellation or theoryParams.timeout
@@ -109,6 +118,8 @@ internal class OpenPortfolio(
         maxDecisions = slot.nativeAllowance(theoryParams.maxDecisions),
         maxFlips = slot.heuristicAllowance(theoryParams.maxFlips),
         maxInstructions = theoryParams.maxInstructions?.let(slot::heuristicAllowance),
+        sourceLpWorkLimit = slot.nativeAllowance(theoryParams.sourceLpWorkLimit),
+        sourceLpAllocationLimit = slot.nativeAllowance(theoryParams.sourceLpAllocationLimit),
         cancellation = theoryParams.cancellation or slot.cancellation,
         nodeBudget = slot.nodeBudget,
     )
@@ -250,7 +261,8 @@ internal class OpenPortfolio(
                                 numericalOnly = numericalOnly,
                                 boundOrdered = boundOrdered,
                             ) {
-                                incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
+                                if (!shareCompanions) null else
+                                    incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
                             }
                             if (linear == null) {
                                 descent
@@ -265,6 +277,9 @@ internal class OpenPortfolio(
                 )
             }
             addAll(localSearch)
+            if (jointCompanion && context != null) {
+                addAll(companionFactories(if (rational) 1 else 0, objective, context, binding, incumbents, linear))
+            }
         }
         if (factories.isEmpty()) {
             return OpenTheoryOptimum.Bounded(
@@ -303,6 +318,57 @@ internal class OpenPortfolio(
         }
         val result = portfolio.use { it.minimize(cancellation, null, incumbents, linear, accepted) }
         return linear?.fold(result) ?: optimumOf(result, incumbents)
+    }
+
+    private fun companionFactories(
+        firstArm: Int,
+        objective: LinearObjective,
+        context: SourceProofContext,
+        binding: EngineInvocation,
+        incumbents: PortfolioIncumbents<OpenIncumbentValue>,
+        linear: OpenLinearPortfolioResults?,
+    ): List<PortfolioArmFactory> = buildList {
+        val identity = ModelIdentity.of(sourceModel, objective)
+        finiteCompanion?.let { finite ->
+            add(PortfolioArmFactory(preparedPlan, firstArm, ArmFamily.Backtrack) { slot ->
+                val local = workerParams(slot)
+                PortfolioWorker.ofMinimize("finite/linear-companion", firstArm, resumable = {
+                    val solver = BacktrackSolver(finite.bake(cancellation = lifetime or slot.cancellation))
+                    val params = BacktrackParams(randomSeed = slot.seed, nodeBudget = slot.nodeBudget,
+                        maxDecisions = local.maxDecisions,
+                        cancellation = lifetime or slot.cancellation, lpConfig = LpConfig.AUTO,
+                        objectiveBoundSupplier = if (!shareCompanions) null else ({
+                            val exact = incumbents.exchange.current()?.objective?.execution
+                            val value = exact?.toDouble() ?: Double.POSITIVE_INFINITY
+                            if (exact == null || !value.isFinite() ||
+                                BigFraction.ofDouble(value)?.let { it >= exact } == true) value else value.nextUp()
+                        }),
+                        objectiveLowerBoundSupplier = if (!shareCompanions) null else linear?.let {
+                            { it.sharedLowerBound() }
+                        })
+                    LinearCompanionSearch(solver.resumable(objective, params), context, binding, objective)
+                }) { _, _, _, _ -> error("finite companion runs only by slice") }
+                    .bindEvidence(identity, provesResults = false)
+            })
+        }
+        if (model.numBoolVars == 0) {
+            val arm = firstArm + size
+            add(PortfolioArmFactory(preparedPlan, arm, ArmFamily.LocalSearch) { slot ->
+                val local = workerParams(slot)
+                val repair = slot.own(JointLinearRepair(model, context, objective, local, boundOrdered = true,
+                    external = { if (shareCompanions) incumbents.exchange.current()?.assignment else null }))
+                val worker = exactNeighborhoodWorker("ls/joint-linear-companion", arm, objective,
+                    lifetime or slot.cancellation, theoryParams.timeout, { repair.exhausted },
+                    open = { repair.search(adaptive = false, seed = slot.seed) })
+                PortfolioWorker.ofMinimize("ls/joint-linear-companion", arm, countsInstructions = true,
+                    resumable = {
+                        LinearCompanionSearch(requireNotNull(worker.newResumableSearch {
+                            Double.POSITIVE_INFINITY
+                        }), context, binding, objective)
+                    }) { _, _, _, _ -> error("joint companion runs only by slice") }
+                    .bindEvidence(identity, provesResults = false)
+            })
+        }
     }
 
     private fun optimumOf(

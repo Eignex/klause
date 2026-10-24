@@ -75,6 +75,12 @@ internal class RationalTheoryDescent(
     private var witnessContext: SourceProofContext? = null
     var linearResult: LinearOptimizationResult? = null
         private set
+    fun linearSnapshot(): LinearOptimizationResult? = linearResult ?: linear?.let { invocation ->
+        val result = invocation.snapshot(TerminationReason.BudgetExhausted)
+        val captured = requireNotNull(context)
+        LinearOptimizationResult(captured.scope, null, result.bound, result.incumbent, result.value,
+            result.reason, result.stats, captured.semantics)
+    }
     private var round: ResumableOpenTheory? = null
     private var incumbent: Sample? = null
     private var value: BigFraction? = null

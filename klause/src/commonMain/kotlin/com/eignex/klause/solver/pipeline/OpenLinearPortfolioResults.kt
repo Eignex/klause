@@ -10,6 +10,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -20,6 +23,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.math.nextDown
 
 internal class OpenLinearPortfolioResults(
     private val binding: EngineInvocation,
@@ -35,6 +39,19 @@ internal class OpenLinearPortfolioResults(
 
     fun retain(worker: PortfolioWorker, handle: AtomicReference<LinearPortfolioSearch?>) {
         handles += worker to handle
+    }
+
+    fun sharedLowerBound(): Double {
+        val bound = strongestBound() ?: return Double.NEGATIVE_INFINITY
+        if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(bound, cancellation) !=
+            SourceEvidenceCheck.Checked) return Double.NEGATIVE_INFINITY
+        val claim = bound.claim as? SourceClaim.Bound ?: return Double.NEGATIVE_INFINITY
+        val value = (claim.value as? SourceValue.Rational)?.value ?: return Double.NEGATIVE_INFINITY
+        val minimized = minimized(value)
+        val rounded = minimized.toDouble()
+        if (!rounded.isFinite()) return Double.NEGATIVE_INFINITY
+        return if (BigFraction.ofDouble(rounded)?.let { it <= minimized } == true) rounded
+            else rounded.nextDown()
     }
 
     override fun check(worker: PortfolioWorker, search: ResumableSearch?): PortfolioTerminalPublication? {

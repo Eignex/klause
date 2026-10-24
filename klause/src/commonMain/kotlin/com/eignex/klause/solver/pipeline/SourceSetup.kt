@@ -133,6 +133,12 @@ enum class LinearTraversal {
 
     /** Use numerical LP/MIP traversal with a retained bound-ordered frontier. */
     NUMERICAL_FRONTIER,
+
+    /** Pair numerical frontier traversal with admitted finite search and joint repair. */
+    NUMERICAL_COMPANIONS,
+
+    /** Use the companion recipe while withholding cross-worker incumbent and bound imports. */
+    NUMERICAL_COMPANIONS_INDEPENDENT,
 }
 
 /** Captures one source route and retains its operation binding for execution. */

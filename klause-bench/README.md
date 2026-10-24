@@ -2432,6 +2432,16 @@ coordinate sides; these closures spend no floating solve operation.
 bound after checking its derivation in the child scope against the current
 incumbent; these closures spend no LP query.
 
+`param.linear-traversal=numerical-companions` schedules the frontier, an admitted
+finite search and joint repair together. Compare it with
+`numerical-companions-independent`, which withholds cross-worker incumbent and
+bound imports under the same worker quotas, and with standalone finite, frontier
+and repair controls. Keep the same total deadline, decision/move and source LP
+work/allocation ceilings. `param.source-lp-operations=256` retains a fixed-count
+control; `param.source-lp-work-limit` and `param.source-lp-allocation-limit` set
+cumulative numerical funding. Native objective units and original-source objective
+units must remain separately recorded. Companion exhaustion grants no global proof.
+
 Numerical traversal's `smtCompleteSearchStage_numerical*` fields count checked nodes,
 certified bounds, strict child-bound improvements, fractional/indicator splits,
 closed leaves and missing guidance. LP shape maxima and
