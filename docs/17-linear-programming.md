@@ -124,6 +124,10 @@ owner construction the remaining cumulative LP allowance while keeping each
 floating query under its adaptive solve allowance. It requires a finite containing
 allowance. Source-edit preparation, including a declined edit, charges that same
 governor before a solve and is excluded from the solve's later work report.
+Its interruption policy can grow the adaptive request when a query makes pivots
+and stops on work before producing a point. Growth stays under the existing
+adaptive ceiling and remaining cumulative allowance; missing reasons, zero-pivot
+stops and numerical or infeasibility candidates supply no such feedback.
 Ordinary admission and node preparation use the shared adaptive allowance.
 
 ### Leaf completion

@@ -887,6 +887,12 @@ is determined by those boundaries, rather than three repeats. This mode tests
 retained partial progress without inheriting a changed CP problem; float termination
 and cumulative preparation/work counters expose retries and ownership reuse.
 
+`feedback-cold` and `feedback-session` add work-stop feedback to that comparison.
+Only an observed work termination with pivots and no point grows the existing
+adaptive request; its ceiling, cumulative governor and deadlines still apply.
+The report names the internal root policy explicitly. A missing point is neither
+an infeasibility proof nor evidence of a numerical failure.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing
