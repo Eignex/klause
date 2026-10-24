@@ -198,11 +198,16 @@ internal class TableInvariant(
         val columns = if (single >= 0) intArrayOf(single) else multiColumnsByVar.getValue(intVar)
         val index = supportCache.supports {}
         if (index == null) {
+            var work = 0
             for (row in 0 until numTuples) {
                 var delta = 0
                 for (column in columns) {
                     delta += (if (tableCellContains(tuples, hi, arity, row, column, newValue)) 0 else 1) -
                         (if (tableCellContains(tuples, hi, arity, row, column, oldValue)) 0 else 1)
+                    if (++work == LOCAL_SEARCH_OPERATION_BATCH) {
+                        yield(Unit)
+                        work = 0
+                    }
                 }
                 s.setDistance(row, s.dist[row] + delta)
                 if (row % LOCAL_SEARCH_OPERATION_BATCH == 0) yield(Unit)
