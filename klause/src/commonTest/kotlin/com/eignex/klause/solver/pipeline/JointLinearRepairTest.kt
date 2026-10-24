@@ -14,6 +14,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -24,6 +25,29 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
+    @Test
+    fun `a checked incumbent should close a nonimproving repair without global proof`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2))
+
+        val result = repair.use {
+            it.search(adaptive = false).use { search ->
+                while (!search.advance(Cancellation.Never, 1_000_000)) Unit
+                search.minimizeResult(TerminationReason.BudgetExhausted)
+            }
+        }
+
+        assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(1L, assertNotNull(result.assignment).intValue(0))
+        assertEquals(1.0, result.stats.ls.completionsRefuted.sum)
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures"))
+    }
+
     @Test
     fun `paused guidance should keep its check allowance through incumbent publication`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),

@@ -233,6 +233,8 @@ allowances span candidates, and the driver charges native work as heuristic
 instructions, including sparse preparation and bound certification. Root and
 candidate consultations advance bounded quanta under the invocation's cancellation
 token; a paused consultation retains its admitted operation and check allowance.
+A checked center supplies a candidate incumbent; a scoped bound can close a
+nonimproving neighborhood before its remaining alternatives are explored.
 A completed candidate must pass the original-source witness check
 before it can update the center or publish an incumbent. Local bounds, refutations
 and exhausted alternatives never leave the heuristic as global claims.
