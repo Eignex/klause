@@ -46,10 +46,10 @@ internal object IntFunctionLowering {
         remainder: Int?,
         freshInt: (IntDomain) -> Int,
         @Suppress("UNUSED_PARAMETER") freshBool: () -> Int,
-        existing: List<Factor> = emptyList(),
+        relations: com.eignex.klause.lowering.DivModRelationIndex,
     ): TruncDivMod {
-        val relation = com.eignex.klause.lowering.retainDivMod(a, b, domainA, domainB,
-            quotient, remainder, existing, freshInt)
+        val relation = relations.retain(a, b, domainA, domainB,
+            quotient, remainder, freshInt)
         return TruncDivMod(relation.quotient, relation.remainder, relation.factors)
     }
 }

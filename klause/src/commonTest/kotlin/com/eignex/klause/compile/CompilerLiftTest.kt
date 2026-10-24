@@ -46,6 +46,29 @@ import kotlin.test.assertTrue
 
 class CompilerLiftTest {
     @Test
+    fun `repeated FlatZinc division outputs should preserve aliases across compilations`() {
+        for ((a, q, r) in listOf(Triple(-7L, 2L, -1L), Triple(7L, -2L, 1L))) {
+            val parsed = parseFlatZinc(
+                """
+                var $a..$a: a; var -3..-3: b; var -3..-3: c;
+                var -4..4: q; var -4..4: r; var -4..4: qAlias; var -4..4: rAlias;
+                constraint int_div(a,b,q); constraint int_eq(q,q);
+                constraint int_mod(a,c,r); constraint int_div(a,c,qAlias);
+                constraint int_mod(a,b,rAlias); solve satisfy;
+                """.trimIndent(),
+            )
+            assertEquals(1, parsed.problem.factors.filterIsInstance<DivMod>().size)
+
+            val session = PropagationSession(parsed.problem)
+
+            assertFalse(session.isUnsatAtRoot)
+            for ((name, expected) in listOf("q" to q, "qAlias" to q, "r" to r, "rAlias" to r)) {
+                assertEquals(IntDomain(expected, expected), session.intDomain(parsed.intVarsByName.getValue(name)))
+            }
+        }
+    }
+
+    @Test
     fun `mul product domain overflow should fail at compile time`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 100_000)

@@ -114,6 +114,7 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
     val idToBoolName = MutableIntObjectMap<String>()
     val intDomains get() = problemBuilder.intDomains
     internal val divModOperands = HashMap<IntExpr, Int>()
+    internal val divModRelations = com.eignex.klause.lowering.DivModRelationIndex()
     val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
 
     val floatDecoders = mutableMapOf<String, FloatSpec>()
