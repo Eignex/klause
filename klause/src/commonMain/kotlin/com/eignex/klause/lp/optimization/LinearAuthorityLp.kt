@@ -23,6 +23,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
 
 internal data class LinearAuthorityLpShape(
@@ -208,6 +209,21 @@ internal class LinearAuthorityLp(
         guidanceInactive = emptySet()
         guidancePacked = null
         session?.close()
+    }
+
+    fun recover(
+        coordinates: List<SourceCoordinate>, point: List<BigFraction>, rows: List<ExactRationalInequality>,
+        inactive: Set<Int>, cancellation: Cancellation, observe: (String, Long) -> Unit,
+    ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
+        recoverLinearPrimal(coordinates, point, rows, inactive, token, complete = { residual, columns, active ->
+            LinearAuthorityLp(budget, onShape).use { completion ->
+                completion.solve(residual, List(columns) { BigFraction.ZERO }, BigFraction.ZERO, active)
+                    ?.result?.exactPrimal?.take(columns)
+            }
+        }, observe = { stage, count ->
+            if (stage == "PrimalRecoveryWork") budget.observe(refinement = count)
+            observe(stage, count)
+        })
     }
 
     fun combination(

@@ -169,6 +169,11 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
         }
     }
 
+    fun <T> withGuidance(cancellation: Cancellation, block: (Cancellation) -> T?): T? {
+        val reservation = admission ?: return null
+        return budget.resumeSparse(reservation, cancellation) { _, active -> block(active) }
+    }
+
     override fun close() {
         val current = owner
         owner = null

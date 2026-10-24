@@ -6,6 +6,7 @@ import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.SparseSourceLpRowPolicy
 import com.eignex.klause.lp.engine.ReconstructionLimits
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -17,6 +18,7 @@ import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.SourceSemanticsChecker
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -307,6 +309,78 @@ class LinearAuthorityTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         }
+    }
+
+    @Test
+    fun `sparse guidance should recover a strict real residual without changing a wide integer`() {
+        val coordinates = (0 until 128).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val value = BigFraction.ofLong(9007199254740993L)
+        val source = SourceProofContext(scope, (coordinates + integer).toSet(), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+            "integerLower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),
+                value.negated())),
+            "integerUpper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), value)),
+        ), emptyMap())
+        val budget = SourceLpBudget(maxOperations = 2)
+
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            val result = authority.advance(source, Cancellation.Never)
+
+            val sample = assertNotNull(result.incumbent)
+            assertEquals(value.num, sample.exactIntValue(0))
+            assertTrue(assertNotNull(sample.exactReals).first() > BigFraction.ZERO)
+            assertEquals(1L, result.primalStages["PrimalRecoveryResidual"])
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+            val operations = budget.operations
+            val repeated = authority.advance(source, Cancellation.Never)
+            assertNotNull(repeated.incumbent)
+            assertEquals(1L, repeated.primalStages["PrimalRecoveryReused"])
+            assertEquals(operations, budget.operations)
+        }
+    }
+
+    @Test
+    fun `sparse recovery should decline when its shared source operations are exhausted`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+        ), emptyMap())
+
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use {
+            it.advance(source, Cancellation.Never)
+        }
+
+        assertNull(result.incumbent)
+        assertNull(result.evidence)
+        assertEquals(1L, result.primalStages["PrimalRecoveryComponentUnavailable"])
+    }
+
+    @Test
+    fun `a recovered nominal point should still require the original source checker`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+        ), emptyMap(), semanticsChecker = object : SourceSemanticsChecker {
+            override fun witness(
+                sample: Sample, scope: SourceScope, cancellation: Cancellation,
+            ): SourceEvidenceCheck = SourceEvidenceCheck.Rejected("source restriction")
+
+            override fun ray(
+                claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation,
+            ): SourceEvidenceCheck = SourceEvidenceCheck.Unavailable("no source ray")
+        })
+
+        val result = LinearAuthority(SourceLpBudget(), retainLp = true).use {
+            it.advance(source, Cancellation.Never)
+        }
+
+        assertEquals(1L, result.primalStages["PrimalRecoveryResidual"])
+        assertNull(result.incumbent)
+        assertNull(result.evidence)
     }
 
     @Test
