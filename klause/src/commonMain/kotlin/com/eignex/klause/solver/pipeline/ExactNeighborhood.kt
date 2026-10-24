@@ -134,6 +134,7 @@ internal class ExactNeighborhood(
             val total = centers.size + boolCount
             val operator = pending?.first ?: operator()
             val count = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
+            val before = nativeWork()
             val condition = pending?.second ?: proposal?.propose(centers, bools, count,
                 moves, radius, value) ?: run {
                 val selected = if (moves == 0L) emptySet() else (0 until total).shuffled(random).take(count).toSet()
@@ -143,7 +144,6 @@ internal class ExactNeighborhood(
                 ExactNeighborhoodCondition(pins, lower, upper, value)
             }
             pending = operator to condition
-            val before = nativeWork()
             val result = completion.check(condition, cancellation)
             val cost = 1 + ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong()
             charge(cost)
