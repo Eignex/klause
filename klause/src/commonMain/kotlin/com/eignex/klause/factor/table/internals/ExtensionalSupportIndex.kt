@@ -2,6 +2,8 @@ package com.eignex.klause.factor.table.internals
 
 import com.eignex.klause.util.argsortBy
 
+private const val SUPPORT_TRAVERSAL_BATCH = 256
+
 internal class ExtensionalSupportIndex private constructor(val columns: Array<Column>, val retainedBytes: Long) {
     internal class Column(
         private val values: LongArray,
@@ -108,7 +110,7 @@ internal class ExtensionalSupportIndex private constructor(val columns: Array<Co
                     val limit = sparseLimit(bucket)
                     for (i in start until limit) {
                         visit(rows[i])
-                        if (++work == 256) {
+                        if (++work == SUPPORT_TRAVERSAL_BATCH) {
                             yield(Unit)
                             work = 0
                         }
@@ -121,8 +123,8 @@ internal class ExtensionalSupportIndex private constructor(val columns: Array<Co
                             visit((i shl 6) + bits.countTrailingZeroBits())
                             bits = bits and (bits - 1)
                         }
-                        work += 64
-                        if (work >= 256) {
+                        work += Long.SIZE_BITS
+                        if (work >= SUPPORT_TRAVERSAL_BATCH) {
                             yield(Unit)
                             work = 0
                         }
