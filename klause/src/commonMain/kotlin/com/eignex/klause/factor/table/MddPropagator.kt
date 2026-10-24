@@ -6,7 +6,7 @@ import com.eignex.klause.factor.table.internals.MddIncrementalState
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.InterruptiblePropagator
 
 internal class MddPropagator(
     val boolVars: IntArray,
@@ -20,7 +20,11 @@ internal class MddPropagator(
     private val recordStride: Int,
     private val cost: Int,
     private val transitionIndex: MddTransitionIndex? = null,
-) : Propagator {
+) : InterruptiblePropagator {
+
+    override fun interrupted(state: PropagationState, factorId: Int) {
+        (state.refPayload[factorId] as? MddIncrementalState)?.invalidate()
+    }
 
     override val expensiveBake: Boolean get() = true
 

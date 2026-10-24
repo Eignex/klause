@@ -362,6 +362,7 @@ class PropagationState private constructor(
     internal var propagations: Long = 0L
 
     internal var work: Long = 0L
+    internal val finiteWork = FinitePropagationWork()
     internal var propagationNanos: Long = 0L
 
     /** Set once [runToFixpoint]'s cancellation poll fires — the deadline passed mid-fixpoint, so the
@@ -1028,6 +1029,7 @@ class PropagationState private constructor(
         skipExpensiveBake: Boolean = false,
     ): IntArray? {
         val start = TimeSource.Monotonic.markNow()
+        finiteWork.cancellation = cancellation
         try {
             return drainFixpoint(allFactors, initialFactor, initialFactors, cancellation, skipExpensiveBake)
         } finally {
@@ -1115,6 +1117,7 @@ class PropagationState private constructor(
     internal fun advanceRootFixpoint(cancellation: Cancellation): IntArray? {
         check(rootPreparationStarted)
         val start = TimeSource.Monotonic.markNow()
+        finiteWork.cancellation = cancellation
         try {
             return fireQueue(
                 cancellation !== Cancellation.Never, 0, cancellation, false,
@@ -1209,7 +1212,16 @@ class PropagationState private constructor(
             if (f is ClausePropagator && !f.allLiteralsBool(problem.numBoolVars)) deferredLevelClause = f.literals
             currentFactor = fid
             conflictLevels = null
-            if (!f.propagate(this, fid)) {
+            val propagated = try {
+                f.propagate(this, fid)
+            } catch (_: FinitePropagationInterrupted) {
+                (f as? InterruptiblePropagator)?.interrupted(this, fid)
+                propEnq(fid)
+                if (!cancelIsPause) runCancelled = true
+                conflictLevels = null
+                return null
+            }
+            if (!propagated) {
                 // The failing factor is always in the core, regardless of whether it
                 // recorded a conflict via the impl methods (some factors return false
                 // without calling pin/tighten — they just detected infeasibility from

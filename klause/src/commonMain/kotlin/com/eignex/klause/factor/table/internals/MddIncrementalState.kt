@@ -2,6 +2,7 @@ package com.eignex.klause.factor.table.internals
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.propagation.lazyReason
@@ -61,6 +62,10 @@ internal class MddIncrementalState(
     internal val layersBuilt: Boolean get() = fwdLazy.isInitialized()
     private val valid = RevInt(state, 0)
 
+    fun invalidate() {
+        valid.set(0)
+    }
+
     /** 1 while this factor's reachability is exactly the shared root snapshot and [fwd]/[bwd] therefore
      *  hold nothing of its own. Reversible alongside [valid], so a backtrack above the point where the
      *  layers were filled restores it to 1 and the stale bitsets are re-seeded before any incremental
@@ -89,8 +94,10 @@ internal class MddIncrementalState(
     private inline fun forEachState(rev: RevLongArray, layer: Int, cap: Int, action: (Int) -> Unit) {
         val base = layerBase[layer]
         for (k in 0 until layerWords[layer]) {
+            owner.checkFiniteWork()
             var word = rev[base + k]
             while (word != 0L) {
+                owner.checkFiniteWork()
                 val s = (k shl 6) + word.countTrailingZeroBits()
                 if (s < cap) action(s)
                 word = word and (word - 1)
@@ -108,6 +115,7 @@ internal class MddIncrementalState(
         val base = layerBase[layer]
         var changed = false
         for (k in 0 until layerWords[layer]) {
+            owner.checkFiniteWork()
             if (rev[base + k] != tmp[k]) {
                 rev[base + k] = tmp[k]
                 changed = true
@@ -127,6 +135,7 @@ internal class MddIncrementalState(
             var k = head[src]
             val e = head[src + 1]
             while (k < e) {
+                owner.checkFiniteWork()
                 val p = ptr[k]
                 val sym = transitions[p + 1]
                 val dst = transitions[p + 2].toInt()
@@ -151,6 +160,7 @@ internal class MddIncrementalState(
             var k = head[dst]
             val e = head[dst + 1]
             while (k < e) {
+                owner.checkFiniteWork()
                 val src = srcs[k]
                 val sym = syms[k]
                 if (sym in d && src in 0 until numI && testBit(fwd, i, src)) {
@@ -181,6 +191,7 @@ internal class MddIncrementalState(
             var k = head[dst]
             val e = head[dst + 1]
             while (k < e) {
+                owner.checkFiniteWork()
                 val src = srcs[k]
                 val sym = syms[k]
                 if (sym in d && src in 0 until numI && testBit(fwd, i, src)) {
@@ -200,6 +211,7 @@ internal class MddIncrementalState(
         if (symSpan <= 0) return false
         val maxSym = minSym + symSpan - 1
         for (i in 0 until n) {
+            owner.checkFiniteWork()
             val d = state.intDomains[seq[i]]
             if (d.min > minSym || d.max < maxSym) return false
             if (d.holeCount == 0L) continue
@@ -214,6 +226,7 @@ internal class MddIncrementalState(
     private fun excludeNonSurvivors(state: PropagationState, i: Int, survives: LongArray, ant: IntArray?): Boolean {
         val d = state.intDomains[seq[i]]
         for (s in d.min..d.max) {
+            owner.checkFiniteWork()
             val off = s - minSym
             val alive = off in 0 until symSpan &&
                 ((survives[(off ushr 6).toInt()] ushr (off and 63L).toInt()) and 1L) != 0L
@@ -227,6 +240,7 @@ internal class MddIncrementalState(
         scratch.fill(0L)
         val numN = numStatesPerLayer[n]
         for (s in accepting) {
+            owner.checkFiniteWork()
             if (s in 0 until numN && testBit(fwd, n, s)) scratch[s ushr 6] = scratch[s ushr 6] or (1L shl (s and 63))
         }
         return writeLayer(bwd, n, scratch)
@@ -242,6 +256,7 @@ internal class MddIncrementalState(
      *  transitions on it to a backward-co-reachable state. Returns false on a domain wipeout. */
     private fun prune(state: PropagationState, lo: Int, hi: Int, ant: IntArray?): Boolean {
         for (i in lo..hi) {
+            owner.checkFiniteWork()
             val d = state.intDomains[seq[i]]
             val span = d.max - d.min + 1
             if (span <= 0) continue
@@ -253,6 +268,7 @@ internal class MddIncrementalState(
                 var k = head[src]
                 val e = head[src + 1]
                 while (k < e) {
+                    owner.checkFiniteWork()
                     val p = ptr[k]
                     val sym = transitions[p + 1]
                     val dst = transitions[p + 2].toInt()
@@ -265,6 +281,7 @@ internal class MddIncrementalState(
                 }
             }
             for (s in d.min..d.max) {
+                owner.checkFiniteWork()
                 val off = s - d.min
                 if (((survives[(off ushr 6).toInt()] ushr (off and 63L).toInt()) and 1L) == 0L) {
                     if (!state.excludeIntValue(seq[i], s, reason(state, PRUNE, i, ant))) return false
@@ -284,6 +301,7 @@ internal class MddIncrementalState(
             maxCost[0][initial] = 0L
         }
         for (i in 0 until n) {
+            owner.checkFiniteWork()
             val d = state.intDomains[seq[i]]
             val numN = numStatesPerLayer[i + 1]
             val head = fwdHead[i]
@@ -294,6 +312,7 @@ internal class MddIncrementalState(
                 var k = head[src]
                 val e = head[src + 1]
                 while (k < e) {
+                    owner.checkFiniteWork()
                     val p = ptr[k]
                     val sym = transitions[p + 1]
                     val dst = transitions[p + 2].toInt()
@@ -312,6 +331,7 @@ internal class MddIncrementalState(
         var bestHi = -inf
         val numN = numStatesPerLayer[n]
         for (s in accepting) {
+            owner.checkFiniteWork()
             if (s in 0 until numN && testBit(fwd, n, s)) {
                 if (minCost[n][s] < bestLo) bestLo = minCost[n][s]
                 if (maxCost[n][s] > bestHi) bestHi = maxCost[n][s]
@@ -362,12 +382,14 @@ internal class MddIncrementalState(
     private fun computeReachability(state: PropagationState, ant: IntArray?, snapshot: Boolean): Boolean {
         val scratch = LongArray(w)
         for (k in 0 until totalWords) {
+            owner.checkFiniteWork()
             fwd[k] = 0L
             bwd[k] = 0L
         }
         scratch[initial ushr 6] = 1L shl (initial and 63)
         writeLayer(fwd, 0, scratch)
         for (i in 0 until n) {
+            owner.checkFiniteWork()
             if (layerEmpty(fwd, i)) return false
             recomputeForward(state, i, scratch)
         }
@@ -422,6 +444,7 @@ internal class MddIncrementalState(
         val f = fwd
         val b = bwd
         for (k in 0 until totalWords) {
+            owner.checkFiniteWork()
             f[k] = snap.fwd[k]
             b[k] = snap.bwd[k]
         }
@@ -432,8 +455,10 @@ internal class MddIncrementalState(
         var minD = n
         var maxD = -1
         for (i in seq.indices) {
+            owner.checkFiniteWork()
             val v = seq[i]
             for (d in dirty) {
+                owner.checkFiniteWork()
                 if (d == v) {
                     if (i < minD) minD = i
                     if (i > maxD) maxD = i
@@ -446,6 +471,7 @@ internal class MddIncrementalState(
             var lastFwdChanged = minD
             var i = minD
             while (i < n) {
+                owner.checkFiniteWork()
                 if (layerEmpty(fwd, i)) return false
                 val ch = recomputeForward(state, i, scratch)
                 if (ch) lastFwdChanged = i + 1
@@ -461,6 +487,7 @@ internal class MddIncrementalState(
             }
             var j = bwdStart
             while (j >= 0) {
+                owner.checkFiniteWork()
                 val ch = recomputeBackward(state, j, scratch)
                 if (ch) firstBwdChanged = j
                 if (j <= minD && !ch) break

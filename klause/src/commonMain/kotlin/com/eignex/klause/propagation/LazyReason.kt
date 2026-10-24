@@ -74,8 +74,15 @@ internal fun extendReason(base: IntArray?, extra: IntArray): IntArray? {
 internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
     if (!isLazyReason(reason)) return reason
     val marker = requireNotNull(reason)
-    if (lazyReasonMemo.containsKey(marker)) return lazyReasonMemo[marker]
-    val built = buildLazyReason(marker)
+    val built = try {
+        finiteWork.checkNow()
+        if (lazyReasonMemo.containsKey(marker)) return lazyReasonMemo[marker]
+        buildLazyReason(marker)
+    } catch (_: FinitePropagationInterrupted) {
+        runCancelled = true
+        return null
+    }
+    if (runCancelled) return null
     check(!isLazyReason(built)) { "a lazy reason must explain itself in literals" }
     lazyReasonMemo[marker] = built
     return built

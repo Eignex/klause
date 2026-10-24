@@ -171,11 +171,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * is max-antecedent based, so no reason literal — nor any antecedent resolved in below —
      * sits above this, keeping the asserting/backjump computation sound.)
      */
-    fun analyze(conflictFactorId: Int): AnalysisResult {
+    fun analyze(conflictFactorId: Int): AnalysisResult = boundedAnalysis {
         beginAnalysis()
         val factor = state.factorAt(conflictFactorId)
-        val seedReason = factor.conflictReason(state, conflictFactorId) ?: return AnalysisResult.NotApplicable
-        return analyzeFromSeed(seedReason, conflictLevelOf(seedReason), seedFactorId = conflictFactorId)
+        val seedReason = factor.conflictReason(state, conflictFactorId)
+            ?: return@boundedAnalysis AnalysisResult.NotApplicable
+        return@boundedAnalysis analyzeFromSeed(seedReason, conflictLevelOf(seedReason), seedFactorId = conflictFactorId)
     }
 
     /**
@@ -187,9 +188,18 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * backjumps non-chronologically. Returns [AnalysisResult.NotApplicable] when the conflict sits at
      * the root (nothing to learn) or 1UIP cannot collapse it to an asserting clause.
      */
-    fun analyzeConflictClause(conflictClause: IntArray): AnalysisResult {
+    fun analyzeConflictClause(conflictClause: IntArray): AnalysisResult = boundedAnalysis {
         beginAnalysis()
-        return analyzeFromSeed(conflictClause, conflictLevelOf(conflictClause))
+        return@boundedAnalysis analyzeFromSeed(conflictClause, conflictLevelOf(conflictClause))
+    }
+
+    private inline fun boundedAnalysis(analyze: () -> AnalysisResult): AnalysisResult = try {
+        if (state.problem.numIntVars > 0) state.finiteWork.checkNow()
+        val result = analyze()
+        if (state.runCancelled) AnalysisResult.NotApplicable else result
+    } catch (_: FinitePropagationInterrupted) {
+        state.runCancelled = true
+        AnalysisResult.NotApplicable
     }
 
     /**
@@ -235,9 +245,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * the conflict level. Holding the conflict level above the seed literals also lets the
      * minimiser resolve the decision lit away into the stronger underlying nogood.
      */
-    fun analyzeDecisionConflict(conflictedVar: Int): AnalysisResult {
+    fun analyzeDecisionConflict(conflictedVar: Int): AnalysisResult = boundedAnalysis {
         beginAnalysis()
-        val priorValue = state.boolValues[conflictedVar] ?: return AnalysisResult.NotApplicable
+        val priorValue = state.boolValues[conflictedVar] ?: return@boundedAnalysis AnalysisResult.NotApplicable
         val priorAnt = state.reasonOf(state.boolAntecedents[conflictedVar])
         // The just-attempted decision lit (currently false in state because the prior
         // pin still holds and pinBoolImpl rejected the new value).
@@ -250,7 +260,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 it[priorAnt.size] = decisionLit
             }
         }
-        return analyzeFromSeed(seed, state.currentLevel)
+        return@boundedAnalysis analyzeFromSeed(seed, state.currentLevel)
     }
 
     /**

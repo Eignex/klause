@@ -202,6 +202,15 @@ root reachability is admitted only when every position contains the whole diagra
 alphabet; a hole inside that alphabet requires private reachability. Reversible
 layers restore the filtering state across sibling branches.
 
+Table and MDD scans poll the containing invocation token every 64 primitive visits,
+or every visit for a metered token. Visits contribute to propagation work. An
+interrupted factor stays queued: Table clears its completed-sweep marker, and MDD
+invalidates private reachability before another delta can read it. Completed domain
+deductions remain sound. Root preparation can retry the queued work; interruption
+in an ordinary search fixpoint latches incompleteness and withholds model and fact
+publication. Bulk allocations and domain mutations, including atom maintenance,
+remain atomic.
+
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,
 suspension or retraction.
