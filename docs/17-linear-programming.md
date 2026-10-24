@@ -139,6 +139,7 @@ Finite optimization keeps a pinned real-leaf request across portfolio slices.
 The discrete assignment, assembled row authority, source encoding and required
 certification remain owned by that request. Numerical pauses preserve the live
 solve; a completed floating solve can wait for certification in a later slice.
+Source encoding and relaxation assembly are atomic preparation of the request.
 Neither pause consumes the discrete model or records an indeterminate region.
 Reseeding and shared objective-floor imports are deferred while completion is
 pending, and explicit rebind or close discards its numerical owners before changing
