@@ -973,7 +973,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `open numerical local search should decline before publishing a source point`() {
+    fun `unfunded numerical local search should decline before publishing a source point`() {
         val mps = File.createTempFile("mpsopenincumbent", ".mps").apply {
             writeText(
                 "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n" +
@@ -994,6 +994,8 @@ class MpsModeTest {
                         "node-limit=100",
                         "--param",
                         "max-flips=1",
+                        "--param",
+                        "source-lp-work-limit=0",
                         mps.absolutePath,
                     ),
                 ),
