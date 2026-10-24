@@ -92,6 +92,22 @@ class ParityInputRevisionTest {
     }
 
     @Test
+    fun `unrelated source factors should not rescan participating columns`() {
+        val source = Problem(4, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val inputs = ParityInputRevision(source, budget.orSpent(Cancellation.Never))
+        val before = assertNotNull(inputs.current(source))
+        val spent = budget.spent()
+        val delta = SourceDelta(addedFactors = listOf(Clause(intArrayOf(Lit.make(3, true)))))
+
+        inputs.recordDelta(source.factors, delta.droppedIndices, delta.addedFactors, deductionsChanged = false)
+        val after = inputs.current(assertNotNull(source.withSourcePassDelta(delta)))
+
+        assertEquals(before, after)
+        assertEquals(1L, budget.spent() - spent)
+    }
+
+    @Test
     fun `interrupted premise tracking should spend the shared allowance without publishing a revision`() {
         val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
         val budget = PresolveBudget(1L)

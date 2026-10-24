@@ -190,7 +190,9 @@ object Presolver {
                     invocation?.narrowedColumns = narrowed
                     // A proved range can empty a column whose declaration it intersects, which refutes the
                     // model even though the pass itself only claimed a bound.
-                    parityInputs?.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
+                    parityInputs?.recordDelta(
+                        current.factors, delta.droppedIndices, delta.addedFactors, deductionsChanged = delta.bounds != null,
+                    )
                     current = current.withSourcePassDelta(delta) ?: return@observeRoundPass PassOutcome.INFEASIBLE
                     booleanPins.record(invocation, delta.addedFactors, entrySize::isBooleanPinned)
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
