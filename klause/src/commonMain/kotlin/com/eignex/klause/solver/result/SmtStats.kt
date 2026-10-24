@@ -25,6 +25,8 @@ data class SourceLpWorkStats(
     val refinementWork: Long = 0L,
     /** Metered bound-only certificate work, excluding floating solving and source preparation. */
     val boundCertificationWork: Long = 0L,
+    /** Metered Farkas certificate work, excluding floating solving and source lifting. */
+    val conflictCertificationWork: Long = 0L,
 ) {
     /** Merge independent nonnegative deltas with saturating arithmetic. */
     fun mergedWith(other: SourceLpWorkStats): SourceLpWorkStats = SourceLpWorkStats(
@@ -37,6 +39,7 @@ data class SourceLpWorkStats(
         continuationWork + minOf(other.continuationWork, Long.MAX_VALUE - continuationWork),
         refinementWork + minOf(other.refinementWork, Long.MAX_VALUE - refinementWork),
         boundCertificationWork + minOf(other.boundCertificationWork, Long.MAX_VALUE - boundCertificationWork),
+        conflictCertificationWork + minOf(other.conflictCertificationWork, Long.MAX_VALUE - conflictCertificationWork),
     )
 }
 

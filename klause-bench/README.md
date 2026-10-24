@@ -2136,6 +2136,11 @@ are observations rather than proof authority or a retained best-bound queue.
 `numericalLpMaxRows` measures working rows and `numericalLpExtractedBoundRows`
 sums extracted rows over prepared attempts. An exhausted operation allowance can
 skip preparation, so such an attempt reports its unprepared shape.
+`numericalLpConflicts` counts source-checked LP refutations; coordinate-side
+contradictions have their separate `numericalCoordinateConflicts` counter.
+`smtSourceLpConflictCertificationWork` reports metered Farkas reconstruction,
+including refused candidates, separately from bound certification. Completed
+consultations reuse certificates without repeating their work charges.
 `numericalIncumbentDominatedSplits` counts proposed fractional splits whose checked
 bound already dominates the invocation's checked incumbent.
 `numericalIncumbentBoundClosures` counts unexpanded subtrees closed with those

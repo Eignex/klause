@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpRootGuidance
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.advanceRootGuidance
@@ -133,7 +134,12 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
                 val guidance = current.advanceRootGuidance(policy.quantum, policy.floating,
                     policy.certificate, token, observer)
                     .also {
-                        budget.observe(boundCertification = it.certificateMetrics?.work ?: 0L)
+                        val work = it.certificateMetrics?.work ?: 0L
+                        if (it.termination == LpFloatTermination.INFEASIBLE_CANDIDATE) {
+                            budget.observe(conflictCertification = work)
+                        } else {
+                            budget.observe(boundCertification = work)
+                        }
                         if (!it.paused) completed = it
                     }
                 consume(guidance, token)

@@ -531,7 +531,7 @@ class CliStatsTest {
             run = RunStats(backend = "exact-lira"),
             openTheory = OpenTheoryWorkStats(openTheoryChecks = 5),
             smt = SmtStats(sourceLp = SourceLpWorkStats(operations = 2, modeledWork = 7, floatWork = 3,
-                boundCertificationWork = 11)),
+                boundCertificationWork = 11, conflictCertificationWork = 13)),
         )
 
         val pairs = openTheoryStatPairs(stats, solveTimeMs = 0).toMap()
@@ -540,6 +540,7 @@ class CliStatsTest {
         assertEquals("7", pairs["smtSourceLpModeledWork"])
         assertEquals("3", pairs["smtSourceLpFloatWork"])
         assertEquals("11", pairs["smtSourceLpBoundCertificationWork"])
+        assertEquals("13", pairs["smtSourceLpConflictCertificationWork"])
         assertTrue("smtPrivateChecks" !in pairs)
         assertTrue("smtSimplexAttempts" !in pairs)
         assertEquals("5", pairs["smtTheoryChecks"])
