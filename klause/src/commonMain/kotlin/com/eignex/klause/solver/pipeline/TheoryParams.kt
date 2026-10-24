@@ -97,7 +97,7 @@ data class TheoryParams(
     val maxInstructions: Long? = null,
     /** Cumulative source LP preparation, numerical and certification work, including admission overhead. */
     val sourceLpWorkLimit: Long = 1_000_000_000L,
-    /** Cumulative sparse source preparation allocation in bytes. */
+    /** Cumulative sparse source preparation and modeled retained coverage allocation in bytes. */
     val sourceLpAllocationLimit: Long = 512L * 1024L * 1024L,
     /** Optional source LP operation ceiling, independent of cumulative numerical work. */
     val sourceLpOperations: Int = Int.MAX_VALUE,

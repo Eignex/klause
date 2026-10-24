@@ -267,7 +267,8 @@ allowance. Admission costs 1024 work units, including declined and resumed attem
 preparation, floating work, exact continuation, refinement and certification debit
 their measured work. Atomic phases can overspend, and the next admission pauses.
 An unfunded query keeps its pending alternative and owner; cumulative exhaustion
-ends the worker without proving exhaustion. Resuming cannot renew either ceiling.
+ends the worker without proving exhaustion. Coverage splits debit modeled storage
+for both children and their captured condition maps. Resuming cannot renew either ceiling.
 `source-lp-work-limit` defaults to one billion units and
 `source-lp-allocation-limit` to 512 MiB. `source-lp-operations` supplies an independent
 operation ceiling for controlled comparisons. Other source LP clients retain their

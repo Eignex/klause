@@ -81,6 +81,19 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `empty cumulative funding should keep an external witness without claiming completion`() {
+        val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceLpWorkLimit = 0),
+            external = { sample }).use { it.run { _, _ -> } }
+
+        assertEquals(sample, result.incumbent)
+        assertNull(result.terminal)
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
+    }
+
+    @Test
     fun `unsliced numerical execution should resume sparse guidance pauses`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(real, other), mapOf(
