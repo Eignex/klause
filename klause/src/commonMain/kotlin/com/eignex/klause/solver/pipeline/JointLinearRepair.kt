@@ -84,6 +84,10 @@ internal class JointLinearRepair(
             rootPoint = result.relaxedPoint
             requireNotNull(selection).guide(result.relaxedPoint)
             observe("jointRepairRootQueries")
+            stages["jointRepairGuidedIntegers"] = result.relaxedPoint.keys.count {
+                it.kind == SourceCoordinate.Kind.Integer
+            }.toLong()
+            if (result.relaxedPoint.isEmpty()) observe("jointRepairRootGuidanceUnavailable")
         }
         return true
     }
@@ -94,8 +98,14 @@ internal class JointLinearRepair(
         var value = rootPoint?.get(coordinate)?.takeIf { it.isFinite() }?.let { BigFraction.ofDouble(round(it)) }
             ?: BigFraction.ZERO
         val bounds = model.intBounds
-        if (bounds.hasLower(index)) value = maxOf(value, BigFraction.ofLong(bounds.lower(index)))
-        if (bounds.hasUpper(index)) value = minOf(value, BigFraction.ofLong(bounds.upper(index)))
+        if (bounds.hasLower(index)) {
+            val lower = BigFraction.ofLong(bounds.lower(index))
+            if (value < lower) value = lower
+        }
+        if (bounds.hasUpper(index)) {
+            val upper = BigFraction.ofLong(bounds.upper(index))
+            if (value > upper) value = upper
+        }
         return value
     }
 

@@ -16,9 +16,9 @@ import kotlin.test.assertNull
 class JointRepairNeighborhoodTest {
     @Test
     fun `repair should free related integers through a real bridge and retain unrelated pins`() {
-        val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val source = SourceProofContext(SourceScope(SourceRevision("bridge", "exact")), setOf(x, y, z, real),
             mapOf("x-real" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, real to BigFraction.ONE),
@@ -31,7 +31,7 @@ class JointRepairNeighborhoodTest {
         val condition = repair.propose(List(4) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
             BigFraction.ONE, BigFraction.ONE)
 
-        assertEquals(mapOf(2 to BigFraction.ZERO), condition.lower)
+        assertEquals(mapOf(0 to BigFraction.ZERO), condition.lower)
         assertEquals(condition.lower, condition.upper)
         assertEquals(BigFraction.ONE, condition.cutoff)
         assertEquals(2L, repair.selectedIntegers)
