@@ -1407,6 +1407,20 @@ numerical ownership.
 
 ### Numerical kernel decisions
 
+[Owned-scatter controls 7989](https://lab.eignex.com/jobs/7989) and
+[7990](https://lab.eignex.com/jobs/7990) compare complete cold/retained numerical
+lifecycles on the same captured dsbmip and cap64 residuals at 120 million work units.
+With debug statistics disabled on Mac/aarch64, three measured JFR rounds reduce
+dsbmip median cold/retained lifecycle from 131.1/120.1 to 119.7/110.4 ms and
+cap64 from 140.9/139.8 to 130.5/128.7 ms. Pivot counts, charged work and exact
+result packages match. Separate observed rounds retain equal factor-slice samples
+and source-matrix residuals; the broader four-residual controls
+[7976](https://lab.eignex.com/jobs/7976), [7977](https://lab.eignex.com/jobs/7977),
+[7984](https://lab.eignex.com/jobs/7984) and [7985](https://lab.eignex.com/jobs/7985)
+also preserve them, with sampled relative residual at most 8.2e-14. These captures
+measure the fused basis traversal, including updates and cleanup; they establish
+no ordinary whole-source speedup or source proof.
+
 [Session replay 7872](https://lab.eignex.com/jobs/7872) compares cumulative-work
 rebuilds on identical MPS residuals. Disabling that trigger reduces cap64's median
 two-cold-query lifecycle from 1.623 s to 0.793 s, retaining its native feasible
