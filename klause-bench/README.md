@@ -1310,6 +1310,20 @@ has different sliced paths and modest overhead; Regular preserves its work.
 These controls establish neither a deadline-tail fix nor a throughput gain for
 publication alone. Atomic hole-history and atom maintenance remain separate work.
 
+Retain pending history/atom completion and retraction of interrupted decision
+cascades. [8071](https://lab.eignex.com/jobs/8071) pairs merged parent `65796c1808`
+with core `4337423bcf` using the same two-arm, 2-second/20-second controls. All 60
+commands return, and all 18 reported witnesses pass source checks with matching
+source hashes, runtime, options and non-solver dependencies. WordSquare remains
+unknown with two nodes at 20 seconds: elapsed ranges are 21.02–21.15 s for the
+parent and 20.58–21.19 s for the candidate, establishing no consistent tail gain.
+Eternity reports 2001 nodes with different failure paths and 3.75–3.85 s instead
+of 3.53–3.54 s. Table Nonogram reaches 814 instead of 922 nodes but takes
+1.98–2.07 s instead of 1.86–1.90 s; both 2-second arms remain unknown. Regular
+keeps similar timing with slightly different sliced paths. Native atom visits
+also change the work charged to slices. These are bounded-execution and authority
+changes with measured cost, not a throughput or hard-source recovery gain.
+
 Retain shared sparse/dense ground support postings for historical reasons.
 [8029](https://lab.eignex.com/jobs/8029) compares `3e8ac3841` with `b7547b3f50` on
 Mac/aarch64: one conflictDriven CP arm, LP off, 2000 nodes, 20 seconds, seed 3,
