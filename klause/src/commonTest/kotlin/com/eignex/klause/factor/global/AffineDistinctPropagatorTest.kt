@@ -94,6 +94,36 @@ class AffineDistinctPropagatorTest {
     }
 
     @Test
+    fun `historical Hall reasons should ignore later holes in a source operand`() {
+        val factor = Distinct(listOf(0L, 1L, -1L, 0L).mapIndexed { i, offset ->
+            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
+        })
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 4) }, arrayOf(factor))
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        state.tightenIntMin(0, 1)
+        state.tightenIntMax(0, 3)
+        state.tightenIntMax(1, 2)
+        state.tightenIntMin(2, 2)
+        state.currentFactor = 0
+        assertTrue(state.factorAt(0).propagate(state, 0))
+        val recorded = state.holeReasonFor(3, 2)
+        state.currentFactor = -1
+        state.currentLevel = 2
+        state.excludeIntValue(0, 2)
+        state.tightenIntMax(1, 1)
+
+        val cited = requireNotNull(state.reasonOf(recorded)).map { lit ->
+            val atom = Lit.variable(lit)
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }.toSet()
+
+        assertEquals(setOf(Triple(0, AtomKind.GE, 1L), Triple(0, AtomKind.LE, 3L),
+            Triple(1, AtomKind.LE, 2L), Triple(2, AtomKind.GE, 2L)), cited)
+    }
+
+    @Test
     fun `affine Hall reasons should imply each removed source value`() {
         val factor = Distinct(listOf(0L, 1L, -1L).mapIndexed { i, offset ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
