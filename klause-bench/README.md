@@ -2225,6 +2225,27 @@ are rechecked together before an optimum can be reported.
 units; it does not certify the feasible set enlarged by a positive tolerance.
 Independent source witness validation remains separate from solver proof claims.
 
+`param.source-lp-work-limit` and `param.source-lp-allocation-limit` fund retained
+numerical traversal and joint repair cumulatively. Grants preserve their spent
+work, sparse preparation and retained-coverage allocation. The independent
+`param.source-lp-operations=256` ceiling supplies a fixed-count control.
+
+The completed bell3a pairs in [8131](https://lab.eignex.com/jobs/8131) compare those
+policies on the same pre-cut revision `2013ac4ec4`, original source hash, runtime,
+dependencies and Linux/amd64 c7i.2xlarge spot host. They use exact semantics, P1,
+ten seconds, presolve off, debug capture, seeds 1/2/3, one billion numerical work
+units and 512 MiB of cumulative sparse/coverage allocation. The frontier expands
+from 399 checked nodes and 57 checked LP conflicts to 2449–2600 nodes and 453–485
+conflicts. Closed leaves rise from 119 to 680–728; pending alternatives also rise
+from 81 to 1088–1143 as the tree grows. No frontier witness or terminal appears.
+
+Funded work rises from 58.1 million to 354.5–374.1 million units. Median physical
+whole-CLI wall time rises from 2.20 to 10.15 seconds and peak RSS from 196,808 to
+240,036 KiB. Joint LS and ALNS also continue beyond 256 operations when that ceiling
+binds. These pairs support retained useful work at higher cost, with unresolved
+coverage still present; they establish no general speedup or independently checked
+proof. The wider corpus and standalone/companion controls remain separate evidence.
+
 The scalar session [qualification 8040](https://lab.eignex.com/jobs/8040) compares
 cold `3e8ac384` with retained `6aef3fdd` and an automatic finite control over
 opt1217, p0201, gr4x6, flugpl, p0033, enigma, enlight4 and flugplinf. Each has
