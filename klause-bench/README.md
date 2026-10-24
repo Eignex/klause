@@ -2084,6 +2084,68 @@ allowance. This comparison supports preparation reuse with complete source
 coverage, alongside higher retained memory and no observed wall-time improvement;
 it does not measure the sparse bound-ordered consumer.
 
+The complete-worker [comparison 8067](https://lab.eignex.com/jobs/8067) freezes
+`6b3e0df4` after the work-accounting correction. It compares automatic finite,
+numerical depth-first and sparse frontier modes, default/exact separately, on the
+same eight controls plus held-out bell3a, bell5, egout and l152lav. P1, 10 seconds,
+seed 3 repeated three times, presolve off and debug on give 216 cases. All share
+original source hashes, Mac/aarch64 runtime, JVM options and non-solver dependencies;
+all 66 reported final witnesses pass solchecker, and all 216 CLI processes exit
+successfully. Default/exact retain the same nominal outcomes in all three repeats.
+An earlier [comparison 8057](https://lab.eignex.com/jobs/8057) exposed six l152lav
+failures at a single-shot quantum pause. All six corrected frontier runs resume
+that pause, retaining one preparation and a checked bound near 4656.36 across
+20–22 checks on 1,989 columns. Neither control has a point on this source; the
+numerical control declines after one check.
+
+This is a whole-worker comparison, including sparse guidance and its allowances.
+The frontier supplies checked global bounds on opt1217, p0201 and enigma where the
+numerical control declines. On p0033 it raises the bound from about 2520.57 to
+2844.65 but loses the control's incumbent 3447; finite proves 3089. On flugpl the
+bound rises from about 1,167,185.73 to 1,183,174.78, with neither numerical mode
+finding a point. Finite proves 1,201,500 and refutes enlight4 and flugplinf, while
+both numerical modes leave those infeasible sources unresolved.
+
+On gr4x6 all modes prove 202.35. Frontier closes 33 leaves in 45 checks and 48 LP
+operations, against 54 leaves in 107 checks/operations for numerical depth-first.
+Both have zero pending alternatives. Frontier makes one preparation and 47 reuses,
+with 20 inherited-bound closures. Its floating work is 2,070,457 versus 3,115,546;
+bound-only certification separately spends 603,409 work units. Instrumented
+[capture 8068](https://lab.eignex.com/jobs/8068) checks a root bound of 185.55,
+then global bounds 197.6, 2827/14 and 202.35 at checks 23, 40 and 45. Its incumbents
+206.5 and 202.35 arrive at checks 28 and 36. [Depth-first 8059](https://lab.eignex.com/jobs/8059)
+finds six incumbents at checks 18 through 82 and proves the last one at check 107.
+The earlier [frontier 8058](https://lab.eignex.com/jobs/8058) has no root bound,
+179 certificate-phase consultations and 104 unresolved alternatives. Reusing the
+bounded dual reconstruction schedule makes those checked bounds available to the
+same frontier; the queue alone supplies no proof.
+
+Held-out bell3a, bell5 and egout advance from one declined numerical check to
+403, 453 and 329 frontier checks, with one preparation each. They retain 166, 180
+and 163 pending alternatives and have no frontier incumbent. Egout has a checked
+bound near 150.97; bell3a and bell5 have no global bound. Finite finds points on
+bell3a and egout. Physical whole-CLI medians show the
+cost and outcome tradeoffs; timings with different completion or witness results
+do not establish a speed ranking:
+
+| Source / arm | Numerical wall (s) | Frontier wall (s) | Numerical peak RSS (KiB) | Frontier peak RSS (KiB) |
+| --- | ---: | ---: | ---: | ---: |
+| gr4x6 default | 0.76 | 0.47 | 231,856 | 213,536 |
+| gr4x6 exact | 0.75 | 0.48 | 236,736 | 216,944 |
+| p0033 default | 0.66 | 0.59 | 238,448 | 223,968 |
+| p0033 exact | 0.67 | 0.60 | 232,736 | 236,704 |
+| l152lav default | 0.41 | 10.10 | 210,240 | 354,016 |
+| l152lav exact | 0.39 | 10.10 | 208,928 | 361,408 |
+
+Operation counts include small exact fallback consultations; bound-only
+certification itself stays inside its retained operation. The supported foundation
+is source-session reuse, resumable wide guidance and consumed complete frontier
+coverage, with a gr4x6 proof/cost improvement and weaker feasibility progress on
+p0033 and the held-outs. Incumbent integration under
+[#3514](https://github.com/Eignex/klause/issues/3514) and checked scoped LP refutations
+under [#3533](https://github.com/Eignex/klause/issues/3533) are the next integration
+steps. Native optimum/refutation claims have no independent proof certificate here.
+
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
 invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.
