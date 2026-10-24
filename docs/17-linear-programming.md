@@ -110,7 +110,8 @@ count, and root and node separation keep their round, depth, pool and work
 allowances. The [portfolio](12-portfolio.md#lp-arm-admission) decides when
 an aggressive LP companion runs.
 
-Sparse source guidance consumes single-row Chvatal–Gomory rounding. The adapter
+Explicit bound-ordered sparse frontiers consume single-row Chvatal–Gomory rounding.
+Other guidance calls can opt in through the adapter. The adapter
 normalizes an integer-only source activity by its exact rational coefficient gcd
 and retains a cut only when rounding tightens its right side. Continuous activity
 declines. Preparation visits at most 65,536 modeled row/support operations with
