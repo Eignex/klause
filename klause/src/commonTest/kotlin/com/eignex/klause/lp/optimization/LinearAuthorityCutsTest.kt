@@ -19,6 +19,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -29,6 +30,21 @@ class LinearAuthorityCutsTest {
     private val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
     private val scope = SourceScope(SourceRevision("rounding", "exact-affine"),
         objective = SourceObjective("sum", ObjectiveSense.MINIMIZE))
+
+    @Test
+    fun `an unverified cut should withhold unconditional row layout admission`() {
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ), emptyMap())
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+
+        val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+            maximumCutProofSteps = 1))
+
+        assertTrue(1 in query.inactive)
+        assertFalse(query.unconditionalRows)
+    }
 
     @Test
     fun `rational row normalization should retain a checked rounding derivation`() {

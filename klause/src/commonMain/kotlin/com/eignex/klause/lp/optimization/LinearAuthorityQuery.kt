@@ -43,6 +43,7 @@ internal class LinearAuthorityQuery private constructor(
     companion object {
         fun prepare(
             source: SourceProofContext, template: LinearAuthorityTemplate?, cancellation: Cancellation,
+            maximumCutProofSteps: Int = 100_000,
             onCutWork: (Long) -> Unit = {},
         ): LinearAuthorityQuery? {
             val coordinates = template?.coordinates ?: source.numericCoordinates()
@@ -68,7 +69,7 @@ internal class LinearAuthorityQuery private constructor(
             }
             var activeCuts = 0
             var cutVerificationWork = 0L
-            val verifier = SourceEvidenceVerifier(numeric.atScope(source.scope))
+            val verifier = SourceEvidenceVerifier(numeric.atScope(source.scope), maximumSteps = maximumCutProofSteps)
             val cuts = template?.cuts?.rows.orEmpty()
             val active = cuts.filter { it.owner !in inactive }
             val checks = verifier.verifyAll(active.map {
@@ -97,7 +98,7 @@ internal class LinearAuthorityQuery private constructor(
             val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
-            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional,
+            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional && inactive.isEmpty(),
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts)
         }
     }
