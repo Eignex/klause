@@ -110,6 +110,19 @@ count, and root and node separation keep their round, depth, pool and work
 allowances. The [portfolio](12-portfolio.md#lp-arm-admission) decides when
 an aggressive LP companion runs.
 
+Sparse source guidance consumes single-row Chvatal–Gomory rounding. The adapter
+normalizes an integer-only source activity by its exact rational coefficient gcd
+and retains a cut only when rounding tightens its right side. Continuous activity
+declines. Preparation visits at most 65,536 modeled row/support operations with
+4,096-bit input and denominator limits. Cut definitions and source-row ownership
+stay in the retained template, ahead of changing invocation-bound rows. Every
+query rechecks active cuts against the exact numeric source context; inactive
+Boolean guards or integer pins disable the owner and its cuts together. Retraction
+restores those activation masks. LP certificates cite the nested source rounding
+derivation, and final source checking repeats Boolean substitution independently.
+Preparation and proof traversal have separate work observations. Separation and
+proof policy belong to the adapter, outside `lp.engine`.
+
 ### Root preparation
 
 Finite satisfaction and optimization share root hull pruning and cut harvesting;

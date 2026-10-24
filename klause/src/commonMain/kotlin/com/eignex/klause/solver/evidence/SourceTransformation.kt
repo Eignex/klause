@@ -196,6 +196,7 @@ class SourceTransformationVerifier(
             is SourceDerivation.BooleanSplit -> listOf(derivation.whenFalse, derivation.whenTrue)
             is SourceDerivation.IntegerSplit -> listOf(derivation.below, derivation.above)
             is SourceDerivation.Combination -> derivation.terms.map { it.derivation }
+            is SourceDerivation.IntegerRounding -> listOf(derivation.inequality)
             is SourceDerivation.Import -> listOf(derivation.evidence.derivation)
             is SourceDerivation.Discharge -> listOf(derivation.refutation.derivation)
             is SourceDerivation.Optimum -> listOf(derivation.witness, derivation.bound)

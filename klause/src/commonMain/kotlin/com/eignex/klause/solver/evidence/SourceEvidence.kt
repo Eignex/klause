@@ -126,6 +126,11 @@ sealed interface SourceDerivation {
         /** Whether to cite its upper or lower invocation bound. */
         val upper: Boolean,
     ) : SourceDerivation
+    /** Round the right side of an inequality whose activity is integral. */
+    data class IntegerRounding(
+        /** Exact inequality with integral coefficients over declared integer coordinates. */
+        val inequality: SourceDerivation,
+    ) : SourceDerivation
     /** A nonnegative exact combination of inequalities. */
     class Combination(terms: List<Term>) : SourceDerivation {
         private val captured = terms.toList()

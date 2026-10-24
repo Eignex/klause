@@ -39,6 +39,11 @@ in original objective units and direction; refutations must derive an exact
 contradiction. A branch flag, traversal exhaustion or engine identity supplies no
 authority.
 
+`IntegerRounding` first checks its cited inequality, then requires integral
+coefficients over declared integer coordinates. It rounds a closed right side
+down, or a strict right side to `ceil(rhs) - 1`. Source guards and integer pins
+remain premises of the nested derivation; rounding cannot establish them.
+
 `SourceSemanticsChecker` owns complete exact witness and recession checks for the
 declared source language and declines unsupported semantics.
 `LinearSourceSemanticsChecker` handles a source made entirely of affine premises and
