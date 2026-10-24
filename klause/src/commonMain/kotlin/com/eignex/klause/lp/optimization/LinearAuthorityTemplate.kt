@@ -10,6 +10,7 @@ internal class LinearAuthorityTemplate private constructor(
     private val source: SourceProofContext,
     val numeric: SourceProofContext,
     val coordinates: List<SourceCoordinate>,
+    val indices: Map<SourceCoordinate, Int>,
     val rows: List<ExactRationalInequality>,
 ) {
     fun matches(other: SourceProofContext): Boolean = source.scope.revision == other.scope.revision &&
@@ -28,7 +29,7 @@ internal class LinearAuthorityTemplate private constructor(
                 if (cancellation()) return null
                 rows += premise.inequality.row(indices)
             }
-            return LinearAuthorityTemplate(source, numeric, coordinates, rows)
+            return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows)
         }
     }
 }
