@@ -11,8 +11,14 @@ import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.lp.optimization.LinearPinnedObjective
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -35,20 +41,30 @@ import kotlinx.serialization.json.put
 internal object MpsSparseRoot {
     private const val LP = "com.eignex.klause.lp."
     private const val ENGINE = LP + "engine."
-    private val policy = Class.forName(LP + "SparseSourceLpPolicy").getConstructor().newInstance()
+    private val defaultPolicy = Class.forName(LP + "SparseSourceLpPolicy").getConstructor().newInstance()
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1 && args.single().startsWith("batch64="))
+        require(args.size in 1..2 && args[0].startsWith("batch64="))
+        val layouts = when (args.getOrNull(1)) {
+            null, "layout=identity" -> listOf("IDENTITY")
+            "layout=equalities" -> listOf("UNCONDITIONAL_EQUALITIES")
+            "layout=compare" -> listOf("IDENTITY", "UNCONDITIONAL_EQUALITIES")
+            else -> error("unsupported sparse root layout")
+        }
         val requests = Json.decodeFromString<List<List<String>>>(
-            Base64.getDecoder().decode(args.single().substringAfter('=')).decodeToString())
+            Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString())
         require(requests.size in 1..16)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
-        requests.forEachIndexed { index, request -> inspect(request, out.resolve("$index").apply { mkdirs() }) }
+        requests.forEachIndexed { index, request ->
+            layouts.forEach { layout ->
+                inspect(request, out.resolve("$index/$layout").apply { mkdirs() }, layout)
+            }
+        }
     }
 
-    private fun inspect(request: List<String>, out: File) {
+    private fun inspect(request: List<String>, out: File, layout: String) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val selected = Catalog.uncapped(options.getValue("suite")).problems
@@ -93,14 +109,20 @@ internal object MpsSparseRoot {
         val workingRows = call(packed, "getRows") as List<*>
         val columns = call(packed, "getColumns") as List<*>
         val sparseType = Class.forName(LP + "SparseSourceLp")
-        val limits = checkNotNull(call(policy, "getPreparation"))
+        val rowPolicy = Class.forName(LP + "SparseSourceLpRowPolicy").enumConstants.single {
+            it.toString() == layout
+        }
+        val policy = defaultPolicy.javaClass.constructors.single { it.parameterCount == 5 }.newInstance(
+            call(defaultPolicy, "getPreparation"), call(defaultPolicy, "getFloating"),
+            call(defaultPolicy, "getQuantum"), call(defaultPolicy, "getCertificate"), rowPolicy,
+        )
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         bean.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
         val started = System.nanoTime()
         val allocated = bean.getThreadAllocatedBytes(thread)
         val preparation = checkNotNull(call(sparseType.getField("Companion").get(null), "prepare",
-            workingRows, columns, costs, context.objectiveConstant * sign, limits, stop))
+            workingRows, columns, costs, context.objectiveConstant * sign, policy, stop))
         val prepareNs = System.nanoTime() - started
         val prepareBytes = bean.getThreadAllocatedBytes(thread) - allocated
         val prepared = call(preparation, "getPrepared")
@@ -112,6 +134,7 @@ internal object MpsSparseRoot {
             put("sourceTolerance", source.semantics.effective.feasibilityTolerance.toString())
             put("inputRows", rows.size)
             put("workingRows", workingRows.size)
+            put("emittedRows", prepared?.let { call(it, "getEmittedRowCount") } as Int?)
             put("columns", columns.size)
             put("preparation", NumericalResidualProfile.json(call(preparation, "getMetrics")))
             put("preparationDecline", call(preparation, "getDecline")?.toString())
@@ -127,10 +150,55 @@ internal object MpsSparseRoot {
         }
         out.resolve("preparation.json").writeText(report.toString() + "\n")
         println(report)
-        if (prepared != null && !stop()) run(checkNotNull(call(prepared, "getModel")), out, bean, thread)
+        if (prepared != null && !stop()) {
+            run(checkNotNull(call(prepared, "getModel")), out, bean, thread, policy) { guide ->
+                val bound = call(guide, "getBound") ?: return@run buildJsonObject { put("available", false) }
+                val startedLift = System.nanoTime()
+                val beforeLift = bean.getThreadAllocatedBytes(thread)
+                val check = checkBound(bound, prepared, packed, context, costs, sign)
+                buildJsonObject {
+                    put("available", true)
+                    put("check", check)
+                    put("elapsedNs", System.nanoTime() - startedLift)
+                    put("threadBytes", bean.getThreadAllocatedBytes(thread) - beforeLift)
+                }
+            }
+        }
     }
 
-    private fun run(model: Any, out: File, bean: ThreadMXBean, thread: Long) {
+    @Suppress("UNCHECKED_CAST")
+    private fun checkBound(
+        bound: Any,
+        prepared: Any,
+        packed: Any,
+        context: SourceProofContext,
+        costs: List<BigFraction>,
+        sign: BigFraction,
+    ): String {
+        val stop = Cancellation.after(10.seconds)
+        val duals = call(bound, "getDualMultipliers") as List<BigFraction>? ?: return "NO_MULTIPLIERS"
+        val weights = call(prepared, "sourceRowWeights", duals.map { it.negated() }, stop) as List<BigFraction>?
+            ?: return "ROW_LIFT_DECLINED"
+        val original = call(packed, "lift", weights, costs.map { it.negated() }, stop) as List<BigFraction>?
+            ?: return "SOURCE_LIFT_DECLINED"
+        val ids = context.premises.keys.toList()
+        require(original.size == ids.size)
+        val derivation = SourceDerivation.Combination(original.mapIndexedNotNull { id, weight ->
+            if (weight.isZero) null else SourceDerivation.Combination.Term(weight, SourceDerivation.Premise(ids[id]))
+        })
+        val value = call(bound, "getValue") as BigFraction
+        return SourceEvidenceVerifier(context.withLinearAuthority()).verify(SourceEvidence(context.scope,
+            SourceClaim.Bound(value * sign), LinearPinnedObjective(derivation)), stop).toString()
+    }
+
+    private fun run(
+        model: Any,
+        out: File,
+        bean: ThreadMXBean,
+        thread: Long,
+        policy: Any,
+        checkBound: (Any) -> kotlinx.serialization.json.JsonObject,
+    ) {
         val stop = Cancellation.after(10.seconds)
         val trail = Class.forName(ENGINE + "LpBoundTrail").constructors.single {
             it.parameterCount == 1 && it.parameterTypes.single().isInstance(model)
@@ -173,6 +241,7 @@ internal object MpsSparseRoot {
                         put("heuristicCoordinates", point?.size ?: 0)
                         put("checkedNativeBound", call(guide, "getBound")?.let { call(it, "getValue").toString() })
                         put("certificate", NumericalResidualProfile.json(call(guide, "getCertificateMetrics")))
+                        put("nativeSourceBound", checkBound(guide))
                         put("maxLuFill", observations?.let { call(it, "getMaxLuFill") } as Double?)
                         put("maxLuDensity", observations?.let { call(it, "getMaxLuDensity") } as Double?)
                         put("numericalProgress", NumericalResidualProfile.json(numerical?.let {

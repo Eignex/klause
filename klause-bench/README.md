@@ -1095,6 +1095,14 @@ captures qualify the internal source-root mechanism; they do not establish sourc
 witnesses, configured-tolerance verdicts, physical RSS or end-to-end speedups.
 Ordinary finite and source admission remain independent of this diagnostic policy.
 
+Add `layout=compare` for identity and unconditional-equality layouts on the same
+hash-pinned requests and resource policy. `layout=equalities` selects the latter
+alone. Pairing changes emitted rows and support, not source inequalities or their
+scope; guarded and pinned templates are excluded. Reports retain emitted shape,
+floating progress, factor fill, certificate work and the separate cost/outcome of
+lifting the bound through the existing native source-evidence verifier. This native
+source check remains separate from an independent MPS witness or proof check.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing

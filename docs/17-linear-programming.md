@@ -152,6 +152,13 @@ A changed scoped query spends a fresh operation and can reuse the prepared matri
 without reserving its construction again. `SparseSourceLpPolicy` carries the
 preparation, floating, consultation and certificate allowances together.
 
+Identity row layouts are the default. An explicit unconditional-equality policy
+combines adjacent closed, exactly opposing inequalities into one row with a fixed
+logical column. The emitted multiplier's sign selects the original inequality when
+lifting row weights. Conditional templates retain their identity layout even when
+their guards currently hold: a later sibling can retract either side. Source
+lifting and ordinary evidence checking still decide whether the bound is usable.
+
 The scoped root-guidance operation advances the existing floating cursor under
 finite cumulative and per-consultation work limits. Pauses publish no coordinates
 or proofs. A completed point remains heuristic even when bound certification declines.
