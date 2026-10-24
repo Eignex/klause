@@ -1189,6 +1189,7 @@ class PropagationState private constructor(
         maxFires: Int = Int.MAX_VALUE,
         cancelIsPause: Boolean = false,
     ): IntArray? {
+        if (runCancelled) return null
         var fireCount = 0
         val completingMutation = pendingFiniteMutation != null
         try {
@@ -1199,6 +1200,7 @@ class PropagationState private constructor(
         }
         if (completingMutation) drainDirtyIntoQueue(atomFactorCap = Int.MAX_VALUE)
         while (propQueue.isNotEmpty()) {
+            if (runCancelled) return null
             if (maxFires != Int.MAX_VALUE && fireCount >= maxFires) return null
             // Only a single fixpoint that itself runs away — an O(span) reified-linear bound crawl
             // over a Long-wide domain, millions of fires deep — needs the deadline *inside*
@@ -1235,6 +1237,10 @@ class PropagationState private constructor(
                 return null
             } finally {
                 finiteMutationInterruptible = false
+            }
+            if (runCancelled) {
+                propEnq(fid)
+                return null
             }
             if (!propagated) {
                 // The failing factor is always in the core, regardless of whether it
