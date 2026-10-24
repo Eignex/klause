@@ -13,6 +13,7 @@ internal class LpRootGuidance(
     val certificateMetrics: ReconstructionMetrics? = null,
     val maxLuFill: Double? = null,
     val maxLuDensity: Double? = null,
+    val optimalCandidate: Boolean = false,
 ) {
     private val values = primal?.copyOf()
     val primal: DoubleArray? get() = values?.copyOf()
@@ -41,7 +42,11 @@ internal fun LpScopedSolver.advanceRootGuidance(
     )
     if (token()) return LpRootGuidance(null, null, LpRootGuidancePhase.CERTIFICATE, false,
         lastFloatTermination, checked.metrics)
-    return LpRootGuidance(point, checked.bound,
-        if (checked.bound == null) LpRootGuidancePhase.CERTIFICATE else LpRootGuidancePhase.COMPLETE,
-        false, lastFloatTermination, checked.metrics, result.luMaxFill, result.luMaxDensity)
+    val phase = when {
+        !result.optimal -> LpRootGuidancePhase.FLOAT
+        checked.bound == null -> LpRootGuidancePhase.CERTIFICATE
+        else -> LpRootGuidancePhase.COMPLETE
+    }
+    return LpRootGuidance(point, checked.bound, phase, false, lastFloatTermination,
+        checked.metrics, result.luMaxFill, result.luMaxDensity, result.optimal)
 }

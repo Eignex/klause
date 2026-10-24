@@ -144,6 +144,24 @@ class SparseSourceLpTest {
         assertNull(budget.resumeSparse(admission, Cancellation.Never) { _, _ -> true })
     }
 
+    @Test
+    fun `changed sparse consultations should spend operations without repeating matrix reservations`() {
+        val budget = SourceLpBudget(maxOperations = 2)
+        val initial = assertNotNull(budget.admitSparse(Cancellation.Never) { prepare(emptyList(), limits) })
+        val reservedWork = budget.reservedWork
+        val reservedAllocation = budget.reservedAllocation
+        val preparationWork = budget.measuredPreparationWork
+
+        val next = assertNotNull(budget.admitSparse(initial.prepared, Cancellation.Never))
+
+        assertSame(initial.prepared, next.prepared)
+        assertEquals(2, budget.operations)
+        assertEquals(reservedWork + 1024L, budget.reservedWork)
+        assertEquals(reservedAllocation, budget.reservedAllocation)
+        assertEquals(preparationWork, budget.measuredPreparationWork)
+        assertNull(budget.admitSparse(next.prepared, Cancellation.Never))
+    }
+
     private fun prepare(
         rows: List<ExactRationalInequality>,
         allowance: SparseSourceLpLimits,

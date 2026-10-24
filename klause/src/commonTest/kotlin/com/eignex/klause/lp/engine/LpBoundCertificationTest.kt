@@ -24,9 +24,10 @@ class LpBoundCertificationTest {
     @Test
     fun `unsupported slack multiplier should weaken the bound instead of supplying authority`() {
         val result = certifyLpBoundOnly(model(), doubleArrayOf(1.0), ReconstructionLimits())
+        val bound = assertNotNull(result.bound)
 
-        assertEquals(BigFraction.ofLong(-10L), assertNotNull(result.bound).value)
-        assertEquals(listOf(BigFraction.ZERO), result.bound?.dualMultipliers)
+        assertEquals(BigFraction.ofLong(-10L), bound.value)
+        assertEquals(listOf(BigFraction.ZERO), bound.dualMultipliers)
     }
 
     @Test

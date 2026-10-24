@@ -35,9 +35,7 @@ import kotlinx.serialization.json.put
 internal object MpsSparseRoot {
     private const val LP = "com.eignex.klause.lp."
     private const val ENGINE = LP + "engine."
-    private const val FLOAT_WORK = 150_000_000L
-    private const val PREPARATION_WORK = 2_000_000L
-    private const val ALLOCATION = 64L * 1024L * 1024L
+    private val policy = Class.forName(LP + "SparseSourceLpPolicy").getConstructor().newInstance()
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -89,8 +87,7 @@ internal object MpsSparseRoot {
         val workingRows = call(packed, "getRows") as List<*>
         val columns = call(packed, "getColumns") as List<*>
         val sparseType = Class.forName(LP + "SparseSourceLp")
-        val limits = Class.forName(LP + "SparseSourceLpLimits").constructors.single { it.parameterCount == 3 }
-            .newInstance(PREPARATION_WORK, ALLOCATION, 4096)
+        val limits = checkNotNull(call(policy, "getPreparation"))
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         bean.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
@@ -113,9 +110,7 @@ internal object MpsSparseRoot {
             put("preparationDecline", call(preparation, "getDecline")?.toString())
             put("prepareNs", prepareNs)
             put("prepareThreadBytes", prepareBytes)
-            put("preparationWorkLimit", PREPARATION_WORK)
-            put("preparationAllocationLimit", ALLOCATION)
-            put("floatWorkLimit", FLOAT_WORK)
+            put("policy", NumericalResidualProfile.json(policy))
             put("sourceVerdictClaim", false)
             put("independentWitnessCheck", false)
             put("javaVersion", System.getProperty("java.version"))
@@ -135,12 +130,11 @@ internal object MpsSparseRoot {
         val context = Class.forName(ENGINE + "LpSolveContext").getConstructor().newInstance()
         val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 2 }
             .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L)
+        val allowance = checkNotNull(call(policy, "getFloating"))
         val owner = Class.forName(ENGINE + "LpScopedSolver").constructors.single { it.parameterCount == 9 }
-            .newInstance(call(trail, "getState"), stop, context, 50, 1024, FLOAT_WORK, false, Int.MAX_VALUE, pricing)
-        val allowance = Class.forName(ENGINE + "LpFloatAllowance").constructors.single { it.parameterCount == 2 }
-            .newInstance(FLOAT_WORK, 1024)
-        val limits = Class.forName(ENGINE + "ReconstructionLimits").constructors.single { it.parameterCount == 6 }
-            .newInstance(Int.MAX_VALUE, Int.MAX_VALUE, 4096, PREPARATION_WORK, ALLOCATION, 1)
+            .newInstance(call(trail, "getState"), stop, context, 50, call(allowance, "getIterations"),
+                call(allowance, "getWork"), false, Int.MAX_VALUE, pricing)
+        val limits = checkNotNull(call(policy, "getCertificate"))
         val advance = Class.forName(ENGINE + "LpRootGuidanceKt").methods.single {
             it.name == "advanceRootGuidance" && it.parameterCount == 7
         }
@@ -150,11 +144,13 @@ internal object MpsSparseRoot {
                 do {
                     val started = System.nanoTime()
                     val bytes = bean.getThreadAllocatedBytes(thread)
-                    val guide = advance.invoke(null, owner, 20_000_000L, allowance, limits, stop, null,
+                    val guide = advance.invoke(null, owner, call(policy, "getQuantum"), allowance, limits, stop, null,
                         call(context, "getCertificationPolicy"))
                     val elapsed = System.nanoTime() - started
                     val allocation = bean.getThreadAllocatedBytes(thread) - bytes
                     val point = call(guide, "getPrimal") as DoubleArray?
+                    val numerical = NumericalFrontierSnapshot.field(owner, "solver")
+                    val observations = numerical?.let { NumericalFrontierSnapshot.field(it, "observations") }
                     point?.let { out.resolve("heuristic-primal.json")
                         .writeText(JsonArray(it.map(::JsonPrimitive)).toString() + "\n") }
                     val report = buildJsonObject {
@@ -164,11 +160,15 @@ internal object MpsSparseRoot {
                         put("phase", call(guide, "getPhase").toString())
                         put("paused", call(guide, "getPaused") as Boolean)
                         put("termination", call(guide, "getTermination")?.toString())
+                        put("optimalCandidate", call(guide, "getOptimalCandidate") as Boolean)
                         put("heuristicCoordinates", point?.size ?: 0)
                         put("checkedNativeBound", call(guide, "getBound")?.let { call(it, "getValue").toString() })
                         put("certificate", NumericalResidualProfile.json(call(guide, "getCertificateMetrics")))
-                        put("maxLuFill", call(guide, "getMaxLuFill") as Double?)
-                        put("maxLuDensity", call(guide, "getMaxLuDensity") as Double?)
+                        put("maxLuFill", observations?.let { call(it, "getMaxLuFill") } as Double?)
+                        put("maxLuDensity", observations?.let { call(it, "getMaxLuDensity") } as Double?)
+                        put("numericalProgress", NumericalResidualProfile.json(numerical?.let {
+                            call(it, "getLastNumericalMetrics")
+                        }))
                         put("floatMetrics", NumericalResidualProfile.json(call(owner, "getLastMetrics")))
                         put("ownerMetrics", NumericalResidualProfile.json(call(owner, "getMetrics")))
                     }
