@@ -67,31 +67,33 @@ class CpSearchComponentTest {
 
     @Test
     fun `cancelled publication should stop visiting later deductions`() {
-        var cancelled = false
-        val native = PropagationSession(
-            Problem(512, 0, emptyArray(), Array(512) { Clause(intArrayOf(Lit.make(it, true))) }),
-            cancellation = Cancellation { cancelled },
-        )
-        val cp = CpSearchComponent(native)
-        var publications = 0
-        val context = object : SearchContext by SearchSession(emptyList()) {
-            override fun publish(decision: SearchDecision, premise: SearchAtomPremise): ComponentResult {
-                publications++
-                return ComponentResult.Consistent
+        for (initializing in listOf(false, true)) {
+            var cancelled = false
+            val native = PropagationSession(
+                Problem(512, 0, emptyArray(), Array(512) { Clause(intArrayOf(Lit.make(it, true))) }),
+                cancellation = Cancellation { cancelled },
+            )
+            val cp = CpSearchComponent(native)
+            var publications = 0
+            val context = object : SearchContext by SearchSession(emptyList()) {
+                override fun publish(decision: SearchDecision, premise: SearchAtomPremise): ComponentResult {
+                    publications++
+                    return ComponentResult.Consistent
+                }
             }
+            val result = PropagationResult.Implied(
+                IntArray(512) { it }, BooleanArray(512) { true }, intArrayOf(), longArrayOf(),
+            )
+            val before = native.work
+            cancelled = true
+
+            val publication = if (initializing) cp.initialize(context) else cp.publish(result, context)
+
+            assertIs<ComponentResult.Indeterminate>(publication)
+            assertEquals(63, publications)
+            assertEquals(63L, native.work - before)
+            assertEquals(true, native.fixpointCancelled)
         }
-        val result = PropagationResult.Implied(
-            IntArray(512) { it }, BooleanArray(512) { true }, intArrayOf(), longArrayOf(),
-        )
-        val before = native.work
-        cancelled = true
-
-        val publication = cp.publish(result, context)
-
-        assertIs<ComponentResult.Indeterminate>(publication)
-        assertEquals(63, publications)
-        assertEquals(63L, native.work - before)
-        assertEquals(true, native.fixpointCancelled)
     }
 
     @Test

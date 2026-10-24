@@ -47,6 +47,7 @@ class SearchRun internal constructor(
     internal var pauseBeforeDecision: () -> Boolean = { false }
     private var pendingAdvance = false
     private var pendingCancellation = false
+    private var retryingAssertion = false
 
     /**
      * Poll the cancellation token on a fixed cadence rather than a time-adaptive one.
@@ -73,6 +74,10 @@ class SearchRun internal constructor(
             lifecycle.onStart(session).toEvent()?.let { return it }
         }
         lifecycle.onResume(session).toEvent()?.let { return it }
+        if (retryingAssertion) {
+            if (session.cancelled()) return cancelledAssertion()
+            retryingAssertion = false
+        }
         pendingModel?.let { model ->
             if (session.cancelled()) {
                 return lifecycle.onCancellation(session).toEvent()
@@ -326,6 +331,7 @@ class SearchRun internal constructor(
                         frame.next--
                         pendingAdvance = true
                         pendingCancellation = true
+                        retryingAssertion = true
                         return Advance.Cancelled
                     }
                     rememberIndeterminate()
@@ -556,6 +562,7 @@ class SearchRun internal constructor(
         terminal = null
         pendingAdvance = false
         pendingCancellation = false
+        retryingAssertion = false
         started = false
         cancellationPoller.reset()
         params.restart.beginRun()
