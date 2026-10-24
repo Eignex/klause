@@ -90,6 +90,18 @@ class DependentEqualitiesTest {
     }
 
     @Test
+    fun `mixed equalities should supply exact real elimination premises`() {
+        val one = BigFraction.ONE
+        val rows = listOf(
+            exact(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)), listOf(one, one), one),
+            exact(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)), listOf(one, one), BigFraction.ofLong(2)),
+            exact(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(1)), listOf(one, one.negated()), one.negated()),
+        )
+
+        assertEquals(listOf(2), dropped(realProblem(rows, integers = 1)).droppedIndices.toList())
+    }
+
+    @Test
     fun `binary64 fractional rows should use exact rational cancellation`() {
         val rows = listOf(
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(0.5, 0.25), LinearOp.EQ, 0.75),
@@ -298,7 +310,7 @@ class DependentEqualitiesTest {
     }
 
     @Test
-    fun `a spent allowance should stop within a shared pivot bucket`() {
+    fun `a spent allowance should stop before collecting equality premises`() {
         val factors = List(16) { i -> eq(intArrayOf(1, 1), intArrayOf(0, i + 1), 1) }
         val p = Problem(0, 17, Array(17) { IntDomain(0, 1) }, factors)
         val budget = PresolveBudget(1)
