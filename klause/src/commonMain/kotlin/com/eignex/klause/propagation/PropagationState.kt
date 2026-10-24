@@ -409,6 +409,10 @@ class PropagationState private constructor(
     private val propagatorFailureStore = lazy(LazyThreadSafetyMode.NONE) { mutableMapOf<Propagator, IntArray?>() }
     internal val propagatorFailures: MutableMap<Propagator, IntArray?> by propagatorFailureStore
 
+    // Retained DivMod cells have a state-wide allowance; replaced payloads reuse their reservation.
+    // Tombstoning may leave unused reservation, which only weakens subsequent cache admission.
+    internal var divModSupportCells: Int = 0
+
     internal fun clearPropagatorFailures() {
         if (propagatorFailureStore.isInitialized()) propagatorFailures.clear()
     }

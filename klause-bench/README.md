@@ -1287,6 +1287,8 @@ source feasibility; they do not certify the CP optimum reports.
 [Search propagation](../docs/08-search.md#selected-propagation-projections) owns the
 state-local bounded tuple cache, restored-operand coverage checks and live dividend
 buckets. This is separate from the compilation relation index.
+The state-wide retention allowance keeps large families of small relations from
+materializing every tuple product; unretained relations still filter completely.
 
 Ordinary [7986](https://lab.eignex.com/jobs/7986) compares main `3b34027` with
 retained full scanning `a75c892`: nine sources, CP/LP off/P1, seed 3, 20 seconds,
