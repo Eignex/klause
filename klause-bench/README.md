@@ -1231,6 +1231,21 @@ near 2.26 and 1.12 s with identical work; all twelve witnesses pass original-sou
 checking. The comparison establishes neither a general speedup nor a solve gain.
 The indexed history and undo sources are unchanged by rebase onto main.
 
+Retain atomic interior Table pruning with per-value reasons. [Comparison 8006](https://lab.eignex.com/jobs/8006)
+isolates `381710d79` against indexed parent `4a3642171` under the same settings
+and source/runtime identities as 7993. All three WordSquare pairs retain two nodes,
+one failure, depth two and 42 propagations. Median CLI time falls from 34.020 to
+28.443 s, reported propagation time from 6.263 to 0.647 s, and propagation work
+from 1642588 to 832668. Peak RSS ranges are 490772–492036 KiB and 324888–342204 KiB.
+All remain unknown; the 20-second deadline still overruns by 7.9–10.9 s with
+batching, so domain reconstruction does not explain the entire overrun.
+
+Eternity retains its search counts with mixed timings (median 5.909/5.959 s).
+Table Nonogram and Regular retain identical work and nearly equal medians
+(2.320/2.319 s and 1.110/1.112 s); all twelve witnesses pass original-source
+checking. These controls support the focused pruning change without a general
+solve-speed claim. The measured Table and mutation sources survive rebase unchanged.
+
 ### Division relation lookup
 
 Retain the compilation-owned index described in [integer division relations](../docs/02-model.md#integer-division-relations).
