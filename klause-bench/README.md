@@ -1108,6 +1108,45 @@ timing claim. The comparison uses matched source/build/runtime identities on
 Mac/aarch64 with lab debug statistics enabled. Source-witness checks do not
 independently certify native optimality.
 
+### Continuous leaf lifetime
+
+[Residual replay 7909](https://lab.eignex.com/jobs/7909) preserves exact points,
+terminations and non-timing numerical metrics through 173 advances of a captured
+cap64 query. The uninterrupted and sliced paths use the same invocation limits
+and native work prices. The paired cumulative-refactor control also completes
+through 72 advances. These captures omit original factors and establish numerical
+parity, with full-source checks supplied separately.
+
+[Qualification 7929](https://lab.eignex.com/jobs/7929) and
+[repetitions 7930](https://lab.eignex.com/jobs/7930) compare the retained leaf cursor
+with main on thirteen frozen MPS identities, with three repetitions of dsbmip,
+misc06, rentacar and flugpl. All 168 runs use seed 3, one processor, debug statistics
+and ten seconds on Mac/aarch64; default/CP and exact/declared modes remain separate.
+Shared immutable condition snapshots remove rentacar's repeated attribution-map
+copies before numerical solving. Median maximum segment times in default declared
+mode are:
+
+| Source | Main (ms) | Retained leaf (ms) |
+|---|---:|---:|
+| dsbmip | 9451 | 562 |
+| misc06 | 9726 | 585 |
+| rentacar | 9097 | 914 |
+
+Exact and CP modes show the same segment reduction. Active workers increase from
+one to seven or eight in default mode and six in CP. The three hard sources remain
+undecided. All 24 flugpl runs return 1201500 with a native optimality result and
+identical pivot/work totals within each mode. Default first-witness medians increase
+from 532 to 541 ms declared and 547 to 558 ms exact.
+
+The thirteen-identity screen has six objective improvements, four regressions and
+eighteen ties among feasible pairs, with no paired witness loss; withheld identities
+have one sample per mode. The independent checker accepts 68 final witnesses across
+both jobs. Four exact cap64 points have nonterminating rational coordinates the
+checker cannot read; their internal exact source checks remain separate from that
+unsupported external check. Witness checking does not establish native optimality.
+Encoding, assembly, factorization and certification remain atomic and can overrun
+a slice.
+
 ### Numerical kernel decisions
 
 [Session replay 7872](https://lab.eignex.com/jobs/7872) compares cumulative-work
