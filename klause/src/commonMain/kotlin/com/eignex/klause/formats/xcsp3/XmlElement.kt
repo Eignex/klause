@@ -209,7 +209,7 @@ internal class XmlReader(private val reader: CharReader) {
     /** Consume the start tag of the child [nextChildTag] just peeked (cursor at its `<`), leaving the
      *  cursor inside it; the tag name and attributes are discarded. Returns false for a self-closing
      *  (empty) element — already fully consumed — and true for one with a body. */
-    fun enterPeeked(): Boolean {
+    fun enterPeeked(onAttribute: ((String, String) -> Unit)? = null): Boolean {
         expect('<')
         val tag = readName()
         while (true) {
@@ -226,11 +226,12 @@ internal class XmlReader(private val reader: CharReader) {
                 openElements.addLast(tag)
                 return true
             }
-            readName()
+            val name = readName()
             skipWs()
             expect('=')
             skipWs()
-            readAttrValue()
+            val value = readAttrValue()
+            onAttribute?.invoke(name, value)
         }
     }
 
