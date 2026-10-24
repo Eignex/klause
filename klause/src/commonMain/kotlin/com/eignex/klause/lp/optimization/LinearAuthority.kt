@@ -53,7 +53,16 @@ internal class LinearAuthority(
 
     fun check(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
         relaxedPoint = emptyMap()
-        return checkSource(source, cancellation).copy(relaxedPoint = relaxedPoint)
+        if (cancellation()) {
+            lp.close()
+            return LinearAuthorityResult()
+        }
+        val result = checkSource(source, cancellation)
+        if (cancellation()) {
+            lp.close()
+            return LinearAuthorityResult()
+        }
+        return result.copy(relaxedPoint = relaxedPoint)
     }
 
     fun advance(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
@@ -62,7 +71,12 @@ internal class LinearAuthority(
             lp.close()
             return LinearAuthorityResult()
         }
-        return checkSource(source, cancellation, guidance = true).copy(relaxedPoint = relaxedPoint)
+        val result = checkSource(source, cancellation, guidance = true)
+        if (cancellation()) {
+            lp.close()
+            return LinearAuthorityResult()
+        }
+        return result.copy(relaxedPoint = relaxedPoint)
     }
 
     private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
