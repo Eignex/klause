@@ -41,7 +41,9 @@ Five owners divide the work:
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every
 split, including unresolved leaves. Improved checked incumbents reawaken those
-leaves for dominance closure. Replayed decisions charge the ordinary work and
+leaves for dominance closure. An ancestor bound can close a queued child after
+its derivation checks in the child's source scope, without another LP query.
+Replayed decisions charge the ordinary work and
 decision allowances; the retained queue is capped at 4,096 alternatives. A failed
 required check or exhausted queue allowance withholds completion.
 

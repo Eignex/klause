@@ -43,6 +43,8 @@ internal class LinearAuthority(
     private var template: LinearAuthorityTemplate? = null
     private var query: LinearAuthorityQuery? = null
 
+    fun invalidateGuidance() = lp.invalidateGuidance()
+
     override fun close() {
         template = null
         query = null

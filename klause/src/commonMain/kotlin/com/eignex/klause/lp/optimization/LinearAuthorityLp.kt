@@ -55,6 +55,7 @@ internal class LinearAuthorityLp(
     private var guidancePacked: LinearAuthorityModel? = null
     val preparations: Long get() = session?.preparations ?: 0L
     val reuses: Long get() = session?.reuses ?: 0L
+    fun invalidateGuidance() = session?.invalidateGuidance() ?: Unit
     private val observer = object : LpCertificationObserver {
         override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
         override fun observeExactInput(accepted: Boolean) = Unit
