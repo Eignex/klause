@@ -119,6 +119,10 @@ without auxiliary coordinates or pairwise clauses. Repeated coordinates and
 declared domains stay intact. Tuple exceptions and tuple reification attributes
 are unsupported and raise `UnsupportedXcsp3Exception`.
 
+Scalar `allDifferent` retains one native relation, including excepted values and
+wide finite domains. Matrix rows and columns use the same span-independent path;
+fewer than two positions impose no constraint.
+
 ### Expressions and selection
 
 Integer conditionals retain a native `Element` over their else and then values

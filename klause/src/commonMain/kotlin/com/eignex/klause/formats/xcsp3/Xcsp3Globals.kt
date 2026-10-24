@@ -22,7 +22,6 @@ import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LayeredMddData
-import com.eignex.klause.lowering.allDifferentWindow
 import com.eignex.klause.lowering.packLayeredMdd
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.tseitinOr
@@ -1188,22 +1187,9 @@ internal fun Compiler.Builder.allDifferent(e: XmlElement) {
     postAllDifferent(vars)
 }
 
-/** Post one all-different over [vars] as an [AllDifferent] factor, or as pairwise `!=` when the global
- *  cannot hold the members — see [allDifferentWindow]. Fewer than two variables is vacuous and posts
- *  nothing. */
+/** Post native distinctness; fewer than two positions impose no constraint. */
 internal fun Compiler.Builder.postAllDifferent(vars: IntArray) {
-    // An XCSP3 column always declares a finite domain, so both sides are always present here; the
-    // shared judgement still decides whether the window fits the global.
-    val window = allDifferentWindow(vars, { domains[it].min }, { domains[it].max })
-    if (window == null) {
-        for (a in vars.indices) {
-            for (b in a + 1 until vars.size) {
-                factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[a], vars[b]), LinearOp.NE, 0))
-            }
-        }
-        return
-    }
-    factors.add(AllDifferent(vars = vars, domainMin = window.min, domainSize = window.size))
+    if (vars.size >= 2) factors.add(AllDifferent(vars))
 }
 
 /** `allDifferent` over several `<list>`s: the lists, read as tuples, are pairwise distinct — each pair
@@ -1212,18 +1198,6 @@ internal fun Compiler.Builder.allDifferentLists(lists: List<IntArray>) {
     factors.add(AllDifferentTuples(lists))
 }
 
-/** `allDifferent` with `<except>`: variables must be pairwise distinct unless they take an exempt
- *  value. Decomposed as `x(i) = x(j) ⟹ x(i) ∈ except` per pair — two equal variables share a value,
- *  so it suffices to require that common value be exempt (one membership guard, symmetric). */
 internal fun Compiler.Builder.allDifferentExcept(vars: IntArray, except: IntArray) {
-    // x[i] ∈ except, reused across every pair sharing i.
-    val inExcept = IntArray(vars.size) { i ->
-        tseitinOr(except.map { reifyLinear(intArrayOf(1), intArrayOf(vars[i]), LinearOp.EQ, it) })
-    }
-    for (a in vars.indices) {
-        for (b in a + 1 until vars.size) {
-            val eq = reifyLinear(intArrayOf(1, -1), intArrayOf(vars[a], vars[b]), LinearOp.EQ, 0)
-            factors.add(Clause(intArrayOf(Lit.negate(eq), inExcept[a]))) // x[a]=x[b] ⟹ x[a] ∈ except
-        }
-    }
+    if (vars.size >= 2) factors.add(AllDifferent(vars, exceptSet = except.widenToLong()))
 }
