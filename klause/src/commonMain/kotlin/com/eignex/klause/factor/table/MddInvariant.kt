@@ -30,8 +30,7 @@ internal class MddInvariant(
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val st = buildState(state)
         state.refPayload[factorId] = st
-        state.factorDegree[factorId] =
-            compressViolation(st.distance.toLong() + costGap(state, -1, 0L), state.violationSoftCap)
+        state.factorDegree[factorId] = violationDegree(state, factorId)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
@@ -40,7 +39,7 @@ internal class MddInvariant(
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
         val st = state.refPayload[factorId] as? MddLsState ?: return fullDegree(state)
         return compressViolation(
-            st.distance.toLong() + if (st.distance == 0) costGap(state, -1, 0L) else 0L,
+            st.distance.toLong() + cachedCostGap(state, st),
             state.violationSoftCap,
         )
     }
@@ -48,7 +47,12 @@ internal class MddInvariant(
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val st = state.refPayload[factorId] as MddLsState
         val newDist = if (positionsByVar[intVar] == null) st.distance else distanceWith(state, st, intVar, newValue)
-        val degree = newDist.toLong() + if (newDist == 0) costGap(state, intVar, newValue) else 0L
+        val gap = when {
+            newDist != 0 -> 0L
+            positionsByVar[intVar] == null -> cachedCostGap(state, st, intVar, newValue)
+            else -> costGap(state, intVar, newValue)
+        }
+        val degree = newDist.toLong() + gap
         return compressViolation(degree, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
@@ -68,8 +72,18 @@ internal class MddInvariant(
                 if (!changed && layer <= first) break
             }
             st.distance = acceptingDistance(st.forward)
+            st.weight = currentWeight(state, st.distance)
         }
-        return compressViolation(st.distance.toLong() + costGap(state, -1, 0L), state.violationSoftCap) - before
+        return violationDegree(state, factorId) - before
+    }
+
+    private fun currentWeight(state: LocalSearchState, distance: Int): Long? =
+        if (cost < 0 || distance != 0) null else acceptedWeight({}) { state.assignment.intValue(seq[it]) }
+
+    private fun cachedCostGap(state: LocalSearchState, st: MddLsState, intVar: Int = -1, newValue: Long = 0L): Long {
+        val weight = st.weight ?: return 0L
+        val value = if (intVar == cost) newValue else state.assignment.intValue(cost)
+        return if (value > weight) value - weight else weight - value
     }
 
     private fun updateLayer(state: LocalSearchState, st: MddLsState, layer: Int, forward: Boolean): Boolean {
@@ -124,7 +138,39 @@ internal class MddInvariant(
             }
             if (!changed && layer <= first) break
         }
-        st.distance = acceptingDistance(st.forward)
+        var best = seq.size + 1
+        for (position in accepting.indices) {
+            val q = accepting[position]
+            if (q < st.forward[seq.size].size) best = minOf(best, st.forward[seq.size][q])
+            if (position % 256 == 0) yield(Unit)
+        }
+        st.distance = best
+        st.weight = null
+        if (cost >= 0 && best == 0) {
+            var current = initial
+            var weight = 0L
+            var work = 0
+            for (layer in seq.indices) {
+                var next = -1
+                val symbol = state.assignment.intValue(seq[layer])
+                var record = layerStarts[layer]
+                while (record < layerStarts[layer + 1]) {
+                    if (++work == 256) {
+                        yield(Unit)
+                        work = 0
+                    }
+                    if (transitions[record].toInt() == current && transitions[record + 1] == symbol) {
+                        next = transitions[record + 2].toInt()
+                        if (recordStride == 4) weight += transitions[record + 3]
+                        break
+                    }
+                    record += recordStride
+                }
+                if (next < 0) return@sequence
+                current = next
+            }
+            if (accepting.any { it == current }) st.weight = weight
+        }
     }
 
     private fun updateLayerSteps(
@@ -227,7 +273,8 @@ internal class MddInvariant(
         )
         val backward =
             mddBackwardLayers(seq.size, numStatesPerLayer, layerStarts, transitions, recordStride, accepting, getSym)
-        return MddLsState(forward, backward, acceptingDistance(forward))
+        val distance = acceptingDistance(forward)
+        return MddLsState(forward, backward, distance).also { it.weight = currentWeight(state, distance) }
     }
 
     /** Accept distance with [intVar] set to [newValue]. A single-position variable recombines its DP
@@ -476,39 +523,6 @@ internal class MddInvariant(
 private const val MDD_STRUCTURED_MOVE_CAP: Int = 4
 private const val MDD_MOVE_ATTEMPT_STRIDE: Int = 6
 
-/** Walk the layered DAG along the current assignment (with one optional override). */
-internal fun mddPathExists(
-    state: LocalSearchState,
-    seq: IntArray,
-    layerStarts: IntArray,
-    transitions: LongArray,
-    recordStride: Int,
-    initial: Int,
-    accepting: IntArray,
-    intVar: Int,
-    override: Int,
-): Boolean {
-    var current = initial
-    for (i in 0 until seq.size) {
-        val symbol: Long = if (seq[i] == intVar) override.toLong() else state.assignment.intValue(seq[i])
-        val start = layerStarts[i]
-        val end = layerStarts[i + 1]
-        var next = -1
-        var p = start
-        while (p < end) {
-            if (transitions[p].toInt() == current && transitions[p + 1] == symbol) {
-                next = transitions[p + 2].toInt()
-                break
-            }
-            p += recordStride
-        }
-        if (next < 0) return false
-        current = next
-    }
-    for (s in accepting) if (s == current) return true
-    return false
-}
-
 /** Destination state of the transition from [from] on [symbol] at layer [i], or -1 if none. */
 internal fun mddStep(
     layerStarts: IntArray,
@@ -663,6 +677,7 @@ internal fun mddRepairPath(
  *  O(Q·Σ) instead of resweeping the whole DP. */
 internal class MddLsState(val forward: Array<IntArray>, val backward: Array<IntArray>, var distance: Int) {
     val scratch = IntArray(forward.maxOf { it.size })
+    var weight: Long? = null
 }
 
 /** `forward(i)(q)` = min symbol changes over layers `0 until i` to reach state `q` from [initial],

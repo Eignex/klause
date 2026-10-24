@@ -17,6 +17,27 @@ import kotlin.test.assertTrue
 class MddInvariantTest {
 
     @Test
+    fun `a path cost aliased to a repeated symbol should stay exact through stepped edits`() {
+        val factor = Mdd(
+            intArrayOf(0, 0), intArrayOf(1, 2, 1), intArrayOf(0, 8, 16),
+            longArrayOf(0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0),
+            0, intArrayOf(0), 4, 0,
+        )
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(factor))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setInt(0, 0)
+        state.recompute()
+
+        for (value in listOf(1L, 0L, 1L)) {
+            val move = Move.IntSet(0, value)
+            assertEquals(0L, state.netDelta(move))
+            state.applySteps(move).forEach { }
+            assertEquals(0L, state.cost)
+            assertFalse(state.factors[0].isViolated(state, 0))
+        }
+    }
+
+    @Test
     fun `weighted repeated coordinates should retain exact scores across compound edits and restoration`() {
         val records = ArrayList<Long>()
         val starts = IntArray(5)
