@@ -71,6 +71,7 @@ internal class LinearAuthorityInvocation(
     private var incumbent: Sample? = null
     private var value: BigFraction? = null
     private var incumbentRevision = 0L
+    private var importedIncumbents = 0L
     private var result: LinearInvocationResult? = null
     val isDone: Boolean get() = result != null
     val work: Long get() = state.work.spent + funding.spent / 600L
@@ -78,7 +79,8 @@ internal class LinearAuthorityInvocation(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
         smt = state.smt.snapshot().copy(completeSearchStages = component.observations() +
-            mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated) +
+            mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
+                "numericalImportedIncumbents" to importedIncumbents) +
             (frontier?.let { mapOf("numericalFrontierPending" to it.pending.toLong(),
                 "numericalFrontierPeakPending" to it.peakPending.toLong()) } ?: emptyMap())),
         openTheory = state.work.snapshot(),
@@ -138,7 +140,11 @@ internal class LinearAuthorityInvocation(
             if (!context.affineObjectiveAvailable || !context.linearCoordinatesSupported()) {
                 return finish(null, TerminationReason.Unsupported)
             }
-            external()?.let(::offer)
+            external()?.takeUnless { it === incumbent }?.let { sample ->
+                val before = incumbentRevision
+                offer(sample)
+                if (incumbentRevision != before) importedIncumbents++
+            }
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
                 else TerminationReason.Cancelled)
             if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)

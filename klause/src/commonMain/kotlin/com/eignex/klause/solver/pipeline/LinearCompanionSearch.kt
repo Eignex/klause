@@ -24,8 +24,13 @@ internal class LinearCompanionSearch(
     context: SourceProofContext,
     private val binding: EngineInvocation,
     private val objective: LinearObjective,
+    private val observations: () -> Map<String, Long> = { emptyMap() },
 ) : InstructionSlicedSearch, ReseedGuard, ResumableSearch by search {
     private val context = context.withLinearAuthority()
+    override val stats get() = search.stats.let { stats ->
+        stats.copy(smt = stats.smt.copy(completeSearchStages =
+            stats.smt.completeSearchStages.orEmpty() + observations()))
+    }
     override val canReseed: Boolean get() = false
     override val chargedInstructions: Long get() =
         (search as? InstructionSlicedSearch)?.chargedInstructions ?: search.work
@@ -52,11 +57,11 @@ internal class LinearCompanionSearch(
             val value = objective.evaluateExact(published).toDouble()
             published.witnessCertificate = EvidenceCertificate.published(
                 CompletedEnginePublication.Witness(binding, published, value))
-            return MinimizeResult.BestFound(published, value, TerminationReason.BudgetExhausted, result.stats)
+            return MinimizeResult.BestFound(published, value, TerminationReason.BudgetExhausted, stats)
         }
         val result = run { candidate -> checked(candidate)?.let(onIncumbent) } ?: return null
         return if (result is MinimizeResult.WithSample) checked(result)
-            ?: MinimizeResult.Unknown(TerminationReason.Unsupported, result.stats)
-        else MinimizeResult.Unknown(TerminationReason.Unsupported, result.stats)
+            ?: MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
+        else MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
     }
 }

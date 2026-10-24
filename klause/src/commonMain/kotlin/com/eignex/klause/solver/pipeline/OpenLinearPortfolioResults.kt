@@ -34,7 +34,9 @@ internal class OpenLinearPortfolioResults(
     private val timeout: Cancellation = Cancellation.Never,
 ) : PortfolioTerminalCheck {
     private data class Accepted(val result: LinearOptimizationResult, val rayValue: BigFraction?)
+    private data class SharedBound(val evidence: SourceEvidence, val value: Double)
     private val accepted = AtomicReference<Accepted?>(null)
+    private val sharedBound = AtomicReference<SharedBound?>(null)
     private val handles = ArrayList<Pair<PortfolioWorker, AtomicReference<LinearPortfolioSearch?>>>()
 
     fun retain(worker: PortfolioWorker, handle: AtomicReference<LinearPortfolioSearch?>) {
@@ -43,6 +45,7 @@ internal class OpenLinearPortfolioResults(
 
     fun sharedLowerBound(): Double {
         val bound = strongestBound() ?: return Double.NEGATIVE_INFINITY
+        sharedBound.load()?.takeIf { it.evidence === bound }?.let { return it.value }
         if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(bound, cancellation) !=
             SourceEvidenceCheck.Checked) return Double.NEGATIVE_INFINITY
         val claim = bound.claim as? SourceClaim.Bound ?: return Double.NEGATIVE_INFINITY
@@ -50,8 +53,10 @@ internal class OpenLinearPortfolioResults(
         val minimized = minimized(value)
         val rounded = minimized.toDouble()
         if (!rounded.isFinite()) return Double.NEGATIVE_INFINITY
-        return if (BigFraction.ofDouble(rounded)?.let { it <= minimized } == true) rounded
+        val conservative = if (BigFraction.ofDouble(rounded)?.let { it <= minimized } == true) rounded
             else rounded.nextDown()
+        sharedBound.store(SharedBound(bound, conservative))
+        return conservative
     }
 
     override fun check(worker: PortfolioWorker, search: ResumableSearch?): PortfolioTerminalPublication? {

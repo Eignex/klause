@@ -333,6 +333,8 @@ internal class OpenPortfolio(
             add(PortfolioArmFactory(preparedPlan, firstArm, ArmFamily.Backtrack) { slot ->
                 val local = workerParams(slot)
                 PortfolioWorker.ofMinimize("finite/linear-companion", firstArm, resumable = {
+                    var cutoffReads = 0L
+                    var floorReads = 0L
                     val solver = BacktrackSolver(finite.bake(cancellation = lifetime or slot.cancellation))
                     val params = BacktrackParams(randomSeed = slot.seed, nodeBudget = slot.nodeBudget,
                         maxDecisions = local.maxDecisions,
@@ -340,13 +342,16 @@ internal class OpenPortfolio(
                         objectiveBoundSupplier = if (!shareCompanions) null else ({
                             val exact = incumbents.exchange.current()?.objective?.execution
                             val value = exact?.toDouble() ?: Double.POSITIVE_INFINITY
+                            if (exact != null) cutoffReads++
                             if (exact == null || !value.isFinite() ||
                                 BigFraction.ofDouble(value)?.let { it >= exact } == true) value else value.nextUp()
                         }),
                         objectiveLowerBoundSupplier = if (!shareCompanions) null else linear?.let {
-                            { it.sharedLowerBound() }
+                            { it.sharedLowerBound().also { bound -> if (bound.isFinite()) floorReads++ } }
                         })
-                    LinearCompanionSearch(solver.resumable(objective, params), context, binding, objective)
+                    LinearCompanionSearch(solver.resumable(objective, params), context, binding, objective) {
+                        mapOf("finiteCompanionCutoffReads" to cutoffReads, "finiteCompanionBoundReads" to floorReads)
+                    }
                 }) { _, _, _, _ -> error("finite companion runs only by slice") }
                     .bindEvidence(identity, provesResults = false)
             })
