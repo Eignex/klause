@@ -9,6 +9,20 @@ import kotlin.test.assertTrue
 
 class RunsDomainTest {
     @Test
+    fun `interior restoration should retain runs at signed word endpoints`() {
+        val domain = intDomainFromSurvivors(
+            longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, Long.MAX_VALUE - 1, Long.MAX_VALUE),
+        )
+
+        val restored = domain.includeInteriorValue(0)
+
+        assertEquals(
+            listOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, 0, Long.MAX_VALUE - 1, Long.MAX_VALUE),
+            (0 until restored.values.size).map { restored.values.valueAt(it) },
+        )
+    }
+
+    @Test
     fun `holeCount should saturate across signed word gaps`() {
         val values = longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, Long.MAX_VALUE - 1, Long.MAX_VALUE)
         val domain = intDomainFromSurvivors(values)
