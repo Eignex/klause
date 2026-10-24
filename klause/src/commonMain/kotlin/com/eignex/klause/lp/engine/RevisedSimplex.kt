@@ -125,6 +125,7 @@ internal class RevisedSimplex(
     private val syntheticWorkEnabled: Boolean = false,
     private val phaseOneLongSteps: Boolean = true,
     private val phaseOneIncrementalValues: Boolean = true,
+    private val singletonStart: Boolean = true,
 ) : TableauCutSolver,
     PersistentLpSolver,
     ResumableLpSolver {
@@ -1449,15 +1450,24 @@ internal class RevisedSimplex(
         if ((observations.warmStarted || after != null) &&
             (!kept || !sameObjective || !sameSeats) && !dualFeasible()
         ) {
-            // Only the slack start is boxed: a warm or kept basis carries a pivot path the primal can
-            // continue, and boxing it would trade that for a cold dual.
-            val slackStart = !kept && !observations.warmStarted && after != null
-            if (!slackStart || !installArtificialBounds()) {
-                if (kept && before != null && after != null && before.model.objective != after.model.objective) {
-                    observations.objectiveWarmAttempts++
-                    observations.objectiveWarmRepairs++
+            val pivotsBeforeOpening = observations.pivots
+            when (trySingletonStart(kept, progress)) {
+                IterationResult.CONTINUE -> Unit
+                IterationResult.BASIS_CHANGED, IterationResult.RESTART -> return restartDual(enforced, progress)
+                IterationResult.FAILED -> return null
+            }
+            val changedOpening = observations.pivots > pivotsBeforeOpening
+            if (!changedOpening || !dualFeasible()) {
+                // Only the slack start is boxed: a warm or kept basis carries a pivot path the primal can
+                // continue, and boxing it would trade that for a cold dual.
+                val slackStart = !kept && !observations.warmStarted && after != null
+                if (!slackStart || !installArtificialBounds()) {
+                    if (kept && before != null && after != null && before.model.objective != after.model.objective) {
+                        observations.objectiveWarmAttempts++
+                        observations.objectiveWarmRepairs++
+                    }
+                    return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
                 }
-                return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
             }
         }
         resetGamma() // fresh Devex reference frame for this solve
@@ -1922,7 +1932,10 @@ internal class RevisedSimplex(
         return true
     }
 
+    private var dualFailureColumn = -1
+
     private fun recordDualFailure(column: Int, reduced: Double): Boolean {
+        dualFailureColumn = column
         progressTrace?.let { trace ->
             if (trace.dualStart == null) {
                 val singleton = columnNnz(column) == 1
@@ -1934,6 +1947,55 @@ internal class RevisedSimplex(
             }
         }
         return false
+    }
+
+    @Suppress("ReturnCount", "CyclomaticComplexMethod", "LongMethod")
+    private fun trySingletonStart(kept: Boolean, progress: SolveProgress): IterationResult {
+        if (!singletonStart || !kept || model.exactState == null || cachedModel != null || progress.iterations != 0L) {
+            return IterationResult.CONTINUE
+        }
+        val q = dualFailureColumn
+        if (q !in 0 until n || status[q] != VarStatus.FREE || columnNnz(q) != 1) {
+            return IterationResult.CONTINUE
+        }
+        val entry = colPtr[q]
+        val row = rowIdx[entry]
+        val leaving = n + row
+        if (!model.fixed(leaving) || !colVal[entry].isFinite() || abs(colVal[entry]) < tolerance) {
+            return IterationResult.CONTINUE
+        }
+        for (i in 0 until m) {
+            work.add(1)
+            if (basicVar[i] != n + i) return IterationResult.CONTINUE
+        }
+        if (!resourcesRemain(progress)) return IterationResult.FAILED
+        // The singleton is a scalar multiple of the fixed logical, preserving nonsingularity.
+        spike(q)
+        if (!resourcesRemain(progress)) return IterationResult.FAILED
+        if (abs(spikeVec[row]) < tolerance) return IterationResult.CONTINUE
+        status[leaving] = sideStatus(leaving, upper = false)
+        basicVar[row] = q
+        status[q] = VarStatus.BASIC
+        observations.pivots++
+        progress.dualIterations++
+        observations.numericalMetrics.singletonStarts++
+        when (foldPivot(row, q, leaving, withPivotEta = false)) {
+            PivotFold.UPDATED, PivotFold.REBUILT -> Unit
+            PivotFold.BASIS_CHANGED -> return IterationResult.BASIS_CHANGED
+            PivotFold.FAILED -> return IterationResult.FAILED
+        }
+        val y = duals()
+        for (j in 0 until numVars) {
+            if (j % CANCEL_POLL == 0 && !resourcesRemain(progress)) return IterationResult.FAILED
+            work.add(1)
+            if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
+            val reduced = cost(j) - dotColumn(y, j)
+            when {
+                reduced > tolerance && model.hasFiniteLower(j) -> status[j] = VarStatus.AT_LOWER
+                reduced < -tolerance && model.hasFiniteUpper(j) -> status[j] = VarStatus.AT_UPPER
+            }
+        }
+        return IterationResult.CONTINUE
     }
 
     /*
@@ -3287,6 +3349,7 @@ private fun lpColumns(model: LpScalingView): SparseMatrix {
 }
 
 internal class SimplexNumericalMetrics {
+    var singletonStarts = 0
     var primalBlandEntries = 0
     var capExits = 0
 

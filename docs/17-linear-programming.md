@@ -298,6 +298,13 @@ The owner rejects another solve or authority adoption while that cursor is live;
 closing it unwinds the suspended operation and retires its factors. Synchronous
 calls consume the same operation without suspension.
 
+A prepared all-logical native basis can seat a dual-infeasible free singleton
+in place of its fixed logical column. The columns are scalar multiples, so the
+opening preserves nonsingularity and the exact region. Repricing seats the other
+nonbasics on their available minimizing sides; unresolved dual infeasibility
+continues through primal repair. The opening pivot and its work consume the same
+invocation allowances as subsequent iterations.
+
 Primal feasibility repair minimizes the convex sum of basic-bound violations
 along an entering edge. It passes bound crossings while the directional slope
 remains negative, then pivots at the minimizing crossing or flips the entering
