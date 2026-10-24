@@ -41,6 +41,23 @@ import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
     @Test
+    fun `companion admission should retain a root refutation without numerical funding`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                lower = SemanticRational.ONE, upper = SemanticRational.ofLong(-1))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.SATISFY, FiniteEngine.MIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_COMPANIONS))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0))))
+
+        assertEquals(LinearSourceConclusion.UNSATISFIABLE, assertNotNull(result.linearSource).conclusion)
+    }
+
+    @Test
     fun `a finite companion should supply an original source incumbent after numerical funding stops`() {
         val cases = ObjectiveSense.entries.flatMap { sense ->
             listOf(LinearTraversal.NUMERICAL_COMPANIONS, LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT)

@@ -44,13 +44,17 @@ internal fun prepareLinearSource(
         boundOrdered = request.linearTraversal == LinearTraversal.NUMERICAL_FRONTIER || companions)
     val route = if (companions) {
         val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
-        val companion = (finite as? SourceProblemRoute.Finite)?.problem?.takeUnless {
-            it.requiresExactObjectiveRoute(objective, stop)
+        if (finite == SourceProblemRoute.Refuted) {
+            finite
+        } else {
+            val companion = (finite as? SourceProblemRoute.Finite)?.problem?.takeUnless {
+                it.requiresExactObjectiveRoute(objective, stop)
+            }
+            SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(
+                native.withCompanions(companion,
+                    sharing = request.linearTraversal == LinearTraversal.NUMERICAL_COMPANIONS),
+                view.numericalPlan(objective)))
         }
-        SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(
-            native.withCompanions(companion,
-                sharing = request.linearTraversal == LinearTraversal.NUMERICAL_COMPANIONS),
-            view.numericalPlan(objective)))
     } else if (request.linearTraversal == LinearTraversal.AUTOMATIC && native.numericalRowsSupported(stop)) {
         val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
         if (finite is SourceProblemRoute.Finite && finite.problem.requiresExactObjectiveRoute(objective, stop)) {
