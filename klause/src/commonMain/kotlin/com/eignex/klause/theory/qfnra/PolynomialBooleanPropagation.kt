@@ -10,6 +10,7 @@ internal class PolynomialBooleanPropagation(
     private val root: Int,
     private val arithmetic: PolynomialArithmetic,
     private val skipConfirmedParents: Boolean = false,
+    trackWitnesses: Boolean = false,
 ) {
     private val values = IntArray(nodes.size) { UNASSIGNED }
     private val parents = List(nodes.size) {
@@ -17,16 +18,21 @@ internal class PolynomialBooleanPropagation(
         ArrayList<Int>()
     }
     private val leaves = ArrayList<Int>()
+    private val leafPositions = IntArray(nodes.size) { -1 }
+    private var nextLeaf = 0
     private val trail = ArrayList<Int>()
     private val pending = ArrayDeque<Int>()
     private val queued = BooleanArray(nodes.size)
     private val choices = ArrayList<Choice>()
+    private val witnesses = if (trackWitnesses) PolynomialBooleanWitness(nodes, values, parents, arithmetic) else null
 
     val trailSize: Int get() = trail.size
     var numericChanges: Long = 0
         private set
 
     fun value(index: Int): Int = values[index]
+
+    fun witnessed(index: Int): Boolean = checkNotNull(witnesses).witnessed(index)
 
     fun decide(): Boolean {
         val leaf = unassignedLeaf() ?: return false
@@ -42,14 +48,14 @@ internal class PolynomialBooleanPropagation(
             when (node) {
                 is FormulaNode.Not -> addParent(node.child, index)
                 is FormulaNode.Junction -> for (child in node.children) addParent(child, index)
-                is FormulaNode.BooleanVariable -> leaves.add(index)
+                is FormulaNode.BooleanVariable -> addLeaf(index)
                 else -> Unit
             }
             enqueue(index)
         }
         for ((index, node) in nodes.withIndex()) {
             arithmetic.step()
-            if (node is FormulaNode.Atom) leaves.add(index)
+            if (node is FormulaNode.Atom) addLeaf(index)
             if (node is FormulaNode.Constant && !assign(index, if (node.value) TRUE else FALSE)) return false
         }
         return assign(root, TRUE)
@@ -58,6 +64,12 @@ internal class PolynomialBooleanPropagation(
     private fun addParent(child: Int, parent: Int) {
         arithmetic.step()
         parents[child].add(parent)
+    }
+
+    private fun addLeaf(index: Int) {
+        arithmetic.step()
+        leafPositions[index] = leaves.size
+        leaves.add(index)
     }
 
     private fun enqueue(index: Int) {
@@ -72,6 +84,7 @@ internal class PolynomialBooleanPropagation(
         arithmetic.step()
         if (values[index] != UNASSIGNED) return values[index] == value
         values[index] = value
+        witnesses?.changed(index)
         if (nodes[index] is FormulaNode.Atom) numericChanges++
         trail.add(index)
         enqueue(index)
@@ -139,9 +152,11 @@ internal class PolynomialBooleanPropagation(
     }
 
     private fun unassignedLeaf(): Int? {
-        for (index in leaves) {
+        while (nextLeaf < leaves.size) {
             arithmetic.step()
+            val index = leaves[nextLeaf]
             if (values[index] == UNASSIGNED) return index
+            nextLeaf++
         }
         return null
     }
@@ -158,6 +173,9 @@ internal class PolynomialBooleanPropagation(
                 arithmetic.step()
                 val index = trail.removeAt(trail.lastIndex)
                 values[index] = UNASSIGNED
+                witnesses?.changed(index)
+                val position = leafPositions[index]
+                if (position >= 0) nextLeaf = minOf(nextLeaf, position)
                 if (nodes[index] is FormulaNode.Atom) numericChanges++
             }
             if (!choice.triedTrue) {

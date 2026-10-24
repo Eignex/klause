@@ -17,7 +17,8 @@ internal class PolynomialBooleanRegions(
     private val progress: PolynomialQueryProgress? = null,
     private val onConflict: ((List<PolynomialAtom>) -> Unit)? = null,
 ) {
-    private val state = PolynomialBooleanPropagation(nodes, root, arithmetic, skipConfirmedParents = true)
+    private val state = PolynomialBooleanPropagation(nodes, root, arithmetic,
+        skipConfirmedParents = true, trackWitnesses = true)
     private val exclusions = ArrayList<Exclusion>()
     private val signs = PolynomialBooleanSigns(nodes, atoms, state, arithmetic)
     private var partialAvailable = true
@@ -207,49 +208,11 @@ internal class PolynomialBooleanRegions(
     }
 
     private fun proof(): Proof? {
-        val witnessed = BooleanArray(nodes.size)
-        val selected = IntArray(nodes.size) { -1 }
-        for ((index, node) in nodes.withIndex()) {
-            arithmetic.step()
-            val value = state.value(index)
-            witnessed[index] = when (node) {
-                is FormulaNode.Constant -> value == if (node.value) TRUE else FALSE
-                is FormulaNode.BooleanVariable, is FormulaNode.Atom -> value != UNASSIGNED
-                is FormulaNode.Not -> witnessed[node.child] && value == TRUE - state.value(node.child)
-                is FormulaNode.Junction -> witnessed(index, node, witnessed, selected)
-            }
-        }
-        if (!witnessed[root]) return null
-        return capture(selected)
+        if (!state.witnessed(root)) return null
+        return capture()
     }
 
-    private fun witnessed(
-        index: Int,
-        node: FormulaNode.Junction,
-        witnessed: BooleanArray,
-        selected: IntArray,
-    ): Boolean {
-        val value = state.value(index)
-        if (value == UNASSIGNED) return false
-        val decisive = if (node.conjunction) FALSE else TRUE
-        if (value == decisive) {
-            for (child in node.children) {
-                arithmetic.step()
-                if (witnessed[child] && state.value(child) == value) {
-                    selected[index] = child
-                    return true
-                }
-            }
-            return false
-        }
-        for (child in node.children) {
-            arithmetic.step()
-            if (!witnessed[child] || state.value(child) != value) return false
-        }
-        return true
-    }
-
-    private fun capture(selected: IntArray): Proof {
+    private fun capture(): Proof {
         val visited = BooleanArray(nodes.size)
         val pending = ArrayDeque<Int>()
         pending.addLast(root)
@@ -261,8 +224,14 @@ internal class PolynomialBooleanRegions(
             when (val node = nodes[index]) {
                 is FormulaNode.Not -> pending.addLast(node.child)
                 is FormulaNode.Junction -> {
-                    if (selected[index] >= 0) pending.addLast(selected[index])
-                    else for (child in node.children) {
+                    val decisive = if (node.conjunction) FALSE else TRUE
+                    if (state.value(index) == decisive) {
+                        val selected = node.children.first { child ->
+                            arithmetic.step()
+                            state.witnessed(child) && state.value(child) == decisive
+                        }
+                        pending.addLast(selected)
+                    } else for (child in node.children) {
                         arithmetic.step()
                         pending.addLast(child)
                     }

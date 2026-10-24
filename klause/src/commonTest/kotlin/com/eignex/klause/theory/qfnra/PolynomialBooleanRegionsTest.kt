@@ -97,6 +97,22 @@ class PolynomialBooleanRegionsTest {
     }
 
     @Test
+    fun `simultaneously supported children retain their first source premise`() {
+        for ((assertion, truth) in listOf(
+            "(or (< (- 1) 0) (> 2 0))" to true,
+            "(not (and (= 1 0) (< 2 0)))" to false,
+        )) {
+            val source = SmtLibPolynomial.parse("(assert $assertion)")
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+            val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+            assertEquals(listOf(PolynomialBooleanRegion(mapOf(0 to truth), emptyMap())), regions)
+        }
+    }
+
+    @Test
     fun `Boolean leaves retain priority over earlier numeric leaves`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const b Bool) (assert (or (> x 0) b))",
