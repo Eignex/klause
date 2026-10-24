@@ -56,7 +56,7 @@ class LinearTraversalTest(private val traversal: LinearTraversal, private val to
         assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
         assertEquals(BigFraction.ofLong(7), result.linearSource?.incumbent?.objective)
         assertEquals(listOf(BigFraction.ZERO), result.linearSource?.incumbent?.values)
-        if (traversal == LinearTraversal.NUMERICAL) assertIs<SourceExecutionResult.Numerical>(result)
+        if (traversal != LinearTraversal.AUTOMATIC) assertIs<SourceExecutionResult.Numerical>(result)
         else assertIs<SourceExecutionResult.Finite>(result)
     }
 }
