@@ -60,7 +60,14 @@ internal class TablePropagator(
     ): ExtensionalSupportCounts? {
         val support = state.refPayload[factorId] as? TableStr2State ?: return null
         if (hi != null || !support.started || support.numValid == 0) return null
-        val col = xs.indexOf(variable)
+        var col = -1
+        for (i in xs.indices) {
+            if (!visit()) return null
+            if (xs[i] == variable) {
+                col = i
+                break
+            }
+        }
         if (col < 0) return null
         val index = support.index
         val counts = IntArray(values.size)

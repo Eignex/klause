@@ -297,7 +297,9 @@ started marker and baselines follow undo, including restoration above a payload'
 construction branch. Interval Tables and storage declines keep the full STR2 scan.
 
 `val-selector=max-sd` ranks small integer domains by completed extensional support
-fractions, with at most 65,536 row/word visits for one ordering. Tables count live
+fractions, with at most 65,536 factor, position, row and word visits for one ordering.
+Provider discovery and diagram admission share that allowance and cancellation
+polling. Tables count live
 tuples through the bitmap or the small STR2 prefix. Deterministic, unweighted MDDs
 with distinct sequence variables cache prefix and suffix path counts, multiplying
 them at each live edge to count accepted assignments for a value. Admission allows

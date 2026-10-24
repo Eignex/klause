@@ -44,7 +44,7 @@ class MddIncrementalStateTest {
     }
 
     @Test
-    fun `path weights should restore root and sibling counts after an interior removal`() {
+    fun `path weights should restore root and sibling counts after a domain removal`() {
         val state = PropagationState(
             Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(diagram)), Assumptions.None,
         )
@@ -71,6 +71,35 @@ class MddIncrementalStateTest {
         assertContentEquals(
             intArrayOf(0, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
         )
+    }
+
+    @Test
+    fun `path weights should count interior holes and their undo`() {
+        val ternary = Mdd(
+            intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 9),
+            longArrayOf(0, 0, 0, 0, 1, 0, 0, 2, 0), 0, intArrayOf(0), 3,
+        )
+        val state = PropagationState(
+            Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(ternary)), Assumptions.None,
+        )
+        assertNull(state.runToFixpoint(allFactors = true))
+        val payload = state.refPayload[0] as MddIncrementalState
+        val values = longArrayOf(0, 1, 2)
+        assertEquals(3, assertNotNull(payload.supportCounts(0, values) { true }).total)
+        state.undoLogging = true
+        val root = state.mark()
+        state.currentLevel = 1
+        check(state.excludeIntValue(0, 1))
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        val narrowed = assertNotNull(payload.supportCounts(0, values) { true })
+        state.undoTo(root)
+        val restored = assertNotNull(payload.supportCounts(0, values) { true })
+
+        assertContentEquals(intArrayOf(1, 0, 1), narrowed.supporting)
+        assertEquals(2, narrowed.total)
+        assertContentEquals(intArrayOf(1, 1, 1), restored.supporting)
+        assertEquals(3, restored.total)
     }
 
     @Test

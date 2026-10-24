@@ -123,10 +123,19 @@ internal class MddPathWeights private constructor(
             accepting: IntArray,
             visit: () -> Boolean,
         ): MddPathWeights? {
-            if (seq.size > MAX_STATES || sizes.sumOf { it.toLong() } > MAX_STATES ||
-                index.fwdPtr.sumOf { it.size.toLong() } > MAX_EDGES || initial !in 0 until sizes[0]
-            ) return null
-            val cells = sizes.sum() * 2 + seq.size * 2
+            if (seq.size > MAX_STATES || initial !in 0 until sizes[0]) return null
+            var states = 0
+            var edges = 0
+            for (layer in sizes.indices) {
+                if (!visit() || sizes[layer] > MAX_STATES - states) return null
+                states += sizes[layer]
+                if (layer < seq.size) {
+                    val count = index.fwdPtr[layer].size
+                    if (count > MAX_EDGES - edges) return null
+                    edges += count
+                }
+            }
+            val cells = states * 2 + seq.size * 2
             if (cells > MAX_CELLS - state.mddPathWeightCells) return null
             val variables = HashSet<Int>()
             for (v in seq) {

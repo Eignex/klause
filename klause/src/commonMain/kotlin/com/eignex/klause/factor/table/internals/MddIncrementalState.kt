@@ -367,7 +367,14 @@ internal class MddIncrementalState(
 
     fun supportCounts(variable: Int, values: LongArray, visit: () -> Boolean): ExtensionalSupportCounts? {
         if (valid.value == 0) return null
-        val pos = seq.indexOf(variable)
+        var pos = -1
+        for (i in seq.indices) {
+            if (!visit()) return null
+            if (seq[i] == variable) {
+                pos = i
+                break
+            }
+        }
         if (pos < 0) return null
         if (!pathWeightsAttempted && cost < 0) {
             pathWeights = MddPathWeights.build(
