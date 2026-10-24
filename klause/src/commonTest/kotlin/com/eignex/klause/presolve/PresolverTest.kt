@@ -75,7 +75,7 @@ class PresolverTest {
 
         val prepared = Presolver.runSource(
             problem, PresolveConfig.parse("off,+xor-units,+bve"),
-            PresolveContext(objectiveBoolVars = setOf(4), presolveBudget = budget),
+            PresolveContext(objectiveBoolCoeffs = mapOf(4 to 1L), presolveBudget = budget),
         )
 
         assertFalse(prepared.infeasible)

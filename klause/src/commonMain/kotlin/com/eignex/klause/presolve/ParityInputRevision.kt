@@ -36,7 +36,12 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
         complete = complete && work.check()
     }
 
-    fun recordDelta(factors: Array<Factor>, dropped: IntArray, added: List<Factor>) {
+    fun recordDelta(
+        factors: Array<Factor>,
+        dropped: IntArray,
+        added: List<Factor>,
+        deductionsChanged: Boolean = true,
+    ) {
         if (!complete) return
         val work = ScanMeter(cancellation)
         for (index in dropped) {
@@ -52,7 +57,7 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
             }
         }
         // Propagation can change participating pins and ranges even when the delta has no parity row.
-        dirty = true
+        dirty = dirty || deductionsChanged
         complete = work.check()
     }
 
@@ -104,9 +109,15 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
     private fun record(factor: Factor, direction: Int, work: ScanMeter): Boolean {
         if (!work.visit(1L)) return false
         when (factor) {
-            is Clause -> if (factor.literals.size == 1) update(units, factor.literals[0], direction)
+            is Clause -> if (factor.literals.size == 1) {
+                val lit = factor.literals[0]
+                val wasPresent = units.containsKey(lit)
+                update(units, lit, direction)
+                if (boolColumns.containsKey(Lit.variable(lit)) && wasPresent != units.containsKey(lit)) dirty = true
+            }
             is Xor -> {
                 revision++
+                dirty = true
                 for (lit in factor.literals) {
                     if (!work.visit(1L)) return false
                     update(boolColumns, Lit.variable(lit), direction)
@@ -117,6 +128,7 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
                 val narrow = factor.integerConstants
                 val wide = factor.integralConstants ?: return true
                 revision++
+                dirty = true
                 for (k in factor.vars.indices) {
                     if (!work.visit(1L)) return false
                     val odd = narrow?.let { it.coeff(k) and 1L != 0L }
