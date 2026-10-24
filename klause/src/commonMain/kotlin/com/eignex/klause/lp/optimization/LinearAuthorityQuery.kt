@@ -69,14 +69,19 @@ internal class LinearAuthorityQuery private constructor(
             var activeCuts = 0
             var cutVerificationWork = 0L
             val verifier = SourceEvidenceVerifier(numeric.atScope(source.scope))
-            for (cut in template?.cuts?.rows.orEmpty()) {
+            val cuts = template?.cuts?.rows.orEmpty()
+            val active = cuts.filter { it.owner !in inactive }
+            val checks = verifier.verifyAll(active.map {
+                SourceEvidence(source.scope, SourceClaim.Consequence(it.inequality), it.derivation)
+            }, Cancellation {
+                cutVerificationWork++
+                cancellation()
+            })
+            val accepted = active.indices.filter { checks[it] == SourceEvidenceCheck.Checked }
+                .mapTo(HashSet()) { active[it].owner }
+            for (cut in cuts) {
                 if (cancellation()) return null
-                val active = cut.owner !in inactive && verifier.verify(SourceEvidence(source.scope,
-                    SourceClaim.Consequence(cut.inequality), cut.derivation), Cancellation {
-                        cutVerificationWork++
-                        cancellation()
-                    }) == SourceEvidenceCheck.Checked
-                if (active) activeCuts++ else inactive += cited.size
+                if (cut.owner in accepted) activeCuts++ else inactive += cited.size
                 cited += cut.inequality to cut.derivation
             }
             val condition = source.scope.condition

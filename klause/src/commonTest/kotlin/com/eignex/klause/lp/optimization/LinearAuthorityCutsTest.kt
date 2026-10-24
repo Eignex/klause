@@ -31,6 +31,26 @@ class LinearAuthorityCutsTest {
         objective = SourceObjective("sum", ObjectiveSense.MINIMIZE))
 
     @Test
+    fun `rational row normalization should retain a checked rounding derivation`() {
+        val half = BigFraction.ofLong(2).reciprocal()
+        for ((rhs, strict, expected) in listOf(
+            Triple(BigFraction.ofLong(7) * half * half, false, BigFraction.ofLong(3)),
+            Triple(BigFraction.ONE, true, BigFraction.ONE),
+            Triple((half * half).negated(), false, BigFraction.MINUS_ONE),
+        )) {
+            val source = SourceProofContext(scope, setOf(x, y), mapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to half, y to BigFraction.ONE), rhs, strict)),
+            ), emptyMap())
+
+            val cut = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never)).rows.single()
+
+            assertEquals(expected, cut.inequality.rhs)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
+                SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
     fun `single row rounding should strengthen a checked sparse objective bound`() {
         val source = SourceProofContext(scope, setOf(x, y), mapOf(
             "sum" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2),

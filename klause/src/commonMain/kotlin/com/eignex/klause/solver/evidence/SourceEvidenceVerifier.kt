@@ -106,8 +106,17 @@ class SourceEvidenceVerifier(
 
     internal fun verify(
         evidence: SourceEvidence, cancellation: Cancellation, allowance: SourceProofAllowance,
-    ): SourceEvidenceCheck = try {
-        Run(cancellation, allowance).verify(evidence, context.scope, 0)
+    ): SourceEvidenceCheck = checked { Run(cancellation, allowance).verify(evidence, context.scope, 0) }
+
+    internal fun verifyAll(
+        evidence: List<SourceEvidence>, cancellation: Cancellation,
+    ): List<SourceEvidenceCheck> {
+        val run = Run(cancellation, SourceProofAllowance(maximumSteps, maximumDepth))
+        return evidence.map { checked { run.verify(it, context.scope, 0) } }
+    }
+
+    private inline fun checked(block: () -> SourceEvidenceCheck): SourceEvidenceCheck = try {
+        block()
     } catch (stop: ProofStop) {
         stop.verdict
     } catch (_: PolynomialInterrupted) {
