@@ -54,7 +54,7 @@ interface IntDomain {
 
     /** Number of interior holes: values strictly between [min] and [max] that are absent. O(1) or
      *  O(runs) and span-independent — it never walks the gap value by value. Zero for a contiguous
-     *  domain; may exceed [Int] range for a sparse domain over a wide span. The dual of the value count, for
+     *  domain; saturates at [Long.MAX_VALUE]. The dual of the value count, for
      *  callers deciding whether iterating holes or members is cheaper. */
     val holeCount: Long
 
@@ -110,11 +110,10 @@ interface IntDomain {
     val isFixed: Boolean get() = min == max
 
     /**
-     * Number of present values, saturating at [Long.MAX_VALUE] when the bounds span more than a
-     * `Long` can count.
+     * Number of present values, saturating at [Long.MAX_VALUE] when a `Long` cannot count them.
      *
-     * A magnitude, not an enumeration: derived from the bounds and [holeCount], so it answers for
-     * every domain however wide, where [spanOrNull] declines. Callers ordering domains by size, or
+     * A magnitude, not an enumeration: exact for enumerable survivor sets regardless of span.
+     * It also answers for wider domains where [spanOrNull] declines. Callers ordering domains by size, or
      * comparing two domains' value counts, want this rather than a span they cannot obtain.
      */
     val valueCount: Long get() {

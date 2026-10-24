@@ -4,9 +4,12 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
+import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.*
 import kotlin.test.Test
@@ -15,6 +18,55 @@ import kotlin.test.assertIs
 import kotlin.test.fail
 
 class RootPropagationTest {
+
+    @Test
+    fun `sparse signed word domains should capture survivors without walking gaps`() {
+        val cases = listOf(
+            longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE),
+            longArrayOf(Long.MIN_VALUE, -1),
+            longArrayOf(-1, Long.MAX_VALUE),
+            longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, Long.MAX_VALUE - 1, Long.MAX_VALUE),
+        )
+        for (values in cases) {
+            val problem = Problem(0, 1, arrayOf(intDomainFromSurvivors(values)), emptyArray())
+
+            val result = implied(problem.propagate())
+
+            assertEquals(listOf(0), result.intSetKeys.toList())
+            assertEquals(values.toList(), result.intSetValues.toList())
+            assertEquals(0, result.intHoleValues.size)
+        }
+    }
+
+    @Test
+    fun `captured sparse roots should reconstruct surviving values`() {
+        val values = longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE)
+        val problem = Problem(0, 1, arrayOf(intDomainFromSurvivors(values)), emptyArray())
+        val captured = implied(problem.propagate(Assumptions.None.withIntHole(0, 0)))
+
+        val rebuilt = BakedProblem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = emptyList(),
+            seedDeductions = captured,
+        )
+
+        val domain = rebuilt.rootIntDomain(0).values
+        assertEquals(listOf(Long.MIN_VALUE, Long.MAX_VALUE), (0 until domain.size).map { domain.valueAt(it) })
+    }
+
+    @Test
+    fun `sparse root pins should retract to the captured domain`() {
+        val values = longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE)
+        val problem = Problem(0, 1, arrayOf(intDomainFromSurvivors(values)), emptyArray()).bake()
+        val session = PropagationSession(problem)
+
+        session.pinInt(0, Long.MAX_VALUE)
+        session.popLast()
+
+        assertEquals(problem.rootIntDomain(0), session.intDomain(0))
+    }
 
     private fun boolProblem(numBoolVars: Int, vararg clauses: IntArray): Problem = Problem(
         numBoolVars = numBoolVars,

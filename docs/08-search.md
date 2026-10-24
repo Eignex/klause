@@ -186,6 +186,12 @@ replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see
 them.
 
+Root snapshot capture compares enumerable survivors with the saturated hole count,
+independently of numeric span. Sparse sets are captured as ascending survivor
+restrictions and reconstructed without materializing their gaps. Enumerable
+domains retain exact cardinalities for exhaustive-search admission and radices,
+including sets spanning both signed-word endpoints.
+
 Layered MDD filtering watches interior removals as well as bounds. Forward and
 backward reachability and weighted path bounds use full symbol membership. Shared
 root reachability is admitted only when every position contains the whole diagram

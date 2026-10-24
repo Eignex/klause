@@ -9,6 +9,25 @@ import kotlin.test.assertTrue
 
 class RunsDomainTest {
     @Test
+    fun `holeCount should saturate across signed word gaps`() {
+        val values = longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, Long.MAX_VALUE - 1, Long.MAX_VALUE)
+        val domain = intDomainFromSurvivors(values)
+
+        assertEquals(Long.MAX_VALUE, domain.holeCount)
+    }
+
+    @Test
+    fun `value iteration should stop at the maximum signed word`() {
+        val values = longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, Long.MAX_VALUE - 1, Long.MAX_VALUE)
+        val domain = intDomainFromSurvivors(values)
+        val seen = mutableListOf<Long>()
+
+        domain.values.forEach { seen.add(it) }
+
+        assertEquals(values.toList(), seen)
+    }
+
+    @Test
     fun `holeCount should stay exact when size saturates on a wide span`() {
         val d = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
         assertTrue(d is RunsDomain)

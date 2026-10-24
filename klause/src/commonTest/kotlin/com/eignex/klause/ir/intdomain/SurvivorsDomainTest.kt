@@ -8,6 +8,20 @@ import kotlin.test.assertTrue
 class SurvivorsDomainTest {
 
     @Test
+    fun `valueCount should count signed word survivors regardless of span`() {
+        val cases = listOf(
+            longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE),
+            longArrayOf(Long.MIN_VALUE, -1),
+            longArrayOf(-1, Long.MAX_VALUE),
+        )
+        for (values in cases) {
+            val domain = intDomainFromSurvivors(values)
+
+            assertEquals(values.size.toLong(), domain.valueCount)
+        }
+    }
+
+    @Test
     fun `excludeValue should return same instance when value is absent`() {
         val d = SurvivorsDomain(1, 10, longArrayOf(1, 3, 7, 10))
         val e = d.excludeValue(5)
