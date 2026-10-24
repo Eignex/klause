@@ -83,7 +83,13 @@ internal object MpsSparseRoot {
             else BigFraction.ONE
         val costs = coordinates.map { (context.objective[it] ?: BigFraction.ZERO) * sign }
         val modelType = Class.forName(LP + "optimization.LinearAuthorityModel")
-        val packed = checkNotNull(call(modelType.getField("Companion").get(null), "prepare", rows, costs.size, stop))
+        val companion = modelType.getField("Companion").get(null)
+        val prepare = companion.javaClass.methods.single { it.name == "prepare" }
+        val packed = checkNotNull(when (prepare.parameterCount) {
+            3 -> prepare.invoke(companion, rows, costs.size, stop)
+            4 -> prepare.invoke(companion, rows, costs.size, stop, emptySet<Int>())
+            else -> error("unsupported source preparation signature")
+        })
         val workingRows = call(packed, "getRows") as List<*>
         val columns = call(packed, "getColumns") as List<*>
         val sparseType = Class.forName(LP + "SparseSourceLp")
