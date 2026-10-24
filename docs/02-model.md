@@ -171,7 +171,8 @@ convention. Each schema, FlatZinc or XCSP3 compilation owns a
 `lowering.DivModRelationIndex`, keyed by dividend coordinate, divisor coordinate
 or constant value, and convention. Retained relations stay present throughout
 lowering; additional output coordinates receive equality aliases. The index is
-discarded with the compiler before mutable solving state is created. Shared formulas live in `lowering.DivModEncoding`: the linear encoder
+discarded with the compiler before mutable solving state is created. Shared
+formulas live in `lowering.DivModEncoding`: the linear encoder
 handles a literal divisor or requires a variable-divisor fixing, and the
 polynomial encoder enforces the whole relation including the sign cases. An open
 variable-divisor relation has no general linear completion, and difference
