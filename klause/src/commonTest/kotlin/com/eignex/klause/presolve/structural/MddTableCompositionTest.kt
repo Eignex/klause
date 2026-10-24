@@ -45,7 +45,9 @@ class MddTableCompositionTest {
         )
         val table = Table(intArrayOf(2, 3, 0), longArrayOf(0, 8, 0, 1, 9, 1))
 
-        val composed = assertIs<Mdd>(MddTableComposition.intersect(mdd, table, { true }, ExtensionalComposition.Limits()))
+        val composed = assertIs<Mdd>(
+            MddTableComposition.intersect(mdd, table, { true }, ExtensionalComposition.Limits()),
+        )
         val problem = Problem(0, 3, arrayOf(IntDomain(0, 0), IntDomain(7, 7), IntDomain(0, 1)), arrayOf(composed))
         val state = PropagationState(problem, Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))
@@ -63,14 +65,37 @@ class MddTableCompositionTest {
         )
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0))
 
-        val composed = assertIs<Mdd>(MddTableComposition.intersect(mdd, table, { true }, ExtensionalComposition.Limits()))
+        val composed = assertIs<Mdd>(
+            MddTableComposition.intersect(mdd, table, { true }, ExtensionalComposition.Limits()),
+        )
 
         assertEquals(4, composed.recordStride)
         assertEquals(2, composed.cost)
         for (cost in listOf(3L, 5L, 7L)) {
-            val problem = Problem(0, 3, arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(cost, cost)), arrayOf(composed))
+            val problem = Problem(
+                0, 3, arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(cost, cost)), arrayOf(composed),
+            )
             val state = PropagationState(problem, Assumptions.None)
             assertEquals(cost == 7L, state.runToFixpoint(allFactors = true) != null)
+        }
+    }
+
+    @Test
+    fun `reconverging composition should preserve both shared tuple alternatives`() {
+        val mdd = Mdd(
+            intArrayOf(0, 1, 2), intArrayOf(1, 1, 1, 1), intArrayOf(0, 6, 12, 18),
+            longArrayOf(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0), 0, intArrayOf(0), 3,
+        )
+        val table = Table(intArrayOf(2, 0), longArrayOf(0, 0, 1, 1))
+        val composed = assertIs<Mdd>(
+            MddTableComposition.intersect(mdd, table, { true }, ExtensionalComposition.Limits()),
+        )
+
+        for (first in 0L..1L) for (middle in 0L..1L) for (last in 0L..1L) {
+            val domains = arrayOf(IntDomain(first, first), IntDomain(middle, middle), IntDomain(last, last))
+            val state = PropagationState(Problem(0, 3, domains, arrayOf<Factor>(composed)), Assumptions.None)
+
+            assertEquals(first == last, state.runToFixpoint(allFactors = true) == null)
         }
     }
 
@@ -93,7 +118,9 @@ class MddTableCompositionTest {
     @Test
     fun `composed hole explanations should restore sibling supports`() {
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1, 2, 2))
-        val composed = assertIs<Mdd>(MddTableComposition.intersect(independent(), table, { true }, ExtensionalComposition.Limits()))
+        val composed = assertIs<Mdd>(
+            MddTableComposition.intersect(independent(), table, { true }, ExtensionalComposition.Limits()),
+        )
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(composed))
         val state = PropagationState(problem, Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))

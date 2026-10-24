@@ -20,7 +20,7 @@ internal object ExtensionalComposition {
 
     private class Meter(val cancellation: Cancellation, val limits: Limits) {
         var remaining = limits.work
-        var pairRemaining = limits.pairWork
+        var pairRemaining = Int.MAX_VALUE
         var retained = 0
 
         fun visit(): Boolean {
@@ -43,20 +43,31 @@ internal object ExtensionalComposition {
         limits: Limits = Limits(),
     ): PassDelta {
         val meter = Meter(cancellation, limits)
-        val tables = ArrayList<Table>()
+        val occurrences = HashMap<Int, MutableList<Table>>()
         for (factor in factors) {
             if (!meter.visit()) return PassDelta()
-            if (factor is Table && eligible(factor, limits)) tables.add(factor)
+            if (factor !is Table || !eligible(factor, limits)) continue
+            for (variable in factor.xs) {
+                if (!meter.visit()) return PassDelta()
+                occurrences.getOrPut(variable) { ArrayList() }.add(factor)
+            }
         }
-        if (tables.isEmpty()) return PassDelta()
+        if (occurrences.isEmpty()) return PassDelta()
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         for ((id, factor) in factors.withIndex()) {
+            meter.pairRemaining = Int.MAX_VALUE
+            val scope = when (factor) {
+                is Table -> if (eligible(factor, limits)) factor.xs else continue
+                is Mdd -> if (factor.seq.size <= MAX_SCOPE) factor.seq else continue
+                else -> continue
+            }
+            val candidates = candidates(factor, scope, occurrences, meter) ?: break
             var current = factor
-            for (table in tables) {
+            for ((table, shared) in candidates) {
+                if (shared < 2) continue
                 meter.pairRemaining = limits.pairWork
                 if (!meter.visit()) break
-                if (factor === table) continue
                 val next = when (current) {
                     is Table -> if (eligible(current, limits)) intersectTables(current, table, meter) else null
                     is Mdd -> MddTableComposition.intersect(current, table, meter::visit, limits)
@@ -79,6 +90,23 @@ internal object ExtensionalComposition {
             if (meter.remaining <= 0 || cancellation()) break
         }
         return PassDelta(dropped.toIntArray(), added)
+    }
+
+    private fun candidates(
+        factor: Factor,
+        scope: IntArray,
+        occurrences: Map<Int, List<Table>>,
+        meter: Meter,
+    ): Map<Table, Int>? {
+        val counts = LinkedHashMap<Table, Int>()
+        for (variable in scope) {
+            if (!meter.visit()) return null
+            for (table in occurrences[variable].orEmpty()) {
+                if (!meter.visit()) return null
+                if (factor !== table) counts[table] = (counts[table] ?: 0) + 1
+            }
+        }
+        return counts
     }
 
     private fun eligible(table: Table, limits: Limits): Boolean =
