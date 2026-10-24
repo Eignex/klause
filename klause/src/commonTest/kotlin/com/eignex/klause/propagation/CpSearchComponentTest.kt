@@ -37,6 +37,30 @@ import kotlin.test.assertSame
 
 class CpSearchComponentTest {
     @Test
+    fun `a cancelled decision atom cascade should retract before its retry`() {
+        val native = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 255)), emptyArray()))
+        val state = native.explanationState
+        val thresholds = IntArray(128) { state.atomVarGe(0, it.toLong() + 1) }
+        var armed = false
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(cp), cancellation = Cancellation {
+            armed && state.atoms.truth[state.atomIdOf(thresholds[15])] == 1
+        })
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        armed = true
+
+        assertIs<ComponentResult.Indeterminate>(shared.push(SearchDecision.IntAtLeast(0, 129)))
+        assertNotNull(state.pendingFiniteMutation)
+        shared.popTo(0)
+        armed = false
+        val retried = shared.push(SearchDecision.IntAtLeast(0, 129))
+
+        assertNull(state.pendingFiniteMutation)
+        assertIs<ComponentResult.Consistent>(retried)
+        assertEquals(129L, native.intDomain(0).min)
+    }
+
+    @Test
     fun `a shared assertion allowance should interrupt native filtering and allow a retry after retraction`() {
         val native = PropagationSession(
             Problem(

@@ -63,6 +63,7 @@ internal class FiniteDomainCompletion(
                 history(next)
                 next++
             }
+            // Atom wakes preserve their first establishment and can replay a completed prefix.
             finish()
         } finally {
             state.currentFactor = previousFactor
@@ -83,6 +84,7 @@ internal fun PropagationState.completeDomainMutation(
         finish()
         return
     }
+    // The queue completes this cursor before any factor can read the changed domain's history.
     pendingFiniteMutation = FiniteDomainCompletion(currentFactor, currentLevel, historyCount, history, finish)
     completePendingFiniteMutation()
 }
