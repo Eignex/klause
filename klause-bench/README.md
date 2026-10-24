@@ -2803,6 +2803,17 @@ Frontier observations use the `numerical` prefix; joint candidate traversals use
 `jointRepair`, and root preparation uses `jointRepairRoot`. Retained attempt or
 component reuse has its own counter, and consultations are not distinct incumbents.
 
+[Diagnosis 8121](https://lab.eignex.com/jobs/8121) pins diagnostic-only `78b9c16d48`
+on eleven sources from 8072: frontier and joint repair, exact/P1/10 s, presolve off,
+seed 1 and debug/source validation enabled. All original hashes match 8072, with
+one Mac/aarch64 runtime, dependency set and 3 GiB Serial-GC options. Both gr4x6
+final witnesses pass solchecker; native proof claims remain separate.
+Every wider frontier proposal is fractional. Joint repair reaches integral,
+source-rejected proposals on bell3a, modglob and rgn at 18, 222 and 206 consultations,
+respectively. These observations select real reconstruction and continuous
+residual completion for integral assignments; fractional guides continue to order
+exhaustive integer splits.
+
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
 invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.
