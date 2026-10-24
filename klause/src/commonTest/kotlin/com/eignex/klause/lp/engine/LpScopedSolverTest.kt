@@ -149,6 +149,19 @@ class LpScopedSolverTest {
     }
 
     @Test
+    fun `nonresumable owners should honor the smaller consultation and cumulative allowance`() {
+        for ((quantum, cumulative) in listOf(1L to 10L, 10L to 1L)) {
+            val factory = RecordingLpEngineFactory()
+            LpScopedSolver(LpExactState(lowerBoundModel()), context = LpSolveContext(factory)).use { owner ->
+                owner.advanceFloat(quantum, LpFloatAllowance(cumulative, 100))
+
+                assertEquals(minOf(quantum, cumulative), assertNotNull(factory.floatAllowances.single()).work)
+                assertFalse(owner.floatPaused)
+            }
+        }
+    }
+
+    @Test
     fun `closing a paused owner should release its numerical factors`() {
         val owner = LpScopedSolver(LpExactState(lowerBoundModel()))
         assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
