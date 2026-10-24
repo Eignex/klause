@@ -88,8 +88,7 @@ private fun collectRootPropagation(
             intValues.add(domain.min)
             continue
         }
-        val span = domain.max - domain.min + 1
-        val values = if (span > problem.settings.storage.bitsetThreshold) domain.spanOrNull() else null
+        val values = domain.spanOrNull()
         if (values != null && values.size <= domain.holeCount) {
             intSetKeys.add(variable)
             values.forEach { intSetValues.add(it) }

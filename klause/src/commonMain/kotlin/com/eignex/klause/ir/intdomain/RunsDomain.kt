@@ -47,12 +47,13 @@ internal class RunsDomain(
 
     override val valueCount: Long get() = exactSize
 
-    // Summed from the gaps between consecutive runs, so it stays exact even when `size` saturates.
+    // Gap counts can exceed signed-word range even when the survivors are enumerable.
     override val holeCount: Long = run {
         var holes = 0L
         var k = 2
         while (k < runs.size) {
-            holes += runs[k] - runs[k - 1] - 1
+            val gap = runs[k] - runs[k - 1] - 1
+            holes = if (gap < 0L || holes > Long.MAX_VALUE - gap) Long.MAX_VALUE else holes + gap
             k += 2
         }
         holes
@@ -288,8 +289,9 @@ internal class RunsDomain(
         while (k < runs.size) {
             var v = runs[k]
             val hi = runs[k + 1]
-            while (v <= hi) {
+            while (true) {
                 action.accept(v)
+                if (v == hi) break
                 v++
             }
             k += 2

@@ -28,6 +28,8 @@ internal class SurvivorsDomain(
 
     override val size: Int get() = survivors.size
 
+    override val valueCount: Long get() = survivors.size.toLong()
+
     override fun contains(value: Long): Boolean = value in min..max && survivors.binarySearchLong(value) >= 0
 
     override fun valueAt(i: Int): Long = survivors[i]
