@@ -179,6 +179,9 @@ coordinate sides and the original row sequence before checking a scoped refutati
 Only this checked derivation closes a numerical traversal leaf or a repair query;
 unknown, paused and declined consultations leave it open. Retained completed results
 charge certificate work once, and scope edits discard their authority before reuse.
+An immutable traversal invocation retains its checked global bound when fresh
+coverage supplies an equal or weaker value, avoiding repeated verification of the
+growing sibling proof. A new repair scope owns a separate invocation.
 
 ### Leaf completion
 
