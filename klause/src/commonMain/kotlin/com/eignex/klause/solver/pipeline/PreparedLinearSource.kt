@@ -100,9 +100,10 @@ private fun LinearSourceView.numericalPlan(objective: LinearObjective?): Prepare
         ),
     )
     val heuristic = ComponentStrategySupport(
-        ProcedureCompleteness.UNAVAILABLE,
-        emptySet(),
-        listOf(ExecutionDecline(ExecutionDeclineCause.HEURISTIC_PROJECTION, "linear-numerical")),
+        if (model.numBoolVars == 0) ProcedureCompleteness.WITNESS_SEARCH else ProcedureCompleteness.UNAVAILABLE,
+        if (model.numBoolVars == 0) setOf(ExecutionClaimAuthority.WITNESS) else emptySet(),
+        if (model.numBoolVars == 0) emptyList() else
+            listOf(ExecutionDecline(ExecutionDeclineCause.HEURISTIC_PROJECTION, "linear-numerical")),
     )
     return PreparedSourcePlan(
         source,
