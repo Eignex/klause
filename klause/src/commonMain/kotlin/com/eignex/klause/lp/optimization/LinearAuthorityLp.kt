@@ -166,7 +166,14 @@ internal class LinearAuthorityLp(
             val bound = guide.bound?.takeIf { listOf(it.value).admittedSourcePoint() }
             val weights = bound?.dualMultipliers?.map { it.negated() }
                 ?.let { packed.lift(it, costs.map { cost -> cost.negated() }, token) }
-            val result = CertifiedLpResult(null, bound, null, null, null, false, { null })
+            val conflict = guide.conflict
+            val conflictWeights = conflict?.let {
+                val multipliers = MutableList(packed.rows.size) { BigFraction.ZERO }
+                for (id in it.rows.indices) multipliers[it.rows[id]] += it.multipliers[id]
+                packed.lift(multipliers, List(costs.size) { BigFraction.ZERO }, token)
+            }
+            val result = CertifiedLpResult(null, bound, null, null, conflict, false, { null },
+                conflictSupport = guide.conflictSupport)
             val raw = guide.primal
             val point = raw?.indices?.map { column ->
                 if (token()) return@guideResult null
@@ -180,7 +187,7 @@ internal class LinearAuthorityLp(
                     else -> BigFraction.ofDouble(raw[column]) ?: return@guideResult null
                 }
             }
-            LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, null), point,
+            LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, conflictWeights), point,
                 packed.rows.size, guide.paused)
         }.also {
             onShape(LinearAuthorityLpShape(rows.size, packed.rows.size, costs.size, it != null,

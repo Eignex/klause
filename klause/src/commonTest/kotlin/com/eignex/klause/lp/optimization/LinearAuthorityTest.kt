@@ -3,6 +3,7 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.engine.ReconstructionLimits
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -33,6 +34,88 @@ class LinearAuthorityTest {
         SourceRevision("affine-fixture", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `suspended sparse refutations should lift column sides and charge certificate work once`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val other = coordinates[1]
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE, other to BigFraction.ONE),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val budget = SourceLpBudget(maxOperations = 1)
+
+        LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
+            var result = authority.advance(source, Cancellation.Never)
+            assertTrue(result.paused)
+            assertNull(result.evidence)
+            repeat(64) {
+                if (result.paused) result = authority.advance(source, Cancellation.Never)
+            }
+
+            val evidence = assertNotNull(result.evidence)
+            assertEquals(SourceClaim.Refutation, evidence.claim)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
+            assertTrue(result.relaxedPoint.isEmpty())
+            val certificateWork = budget.measuredBoundCertificationWork
+            val floatWork = budget.measuredFloatWork
+            assertTrue(certificateWork > 0L)
+            assertEquals(SourceClaim.Refutation, authority.advance(source, Cancellation.Never).evidence?.claim)
+            assertEquals(certificateWork, budget.measuredBoundCertificationWork)
+            assertEquals(floatWork, budget.measuredFloatWork)
+            assertEquals(1, budget.operations)
+        }
+    }
+
+    @Test
+    fun `sparse refutations should lose authority after a scoped bound retracts`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val other = coordinates[1]
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE, other to BigFraction.ONE),
+                BigFraction.ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val restricted = source.atScope(scope.copy(condition = SourceCondition(
+            lower = mapOf(real to BigFraction.ofLong(2)))))
+        val budget = SourceLpBudget(maxOperations = 2)
+
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            val evidence = assertNotNull(authority.advance(restricted, Cancellation.Never).evidence)
+            assertEquals(SourceClaim.Refutation, evidence.claim)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(evidence))
+            assertTrue(SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence) != SourceEvidenceCheck.Checked)
+
+            val retracted = authority.advance(source, Cancellation.Never)
+            assertIs<SourceClaim.Optimal>(assertNotNull(retracted.evidence).claim)
+            assertEquals(2, budget.operations)
+        }
+    }
+
+    @Test
+    fun `exhausted sparse conflict certification should leave the source undecided`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                coordinates[1] to BigFraction.ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+
+        LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true,
+            guidancePolicy = SparseSourceLpPolicy(certificate = ReconstructionLimits(maxWork = 0L))).use { authority ->
+            val result = authority.advance(source, Cancellation.Never)
+
+            assertNull(result.evidence)
+            assertNull(result.bound)
+            assertTrue(result.relaxedPoint.isEmpty())
+        }
+    }
 
     @Test
     fun `paused source guidance should retain one admitted operation across slices`() {

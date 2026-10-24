@@ -196,6 +196,7 @@ internal class LinearAuthorityTraversal(
         current.result = result
         observe("numericalChecks")
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")
+        if (result.lpConflict) observe("numericalLpConflicts")
         if (result.bound != null) {
             observe("numericalCertifiedBounds")
             val parent = path.getOrNull(path.lastIndex - 1)?.second?.result?.bound?.claim as? SourceClaim.Bound

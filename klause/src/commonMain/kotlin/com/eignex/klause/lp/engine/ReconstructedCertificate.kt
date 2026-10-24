@@ -897,6 +897,25 @@ internal fun verifyRationalCertificate(
     )
 }
 
+internal fun certifyLpConflictOnly(
+    model: LpModel,
+    ray: DoubleArray,
+    limits: ReconstructionLimits,
+    cancellation: Cancellation = Cancellation.Never,
+    observer: LpCertificationObserver? = null,
+    policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+): ReconstructedCertificate {
+    val timer = LpPhaseTimer(observer, LpSolvePhase.CONFLICT_CERTIFICATE)
+    val checked = reconstructCertificate(model, ray = ray, cancellation = cancellation, limits = limits)
+    val metrics = checked.metrics
+    val conflict = checked.conflict
+    val accepted = policy.acceptNullable(LpCertifier.RATIONAL, conflict)
+    observer?.observe(LpCertifier.RATIONAL, conflict != null, LpCertifierCost.Metered(metrics.work))
+    timer.finish(metrics.decline?.name ?: if (accepted != null) "CONFLICT" else "REFUSED", metrics.work)
+    return ReconstructedCertificate(null, null, accepted, checked.conflictSupport.takeIf { accepted != null },
+        false, false, metrics)
+}
+
 // Dual evidence has its own admission and spending; exact-primal reconstruction is not a prerequisite.
 internal fun certifyLpBoundOnly(
     model: LpModel,
