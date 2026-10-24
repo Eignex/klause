@@ -173,22 +173,21 @@ class PropagationSession private constructor(
             state.checkFiniteWork()
             remaining-- > 0
         }
-        val scores = DoubleArray(values.size)
-        var counted = false
+        var scores: DoubleArray? = null
         state.finiteWork.begin()
         try {
             for (fid in occurrences) {
                 if (!visit()) return null
                 val provider = projection.propagators[fid] as? ExtensionalSupportProvider ?: continue
                 val counts = provider.supportCounts(state, fid, variable, values, visit) ?: return null
-                counted = true
-                for (i in values.indices) scores[i] += ln(counts.supporting[i].toDouble() / counts.total)
+                val combined = scores ?: DoubleArray(values.size).also { scores = it }
+                for (i in values.indices) combined[i] += ln(counts.supporting[i].toDouble() / counts.total)
             }
         } catch (_: FinitePropagationInterrupted) {
             probeCancelled = true
             return null
         }
-        return if (counted) scores else null
+        return scores
     }
 
     /** True once a fixpoint was cut short by the [cancellation] deadline (sticky). The engine must
