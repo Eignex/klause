@@ -59,6 +59,27 @@ class JointLinearRepairTest {
     }
 
     @Test
+    fun `joint repair should consume a recovered continuous residual beyond full exact admission`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(3.0, 3.0), LinearOp.EQ, 0.1),
+            ), numRealVars = 129, realLower = DoubleArray(129), realUpper = DoubleArray(129) { 1.0 })
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO), mapOf(0 to BigFraction.ZERO))
+
+        val result = repair.use { it.check(condition, Cancellation.Never) }
+
+        val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+        val reals = assertNotNull(sample.exactReals)
+        assertEquals(checkNotNull(BigFraction.ofDouble(0.1)), (reals[0] + reals[1]) * BigFraction.ofLong(3))
+        assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairPrimalRecoverySourceChecked"))
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)))
+    }
+
+    @Test
     fun `a checked incumbent should close a nonimproving repair without global proof`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
             factors = arrayOf(

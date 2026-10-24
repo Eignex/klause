@@ -208,6 +208,24 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `sparse frontier should publish a recovered strict residual point`() {
+        val reals = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val source = SourceProofContext(scope, reals.toSet(), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+        ), emptyMap())
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use {
+            assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+        }
+
+        assertTrue(assertNotNull(assertNotNull(result.incumbent).exactReals).first() > BigFraction.ZERO)
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalPrimalRecoverySourceChecked"))
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.terminal)))
+    }
+
+    @Test
     fun `bound frontier should preserve complete sibling proofs across slices`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         for (sense in ObjectiveSense.entries) {

@@ -262,8 +262,16 @@ that add new scoped restrictions, including fractional source-bound endpoints.
 Opposed coordinate sides refute a branch through checked source combinations
 without another numerical query. Integral-looking
 points require original-source witness checking, and checked bounds are lifted into
-the current source scope. Small unresolved queries can use bounded exact completion;
-wide guidance does not acquire exact-primal or infeasibility authority.
+the current source scope. Rejected integral proposals first reconstruct real
+coordinates, then substitute their unchanged exact integer assignment and complete
+connected continuous residuals with the source LP owner. Strict rows remain strict;
+inactive premises stay excluded. Residual solves share the invocation's source
+operation allowance. Recovery bounds input entries, scalar width, work and modeled
+allocation, and retains its result only for an unchanged query and guide. Every
+recovered point requires a fresh complete original-source witness check. Frontier
+leaves and joint repair consume those checked incumbents through the same authority.
+Small unresolved queries can use bounded exact completion; recovery declines supply
+neither a conflict nor exhaustion authority.
 Source reconstruction restores exact fixed coordinates and matching projected
 bound endpoints before checking a proposed witness.
 

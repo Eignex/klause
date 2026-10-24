@@ -56,12 +56,17 @@ internal class LinearAuthority(
         "numericalMaxRetainedCuts" to retainedCutPeak,
         "numericalMaxActiveCuts" to activeCutPeak,
     )
+    private class PrimalAttempt(
+        val query: LinearAuthorityQuery, val point: List<BigFraction>, val recovered: List<BigFraction>?,
+    )
+    private var primalAttempt: PrimalAttempt? = null
 
     fun invalidateGuidance() = lp.invalidateGuidance()
 
     override fun close() {
         template = null
         query = null
+        primalAttempt = null
         lp.close()
     }
 
@@ -103,8 +108,21 @@ internal class LinearAuthority(
     private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
     private val primalStages = linkedMapOf<String, Long>()
 
-    private fun observePrimal(stage: String) {
-        primalStages[stage] = (primalStages[stage] ?: 0L) + 1L
+    private fun observePrimal(stage: String, count: Long = 1L) {
+        primalStages[stage] = (primalStages[stage] ?: 0L) + count
+    }
+
+    private fun recover(
+        prepared: LinearAuthorityQuery, point: List<BigFraction>, cancellation: Cancellation,
+    ): List<BigFraction>? {
+        primalAttempt?.takeIf { it.query === prepared && it.point == point }?.let {
+            observePrimal("PrimalRecoveryReused")
+            return it.recovered
+        }
+        val recovered = lp.recover(prepared.coordinates, point, prepared.rows, prepared.inactive,
+            cancellation, ::observePrimal)
+        if (!cancellation()) primalAttempt = PrimalAttempt(prepared, point, recovered)
+        return recovered
     }
 
     private fun prepareQuery(
@@ -231,7 +249,7 @@ internal class LinearAuthority(
                 combination(costs.map { it.negated() }, constant - value, false)?.let(::checkBound)
         }
         if (guide != null) {
-            val point = guide.point
+            var point = guide.point
             val fractionalCoordinates = fractional(coordinates, point)
             observePrimal(when {
                 point == null -> "PrimalUnavailable"
@@ -245,15 +263,34 @@ internal class LinearAuthority(
                 (lower == null || threshold + BigFraction.ONE > lower) &&
                     (upper == null || threshold < upper)
             }
-            val candidate = point?.takeIf { fractionalCoordinates.isEmpty() }
-                ?.let { sample(source, coordinates, it) }?.takeIf {
-                    checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null
+            fun witness(values: List<BigFraction>): Sample? {
+                val proposed = sample(source, coordinates, values)
+                val evidence = SourceEvidence(source.scope, SourceClaim.Witness(proposed), SourceDerivation.SourceWitness)
+                return when (SourceEvidenceVerifier(context).verify(evidence, cancellation)) {
+                    SourceEvidenceCheck.Checked -> proposed
+                    is SourceEvidenceCheck.Rejected -> {
+                        observePrimal("PrimalSourceRejected")
+                        null
+                    }
+                    is SourceEvidenceCheck.Unavailable -> {
+                        observePrimal("PrimalSourceUnavailable")
+                        null
+                    }
                 }
-            if (point != null && fractionalCoordinates.isEmpty()) {
-                observePrimal(if (candidate == null) "PrimalSourceRejected" else "PrimalSourceChecked")
+            }
+            var candidate = point?.takeIf { fractionalCoordinates.isEmpty() }?.let(::witness)
+            if (candidate != null) observePrimal("PrimalSourceChecked")
+            if (candidate == null && point != null && fractionalCoordinates.isEmpty()) {
+                val recovered = recover(prepared, point, cancellation)
+                candidate = recovered?.let(::witness)
+                if (candidate != null) {
+                    point = recovered
+                    observePrimal("PrimalRecoverySourceChecked")
+                }
             }
             if (candidate != null && bound != null) {
-                val value = (point.indices.fold(constant) { value, id -> value + costs[id] * point[id] }) * sign
+                val accepted = checkNotNull(point)
+                val value = (accepted.indices.fold(constant) { value, id -> value + costs[id] * accepted[id] }) * sign
                 val proof = checked(SourceClaim.Optimal(candidate, SourceValue.Rational(value)),
                     SourceDerivation.Optimum(SourceDerivation.SourceWitness, bound.derivation))
                 if (proof != null) return LinearAuthorityResult(proof, bound, candidate)
