@@ -48,7 +48,7 @@ class BoundHistoryTest {
 
     @Test
     fun `hole witnesses should retract before the value is carved in a sibling`() {
-        for (prepared in listOf(false, true)) {
+        for ((prepared, batch) in listOf(false to false, false to true, true to false, true to true)) {
             val problem = Problem(2, 1, arrayOf(IntDomain(0, 9)), emptyArray())
             val direct = PropagationState(problem, Assumptions.None)
             val state = if (prepared) {
@@ -62,13 +62,20 @@ class BoundHistoryTest {
             state.levelToDecisionVar.add(0)
             state.currentLevel = 1
             check(state.pinBool(0, true))
-            check(state.excludeIntValue(0, 3, intArrayOf(Lit.make(0, false))))
+            val original = intArrayOf(Lit.make(0, false))
+            if (batch) {
+                check(state.excludeIntValues(0, longArrayOf(2, 3, 4), original))
+            } else {
+                check(state.excludeIntValue(0, 3, original))
+            }
             val atom = state.atomVarEq(0, 3) - problem.numBoolVars
             state.undoTo(root)
-            assertFalse(state.holeHistHas(0, 3))
-            assertEquals(-1, state.carvedAt(0, 3))
-            assertEquals(0, state.holeLevelFor(0, 3))
-            assertNull(state.holeReasonFor(0, 3))
+            for (value in 2L..4L) {
+                assertFalse(state.holeHistHas(0, value))
+                assertEquals(-1, state.carvedAt(0, value))
+                assertEquals(0, state.holeLevelFor(0, value))
+                assertNull(state.holeReasonFor(0, value))
+            }
             state.levelToDecisionVar.add(1)
             state.currentLevel = 1
             check(state.pinBool(1, true))
