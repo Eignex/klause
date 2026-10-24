@@ -29,10 +29,9 @@ private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
  *  precedence, which interacts with variable-symmetry breaking) are `false` and need an explicit
  *  override.
  * @property skipAfterEmpty whether the round engine stops re-running this pass once it has run and
- *  changed nothing. The engine re-enables every pass when another pass changes the problem; for an
- *  expensive search that overwhelmingly finds nothing to add (symmetry detection, xor unit
- *  derivation) repeating it after each reduction is wasted work, so it runs at most until its first
- *  empty result. Cheap reductions leave it `false` — they must re-run as the problem shrinks.
+ *  changed nothing. Searches that overwhelmingly find nothing to add stay parked after a completed
+ *  miss unless the host tracks a changed relevant input revision. Cheap reductions leave it `false`
+ *  so they can re-run as the problem shrinks.
  */
 enum class PresolvePass(
     val id: String,

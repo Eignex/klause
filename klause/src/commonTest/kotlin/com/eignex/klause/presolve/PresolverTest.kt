@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -16,15 +17,80 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolverTest {
+    @Test
+    fun `source parity should consume pins resolved by a later BVE pass`() {
+        val problem = Problem(6, 0, emptyArray(), listOf(
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
+            Clause(intArrayOf(Lit.make(2, true), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(2, true), Lit.make(4, false))),
+            Clause(intArrayOf(Lit.make(3, false), Lit.make(5, true))),
+            Clause(intArrayOf(Lit.make(3, false), Lit.make(5, false))),
+        ))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val prepared = Presolver.runSource(
+            problem, PresolveConfig.parse("off,+xor-units,+bve"), PresolveContext(presolveBudget = budget),
+        )
+
+        assertTrue(prepared.infeasible)
+        assertEquals(listOf(PresolvePass.ELIMINATE_BOOL_VARS, PresolvePass.DERIVE_XOR_UNITS), prepared.passesFired)
+        assertEquals(
+            listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.REFUTED),
+            budget.invocations.filter { it.pass == "xor-units" }.map { it.outcome },
+        )
+    }
+
+    @Test
+    fun `source parity should stay parked after BVE produces unrelated pins`() {
+        val problem = Problem(6, 0, emptyArray(), listOf(
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
+            Clause(intArrayOf(Lit.make(4, true), Lit.make(5, true))),
+            Clause(intArrayOf(Lit.make(4, true), Lit.make(5, false))),
+        ))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val prepared = Presolver.runSource(
+            problem, PresolveConfig.parse("off,+xor-units,+bve"),
+            PresolveContext(objectiveBoolVars = setOf(4), presolveBudget = budget),
+        )
+
+        assertFalse(prepared.infeasible)
+        assertEquals(listOf(PresolvePass.ELIMINATE_BOOL_VARS), prepared.passesFired)
+        assertEquals(1, budget.passCalls["xor-units"])
+        assertTrue(prepared.problem.factors.filterIsInstance<Clause>().any {
+            it.literals.contentEquals(intArrayOf(Lit.make(4, true)))
+        })
+    }
+
+    @Test
+    fun `source parity should stay parked with unchanged premises`() {
+        val problem = Problem(4, 0, emptyArray(), listOf(
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
+        ))
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val prepared = Presolver.runSource(
+            problem, PresolveConfig.parse("off,+xor-units"), PresolveContext(presolveBudget = budget),
+        )
+
+        assertSame(problem, prepared.problem)
+        assertEquals(1, budget.passCalls["xor-units"])
+    }
+
     @Test
     fun `a completed root refutation should survive an empty finite schedule`() {
         val source = Problem(

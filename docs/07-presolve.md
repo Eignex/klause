@@ -23,7 +23,13 @@ before another analysis. Yield is the largest of net occurrences removed, factor
 removed, reported columns narrowed or columns fixed, with a floor of one. Distinct
 new Boolean unit pins count as fixed columns; existing units and finite root fixings
 do not. Empty and interrupted calls retain their cost; only completed misses can
-park a pass. These signals are deterministic spending heuristics, not predictions or proofs of search
+park a pass. Parity elimination tracks revisions of XOR and integral equality rows,
+participating Boolean pins and odd-coefficient integer ranges in both lanes. A
+relevant revision releases its completed miss; unrelated factor, pin and range
+changes retain parking. Tracking reads changed factors and participating columns,
+charges the same phase allowance and stops on its cancellation. Other parked
+analyses retain their completed misses for the schedule. These signals are
+deterministic spending heuristics, not predictions or proofs of search
 savings. Unmetered calls use the 1% change threshold without adding accounting
 scans. Cancellation and phase allowances still bound optional work. Presolve and
 an LP-relaxation harvest iterate to a joint fixpoint for at most four rounds, the

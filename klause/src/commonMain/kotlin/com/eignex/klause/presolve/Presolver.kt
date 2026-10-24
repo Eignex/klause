@@ -160,6 +160,15 @@ object Presolver {
             var changed = 0L
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
             val booleanPins = PresolveBooleanPins()
+            var parityInputs: ParityInputRevision? = null
+
+            override fun inputRevision(pass: PresolvePass): Long? {
+                if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
+                val inputs = parityInputs ?: ParityInputRevision(
+                    current, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                ).also { parityInputs = it }
+                return inputs.current(current)
+            }
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
@@ -181,6 +190,7 @@ object Presolver {
                     invocation?.narrowedColumns = narrowed
                     // A proved range can empty a column whose declaration it intersects, which refutes the
                     // model even though the pass itself only claimed a bound.
+                    parityInputs?.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
                     current = current.withSourcePassDelta(delta) ?: return@observeRoundPass PassOutcome.INFEASIBLE
                     booleanPins.record(invocation, delta.addedFactors, entrySize::isBooleanPinned)
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
@@ -287,6 +297,15 @@ object Presolver {
             var changed = 0L
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
             val booleanPins = PresolveBooleanPins()
+            var parityInputs: ParityInputRevision? = null
+
+            override fun inputRevision(pass: PresolvePass): Long? {
+                if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
+                val inputs = parityInputs ?: ParityInputRevision(
+                    current, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                ).also { parityInputs = it }
+                return inputs.current(current)
+            }
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
@@ -309,6 +328,7 @@ object Presolver {
                     changed += changedUnitsOf(delta, current.rootIntDomainsInPlace, invocation)
                     val root = current.rootDeductions as? PropagationResult.Implied
                     booleanPins.record(invocation, delta.addedFactors) { root?.boolValueOrNull(it) != null }
+                    parityInputs?.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
                     current = current.withPassDelta(delta, ctx.bakeConfig)
                     PassOutcome.CHANGED
                 }
@@ -370,6 +390,18 @@ object Presolver {
         val host = object : PresolveRoundEngine.RoundHost {
             var subsumeMark: PresolveSession.ChangeMark? = null
             val booleanPins = PresolveBooleanPins()
+            var parityInputs: ParityInputRevision? = null
+
+            override fun inputRevision(pass: PresolvePass): Long? {
+                if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
+                val inputs = parityInputs ?: ParityInputRevision(
+                    session.passInput(), ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                ).also { parityInputs = it }
+                return inputs.current(session::boolValueOf) { v ->
+                    val domain = session.intDomainOf(v)
+                    domain.min to domain.max
+                }
+            }
 
             // Affine's change-mark at its last firing; a re-run rescans only the variables touched since.
             var affineMark: PresolveSession.ChangeMark? = null
@@ -408,6 +440,7 @@ object Presolver {
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                     changed += changedUnitsOf(delta, input.rootIntDomainsInPlace, invocation)
                     booleanPins.record(invocation, delta.addedFactors) { session.boolValueOf(it) != null }
+                    parityInputs?.recordDelta(input.factors, delta.droppedIndices, delta.addedFactors)
                     session.applyDelta(delta)
                     PassOutcome.CHANGED
                 }

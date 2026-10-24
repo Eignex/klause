@@ -55,6 +55,9 @@ internal object PresolveRoundEngine {
 
         /** Factors dropped or added plus columns narrowed, summed over every change folded in so far. */
         fun changedUnits(): Long
+
+        /** Relevant input revision for a parked pass, or null for permanent parking. */
+        fun inputRevision(pass: PresolvePass): Long? = null
     }
 
     /** The changes made by one bounded pass schedule. */
@@ -83,13 +86,18 @@ internal object PresolveRoundEngine {
         val sizeAtRun = HashMap<PresolvePass, Long>()
         val changeForCost = HashMap<PresolvePass, Long>()
         val fired = LinkedHashSet<PresolvePass>()
-        val exhausted = HashSet<PresolvePass>()
+        val exhausted = HashMap<PresolvePass, Long?>()
         var infeasible = false
         var round = 0
         var roundStartComplexity = host.complexity()
 
         fun due(pass: PresolvePass): Boolean {
-            if (pass in exhausted || ranAtVersion[pass] == version) return false
+            if (ranAtVersion[pass] == version) return false
+            if (pass in exhausted) {
+                val revision = host.inputRevision(pass)
+                if (revision == null || revision == exhausted[pass]) return false
+                exhausted.remove(pass)
+            }
             val after = unitsAfterRun[pass] ?: return true
             val changedSince = host.changedUnits() - after
             return changedSince > 0 && changedSince >= RERUN_CHANGE_FRACTION * sizeAtRun.getValue(pass) &&
@@ -121,7 +129,7 @@ internal object PresolveRoundEngine {
                         version++
                     }
 
-                    PassOutcome.UNCHANGED -> if (pass.skipAfterEmpty) exhausted.add(pass)
+                    PassOutcome.UNCHANGED -> if (pass.skipAfterEmpty) exhausted[pass] = host.inputRevision(pass)
                     PassOutcome.SKIPPED, PassOutcome.INTERRUPTED -> Unit
                 }
                 if (infeasible) break
