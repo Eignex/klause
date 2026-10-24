@@ -167,7 +167,7 @@ class AffineDistinctPropagatorTest {
     }
 
     @Test
-    fun `Hall explanations should lift source bounds across other occupied values`() {
+    fun `Hall explanations should lift earlier bounds across other occupied values`() {
         val factor = Distinct(listOf(0L, 1L, 0L, 0L).mapIndexed { i, offset ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
         })
@@ -179,6 +179,7 @@ class AffineDistinctPropagatorTest {
         state.tightenIntMax(0, 1)
         state.tightenIntMax(1, 1)
         state.tightenIntMax(2, 2)
+        state.currentLevel = 2
         state.currentFactor = 0
 
         assertTrue(state.factorAt(0).propagate(state, 0))
