@@ -19,6 +19,36 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioCompositionTest {
+    @Test
+    fun `default table satisfaction pools should schedule one support aware worker within the containing allowance`() {
+        val budget = NodeBudget(limit = 100)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile, extensionalSupports = true) { false }
+        for (engine in listOf(EngineMix.BACKTRACK, EngineMix.MIXED)) {
+            val scenario = PortfolioScenario.sequential(Kind.CSP, engine = engine).copy(nodeBudget = budget)
+
+            val plan = PortfolioComposition.plan(scenario, facts)
+            val complete = plan.arms.filterIsInstance<BacktrackWorkerConfig>()
+
+            assertEquals(scenario.arms, plan.arms.size)
+            assertEquals(listOf("satOptimized", "conflictDriven", "support-aware"), complete.take(3).map { it.label })
+            val support = complete.single { it.label == "support-aware" }
+            assertSame(budget, support.recipe.build(3L, null).nodeBudget)
+            assertEquals(plan.arms.size, plan.firstSolutionCount)
+        }
+    }
+
+    @Test
+    fun `an explicit table satisfaction pool should keep its selected recipes`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile, extensionalSupports = true) { false }
+        val scenario = PortfolioScenario.sequential(Kind.CSP).copy(
+            btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") },
+        )
+
+        val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertTrue(arms.all { it.label == "conflictDriven" })
+    }
+
 
     @Test
     fun `finite satisfaction should retain classical branching in the existing complete slots`() {

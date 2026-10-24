@@ -10,6 +10,8 @@ import com.eignex.klause.backtrack.selector.DomWdeg
 import com.eignex.klause.backtrack.selector.Impact
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.IndomainRandom
+import com.eignex.klause.backtrack.selector.MaxSd
 import com.eignex.klause.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.SolutionGuided
@@ -56,6 +58,12 @@ object BacktrackCatalog {
     /** LastConflict + VSIDS + solution-guided values — the general-COP bound workhorse. */
     private fun conflictDriven() = BacktrackRecipe("conflictDriven") { seed, onEvent ->
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent)
+    }
+
+    private fun supportAware() = BacktrackRecipe("support-aware") { seed, onEvent ->
+        BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(
+            valueSelector = MaxSd(fallback = IndomainRandom),
+        )
     }
 
     /** The learned LinUCB variable heuristic ([RegressionVariableSelector]) on solution-guided
@@ -162,6 +170,7 @@ object BacktrackCatalog {
         BacktrackArm.ClausalBalanced -> clausal(arm, 0.975, maxLearned = 4000)
         BacktrackArm.ClausalStable -> clausal(arm, 0.99)
         BacktrackArm.ConflictDriven -> conflictDriven()
+        BacktrackArm.SupportAware -> supportAware()
         BacktrackArm.CoreGuided -> BacktrackRecipe(BacktrackArm.CoreGuided.label) { seed, event ->
             BacktrackPresets.satOptimized(randomSeed = seed, inprocess = false, onEvent = event)
         }
@@ -195,10 +204,12 @@ object BacktrackCatalog {
         BacktrackArm.ClausalBalanced,
         BacktrackArm.ClausalStable,
         BacktrackArm.CoreGuided,
+        BacktrackArm.SupportAware,
     )
     private val cspOrder = listOf(
         BacktrackArm.SatOptimized,
         BacktrackArm.ConflictDriven,
+        BacktrackArm.SupportAware,
         // The relaxation refutes a satisfaction node by infeasibility, which needs no objective — the
         // emphasis is the axis here exactly as it is for the optimize palette.
         BacktrackArm.LpDefault,
@@ -281,6 +292,7 @@ internal enum class BacktrackArm(val label: String, val needs: Set<ArmNeed> = em
     ClausalBalanced("clausal-balanced", setOf(ArmNeed.Clausal)),
     ClausalStable("clausal-stable", setOf(ArmNeed.Clausal)),
     ConflictDriven("conflictDriven"),
+    SupportAware("support-aware", setOf(ArmNeed.ExtensionalSupports)),
     CoreGuided("core-guided", setOf(ArmNeed.BooleanObjective)),
     LpAggressive("lp-aggressive", setOf(ArmNeed.Relaxation(LpEmphasis.AGGRESSIVE))),
     LpDefault("lp-default", setOf(ArmNeed.Relaxation(LpEmphasis.DEFAULT))),

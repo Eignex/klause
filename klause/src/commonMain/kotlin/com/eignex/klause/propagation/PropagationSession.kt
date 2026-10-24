@@ -163,13 +163,13 @@ class PropagationSession private constructor(
      *  candidate value — since the engine only polls between nodes and cannot see past them. */
     internal val cancelRequested: Boolean get() = cancellation()
 
-    internal fun extensionalDensities(variable: Int, values: LongArray): DoubleArray? {
+    internal fun extensionalDensities(variable: Int, values: LongArray, maxVisits: Int = 65_536): DoubleArray? {
         if (fixpointCancelled || state.propQueue.isNotEmpty() || state.dirtyBools.isNotEmpty() ||
             state.dirtyInts.isNotEmpty()
         ) return null
         val occurrences = projection.intOccurrences[variable]
         if (occurrences.none { projection.propagators[it] is ExtensionalSupportProvider }) return null
-        var remaining = 65_536
+        var remaining = maxVisits.coerceIn(0, 65_536)
         val visit = {
             state.checkFiniteWork()
             remaining-- > 0

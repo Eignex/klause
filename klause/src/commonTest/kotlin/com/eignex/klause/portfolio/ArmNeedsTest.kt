@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.symmetry.SymmetryHandling
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -25,6 +26,30 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ArmNeedsTest {
+    @Test
+    fun `small ground tables should offer support ordering`() {
+        val model = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))),
+        ).bake()
+
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, false), LpConfig.OFF)
+
+        assertTrue(facts.offers(ArmNeed.ExtensionalSupports))
+    }
+
+    @Test
+    fun `interval tables should decline automatic support ordering`() {
+        val model = Problem(
+            0, 2, Array(2) { IntDomain(0, 64) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0), longArrayOf(64, 64))),
+        ).bake()
+
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, false), LpConfig.OFF)
+
+        assertFalse(facts.offers(ArmNeed.ExtensionalSupports))
+    }
+
     @Test
     fun `finite preparation should preserve an integer linear proof recipe`() {
         val side = 4

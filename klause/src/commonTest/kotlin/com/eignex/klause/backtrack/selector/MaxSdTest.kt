@@ -15,6 +15,40 @@ import kotlin.test.assertTrue
 
 class MaxSdTest {
     @Test
+    fun `a cheap fallback should preserve unsupported alternatives without probes`() {
+        val problem = Problem(
+            0, 2, arrayOf(IntDomain(0, 3), IntDomain(2, 2)),
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
+        )
+        val session = PropagationSession(problem)
+        val before = session.propagationCount
+        val expected = (0L..3L).filter { it in session.intDomain(0) }.toSet()
+
+        val values = MaxSd(fallback = IndomainRandom).fresh()
+            .values(session, VarRef.IntVar(0), Random(0L)).toSet()
+
+        assertEquals(expected, values)
+        assertEquals(before, session.propagationCount)
+        assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
+    fun `a cheap fallback should avoid probes after the support visit allowance declines`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))),
+        )
+        val session = PropagationSession(problem)
+        val before = session.propagationCount
+
+        val values = MaxSd(fallback = IndomainRandom, maxSupportVisits = 1)
+            .values(session, VarRef.IntVar(0), Random(0L)).toSet()
+
+        assertEquals(setOf(0L, 1L), values)
+        assertEquals(before, session.propagationCount)
+    }
+
+    @Test
     fun `MaxSd should rank live mdd assignments without propagation probes`() {
         val states = intArrayOf(1, 2, 4, 1)
         val starts = intArrayOf(0, 6, 18, 39)
