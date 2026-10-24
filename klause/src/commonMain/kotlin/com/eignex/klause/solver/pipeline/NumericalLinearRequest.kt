@@ -129,6 +129,9 @@ class NumericalLinearRequest internal constructor(
         publication: SourcePublicationObserver,
     ): LinearOptimizationResult {
         require(cores > 0)
+        if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
+            return repair(params, engine == FiniteEngine.ALNS, publication)
+        }
         if (engine == FiniteEngine.FIXED) {
             return solve(params, onIncumbent = { sample, value ->
                 publication.accepted(sample, SourceValue.Rational(value))
@@ -159,6 +162,40 @@ class NumericalLinearRequest internal constructor(
             result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")),
             result.semantics,
         )
+    }
+
+    private fun repair(
+        params: TheoryParams,
+        adaptive: Boolean,
+        publication: SourcePublicationObserver,
+    ): LinearOptimizationResult {
+        val stop = cancellation or params.timeout or params.cancellation
+        val context = authorityContext(objective ?: LinearObjective(), stop) ?: return unavailable(params, stop)
+        if (model.numBoolVars != 0) return unavailable(params, stop)
+        val executionObjective = if (maximize) objective?.negated() else objective
+        return JointLinearRepair(model, context, executionObjective, params.copy(cancellation = stop)).use { repair ->
+            repair.search(adaptive).use { search ->
+                var incumbent: Sample? = null
+                var value: BigFraction? = null
+                var done = false
+                while (!done && !stop() && !repair.exhausted) {
+                    done = search.advance(stop, Long.MAX_VALUE) { sample, _ ->
+                        val original = context.linearValue(sample, stop) ?: return@advance
+                        incumbent = sample
+                        value = original
+                        publication.accepted(sample, SourceValue.Rational(original))
+                    }
+                }
+                val reason = when {
+                    params.timeout() -> TerminationReason.Timeout
+                    stop() -> TerminationReason.Cancelled
+                    else -> TerminationReason.BudgetExhausted
+                }
+                LinearOptimizationResult(context.scope, null, null, incumbent, value, reason,
+                    search.stats.copy(run = search.stats.run.copy(backend = "numerical-joint-repair")),
+                    context.semantics)
+            }
+        }
     }
 
     private fun authorityContext(objective: LinearObjective, stop: Cancellation) =
