@@ -715,6 +715,16 @@ source-assertion time. Calls include redundant individual assertions; strengthen
 sides retain the per-bound work debit even when one call shares their snapshot.
 These clocks are opt-in and establish neither ordinary CLI timing nor source verdicts.
 
+[Lab 7956](https://lab.eignex.com/jobs/7956) preserves both boundary snapshots and
+continuations byte for byte, including the PWD/myget states retained by Lab 7859.
+PWD retains 4,024 strengthened sides and 1,107 definition appends while source-bound
+calls fall from 5,213 to 2,216. The two warmed pairs reduce bound-edit time from
+333–366 ms to 112–114 ms and containing source assertion from 1.47–1.63 s to
+1.27–1.29 s. Definition appends still take 1.09–1.14 s in the batched openings.
+Myget retains its 28 sides, 11 appends and unchanged frontier. These same-head JFR
+diagnostics support sharing bound edits; they establish no source verdict or
+default-policy solve speedup, and the broad partial producer remains opt-in.
+
 The [partial arithmetic investigation](https://github.com/Eignex/klause/issues/3426#issuecomment-6375588869)
 retains matching source/search states for cached and uncached PWD and myget prefixes.
 PWD publishes 37 explained guards over sixteen boundary visits; decline reuse reduces

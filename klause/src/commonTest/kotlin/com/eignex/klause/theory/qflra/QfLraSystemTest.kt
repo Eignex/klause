@@ -143,7 +143,8 @@ class QfLraSystemTest {
             val comparisons = listOf(
                 PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
                     LinearOp.LE, false, true), axiom),
-                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), BigFraction.ONE,
+                PremisedSmtComparison(ExactComparison(
+                    mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), BigFraction.ONE,
                     LinearOp.LE, false, true), axiom),
             )
             val committed = ArrayList<Int>()
@@ -174,7 +175,8 @@ class QfLraSystemTest {
             val comparisons = listOf(
                 PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
                     LinearOp.EQ, false, true), premise(0)),
-                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), BigFraction.ONE,
+                PremisedSmtComparison(ExactComparison(
+                    mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), BigFraction.ONE,
                     LinearOp.LE, false, true), premise(1)),
             )
             val committed = ArrayList<Int>()

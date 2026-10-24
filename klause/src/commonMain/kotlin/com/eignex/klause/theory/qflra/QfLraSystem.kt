@@ -361,7 +361,8 @@ internal class LiveQfLraSystem(
             SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
         }
         val term = slot.term
-        val column = slot.column.takeIf { it >= 0 } ?: (definitionColumn(term.coefficients, beforeDefinition) ?: return null)
+        val column = slot.column.takeIf { it >= 0 }
+            ?: (definitionColumn(term.coefficients, beforeDefinition) ?: return null)
         slot.column = column
         return LpPremisedBound(
             column,
