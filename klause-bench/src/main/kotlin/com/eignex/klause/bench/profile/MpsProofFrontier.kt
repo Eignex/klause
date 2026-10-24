@@ -54,7 +54,9 @@ internal object MpsProofFrontier {
         }
         require(Runtime.getRuntime().availableProcessors() == 1)
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("suite", "problem", "sha256", "exact"))
+        require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
+            (options.keys - setOf("suite", "problem", "sha256", "exact", "probe")).isEmpty())
+        val probe = options["probe"]?.toBooleanStrict() ?: false
         val exact = options.getValue("exact").toBooleanStrict()
         val selected = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -164,6 +166,11 @@ internal object MpsProofFrontier {
                         .verify(it, captureStop).toString())
                 }
             })
+            if (probe) {
+                out.resolve("root-probes.jsonl").writeText("")
+                NumericalFrontierSnapshot(context, Cancellation.after(10.seconds), scale)
+                    .probeRoot(invocation) { out.resolve("root-probes.jsonl").appendText(it.toString() + "\n") }
+            }
         } finally {
             (invocation as AutoCloseable).close()
         }

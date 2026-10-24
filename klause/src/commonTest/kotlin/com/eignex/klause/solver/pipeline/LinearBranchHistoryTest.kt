@@ -2,7 +2,10 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -78,6 +81,20 @@ class LinearBranchHistoryTest {
         }
 
         val selected = history.select(listOf(first, second), Cancellation { true })
+
+        assertEquals(first, selected)
+    }
+
+    @Test
+    fun `nonfinite projected gains should retain source order`() {
+        val history = LinearBranchHistory()
+        val gain = BigFraction.of(bigIntOf(1) shl 2048, BIG_ONE)
+        repeat(2) {
+            history.observe(second, true, gain)
+            history.observe(second, false, gain)
+        }
+
+        val selected = history.select(listOf(first, second), Cancellation.Never)
 
         assertEquals(first, selected)
     }

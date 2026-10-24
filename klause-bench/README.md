@@ -1756,6 +1756,18 @@ stage counters. Reflection fails on an internal shape mismatch. The report does
 not claim an independently validated witness, proof or configured-tolerance source
 verdict; retain ordinary source validation and native/source conclusions alongside it.
 
+The snapshot also retains every checked node's eligible fractional coordinates,
+actual split and exact immediate parent/child bound difference. Both bounds are
+rechecked in their original source scopes. The source LP operation, preparation,
+floating, continuation and refinement counters retain their distinct units;
+refinement overlaps other work and must not be added to them.
+Optional `probe=true` checks both child relaxations for every eligible root
+coordinate under a separate ten-second diagnostic allowance. Each child has one
+theory check and a fresh source-adapter allowance; completed entries flush to
+`root-probes.jsonl`. These queries assess missing root history on identical
+parent states. They do not guide the captured traversal or contribute to its
+operation, frontier, witness or proof observations.
+
 #### Bounded comparison evidence
 
 [7932](https://lab.eignex.com/jobs/7932) compares eight frozen
