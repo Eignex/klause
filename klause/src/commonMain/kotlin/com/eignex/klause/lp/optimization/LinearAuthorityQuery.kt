@@ -28,7 +28,9 @@ internal class LinearAuthorityQuery private constructor(
     }
 
     fun matches(other: SourceProofContext): Boolean = source === other ||
-        (source.scope == other.scope && source.coordinates == other.coordinates && source.premises == other.premises &&
+        (source.scope == other.scope &&
+            source.coordinates == other.coordinates &&
+            source.premises == other.premises &&
             source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
             source.objective == other.objective && source.objectiveConstant == other.objectiveConstant &&
             source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker)
@@ -55,7 +57,8 @@ internal class LinearAuthorityQuery private constructor(
                     cited += premise.inequality to SourceDerivation.Premise(id)
                 }
             }
-            for ((upper, bounds) in listOf(false to source.scope.condition.lower, true to source.scope.condition.upper)) {
+            val condition = source.scope.condition
+            for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
                 val sign = if (upper) BigFraction.ONE else BigFraction.MINUS_ONE
                 for ((id, value) in bounds) cited += SourceInequality(mapOf(id to sign), value * sign) to
                     SourceDerivation.Assumption(id, upper)
@@ -65,9 +68,9 @@ internal class LinearAuthorityQuery private constructor(
                 else template.rows + cited.drop(template.rows.size).map { it.first.row(indices) }
             val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
                 else BigFraction.MINUS_ONE
+            val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
             return LinearAuthorityQuery(source, coordinates, indices, cited, rows, inactive,
-                coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }, numeric.objectiveConstant * sign,
-                sign)
+                costs, numeric.objectiveConstant * sign, sign)
         }
     }
 }

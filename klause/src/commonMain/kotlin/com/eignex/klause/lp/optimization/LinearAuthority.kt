@@ -172,7 +172,7 @@ internal class LinearAuthority(
                 ?.let { sample(source, coordinates, it) }?.takeIf {
                     checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null
                 }
-            if (candidate != null && bound != null && point != null) {
+            if (candidate != null && bound != null) {
                 val value = (point.indices.fold(constant) { value, id -> value + costs[id] * point[id] }) * sign
                 val proof = checked(SourceClaim.Optimal(candidate, SourceValue.Rational(value)),
                     SourceDerivation.Optimum(SourceDerivation.SourceWitness, bound.derivation))
