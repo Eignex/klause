@@ -160,7 +160,7 @@ It indexes at most 65,536 rows, 512 variables, 32,768 distinct labelled edges an
 eight labels per pair, and spends at most one million adjacency/label probes with
 cooperative cancellation. Exceeding collection limits discards the optional index;
 no source row is removed. Reified and soft constraint attributes are unsupported
-and rejected, including group templates.
+and rejected, including group templates and streamed group/block containers.
 
 Each admitted signed-word-safe affine view has an exact channel and a functional
 linear definition hint. A constant `Element` channel preserves live holes in both
