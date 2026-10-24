@@ -33,6 +33,41 @@ class LpEffortGovernorTest {
     }
 
     @Test
+    fun `progressing work stops should not consume the point assessment warmup`() {
+        val g = governor()
+        g.nodes(1)
+
+        repeat(10) {
+            g.observeSolve(opsSpent = 5_000L, pruned = false, workStoppedAfterProgress = true)
+        }
+
+        assertFalse(g.isDemoted)
+    }
+
+    @Test
+    fun `progressing work stops should still spend the cumulative allowance`() {
+        val g = governor(allowance = 1_000L)
+        g.nodes(1)
+        g.chargeWork(1_000L)
+
+        g.observeSolve(opsSpent = 1_000L, pruned = false, workStoppedAfterProgress = true)
+
+        assertTrue(g.isDemoted)
+        assertTrue(g.allowanceSpent)
+    }
+
+    @Test
+    fun `completed queries should assess all preceding work after the warmup`() {
+        val g = governor()
+        g.nodes(1)
+        g.observeSolve(opsSpent = 5_000L, pruned = false, workStoppedAfterProgress = true)
+
+        repeat(4) { g.observeSolve(opsSpent = 1L, pruned = false) }
+
+        assertTrue(g.isDemoted)
+    }
+
+    @Test
     fun `governor should spare a pruning LP however much it costs`() {
         val g = governor()
         g.nodes(1)

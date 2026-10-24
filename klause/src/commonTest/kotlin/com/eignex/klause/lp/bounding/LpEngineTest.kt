@@ -282,7 +282,7 @@ class LpEngineTest {
     }
 
     @Test
-    fun `interrupted root policy should grow only a pivoting work stop without a point`() {
+    fun `adaptive node queries should grow only a pivoting work stop without a point`() {
         for (policy in LpRootQueryPolicy.entries) {
             for (termination in LpFloatTermination.entries + listOf(null)) {
                 for (pivots in listOf(0, 1)) {
@@ -296,7 +296,8 @@ class LpEngineTest {
 
                         engine.observeNodeWorkStop(metricSolver(termination = termination, pivots = pivots))
 
-                        val grows = policy == LpRootQueryPolicy.INTERRUPTED_WORK &&
+                        val grows = (policy == LpRootQueryPolicy.SHARED_WORK ||
+                            policy == LpRootQueryPolicy.INTERRUPTED_WORK) &&
                             termination == LpFloatTermination.WORK && pivots > 0
                         assertEquals(if (grows) before * 2 else before, engine.nodeWorkBudget(),
                             "$policy $termination pivots=$pivots")
