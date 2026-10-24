@@ -49,15 +49,16 @@ class NValueTest {
         val expected = values.flatMap { x -> values.filter { it != x }.map { y -> listOf(x, y, 2L) } }.toSet()
 
         for (factors in listOf(listOf(factor), reduced.replacement)) {
-            val state = LocalSearchState(LocalSearchModel.open(Problem(0, 3, domains, factors.toTypedArray())), Random(3))
+            val problem = Problem(0, 3, domains, factors.toTypedArray())
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
             val actual = values.flatMap { x ->
-                values.mapNotNull { y ->
+                values.map { y ->
                     state.assignment.setInt(0, x)
                     state.assignment.setInt(1, y)
                     state.assignment.setInt(2, 2L)
                     state.recompute()
                     if (state.cost == 0L) listOf(x, y, 2L) else null
-                }
+                }.filterNotNull()
             }.toSet()
 
             assertEquals(expected, actual)
