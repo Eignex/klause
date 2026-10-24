@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.withLinearAuthority
@@ -35,6 +36,21 @@ class LinearAuthorityInvocationTest {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `borrowing an authority should preserve its exhausted cumulative funding`() {
+        val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
+        val budget = SourceLpBudget(funding = SourceLpFunding(0, 1000))
+
+        val result = LinearAuthority(budget, retainLp = true).use { authority ->
+            LinearAuthorityInvocation(source, TheoryParams(), borrowedAuthority = authority).use {
+                it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            }
+        }
+
+        assertEquals(TerminationReason.BudgetExhausted, assertNotNull(result).reason)
+        assertEquals(0, budget.operations)
+    }
 
     @Test
     fun `checked source cuts should close a sparse integer contradiction at the root`() {

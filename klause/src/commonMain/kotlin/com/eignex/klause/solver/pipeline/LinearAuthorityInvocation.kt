@@ -47,9 +47,15 @@ internal class LinearAuthorityInvocation(
     borrowedAuthority: LinearAuthority? = null,
     private val boundOrdered: Boolean = false,
     guidance: Boolean = false,
-    private val funding: SourceLpFunding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit),
+    private val funding: SourceLpFunding = borrowedAuthority?.funding
+        ?: SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit),
     cuts: Boolean = boundOrdered,
 ) : AutoCloseable {
+    init {
+        require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
+            "borrowed linear authority has another work allowance"
+        }
+    }
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
     private var currentStop = params.timeout or params.cancellation
