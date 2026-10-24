@@ -1077,6 +1077,24 @@ Java 25.0.4.1, 6 GiB-heap JFR diagnostics, with no source witness/proof or physi
 RSS claim. The checkpoint policy remains internal; ordinary admission and the
 frozen 144-source baseline denominator stay unchanged.
 
+### Sparse source root capture
+
+`bench.profile.MpsSparseRoot` takes the same hash-pinned `batch64` requests as
+`MpsLpAdmission`. It uses the numerical source pipeline, coordinate-side extraction
+and sparse CSC preparation, then advances the existing scoped root owner at seed 3.
+Preparation has 2M work units and 64 MiB modeled allocation; floating work retains
+the 150M cumulative limit, 1024 pivots and a ten-second deadline. Consultations
+advance at 20M work units and stop at the completed numerical operation. Dual-only
+certification has its own 2M/64 MiB allowance, with no exact-primal recovery.
+
+Each source retains original bytes and build identity. Preparation and guidance
+reports separate work, measured thread allocation, active time, paused versus
+completed floating outcomes, heuristic coordinates, native checked bounds and
+certificate declines. Completed solves expose factor fill and density. These
+captures qualify the internal source-root mechanism; they do not establish source
+witnesses, configured-tolerance verdicts, physical RSS or end-to-end speedups.
+Ordinary finite and source admission remain independent of this diagnostic policy.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing
