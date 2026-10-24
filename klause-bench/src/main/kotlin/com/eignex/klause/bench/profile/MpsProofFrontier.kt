@@ -55,8 +55,9 @@ internal object MpsProofFrontier {
         require(Runtime.getRuntime().availableProcessors() == 1)
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
-            (options.keys - setOf("suite", "problem", "sha256", "exact", "probe")).isEmpty())
+            (options.keys - setOf("suite", "problem", "sha256", "exact", "probe", "history")).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
+        val historyEnabled = options["history"]?.toBooleanStrict() ?: false
         val exact = options.getValue("exact").toBooleanStrict()
         val selected = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -90,7 +91,7 @@ internal object MpsProofFrontier {
         val scale = field(view, "objectiveScale") as BigFraction
         val system = NumericalFrontierSnapshot.system(context)
         Reports.writeJson(out.resolve("native-system.json").path, system)
-        val invocation = NumericalFrontierSnapshot.open(context, params)
+        val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled)
         val history = ArrayList<JsonObject>()
         out.resolve("incumbents.jsonl").writeText("")
         val started = System.nanoTime()
@@ -140,6 +141,7 @@ internal object MpsProofFrontier {
                 put("claimsCoverTolerance", field(linear, "claimsCoverTolerance") as Boolean)
                 put("scope", NumericalFrontierSnapshot.scope(context.scope))
                 put("measurement", "numerical-owner-state-capture")
+                put("branchHistory", historyEnabled)
                 put("wholeCliTimingClaim", false)
                 put("sourceVerdictClaim", false)
                 put("independentWitnessCheck", false)

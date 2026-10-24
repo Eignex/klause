@@ -1761,6 +1761,10 @@ actual split and exact immediate parent/child bound difference. Both bounds are
 rechecked in their original source scopes. The source LP operation, preparation,
 floating, continuation and refinement counters retain their distinct units;
 refinement overlaps other work and must not be added to them.
+Optional `history=true` enables the internal directional-gain prototype for that
+capture. It requires two nonnegative finite gain observations per direction,
+normalized by movement, before ranking a coordinate. Missing, unusable or all-zero
+estimates retain source order. The production default uses source order.
 Optional `probe=true` checks both child relaxations for every eligible root
 coordinate under a separate ten-second diagnostic allowance. Each child has one
 theory check and a fresh source-adapter allowance; completed entries flush to

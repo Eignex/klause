@@ -33,6 +33,31 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `directional history should preserve exhaustive fractional sibling proofs`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        for (sense in ObjectiveSense.entries) {
+            val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
+            val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", sense)),
+                setOf(integer, other), mapOf(
+                    "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2) * direction),
+                        BigFraction.MINUS_ONE)),
+                    "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ofLong(-2) * direction),
+                        BigFraction.MINUS_ONE)),
+                ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
+
+            val result = assertNotNull(LinearAuthorityInvocation(source, TheoryParams(), useBranchHistory = true).use {
+                it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            })
+
+            val terminal = assertNotNull(result.terminal)
+            val claim = assertIs<SourceClaim.Optimal>(terminal.claim)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2) * direction), claim.value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        }
+    }
+
+    @Test
     fun `a checked incumbent should close a dominated fractional sibling`() {
         for (sense in ObjectiveSense.entries) {
             val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE

@@ -188,12 +188,13 @@ internal class NumericalFrontierSnapshot(
 
     companion object {
         // Reflection keeps solver ownership and inspection types out of the published API.
-        fun open(context: SourceProofContext, params: TheoryParams): Any {
+        fun open(context: SourceProofContext, params: TheoryParams, history: Boolean = false): Any {
             val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
             val type = Class.forName("com.eignex.klause.solver.pipeline.LinearAuthorityInvocation")
             return type.getDeclaredConstructor(SourceProofContext::class.java, TheoryParams::class.java,
-                Function0::class.java, stateType).newInstance(context, params, { null }, state)
+                Function0::class.java, stateType, Boolean::class.javaPrimitiveType)
+                .newInstance(context, params, { null }, state, history)
         }
 
         fun run(invocation: Any, onIncumbent: (Sample, BigFraction) -> Unit): Any = checkNotNull(
