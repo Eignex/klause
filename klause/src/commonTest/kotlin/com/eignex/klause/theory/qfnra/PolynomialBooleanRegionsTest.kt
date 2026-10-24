@@ -20,6 +20,29 @@ import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
     @Test
+    fun `numeric sign retraction retains guarded zero and positive regions`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const gate Bool) " +
+                "(assert (or (and gate (> x 0)) (and (not gate) (= x 0))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+        val algebraic = AlgebraicArithmetic()
+        for ((gate, value) in listOf(false to BigFraction.ZERO, true to BigFraction.ONE)) {
+            val point = mapOf(0 to algebraic.rational(value))
+            assertTrue(regions.any { region ->
+                region.bools[0] == gate && region.atoms.all { (index, required) ->
+                    val atom = formula.atoms[index]
+                    atom.holds(algebraic.signAt(atom.polynomial, point)) == required
+                }
+            })
+        }
+    }
+
+    @Test
     fun `partial numeric conflicts exclude a guarded branch before its unrelated obligations`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) " +

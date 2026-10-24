@@ -23,65 +23,86 @@ internal fun preparePolynomialSignPropagation(
     arithmetic: PolynomialArithmetic,
     onDomains: ((PolynomialSignDomains) -> Unit)?,
 ): Iterator<Boolean?> = sequence {
-    val domains = IntArray(realCount) { arithmetic.step(); ALL_SIGNS }
-    val adjacent = Array(realCount) { arithmetic.step(); ArrayList<Int>() }
-    val constraints = ArrayList<SignConstraint>()
-    val pending = ArrayDeque<Int>()
-    val queued = BooleanArray(atoms.size)
-    for ((index, atom) in atoms.withIndex()) {
-        arithmetic.step()
-        val variables = atom.polynomial.variables
-        for (variable in variables) {
-            arithmetic.step()
-            require(variable in 0 until realCount)
-            adjacent[variable].add(index)
-        }
-        constraints.add(SignConstraint(atom.polynomial.terms, variables, relationSigns(atom.relation)))
-        pending.addLast(index)
-        queued[index] = true
-        yield(null)
+    val propagation = PolynomialSignPropagation(realCount, arithmetic)
+    for (result in propagation.prepare(atoms)) {
+        if (result == false) onDomains?.invoke(propagation.domains())
+        yield(result)
     }
-    while (pending.isNotEmpty()) {
-        arithmetic.step()
-        val index = pending.removeFirst()
-        queued[index] = false
-        val constraint = constraints[index]
-        if (possibleSigns(constraint.terms, domains, arithmetic) and constraint.allowed == 0) {
+}.iterator()
+
+internal class PolynomialSignPropagation(realCount: Int, private val arithmetic: PolynomialArithmetic) {
+    private val domains = IntArray(realCount) { arithmetic.step(); ALL_SIGNS }
+    private val adjacent = Array(realCount) { arithmetic.step(); ArrayList<Int>() }
+    private val constraints = ArrayList<SignConstraint>()
+    private val pending = ArrayDeque<Int>()
+    private var checking = false
+    private var refuted = false
+
+    fun domains(): PolynomialSignDomains {
+        check(!checking && !refuted)
+        return PolynomialSignDomains(domains)
+    }
+
+    fun prepare(atoms: List<PolynomialAtom>): Iterator<Boolean?> = sequence {
+        check(!checking && !refuted)
+        checking = true
+        for (atom in atoms) {
             arithmetic.step()
-            yield(true)
-            return@sequence
-        }
-        for (variable in constraint.variables) {
-            arithmetic.step()
-            val previous = domains[variable]
-            var restricted = previous
-            for (sign in listOf(NEGATIVE_SIGN, ZERO_SIGN, POSITIVE_SIGN)) {
+            val index = constraints.size
+            val variables = atom.polynomial.variables
+            for (variable in variables) {
                 arithmetic.step()
-                if (previous and sign != 0 &&
-                    possibleSigns(constraint.terms, domains, arithmetic, variable, sign) and constraint.allowed == 0
-                ) restricted = restricted and sign.inv()
+                require(variable in domains.indices)
+                adjacent[variable].add(index)
             }
-            if (restricted == 0) {
+            constraints.add(SignConstraint(atom.polynomial.terms, variables, relationSigns(atom.relation)))
+            pending.addLast(index)
+            yield(null)
+        }
+        while (pending.isNotEmpty()) {
+            arithmetic.step()
+            val index = pending.removeFirst()
+            val constraint = constraints[index]
+            constraint.queued = false
+            if (possibleSigns(constraint.terms, domains, arithmetic) and constraint.allowed == 0) {
                 arithmetic.step()
+                refuted = true
                 yield(true)
                 return@sequence
             }
-            if (restricted == previous) continue
-            domains[variable] = restricted
-            for (neighbor in adjacent[variable]) {
+            for (variable in constraint.variables) {
                 arithmetic.step()
-                if (!queued[neighbor]) {
-                    pending.addLast(neighbor)
-                    queued[neighbor] = true
+                val previous = domains[variable]
+                var restricted = previous
+                for (sign in listOf(NEGATIVE_SIGN, ZERO_SIGN, POSITIVE_SIGN)) {
+                    arithmetic.step()
+                    if (previous and sign != 0 &&
+                        possibleSigns(constraint.terms, domains, arithmetic, variable, sign) and constraint.allowed == 0
+                    ) restricted = restricted and sign.inv()
+                }
+                if (restricted == 0) {
+                    arithmetic.step()
+                    refuted = true
+                    yield(true)
+                    return@sequence
+                }
+                if (restricted == previous) continue
+                domains[variable] = restricted
+                for (neighbor in adjacent[variable]) {
+                    arithmetic.step()
+                    if (!constraints[neighbor].queued) {
+                        pending.addLast(neighbor)
+                        constraints[neighbor].queued = true
+                    }
                 }
             }
+            yield(null)
         }
-        yield(null)
-    }
-    arithmetic.step()
-    onDomains?.invoke(PolynomialSignDomains(domains))
-    yield(false)
-}.iterator()
+        arithmetic.step()
+        checking = false
+        yield(false)
+    }.iterator()
+}
 
 internal class PolynomialSignDomains(private val domains: IntArray) {
     fun truth(atom: PolynomialAtom, arithmetic: PolynomialArithmetic): Boolean? {
@@ -96,7 +117,9 @@ internal class PolynomialSignDomains(private val domains: IntArray) {
     }
 }
 
-private class SignConstraint(val terms: List<PolynomialTerm>, val variables: List<Int>, val allowed: Int)
+private class SignConstraint(val terms: List<PolynomialTerm>, val variables: List<Int>, val allowed: Int) {
+    var queued: Boolean = true
+}
 
 private fun possibleSigns(
     terms: List<PolynomialTerm>,
