@@ -7,6 +7,7 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.MpsCompiled
 import com.eignex.klause.formats.mps.checkMpsWitness
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.formats.mps.toProblem
@@ -24,9 +25,11 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.parseBigInt
 import java.io.File
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
+import java.math.BigDecimal
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
@@ -60,7 +63,9 @@ internal object ContinuousCompletionProfile {
     }
 
     private fun capture(input: JsonObject, out: File) {
-        require(input.keys == setOf("suite", "problem", "sha256", "exact"))
+        require(input.keys - setOf("initialWitness", "initialWitnessSha256") ==
+            setOf("suite", "problem", "sha256", "exact"))
+        require(("initialWitness" in input) == ("initialWitnessSha256" in input))
         val reference = Catalog.uncapped(input.getValue("suite").jsonPrimitive.content).problems
             .single { it.name == input.getValue("problem").jsonPrimitive.content }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
@@ -73,6 +78,10 @@ internal object ContinuousCompletionProfile {
         val parsed = Mps.parse(bytes.decodeToString())
         val source = requireNotNull(parsed.toLinearSourceProblem(overrides))
         val compiled = parsed.toProblem(semanticOverrides = overrides)
+        val initial = input["initialWitness"]?.jsonPrimitive?.content?.let { witness ->
+            require(sha256(witness.encodeToByteArray()) == input.getValue("initialWitnessSha256").jsonPrimitive.content)
+            initialSample(compiled, witness)
+        }
         val problem = compiled.model.bake()
         val objective = requireNotNull(compiled.objective).toLinearObjective().let {
             if (compiled.maximize) it.negated() else it
@@ -144,11 +153,14 @@ internal object ContinuousCompletionProfile {
             search.session().use { session ->
                 val result = session.minimize(objective, LocalSearchParams(
                     randomSeed = 3L, cancellation = stop,
+                    initialAssignment = initial,
                 ))
                 out.resolve("summary.json").writeText(buildJsonObject {
                     put("revision", Reports.readGitSha())
                     put("input", input)
-                    put("scope", "direct-ls-cold-completion-sequence")
+                    put("scope", if (initial == null) "direct-ls-cold-completion-sequence"
+                        else "direct-ls-seeded-completion-sequence")
+                    put("initialWitnessSha256", input["initialWitnessSha256"] ?: JsonNull)
                     put("instrumentation", "candidate and exact residual capture; timing is observed only")
                     put("sourceVerdictClaim", false)
                     put("seed", 3)
@@ -163,6 +175,29 @@ internal object ContinuousCompletionProfile {
                 }.toString())
             }
         }
+    }
+
+    private fun initialSample(compiled: MpsCompiled, witness: String): Sample {
+        val tokens = witness.removePrefix("v ").trim().split(Regex("\\s+"))
+        val values = tokens.associate { token ->
+            require('=' in token)
+            token.substringBefore('=') to BigDecimal(token.substringAfter('='))
+        }
+        require(values.size == tokens.size && values.keys == compiled.columns.map { it.name }.toSet())
+        val ints = LongArray(compiled.model.numIntVars)
+        val reals = DoubleArray(compiled.model.numRealVars)
+        val exact = MutableList(compiled.model.numRealVars) { BigFraction.ZERO }
+        for (column in compiled.columns) {
+            val value = values.getValue(column.name)
+            if (column.real) {
+                val decimal = value.setScale(maxOf(0, value.scale()))
+                reals[column.id] = decimal.toDouble()
+                exact[column.id] = BigFraction.of(parseBigInt(decimal.unscaledValue().toString()),
+                    parseBigInt(BigDecimal.ONE.scaleByPowerOfTen(decimal.scale()).toBigIntegerExact().toString()))
+            } else ints[column.id] = value.longValueExact()
+        }
+        require(compiled.model.numBoolVars == 0)
+        return Sample(BooleanArray(0), ints, reals, exactReals = exact)
     }
 
     internal fun newCompletion(

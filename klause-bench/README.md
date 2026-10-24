@@ -1355,6 +1355,9 @@ ten-second containing deadline. Each request saves its
 hashed MPS source, discrete pins, completion outcome, work, numerical-block exact
 captures and an independent original-source witness check. `exact=true` removes
 source feasibility slack; the other mode retains the declared source policy.
+Optional `initialWitness` (the MPS `v name=value` line) and its
+`initialWitnessSha256` start from an existing assignment. These captures are marked
+as seeded and do not establish cold-start reachability or incumbent quality.
 
 Capture is observed and its elapsed times are not throughput measurements. Use the
 same saved candidate sequence for cold and retained-owner comparisons, including
