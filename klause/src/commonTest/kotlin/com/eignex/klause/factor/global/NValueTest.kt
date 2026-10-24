@@ -10,7 +10,10 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
+import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.bake
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -46,8 +49,16 @@ class NValueTest {
         val expected = values.flatMap { x -> values.filter { it != x }.map { y -> listOf(x, y, 2L) } }.toSet()
 
         for (factors in listOf(listOf(factor), reduced.replacement)) {
-            val actual = BruteForceSolver(Problem(0, 3, domains, factors.toTypedArray()).bake())
-                .enumerate(BruteForceParams(randomSeed = 0L)).map { it.ints.toList() }.toSet()
+            val state = LocalSearchState(LocalSearchModel.open(Problem(0, 3, domains, factors.toTypedArray())), Random(3))
+            val actual = values.flatMap { x ->
+                values.mapNotNull { y ->
+                    state.assignment.setInt(0, x)
+                    state.assignment.setInt(1, y)
+                    state.assignment.setInt(2, 2L)
+                    state.recompute()
+                    if (state.cost == 0L) listOf(x, y, 2L) else null
+                }
+            }.toSet()
 
             assertEquals(expected, actual)
         }
