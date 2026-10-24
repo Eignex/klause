@@ -1115,6 +1115,18 @@ lifting the bound through the existing native source-evidence verifier. This nat
 source check remains separate from an independent MPS witness or proof check.
 Owner close time/allocation and final owner counts are recorded separately.
 
+`phase1=compare values=recompute` compares first-bound and long-step feasibility
+ratios; `phase1=long-step values=compare` isolates incremental basic values.
+Both options accept their named single policy, and the defaults are
+`phase1=long-step values=incremental`. Comparisons warm up in round zero and
+reverse policy order in round one. The bounded trace separates numerical phases,
+scaled objective and infeasibility samples, zero steps, passed crossings, pricing,
+basis-solve work and rebuild triggers. Owner preparation has its own report.
+The profile fixes floating defaults at 150M work and 1024 iterations independently
+of caller policy defaults. Explicit `work=N iterations=N` changes both limits
+for a separately labelled funded comparison; retain an original-limit control
+first. Submit these captures as Mac-only profiles with `runTimeoutSec: 180`.
+
 [Matched capture 8051](https://lab.eignex.com/jobs/8051) freezes `c4c8489f`, the
 original source hashes, Java 25.0.4.1 on Mac/aarch64, a 6 GiB heap and the policy
 above. Source defaults use absolute and relative tolerance `1/10000000`; the native
@@ -1158,6 +1170,33 @@ retain the same exact bound, with 122.6–122.7 MB of measured thread allocation
 recorded pivot counts. The proof traversal allowance, public defensive snapshots
 and source authority are unchanged. This single warmed pair measures the native
 recheck phase, not a general whole-solve speedup or physical memory bound.
+
+[Phase capture 8142](https://lab.eignex.com/jobs/8142), at `1c1649e3`, retains the
+four frozen sources and existing floating limits on Mac/aarch64. Both large roots
+remain in primal feasibility repair: rentacar has 251 zero steps in 323 iterations,
+and misc04inf has 718 in 1024. There are no artificial-bound starts or numerical
+recovery triggers. Their basis work is split almost equally between RHS FTRAN,
+feasibility-gradient BTRAN and entering FTRAN.
+
+[Long-step comparison 8149](https://lab.eignex.com/jobs/8149), at `7a987b4c`,
+changes only the feasibility ratio in matched identity/equality layouts.
+In the warmed equality layout, the last sampled scaled infeasibility falls from
+207151.69 to 171981.42 on rentacar and from 2516.85 to 183.98 on misc04inf.
+Zero steps fall from 251 to 106 and from 718 to 318. The added breakpoint work
+leaves 291/984 pivots, against 321/1021; both candidates reach floating work.
+Neither produces coordinates or a checked bound.
+
+[Value-update comparison 8153](https://lab.eignex.com/jobs/8153), at `71850ef2`,
+retains long steps and compares fresh RHS solves with periodic refreshes.
+Rentacar advances from 291 to 386 pivots at 150M work; its last sampled scaled
+infeasibility falls to 160454.41. Misc04inf reaches its 1024-iteration limit at
+120524727 work, with 1020 pivots and sampled infeasibility 172.94. RHS FTRAN
+charges fall from 40.23M to 7.25M and from 39.68M to 5.59M. Rentacar's additional
+pivots raise measured guidance thread allocation from 114.2 MB to 152.0 MB;
+misc04inf rises from 184.2 MB to 191.1 MB. These are instrumented phase allocations,
+not RSS or a speedup claim. Cap6000 and p0033 retain identical pivots, work and
+checked native source bounds in both comparisons. All owners close to zero;
+observed sparse fill remains below 1.064 and density below 0.00165.
 
 ### CLI profile tables
 

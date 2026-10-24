@@ -46,9 +46,15 @@ internal object MpsSparseRoot {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..4 && args[0].startsWith("batch64="))
+        require(args.size in 1..6 && args[0].startsWith("batch64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("layout", "phase1", "values") })
+        require(options.keys.all { it in setOf("layout", "phase1", "values", "work", "iterations") })
+        require(("work" in options) == ("iterations" in options))
+        val work = options["work"]?.toLong() ?: 150_000_000L
+        val iterations = options["iterations"]?.toInt() ?: 1024
+        require(work > 0L && iterations > 0)
+        val floating = Class.forName(ENGINE + "LpFloatAllowance").constructors.single { it.parameterCount == 2 }
+            .newInstance(work, iterations)
         val layouts = when (options["layout"]) {
             null, "identity" -> listOf("IDENTITY")
             "equalities" -> listOf("UNCONDITIONAL_EQUALITIES")
@@ -80,7 +86,7 @@ internal object MpsSparseRoot {
                     for (phaseOne in if (round == 0) phaseOnePolicies else phaseOnePolicies.reversed()) {
                         for (values in if (round == 0) valuePolicies else valuePolicies.reversed()) {
                             inspect(request, out.resolve("$index/$round/$layout/$phaseOne/$values").apply { mkdirs() },
-                                layout, round, phaseOne, values)
+                                layout, round, phaseOne, values, floating)
                         }
                     }
                 }
@@ -88,7 +94,15 @@ internal object MpsSparseRoot {
         }
     }
 
-    private fun inspect(request: List<String>, out: File, layout: String, round: Int, phaseOne: String, values: String) {
+    private fun inspect(
+        request: List<String>,
+        out: File,
+        layout: String,
+        round: Int,
+        phaseOne: String,
+        values: String,
+        floating: Any,
+    ) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val selected = Catalog.uncapped(options.getValue("suite")).problems
@@ -140,7 +154,7 @@ internal object MpsSparseRoot {
             it.toString() == layout
         }
         val policy = defaultPolicy.javaClass.constructors.single { it.parameterCount == 5 }.newInstance(
-            call(defaultPolicy, "getPreparation"), call(defaultPolicy, "getFloating"),
+            call(defaultPolicy, "getPreparation"), floating,
             call(defaultPolicy, "getQuantum"), call(defaultPolicy, "getCertificate"), rowPolicy,
         )
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
