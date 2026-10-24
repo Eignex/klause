@@ -20,6 +20,9 @@ internal data class PolynomialQueryProgress(
     var partialConflictPremises: Long = 0,
     var partialExclusionUses: Long = 0,
     var partialExclusionReuses: Long = 0,
+    var partialBuilds: Long = 0,
+    var partialExtensions: Long = 0,
+    var partialInputAtoms: Long = 0,
 ) {
     fun committed(reduction: PolynomialFormulaReduction, work: Long) {
         snapshots++

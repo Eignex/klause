@@ -8,12 +8,67 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialSignPropagationTest {
+    @Test
+    fun `appended predicates retain earlier sign restrictions`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) " +
+                "(assert (> x 0)) (assert (> y 0)) (assert (< (* x y) 0))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
+        val propagation = PolynomialSignPropagation(source.realCount, arithmetic)
+        propagation.prepare(atoms.take(2)).asSequence().filterNotNull().single()
+
+        val conflict = propagation.prepare(atoms.drop(2)).asSequence().filterNotNull().single()
+
+        assertTrue(conflict)
+    }
+
+    @Test
+    fun `new restrictions revisit existing adjacent predicates`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) " +
+                "(assert (< (* x y) 0)) (assert (> x 0)) (assert (>= y 0))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
+        val propagation = PolynomialSignPropagation(source.realCount, arithmetic)
+        for (atom in atoms.dropLast(1)) {
+            propagation.prepare(listOf(atom)).asSequence().filterNotNull().single()
+        }
+
+        val conflict = propagation.prepare(atoms.takeLast(1)).asSequence().filterNotNull().single()
+
+        assertTrue(conflict)
+    }
+
+    @Test
+    fun `appended weak predicates retain their zero fiber`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (assert (>= x 0)) (assert (= (* x x) 0)) (assert (= x 0))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
+        val propagation = PolynomialSignPropagation(source.realCount, arithmetic)
+        for (atom in atoms.dropLast(1)) {
+            propagation.prepare(listOf(atom)).asSequence().filterNotNull().single()
+        }
+
+        val conflict = propagation.prepare(atoms.takeLast(1)).asSequence().filterNotNull().single()
+
+        assertFalse(conflict)
+    }
+
     @Test
     fun `complete regions propagate strict signs through polynomial definitions`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
