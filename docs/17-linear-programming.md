@@ -166,8 +166,8 @@ Dual-only certification checks exact Lagrangian evidence under its own sparse in
 arithmetic and allocation limits. A refused binary dual candidate enters the bounded
 dual-vector rational reconstruction schedule under the same work, allocation and
 attempt limits. The first checked bound ends that schedule without primal recovery
-or exact feasibility continuation. Its accepted bound retains row multipliers for source lifting and
-rechecking. Preparation, floating stops, certificate declines and completed checked
+or exact feasibility continuation. Its accepted bound retains row multipliers for
+source lifting and rechecking. Preparation, floating stops, certificate declines and completed checked
 bounds have separate outcomes and costs; factor fill and density describe the
 completed numerical solve. Sparse preparation alone does not authorize ordinary
 admission or bound the fill of a numerical basis.

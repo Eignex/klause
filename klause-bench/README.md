@@ -1105,6 +1105,38 @@ lifting the bound through the existing native source-evidence verifier. This nat
 source check remains separate from an independent MPS witness or proof check.
 Owner close time/allocation and final owner counts are recorded separately.
 
+[Matched capture 8051](https://lab.eignex.com/jobs/8051) freezes `c4c8489f`, the
+original source hashes, Java 25.0.4.1 on Mac/aarch64, a 6 GiB heap and the policy
+above. Source defaults use absolute and relative tolerance `1/10000000`; the native
+evidence scope is `klause-ir-exact-v1`. Both rounds reproduce these work/progress outcomes; round one follows the
+warmup and reverses layout order. All sixteen preparations admit, with at most
+815,592 work and 21,129,260 modeled bytes. Each consultation sequence owns one
+scoped solver and closes it to zero live owners.
+
+| Source | Identity rows / entries | Equality rows / entries | Recorded pivots, identity / equality | First limiting phase or result |
+| --- | --- | --- | --- | --- |
+| cap6000 | 2299 / 48539 | 2176 / 48243 | 349 / 349 | Both complete with the same checked native source bound |
+| rentacar | 10548 / 80230 | 5515 / 40772 | 174 / 321 | Both stop at floating work, without coordinates or a bound |
+| misc04inf | 1852 / 23762 | 1545 / 17073 | 879 / 1021 | Floating work / pivot limit, without coordinates or a bound |
+| p0033 | 15 / 98 | 15 / 98 | 16 / 16 | Both complete with the same checked native source bound |
+
+Compaction reduces cap6000 floating work from 90,374,706 to 85,852,558 and
+certificate work from 1,196,843 to 1,184,285, with no primal recovery. Rentacar
+advances further under the same work allowance; misc04inf reaches its pivot
+allowance at 142,364,117 work. Maximum observed fill is below 1.064 and density
+below 0.00165. These observations identify numerical progress as the remaining
+limit on the two large sources; they do not establish general fill bounds or a
+wall-time speedup. The paired policy remains opt-in for unconditional templates.
+
+The separate cap6000 native source lift and recheck takes 1.87–1.91 seconds and
+about 8.30 GB of measured thread allocation in round one, versus 90–94 ms for
+guidance and 25.4–25.7 MB of modeled engine certificate storage. That verifier
+cost is outside the engine certificate allowance and is not an end-to-end resource
+bound. Native source rechecks pass for cap6000 and p0033; these are not independent
+original-MPS tolerance proofs. The retained consumer's separate
+[gr4x6 certificate qualification](https://lab.eignex.com/jobs/8068), described
+below, exercises bounded rational dual reconstruction and inherited bound closure.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing
