@@ -71,7 +71,7 @@ class MaxSdTest {
     }
 
     @Test
-    fun `MaxSd should rank live mdd assignments without propagation probes`() {
+    fun `MaxSd should rank equal mdd root edges by accepted assignments without probes`() {
         val states = intArrayOf(1, 2, 4, 1)
         val starts = intArrayOf(0, 6, 18, 39)
         val transitions = longArrayOf(
@@ -90,7 +90,7 @@ class MaxSdTest {
         val session = PropagationSession(problem)
         val before = session.propagationCount
 
-        val values = MaxSd().values(session, VarRef.IntVar(5), Random(0L)).toList()
+        val values = MaxSd().values(session, VarRef.IntVar(3), Random(0L)).toList()
 
         assertEquals(listOf(1L, 0L), values)
         assertEquals(before, session.propagationCount)
