@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableLongIntMap
 
 // The interior-hole carve record: the per-var (value, level, reason) of each interior hole carved
 // out of a variable's domain during search. Bound atoms carry their establishment level/reason on
@@ -15,9 +16,8 @@ import com.eignex.klause.util.LongArrayList
  *  bake-time fact. */
 internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
     if (rootHoleHist[v]?.contains(k) == true) return null
-    val vals = holeHistVal[v] ?: return null
-    for (i in 0 until vals.size) if (vals[i] == k) return requireNotNull(holeHistAnt[v])[i]
-    return null
+    val slot = holeHistIndex[v]?.getOrDefault(k, -1) ?: -1
+    return if (slot >= 0) requireNotNull(holeHistAnt[v])[slot] else null
 }
 
 /** True iff `k` is on `v`'s interior-carve record. Since the record is truncated on every undo,
@@ -27,9 +27,7 @@ internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
  *  that otherwise cycles for a value far from the live bound. */
 internal fun PropagationState.holeHistHas(v: Int, k: Long): Boolean {
     if (rootHoleHist[v]?.contains(k) == true) return true
-    val vals = holeHistVal[v] ?: return false
-    for (i in 0 until vals.size) if (vals[i] == k) return true
-    return false
+    return (holeHistIndex[v]?.getOrDefault(k, -1) ?: -1) >= 0
 }
 
 internal fun PropagationState.pushHoleHist(v: Int, value: Long, level: Int, ant: IntArray?) {
@@ -41,6 +39,8 @@ internal fun PropagationState.pushHoleHist(v: Int, value: Long, level: Int, ant:
     val lvls = holeHistLvl[v] ?: IntArrayList(initialCapacity = 4).also { holeHistLvl[v] = it }
     val ants = holeHistAnt[v] ?: ArrayList<IntArray?>(4).also { holeHistAnt[v] = it }
     val poss = holeHistPos[v] ?: IntArrayList(initialCapacity = 4).also { holeHistPos[v] = it }
+    val index = holeHistIndex[v] ?: MutableLongIntMap(initialCapacity = 4).also { holeHistIndex[v] = it }
+    if (index.getOrDefault(value, -1) < 0) index.put(value, vals.size)
     vals.add(value)
     lvls.add(level)
     ants.add(ant)
@@ -54,10 +54,8 @@ internal fun PropagationState.pushHoleHist(v: Int, value: Long, level: Int, ant:
  */
 internal fun PropagationState.carvedAt(v: Int, k: Long): Int {
     if (rootHoleHist[v]?.contains(k) == true) return 0
-    val vals = holeHistVal[v] ?: return -1
-    val poss = requireNotNull(holeHistPos[v])
-    for (i in 0 until vals.size) if (vals[i] == k) return poss[i]
-    return -1
+    val slot = holeHistIndex[v]?.getOrDefault(k, -1) ?: -1
+    return if (slot >= 0) requireNotNull(holeHistPos[v])[slot] else -1
 }
 
 /** Level at which interior value `k` was carved out of `v`'s domain. `0` when no
@@ -65,10 +63,22 @@ internal fun PropagationState.carvedAt(v: Int, k: Long): Int {
  *  propagation), which is a root fact. */
 internal fun PropagationState.holeLevelFor(v: Int, k: Long): Int {
     if (rootHoleHist[v]?.contains(k) == true) return 0
-    val vals = holeHistVal[v] ?: return 0
-    val lvls = holeHistLvl[v] ?: error("holeHistLvl[$v] missing while holeHistVal present")
-    for (i in 0 until vals.size) if (vals[i] == k) return lvls[i]
-    return 0
+    val slot = holeHistIndex[v]?.getOrDefault(k, -1) ?: -1
+    return if (slot >= 0) requireNotNull(holeHistLvl[v])[slot] else 0
+}
+
+internal fun PropagationState.truncateHoleHistory(v: Int, size: Int) {
+    val values = holeHistVal[v] ?: return
+    val index = holeHistIndex[v]
+    for (slot in values.size - 1 downTo size) {
+        val value = values[slot]
+        // The index names the first witness when a value has more than one record.
+        if (index != null && index.getOrDefault(value, -1) == slot) index.remove(value)
+    }
+    values.truncateTo(size)
+    holeHistLvl[v]?.truncateTo(size)
+    holeHistAnt[v]?.let { reasons -> while (reasons.size > size) reasons.removeAt(reasons.size - 1) }
+    holeHistPos[v]?.truncateTo(size)
 }
 
 internal class RootHoleHistory {

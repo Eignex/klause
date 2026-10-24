@@ -186,6 +186,10 @@ replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see
 them.
 
+Search-time holes keep their reason, level and undo position in trail order, with
+a per-variable value index for lookup. Retraction removes index entries with the
+discarded witness tail. Unconditional root runs remain separate from that index.
+
 Root snapshot capture compares enumerable survivors with the saturated hole count,
 independently of numeric span. Sparse sets are captured as ascending survivor
 restrictions and reconstructed without materializing their gaps. Enumerable

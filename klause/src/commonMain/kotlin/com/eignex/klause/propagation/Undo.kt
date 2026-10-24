@@ -213,10 +213,7 @@ private fun PropagationState.replayIntVarUndo(
             intMaxAntecedents[v] = undo.maxAnt[i]
             // Truncate the interior-hole carve history back to its pre-mutation length so
             // the (value, level, reason) records stay aligned with the restored domain.
-            holeHistVal[v]?.truncateTo(undo.holeHistLen[i])
-            holeHistLvl[v]?.truncateTo(undo.holeHistLen[i])
-            holeHistAnt[v]?.let { a -> while (a.size > undo.holeHistLen[i]) a.removeAt(a.size - 1) }
-            holeHistPos[v]?.truncateTo(undo.holeHistLen[i])
+            truncateHoleHistory(v, undo.holeHistLen[i])
         }
 
         2 -> { // interior carve — re-insert the carved value
@@ -227,10 +224,7 @@ private fun PropagationState.replayIntVarUndo(
             intLevel[v] = undo.level[i]
             intMinLevel[v] = undo.minLvl[i]
             intMaxLevel[v] = undo.maxLvl[i]
-            holeHistVal[v]?.truncateTo(undo.maxReason[i])
-            holeHistLvl[v]?.truncateTo(undo.maxReason[i])
-            holeHistAnt[v]?.let { a -> while (a.size > undo.maxReason[i]) a.removeAt(a.size - 1) }
-            holeHistPos[v]?.truncateTo(undo.maxReason[i])
+            truncateHoleHistory(v, undo.maxReason[i])
         }
 
         else -> error("unknown undo tag")
