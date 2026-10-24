@@ -1169,6 +1169,26 @@ These observations support explicit post-repair decline results while preserving
 the following walk. They establish neither absence of admissible moves nor a better
 restart operator. Diversity, ordinary-route quality and cost remain separate measures.
 
+Production [7885](https://lab.eignex.com/jobs/7885) compares `9f4f9b0496` with
+`da9dba7685` without debug instrumentation on both team sources, gbac and photo.
+All 32 witnesses pass source checks; all sixteen fixed/ILS pairs match final witness,
+objective and existing non-timing counters at 1600 LS moves. ILS changed/declined
+totals are 47/9 and 52/10 for the team sources, and 70/18 for photo. Fixed controls
+and gbac omit unobserved outcomes. Small/large median ILS solve seconds are
+3.118/3.062 and 9.002/9.025; gbac is 2.935/2.713 and photo 0.429/0.487. These
+two-seed timings are descriptive and establish no general cost improvement.
+
+Ordinary mixed/P1/10-second [7886](https://lab.eignex.com/jobs/7886) retains seeds
+1/2/3 three times. All 72 witnesses pass source checks. Small/large signed mean
+objective differences are +451.3/+2652.0, with wins/losses/ties 3/3/3 and 4/3/2;
+gbac is +31.8 at 4/3/2 and photo ties all nine pairs. Repeats are not independent
+seeds, and this observational mechanism supports no optimization-gain claim.
+Team changed/declined totals are 1689/46 and 457/28; the mixed-route restart total
+also includes CP work and is not an ILS denominator. Both production runs share
+source hashes, runtime, options, dependencies and compiler identity, with distinct
+solver and CLI JARs bound to each revision. Adoption is for explicit prepared
+input-change outcomes while preserving the operator and its following walk.
+
 ### Source-scoped derivation admission
 
 Retain typed original-source derivations separately from native engine completion;
