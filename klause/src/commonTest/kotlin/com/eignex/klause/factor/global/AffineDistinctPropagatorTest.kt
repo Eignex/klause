@@ -54,7 +54,7 @@ class AffineDistinctPropagatorTest {
         val factor = Distinct((0..2).map { i ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(i.toLong()))
         })
-        val problem = Problem(0, 3, arrayOf(IntDomain(1, 2), IntDomain(0, 1), IntDomain(-2, 1000000)), arrayOf(factor))
+        val problem = Problem(0, 3, arrayOf(IntDomain(1, 2), IntDomain(0, 1), IntDomain(-1, 1000000)), arrayOf(factor))
 
         val session = PropagationSession(problem)
 
