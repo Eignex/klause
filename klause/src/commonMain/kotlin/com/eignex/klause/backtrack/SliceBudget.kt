@@ -96,7 +96,10 @@ internal class SliceBudget(
     )
 
     /** Whether the armed slice has spent its allowance. */
-    fun expired(): Boolean = workExpired() || deadline?.hasPassedNow() == true
+    fun expired(): Boolean {
+        charge()
+        return workExpired() || deadline?.hasPassedNow() == true
+    }
 
     fun workExpired(): Boolean = workBounded && sliceSpent() >= nodeAllowance
 
@@ -104,7 +107,7 @@ internal class SliceBudget(
 
     /**
      * Spend the LP and propagation work done since the last charge from the slice's budget. The charge lands at a
-     * node boundary and increases the completed work, so the slice pauses at its next poll as if it had explored
+     * cancellation poll or node boundary and increases the completed work, so the slice pauses as if it had explored
      * that many nodes; it stays a function of the search, and runs remain reproducible.
      */
     fun charge() {

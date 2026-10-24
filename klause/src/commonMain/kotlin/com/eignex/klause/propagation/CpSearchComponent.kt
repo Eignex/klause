@@ -145,8 +145,16 @@ class CpSearchComponent(
     override fun assert(
         decision: SearchDecision,
         context: com.eignex.klause.solver.search.SearchContext,
+    ): ComponentResult = session.withCancellation(context.executionControls.cancellation) {
+        assertDecision(decision, context)
+    }
+
+    private fun assertDecision(
+        decision: SearchDecision,
+        context: com.eignex.klause.solver.search.SearchContext,
     ): ComponentResult {
         sharedContext = context
+        if (session.fixpointCancelled) return ComponentResult.Indeterminate
         lastResult = null
         if (decision is SearchDecision.Bool && Lit.variable(decision.literal) >= session.problem.numBoolVars) {
             return if (context.atomLiteral(decision) != null) {
@@ -269,21 +277,31 @@ class CpSearchComponent(
     ): ComponentResult {
         if (session.fixpointCancelled) return ComponentResult.Indeterminate
         session.explanationState.finiteWork.begin()
-        fun publishCompleted(decision: SearchDecision, premise: SearchAtomPremise): ComponentResult {
-            if (session.fixpointCancelled) return ComponentResult.Indeterminate
-            return try {
-                session.explanationState.checkFiniteWork()
-                publish(decision, premise)
-            } catch (_: FinitePropagationInterrupted) {
-                session.explanationState.runCancelled = true
-                ComponentResult.Indeterminate
-            }
+        return try {
+            publishFixpoint(result, context, skippedVariable, publish)
+        } catch (_: FinitePropagationInterrupted) {
+            session.explanationState.runCancelled = true
+            ComponentResult.Indeterminate
         }
+    }
+
+    private fun checkPublication() {
+        if (session.fixpointCancelled) throw FinitePropagationInterrupted()
+        session.explanationState.checkFiniteWork()
+    }
+
+    private fun publishFixpoint(
+        result: PropagationResult.Implied,
+        context: com.eignex.klause.solver.search.SearchContext,
+        skippedVariable: Int,
+        publish: (SearchDecision, SearchAtomPremise) -> ComponentResult,
+    ): ComponentResult {
         propagationObserver?.invoke(result)
         var published: ComponentResult = ComponentResult.Consistent
         result.forEachBool { variable, value ->
+            checkPublication()
             if (variable != skippedVariable) {
-                val publication = publishCompleted(
+                val publication = publish(
                     SearchDecision.Bool(Lit.make(variable, value)), SearchAtomPremise.Unavailable,
                 )
                 if (publication !is ComponentResult.Consistent) published = publication
@@ -293,29 +311,26 @@ class CpSearchComponent(
         // Queued assertions are delivered after this callback, keeping the native point fixed.
         val premises = CpPublicationPremises(session, context, ::sourceIntId, sharedRootLevel)
         result.forEachInt { variable, value ->
-            val publication = publishCompleted(
-                SearchDecision.IntEqual(sourceIntId(variable), value),
-                SearchAtomPremise.All(
-                    listOf(
-                        premises.bound(variable, false),
-                        premises.bound(variable, true),
-                    ),
-                ),
+            checkPublication()
+            val premise = SearchAtomPremise.All(
+                listOf(premises.bound(variable, false), premises.bound(variable, true)),
             )
+            if (session.fixpointCancelled) throw FinitePropagationInterrupted()
+            val publication = publish(SearchDecision.IntEqual(sourceIntId(variable), value), premise)
             if (publication !is ComponentResult.Consistent) published = publication
         }
         result.forEachIntMin { variable, value ->
-            val publication = publishCompleted(
-                SearchDecision.IntAtLeast(sourceIntId(variable), value),
-                premises.bound(variable, false),
-            )
+            checkPublication()
+            val premise = premises.bound(variable, false)
+            if (session.fixpointCancelled) throw FinitePropagationInterrupted()
+            val publication = publish(SearchDecision.IntAtLeast(sourceIntId(variable), value), premise)
             if (publication !is ComponentResult.Consistent) published = publication
         }
         result.forEachIntMax { variable, value ->
-            val publication = publishCompleted(
-                SearchDecision.IntAtMost(sourceIntId(variable), value),
-                premises.bound(variable, true),
-            )
+            checkPublication()
+            val premise = premises.bound(variable, true)
+            if (session.fixpointCancelled) throw FinitePropagationInterrupted()
+            val publication = publish(SearchDecision.IntAtMost(sourceIntId(variable), value), premise)
             if (publication !is ComponentResult.Consistent) published = publication
         }
         return if (session.fixpointCancelled) ComponentResult.Indeterminate else published
@@ -336,7 +351,9 @@ class CpSearchComponent(
         } else {
             sharedRootLevel
         }
+        val rolledBack = target < session.decisionLevel
         session.popToLevel(target)
+        if (rolledBack) session.explanationState.runCancelled = false
         nativeLevelBySharedLevel.truncateTo(decisionLevel + 1)
     }
 

@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -35,6 +36,64 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class CpSearchComponentTest {
+    @Test
+    fun `a shared assertion allowance should interrupt native filtering and allow a retry after retraction`() {
+        val native = PropagationSession(
+            Problem(
+                0, 2, Array(2) { IntDomain(0, 255) },
+                arrayOf(Table(intArrayOf(0, 1), LongArray(512) { (it / 2).toLong() })),
+            ),
+        )
+        val cp = CpSearchComponent(native)
+        var armed = false
+        var start = 0L
+        val shared = SearchSession(listOf(cp), cancellation = Cancellation { armed && native.work - start >= 128L })
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        start = native.work
+        armed = true
+
+        val interrupted = shared.push(SearchDecision.IntEqual(0, 17))
+
+        assertIs<ComponentResult.Indeterminate>(interrupted)
+        assertEquals(true, native.fixpointCancelled)
+        assertIs<ComponentCheck.Indeterminate>(cp.check(shared))
+        shared.popTo(0)
+        assertEquals(false, native.fixpointCancelled)
+        armed = false
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(0, 17)))
+        assertEquals(17L, native.intDomain(1).min)
+        assertEquals(17L, native.intDomain(1).max)
+    }
+
+    @Test
+    fun `cancelled publication should stop visiting later deductions`() {
+        var cancelled = false
+        val native = PropagationSession(
+            Problem(512, 0, emptyArray(), Array(512) { Clause(intArrayOf(Lit.make(it, true))) }),
+            cancellation = Cancellation { cancelled },
+        )
+        val cp = CpSearchComponent(native)
+        var publications = 0
+        val context = object : SearchContext by SearchSession(emptyList()) {
+            override fun publish(decision: SearchDecision, premise: SearchAtomPremise): ComponentResult {
+                publications++
+                return ComponentResult.Consistent
+            }
+        }
+        val result = PropagationResult.Implied(
+            IntArray(512) { it }, BooleanArray(512) { true }, intArrayOf(), longArrayOf(),
+        )
+        val before = native.work
+        cancelled = true
+
+        val publication = cp.publish(result, context)
+
+        assertIs<ComponentResult.Indeterminate>(publication)
+        assertEquals(63, publications)
+        assertEquals(63L, native.work - before)
+        assertEquals(true, native.fixpointCancelled)
+    }
+
     @Test
     fun `shared native bound chains should preserve source coordinates and their Boolean premise`() {
         val mapping = intArrayOf(4, 7, 9, 12, 14)

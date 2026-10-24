@@ -46,6 +46,7 @@ class SearchRun internal constructor(
     private val cancellationPoller = SearchCancellationPoller()
     internal var pauseBeforeDecision: () -> Boolean = { false }
     private var pendingAdvance = false
+    private var pendingCancellation = false
 
     /**
      * Poll the cancellation token on a fixed cadence rather than a time-adaptive one.
@@ -208,6 +209,7 @@ class SearchRun internal constructor(
                     when (advanceFrame()) {
                         Advance.Expanded -> Unit
                         Advance.Paused -> return SearchRunEvent.Paused
+                        Advance.Cancelled -> return cancelledAssertion()
                         Advance.Budget -> return finish(SearchRunEvent.Indeterminate.Budget)
                         Advance.Exhausted -> if (!backtrack()) return stopAfterBacktrack()
                         Advance.Restart -> restart()?.let { return it }
@@ -317,7 +319,15 @@ class SearchRun internal constructor(
                 }
 
                 ComponentResult.Indeterminate -> {
+                    val interrupted = session.cancelled()
                     session.popTo(level)
+                    if (interrupted) {
+                        // Retraction restores the completed parent; the unrefuted alternative must be retried.
+                        frame.next--
+                        pendingAdvance = true
+                        pendingCancellation = true
+                        return Advance.Cancelled
+                    }
                     rememberIndeterminate()
                 }
 
@@ -366,7 +376,7 @@ class SearchRun internal constructor(
             when (advanceFrame()) {
                 Advance.Expanded -> return true
 
-                Advance.Paused -> return false
+                Advance.Paused, Advance.Cancelled -> return false
 
                 Advance.Budget -> {
                     budgetInterrupted = true
@@ -485,7 +495,13 @@ class SearchRun internal constructor(
         return event
     }
 
+    private fun cancelledAssertion(): SearchRunEvent {
+        pendingCancellation = false
+        return lifecycle.onCancellation(session).toEvent() ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+    }
+
     private fun stopAfterBacktrack(indeterminate: Boolean = false): SearchRunEvent {
+        if (pendingCancellation) return cancelledAssertion()
         if (pendingAdvance) return SearchRunEvent.Paused
         // An exhausted frame stack has no pending region for a later slice to resume.
         if (frames.isEmpty() && !budgetInterrupted) return finish(exhausted())
@@ -539,6 +555,7 @@ class SearchRun internal constructor(
         consumedModel = false
         terminal = null
         pendingAdvance = false
+        pendingCancellation = false
         started = false
         cancellationPoller.reset()
         params.restart.beginRun()
@@ -554,6 +571,7 @@ class SearchRun internal constructor(
     private enum class Advance {
         Expanded,
         Paused,
+        Cancelled,
         Exhausted,
         Budget,
         Restart,
