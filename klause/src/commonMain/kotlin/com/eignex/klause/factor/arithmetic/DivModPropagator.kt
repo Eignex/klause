@@ -96,11 +96,11 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         if (dividends.size.toLong() * (divisors?.size ?: 1) > MAX_PAIRS) return true
         val cached = state.refPayload[factorId] as? DivModSupports
         val supports = if (cached != null && cached.covers(state)) cached else {
-            DivModSupports(relation, state).also {
-                val cells = state.divModSupportCells - (cached?.storageCells ?: 0) + it.storageCells
-                if (cells <= MAX_CACHED_CELLS) {
+            val available = MAX_CACHED_CELLS - state.divModSupportCells + (cached?.storageCells ?: 0)
+            DivModSupports(relation, state, available).also {
+                if (it.retained) {
                     state.refPayload[factorId] = it
-                    state.divModSupportCells = cells
+                    state.divModSupportCells += it.storageCells - (cached?.storageCells ?: 0)
                 }
             }
         }

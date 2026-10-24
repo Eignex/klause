@@ -9,7 +9,7 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
-internal class DivModSupports(relation: DivMod, state: PropagationState) {
+internal class DivModSupports(relation: DivMod, state: PropagationState, availableCells: Int) {
     private val dividend = relation.dividend
     private val divisor = relation.divisor
     private val sourceDividend = state.intDomains[dividend]
@@ -20,10 +20,11 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
     private val supports = Array(variables.size) { LongHashSet() }
     private val minima = LongArray(variables.size)
     private val maxima = LongArray(variables.size)
-    private val dividendIndices = MutableLongIntMap()
+    val storageCells: Int = 64 + sourceDividend.span().size * (sourceDivisor?.span()?.size ?: 1) * roles.size
+    val retained: Boolean = storageCells <= availableCells
+    private val dividendIndices = if (retained) MutableLongIntMap() else null
     private val dividendOffsets: IntArray
     private val tuples: LongArray
-    val storageCells: Int = 64 + sourceDividend.span().size * (sourceDivisor?.span()?.size ?: 1) * roles.size
 
     init {
         val dividends = sourceDividend.span()
@@ -31,11 +32,13 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
         val constant = relation.constantDivisor
         val constantWord = constant?.takeIf { it.fitsLong() }?.toLongExact()
         val rows = LongArrayList()
-        dividendOffsets = IntArray(dividends.size + 1)
+        dividendOffsets = if (retained) IntArray(dividends.size + 1) else IntArray(0)
         for (i in 0 until dividends.size) {
             val av = dividends.valueAt(i)
-            dividendIndices.put(av, i)
-            dividendOffsets[i] = rows.size
+            if (retained) {
+                checkNotNull(dividendIndices).put(av, i)
+                dividendOffsets[i] = rows.size
+            }
             for (j in 0 until (divisors?.size ?: 1)) {
                 val bv = divisors?.valueAt(j)
                 val wordDivisor = bv ?: constantWord
@@ -54,7 +57,7 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
                 for (value in values) rows.add(value)
             }
         }
-        dividendOffsets[dividends.size] = rows.size
+        if (retained) dividendOffsets[dividends.size] = rows.size
         tuples = rows.toLongArray()
     }
 
@@ -77,11 +80,16 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
         for (values in supports) values.clear()
         minima.fill(Long.MAX_VALUE)
         maxima.fill(Long.MIN_VALUE)
-        val dividends = state.intDomains[dividend].span()
-        for (i in 0 until dividends.size) {
-            val index = dividendIndices.getOrDefault(dividends.valueAt(i), -1)
-            check(index >= 0)
-            collectSupports(state, dividendOffsets[index], dividendOffsets[index + 1])
+        val indices = dividendIndices
+        if (indices == null) {
+            collectSupports(state, 0, tuples.size, firstRole = 0)
+        } else {
+            val dividends = state.intDomains[dividend].span()
+            for (i in 0 until dividends.size) {
+                val index = indices.getOrDefault(dividends.valueAt(i), -1)
+                check(index >= 0)
+                collectSupports(state, dividendOffsets[index], dividendOffsets[index + 1], firstRole = 1)
+            }
         }
         for (column in variables.indices) {
             val values = supports[column]
@@ -98,11 +106,11 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
         return true
     }
 
-    private fun collectSupports(state: PropagationState, start: Int, end: Int) {
+    private fun collectSupports(state: PropagationState, start: Int, end: Int, firstRole: Int) {
         var row = start
         while (row < end) {
             var live = true
-            for (role in 1 until roles.size) {
+            for (role in firstRole until roles.size) {
                 if (tuples[row + role] !in state.intDomains[roles[role]]) {
                     live = false
                     break
