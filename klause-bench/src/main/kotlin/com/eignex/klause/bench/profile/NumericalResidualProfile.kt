@@ -214,6 +214,7 @@ internal object NumericalResidualProfile {
         private val denseLimit: Int = 6,
         private val observed: Boolean = true,
         val syntheticWorkEnabled: Boolean = false,
+        private val auditBasis: Boolean = false,
     ) {
         val phaseNs = linkedMapOf<String, Long>()
         val phaseCalls = linkedMapOf<String, Long>()
@@ -224,6 +225,8 @@ internal object NumericalResidualProfile {
         val solves = ArrayList<JsonElement>()
         val builds = ArrayList<JsonElement>()
         val captures = ArrayList<Any>()
+        val basisResiduals = ArrayList<JsonElement>()
+        val basisSlices = ArrayList<JsonElement>()
         private var owners = 0
         private val originals = IdentityHashMap<Any, Any>()
         val context: Any
@@ -273,6 +276,9 @@ internal object NumericalResidualProfile {
                     val phase = method.name
                     val transform = phase == "ftran" || phase == "btran"
                     val inputSupport = if (transform) call(requireNotNull(arguments[0]), "getCount") as Int else 0
+                    val rhs = if (transform && auditBasis && basisResiduals.size < 128) {
+                        call(requireNotNull(arguments[0]), "toDoubleArray") as DoubleArray
+                    } else null
                     val observation = if (phase == "refactorize" && builds.size < 4096) {
                         buildJsonObject {
                             put("owner", id)
@@ -306,7 +312,16 @@ internal object NumericalResidualProfile {
                         val entries = call(work, "getTransformEntries") as Long
                         transformEntries[phase] = (transformEntries[phase] ?: 0L) + entries
                         recordSolveWork(phase, arguments, inputSupport, work)
+                        if (rhs != null) {
+                            basisResiduals += buildJsonObject {
+                                put("phase", phase)
+                                put("updates", call(backend, "getUpdateCount") as Int)
+                                put("quality", json(call(backend, "solveQuality", rhs, arguments[0], phase == "btran")))
+                            }
+                        }
                     }
+                    if (auditBasis && ((phase == "refactorize" && result == true) ||
+                        (phase == "update" && result.toString() != "SINGULAR"))) recordBasisSlices(backend, phase)
                     if (phase == "update" && result.toString() != "SINGULAR") {
                         val spread = call(backend, "getRcond") as Double
                         if (spread.isFinite() && spread >= 0.0) {
@@ -358,6 +373,36 @@ internal object NumericalResidualProfile {
             } finally {
                 phaseNs[phase] = (phaseNs[phase] ?: 0L) + System.nanoTime() - start
                 phaseCalls[phase] = (phaseCalls[phase] ?: 0L) + 1L
+            }
+        }
+
+        private fun recordBasisSlices(backend: Any, phase: String) {
+            if (basisSlices.size >= 16) return
+            val cache = field(backend, "cache")
+            val upper = requireNotNull(call(requireNotNull(call(cache, "getFt")), "getUpper"))
+            val columns = call(upper, "getColumns") as Array<*>
+            if (columns.isEmpty()) return
+            for (j in listOf(0, columns.size / 3, 2 * (columns.size / 3), columns.lastIndex).distinct()) {
+                if (basisSlices.size >= 16) break
+                val slice = requireNotNull(columns[j])
+                val indices = call(slice, "getIndices") as IntArray
+                val values = call(slice, "getValues") as DoubleArray
+                val offset = call(slice, "getOffset") as Int
+                val count = call(slice, "getCount") as Int
+                basisSlices += buildJsonObject {
+                    put("phase", phase)
+                    put("updates", call(backend, "getUpdateCount") as Int)
+                    put("dimension", columns.size)
+                    put("column", j)
+                    put("offset", offset)
+                    put("count", count)
+                    put("sampleCount", minOf(count, 64))
+                    put("indices", json(indices.copyOfRange(offset, offset + minOf(count, 64))))
+                    put("values", json(values.copyOfRange(offset, offset + minOf(count, 64))))
+                    put("indicesInBounds", (offset until offset + count).all { indices[it] in columns.indices })
+                    put("strictlySorted", (offset + 1 until offset + count).all { indices[it - 1] < indices[it] })
+                    put("finite", (offset until offset + count).all { values[it].isFinite() })
+                }
             }
         }
 
