@@ -56,15 +56,21 @@ class MddIncrementalStateTest {
         state.currentLevel = 1
         check(state.excludeIntValue(2, 1))
         assertNull(state.runToFixpoint(allFactors = false))
-        assertContentEquals(intArrayOf(2, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting)
+        assertContentEquals(
+            intArrayOf(2, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
+        )
 
         state.undoTo(root)
 
-        assertContentEquals(intArrayOf(2, 8), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting)
+        assertContentEquals(
+            intArrayOf(2, 8), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
+        )
         state.currentLevel = 1
         check(state.excludeIntValue(1, 0))
         assertNull(state.runToFixpoint(allFactors = false))
-        assertContentEquals(intArrayOf(0, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting)
+        assertContentEquals(
+            intArrayOf(0, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
+        )
     }
 
     @Test
@@ -81,7 +87,9 @@ class MddIncrementalStateTest {
 
         assertNull(payload.supportCounts(0, longArrayOf(0, 1)) { ++visits < 12 })
 
-        assertContentEquals(intArrayOf(1, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting)
+        assertContentEquals(
+            intArrayOf(1, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
+        )
     }
 
     @Test
