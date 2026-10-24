@@ -1209,6 +1209,46 @@ experiments and stay outside the repository.
 
 ### Table and MDD historical domains
 
+Retain adaptive live tuple masks and bounded support-count ordering as consumers of
+the shared index. [8055](https://lab.eignex.com/jobs/8055) compares `e5028472dd`
+(the retained algorithms on parent `e467739f4e`, with maxSD exposed) and `e36eb235ac`
+on Mac/aarch64, CP/LP-off, one conflictDriven arm, 2000 nodes, 20 seconds, seed 3
+and three repeats. Both revisions run random ordering and maxSD; all 60 commands
+exit successfully, and all 24 reported witnesses pass independent source checking.
+Source hashes, runtime, options and non-solver dependency bytes match.
+
+| Source | Probing maxSD control | Live-support maxSD |
+| --- | --- | --- |
+| WordSquare | 2 nodes, 20.13–20.24 s, unknown | 4 nodes, 20.97–20.98 s, unknown |
+| Eternity | 1839–1879 nodes, 20.12–20.13 s, unknown | 2000 nodes, 3.39–3.47 s, unknown |
+| WordDesign2 | 13–14 nodes, 20.12–20.15 s, unknown | 11–12 nodes, 20.12 s, unknown |
+| Table Nonogram | 348 nodes, 2.51–2.64 s, valid witness | 614 nodes, 1.39–1.41 s, valid witness |
+| Regular Nonogram | 398 nodes, 0.89–0.91 s, valid witness | 398 nodes, 0.89–0.91 s, valid witness |
+
+Random-order Eternity preserves 5644 failures and depth 27 at 2000 nodes, with
+similar process times; random Table/Regular Nonograms preserve nodes and failures.
+Random WordDesign reaches 70–77 nodes instead of 67–68, with different failures.
+Support ordering changes trajectories: Eternity's depth reaches 37 instead of 19,
+while WordDesign reaches fewer nodes. WordSquare support ordering raises peak RSS
+from 1442944–1452784 to 1624272–1723856 KiB; its deadline overrun is retained as a
+cost, not a solved-source gain. Cold root propagation also grows from 19–25 to
+204–243 ms on WordSquare, and 56–62 to 107–118 ms on WordDesign. The Table mechanism
+uses Compact-Table-style mask invalidation with a retained STR2 prefix; the MDD
+comparison retains CSR reachability and adds indexed symbol cuts. It does not
+evaluate a complete Compact-MDD replacement.
+
+Retain cooperative Table/MDD visits and incomplete-reason suppression.
+[8046](https://lab.eignex.com/jobs/8046) pairs `2f228a33b2` with `0b087c2a89`
+under matching 2-second and 20-second controls on the same five sources. All 60
+commands return and all 24 witnesses pass source checks. WordDesign's 20-second
+overrun falls from 21.71–21.79 to 20.16–20.17 s; its reached nodes fall from 39 to
+30. At identical 2000-node Eternity trajectories, process time rises from
+2.98–3.08 to 3.40 s. Primitive visit accounting changes, so raw old/new work totals
+are different currencies. [8052](https://lab.eignex.com/jobs/8052) isolates
+per-operation polling metadata binding against `0b087c2a89`; its 30 ordinary runs
+and twelve valid witnesses preserve trajectories with similar times, establishing
+no separate throughput gain.
+
 Retain shared sparse/dense ground support postings for historical reasons.
 [8029](https://lab.eignex.com/jobs/8029) compares `3e8ac3841` with `b7547b3f50` on
 Mac/aarch64: one conflictDriven CP arm, LP off, 2000 nodes, 20 seconds, seed 3,
