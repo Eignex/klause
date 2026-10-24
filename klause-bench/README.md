@@ -2287,6 +2287,16 @@ The `scan=SUITE` form inspects original MPS integer translations across a comple
 catalog suite under a two-minute deadline, retaining source hashes, objective reads
 and candidate bytes without preparing or solving the models.
 
+[8134](https://lab.eignex.com/jobs/8134), at `678caea38f` on Mac/aarch64, finds no
+original unit translations in flugpl, gr4x6, opt1217, p0033 or p0201. All ten
+default/exact enabled/disabled residual pairs are byte-identical, with no objective
+change. Default preparation work agrees; exact p0033 and p0201 spend another 192
+and 2,412 units on objective analysis. Fixed-order instrumented timings establish
+no speedup. The complete 65-source MIPLIB 3 scan
+[8140](https://lab.eignex.com/jobs/8140) retains 33 cap6000 and 40 fiber alias rows
+whose two integer columns both have nonzero source objective weights; all offsets
+are zero. Candidate shapes alone establish neither retained contraction nor solve benefit.
+
 The scalar session [qualification 8040](https://lab.eignex.com/jobs/8040) compares
 cold `3e8ac384` with retained `6aef3fdd` and an automatic finite control over
 opt1217, p0201, gr4x6, flugpl, p0033, enigma, enlight4 and flugplinf. Each has

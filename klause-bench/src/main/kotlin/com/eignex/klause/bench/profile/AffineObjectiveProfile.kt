@@ -155,7 +155,10 @@ internal object AffineObjectiveProfile {
                         put("columns", JsonArray(terms.map { JsonPrimitive(it.column) }))
                         put("names", JsonArray(terms.map { JsonPrimitive(variables[it.column].name) }))
                         put("weights", JsonArray(terms.map {
-                            JsonPrimitive(objective[it.column]?.toString() ?: "0")
+                            val weight = objective[it.column]
+                            JsonPrimitive(weight?.let { value ->
+                                BigFraction.of(value.numerator, value.denominator).toString()
+                            } ?: "0")
                         }))
                         put("bothObjectiveColumns", terms.all {
                             objective[it.column]?.numerator?.let { value -> value != BIG_ZERO } == true
