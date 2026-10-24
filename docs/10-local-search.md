@@ -213,8 +213,9 @@ Each live Table payload holds three integers per row plus bucket heads and count
 MDD invariants retain forward and backward minimum-Hamming-distance layers. An
 accepted coordinate edit propagates from its first and last occurrence until the
 layers stabilize beyond all changed positions. A reusable widest-layer scratch
-buffer avoids rebuilding the lattice. Cost-only edits keep the distance lattice;
-the accepted path's weight still determines the exact cost gap. A single-position
+buffer avoids rebuilding the lattice. Cost-only edits keep the distance lattice
+and cached path weight; word edits reconcile the weight before exposing the exact
+cost gap. A single-position
 candidate recombines one layer, while repeated-position candidates recompute the
 distance with every occurrence substituted.
 
