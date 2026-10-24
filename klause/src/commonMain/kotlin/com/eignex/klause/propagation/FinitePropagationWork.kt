@@ -10,6 +10,10 @@ internal interface InterruptiblePropagator : Propagator {
 
 internal class FinitePropagationWork {
     var cancellation: Cancellation = Cancellation.Never
+        set(value) {
+            field = value
+            begin()
+        }
     private var remaining = 63
     private var metered = false
     private var never = true
