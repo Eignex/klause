@@ -169,6 +169,16 @@ objective edits invalidate dependent proofs.
 and [CpLpAdapter](../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/CpLpAdapter.kt)
 hold bound trails, active-row identity and verification caches.
 
+Numerical source traversal retains a `LinearAuthoritySession` per invocation.
+Its fixed matrix has free structural columns; extracted source sides are asserted
+in a replaceable scope. Child and sibling queries retract that scope and retain
+compatible factors. Objective edits invalidate dependent certificates; changed
+structural rows replace the owner. Each query lifts multipliers through its own
+source-side mapping and checks the resulting derivation in its source scope.
+Auxiliary multiplier searches own separate temporary solvers. Neighborhood
+invocations can borrow a retained authority, leaving its cleanup to the caller.
+Floating source coordinates are guidance and supply no witness or proof authority.
+
 Rows have stable identities. Deactivation removes slack bounds, strictness and
 integrality, and is rejected while surviving assertions need the row; global
 source-valid cuts can survive pop. Appends and compaction prepare a fresh

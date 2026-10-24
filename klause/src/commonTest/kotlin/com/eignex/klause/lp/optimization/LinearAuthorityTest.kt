@@ -33,6 +33,55 @@ class LinearAuthorityTest {
     )
 
     @Test
+    fun `retained branch bounds should match cold queries after sibling retraction`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
+        val conditions = listOf(SourceCondition(),
+            SourceCondition(upper = mapOf(real to BigFraction.ONE)),
+            SourceCondition(lower = mapOf(real to BigFraction.ofLong(2))), SourceCondition())
+
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { retained ->
+            for (condition in conditions) {
+                val branch = source.atScope(scope.copy(condition = condition))
+                val cold = LinearAuthority(SourceLpBudget()).use { it.check(branch, Cancellation.Never) }
+                val result = retained.check(branch, Cancellation.Never)
+
+                assertEquals(assertIs<SourceClaim.Optimal>(assertNotNull(cold.evidence).claim).value,
+                    assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(branch.withLinearAuthority()).verify(result.evidence))
+            }
+            assertEquals(1L, retained.preparations)
+            assertEquals(3L, retained.reuses)
+        }
+    }
+
+    @Test
+    fun `retained objective replacement should not reuse a preceding bound`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(3))),
+        ), mapOf(real to BigFraction.ONE))
+        val changed = SourceProofContext(scope.copy(objective = SourceObjective("negative-x", ObjectiveSense.MINIMIZE)),
+            source.coordinates, source.premises, mapOf(real to BigFraction.MINUS_ONE))
+
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { retained ->
+            retained.check(source, Cancellation.Never)
+            val result = retained.check(changed, Cancellation.Never)
+
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(-3)),
+                assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(changed.withLinearAuthority()).verify(result.evidence))
+        }
+    }
+
+    @Test
     fun `fractional proposals should retain every eligible coordinate and floor negative values`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         val half = BigFraction.of(bigIntOf(1), bigIntOf(2))
