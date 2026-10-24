@@ -29,6 +29,7 @@ internal data class LinearAuthorityResult(
     val bound: SourceEvidence? = null,
     val incumbent: Sample? = null,
     val split: Pair<SourceCoordinate, BigFraction>? = null,
+    val fractional: List<Pair<SourceCoordinate, BigFraction>> = emptyList(),
 )
 
 internal class LinearAuthority(
@@ -111,7 +112,9 @@ internal class LinearAuthority(
             return LinearAuthorityResult(refutation(solved), bound)
         }
         val endpoint = closure.exactPrimal?.take(coordinates.size)
-        fractional(coordinates, endpoint)?.let { return LinearAuthorityResult(bound = bound, split = it) }
+        fractional(coordinates, endpoint).takeIf { it.isNotEmpty() }?.let {
+            return LinearAuthorityResult(bound = bound, split = it.first().floorSplit(), fractional = it)
+        }
         val endpointSample = endpoint?.let { sample(source, coordinates, it) }
         val endpointAccepted = endpointSample?.takeIf {
             checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null
@@ -126,7 +129,9 @@ internal class LinearAuthority(
             val original = lp.solve(rows, List(costs.size) { BigFraction.ZERO }, BigFraction.ZERO, cancellation)
             original?.let { refutation(it) }?.let { return LinearAuthorityResult(it, bound) }
             val primal = original?.result?.exactPrimal?.take(coordinates.size)
-            fractional(coordinates, primal)?.let { return LinearAuthorityResult(bound = bound, split = it) }
+            fractional(coordinates, primal).takeIf { it.isNotEmpty() }?.let {
+                return LinearAuthorityResult(bound = bound, split = it.first().floorSplit(), fractional = it)
+            }
             primal?.let { sample(source, coordinates, it) }?.takeIf {
                 checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null
             }
@@ -172,15 +177,17 @@ internal class LinearAuthority(
 
 private fun fractional(
     coordinates: List<SourceCoordinate>, point: List<BigFraction>?,
-): Pair<SourceCoordinate, BigFraction>? {
-    if (point == null) return null
-    for (id in coordinates.indices) {
+): List<Pair<SourceCoordinate, BigFraction>> {
+    if (point == null) return emptyList()
+    return coordinates.indices.mapNotNull { id ->
         if (coordinates[id].kind == SourceCoordinate.Kind.Integer && point[id].den != BIG_ONE) {
-            return coordinates[id] to BigFraction.of(point[id].negated().ceilInteger(), BIG_ONE).negated()
-        }
+            coordinates[id] to point[id]
+        } else null
     }
-    return null
 }
+
+internal fun Pair<SourceCoordinate, BigFraction>.floorSplit(): Pair<SourceCoordinate, BigFraction> =
+    first to BigFraction.of(second.negated().ceilInteger(), BIG_ONE).negated()
 
 private fun sample(source: SourceProofContext, coordinates: List<SourceCoordinate>, point: List<BigFraction>): Sample {
     val integers = coordinates.indices.filter { coordinates[it].kind == SourceCoordinate.Kind.Integer }
