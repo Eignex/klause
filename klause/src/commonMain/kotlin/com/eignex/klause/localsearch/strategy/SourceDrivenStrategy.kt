@@ -160,7 +160,7 @@ class SourceDrivenStrategy(
         evaluation: CompletedMoveEvaluation?,
     ): Move? {
         state.boardCoverage.beginPick(state)
-        val move = pickCollectedMove(state, cancellation, evaluation)
+        val move = state.scoringPick(cancellation) { pickCollectedMove(state, cancellation, evaluation) }
         val cancelled = state.boardCoverage.consulted && cancellation()
         state.boardCoverage.finishPick(cancelled)
         return move.takeUnless { cancelled }

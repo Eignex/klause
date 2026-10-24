@@ -7,10 +7,11 @@ import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.ChannelingSink
-import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.localsearch.LOCAL_SEARCH_OPERATION_BATCH
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.SteppedIntInvariant
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
@@ -26,7 +27,7 @@ internal class TableInvariant(
      *  null when every cell is a point (a ground table). */
     private val hi: LongArray?,
     private val supportCache: TableGroupCache = TableGroupCache(arity, tuples, hi),
-) : Invariant {
+) : SteppedIntInvariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         (state.refPayload[factorId] as TableLsState).minDist > 0
@@ -50,7 +51,7 @@ internal class TableInvariant(
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as TableLsState
-        for (row in s.closestRows()) {
+        for (row in s.closestRows(state::checkScoringWork)) {
             for (col in 0 until arity) {
                 val cur = state.assignment.intValue(xs[col])
                 // Already inside the cell's interval (covers points that already match and wildcards).
@@ -126,12 +127,27 @@ internal class TableInvariant(
             return tableRescanForChange(
                 s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi, intVar, old, newValue,
                 commit = false,
+                poll = state::checkScoringWork,
             ) - before
         }
-        indexedChange(s, index, intVar, old, newValue)
-        val after = s.minDist
-        indexedChange(s, index, intVar, newValue, old)
-        return after - before
+        val single = singleColumnByVar[intVar]
+        val columns = if (single >= 0) intArrayOf(single) else multiColumnsByVar.getValue(intVar)
+        s.beginProbe(columns.size > 1)
+        fun row(row: Int) {
+            if (columns.size > 1 && !s.visitProbeRow(row)) return
+            var delta = 0
+            for (column in columns) {
+                val value = tuples[row * arity + column]
+                delta += (if (value == newValue) 0 else 1) - (if (value == old) 0 else 1)
+            }
+            s.scoreProbeRow(row, delta)
+        }
+        for (column in columns) {
+            val posting = index.columns[column]
+            posting.forEachRow(old, old, ::row, state::checkScoringWork)
+            posting.forEachRow(newValue, newValue, ::row, state::checkScoringWork)
+        }
+        return s.probeMinimum() - before
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
@@ -166,6 +182,37 @@ internal class TableInvariant(
         val col = singleColumnByVar[intVar]
         if (col >= 0) column(col) else for (position in multiColumnsByVar.getValue(intVar)) column(position)
     }
+
+    override fun applyIntSetSteps(
+        state: LocalSearchState,
+        factorId: Int,
+        intVar: Int,
+        oldValue: Long,
+    ): Sequence<Unit> = sequence {
+        val s = state.refPayload[factorId] as TableLsState
+        val newValue = state.assignment.intValue(intVar)
+        if (newValue == oldValue) return@sequence
+        val single = singleColumnByVar[intVar]
+        val columns = if (single >= 0) intArrayOf(single) else multiColumnsByVar.getValue(intVar)
+        val index = supportCache.supports {}
+        if (index == null) {
+            for (row in 0 until numTuples) {
+                var delta = 0
+                for (column in columns) {
+                    delta += (if (tableCellContains(tuples, hi, arity, row, column, newValue)) 0 else 1) -
+                        (if (tableCellContains(tuples, hi, arity, row, column, oldValue)) 0 else 1)
+                }
+                s.setDistance(row, s.dist[row] + delta)
+                if (row % LOCAL_SEARCH_OPERATION_BATCH == 0) yield(Unit)
+            }
+        } else {
+            for (column in columns) {
+                val posting = index.columns[column]
+                yieldAll(posting.forEachRowSteps(oldValue, oldValue) { row -> s.setDistance(row, s.dist[row] + 1) })
+                yieldAll(posting.forEachRowSteps(newValue, newValue) { row -> s.setDistance(row, s.dist[row] - 1) })
+            }
+        }
+    }
 }
 
 private const val TABLE_STRUCTURED_JUMP_CAP: Int = 4
@@ -187,11 +234,13 @@ internal fun tableRescanForChange(
     oldV: Long,
     newV: Long,
     commit: Boolean,
+    poll: () -> Unit = {},
 ): Int {
     var minD = arity
     val col = singleColumnByVar[intVar]
     if (col >= 0) {
         for (row in 0 until numTuples) {
+            poll()
             val miss = if (tableCellContains(tuples, hi, arity, row, col, newV)) 0 else 1
             val was = if (tableCellContains(tuples, hi, arity, row, col, oldV)) 0 else 1
             val d = s.dist[row] + miss - was
@@ -201,6 +250,7 @@ internal fun tableRescanForChange(
     } else {
         val cols = multiColumnsByVar.getValue(intVar)
         for (row in 0 until numTuples) {
+            poll()
             var d = s.dist[row]
             for (c in cols) {
                 val miss = if (tableCellContains(tuples, hi, arity, row, c, newV)) 0 else 1

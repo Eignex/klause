@@ -234,6 +234,26 @@ internal class LocalSearchEngine(
         }
     }
 
+    private suspend fun <T> SequenceScope<T?>.applyMoveSteps(
+        state: LocalSearchState,
+        move: Move,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+        timing: LocalSearchPhaseTimer?,
+    ) {
+        if (checkpoint == null || !state.hasSteppedInvariants) {
+            timing.inPhase("application") { state.apply(move) }
+            return
+        }
+        val cursor = state.applySteps(move).iterator()
+        while (true) {
+            while (params.cancellation()) yield(null)
+            val remaining = timing.inPhase("application") { cursor.hasNext() }
+            if (!remaining) return
+            cursor.next()
+        }
+    }
+
     private suspend fun <T, R : Any> SequenceScope<T?>.preparedValue(
         steps: Sequence<R?>,
         params: LocalSearchParams,
@@ -567,6 +587,7 @@ internal class LocalSearchEngine(
             // search neighbourhood is effectively exhausted, so end the sequence.
             var flipsSinceYield = 0L
             var cancelCountdown = 0
+            var lastCheckMs = 0L
             var moves = 0L
             var restartCount = 0L
             var everFeasible = false
@@ -597,7 +618,15 @@ internal class LocalSearchEngine(
                             reportProgress()
                             yield(null)
                         }
-                        cancelCountdown = CANCEL_CHECK_INTERVAL
+                        val nowMs = sink?.elapsedMs() ?: 0L
+                        val gapMs = maxOf(nowMs - lastCheckMs, 1L)
+                        cancelCountdown = (CANCEL_CHECK_INTERVAL.toLong() * CANCEL_CHECK_TARGET_MS / gapMs)
+                            .coerceIn(1L, CANCEL_CHECK_INTERVAL.toLong()).toInt()
+                        lastCheckMs = nowMs
+                    } else if ((cancelCountdown and (CANCEL_CLOCK_STRIDE - 1)) == 0 &&
+                        sink != null && sink.elapsedMs() - lastCheckMs >= CANCEL_CHECK_TARGET_MS * CANCEL_OVERRUN_FACTOR
+                    ) {
+                        cancelCountdown = 0
                     }
                     val continuousCandidate = if (checkContinuousStart) {
                         checkContinuousStart = false
@@ -680,7 +709,7 @@ internal class LocalSearchEngine(
                         }
                         continue
                     }
-                    timing.inPhase("application") { state.apply(move) }
+                    applyMoveSteps(state, move, params, checkpoint, timing)
                     moves++
                     if (state.cost < bestCost) {
                         bestCost = state.cost
@@ -1088,7 +1117,7 @@ internal class LocalSearchEngine(
                 roundFeedback?.endRound() // a restart ends the round; don't span it
                 continue
             }
-            timing.inPhase("application") { state.apply(move) }
+            applyMoveSteps(state, move, params, checkpoint, timing)
             liveCompletion = null
             if (state.cost in 1 until bestCostInfeasible) {
                 bestCostInfeasible = state.cost

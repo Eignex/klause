@@ -99,6 +99,39 @@ internal class ExtensionalSupportIndex private constructor(val columns: Array<Co
             }
         }
 
+        fun forEachRowSteps(lower: Long, upper: Long, visit: (Int) -> Unit): Sequence<Unit> = sequence {
+            var bucket = lowerBound(lower)
+            var work = 0
+            while (bucket < values.size && values[bucket] <= upper) {
+                val start = starts[bucket]
+                if (start >= 0) {
+                    val limit = sparseLimit(bucket)
+                    for (i in start until limit) {
+                        visit(rows[i])
+                        if (++work == 256) {
+                            yield(Unit)
+                            work = 0
+                        }
+                    }
+                } else {
+                    val base = -start - 1
+                    for (i in 0 until words) {
+                        var bits = masks[base + i]
+                        while (bits != 0L) {
+                            visit((i shl 6) + bits.countTrailingZeroBits())
+                            bits = bits and (bits - 1)
+                        }
+                        work += 64
+                        if (work >= 256) {
+                            yield(Unit)
+                            work = 0
+                        }
+                    }
+                }
+                bucket++
+            }
+        }
+
         private fun lowerBound(value: Long): Int {
             var lo = 0
             var hi = values.size
