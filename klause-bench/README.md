@@ -1992,6 +1992,36 @@ owner per run; matched comparisons showed unchanged results and work with at mos
 about 0.5% allocation change. See [LP architecture](../docs/17-linear-programming.md)
 and [local search](../docs/10-local-search.md).
 
+### Incremental extensional local search
+
+Ground Table local search shares bounded relation postings and retains row-distance
+buckets; MDD local search retains its forward/backward layers and stops accepted
+updates when they stabilize beyond the edited positions. See
+[local-search projections](../docs/10-local-search.md#projections-and-preparation).
+
+[8112](https://lab.eignex.com/jobs/8112) compares `ee56127636` with `e5970b653f`
+on six original XCSP3 sources, LS and mixed/P1, seeds 1/3 three times and 15 seconds.
+All 144 cases run on one Linux/amd64 spot node with matching source, runtime,
+options and non-solver dependency hashes. All 90 returned witnesses pass independent
+XCSP3 checking. WordSquare `tab2-07` gains six checked witnesses, from 6/12 to 12/12;
+the other paired feasibility outcomes are unchanged.
+
+On WordDesign2 `mdd-005`, median LS process time falls from 5.723 to 3.836 seconds
+with the same five/twenty moves, and median peak RSS from 1,366,346 to 840,708 KiB.
+WordDesign1 `words-005` regresses from 2.096 to 2.798 seconds with the same
+1455/1462 moves; its RSS falls from 172,194 to 163,326 KiB. Crossword has mixed
+seed costs. These whole-process observations establish no uniform move-rate gain;
+[8139](https://lab.eignex.com/jobs/8139) separates fixed-work cost and preparation.
+
+Large WordSquare changes twelve 50-second hard kills into twelve unknown returns
+at 28.86–29.99 seconds with 2050 moves; complete mixed arms still receive no segment.
+Large WordDesign2 retains nine hard kills in twelve candidate cases. Missing RSS
+and counters from killed processes are unavailable measurements. These deadline
+failures motivate [bounded-operation comparison](https://lab.eignex.com/jobs/8133),
+with [Mac JFR attribution](https://lab.eignex.com/jobs/8146) kept separate from
+ordinary cost and checked outcomes. RSS is external process peak memory, not
+allocated bytes, and witness checking supplies no independent native proof.
+
 ### Local-search definition propagation
 
 Retain state-owned evaluation caches and pending-node intersections with the full
