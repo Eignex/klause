@@ -27,18 +27,19 @@ internal fun LpScopedSolver.advanceRootGuidance(
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = proofPolicy,
 ): LpRootGuidance {
-    val attempt = advanceFloat(quantum, allowance, cancellation)
+    val token = cancellation or cancellationToken
+    val attempt = advanceFloat(quantum, allowance, token)
     val result = attempt?.second
-    if (result == null || cancellation()) {
+    if (result == null || token()) {
         return LpRootGuidance(null, null,
             if (lastFloatTermination == null && !floatPaused) LpRootGuidancePhase.PREPARATION
             else LpRootGuidancePhase.FLOAT, floatPaused, lastFloatTermination)
     }
     val point = result.primal.takeIf { it.size == state.model.n && it.all(Double::isFinite) }
     val checked = certifyLpBoundOnly(
-        requireNotNull(state.ownerWorkingModel()), result.duals, certificateLimits, cancellation, observer, policy,
+        requireNotNull(state.ownerWorkingModel()), result.duals, certificateLimits, token, observer, policy,
     )
-    if (cancellation()) return LpRootGuidance(null, null, LpRootGuidancePhase.CERTIFICATE, false,
+    if (token()) return LpRootGuidance(null, null, LpRootGuidancePhase.CERTIFICATE, false,
         lastFloatTermination, checked.metrics)
     return LpRootGuidance(point, checked.bound,
         if (checked.bound == null) LpRootGuidancePhase.CERTIFICATE else LpRootGuidancePhase.COMPLETE,
