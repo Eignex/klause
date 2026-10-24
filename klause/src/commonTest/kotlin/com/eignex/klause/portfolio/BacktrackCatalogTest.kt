@@ -27,7 +27,9 @@ class BacktrackCatalogTest {
             Triple(Kind.CSP, ProblemClass.Sat, true),
             Triple(Kind.CSP, ProblemClass.MixedInteger, true),
         )) {
-            val facts = ProblemFacts(ProblemFacts.assumed(kind, problemClass).profile, extensionalSupports = tables) { false }
+            val facts = ProblemFacts(
+                ProblemFacts.assumed(kind, problemClass).profile, extensionalSupports = tables,
+            ) { false }
 
             val recipes = BacktrackCatalog.ranked(kind, facts)
 
