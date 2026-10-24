@@ -1427,10 +1427,11 @@ experiments and stay outside the repository.
 
 ### XCSP3 recovered affine distinctness
 
-Retain bounded complete-group recognition and exact affine channels into native
-matching/Hall propagation. Constant `Element` channels transfer live holes in both
-directions; wide windows keep linear equalities. The
-[format contract](../docs/04-finite-formats.md#arithmetic-relations) owns admission.
+Retain bounded complete-group recognition into exact affine `Distinct` over
+original integer coordinates. Matching/Hall propagation transfers bounds and holes
+directly to source domains, with historical source reasons and no materialized
+channels. The [format contract](../docs/04-finite-formats.md#arithmetic-relations)
+owns admission.
 
 [8047](https://lab.eignex.com/jobs/8047) compares pairwise main `2f228a33b2`,
 linear channels `8e803014ee` and bounded Element channels `cca1b1ad8e` on all
@@ -1468,11 +1469,37 @@ unknown in all three seeds. `56-1860436781` remains unknown in every arm, and
 heldout feasibility/proof outcomes agree. Native refutations are not independently
 proof-checked; one ordinary-route repeat establishes no timing speedup.
 
-Adoption retains collective interval and noncontiguous deductions with exact
-reasons and source semantics. It does not establish hard-family recovery or isolate
-matching from representation and worker effects. [Source-coordinate affine
-views](https://github.com/Eignex/klause/issues/3531) consume the recognizer while
-targeting its materialized-coordinate cost.
+These materialized-coordinate controls retain collective interval and noncontiguous
+deductions with exact source semantics. They do not establish hard-family recovery
+or isolate matching from representation and worker effects.
+
+[8091](https://lab.eignex.com/jobs/8091) compares materialized parent `e77e09a7e4`,
+source-coordinate projections `4f4f50fa76` and its ground-only CP control
+`2041301437` on the same twelve sources: CP/LP-off, one conflictDriven arm, P1,
+2000 nodes, 20 seconds, seeds 1/2/3 and three repeats, without JFR. All 324 cases
+return and all 81 SAT witnesses pass independent original-source checks. Source
+hashes, runtime/options and non-solver dependency hashes match on Mac/aarch64;
+compiler identity is unreported. CP counters repeat across seeds and repetitions,
+so these are timing repeats rather than independent search paths.
+
+On `56-1860436781`, source integers fall from 166 to 56 and factors from 5927 to
+5817. Median subprocess elapsed falls from 3.864 to 2.878 seconds at 2000 nodes;
+failures change from 4306 to 4151 and mean learned size from 59.07 to 55.28 literals.
+The ground-only control takes 2.726 seconds with mean learned size 59.15.
+Matching is slower than ground checking on all eight queen sources. On the small
+SAT source, materialized/matching/ground nodes are 1294/856/268 and median elapsed
+is 1.924/1.189/0.602 seconds. Collective inference has a cost and does not improve
+every search prefix. Four holdouts retain their search counters and nearly equal
+median elapsed. Different failures, depths and auxiliary root-fixing counts prevent
+a pure per-node throughput claim; the seven capped queen sources remain unknown.
+
+Coarse source-domain reasons in [8083](https://lab.eignex.com/jobs/8083) also reduce
+cost, but [8084](https://lab.eignex.com/jobs/8084) loses all three small-source native
+refutations and the parent's one checked 56-queen witness. Those reasons are not
+retained. [8092](https://lab.eignex.com/jobs/8092) separates historical Hall-union
+reasons from their combination with incremental source collision scoring on the
+ordinary mixed/P1/10-second route. The combined arm retains all three small-source
+native refutations; native proof labels are not independently certificate-checked.
 
 ### Table and MDD historical domains
 
