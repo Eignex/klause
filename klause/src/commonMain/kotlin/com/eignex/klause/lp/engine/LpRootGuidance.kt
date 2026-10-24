@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.util.Cancellation
 
 internal enum class LpRootGuidancePhase { PREPARATION, FLOAT, CERTIFICATE, COMPLETE }
@@ -14,6 +15,8 @@ internal class LpRootGuidance(
     val maxLuFill: Double? = null,
     val maxLuDensity: Double? = null,
     val optimalCandidate: Boolean = false,
+    val conflict: BigRationalConflict? = null,
+    val conflictSupport: LpExactSupport? = null,
 ) {
     private val values = primal?.copyOf()
     val primal: DoubleArray? get() = values?.copyOf()
@@ -31,6 +34,20 @@ internal fun LpScopedSolver.advanceRootGuidance(
     val token = cancellation or cancellationToken
     val attempt = advanceFloat(quantum, allowance, token)
     val result = attempt?.second
+    if (attempt != null && result == null && !token() &&
+        lastFloatTermination == LpFloatTermination.INFEASIBLE_CANDIDATE
+    ) {
+        val ray = attempt.first.infeasibleRay
+        if (ray != null) {
+            val checked = certifyLpConflictOnly(requireNotNull(state.ownerWorkingModel()), ray,
+                certificateLimits, token, observer, policy)
+            val conflict = checked.conflict.takeUnless { token() }
+            return LpRootGuidance(null, null,
+                if (conflict != null) LpRootGuidancePhase.COMPLETE else LpRootGuidancePhase.CERTIFICATE,
+                false, lastFloatTermination, checked.metrics, conflict = conflict,
+                conflictSupport = checked.conflictSupport.takeIf { conflict != null })
+        }
+    }
     if (result == null || token()) {
         return LpRootGuidance(null, null,
             if (lastFloatTermination == null && !floatPaused) LpRootGuidancePhase.PREPARATION
