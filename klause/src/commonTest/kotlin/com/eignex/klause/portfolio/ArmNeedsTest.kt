@@ -51,6 +51,20 @@ class ArmNeedsTest {
     }
 
     @Test
+    fun `wide table scopes or domains should decline automatic support ordering`() {
+        for ((arity, values) in listOf(33 to 2, 2 to 33)) {
+            val model = Problem(
+                0, arity, Array(arity) { IntDomain(0, (values - 1).toLong()) },
+                arrayOf<Factor>(Table(IntArray(arity) { it }, LongArray(arity * values) { (it / arity).toLong() })),
+            ).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, false), LpConfig.OFF)
+
+            assertFalse(facts.offers(ArmNeed.ExtensionalSupports))
+        }
+    }
+
+    @Test
     fun `finite preparation should preserve an integer linear proof recipe`() {
         val side = 4
         val rows = (0 until side).map { row ->
