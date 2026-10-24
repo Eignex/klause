@@ -184,6 +184,7 @@ internal object MpsProofFrontier {
                     put("continuationWork", work.continuationWork)
                     put("refinementWork", work.refinementWork)
                     put("boundCertificationWork", work.boundCertificationWork)
+                    put("conflictCertificationWork", work.conflictCertificationWork)
                 })
                 terminal?.let {
                     put("nativeTerminal", it.claim::class.simpleName)

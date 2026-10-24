@@ -29,6 +29,7 @@ internal data class LinearAuthorityResult(
     val relaxedPoint: Map<SourceCoordinate, Double> = emptyMap(),
     val paused: Boolean = false,
     val coordinateConflict: Boolean = false,
+    val lpConflict: Boolean = false,
 )
 
 internal class LinearAuthority(
@@ -137,13 +138,15 @@ internal class LinearAuthority(
             result.conflictWeights?.let { weights ->
                 checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))?.let { return it }
             }
+            if (guidance) return null
             val zeros = List(coordinates.size) { BigFraction.ZERO }
             val weights = combination(zeros, BigFraction.MINUS_ONE, false)
                 ?: combination(zeros, BigFraction.ZERO, true) ?: return null
             return checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
         }
         val closureRows = prepared.closureRows
-        val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive)
+        val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive,
+            prepared.unconditionalRows)
             ?: return LinearAuthorityResult() else null
         if (guide?.paused == true) return LinearAuthorityResult(paused = true)
         guide?.coordinateConflictWeights?.let { weights ->
@@ -153,6 +156,13 @@ internal class LinearAuthority(
         val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive)
             ?: return LinearAuthorityResult()
         val closure = solved.result
+        if (closure.verdict == LpVerdict.INFEASIBLE) {
+            val evidence = refutation(solved)
+            if (evidence != null) return LinearAuthorityResult(evidence = evidence, lpConflict = true)
+            return if (guide != null && budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
+                checkSource(source, cancellation)
+            } else LinearAuthorityResult()
+        }
         guide?.point?.let { point ->
             val projected = point.map { it.toDouble() }
             if (projected.all(Double::isFinite)) {
@@ -198,9 +208,6 @@ internal class LinearAuthority(
                 return exact.copy(bound = exact.bound ?: bound, incumbent = exact.incumbent ?: candidate)
             }
             return LinearAuthorityResult(bound = bound, incumbent = candidate)
-        }
-        if (closure.verdict == LpVerdict.INFEASIBLE) {
-            return LinearAuthorityResult(refutation(solved), bound)
         }
         val endpoint = closure.exactPrimal?.take(coordinates.size)
         fractional(coordinates, endpoint).takeIf { it.isNotEmpty() }?.let {

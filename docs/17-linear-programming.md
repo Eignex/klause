@@ -172,6 +172,17 @@ bounds have separate outcomes and costs; factor fill and density describe the
 completed numerical solve. Sparse preparation alone does not authorize ordinary
 admission or bound the fill of a numerical basis.
 
+A completed infeasibility candidate can instead enter bounded Farkas reconstruction
+under the same certificate policy. The exact ray checker produces row multipliers
+and bound-side support without primal recovery. Source lifting restores extracted
+coordinate sides and the original row sequence before checking a scoped refutation.
+Only this checked derivation closes a numerical traversal leaf or a repair query;
+unknown, paused and declined consultations leave it open. Retained completed results
+charge certificate work once, and scope edits discard their authority before reuse.
+An immutable traversal invocation retains its checked global bound when fresh
+coverage supplies an equal or weaker value, avoiding repeated verification of the
+growing sibling proof. A new repair scope owns a separate invocation.
+
 ### Leaf completion
 
 Finite optimization keeps a pinned real-leaf request across portfolio slices.

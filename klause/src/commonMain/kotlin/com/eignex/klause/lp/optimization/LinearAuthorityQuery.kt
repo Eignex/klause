@@ -17,6 +17,7 @@ internal class LinearAuthorityQuery private constructor(
     val cited: List<Pair<SourceInequality, SourceDerivation>>,
     val rows: List<ExactRationalInequality>,
     val inactive: Set<Int>,
+    val unconditionalRows: Boolean,
     val costs: List<BigFraction>,
     val constant: BigFraction,
     val sign: BigFraction,
@@ -46,11 +47,14 @@ internal class LinearAuthorityQuery private constructor(
             } else null
             val cited = ArrayList<Pair<SourceInequality, SourceDerivation>>()
             val inactive = HashSet<Int>()
+            var unconditional = true
             for ((id, premise) in premises) {
                 if (cancellation()) return null
-                val active = premise.guards.all { (bool, value) -> source.scope.condition.bools[bool] == value } &&
-                    (premise.integerPins.isEmpty() ||
-                        integerBounds?.status(premise.integerPins) == IntegerPinStatus.Established)
+                val guards = premise.guards
+                val pins = premise.integerPins
+                if (guards.isNotEmpty() || pins.isNotEmpty()) unconditional = false
+                val active = guards.all { (bool, value) -> source.scope.condition.bools[bool] == value } &&
+                    (pins.isEmpty() || integerBounds?.status(pins) == IntegerPinStatus.Established)
                 if (active || template != null) {
                     if (!active) inactive += cited.size
                     cited += premise.inequality to SourceDerivation.Premise(id)
@@ -68,7 +72,7 @@ internal class LinearAuthorityQuery private constructor(
             val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
-            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive,
+            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional,
                 costs, numeric.objectiveConstant * sign, sign)
         }
     }

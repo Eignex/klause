@@ -4,6 +4,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpSparseAdmission
 import com.eignex.klause.lp.SparseSourceLp
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.SparseSourceLpRowPolicy
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpModel
@@ -12,6 +13,7 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpRootGuidance
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.advanceRootGuidance
@@ -29,6 +31,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
     private var authority: SourceScope? = null
     private var effort: LpFloatAllowance? = null
     private var sparse: SparseSourceLp? = null
+    private var rowPolicy: SparseSourceLpRowPolicy? = null
     private var admission: SourceLpSparseAdmission? = null
     private var completed: LpRootGuidance? = null
     private var currentToken: Cancellation = Cancellation.Never
@@ -97,25 +100,28 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
         cancellation: Cancellation,
         policy: SparseSourceLpPolicy,
         observer: LpCertificationObserver,
-        consume: (LpRootGuidance, Cancellation) -> T?,
+        consume: (LpRootGuidance, SparseSourceLp, Cancellation) -> T?,
     ): T? {
         if (cancellation()) {
             close()
             return null
         }
         val zero = ExactLpNumber.of(0L)
-        val objective = ExactLpObjective(costs.map(ExactLpNumber::of) + List(packed.rows.size) { zero },
+        val objective = ExactLpObjective(costs.map(ExactLpNumber::of) +
+            List(sparse?.emittedRowCount ?: packed.rows.size) { zero },
             ExactLpNumber.of(constant))
         val compatible = sparse != null && owner?.state?.model?.n == packed.columns.size &&
+            rowPolicy == policy.rowPolicy &&
             effort == policy.floating && this.objective?.let { sameObjective(it, objective) } == true &&
             sameRows(rows, packed.rows)
         if (!compatible) {
             close()
             admission = budget.admitSparse(cancellation) { active ->
                 SparseSourceLp.prepare(packed.rows, packed.columns.map { it.copy(bounds = ExactLpBounds()) },
-                    costs, constant, policy.preparation, active)
+                    costs, constant, policy, active)
             } ?: return null
             sparse = checkNotNull(admission).prepared
+            rowPolicy = policy.rowPolicy
         } else if (admission == null || authority != scope || sides != packed.columns ||
             inactive != packed.inactiveRows) {
             admission?.close()
@@ -125,18 +131,25 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
         val reservation = admission ?: return null
         return budget.resumeSparse(reservation, cancellation) { prepared, active ->
             currentToken = active
-            val current = bind(packed, objective, active, { prepared.model }, scope, policy.floating)
+            val emittedObjective = objective.takeIf { it.size == prepared.model.numVars } ?: ExactLpObjective(
+                costs.map(ExactLpNumber::of) + List(prepared.emittedRowCount) { zero }, ExactLpNumber.of(constant))
+            val current = bind(packed, emittedObjective, active, { prepared.model }, scope, policy.floating)
                 ?: return@resumeSparse null
-            completed?.let { return@resumeSparse consume(it, token) }
+            completed?.let { return@resumeSparse consume(it, prepared, token) }
             val preparation = current.metrics.preparationWork
             try {
                 val guidance = current.advanceRootGuidance(policy.quantum, policy.floating,
                     policy.certificate, token, observer)
                     .also {
-                        budget.observe(boundCertification = it.certificateMetrics?.work ?: 0L)
+                        val work = it.certificateMetrics?.work ?: 0L
+                        if (it.termination == LpFloatTermination.INFEASIBLE_CANDIDATE) {
+                            budget.observe(conflictCertification = work)
+                        } else {
+                            budget.observe(boundCertification = work)
+                        }
                         if (!it.paused) completed = it
                     }
-                consume(guidance, token)
+                consume(guidance, prepared, token)
             } finally {
                 budget.observe(preparation = current.metrics.preparationWork - preparation,
                     floatWork = current.lastMetrics.workOps)
@@ -166,6 +179,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
         authority = null
         effort = null
         sparse = null
+        rowPolicy = null
         admission?.close()
         admission = null
         completed = null

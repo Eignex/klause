@@ -113,6 +113,8 @@ internal class LinearAuthorityTraversal(
         val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
         val coverage = root.boundCoverage(null, minimizes, cancellation) ?: return
         val value = coverage.value ?: return
+        val checkedValue = ((rootBound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
+        if (checkedValue != null && if (minimizes) value <= checkedValue else value >= checkedValue) return
         checked(SourceClaim.Bound(value), coverage.proof)?.let { rootBound = it }
     }
 
@@ -196,6 +198,7 @@ internal class LinearAuthorityTraversal(
         current.result = result
         observe("numericalChecks")
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")
+        if (result.lpConflict) observe("numericalLpConflicts")
         if (result.bound != null) {
             observe("numericalCertifiedBounds")
             val parent = path.getOrNull(path.lastIndex - 1)?.second?.result?.bound?.claim as? SourceClaim.Bound

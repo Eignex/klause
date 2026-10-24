@@ -108,6 +108,32 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `sparse frontier should combine checked LP refutations over complete integer siblings`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val reals = (0 until 127).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val coefficients = mapOf(integer to BigFraction.ofLong(2), other to BigFraction.ofLong(2))
+        val source = SourceProofContext(scope, (listOf(integer, other) + reals).toSet(), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ONE)),
+            "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                BigFraction.MINUS_ONE)),
+        ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
+            assertNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceClaim.Refutation, terminal.claim)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(3L, stages["numericalLpConflicts"])
+        assertEquals(3L, stages["numericalClosedLeaves"])
+    }
+
+    @Test
     fun `bound frontier should preserve complete sibling proofs across slices`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         for (sense in ObjectiveSense.entries) {
