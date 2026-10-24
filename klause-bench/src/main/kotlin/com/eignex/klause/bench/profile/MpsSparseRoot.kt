@@ -184,5 +184,6 @@ internal object MpsSparseRoot {
     }
 
     @Suppress("SpreadOperator")
-    private fun call(owner: Any, name: String, vararg args: Any?): Any? = NumericalResidualProfile.call(owner, name, *args)
+    private fun call(owner: Any, name: String, vararg args: Any?): Any? =
+        NumericalResidualProfile.call(owner, name, *args)
 }
