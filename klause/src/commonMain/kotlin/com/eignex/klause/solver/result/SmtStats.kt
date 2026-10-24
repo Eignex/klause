@@ -15,7 +15,7 @@ data class SourceLpWorkStats(
     val modeledAllocation: Long = 0L,
     /** Active adapter time, including nested solves and owner cleanup once. */
     val activeNs: Long = 0L,
-    /** Measured source-owner preparation work. */
+    /** Charged source-owner preparation work, including sparse construction reservations. */
     val preparationWork: Long = 0L,
     /** Measured source float solve work, excluding preparation. */
     val floatWork: Long = 0L,

@@ -74,8 +74,8 @@ internal class SparseSourceLp private constructor(
             for (column in columns.indices) {
                 val descriptor = columns[column]
                 if (!meter.number(costs[column]) || !meter.number(descriptor.origin.value) ||
-                    descriptor.bounds.lower?.let { !meter.number(it.number.value) } == true ||
-                    descriptor.bounds.upper?.let { !meter.number(it.number.value) } == true
+                    descriptor.bounds.lower?.let { !meter.side(it) } == true ||
+                    descriptor.bounds.upper?.let { !meter.side(it) } == true
                 ) return result()
             }
             for (row in rows) {
@@ -123,9 +123,11 @@ internal class SparseSourceLp private constructor(
                 ExactLpObjective(costs.map(ExactLpNumber::of) + List(rows.size) { zero }, ExactLpNumber.of(constant)),
             )
             if (!meter.poll()) return result()
-            return result(SparseSourceLp(model, rowSupport, matrix.map { column ->
+            val adjacency = matrix.map { column ->
                 column.map { it.row }.toIntArray()
-            }))
+            }
+            if (!meter.poll()) return result()
+            return result(SparseSourceLp(model, rowSupport, adjacency))
         }
     }
 }
@@ -169,5 +171,12 @@ private class SparsePreparationMeter(private val limits: SparseSourceLpLimits, p
         if (!reserve((width + 63L) / 64L, (width + 7L) / 8L * 4L)) return false
         bits += width
         return true
+    }
+
+    fun side(side: ExactLpSide): Boolean {
+        if (!number(side.number.value)) return false
+        val premises = side.premises ?: return true
+        if (!reserve(premises.size, premises.size * 32L)) return false
+        return premises.boundEntries().all { number(it.threshold.value) }
     }
 }

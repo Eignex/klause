@@ -18,6 +18,26 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `owner cancellation during root certification should discard guidance`() {
+        var cancelled = false
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                cancelled = true
+            }
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+        LpScopedSolver(LpExactState(lowerBoundModel()), Cancellation { cancelled }).use { owner ->
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits(),
+                observer = observer)
+
+            assertNull(guide.primal)
+            assertNull(guide.bound)
+            assertEquals(LpRootGuidancePhase.CERTIFICATE, guide.phase)
+        }
+    }
+
+    @Test
     fun `root guidance should retain heuristic coordinates when bound certification is exhausted`() {
         LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
             val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100),
