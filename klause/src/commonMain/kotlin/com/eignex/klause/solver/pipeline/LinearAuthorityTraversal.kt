@@ -42,6 +42,7 @@ internal class LinearAuthorityTraversal(
     borrowedAuthority: LinearAuthority? = null,
     private val useGuidance: Boolean = false,
     private val inheritBounds: Boolean = false,
+    private val useCuts: Boolean = true,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -188,7 +189,7 @@ internal class LinearAuthorityTraversal(
                 queriedNode = current
                 queriedSource = it
             }
-        val result = if (useGuidance) authority.advance(branch, cancellation, cuts = true)
+        val result = if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
             else authority.check(branch, cancellation)
         if (result.paused) {
             current.pending = true

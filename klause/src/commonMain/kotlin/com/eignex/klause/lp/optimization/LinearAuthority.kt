@@ -90,7 +90,9 @@ internal class LinearAuthority(
 
     private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
 
-    private fun prepareQuery(source: SourceProofContext, cancellation: Cancellation, cuts: Boolean): LinearAuthorityQuery? {
+    private fun prepareQuery(
+        source: SourceProofContext, cancellation: Cancellation, cuts: Boolean,
+    ): LinearAuthorityQuery? {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return null
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
                 it !in source.coordinates
