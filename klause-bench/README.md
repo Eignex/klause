@@ -41,6 +41,15 @@ launcher uses `klause-bench` as its working directory. From the source tree,
 | `provenance out=<path>` | Capture installed-build and runtime identities |
 | `corpus status`, `corpus gc`, `corpus compress [path]` | Inspect, evict or compress fetched collections |
 
+`bench.profile.DivModConstructionProfile` times XCSP3 parsing and lowering without
+solving. Use `sizes=1024,2048,4096,8192 repeats=3 warmups=1` for generated sources
+that repeat each modular expression twice. Optional `suite=ID problem=NAME sha256=HEX`
+adds one hash-pinned catalog input. Sources, per-iteration construction times,
+compiled sizes, factor kinds and build/runtime identities stay under `$OUT`.
+Compare the identical profile source and settings at both revisions on one host.
+JFR construction timings are separate from uninstrumented, source-checked solve
+controls and establish no solver throughput or verdict claim.
+
 ## Klause-lab
 
 [Klause-lab](https://github.com/Eignex/klause-lab) owns everything that runs more than
