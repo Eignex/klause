@@ -18,6 +18,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
+import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,7 +30,7 @@ import kotlin.test.assertTrue
 
 class PresolverTest {
     @Test
-    fun `source parity should consume pins resolved by a later BVE pass`() {
+    fun `parity should consume pins resolved by a later clause pass in either lane`() {
         val problem = Problem(6, 0, emptyArray(), listOf(
             Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
             Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
@@ -38,18 +39,28 @@ class PresolverTest {
             Clause(intArrayOf(Lit.make(3, false), Lit.make(5, true))),
             Clause(intArrayOf(Lit.make(3, false), Lit.make(5, false))),
         ))
-        val budget = PresolveBudget(Long.MAX_VALUE)
+        for (producer in listOf(PresolvePass.ELIMINATE_BOOL_VARS, PresolvePass.SUBSUME_CLAUSES)) {
+            for (lane in PresolveLane.entries) {
+                val budget = PresolveBudget(Long.MAX_VALUE)
+                val config = PresolveConfig.parse("off,+xor-units,+${producer.id}")
+                val context = PresolveContext(presolveBudget = budget)
 
-        val prepared = Presolver.runSource(
-            problem, PresolveConfig.parse("off,+xor-units,+bve"), PresolveContext(presolveBudget = budget),
-        )
+                val passes = when (lane) {
+                    PresolveLane.SOURCE -> Presolver.runSource(problem, config, context).also {
+                        assertTrue(it.infeasible)
+                    }.passesFired
+                    PresolveLane.FINITE -> Presolver.run(problem.bake(), config, context).also {
+                        assertTrue(it.infeasible)
+                    }.passesFired
+                }
 
-        assertTrue(prepared.infeasible)
-        assertEquals(listOf(PresolvePass.ELIMINATE_BOOL_VARS, PresolvePass.DERIVE_XOR_UNITS), prepared.passesFired)
-        assertEquals(
-            listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.REFUTED),
-            budget.invocations.filter { it.pass == "xor-units" }.map { it.outcome },
-        )
+                assertEquals(listOf(producer, PresolvePass.DERIVE_XOR_UNITS), passes)
+                assertEquals(
+                    listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.REFUTED),
+                    budget.invocations.filter { it.pass == "xor-units" }.map { it.outcome },
+                )
+            }
+        }
     }
 
     @Test
