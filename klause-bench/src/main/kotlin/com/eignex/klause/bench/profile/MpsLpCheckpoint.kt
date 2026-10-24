@@ -8,13 +8,13 @@ import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.time.Duration.Companion.seconds
 
 internal object MpsLpCheckpoint {
     private const val ENGINE = "com.eignex.klause.lp.engine."

@@ -46,6 +46,11 @@ internal class LpScopedSolver(
     internal val pointRecoveryCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
+    private class PendingFloat(val cursor: LpSolveCursor<FloatLpResult?>) {
+        var reported = LpSolveMetrics()
+    }
+    private var pendingFloat: PendingFloat? = null
+    val floatPaused: Boolean get() = pendingFloat != null
     private var closed = false
     private var workingActive = false
     var lastWorkingMetrics: LpWorkingMetrics? = null
@@ -112,6 +117,7 @@ internal class LpScopedSolver(
         val result = next.assertBounds(assertions, token)
         editAttempts += result.count
         if (result is LpBoundBatchResult.Declined || next.state === state) return result
+        discardFloatProgress()
         try {
             val current = solver
             if (current != null && !current.adopt(next.state, token)) return LpBoundBatchResult.Declined(result.count)
@@ -143,6 +149,11 @@ internal class LpScopedSolver(
         requireAvailable()
         editAttempts++
         if (closed || token() || !state.sameMatrix(initial)) return false
+        if (initial === state && pendingFloat != null) {
+            editSuccesses++
+            return true
+        }
+        if (initial !== state) discardFloatProgress()
         val current = solver
         if (current != null && !current.adopt(initial, token)) return false
         if (current == null && token()) return false
@@ -242,6 +253,7 @@ internal class LpScopedSolver(
     ): Pair<LpSolver, FloatLpResult?>? {
         require(warm == null || allowance == null) { "an explicit allowance requires retained factors" }
         requireAvailable()
+        discardFloatProgress()
         lastResult = null
         lastMetrics = LpSolveMetrics()
         lastFloatTermination = null
@@ -273,6 +285,67 @@ internal class LpScopedSolver(
         return current to result
     }
 
+    fun advanceFloat(
+        quantum: Long,
+        allowance: LpFloatAllowance,
+        token: Cancellation = cancellation,
+    ): Pair<LpSolver, FloatLpResult?>? {
+        requireAvailable()
+        require(quantum > 0L && allowance.work > 0L)
+        lastResult = null
+        lastMetrics = LpSolveMetrics()
+        lastFloatTermination = null
+        if (closed || token() || cancellation()) {
+            discardFloatProgress()
+            return null
+        }
+        if (!prepare(token)) return null
+        val current = requireNotNull(solver)
+        if (current !is ResumableLpSolver) return solveFloat(token = token, allowance = allowance.copy(work = quantum))
+        var pending = pendingFloat
+        if (pending == null) {
+            if (!current.adopt(state, token)) return null
+            pending = PendingFloat(current.openSolve(allowance))
+            pendingFloat = pending
+        }
+        try {
+            val step = pending.cursor.advance(quantum)
+            val actual = current.lastMetrics
+            lastMetrics = actual - pending.reported
+            pending.reported = actual
+            if (step is LpSolveStep.Paused) return null
+            pendingFloat = null
+            pending.cursor.close()
+            lastFloatTermination = current.lastTermination
+            recordPendingAppendSolve(current)
+            if (token() || cancellation()) {
+                lastFloatTermination = LpFloatTermination.CANCELLED
+                return null
+            }
+            return current to (step as LpSolveStep.Completed<FloatLpResult?>).value
+        } catch (primary: Throwable) {
+            try {
+                discardFloatProgress()
+            } catch (cleanup: Throwable) {
+                if (cleanup !== primary) primary.addSuppressed(cleanup)
+            }
+            throw primary
+        }
+    }
+
+    private fun discardFloatProgress() {
+        val pending = pendingFloat ?: return
+        pendingFloat = null
+        val current = solver
+        solver = null
+        try {
+            pending.cursor.close()
+            if (current != null) recordPendingAppendSolve(current)
+        } finally {
+            if (current != null) closeOwner(current)
+        }
+    }
+
     private inline fun edit(
         token: Cancellation,
         append: Boolean = false,
@@ -288,6 +361,7 @@ internal class LpScopedSolver(
             editSuccesses++
             return true
         }
+        discardFloatProgress()
         if (next.state.matrixRevision != state.matrixRevision) {
             return replace(next, token, append, compaction)
         }
@@ -310,6 +384,7 @@ internal class LpScopedSolver(
     ): T {
         requireAvailable()
         check(!closed) { "scoped solver is closed" }
+        discardFloatProgress()
         require(working.source === state) { "working model belongs to another source state" }
         require(allowance == null || (allowance.work > 0L && allowance.iterations > 0))
         val childWork = allowance?.work?.let { if (workLimit > 0L) minOf(it, workLimit) else it } ?: workLimit
@@ -353,6 +428,7 @@ internal class LpScopedSolver(
         val next = LpBoundTrail(baseRegion)
         if (!next.replaceObjective(objective, token)) return false
         if (state.sameMatrix(next.state)) return resetRoot(next.state, token)
+        discardFloatProgress()
         editAttempts++
         val replacement = prepared(next.state, token) ?: return false
         var published = false
@@ -638,6 +714,7 @@ internal class LpScopedSolver(
     override fun close() {
         requireAvailable()
         if (closed) return
+        discardFloatProgress()
         closed = true
         continuationCache.clear()
         lastResult = null

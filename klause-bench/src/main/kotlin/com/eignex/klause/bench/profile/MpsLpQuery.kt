@@ -28,7 +28,7 @@ internal object MpsLpQuery {
             for (mode in listOf(
                 "full-cold", "full-retained", "cone-cold", "prepared-cold", "prepared-retained", "prepared-session",
                 "feedback-cold", "feedback-session",
-                "query-session",
+                "query-session", "checkpoint-session",
             )) {
                 queryMode(problem, objective, mode, bean) { report ->
                     output.appendLine(report.toString())
@@ -57,8 +57,9 @@ internal object MpsLpQuery {
         }
         var owner: Pair<AutoCloseable, Any>? = null
         val sameRoot = mode.endsWith("-session")
-        val nodeOnly = mode == "query-session"
+        val nodeOnly = mode == "query-session" || mode == "checkpoint-session"
         val rootPolicy = when {
+            mode == "checkpoint-session" -> "CHECKPOINTED_WORK"
             mode.startsWith("feedback-") || nodeOnly -> "INTERRUPTED_WORK"
             mode.startsWith("prepared-") -> "SEPARATE_PREPARATION"
             else -> "SHARED_WORK"
@@ -246,6 +247,7 @@ internal object MpsLpQuery {
         return buildJsonObject {
             put("floatTermination", propagator.javaClass.getMethod("getFloatTermination")
                 .invoke(propagator)?.toString())
+            put("floatPaused", propagator.javaClass.getMethod("getFloatPaused").invoke(propagator) as Boolean)
             for (name in listOf(
                 "EditAttempts", "EditDeclines", "PreparationAttempts", "PreparationDeclines", "PreparationWork",
                 "CreatedOwners", "ClosedOwners", "RetainedRows", "ActiveRows", "ReservedConstructionWork",
