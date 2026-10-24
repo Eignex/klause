@@ -65,8 +65,8 @@ internal class LpEffortLadder(
     private val reprobeMax: Int = 8192,
 ) {
     companion object {
-        /** Default solves before the first demotion. [LpEffortGovernor] and [LpPivotBudget] share it as
-         *  their warmup, so all three judge the LP over the same evidence window. */
+        /** Default sample count for [LpEffortGovernor], this ladder and [LpPivotBudget]. Each policy
+         *  admits observations under its own progress and cutoff conditions. */
         const val DEFAULT_WARMUP: Int = 64
 
         /** Default first backoff interval; `Int.MAX_VALUE` instead makes a demotion irreversible. */
