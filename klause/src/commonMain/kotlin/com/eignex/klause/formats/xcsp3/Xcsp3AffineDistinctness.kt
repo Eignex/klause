@@ -127,16 +127,13 @@ private fun subtractExact(left: Long, right: Long): Long? {
 internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistinctness, cancellation: Cancellation) {
     for (group in index.groups(cancellation)) {
         if (cancellation()) return
-        factors.add(
-            Distinct(
-                group.vars.indices.map { i ->
+        val operands = group.vars.indices.map { i ->
             Distinct.Operand(
                 intArrayOf(Term.ofIntVar(group.vars[i])),
                 listOf(BigFraction.ONE),
                 BigFraction.ofLong(group.offsets[i]),
             )
         }
-            )
-        )
+        factors.add(Distinct(operands))
     }
 }
