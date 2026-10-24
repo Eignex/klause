@@ -1312,6 +1312,27 @@ targeting its materialized-coordinate cost.
 
 ### Table and MDD historical domains
 
+Retain bounded exact prefix/suffix path weights for deterministic MDD guidance
+with distinct sequence variables; [search](../docs/08-search.md) owns admission,
+undo and qualified edge-count fallbacks. Small-language tests distinguish suffix
+mass and merged prefixes, restore sibling counts and cover interruption, aliases,
+ambiguity, overflow and storage declines.
+[8108](https://lab.eignex.com/jobs/8108) pairs `ee56127636` with core `c3a8a5f5c4`
+on Linux/amd64: one conflictDriven/maxSD CP arm, LP off, P1, 15 seconds and seeds
+3/17. All 20 commands return and all eight witnesses pass independent source
+checks. Source hashes, runtime/options and non-solver dependencies match; compiler
+identity is unavailable.
+
+Every pair retains nodes, failures and depth. WordDesign2 `015` reaches six nodes
+and held-out `045` two; both remain unknown. WordSquare reaches one/three nodes
+by seed and remains unknown. CarSequencing retains its 3,917-node/1,990-failure
+witness prefix, with elapsed ranges 7.55–8.23 versus 7.62–7.94 seconds. Table
+Nonogram retains 614 nodes, taking 2.418–2.458 versus 2.428–2.514 seconds.
+WordDesign peak RSS spans 882,056–908,668 KiB across both arms; allocations were
+not collected. Equal seed prefixes are not independent trajectories. Adoption is
+for bounded exact guidance capability, with no demonstrated hard-family recovery
+or general cost improvement.
+
 Retain adaptive live tuple masks and bounded support-count ordering as consumers of
 the shared index. [8055](https://lab.eignex.com/jobs/8055) compares `e5028472dd`
 (the retained algorithms on parent `e467739f4e`, with maxSD exposed) and `e36eb235ac`
