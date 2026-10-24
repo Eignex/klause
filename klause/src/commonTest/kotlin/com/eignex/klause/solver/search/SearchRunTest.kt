@@ -14,6 +14,43 @@ import kotlin.test.assertSame
 
 class SearchRunTest {
     @Test
+    fun `a cancelled assertion should retry its unrefuted alternative after a pause`() {
+        for (cancelAfterConflict in listOf(false, true)) {
+            var cancelled = false
+            var interrupted = false
+            val assertions = ArrayList<SearchDecision>()
+            val component = object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    assertions += decision
+                    if (cancelAfterConflict && assertions.size == 1) return ComponentResult.Conflict()
+                    if (!interrupted) {
+                        interrupted = true
+                        cancelled = true
+                        return ComponentResult.Indeterminate
+                    }
+                    return ComponentResult.Consistent
+                }
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+            }
+            val session = SearchSession(listOf(component), cancellation = Cancellation { cancelled })
+            session.initialize()
+            val run = session.openRun(1, lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            })
+
+            assertIs<SearchRunEvent.Paused>(run.next())
+            assertEquals(0, session.decisionLevel)
+            val pending = assertions.last()
+            cancelled = false
+            val result = run.next()
+
+            assertIs<SearchRunEvent.Satisfied>(result)
+            assertEquals(pending, assertions.last())
+            assertEquals(if (cancelAfterConflict) 3 else 2, assertions.size)
+        }
+    }
+
+    @Test
     fun `solution notification should precede model assembly`() {
         var notified = false
         val key = SearchModelKey(Boolean::class)

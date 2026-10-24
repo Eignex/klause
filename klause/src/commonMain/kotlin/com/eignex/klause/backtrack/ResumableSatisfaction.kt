@@ -15,8 +15,8 @@ import com.eignex.klause.util.cancelledWhen
  * and the heuristics, so the arm resumes where it stopped instead of re-deriving them.
  *
  * Two tokens stop it, as in [ResumableMinimize]. The run's own token, handed to each [runSlice], ends the search;
- * propagation polls only that one, so a fixpoint is never stranded half-done for a later slice. The slice
- * boundary is polled at decisions alone.
+ * root preparation polls that token. Shared decision assertions also poll the slice allowance; an
+ * interrupted assertion retracts to its completed parent and retries the same alternative on resumption.
  */
 @Suppress("TooGenericExceptionCaught") // ownership boundaries preserve arbitrary primary and cleanup failures
 internal class ResumableSatisfaction(

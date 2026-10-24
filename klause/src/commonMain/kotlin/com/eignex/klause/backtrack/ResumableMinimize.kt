@@ -184,12 +184,9 @@ internal class ResumableMinimize(
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
     /**
-     * What ends the whole run, as opposed to [sliceCancelled]'s slice boundary. Propagation polls this
-     * one: a fixpoint the deadline cuts leaves the session under-propagated, and only a run that is
-     * over can afford to strand one — a slice must pause at decision granularity so the arm that
-     * resumes finds a state it can trust. The cost is that a runaway fixpoint overruns its slice,
-     * which spends another arm's turn; what bounds it instead is [globalToken] — the whole-solve
-     * deadline [runSlice] is handed — so a caller that supplies none leaves propagation unbounded.
+     * What ends the whole run, as opposed to [sliceCancelled]'s slice boundary. Root propagation and
+     * deductions at retained levels use this token. Shared decision assertions add the search context's
+     * allowance: a cut assertion retracts its fresh level before a later slice retries it.
      */
     private fun solveCancelled(): Boolean = if (pausable) globalToken() else baseCancellation()
 
