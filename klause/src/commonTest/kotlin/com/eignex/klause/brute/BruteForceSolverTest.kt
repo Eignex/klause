@@ -2,6 +2,7 @@ package com.eignex.klause.brute
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
