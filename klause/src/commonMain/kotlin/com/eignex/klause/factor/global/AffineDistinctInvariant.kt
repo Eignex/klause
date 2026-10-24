@@ -2,17 +2,22 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.factor.global.internals.reginHopcroftKarp
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.WIDE_DOMAIN_DRAWS
 import com.eignex.klause.localsearch.movesource.PairSwap
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.toLongExact
 
 internal class AffineDistinctInvariant(private val vars: IntArray, private val offsets: List<BigInt>) : Invariant {
     private val positions = vars.indices.groupBy { vars[it] }
@@ -68,6 +73,85 @@ internal class AffineDistinctInvariant(private val vars: IntArray, private val o
         for (i in affected) counts.excess += counts.change(value(i, newValue), 1)
         return compressViolation(counts.excess.toLong(), state.violationSoftCap) -
             compressViolation(before.toLong(), state.violationSoftCap)
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = vars.size >= 2 && sources.size == vars.size
+
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        if (!providesImplicitNeighbourhood) return false
+        val taken = HashSet<BigInt>()
+        for (i in vars.indices) {
+            if (state.assumptions.isFrozenInt(vars[i]) &&
+                !taken.add(value(i, state.assignment.intValue(vars[i])))
+            ) return false
+        }
+        val free = vars.indices.filter { !state.assumptions.isFrozenInt(vars[it]) }
+        if (free.isEmpty()) return true
+        val values = ArrayList<BigInt>()
+        val ids = HashMap<BigInt, Int>()
+        val edges = Array(free.size) { k ->
+            val i = free[k]
+            val domain = state.rootDomains[vars[i]]
+            val allowed = ArrayList<Int>()
+            var source = domain.min
+            while (true) {
+                val translated = value(i, source)
+                if (translated !in taken) {
+                    allowed.add(ids.getOrPut(translated) {
+                        values.add(translated)
+                        values.lastIndex
+                    })
+                }
+                // A role retaining m values cannot cause a Hall deficit among m free roles.
+                if (allowed.size == free.size || source == domain.max) break
+                source = domain.higher(source)
+            }
+            allowed.toIntArray()
+        }
+        if (values.size < free.size) return false
+        val matchVar = IntArray(free.size) { -1 }
+        val matchVal = IntArray(values.size) { -1 }
+        if (!reginHopcroftKarp(free.size, edges, matchVar, matchVal, IntArray(free.size), IntArray(free.size))) {
+            return false
+        }
+        for (k in free.indices) {
+            val i = free[k]
+            state.assignment.setInt(vars[i], (values[matchVar[k]] - offsets[i]).toLongExact())
+        }
+        return true
+    }
+
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (!providesImplicitNeighbourhood || isViolated(state, factorId)) return
+        val counts = state.refPayload[factorId] as Counts
+        val before = sink.size
+        val cap = AllDifferentInvariant.MAX_STRUCTURED_SWAPS
+        repeat(cap * AllDifferentInvariant.SWAP_ATTEMPT_STRIDE) { step ->
+            if (sink.size - before >= cap) return
+            val i = state.rng.nextInt(vars.size)
+            val a = vars[i]
+            if (!sink.allowsInt(a)) return@repeat
+            if (step % 2 == 0) {
+                val domain = state.rootDomains[a]
+                val source = when (step % 6) {
+                    0 -> domain.min
+                    2 -> domain.max
+                    else -> domain.randomValue(state.rng)
+                }
+                if (value(i, source) !in counts.values) sink.addIntSet(a, source)
+            } else {
+                val j = state.rng.nextInt(vars.size)
+                val b = vars[j]
+                if (a == b || !sink.allowsInt(b)) return@repeat
+                val nextA = value(j, state.assignment.intValue(b)) - offsets[i]
+                val nextB = value(i, state.assignment.intValue(a)) - offsets[j]
+                if (!nextA.fitsLong() || !nextB.fitsLong()) return@repeat
+                val sourceA = nextA.toLongExact()
+                val sourceB = nextB.toLongExact()
+                if (sourceA !in state.rootDomains[a] || sourceB !in state.rootDomains[b]) return@repeat
+                sink.addCompound(listOf(Move.IntSet(a, sourceA), Move.IntSet(b, sourceB)))
+            }
+        }
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {

@@ -43,6 +43,10 @@ full exact collision grading. Bounded repair proposals choose unused affine valu
 through source-domain moves and the ordinary move sink's ownership filters.
 Atomic source-value swaps use the pair-swap kernel and are scored against every
 affected factor; they do not require implicit seeding.
+Scopes without aliased sources participate in the existing implicit neighbourhood.
+Feasible seeds use matching over exact translated values, retaining source pins.
+Structured moves exchange translated values or replace one by an unused value;
+the latter permits the occupied value set to change while preserving distinctness.
 When a plain seeded `AllDifferent` owns the chosen source, repair delegates bounded
 swaps to that owner's existing kernel. Reciprocal domains, pins and defined
 coordinates still filter both endpoints, and the owner's feasibility is preserved.
