@@ -250,6 +250,7 @@ structural authority replaces the owner. Each query lifts multipliers through it
 source-side mapping and checks the resulting derivation in its source scope.
 Auxiliary multiplier searches own separate temporary solvers. Neighborhood
 invocations can borrow a retained authority, leaving its cleanup to the caller.
+Borrowers retain that authority's cumulative funding allowance.
 Floating source coordinates are guidance and supply no witness or proof authority.
 
 `LinearAuthority.advance` consumes the shared sparse preparation, floating and
