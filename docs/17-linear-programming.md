@@ -289,6 +289,11 @@ charging, recovery and publication.
 A retained numerical owner can expose a private solve cursor. It suspends between
 iterations, retaining the current phase, factors, artificial seats, pricing state
 and cumulative solve limits. A pause returns no numerical result or certificate.
+An opt-in bounded progress trace samples scaled objective and basic-bound
+infeasibility separately for boxed dual, ordinary dual, primal feasibility and
+primal objective phases. It counts degenerate steps, flips and priced columns;
+factor-policy metrics identify rebuild triggers. These observations carry no
+coordinate, bound or infeasibility authority.
 The owner rejects another solve or authority adoption while that cursor is live;
 closing it unwinds the suspended operation and retires its factors. Synchronous
 calls consume the same operation without suspension.
