@@ -6,6 +6,9 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lowering.LinRelation
 import com.eignex.klause.util.Cancellation
 
+private const val AFFINE_CHANNEL_VALUE_LIMIT = 65_536
+private const val AFFINE_CHANNEL_SPAN_LIMIT = 4096L
+
 internal class AffineDistinctGroup(val vars: IntArray, val offsets: LongArray)
 
 internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
@@ -124,7 +127,7 @@ private fun subtractExact(left: Long, right: Long): Long? {
 }
 
 internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistinctness, cancellation: Cancellation) {
-    var remainingValues = 65_536
+    var remainingValues = AFFINE_CHANNEL_VALUE_LIMIT
     for (group in index.groups(cancellation)) {
         if (cancellation()) return
         // Every channel must fit before any auxiliary is emitted. The source rows remain authoritative.
@@ -143,7 +146,7 @@ internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistin
             } else {
                 0L
             }
-            val values = if (width in 1L..4096L && width <= remainingValues) {
+            val values = if (width in 1L..AFFINE_CHANNEL_SPAN_LIMIT && width <= remainingValues) {
                 remainingValues -= width.toInt()
                 LongArray(width.toInt()) { domain.min + it + offset }
             } else {
