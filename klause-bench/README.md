@@ -570,6 +570,14 @@ factor batches are separate controls.
 
 ## Profiling
 
+`ExactLinearScoringProfile` compares identical dyadic mixed-row candidate sequences
+at widths 8/64/512/4096, including committed choices and a fresh final score.
+Three warmup batches precede five measured batches of 4096 primitive candidates
+and 256 commits. It reports score/selection hashes, scoring time and Java thread
+allocation. Run the same profile source at both revisions through a bounded lab
+profile job. These synthetic JFR measurements exclude construction and source
+acceptance; ordinary cold CLI comparisons measure whole-search effects.
+
 `NumericalResidualProfile` accepts `request64=<base64 JSON array>` of up to eight
 `{suite, problem, sha256}` MPS sources. It checks original bytes, observes a direct
 satOptimized worker at seed 3 for two seconds, and retains actual refactor-policy
@@ -1421,6 +1429,20 @@ Profile instrumentation excludes a throughput claim. The `lsMoves` counter inclu
 completion work, so its rate alone cannot measure ordinary move throughput. Warm
 numerical savings remain useful evidence, while production keeps per-candidate
 numerical ownership.
+
+### Mixed exact-linear scoring
+
+[Baseline 7978](https://lab.eignex.com/jobs/7978) and
+[incremental 7979](https://lab.eignex.com/jobs/7979) run identical candidate sequences
+on Mac/aarch64 with matching runtime/dependency bytes. All score, selected-index
+and final-degree hashes agree. Median scoring reductions at widths 8/64/512/4096
+are 1.35/3.84/20.98/112.48 times; both arms allocate zero measured scoring bytes.
+From the primitive-call count and source loops, the baseline visits twice the row
+width per delta; the fixed tree reads one coefficient and reduces a logarithmic
+path. These are structural counts, not instrumented visit counters. Tree storage
+adds state memory proportional to row width. Exactly representable inputs isolate
+mechanism cost; balanced and sequential floating sums can otherwise round
+differently. These profiles establish no whole-solver speed or quality gain.
 
 ### Numerical kernel decisions
 
