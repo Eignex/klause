@@ -27,9 +27,9 @@ import com.eignex.klause.util.LongArrayList
  *
  * Propagation (after Cheng and Yap, "An MDD-based generalized arc consistency algorithm for positive
  * and negative table constraints and some global constraints", Constraints 15(2), 2010,
- * https://doi.org/10.1007/s10601-009-9087-y) reads each symbol variable's bounds only:
+ * https://doi.org/10.1007/s10601-009-9087-y) reads each symbol variable's full domain:
  *  - Forward sweep: state `s` at layer `i` is forward-reachable iff some forward-reachable
- *    state at layer `i-1` has a transition on a symbol within `seq(i-1)`'s bounds leading to `s`.
+ *    state at layer `i-1` has a transition on a symbol in `seq(i-1)`'s domain leading to `s`.
  *  - Backward sweep symmetric from accepting states.
  *  - Prune `seq(i)` values that have no transition between forward∩backward reachable states.
  *  - Fail if no forward-reachable state at layer `n` is accepting.
