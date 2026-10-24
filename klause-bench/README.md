@@ -1209,6 +1209,24 @@ experiments and stay outside the repository.
 
 ### Table and MDD historical domains
 
+Retain shared sparse/dense ground support postings for historical reasons.
+[8029](https://lab.eignex.com/jobs/8029) compares `3e8ac3841` with `b7547b3f50` on
+Mac/aarch64: one conflictDriven CP arm, LP off, 2000 nodes, 20 seconds, seed 3,
+three repeats and ordinary resource records without JFR. Source hashes, runtime,
+options and non-solver dependencies match; all twelve witnesses pass independent
+original-source checks.
+
+WordSquare remains unknown but returns in 20.17–20.45 s with 59–61 failures;
+the scan completes twice in 55.29–57.95 s with three failures and is killed once
+at 60 s. Peak RSS rises from 429344–442176 KiB in the completed controls to
+1307344–1347968 KiB on the longer reached conflict/learning trajectory. The index
+bounds its own primitive buffers, not whole-search retained memory. Eternity's
+2000-node median time changes from 3.296 to 2.992 s with different work and reasons.
+Table Nonogram drops from 613 to 231 nodes; Regular keeps identical work.
+WordDesign remains unknown at 39–41 nodes, with elapsed ranges of 21.73–21.76 s
+for the scan and 21.77–23.44 s for the index arm. These are mechanism and trajectory
+observations, not a uniform speedup or a source-recovery claim.
+
 Retain full-domain MDD reachability and historical hole premises. The initial
 [comparison 7954](https://lab.eignex.com/jobs/7954), against `5a8c2b0c1`, leaves
 all 18 WordDesign2, Eternity and BlockedQueens runs unknown. WordDesign2 reaches

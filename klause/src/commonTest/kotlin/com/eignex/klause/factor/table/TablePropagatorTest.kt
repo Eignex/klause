@@ -21,15 +21,88 @@ import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TablePropagatorTest {
+
+    @Test
+    fun `interrupted cold table preparation should resume its required filtering`() {
+        for (limit in listOf(3, 6, 10)) {
+            val problem = Problem(
+                0, 2, Array(2) { IntDomain(0, 511) },
+                arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(512) { (it / 2 * 2).toLong() })),
+            )
+            val state = PropagationState(problem, Assumptions.None)
+            state.beginRootFixpoint().forEach { }
+            var polls = 0
+
+            assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= limit }))
+
+            assertTrue(state.rootFixpointPending)
+            assertFalse(state.runCancelled)
+            assertEquals(limit, polls)
+            while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+            for (col in 0..1) assertEquals(256L, state.intDomains[col].valueCount)
+        }
+    }
+
+    @Test
+    fun `interrupted table filtering should preserve sibling supports after undo`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 255) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(512) { (it / 2).toLong() })),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.beginRootFixpoint().forEach { }
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+        state.undoLogging = true
+        val root = state.mark()
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 63))
+        state.beginSeedFixpoint().forEach { }
+        var polls = 0
+        assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= 5 }))
+        assertTrue(state.rootFixpointPending)
+        state.undoTo(root)
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 192))
+
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertEquals(192L, state.intDomains[1].min)
+        assertEquals(255L, state.intDomains[1].max)
+    }
+
+    @Test
+    fun `interrupted delayed table reasons should withhold partial premises`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 127) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(256) { (it / 2).toLong() })),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.undoLogging = true
+        state.levelToDecisionVar.add(0)
+        state.currentLevel = 1
+        check(state.excludeIntValue(0, 1))
+        assertNull(state.runToFixpoint(allFactors = false))
+        val reason = assertNotNull(state.holeReasonFor(1, 1))
+        var polls = 0
+        state.finiteWork.cancellation = Cancellation { ++polls >= 2 }
+
+        assertNull(state.reasonOf(reason))
+
+        assertTrue(state.runCancelled)
+        assertFalse(state.lazyReasonMemo.containsKey(reason))
+    }
 
     @Test
     fun `bounded unary supports should constrain local search root domains`() {

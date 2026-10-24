@@ -2,6 +2,7 @@ package com.eignex.klause.factor.table.internals
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.inDomainAt
@@ -43,7 +44,9 @@ internal class MddExplainer(
         val head = idx.fwdHead[pos]
         val ptr = idx.fwdPtr[pos]
         for (src in 0 until numStatesPerLayer[pos]) {
+            state.checkFiniteWork()
             for (k in head[src] until head[src + 1]) {
+                state.checkFiniteWork()
                 val p = ptr[k]
                 val sym = transitions[p + 1]
                 val dst = transitions[p + 2].toInt()
@@ -101,10 +104,12 @@ internal class MddExplainer(
         init {
             if (initial in 0 until numStatesPerLayer[0]) fwd[0][initial] = true
             for (i in 0 until n) {
+                state.checkFiniteWork()
                 forEachRecord(i) { src, sym, dst, _ -> if (fwd[i][src] && contains(i, sym)) fwd[i + 1][dst] = true }
             }
             for (q in accepting) if (q in 0 until numStatesPerLayer[n]) bwd[n][q] = true
             for (i in n - 1 downTo 0) {
+                state.checkFiniteWork()
                 forEachRecord(i) { src, sym, dst, _ -> if (bwd[i + 1][dst] && contains(i, sym)) bwd[i][src] = true }
             }
         }
@@ -117,7 +122,9 @@ internal class MddExplainer(
             val ptr = idx.fwdPtr[layer]
             val numN = numStatesPerLayer[layer + 1]
             for (src in 0 until numStatesPerLayer[layer]) {
+                state.checkFiniteWork()
                 for (k in head[src] until head[src + 1]) {
+                    state.checkFiniteWork()
                     val p = ptr[k]
                     val dst = transitions[p + 2].toInt()
                     val weight = if (cost >= 0) transitions[p + 3] else 0L
@@ -131,6 +138,7 @@ internal class MddExplainer(
             val stack = IntArrayList()
             push(stack, explainedFwd, layer, q)
             while (stack.size > 0) {
+                state.checkFiniteWork()
                 val i = stack[stack.size - 2]
                 val t = stack[stack.size - 1]
                 stack.truncateTo(stack.size - 2)
@@ -139,6 +147,7 @@ internal class MddExplainer(
                 val srcs = idx.bwdSrc[i - 1]
                 val syms = idx.bwdSym[i - 1]
                 for (k in head[t] until head[t + 1]) {
+                    state.checkFiniteWork()
                     val p = srcs[k]
                     if (p !in 0 until numStatesPerLayer[i - 1]) continue
                     if (!fwd[i - 1][p]) push(stack, explainedFwd, i - 1, p) else cite(i - 1, syms[k])
@@ -151,6 +160,7 @@ internal class MddExplainer(
             val stack = IntArrayList()
             push(stack, explainedBwd, layer, q)
             while (stack.size > 0) {
+                state.checkFiniteWork()
                 val i = stack[stack.size - 2]
                 val s = stack[stack.size - 1]
                 stack.truncateTo(stack.size - 2)
@@ -158,6 +168,7 @@ internal class MddExplainer(
                 val head = idx.fwdHead[i]
                 val ptr = idx.fwdPtr[i]
                 for (k in head[s] until head[s + 1]) {
+                    state.checkFiniteWork()
                     val p = ptr[k]
                     val dst = transitions[p + 2].toInt()
                     if (dst !in 0 until numStatesPerLayer[i + 1]) continue
@@ -171,6 +182,7 @@ internal class MddExplainer(
             val best = extremeFromRoot(lower, live = true)
             var w = if (lower) INF else -INF
             for (q in accepting) {
+                state.checkFiniteWork()
                 if (q !in 0 until numStatesPerLayer[n]) continue
                 w = if (lower) minOf(w, best[n][q]) else maxOf(w, best[n][q])
             }
@@ -183,6 +195,7 @@ internal class MddExplainer(
             val to = extremeToAccept(lower)
             val none = if (lower) INF else -INF
             for (i in 0 until n) {
+                state.checkFiniteWork()
                 forEachRecord(i) { src, sym, dst, w ->
                     if (contains(i, sym)) return@forEachRecord
                     val a = from[i][src]
@@ -200,6 +213,7 @@ internal class MddExplainer(
             val best = Array(n + 1) { LongArray(numStatesPerLayer[it]) { none } }
             if (initial in 0 until numStatesPerLayer[0]) best[0][initial] = 0L
             for (i in 0 until n) {
+                state.checkFiniteWork()
                 forEachRecord(i) { src, sym, dst, w ->
                     if (best[i][src] == none || (live && !contains(i, sym))) return@forEachRecord
                     val c = best[i][src] + w
@@ -215,6 +229,7 @@ internal class MddExplainer(
             val best = Array(n + 1) { LongArray(numStatesPerLayer[it]) { none } }
             for (q in accepting) if (q in 0 until numStatesPerLayer[n]) best[n][q] = 0L
             for (i in n - 1 downTo 0) {
+                state.checkFiniteWork()
                 forEachRecord(i) { src, _, dst, w ->
                     if (best[i + 1][dst] == none) return@forEachRecord
                     val c = best[i + 1][dst] + w

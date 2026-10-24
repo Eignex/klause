@@ -10,18 +10,23 @@ internal class TableSupportIndex private constructor(val columns: Array<Column>,
         private val masks: LongArray,
         private val words: Int,
     ) {
-        fun forEachRow(lower: Long, upper: Long, visit: (Int) -> Unit) {
+        fun forEachRow(lower: Long, upper: Long, visit: (Int) -> Unit, poll: () -> Unit = {}) {
             var bucket = lowerBound(lower)
             while (bucket < values.size && values[bucket] <= upper) {
+                poll()
                 val start = starts[bucket]
                 if (start >= 0) {
                     var end = bucket + 1
                     while (end < starts.size && starts[end] < 0) end++
                     val limit = if (end < starts.size) starts[end] else rows.size
-                    for (i in start until limit) visit(rows[i])
+                    for (i in start until limit) {
+                        poll()
+                        visit(rows[i])
+                    }
                 } else {
                     val base = -start - 1
                     for (i in 0 until words) {
+                        poll()
                         var bits = masks[base + i]
                         while (bits != 0L) {
                             visit((i shl 6) + bits.countTrailingZeroBits())
@@ -47,7 +52,13 @@ internal class TableSupportIndex private constructor(val columns: Array<Column>,
     companion object {
         private const val MAX_BYTES = 32L * 1024 * 1024
 
-        fun build(tuples: LongArray, arity: Int, maxBytes: Long = MAX_BYTES): TableSupportIndex? {
+        fun build(
+            tuples: LongArray,
+            arity: Int,
+            maxBytes: Long = MAX_BYTES,
+            poll: () -> Unit = {},
+        ): TableSupportIndex? {
+            poll()
             val count = tuples.size / arity
             // Sorting needs two primitive row permutations; decline before allocating either.
             if (count.toLong() * 8 > maxBytes) return null
@@ -55,21 +66,30 @@ internal class TableSupportIndex private constructor(val columns: Array<Column>,
             var retained = 0L
             val words = ((count.toLong() + 63) ushr 6).toInt()
             for (col in 0 until arity) {
+                poll()
                 if (retained + count.toLong() * 8 > maxBytes) return null
-                val order = argsortBy(count) { a, b -> tuples[a * arity + col].compareTo(tuples[b * arity + col]) }
+                val order = argsortBy(count) { a, b ->
+                    poll()
+                    tuples[a * arity + col].compareTo(tuples[b * arity + col])
+                }
                 var buckets = 0
                 var sparse = 0
                 var dense = 0
                 var i = 0
                 while (i < count) {
+                    poll()
                     var end = i + 1
-                    while (end < count && tuples[order[end] * arity + col] == tuples[order[i] * arity + col]) end++
+                    while (end < count && tuples[order[end] * arity + col] == tuples[order[i] * arity + col]) {
+                        poll()
+                        end++
+                    }
                     buckets++
                     if (words.toLong() * 8 < (end - i).toLong() * 4) dense += words else sparse += end - i
                     i = end
                 }
                 val bytes = buckets.toLong() * 12 + sparse.toLong() * 4 + dense.toLong() * 8
                 if (retained + bytes + count.toLong() * 8 > maxBytes) return null
+                poll()
                 val values = LongArray(buckets)
                 val starts = IntArray(buckets)
                 val rows = IntArray(sparse)
@@ -79,13 +99,18 @@ internal class TableSupportIndex private constructor(val columns: Array<Column>,
                 var maskSlot = 0
                 i = 0
                 while (i < count) {
+                    poll()
                     val value = tuples[order[i] * arity + col]
                     var end = i + 1
-                    while (end < count && tuples[order[end] * arity + col] == value) end++
+                    while (end < count && tuples[order[end] * arity + col] == value) {
+                        poll()
+                        end++
+                    }
                     values[bucket] = value
                     if (words.toLong() * 8 < (end - i).toLong() * 4) {
                         starts[bucket] = -maskSlot - 1
                         for (k in i until end) {
+                            poll()
                             val row = order[k]
                             val slot = maskSlot + (row ushr 6)
                             masks[slot] = masks[slot] or (1L shl (row and 63))
@@ -93,7 +118,10 @@ internal class TableSupportIndex private constructor(val columns: Array<Column>,
                         maskSlot += words
                     } else {
                         starts[bucket] = rowSlot
-                        for (k in i until end) rows[rowSlot++] = order[k]
+                        for (k in i until end) {
+                            poll()
+                            rows[rowSlot++] = order[k]
+                        }
                     }
                     bucket++
                     i = end
@@ -101,6 +129,7 @@ internal class TableSupportIndex private constructor(val columns: Array<Column>,
                 columns.add(Column(values, starts, rows, masks, words))
                 retained += bytes
             }
+            poll()
             return TableSupportIndex(columns.toTypedArray(), retained)
         }
     }

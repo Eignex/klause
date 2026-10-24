@@ -61,11 +61,13 @@ private fun PropagationState.sharedBoundPremise(
     rootLevel: Int,
     memo: MutableIntObjectMap<SearchAtomPremise>? = null,
 ): SearchAtomPremise {
+    if (runCancelled) return SearchAtomPremise.Unavailable
     if (endpointLevel(variable, upper) <= rootLevel) return SearchAtomPremise.All(emptyList())
     endpointReason(variable, upper)?.let { antecedents ->
         return sharedPremise(IntArray(antecedents.size) { antecedents[it] xor 1 }, context, sourceIntId, rootLevel,
             memo)
     }
+    if (runCancelled) return SearchAtomPremise.Unavailable
     val domain = intDomains[variable]
     val source = sourceIntId(variable)
     val decision = if (upper) {
@@ -90,6 +92,7 @@ private fun PropagationState.sharedPremise(
     for (literal in asserted) pending.addLast(NativePremiseFrame(literal))
     var remaining = SHARED_PREMISE_VISIT_LIMIT
     while (pending.isNotEmpty()) {
+        if (runCancelled) return SearchAtomPremise.Unavailable
         if (remaining-- <= 0) return SearchAtomPremise.Unavailable
         val frame = pending.removeLast()
         val literal = frame.literal
@@ -125,6 +128,7 @@ private fun PropagationState.sharedPremise(
             continue
         }
         val antecedents = atomAntecedentsDerived(atom)
+        if (runCancelled) return SearchAtomPremise.Unavailable
         if (antecedents == null) {
             // Inherited integer proofs can contain Unavailable below a conjunction.
             val premise = sharedIntegerLeaf(atom, Lit.isPositive(literal), context, sourceIntId)

@@ -38,6 +38,11 @@ Index construction admits at most 32 MiB of primitive buffers including sort scr
 larger relations keep the scan path. A reason visits only the target value or bound
 range's postings, then checks the deduction's historical domains. Mutable live
 prefixes and explanation caches remain state-local.
+Support-index construction and historical reconstruction poll the state's invocation
+token. Interrupted construction publishes no shared index or reason memo. A stopped
+lazy reason is unavailable; it cannot become an empty premise list, and conflict
+analysis discards its unfinished learned result. A completed immutable index remains
+available across state retraction and later invocations.
 Several unsupported interior values commit as one domain mutation. Their individual
 lazy reasons refer to the pre-batch trail boundary, and each removal retains its
 own carve witness for existing and late equality atoms. Undo restores the prior

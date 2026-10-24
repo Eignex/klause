@@ -1,5 +1,7 @@
 package com.eignex.klause.factor.table.internals
 
+import kotlin.concurrent.Volatile
+
 /**
  * Verdict shared across the rows of a `<group>` of table constraints that instantiate one `<extension>`
  * relation (so they share the same `tuples`/`hi` arrays by reference). The first row whose columns all
@@ -16,9 +18,17 @@ package com.eignex.klause.factor.table.internals
  * Written at most once with an immutable value; a benign race under parallel search recomputes the same
  * verdict. Mirrors [MddTransitionIndex.rootSnapshot].
  */
-internal class TableGroupCache(arity: Int, tuples: LongArray, hi: LongArray?) {
-    val supportIndex: TableSupportIndex? by lazy {
-        if (hi == null) TableSupportIndex.build(tuples, arity) else null
+internal class TableGroupCache(private val arity: Int, private val tuples: LongArray, private val hi: LongArray?) {
+    private class Prepared(val index: TableSupportIndex?)
+    @Volatile
+    private var prepared: Prepared? = null
+
+    fun supports(poll: () -> Unit): TableSupportIndex? {
+        prepared?.let { return it.index }
+        val index = if (hi == null) TableSupportIndex.build(tuples, arity, poll = poll) else null
+        poll()
+        prepared = Prepared(index)
+        return index
     }
 
     /** Per-column `[min, max]` bounds under which a full sweep of the shared relation prunes nothing.

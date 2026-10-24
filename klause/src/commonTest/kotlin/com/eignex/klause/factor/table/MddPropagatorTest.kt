@@ -26,6 +26,36 @@ import kotlin.test.assertTrue
 
 class MddPropagatorTest {
 
+    @Test
+    fun `interrupted cold mdd preparation should rebuild before completing its root`() {
+        for (limit in listOf(2, 4, 8)) {
+            val diagram = Mdd(
+                intArrayOf(0, 1), intArrayOf(1, 128, 1), intArrayOf(0, 384, 768),
+                LongArray(768) { cell ->
+                    val row = (cell % 384 / 3).toLong()
+                    when (cell % 3) {
+                        0 -> if (cell < 384) 0 else row
+                        1 -> row
+                        else -> if (cell < 384) row else 0
+                    }
+                },
+                0, intArrayOf(0), 3,
+            )
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 255) }, arrayOf<Factor>(diagram))
+            val state = PropagationState(problem, Assumptions.None)
+            state.beginRootFixpoint().forEach { }
+            var polls = 0
+
+            assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= limit }))
+
+            assertTrue(state.rootFixpointPending)
+            assertFalse(state.runCancelled)
+            assertEquals(limit, polls)
+            while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+            for (col in 0..1) assertEquals(IntDomain(0, 127), state.intDomains[col])
+        }
+    }
+
     private val diagonal = Mdd(
         seq = intArrayOf(0, 1),
         numStatesPerLayer = intArrayOf(1, 4, 1),
@@ -38,6 +68,32 @@ class MddPropagatorTest {
         accepting = intArrayOf(0),
         recordStride = 3,
     )
+
+    @Test
+    fun `interrupted incremental mdd filtering should resume and restore sibling reachability`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 3) }, arrayOf<Factor>(diagonal))
+        val state = PropagationState(problem, Assumptions.None)
+        state.beginRootFixpoint().forEach { }
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+        state.undoLogging = true
+        val root = state.mark()
+        state.currentLevel = 1
+        check(state.excludeIntValue(0, 1))
+        state.beginSeedFixpoint().forEach { }
+        var polls = 0
+
+        assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= 2 }))
+
+        assertTrue(state.rootFixpointPending)
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+        assertFalse(1L in state.intDomains[1])
+        state.undoTo(root)
+        state.currentLevel = 1
+        check(state.excludeIntValue(0, 2))
+        assertNull(state.runToFixpoint(allFactors = false))
+        assertTrue(1L in state.intDomains[1])
+        assertFalse(2L in state.intDomains[1])
+    }
 
     @Test
     fun `interior removals should propagate in both directions without moving bounds`() {
