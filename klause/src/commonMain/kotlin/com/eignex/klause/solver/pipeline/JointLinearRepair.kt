@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SparseSourceLpPolicy
@@ -15,6 +16,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -37,8 +39,8 @@ internal class JointLinearRepair(
     private val budget = SourceLpBudget(maxOperations = SOURCE_OPERATION_LIMIT, onWork = state.smt::observeSourceLp)
     private val stages = linkedMapOf<String, Long>()
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
-        if (shape.sparse) observe("jointRepairLpPhase_${shape.phase ?: "PREPARATION"}")
-        if (!shape.admitted) observe("jointRepairLpAdmissionDeclines")
+        if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")
+        if (!shape.admitted) observe("jointRepairLpDeclinedAttempts")
         stages["jointRepairLpMaxRows"] = maxOf(stages["jointRepairLpMaxRows"] ?: 0, shape.rows.toLong())
         stages["jointRepairLpMaxColumns"] = maxOf(stages["jointRepairLpMaxColumns"] ?: 0, shape.columns.toLong())
     }, retainLp = true, guidancePolicy = guidancePolicy)
@@ -47,6 +49,7 @@ internal class JointLinearRepair(
     private var rootStarted = false
     private var rootPreparationPending = false
     private var query: LinearAuthorityInvocation? = null
+    private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
     private var closed = false
     private var declined = false
@@ -178,7 +181,7 @@ internal class JointLinearRepair(
             }
             pending = condition
             query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)), params,
-                state = state, borrowedAuthority = authority, guidance = true)
+                external = { anchor }, state = state, borrowedAuthority = authority, guidance = true)
             observe("jointRepairCandidates")
         }
         val active = requireNotNull(query)
@@ -195,10 +198,20 @@ internal class JointLinearRepair(
             if (cancellation() && !stop()) return ExactNeighborhoodResult.Paused
             retire()
             if (checked == SourceEvidenceCheck.Checked) {
+                anchor = sample
                 observe("jointRepairCheckedIncumbents")
                 return ExactNeighborhoodResult.Witness(sample)
             }
             return ExactNeighborhoodResult.Undecided
+        }
+        if (condition.cutoff != null) {
+            val bound = ((snapshot.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
+            val minimized = if (source.scope.objective?.sense == ObjectiveSense.MAXIMIZE) bound?.negated() else bound
+            if (minimized != null && minimized >= condition.cutoff) {
+                observe("jointRepairCutoffClosures")
+                retire()
+                return ExactNeighborhoodResult.Refuted
+            }
         }
         if (result == null) {
             observe("jointRepairPauses")
