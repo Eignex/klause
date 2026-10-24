@@ -43,8 +43,7 @@ internal class PolynomialPredicateSharing(
                         arithmetic.step()
                         indices[node.children[it]]
                     }
-                    if (definitions.isEmpty()) append(FormulaNode.Junction(children, node.conjunction))
-                    else junction(children, node.conjunction)
+                    junction(children, node.conjunction)
                 }
             }
         }
