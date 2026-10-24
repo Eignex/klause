@@ -2154,10 +2154,10 @@ Operation counts include small exact fallback consultations; bound-only
 certification itself stays inside its retained operation. The supported foundation
 is source-session reuse, resumable wide guidance and consumed complete frontier
 coverage, with a gr4x6 proof/cost improvement and weaker feasibility progress on
-p0033 and the held-outs. Incumbent integration under
-[#3514](https://github.com/Eignex/klause/issues/3514) and checked scoped LP refutations
-under [#3533](https://github.com/Eignex/klause/issues/3533) are the next integration
-steps. Native optimum/refutation claims have no independent proof certificate here.
+p0033 and the held-outs. Joint repair consumes the same authority in the comparisons
+below. Wide checked scoped LP refutations remain separate under
+[#3533](https://github.com/Eignex/klause/issues/3533). Native optimum/refutation
+claims have no independent proof certificate here.
 
 [Joint repair qualification 8045](https://lab.eignex.com/jobs/8045) compares initial
 rounding, joint LS/ALNS and automatic finite LS/LP over eight frozen mixed sources
@@ -2200,6 +2200,21 @@ Finite LP retains flugpl's proof and feasible egout, pp08a and rgn points; finit
 LS also finds bell5 points. The evidence supports the explicit joint operator and
 frontier option, while retaining automatic routing and the wide-neighborhood
 certification boundary. Native proofs remain separate from independent point checks.
+
+[Final joint integration 8072](https://lab.eignex.com/jobs/8072) repeats all 231 cases
+at `fe25a362c2` with the completed bound service and corrected work accounting.
+All eleven source identities, runtime, dependencies and JVM options match within
+the Mac/aarch64 comparison; all 42 reported final witnesses pass solchecker.
+Across all three seeds, gr4x6 depth-first repair reaches 214.8 in four checked
+incumbents, ALNS reaches 210 in five, and frontier repair follows
+206.5 → 202.35 with nine scoped cutoff closures. Rounding finds no point.
+The finite LP control also reaches 202.35. Frontier spends 256 LP operations,
+11,636 preparation, 7,237,102 floating and 1,755,424 bound-certification work units,
+with one preparation and 255 reuses; ALNS closes five neighborhoods by cutoff.
+All seven wider roots retain guides but have no joint incumbent. Finite LP produces
+21 final points across 33 cases, finite LS nine, and each joint arm three.
+The operator therefore remains explicit: it provides coordinated checked repair
+and local bound closure, with no global proof or general performance claim.
 
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
