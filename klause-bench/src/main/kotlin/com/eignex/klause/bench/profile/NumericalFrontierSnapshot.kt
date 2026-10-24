@@ -190,19 +190,29 @@ internal class NumericalFrontierSnapshot(
 
     companion object {
         // Reflection keeps solver ownership and inspection types out of the published API.
-        fun open(context: SourceProofContext, params: TheoryParams, history: Boolean = false): Any {
+        fun open(
+            context: SourceProofContext, params: TheoryParams, history: Boolean = false, frontier: Boolean = false,
+        ): Any {
             val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
             val type = Class.forName("com.eignex.klause.solver.pipeline.LinearAuthorityInvocation")
+            val authorityType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthority")
             return type.getDeclaredConstructor(SourceProofContext::class.java, TheoryParams::class.java,
-                Function0::class.java, stateType, Boolean::class.javaPrimitiveType)
-                .newInstance(context, params, { null }, state, history)
+                Function0::class.java, stateType, Boolean::class.javaPrimitiveType, authorityType,
+                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+                .newInstance(context, params, { null }, state, history, null, frontier, false)
         }
 
-        fun run(invocation: Any, onIncumbent: (Sample, BigFraction) -> Unit): Any = checkNotNull(
-            invocation.javaClass.methods.single { it.name == "runSlice" && it.parameterCount == 4 }
-                .invoke(invocation, Cancellation.Never, Long.MAX_VALUE, -1L, onIncumbent),
-        )
+        fun run(
+            invocation: Any, onProgress: (Any) -> Unit = {}, onIncumbent: (Sample, BigFraction) -> Unit,
+        ): Any {
+            val advance = invocation.javaClass.methods.single { it.name == "runSlice" && it.parameterCount == 4 }
+            while (true) {
+                val result = advance.invoke(invocation, Cancellation.Never, Long.MAX_VALUE, 64L, onIncumbent)
+                onProgress(invocation)
+                if (result != null) return result
+            }
+        }
 
         fun stats(invocation: Any): SolveStats = invocation.javaClass.methods
             .single { it.name == "getStats" && it.parameterCount == 0 }.invoke(invocation) as SolveStats
