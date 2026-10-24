@@ -2118,8 +2118,28 @@ report an isolated worker heap failure during initialization under the 3 GiB cap
 WordDesign1 median LS elapsed falls from 2.305 to 1.952 seconds, Crossword rises
 from 0.629 to 0.641 seconds, and WordSquare `tab2-07` rises from 3.307 to 4.213
 seconds. Polling changes worker scheduling and move counts; these are default-route
-observations, not equal-work speedups. [8139](https://lab.eignex.com/jobs/8139)
-isolates 128-move maintenance cost, preparation and peak RSS. Mac
+observations, not equal-work speedups. Default-route median RSS rises, including
+large WordSquare mixed from 216,688 to 1,244,736 KiB as complete workers receive
+time, and small MDD LS from 819,208 to 843,760 KiB.
+
+[8139](https://lab.eignex.com/jobs/8139) compares parent, incremental and bounded
+revisions with one fixed CBLS arm, presolve off, node limit 160 (128 LS moves),
+phase clocks and a 60-second safety deadline. All 108 cases complete; all 27
+returned witnesses pass independent checking. Five source groups run six repeats
+per revision on the Mac; Crossword runs one matched triple there and five on a
+Linux/amd64 spot node. Each triple retains its host, work and witness hash; platform
+costs are not pooled. Early solutions use five/twenty moves on small MDD and 52
+on Crossword seed 3 rather than the full allowance.
+
+On the Mac, large MDD median elapsed is 38.527/24.226/33.299 seconds for
+parent/incremental/bounded, with peak RSS 3,013,976/1,230,464/1,332,032 KiB.
+Incremental/bounded selection clocks are 16.153/19.284 seconds and application
+6.513/9.719 seconds. Large WordSquare elapsed is 2.220/1.077/1.404 seconds,
+whereas WordDesign1 is 0.380/0.481/0.544 seconds and RSS
+135,080/177,272/202,976 KiB. These short process measurements include preparation
+and JVM compilation; they establish neither steady-state throughput nor a uniform
+memory improvement. Retain bounded operations for deadline and worker progress,
+with explicit polling, cursor and relation-index costs. Mac
 [JFR 8146](https://lab.eignex.com/jobs/8146), summarized by
 [8150](https://lab.eignex.com/jobs/8150), identifies residual MDD layer maintenance,
 including reversible scoring probes; its instrumented timings are not throughput
