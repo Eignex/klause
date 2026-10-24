@@ -41,6 +41,31 @@ import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
     @Test
+    fun `finite companions should import only floors expressed in their receiver units`() {
+        for ((weight, offset) in listOf(1L to 0L, 5L to 7L)) {
+            val source = LinearSourceProblem(
+                listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ofLong(2)),
+                    LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
+                listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ONE)),
+                    lower = SemanticRational.of(bigIntOf(3), bigIntOf(2)))),
+                LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ofLong(weight))),
+                    SemanticRational.ofLong(offset)),
+            )
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+                linearTraversal = LinearTraversal.NUMERICAL_COMPANIONS))
+
+            val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(
+                invocation, ExecutionOptions(ExecutionOption.openWorkLimit(4), ExecutionOption.maxFlips(0)))))
+
+            assertEquals(BigFraction.ofLong(weight + offset), assertNotNull(result.linearSource?.incumbent).objective)
+            val reads = result.result.stats.smt.completeSearchStages.orEmpty()["finiteCompanionBoundReads"] ?: 0L
+            if (weight == 1L && offset == 0L) assertTrue(reads > 0L) else assertEquals(0L, reads)
+        }
+    }
+
+    @Test
     fun `companion admission should retain a root refutation without numerical funding`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", true)),

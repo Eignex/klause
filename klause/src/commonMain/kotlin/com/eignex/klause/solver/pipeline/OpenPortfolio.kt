@@ -334,6 +334,9 @@ internal class OpenPortfolio(
                 PortfolioWorker.ofMinimize("finite/lp-default-companion", firstArm, resumable = {
                     var cutoffReads = 0L
                     var floorReads = 0L
+                    val floorObjective = objective.singleIntObjective()?.takeIf {
+                        it.ascending && objective.constant == 0L && objective.intCoefficientValues[it.varId] == 1L
+                    }
                     val solver = BacktrackSolver(finite.bake(cancellation = lifetime or slot.cancellation))
                     val params = BacktrackCatalog.byLabel("lp-default").build(
                         slot.baseSeed + 1000L + slot.index, null).copy(nodeBudget = slot.nodeBudget,
@@ -344,7 +347,7 @@ internal class OpenPortfolio(
                             if (exact != null) cutoffReads++
                             exact?.let(::roundedUpperBound) ?: Double.POSITIVE_INFINITY
                         }),
-                        objectiveLowerBoundSupplier = if (!shareCompanions) null else linear?.let {
+                        objectiveLowerBoundSupplier = if (!shareCompanions || floorObjective == null) null else linear?.let {
                             { it.sharedLowerBound().also { bound -> if (bound.isFinite()) floorReads++ } }
                         })
                     LinearCompanionSearch(solver.resumable(objective, params), context, binding, objective) {
