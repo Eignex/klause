@@ -142,6 +142,44 @@ internal class RevisedSimplex(
     internal val lastTheoryPricingSelections: Int get() = observations.lastTheoryPricingSelections
     internal val lastTheorySelectedColumn: Int get() = observations.lastTheorySelectedColumn
     private val observations = SimplexObservations()
+    internal var progressTrace: SimplexProgressTrace? = null
+        private set
+
+    internal fun enableProgressTrace() {
+        check(activeSolve == null)
+        progressTrace = SimplexProgressTrace()
+    }
+
+    private fun traceProgress(phase: SimplexPhase, beta: DoubleArray) {
+        val trace = progressTrace ?: return
+        if (!trace.iteration(phase)) return
+        var objective = model.objConstantD
+        var violation = 0.0
+        var maximum = 0.0
+        var count = 0
+        for (j in 0 until numVars) {
+            val value = when (status[j]) {
+                VarStatus.AT_LOWER, VarStatus.FIXED -> lowerAt(j)
+                VarStatus.AT_UPPER -> upperAt(j)
+                else -> 0.0
+            }
+            if (cost(j) != 0.0) objective += cost(j) * value
+        }
+        for (i in 0 until m) {
+            val j = basicVar[i]
+            objective += cost(j) * beta[i]
+            val below = if (finiteLowerAt(j)) lowerAt(j) - beta[i] else 0.0
+            val above = if (finiteUpperAt(j)) beta[i] - upperAt(j) else 0.0
+            val amount = maxOf(0.0, below, above)
+            if (amount > feasibilityTolerance) {
+                violation += amount
+                maximum = maxOf(maximum, amount)
+                count++
+            }
+        }
+        trace.samples.add(SimplexProgressSample(phase, observations.pivots, work.ops,
+            objective, violation, maximum, count))
+    }
     internal val lastNumericalMetrics: SimplexNumericalMetrics get() = observations.numericalMetrics
     override val lastTermination: LpFloatTermination? get() = observations.termination
     private var numericalFailure = false
@@ -1310,6 +1348,7 @@ internal class RevisedSimplex(
     }
 
     private fun resetSolveState(warmAttempted: Boolean) {
+        if (progressTrace != null) progressTrace = SimplexProgressTrace()
         solveStarted = true
         clearArtificialBounds()
         repairStop = null
@@ -1478,6 +1517,7 @@ internal class RevisedSimplex(
                 RefactorResult.FAILED -> return null
             }
             haveBeta = true
+            traceProgress(if (artificialLower == null) SimplexPhase.DUAL else SimplexPhase.BOXED_DUAL, beta)
             // Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate
             // dual steepest edge). Verify the chosen weight against the pivotal row which this iteration
             // needs anyway. Correcting an underestimate and reselecting is bounded by the row count:
@@ -1626,6 +1666,8 @@ internal class RevisedSimplex(
                 return null
             }
             updateGamma(spikeVec, r)
+            progressTrace?.step(if (artificialLower == null) SimplexPhase.DUAL else SimplexPhase.BOXED_DUAL,
+                ratioBuf[q], tolerance)
             val leaving = basicVar[r]
             status[leaving] = sideStatus(leaving, upper = !belowLower)
             basicVar[r] = q
@@ -2689,6 +2731,7 @@ internal class RevisedSimplex(
                     else -> 0.0
                 }
             }
+            traceProgress(SimplexPhase.PRIMAL_FEASIBILITY, beta)
             if (w <= feasibilityTolerance) return IterationResult.CONTINUE // feasible
 
             btranDense(gamma, pi, dualVec)
@@ -2713,6 +2756,7 @@ internal class RevisedSimplex(
             var best = tolerance
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
+                progressTrace?.let { it.pricedColumns++ }
                 val pj = dotColumn(pi, j)
                 val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && pj > 0.0)
                 val gain = if (atLower) pj else -pj
@@ -2733,6 +2777,7 @@ internal class RevisedSimplex(
                 return IterationResult.FAILED
             }
 
+            progressTrace?.lastEnteringGain = best
             val alpha = spikeDense(q, alphaBuf)
             val dir = if (qAtLower) 1.0 else -1.0
             var tMax = boundRange(q)
@@ -2771,6 +2816,7 @@ internal class RevisedSimplex(
                 }
             }
             if (tMax >= Double.MAX_VALUE) return IterationResult.FAILED // no blocker
+            progressTrace?.step(SimplexPhase.PRIMAL_FEASIBILITY, tMax, tolerance, flip = leaving == -1)
             if (leaving == -1) {
                 status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER
                 basicValues(beta)
@@ -2895,8 +2941,10 @@ internal class RevisedSimplex(
             var q = -1
             var qAtLower = true
             var best = primalPricingTolerance
+            traceProgress(SimplexPhase.PRIMAL_OBJECTIVE, beta)
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
+                progressTrace?.let { it.pricedColumns++ }
                 val dj = cost(j) - dotColumn(y, j)
                 val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && dj < 0.0)
                 // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
@@ -2915,6 +2963,7 @@ internal class RevisedSimplex(
             }
             if (q == -1) return optimal(beta) // no improving column ⇒ optimal
 
+            progressTrace?.lastEnteringGain = best
             val alpha = spikeDense(q, alphaBuf) // α = B⁻¹ A_q
             val dir = if (qAtLower) 1.0 else -1.0 // x_q moves by dir·t, t ≥ 0
             // Ratio test with the entering variable's own bound flip as a candidate blocker.
@@ -2953,6 +3002,7 @@ internal class RevisedSimplex(
             }
             if (leaving == -1) {
                 // The entering variable reaches its opposite bound first: flip it, no basis change.
+                progressTrace?.step(SimplexPhase.PRIMAL_OBJECTIVE, tMax, tolerance, flip = true)
                 status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER
                 basicValues(beta)
                 continue
@@ -2963,6 +3013,7 @@ internal class RevisedSimplex(
                 return null // numerically singular pivot
             }
             progress.primalDegenerate = if (tMax <= tolerance) progress.primalDegenerate + 1 else 0
+            progressTrace?.step(SimplexPhase.PRIMAL_OBJECTIVE, tMax, tolerance)
             val evicted = basicVar[leaving]
             status[evicted] = sideStatus(evicted, leavingToUpper)
             basicVar[leaving] = q
