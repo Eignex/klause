@@ -1166,6 +1166,23 @@ change with a search tradeoff, not a general speedup. The measured Table source
 is unchanged by its rebase onto the MDD contract. See
 [explanation lifetime](../docs/09-learning.md#table-explanations).
 
+Retain the per-variable search-time hole index. [Comparison 7993](https://lab.eignex.com/jobs/7993)
+pairs `443b3c12a` with `4a3642171` on Linux/amd64, CP/LP-off, one conflict-driven
+arm, seed 3, three repeats, 2000 nodes and a 20-second deadline. Ordinary CLI runs
+use debug statistics, external time and no JFR. Two completed WordSquare scan
+runs take 57.050 and 59.950 s; the third is killed by the 60-second lab watchdog
+without search statistics. All three indexed runs finish in 32.890–34.296 s.
+The two completed pairs match at two nodes, one failure and 1642588 propagation
+work; all six runs remain unknown. Completed scan peak RSS is 441072–451604 KiB,
+versus 481840–486352 KiB with the index. This is a lookup improvement with extra
+memory, and cancellation still substantially overruns the requested deadline.
+
+Eternity's median process time changes from 6.150 to 5.906 s with identical
+2000-node work and unknown verdicts. Table Nonogram and Regular medians remain
+near 2.26 and 1.12 s with identical work; all twelve witnesses pass original-source
+checking. The comparison establishes neither a general speedup nor a solve gain.
+The indexed history and undo sources are unchanged by rebase onto main.
+
 ### Division relation lookup
 
 Retain the compilation-owned index described in [integer division relations](../docs/02-model.md#integer-division-relations).
