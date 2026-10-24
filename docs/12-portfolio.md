@@ -150,7 +150,8 @@ The opt-in numerical companion recipe adds admitted finite search and joint line
 repair to a retained numerical frontier. Finite admission uses proved source bounds
 and unchanged working coordinates; a declined finite projection leaves the other
 workers available. Each worker owns its traversal, LP state and cumulative quota
-under the containing portfolio deadline and decision/move allowance.
+under the containing portfolio deadline and decision/move allowance. Joint repair
+uses the same cut layout at its root and in retained queries.
 
 Companions publish witnesses only, rechecking their complete coordinates against
 the captured affine source before publication. The frontier imports accepted
