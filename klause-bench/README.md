@@ -163,6 +163,12 @@ and duplicate decimal terms. Compare default and `exact=true` arms in a lab
 experiment; this fixture suite requires hash-named source bytes.
 Reference agreement does not verify an exported solver proof certificate.
 
+`source-equalities-v1` retains real, fractional, mixed, wide-integer and
+polynomial-backed equality blocks, an inconsistent real block and a guarded
+alternative. The [fixture notes](smoke-corpus/source-equalities-v1/README.md) pin
+source hashes and mathematical expectations. Compare `off,+dependent-rows` and
+default presolve separately, retaining preparation and complete subprocess times.
+
 `exact-globals` exercises MiniZinc's bin-packing and variable-count decompositions
 and offset circuit, subcircuit, symmetric-permutation and inverse wrappers, together
 with float array extrema. Each
@@ -761,6 +767,10 @@ source satisfiability. Parsing has a separate ten-second deadline. It opens no s
 and supplies no route or verdict claim. For up to eight sources,
 `batch64=<base64 JSON array of argument arrays>` retains each inspection in a
 numbered directory.
+`equality-candidates.json` retains unconditional non-strict integral equality rows
+with tagged references, exact coefficients and bounds, factor indices and whether
+one equality describes the whole factor. Capture is limited to 262144 entries and
+does not authorize dropping a binary partition or a row under nonzero tolerance.
 
 `ExactFeasibilityCapture` takes the same source arguments and observes one direct
 complete-worker search at P1/seed3 under a ten-second containing deadline. It wraps
@@ -1199,6 +1209,33 @@ excluded integer value. Run CP/LS arms with default and exact modes; Klause-lab 
 the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
+
+### Exact source equality blocks
+
+[Capture 8115](https://lab.eignex.com/jobs/8115) retains the tagged exact rows of
+the seven equality controls and original `lra-rational`, including polynomial-backed
+and wide rows. The guarded control supplies two unconditional equalities and two
+excluded activated rows. [8137](https://lab.eignex.com/jobs/8137) captures four
+original QF_LRA sources: the Heizmann and routing sources have no unconditional
+equalities, cooking21 has one, and driverlogNumeric has 46 with 457 entries.
+
+[8109](https://lab.eignex.com/jobs/8109) compares fixture-only `1468aae467` with
+`53e2866255`: 35 inputs, default and isolated `off,+dependent-rows` preparation,
+separate default-policy controls, P1, seed 3, three repeats, 10 seconds and debug
+enabled on Mac/aarch64. All 315 paired feasibility, proof-status and exact-objective
+outcomes match. Original hashes, runtime, options and non-solver dependencies match.
+The checker accepts 198 witnesses; 36 mixed witnesses are indeterminate from a
+Dolmen type error and 216 witnesses have unsupported objective, MPS syntax or
+decimal checks. The 72 native UNSAT claims have no independent proof certificate.
+
+The five dependent SAT controls each lose one equality; the guarded alternative
+remains satisfiable. The real contradiction is discharged during preparation:
+default median preparation/whole-CLI times change from 26/358 to 15/298 ms.
+Polynomial SAT preparation/CLI medians instead rise from 24/465 to 30/476 ms.
+Original `miplib/fixnet-5000` loses one row but remains UNKNOWN; its default
+preparation median rises from 241 to 366 ms, within a 10-second solve budget.
+Retain exact representation and earlier refutation with these preparation costs;
+row reduction alone establishes neither search benefit nor a general speedup.
 
 ### XCSP3 declared intension extrema
 
