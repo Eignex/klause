@@ -27,15 +27,35 @@ internal class TableStr2State(
     val live: RevLongArray? = index?.let { RevLongArray(state, (numValidInit + 63) ushr 6) }
     private val baseline = if (index == null) null else Array(xs.size) { RevRef(state, state.intDomains[xs[it]]) }
     private var sweepDomains: Array<IntDomain>? = null
+    private var clearRows = false
 
     fun beginSweep(): Boolean {
-        val delta = started && index != null
+        var changedValues = 0L
+        if (started && index != null) {
+            val prior = requireNotNull(baseline)
+            for (col in xs.indices) {
+                state.checkFiniteWork()
+                val domain = prior[col].value
+                if (domain !== state.intDomains[xs[col]]) {
+                    changedValues += index.columns[col].valueCount(domain.min, domain.max)
+                }
+            }
+        }
+        clearRows = started && live != null && numValid < maxOf(64, live.size * 2)
+        val delta = started && index != null && !clearRows && changedValues * 2 <= numValid.toLong() * xs.size
         if (delta) filterDelta()
         sweepDomains = if (index == null) null else Array(xs.size) {
             state.checkFiniteWork()
             state.intDomains[xs[it]]
         }
         return delta
+    }
+
+    fun rejectRow(row: Int) {
+        if (!clearRows) return
+        val live = requireNotNull(live)
+        val word = row ushr 6
+        live[word] = live[word] and (1L shl (row and 63)).inv()
     }
 
     private fun filterDelta() {
@@ -64,6 +84,7 @@ internal class TableStr2State(
     }
 
     fun rebuildLive() {
+        if (clearRows) return
         val live = live ?: return
         val words = LongArray(live.size)
         for (i in 0 until numValid) {

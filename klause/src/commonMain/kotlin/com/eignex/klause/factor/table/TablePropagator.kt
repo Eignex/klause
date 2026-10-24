@@ -518,6 +518,7 @@ internal class TablePropagator(
                 }
             }
             if (!feasible) {
+                if (!delta) s.rejectRow(row)
                 val last = numValid - 1
                 if (i != last) {
                     s.validTuples[i] = s.validTuples[last]
@@ -639,6 +640,7 @@ internal class TablePropagator(
                 }
             }
             if (!feasible) {
+                if (!delta) s.rejectRow(row)
                 val last = numValid - 1
                 if (i != last) {
                     s.validTuples[i] = s.validTuples[last]
