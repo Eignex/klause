@@ -11853,6 +11853,8 @@ public final class com/eignex/klause/solver/pipeline/LinearSourceOutcome {
 public final class com/eignex/klause/solver/pipeline/LinearTraversal : java/lang/Enum {
 	public static final field AUTOMATIC Lcom/eignex/klause/solver/pipeline/LinearTraversal;
 	public static final field NUMERICAL Lcom/eignex/klause/solver/pipeline/LinearTraversal;
+	public static final field NUMERICAL_COMPANIONS Lcom/eignex/klause/solver/pipeline/LinearTraversal;
+	public static final field NUMERICAL_COMPANIONS_INDEPENDENT Lcom/eignex/klause/solver/pipeline/LinearTraversal;
 	public static final field NUMERICAL_FRONTIER Lcom/eignex/klause/solver/pipeline/LinearTraversal;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/LinearTraversal;

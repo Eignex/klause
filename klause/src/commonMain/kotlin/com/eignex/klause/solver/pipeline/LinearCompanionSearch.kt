@@ -28,8 +28,10 @@ internal class LinearCompanionSearch(
 ) : InstructionSlicedSearch, ReseedGuard, ResumableSearch by search {
     private val context = context.withLinearAuthority()
     init {
-        require(binding.scope == context.scope && binding.executionObjective === objective) {
-            "linear companion has another source scope or execution objective"
+        if (binding.scope != context.scope || binding.executionObjective !== objective) {
+            val failure = IllegalArgumentException("linear companion has another source scope or execution objective")
+            runCatching { search.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
         }
     }
     override val stats get() = search.stats.let { stats ->
