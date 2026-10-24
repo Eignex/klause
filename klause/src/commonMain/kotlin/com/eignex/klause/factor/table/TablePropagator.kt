@@ -95,7 +95,7 @@ internal class TablePropagator(
     private fun groundSupportLoss(state: PropagationState, col: Int, kind: Int, value: Long, atTrail: Int): IntArray {
         val snapshot = ExplanationSnapshot(state, xs, atTrail)
         val out = LitSet()
-        columnLiterals(state, col, snapshot, out)
+        if (kind != VALUE) columnLiterals(state, col, snapshot, out)
         val pick = IntArrayList()
         for (row in 0 until numTuples) {
             val own = cellLo(row, col)
@@ -104,7 +104,8 @@ internal class TablePropagator(
                 UPPER -> own > value
                 else -> own == value
             }
-            if (!removed || cellAt(state, row, col, snapshot, null) == Cell.KILLED) continue
+            if (!removed) continue
+            if (kind != VALUE && cellAt(state, row, col, snapshot, null) == Cell.KILLED) continue
             var chosen = Lit.NONE
             var killed = false
             for (c in 0 until arity) {
