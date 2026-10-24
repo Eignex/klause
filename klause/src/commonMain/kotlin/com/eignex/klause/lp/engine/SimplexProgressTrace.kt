@@ -24,6 +24,7 @@ internal class SimplexProgressTrace {
     var pricedColumns = 0L
     var lastEnteringGain = 0.0
     var lastStep = 0.0
+    var passedPhaseOneBreakpoints = 0L
 
     fun basisSolve(operation: SimplexBasisOperation, work: Long) {
         basisSolves[operation] = basisSolves.getOrElse(operation) { 0 } + 1

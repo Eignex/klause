@@ -298,6 +298,14 @@ The owner rejects another solve or authority adoption while that cursor is live;
 closing it unwinds the suspended operation and retires its factors. Synchronous
 calls consume the same operation without suspension.
 
+Primal feasibility repair minimizes the convex sum of basic-bound violations
+along an entering edge. It passes bound crossings while the directional slope
+remains negative, then pivots at the minimizing crossing or flips the entering
+column at its opposite side. Tied crossings prefer a larger pivot. Basic values
+and feasibility gradients are recomputed after the step; a positive residual
+infeasibility never supplies a primal point. The sparse breakpoint workspace and
+ordering consume the same floating work and iteration allowance as other pivots.
+
 Selected structural-column pricing passes the current owned CSC matrix to Koblas's
 validated column dot, reusing its support without copying columns. An unscaled
 fallback replaces that matrix with the scaling view and retires the basis backend;
