@@ -169,6 +169,12 @@ A changed scoped query spends a fresh operation and can reuse the prepared matri
 without reserving its construction again. `SparseSourceLpPolicy` carries the
 preparation, floating, consultation and certificate allowances together.
 
+Retained MIP callers additionally fund consultations through `SourceLpFunding`.
+Grant pauses preserve admitted sparse state; measured work and cumulative sparse
+construction allocation survive owner replacement. Caller cancellation closes the
+owner, while funding exhaustion is an incomplete resource result. Per-operation
+shape, fill, scalar, iteration and certificate limits still apply to every query.
+
 Identity row layouts are the default. An explicit unconditional-equality policy
 combines adjacent closed, exactly opposing inequalities into one row with a fixed
 logical column. The emitted multiplier's sign selects the original inequality when

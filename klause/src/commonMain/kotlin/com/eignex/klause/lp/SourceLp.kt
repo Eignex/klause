@@ -57,6 +57,7 @@ internal class SourceLpBudget(
     private val solveContext: () -> LpSolveContext = { LpSolveContext.Production },
     private val onWork: (SourceLpWorkStats) -> Unit = {},
     val onBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
+    val funding: SourceLpFunding? = null,
 ) {
     val context: LpSolveContext get() = solveContext()
 
@@ -92,6 +93,12 @@ internal class SourceLpBudget(
         boundCertification: Long = 0L,
         conflictCertification: Long = 0L,
     ) {
+        funding?.charge(preparation)
+        funding?.charge(floatWork)
+        funding?.charge(continuation)
+        funding?.charge(refinement)
+        funding?.charge(boundCertification)
+        funding?.charge(conflictCertification)
         measuredPreparationWork += minOf(preparation, Long.MAX_VALUE - measuredPreparationWork)
         measuredFloatWork += minOf(floatWork, Long.MAX_VALUE - measuredFloatWork)
         measuredContinuationWork += minOf(continuation, Long.MAX_VALUE - measuredContinuationWork)
@@ -223,12 +230,13 @@ internal class SourceLpBudget(
         resumed: SourceLpSparseAdmission? = null,
     ): T? {
         val activeCap = maxActiveNanos
-        if (cancellation() || (resumed == null && operations >= maxOperations)) return null
+        if (cancellation() || funding?.paused == true || (resumed == null && operations >= maxOperations)) return null
         if (activeCap != null && activeNanos >= activeCap) return null
         if (resumed == null) {
             operations++
             reservedWork += minOf(1024L, Long.MAX_VALUE - reservedWork)
         }
+        funding?.charge(1024L)
         val outermost = activeStart == null
         if (outermost) activeStart = Monotonic.markNow()
         val start = checkNotNull(activeStart)
@@ -244,6 +252,7 @@ internal class SourceLpBudget(
                 val preparation = sparse(token)
                 reservedWork += minOf(preparation.metrics.work, Long.MAX_VALUE - reservedWork)
                 reservedAllocation += minOf(preparation.metrics.allocation, Long.MAX_VALUE - reservedAllocation)
+                funding?.charge(0, preparation.metrics.allocation)
                 observe(preparation = preparation.metrics.work)
                 if (preparation.prepared == null || token()) return null
                 return block(token).takeUnless { token() }

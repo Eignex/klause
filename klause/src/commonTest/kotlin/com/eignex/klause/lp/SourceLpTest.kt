@@ -19,6 +19,43 @@ import kotlin.time.TimeSource
 
 class SourceLpTest {
     @Test
+    fun `caller funded declines can continue past the legacy operation ceiling`() {
+        val funding = SourceLpFunding(300_000, 10_000)
+        val budget = SourceLpBudget(maxOperations = Int.MAX_VALUE, funding = funding)
+        funding.grant(300_000)
+
+        repeat(257) {
+            budget.runPrepared(Cancellation.Never, prepare = { null }) { true }
+        }
+
+        assertEquals(257, budget.operations)
+        assertEquals(257L * 1024L, funding.spent)
+        assertFalse(funding.exhausted)
+    }
+
+    @Test
+    fun `unfunded preparation can resume without renewing measured work`() {
+        val funding = SourceLpFunding(10_000, 10_000)
+        val budget = SourceLpBudget(maxOperations = Int.MAX_VALUE, funding = funding)
+        var prepared = 0
+        fun attempt() = budget.runPrepared(Cancellation.Never, prepare = {
+            prepared++
+            null
+        }) { true }
+
+        assertNull(attempt())
+        assertEquals(0, prepared)
+        funding.grant(1024)
+        assertNull(attempt())
+        assertNull(attempt())
+        assertEquals(1, prepared)
+        funding.grant(1024)
+        assertNull(attempt())
+        assertEquals(2, prepared)
+        assertEquals(2048L, funding.spent)
+    }
+
+    @Test
     fun `empty operation allowance should skip source input preparation`() {
         val budget = SourceLpBudget(maxOperations = 0)
         var prepared = false

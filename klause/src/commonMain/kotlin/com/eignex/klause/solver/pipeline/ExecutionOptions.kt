@@ -119,6 +119,16 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Native open arithmetic work, independent of the shared node allowance. */
         val openWorkLimit: ExecutionOption<Long?> = ExecutionOption("open-work-limit", ValueKind.ALLOWANCE)
 
+        /** Cumulative source LP work, including preparation, numerical advances and certificates. */
+        val sourceLpWorkLimit: ExecutionOption<Long?> = ExecutionOption("source-lp-work-limit", ValueKind.ALLOWANCE)
+
+        /** Cumulative sparse source preparation allocation in bytes. */
+        val sourceLpAllocationLimit: ExecutionOption<Long?> =
+            ExecutionOption("source-lp-allocation-limit", ValueKind.ALLOWANCE)
+
+        /** Source LP operation ceiling for controlled comparisons. */
+        val sourceLpOperations: ExecutionOption<Int> = ExecutionOption("source-lp-operations", ValueKind.INT)
+
         /** Native polynomial or function arithmetic work; null means unlimited. */
         val nraWorkLimit: ExecutionOption<Long?> = ExecutionOption("nra-work-limit", ValueKind.ALLOWANCE)
 
@@ -356,7 +366,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
             listOf(
                 dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
-                nodeLimit, openWorkLimit, nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
+                nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations,
+                nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
                 openHintFlips, openHintMinSplits,
                 maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart,

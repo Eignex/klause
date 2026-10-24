@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.atScope
@@ -37,7 +38,9 @@ internal class JointLinearRepair(
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val stop = params.timeout or params.cancellation
     private val state = OpenTheorySolveState(params)
-    private val budget = SourceLpBudget(maxOperations = SOURCE_OPERATION_LIMIT, onWork = state.smt::observeSourceLp)
+    private val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+    private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
+        onWork = state.smt::observeSourceLp, funding = funding)
     private val stages = linkedMapOf<String, Long>()
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
         if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")
@@ -55,12 +58,10 @@ internal class JointLinearRepair(
     private var closed = false
     private var declined = false
     private var preparationWork = 0L
-    val exhausted: Boolean get() = declined || budget.operations >= SOURCE_OPERATION_LIMIT ||
+    val exhausted: Boolean get() = declined || funding.exhausted || budget.operations >= params.sourceLpOperations ||
         (!rootPreparationPending && pending == null && (!state.work.hasAllowance() ||
             state.work.acceptedChecks >= params.maxLeaves))
-    val work: Long get() = state.work.spent + budget.measuredPreparationWork + budget.measuredFloatWork +
-        budget.measuredContinuationWork + budget.measuredBoundCertificationWork +
-        budget.measuredConflictCertificationWork + preparationWork +
+    val work: Long get() = state.work.spent + funding.spent + preparationWork +
         (selection?.visitedEntries ?: 0)
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot().copy(
         completeSearchStages = observations() + mapOf(
@@ -69,6 +70,8 @@ internal class JointLinearRepair(
             "jointRepairPreparationEntries" to preparationWork,
             "jointRepairLpPreparations" to authority.preparations,
             "jointRepairLpReuses" to authority.reuses,
+            "jointRepairFundedWork" to funding.spent,
+            "jointRepairFundedAllocation" to funding.allocated,
         )))
 
     private fun observe(stage: String) { stages[stage] = (stages[stage] ?: 0) + 1 }
@@ -127,6 +130,7 @@ internal class JointLinearRepair(
             }
         }
         if (rootPoint == null) {
+            funding.grant(20_000_000L)
             if (!rootStarted) {
                 if (!state.work.theoryCheck()) return false
                 rootStarted = true
@@ -185,7 +189,7 @@ internal class JointLinearRepair(
             pending = condition
             query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)), params,
                 external = { anchor }, state = state, borrowedAuthority = authority,
-                boundOrdered = boundOrdered, guidance = true)
+                boundOrdered = boundOrdered, guidance = true, funding = funding)
             observe("jointRepairCandidates")
         }
         val active = requireNotNull(query)
@@ -247,4 +251,3 @@ internal class JointLinearRepair(
 
 private const val QUERY_SLICE_MILLIS = 10L
 private const val QUERY_SLICE_WORK = 64L
-private const val SOURCE_OPERATION_LIMIT = 256

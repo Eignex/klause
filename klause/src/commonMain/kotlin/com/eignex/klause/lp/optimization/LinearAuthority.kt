@@ -68,12 +68,15 @@ internal class LinearAuthority(
             lp.close()
             return LinearAuthorityResult()
         }
+        if (budget.funding?.paused == true) return LinearAuthorityResult(paused = true)
         val result = checkSource(source, cancellation)
         if (cancellation()) {
             lp.close()
             return LinearAuthorityResult()
         }
-        return result.copy(relaxedPoint = relaxedPoint)
+        return result.copy(relaxedPoint = relaxedPoint,
+            paused = result.paused || (result.evidence == null && result.split == null &&
+                result.incumbent == null && budget.funding?.paused == true))
     }
 
     fun advance(source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false): LinearAuthorityResult {
@@ -82,12 +85,15 @@ internal class LinearAuthority(
             lp.close()
             return LinearAuthorityResult()
         }
+        if (budget.funding?.paused == true) return LinearAuthorityResult(paused = true)
         val result = checkSource(source, cancellation, guidance = true, cuts = cuts)
         if (cancellation()) {
             lp.close()
             return LinearAuthorityResult()
         }
-        return result.copy(relaxedPoint = relaxedPoint)
+        return result.copy(relaxedPoint = relaxedPoint,
+            paused = result.paused || (result.evidence == null && result.split == null &&
+                result.incumbent == null && budget.funding?.paused == true))
     }
 
     private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
@@ -168,14 +174,14 @@ internal class LinearAuthority(
         val closureRows = prepared.closureRows
         val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive,
             prepared.unconditionalRows)
-            ?: return LinearAuthorityResult() else null
+            ?: return LinearAuthorityResult(paused = budget.funding?.paused == true) else null
         if (guide?.paused == true) return LinearAuthorityResult(paused = true)
         guide?.coordinateConflictWeights?.let { weights ->
             val evidence = checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
             return LinearAuthorityResult(evidence = evidence, coordinateConflict = evidence != null)
         }
         val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive)
-            ?: return LinearAuthorityResult()
+            ?: return LinearAuthorityResult(paused = budget.funding?.paused == true)
         val closure = solved.result
         if (closure.verdict == LpVerdict.INFEASIBLE) {
             val evidence = refutation(solved)
