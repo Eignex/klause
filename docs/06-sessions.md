@@ -264,7 +264,8 @@ the containing cancellation stops it.
 Numerical MIP traversal and joint repair use caller-funded source LP work. Each
 slice grants a quantum from one cumulative work and sparse preparation allocation
 allowance. Admission costs 1024 work units, including declined and resumed attempts;
-preparation, floating work, exact continuation, refinement and certification debit
+source metadata visits, sparse preparation, floating work, exact continuation,
+refinement and certification debit
 their measured work. Atomic phases can overspend, and the next admission pauses.
 An unfunded query keeps its pending alternative and owner; cumulative exhaustion
 ends the worker without proving exhaustion. Coverage splits debit modeled storage
