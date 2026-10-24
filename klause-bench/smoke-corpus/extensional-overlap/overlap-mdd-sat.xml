@@ -1,0 +1,12 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" size="[3]"> 0..1 </array>
+  </variables>
+  <constraints>
+    <extension><list>x[2] x[0]</list><supports>(0,0)(1,1)</supports></extension>
+    <mdd>
+      <list>x[]</list>
+      <transitions>(r,0,a)(r,1,a)(a,0,b)(a,1,b)(b,0,t)(b,1,t)</transitions>
+    </mdd>
+  </constraints>
+</instance>
