@@ -192,6 +192,20 @@ class PresolveRoundEngineTest {
     }
 
     @Test
+    fun `an interrupted parity analysis should retry rather than park after another pass changes the model`() {
+        val parity = PresolvePass.DERIVE_XOR_UNITS
+        val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
+        val host = ScriptedHost(
+            1_000, mapOf(cheap to listOf(10L)), budget = PresolveBudget(Long.MAX_VALUE),
+            interrupted = setOf(parity),
+        )
+
+        val runs = runs(listOf(parity, cheap), host)
+
+        assertEquals(2, runs.count { it == parity })
+    }
+
+    @Test
     fun `an expensive interrupted analysis should retry after sufficient accumulated change`() {
         val expensive = PresolvePass.BREAK_SYMMETRIES
         val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
