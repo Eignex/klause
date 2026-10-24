@@ -33,6 +33,7 @@ import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpCounterResults
+import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -93,6 +94,12 @@ internal class RootRoundingWarmStart(
     val basis: Basis,
 )
 
+internal enum class LpRootQueryPolicy {
+    SHARED_WORK,
+    SEPARATE_PREPARATION,
+    INTERRUPTED_WORK,
+}
+
 /**
  * Per-node relaxation-bounding runtime for branch-and-bound. Owns the whole LP-relaxation family
  * state — the [CpToLpRelaxation] relaxer, structural cut separators and the harvested global-cut
@@ -116,11 +123,11 @@ internal class LpEngine(
     internal val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
     private val nodeWorkAllowance: () -> Long? = { null },
     private val containingWork: (Long) -> Unit = {},
-    private val prepareRootWithinAllowance: Boolean = false,
+    private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
-        require(!prepareRootWithinAllowance || (params0.lpPlan.boundMaxDepth == 0 &&
+        require(rootQueryPolicy == LpRootQueryPolicy.SHARED_WORK || (params0.lpPlan.boundMaxDepth == 0 &&
             lpWorkAllowance(params0.solveBudgetMillis, params0.lpPlan.lpWorkBudgetFraction) > 0L))
     }
 
@@ -461,7 +468,7 @@ internal class LpEngine(
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
-    internal fun nodePreparationWorkBudget(): Long = if (prepareRootWithinAllowance) {
+    internal fun nodePreparationWorkBudget(): Long = if (rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK) {
         lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: nodeWorkBudget()
     } else nodeWorkBudget()
 
@@ -533,6 +540,14 @@ internal class LpEngine(
         lpWorkBudget.observe(reachedOptimum, degenerateColumns, columns, sizeBudget(columns, rows))
     }
 
+    internal fun observeNodeWorkStop(solver: LpSolver) {
+        if (rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK && adaptiveWork &&
+            solver.lastTermination == LpFloatTermination.WORK && solver.lastPivots > 0
+        ) {
+            lpWorkBudget.observeWorkStop()
+        }
+    }
+
     /**
      * The work a solve of this model ought to cost, from its shape alone: roughly one dense pass per
      * column-derived iteration, with `columns / SIZE_BUDGET_DIVISOR` iterations.
@@ -601,9 +616,9 @@ internal class LpEngine(
         solveContext = solveContext,
         cancellation = params.cancellation,
         queryWorkAllowance = {
-            nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { prepareRootWithinAllowance }
+            nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK }
         },
-        onPreparation = if (prepareRootWithinAllowance) { metrics ->
+        onPreparation = if (rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK) { metrics ->
             sink.lp.observeEngineCost(LpRoute.NODE, metrics)
             noteSolveOps(metrics.workOps)
         } else null,

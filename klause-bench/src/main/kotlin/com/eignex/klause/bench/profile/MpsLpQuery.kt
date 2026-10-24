@@ -27,6 +27,7 @@ internal object MpsLpQuery {
         out.resolve("queries.jsonl").bufferedWriter().use { output ->
             for (mode in listOf(
                 "full-cold", "full-retained", "cone-cold", "prepared-cold", "prepared-retained", "prepared-session",
+                "feedback-cold", "feedback-session",
             )) {
                 queryMode(problem, objective, mode, bean) { report ->
                     output.appendLine(report.toString())
@@ -54,7 +55,12 @@ internal object MpsLpQuery {
             override fun workMeter() = callStop.workMeter()
         }
         var owner: Pair<AutoCloseable, Any>? = null
-        val sameRoot = mode == "prepared-session"
+        val sameRoot = mode.endsWith("-session")
+        val rootPolicy = when {
+            mode.startsWith("feedback-") -> "INTERRUPTED_WORK"
+            mode.startsWith("prepared-") -> "SEPARATE_PREPARATION"
+            else -> "SHARED_WORK"
+        }
         var retainedRoot: PropagationSession? = null
         var rootDomains = emptyList<IntDomain>()
         var rootBooleans = emptyList<Boolean?>()
@@ -66,7 +72,7 @@ internal object MpsLpQuery {
                 val startNs = System.nanoTime()
                 val startBytes = bean.getThreadAllocatedBytes(thread)
                 val reused = owner != null
-                val active = owner ?: newOwner(problem, objective, plan, token, mode.startsWith("prepared-")).also {
+                val active = owner ?: newOwner(problem, objective, plan, token, rootPolicy).also {
                     owner = it
                 }
                 val setupNs = System.nanoTime() - startNs
@@ -124,7 +130,7 @@ internal object MpsLpQuery {
                     put("freshRootSession", !sameRoot || repeat == 0)
                     put("rootUnchanged", rootUnchanged)
                     put("stopReason", stopReason)
-                    put("prepareRootWithinAllowance", mode.startsWith("prepared-"))
+                    put("rootQueryPolicy", rootPolicy)
                     put("plan", plan.toString())
                     put("containingSeconds", 30)
                     put("querySeconds", 10)
@@ -160,7 +166,7 @@ internal object MpsLpQuery {
         objective: LinearObjective,
         plan: LpPlan,
         token: Cancellation,
-        prepareWithinAllowance: Boolean,
+        rootPolicy: String,
     ): Pair<AutoCloseable, Any> {
         val routeType = Class.forName("com.eignex.klause.solver.result.LpRoute")
         val route = routeType.enumConstants.single { it.toString() == "NODE" }
@@ -175,7 +181,8 @@ internal object MpsLpQuery {
         values[2] = LpParams(plan, cancellation = token, solveBudgetMillis = 30_000, randomSeed = 3)
         values[3] = sink
         values[5] = false
-        values[9] = prepareWithinAllowance
+        values[9] = Class.forName("com.eignex.klause.lp.bounding.LpRootQueryPolicy")
+            .enumConstants.single { it.toString() == rootPolicy }
         values[10] = 527.inv()
         return (constructor.newInstance(*values) as AutoCloseable) to sink
     }

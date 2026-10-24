@@ -43,4 +43,15 @@ class LpWorkBudgetTest {
 
         assertEquals(100_000L, budget.ops())
     }
+
+    @Test
+    fun `work stop growth should respect the existing ceiling`() {
+        for ((initial, expected) in listOf(1_000L to 2_000L, 80_000L to 100_000L, 100_000L to 100_000L)) {
+            val budget = budget(initial)
+
+            budget.observeWorkStop()
+
+            assertEquals(expected, budget.ops())
+        }
+    }
 }

@@ -481,11 +481,11 @@ internal fun LpEngine.sparseSafePrune(
         observeSolveCost(sink, simplex)
     }
     if (cancellation()) return LpNodeOutcome(false, null)
-    // Feed the budget from the solve itself. A solve that produced no result at all was infeasible or
-    // bailed numerically, which says nothing about how much budget the next one deserves.
+    // Candidate points supply degeneracy feedback; a missing point requires an explicit termination policy.
     floatResult?.let {
         observeNodeWork(it.optimal, simplex.lastDegenerateColumns, simplex.lastColumns, model.m)
     }
+    if (floatResult == null) observeNodeWorkStop(simplex)
     val result = floatResult ?: run {
         if (lpCounterResults.read(model, solveContext.certificationPolicy)?.witness != null) {
             return LpNodeOutcome(false, null)

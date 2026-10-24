@@ -7,8 +7,8 @@ package com.eignex.klause.lp.bounding
  *  - Optimal, nondegenerate solves reset it to the caller's size baseline.
  *  - Optimal, degenerate solves shrink it further.
  *
- * [minOps] and [maxOps] bound the budget. A persistent basis retains partial progress between
- * solves. Prune counts are unsuitable feedback because pruning also depends on the incumbent.
+ * [minOps] and [maxOps] bound the budget. Prune counts are unsuitable feedback because pruning also
+ * depends on the incumbent.
  */
 internal class LpWorkBudget(private val minOps: Long, private val maxOps: Long, initialOps: Long) {
     private var next: Long = initialOps.coerceIn(minOps, maxOps)
@@ -18,8 +18,7 @@ internal class LpWorkBudget(private val minOps: Long, private val maxOps: Long, 
 
     /**
      * Fold in one solve: whether it [reachedOptimum], its [degenerateColumns] out of [columns], and the
-     * [sizeBudget] the model's own size implies. A solve that produced no result at all (infeasible, or a
-     * numerical bail) says nothing about the budget and is not fed back.
+     * [sizeBudget] the model's own size implies. Calls without a point use explicit work-stop feedback.
      */
     fun observe(reachedOptimum: Boolean, degenerateColumns: Int, columns: Int, sizeBudget: Long) {
         if (columns <= 0) return
@@ -34,6 +33,10 @@ internal class LpWorkBudget(private val minOps: Long, private val maxOps: Long, 
             else -> next / maxOf(1, 2 * shrink)
         }
         next = next.coerceIn(minOps, maxOps)
+    }
+
+    fun observeWorkStop() {
+        next += minOf(next, maxOps - next)
     }
 
     companion object {

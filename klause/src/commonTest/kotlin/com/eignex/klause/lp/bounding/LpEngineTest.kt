@@ -11,6 +11,7 @@ import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
@@ -80,20 +81,32 @@ class LpEngineTest {
         ),
     )
 
-    private fun metricSolver(workOps: Long = 0L): LpSolver = object : LpSolver {
+    private fun metricSolver(
+        workOps: Long = 0L,
+        termination: LpFloatTermination? = null,
+        pivots: Int = 0,
+    ): LpSolver = object : LpSolver {
         override val infeasibleRay: DoubleArray? = null
         override val lastWorkOps: Long = workOps
+        override val lastTermination = termination
+        override val lastPivots = pivots
         override fun solve(warm: Basis?) = null
         override fun solvePrimal(warm: Basis?) = null
     }
 
-    private fun budgetedEngine(sink: SolveStatsSink, plan: LpPlan = LpPlan(bounding = true)): LpEngine {
+    private fun budgetedEngine(
+        sink: SolveStatsSink,
+        plan: LpPlan = LpPlan(bounding = true),
+        policy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
+        budgetMillis: Long = 4L,
+    ): LpEngine {
         val problem = boundedProblem()
         return LpEngine(
             problem,
             LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
-            LpParams(lpPlan = plan, solveBudgetMillis = 4L),
+            LpParams(lpPlan = plan, solveBudgetMillis = budgetMillis),
             sink,
+            rootQueryPolicy = policy,
         )
     }
 
@@ -240,7 +253,7 @@ class LpEngineTest {
             LpParams(lpPlan = LpPlan(bounding = true, boundMaxDepth = 0), solveBudgetMillis = 30_000L),
             SolveStatsSink(backend = "root-preparation-cap"),
             LpSolveContext(factory, decline),
-            prepareRootWithinAllowance = true,
+            rootQueryPolicy = LpRootQueryPolicy.SEPARATE_PREPARATION,
         ).use { engine ->
             val queryCap = engine.nodeWorkBudget()
 
@@ -260,11 +273,36 @@ class LpEngineTest {
             LinearObjective(),
             LpParams(lpPlan = plan, solveBudgetMillis = 4L),
             SolveStatsSink(backend = "root-preparation-remaining"),
-            prepareRootWithinAllowance = true,
+            rootQueryPolicy = LpRootQueryPolicy.SEPARATE_PREPARATION,
         ).use { engine ->
             engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
 
             assertEquals(15_000L, engine.nodePreparationWorkBudget())
+        }
+    }
+
+    @Test
+    fun `interrupted root policy should grow only a pivoting work stop without a point`() {
+        for (policy in LpRootQueryPolicy.entries) {
+            for (termination in LpFloatTermination.entries + listOf(null)) {
+                for (pivots in listOf(0, 1)) {
+                    budgetedEngine(
+                        SolveStatsSink(backend = "interrupted-root"),
+                        LpPlan(bounding = true, boundMaxDepth = 0),
+                        policy,
+                        budgetMillis = 30_000L,
+                    ).use { engine ->
+                        val before = engine.nodeWorkBudget()
+
+                        engine.observeNodeWorkStop(metricSolver(termination = termination, pivots = pivots))
+
+                        val grows = policy == LpRootQueryPolicy.INTERRUPTED_WORK &&
+                            termination == LpFloatTermination.WORK && pivots > 0
+                        assertEquals(if (grows) before * 2 else before, engine.nodeWorkBudget(),
+                            "$policy $termination pivots=$pivots")
+                    }
+                }
+            }
         }
     }
 
