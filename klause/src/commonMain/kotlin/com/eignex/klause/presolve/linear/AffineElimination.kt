@@ -155,8 +155,14 @@ internal object AffineSingletons {
         if (problem.factors.size > maxFactors) return null
         val objectiveRewrite = objective?.takeUnless { problem.semantics.isApproximate }
             ?.let { AffineObjective(it, cancellation) }
+        if (objectiveRewrite?.interrupted == true) return null
         val objVars = IntHashSet().apply {
             if (objectiveRewrite == null) for (v in objectiveIntVars) add(v)
+            if (objectiveRewrite == null && objective != null) {
+                for (v in objective.intCoefficientValues.indices) {
+                    if (objective.intCoefficientValues[v] != 0L) add(v)
+                }
+            }
         }
         // On multi-million-factor models the candidate scan alone can run for seconds while barely
         // simplifying. Skipping is sound: the affine-defined variables stay and are solved directly.

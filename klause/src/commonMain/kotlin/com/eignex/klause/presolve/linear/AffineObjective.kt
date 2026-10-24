@@ -11,12 +11,17 @@ internal class AffineObjective(private val source: LinearObjective, private val 
     private val coefficients = HashMap<Int, Long>()
     private var constant = source.constant
     private var changed = false
+    var interrupted = false
+        private set
 
     init {
         for (variable in source.intCoefficientValues.indices) {
             if (variable and 63 == 0) {
                 cancellation.charge(64L)
-                if (cancellation()) break
+                if (cancellation()) {
+                    interrupted = true
+                    break
+                }
             }
             val coefficient = source.intCoefficientValues[variable]
             if (coefficient != 0L) coefficients[variable] = coefficient
