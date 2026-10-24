@@ -48,6 +48,7 @@ internal fun recoverLinearPrimal(
             }
         }
         val active = ArrayList<ExactRationalInequality>()
+        val endpoints = BooleanArray(point.size)
         var entries = 0L
         for (id in rows.indices) {
             meter.reserve(1L)
@@ -60,14 +61,25 @@ internal fun recoverLinearPrimal(
                 if (row.columns[entry] !in point.indices) return null
                 meter.number(row.coefficients[entry])
             }
+            if (!row.strict && row.columns.size == 1) {
+                val column = row.columns.single()
+                if (coordinates[column].kind == SourceCoordinate.Kind.Real &&
+                    meter.subtractProduct(row.rhs, row.coefficients.single(), point[column]).isZero) {
+                    endpoints[column] = true
+                }
+            }
             active += row
         }
         val reconstructed = point.mapIndexed { id, value ->
             meter.reserve(1L, 32L)
-            if (coordinates[id].kind != SourceCoordinate.Kind.Real) value else {
-                val part = reconstructRational(value.toDouble(), onStep = { meter.reserve(1L) })
-                part?.let { meter.number(BigFraction.of(bigIntOf(it.numerator), bigIntOf(it.denominator))) }
-                    ?: value
+            if (coordinates[id].kind != SourceCoordinate.Kind.Real || endpoints[id]) value else {
+                val floating = value.toDouble()
+                val exactFloating = BigFraction.ofDouble(floating)?.let(meter::number)
+                if (exactFloating != value) value else {
+                    val part = reconstructRational(floating, onStep = { meter.reserve(1L) })
+                    part?.let { meter.number(BigFraction.of(bigIntOf(it.numerator), bigIntOf(it.denominator))) }
+                        ?: value
+                }
             }
         }
         if (meter.satisfies(reconstructed, active)) {

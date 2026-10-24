@@ -263,7 +263,8 @@ Opposed coordinate sides refute a branch through checked source combinations
 without another numerical query. Integral-looking
 points require original-source witness checking, and checked bounds are lifted into
 the current source scope. Rejected integral proposals first reconstruct real
-coordinates, then substitute their unchanged exact integer assignment and complete
+coordinates, retaining restored source endpoints, then substitute their unchanged
+exact integer assignment and complete
 connected continuous residuals with the source LP owner. Strict rows remain strict;
 inactive premises stay excluded. Residual solves share the invocation's source
 operation allowance. Recovery bounds input entries, scalar width, work and modeled
