@@ -106,6 +106,11 @@ internal fun bindSourceExecutionControls(
         val defaults = TheoryParams()
         TheoryParams(
             openWorkLimit = reader.defaulted(ExecutionOption.openWorkLimit, defaults.openWorkLimit) ?: Long.MAX_VALUE,
+            sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit, defaults.sourceLpWorkLimit)
+                ?: Long.MAX_VALUE,
+            sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
+                defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
+            sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
             maxDecisions = decisions,
             sharedRestart = reader[ExecutionOption.sharedRestart],
             maxLearnedClauses = reader[ExecutionOption.maxLearned],

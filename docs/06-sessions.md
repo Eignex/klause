@@ -261,6 +261,18 @@ quantum pause leaves it available for the next slice.
 Single-shot numerical execution resumes these pauses until it obtains a result or
 the containing cancellation stops it.
 
+Numerical MIP traversal and joint repair use caller-funded source LP work. Each
+slice grants a quantum from one cumulative work and sparse preparation allocation
+allowance. Admission costs 1024 work units, including declined and resumed attempts;
+preparation, floating work, exact continuation, refinement and certification debit
+their measured work. Atomic phases can overspend, and the next admission pauses.
+An unfunded query keeps its pending alternative and owner; cumulative exhaustion
+ends the worker without proving exhaustion. Resuming cannot renew either ceiling.
+`source-lp-work-limit` defaults to one billion units and
+`source-lp-allocation-limit` to 512 MiB. `source-lp-operations` supplies an independent
+operation ceiling for controlled comparisons. Other source LP clients retain their
+operation-based admission policy.
+
 Optional guidance reuses completed checks. Its index construction spends the check's
 token under a 65,536-entry boundary; a private stop discards only the hint. Native
 setup prepays source capture, and new controls cannot revive stopped preparation.

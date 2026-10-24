@@ -95,8 +95,15 @@ data class TheoryParams(
     val maxFlips: Long = Long.MAX_VALUE,
     /** Solve-wide heuristic instruction cap, including completion work. */
     val maxInstructions: Long? = null,
+    /** Cumulative source LP preparation, numerical and certification work, including admission overhead. */
+    val sourceLpWorkLimit: Long = 1_000_000_000L,
+    /** Cumulative sparse source preparation allocation in bytes. */
+    val sourceLpAllocationLimit: Long = 512L * 1024L * 1024L,
+    /** Optional source LP operation ceiling, independent of cumulative numerical work. */
+    val sourceLpOperations: Int = Int.MAX_VALUE,
 ) {
     init {
+        require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)
         require(maxFlips >= 0) { "heuristic proposal cap must not be negative" }
         require(maxInstructions == null || maxInstructions >= 0) { "heuristic instruction cap must not be negative" }
         require(alnsIterations >= 0) { "ALNS iteration cap must not be negative" }

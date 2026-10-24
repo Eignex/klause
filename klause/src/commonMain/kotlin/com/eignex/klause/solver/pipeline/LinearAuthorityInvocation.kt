@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.linearCoordinatesSupported
 import com.eignex.klause.lp.optimization.withLinearAuthority
@@ -46,6 +47,7 @@ internal class LinearAuthorityInvocation(
     borrowedAuthority: LinearAuthority? = null,
     private val boundOrdered: Boolean = false,
     guidance: Boolean = false,
+    private val funding: SourceLpFunding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit),
     cuts: Boolean = boundOrdered,
 ) : AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
@@ -65,17 +67,19 @@ internal class LinearAuthorityInvocation(
     private var incumbentRevision = 0L
     private var result: LinearInvocationResult? = null
     val isDone: Boolean get() = result != null
-    val work: Long get() = state.work.spent
+    val work: Long get() = state.work.spent + funding.spent / 600L
     val stats: SolveStats get() = SolveStats(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
         smt = state.smt.snapshot().copy(completeSearchStages = component.observations() +
+            mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated) +
             (frontier?.let { mapOf("numericalFrontierPending" to it.pending.toLong(),
                 "numericalFrontierPeakPending" to it.peakPending.toLong()) } ?: emptyMap())),
         openTheory = state.work.snapshot(),
         search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
-        SourceLpBudget(onWork = state.smt::observeSourceLp), stop, ::paused, ::offer,
+        SourceLpBudget(maxOperations = params.sourceLpOperations, onWork = state.smt::observeSourceLp,
+            funding = funding), stop, ::paused, ::offer,
         { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
         useGuidance = boundOrdered || guidance, inheritBounds = boundOrdered, useCuts = cuts)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
@@ -131,6 +135,9 @@ internal class LinearAuthorityInvocation(
             external()?.let(::offer)
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
                 else TerminationReason.Cancelled)
+            if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)
+            funding.grant(if (work < 0) 20_000_000L else maxOf(20_000_000L,
+                work.coerceIn(1L, 150_000L) * 600L))
             if (!initialized) {
                 initialized = true
                 if (session.initialize() !is ComponentResult.Consistent) {
