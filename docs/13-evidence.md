@@ -142,6 +142,11 @@ restrictions and capture scope, require exact equality of values and endpoints, 
 run their installed source checker. A more restricted worker can supply a feasible
 point but no global bound, and unbound workers withhold shared root deductions.
 
+Linear runtime terminal admission checks the captured typed terminal directly under
+the bounded `SourceEvidenceVerifier` policy, after checking its invocation and
+retained evidence scopes. Consumer-selected result packages use claim matching
+under their containing replay allowance.
+
 ## Tolerance claim transfer
 
 `LinearToleranceQualification` checks whether a linear source's tolerance-accepted
