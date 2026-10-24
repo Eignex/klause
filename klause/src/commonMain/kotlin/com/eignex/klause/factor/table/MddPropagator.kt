@@ -1,9 +1,10 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.table.internals.MddExplainer
 import com.eignex.klause.factor.table.internals.MddIncrementalState
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
-import com.eignex.klause.propagation.IntEvent
+import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
@@ -23,12 +24,7 @@ internal class MddPropagator(
 
     override val expensiveBake: Boolean get() = true
 
-    /** Advisor subscription: the layered reachability sweep reads each sequence variable's
-     *  bounds (`sym in min..max`), not interior holes, so it wakes on bound moves only — interior
-     *  [IntEvent.VALUE_REMOVED] carves cannot change the reachability bitsets. Consumes the dirty-
-     *  variable delta; the incremental propagator (`MddIncrementalState`) recomputes only the
-     *  layers a changed position reaches. */
-    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+    override val initialIntEventWatches: IntArray = allEventWatches(intVars)
 
     override val consumesIntEventDelta: Boolean = true
 
@@ -42,7 +38,7 @@ internal class MddPropagator(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = if (state.undoLogging) {
         explainer.conflict(state, state.undo.size)
     } else {
-        state.composeIntVarAtomAntecedents(intVars)
+        collectHoleAndBoundAntecedents(state, intVars)
     }
 
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =

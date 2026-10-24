@@ -37,6 +37,11 @@ once per completed sweep, and sibling branches restore filtering from trailed st
 Root propagation folds unary Table restrictions with at most 4096 expanded supports,
 so local search samples from the same restrictions.
 
+MDD explanations reconstruct full symbol membership at the deduction's trail
+position. A cut path cites the bound or interior removal that excludes its symbol;
+later carves cannot become premises of an earlier deduction. Weighted path reasons
+use the same historical membership.
+
 ### LP explanations
 
 LP explanations cite source bound witnesses and recursively expanded row, fixing and

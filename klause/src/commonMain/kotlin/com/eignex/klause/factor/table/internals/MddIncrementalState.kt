@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.table.internals
 
+import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
@@ -9,7 +10,7 @@ import com.eignex.klause.propagation.lazyReason
  * Reversible, delta-driven layered-MDD filtering. Each layer keeps forward reachability from
  * [initial] and backward reachability to accepting states in [RevLongArray]. A symbol at
  * position i survives iff a forward-reachable state transitions on it to a backward-reachable
- * state. Reachability uses symbol bounds, so only bound moves wake the propagator. A fire
+ * state. Reachability filters full symbol domains, including interior holes. A fire
  * recomputes affected layers; backtracking restores changed words. The cost variant derives
  * cost-variable bounds from the current forward lattice.
  *
@@ -115,7 +116,7 @@ internal class MddIncrementalState(
         return changed
     }
 
-    /** fwd(i+1) = { dst : (src,sym,dst) ∈ layer i, src ∈ fwd(i), sym ∈ [min,max](seq(i)) }. */
+    /** fwd(i+1) = { dst : (src,sym,dst) ∈ layer i, src ∈ fwd(i), sym ∈ domain(seq(i)) }. */
     private fun recomputeForward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -129,7 +130,7 @@ internal class MddIncrementalState(
                 val p = ptr[k]
                 val sym = transitions[p + 1]
                 val dst = transitions[p + 2].toInt()
-                if (sym in d.min..d.max && dst in 0 until numN) {
+                if (sym in d && dst in 0 until numN) {
                     scratch[dst ushr 6] = scratch[dst ushr 6] or (1L shl (dst and 63))
                 }
                 k++
@@ -138,7 +139,7 @@ internal class MddIncrementalState(
         return writeLayer(fwd, i + 1, scratch)
     }
 
-    /** bwd(i) = { src ∈ fwd(i) : (src,sym,dst) ∈ layer i, dst ∈ bwd(i+1), sym ∈ [min,max](seq(i)) }. */
+    /** bwd(i) = { src ∈ fwd(i) : (src,sym,dst) ∈ layer i, dst ∈ bwd(i+1), sym ∈ domain(seq(i)) }. */
     private fun recomputeBackward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -152,7 +153,7 @@ internal class MddIncrementalState(
             while (k < e) {
                 val src = srcs[k]
                 val sym = syms[k]
-                if (sym in d.min..d.max && src in 0 until numI && testBit(fwd, i, src)) {
+                if (sym in d && src in 0 until numI && testBit(fwd, i, src)) {
                     scratch[src ushr 6] = scratch[src ushr 6] or (1L shl (src and 63))
                 }
                 k++
@@ -182,7 +183,7 @@ internal class MddIncrementalState(
             while (k < e) {
                 val src = srcs[k]
                 val sym = syms[k]
-                if (sym in d.min..d.max && src in 0 until numI && testBit(fwd, i, src)) {
+                if (sym in d && src in 0 until numI && testBit(fwd, i, src)) {
                     scratch[src ushr 6] = scratch[src ushr 6] or (1L shl (src and 63))
                     val off = (sym - minSym).toInt()
                     survives[off ushr 6] = survives[off ushr 6] or (1L shl (off and 63))
@@ -200,6 +201,9 @@ internal class MddIncrementalState(
         for (i in 0 until n) {
             val d = state.intDomains[seq[i]]
             if (d.min > minSym || d.max < minSym + symSpan - 1) return false
+            var hole = false
+            d.forEachHoleInRange(minSym, minSym + symSpan - 1) { hole = true }
+            if (hole) return false
         }
         return true
     }
@@ -251,7 +255,7 @@ internal class MddIncrementalState(
                     val p = ptr[k]
                     val sym = transitions[p + 1]
                     val dst = transitions[p + 2].toInt()
-                    if (sym in d.min..d.max && dst in 0 until numN && testBit(bwd, i + 1, dst)) {
+                    if (sym in d && dst in 0 until numN && testBit(bwd, i + 1, dst)) {
                         val off = sym - d.min
                         survives[(off ushr 6).toInt()] =
                             survives[(off ushr 6).toInt()] or (1L shl (off and 63L).toInt())
@@ -293,7 +297,7 @@ internal class MddIncrementalState(
                     val sym = transitions[p + 1]
                     val dst = transitions[p + 2].toInt()
                     val ww = transitions[p + 3]
-                    if (sym in d.min..d.max && dst in 0 until numN && testBit(fwd, i + 1, dst)) {
+                    if (sym in d && dst in 0 until numN && testBit(fwd, i + 1, dst)) {
                         val nm = srcMin + ww
                         if (nm < minCost[i + 1][dst]) minCost[i + 1][dst] = nm
                         val nM = srcMax + ww
@@ -330,11 +334,11 @@ internal class MddIncrementalState(
         val dirty = state.drainIntEventDirtyVars(factorId)
         if (valid.value == 1 && dirty.isEmpty()) return true
         // With the undo log each deduction's reason is built only if analysis reads it ([MddExplainer]); without
-        // one nothing reads reasons, and every variable's bounds stand in.
+        // one every variable's holes and bounds stand in.
         val ant = if (state.undoLogging) {
             null
         } else {
-            state.composeIntVarAtomAntecedents(if (cost >= 0) seq + intArrayOf(cost) else seq)
+            collectHoleAndBoundAntecedents(state, if (cost >= 0) seq + intArrayOf(cost) else seq)
         }
         if (valid.value == 0) return rebuild(state, ant)
         // Standing on the shared snapshot: take a private copy of it first, since the incremental step

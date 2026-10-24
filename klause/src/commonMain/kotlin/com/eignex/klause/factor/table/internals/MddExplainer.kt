@@ -3,13 +3,15 @@ package com.eignex.klause.factor.table.internals
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.domainAt
+import com.eignex.klause.propagation.exclusionLiteral
+import com.eignex.klause.propagation.inDomainAt
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Reasons for [com.eignex.klause.factor.table.Mdd] deductions as cuts of the layered diagram over the bounds at a
- * past undo-log position. The diagram reads only each symbol's bounds, so an edge on symbol `s` from layer `i` is
- * live while `s` lies within `seq(i)`'s bounds, and a cut edge cites the bound its symbol fell past.
+ * Reasons for [com.eignex.klause.factor.table.Mdd] deductions as cuts of the layered diagram over the domains at a
+ * past undo-log position. An edge on symbol `s` from layer `i` is live while `s` belongs to
+ * `seq(i)`'s domain, and a cut edge cites the bound or interior removal excluding its symbol.
  *
  * A symbol leaves `seq(i)` when each of its edges starts at a state the root cannot reach or ends at one that
  * cannot reach acceptance; unreachability is explained by the state's edges on that side, each either cut or
@@ -34,10 +36,9 @@ internal class MddExplainer(
     fun prune(state: PropagationState, pos: Int, atTrail: Int): IntArray {
         val cut = Cut(state, atTrail)
         val idx = index()
-        val (lo, hi) = cut.bounds(pos)
         val supported = HashSet<Long>()
         cut.forEachRecord(pos) { src, sym, dst, _ ->
-            if (sym in lo..hi && cut.fwd[pos][src] && cut.bwd[pos + 1][dst]) supported.add(sym)
+            if (cut.contains(pos, sym) && cut.fwd[pos][src] && cut.bwd[pos + 1][dst]) supported.add(sym)
         }
         val head = idx.fwdHead[pos]
         val ptr = idx.fwdPtr[pos]
@@ -46,7 +47,7 @@ internal class MddExplainer(
                 val p = ptr[k]
                 val sym = transitions[p + 1]
                 val dst = transitions[p + 2].toInt()
-                if (sym !in lo..hi || sym in supported || dst !in 0 until numStatesPerLayer[pos + 1]) continue
+                if (!cut.contains(pos, sym) || sym in supported || dst !in 0 until numStatesPerLayer[pos + 1]) continue
                 if (!cut.fwd[pos][src]) cut.unreachable(pos, src) else cut.dead(pos + 1, dst)
             }
         }
@@ -89,8 +90,7 @@ internal class MddExplainer(
 
     private inner class Cut(private val state: PropagationState, val atTrail: Int) {
         private val idx = index()
-        private val lo = LongArray(n)
-        private val hi = LongArray(n)
+        private val domains = Array(n) { state.domainAt(seq[it], atTrail) }
         val fwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
         val bwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
         private val explainedFwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
@@ -99,22 +99,17 @@ internal class MddExplainer(
         private val out = IntArrayList()
 
         init {
-            for (i in 0 until n) {
-                val d = state.domainAt(seq[i], atTrail)
-                lo[i] = d.min
-                hi[i] = d.max
-            }
             if (initial in 0 until numStatesPerLayer[0]) fwd[0][initial] = true
             for (i in 0 until n) {
-                forEachRecord(i) { src, sym, dst, _ -> if (fwd[i][src] && sym in lo[i]..hi[i]) fwd[i + 1][dst] = true }
+                forEachRecord(i) { src, sym, dst, _ -> if (fwd[i][src] && contains(i, sym)) fwd[i + 1][dst] = true }
             }
             for (q in accepting) if (q in 0 until numStatesPerLayer[n]) bwd[n][q] = true
             for (i in n - 1 downTo 0) {
-                forEachRecord(i) { src, sym, dst, _ -> if (bwd[i + 1][dst] && sym in lo[i]..hi[i]) bwd[i][src] = true }
+                forEachRecord(i) { src, sym, dst, _ -> if (bwd[i + 1][dst] && contains(i, sym)) bwd[i][src] = true }
             }
         }
 
-        fun bounds(pos: Int): Pair<Long, Long> = lo[pos] to hi[pos]
+        fun contains(pos: Int, sym: Long): Boolean = state.inDomainAt(seq[pos], sym, atTrail, domains[pos])
 
         // Not inline: the native backend fails to generate the inlined body inside this inner class.
         fun forEachRecord(layer: Int, action: (src: Int, sym: Long, dst: Int, weight: Long) -> Unit) {
@@ -189,7 +184,7 @@ internal class MddExplainer(
             val none = if (lower) INF else -INF
             for (i in 0 until n) {
                 forEachRecord(i) { src, sym, dst, w ->
-                    if (sym in lo[i]..hi[i]) return@forEachRecord
+                    if (contains(i, sym)) return@forEachRecord
                     val a = from[i][src]
                     val b = to[i + 1][dst]
                     if (a == none || b == none) return@forEachRecord
@@ -206,7 +201,7 @@ internal class MddExplainer(
             if (initial in 0 until numStatesPerLayer[0]) best[0][initial] = 0L
             for (i in 0 until n) {
                 forEachRecord(i) { src, sym, dst, w ->
-                    if (best[i][src] == none || (live && sym !in lo[i]..hi[i])) return@forEachRecord
+                    if (best[i][src] == none || (live && !contains(i, sym))) return@forEachRecord
                     val c = best[i][src] + w
                     if (if (lower) c < best[i + 1][dst] else c > best[i + 1][dst]) best[i + 1][dst] = c
                 }
@@ -236,14 +231,9 @@ internal class MddExplainer(
             stack.add(q)
         }
 
-        // A cut edge's symbol lay past position [pos]'s bound; the diagram never reads holes.
         private fun cite(pos: Int, sym: Long) {
-            val v = seq[pos]
-            val root = state.rootDomains[v]
-            when {
-                sym < lo[pos] -> if (sym >= root.min) add(Lit.make(state.atomVarGe(v, lo[pos]), false))
-                sym > hi[pos] -> if (sym <= root.max) add(Lit.make(state.atomVarLe(v, hi[pos]), false))
-            }
+            val lit = state.exclusionLiteral(seq[pos], sym, atTrail, domains[pos])
+            if (lit != Lit.NONE) add(lit)
         }
 
         fun add(lit: Int) {

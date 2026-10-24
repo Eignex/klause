@@ -203,6 +203,12 @@ replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see
 them.
 
+Layered MDD filtering watches interior removals as well as bounds. Forward and
+backward reachability and weighted path bounds use full symbol membership. Shared
+root reachability is admitted only when every position contains the whole diagram
+alphabet; a hole inside that alphabet requires private reachability. Reversible
+layers restore the filtering state across sibling branches.
+
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,
 suspension or retraction.
