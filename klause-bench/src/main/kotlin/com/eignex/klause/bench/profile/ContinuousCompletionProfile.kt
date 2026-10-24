@@ -79,8 +79,8 @@ internal object ContinuousCompletionProfile {
         val acceptanceType = Class.forName("com.eignex.klause.solver.validation.FiniteSourceAcceptance")
         val acceptance = acceptanceType.constructors.single().newInstance(accepts, !exact)
         val type = Class.forName("com.eignex.klause.portfolio.LeafRealCompletion")
-        val completion = type.constructors.single { it.parameterCount == 6 }
-            .newInstance(problem, objective, acceptance, null, 8, null) as CandidateCompletion
+        val completion = type.constructors.single { it.parameterCount == 7 }
+            .newInstance(problem, objective, acceptance, null, false, 8, null) as CandidateCompletion
         val probe = CaptureProbe(completion, out)
         var stats: JsonElement = JsonNull
         val observe: (Any, LpStats) -> Unit = { verdict, value ->
@@ -174,6 +174,7 @@ internal object ContinuousCompletionProfile {
         put("exactReals", value.exactReals?.let { JsonArray(it.map { v -> JsonPrimitive(v.toString()) }) } ?: JsonNull)
     }
 
+    @Suppress("SpreadOperator")
     private class CaptureProbe(completion: CandidateCompletion, private val out: File) {
         val residuals = ArrayList<JsonElement>()
         var omitted = 0

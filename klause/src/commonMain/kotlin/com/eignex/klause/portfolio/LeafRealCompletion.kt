@@ -7,6 +7,8 @@ import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.relaxation.LeafRealResult
+import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
@@ -38,16 +40,24 @@ internal class LeafRealCompletion(
     private val context: LpSolveContext = if (!toleranceCheck.permitsToleranceOptimum()) {
         LpSolveContext.Production.copy(sparsePointRecovery = true)
     } else LpSolveContext.Production,
-) : CandidateCompletion {
+    private val retained: Boolean = false,
+) : CandidateCompletion, AutoCloseable {
     constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
 
     private val encoders = problem.selectedFactorProjections()
     private val encoding = LinearCompletionEncoding(encoders)
     private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
+    private var owner: LeafRealSolver? = null
+    private var closed = false
     var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
     var observeFloat: ((Sample) -> Unit)? = null
 
     override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
+        check(!closed) { "real completion is closed" }
+        if (cancellation()) {
+            owner?.releaseSolvers()
+            return Completion.Undecided(movesFor(0.0))
+        }
         if (objective == null || objective.realCoefficientValues.all { it == 0.0 }) {
             absCompletion?.let { completion ->
                 val checked = completion.complete(candidate, cancellation)
@@ -70,7 +80,10 @@ internal class LeafRealCompletion(
                 }
             }
         }
-        val encoded = encoding.modelFor(candidate, cancellation) ?: return Completion.Undecided(movesFor(0.0))
+        val encoded = encoding.modelFor(candidate, cancellation) ?: run {
+            owner?.releaseSolvers()
+            return Completion.Undecided(movesFor(0.0))
+        }
         val sink = LpStatsSink(LpRoute.STANDALONE)
         val check = if (observeFloat == null) toleranceCheck else FiniteSourceAcceptance(
             { sample ->
@@ -79,13 +92,20 @@ internal class LeafRealCompletion(
             },
             toleranceCheck.permitsToleranceOptimum(),
         )
-        val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
-            context = context, toleranceCheck = check, encoders = encoders, sourceEncoding = encoded)
+        val real = if (retained) {
+            retainedSolve(candidate, cancellation, sink, check, encoded)
+        } else {
+            leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
+                context = context, toleranceCheck = check, encoders = encoders, sourceEncoding = encoded)
+        }
         val stats = sink.snapshot()
         val pointWork = stats.phases["EXACT_POINT_RECOVERY_STANDALONE"]?.work?.toDouble() ?: 0.0
-        val work = movesFor(stats.standaloneWorkOps.sum + pointWork)
+        val work = movesFor(stats.standaloneWorkOps.sum + stats.componentWorkOps.sum + pointWork)
         observeLp?.invoke(real.verdict, stats)
-        if (cancellation()) return Completion.Undecided(work)
+        if (cancellation()) {
+            owner?.releaseSolvers()
+            return Completion.Undecided(work)
+        }
         return when (real.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
                 Completion.Witness(candidate.copy(reals = real.reals, exactReals = real.exactReals), work)
@@ -102,6 +122,36 @@ internal class LeafRealCompletion(
 
             else -> Completion.Undecided(work)
         }
+    }
+
+    @Suppress("TooGenericExceptionCaught") // Discard failed numerical ownership while preserving the primary failure.
+    private fun retainedSolve(
+        candidate: Sample,
+        cancellation: Cancellation,
+        sink: LpStatsSink,
+        check: ((Sample) -> Boolean)?,
+        encoded: Problem,
+    ): LeafRealResult {
+        val active = owner ?: LeafRealSolver(problem, objective, context = context).also { owner = it }
+        return try {
+            active.solve(candidate, cancellation, check, sourceEncoding = encoded, stats = sink)
+        } catch (primary: Throwable) {
+            owner = null
+            try {
+                active.close()
+            } catch (cleanup: Throwable) {
+                if (cleanup !== primary) primary.addSuppressed(cleanup)
+            }
+            throw primary
+        }
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        val previous = owner
+        owner = null
+        previous?.close()
     }
 
     private companion object {

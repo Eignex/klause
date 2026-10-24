@@ -43,12 +43,14 @@ internal class LeafRealSolver(
         cancellation: Cancellation = Cancellation.Never,
         toleranceCheck: ((Sample) -> Boolean)? = null,
         workLimit: Long = 0L,
+        sourceEncoding: Problem? = null,
+        stats: LpStatsSink? = sink,
     ): LeafRealResult {
         check(!closed) { "real leaf solver is closed" }
         check(activeSolve == null) { "real leaf solver is suspended" }
         require(sample.numIntVars == problem.numIntVars && sample.numBoolVars == problem.numBoolVars)
         if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-        val encoded = encoders.finiteLinearModel(sample, cancellation)
+        val encoded = sourceEncoding ?: encoders.finiteLinearModel(sample, cancellation)
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxation = try {
             relaxation(sample, cancellation)
@@ -59,13 +61,13 @@ internal class LeafRealSolver(
             relaxation.model,
             cancellation = cancellation,
             workLimit = workLimit,
-            observer = sink?.certificationObserver(LpRoute.STANDALONE),
+            observer = stats?.certificationObserver(LpRoute.STANDALONE),
             floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
                 { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
         )
-        return relaxation.leafResult(certified, problem, objective, sample, sink)
+        return relaxation.leafResult(certified, problem, objective, sample, stats)
             .checkedEncoding(encoded, sample, cancellation)
     }
 

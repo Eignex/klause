@@ -29,6 +29,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -75,26 +76,59 @@ class LeafRealCompletionTest {
 
     @Test
     fun `repeated completion should validate each candidate's finite pins`() {
-        val completion = LeafRealCompletion(problem, objective = null)
+        for (retained in listOf(false, true)) {
+            LeafRealCompletion(problem, null, null, retained = retained).use { completion ->
+                val first = completion.complete(candidate(2, 0.4), Cancellation.Never)
+                val rejected = completion.complete(candidate(0, 0.4), Cancellation.Never)
+                val repeated = completion.complete(candidate(2, 0.4), Cancellation.Never)
 
-        val first = completion.complete(candidate(2, 0.4), Cancellation.Never)
-        val rejected = completion.complete(candidate(0, 0.4), Cancellation.Never)
-        val repeated = completion.complete(candidate(2, 0.4), Cancellation.Never)
-
-        assertEquals(BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(first).sample.exactReals?.single())
-        assertIs<Completion.Refuted>(rejected)
-        assertEquals(BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(repeated).sample.exactReals?.single())
+                assertEquals(BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(first).sample.exactReals?.single())
+                assertIs<Completion.Refuted>(rejected)
+                assertEquals(
+                    BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(repeated).sample.exactReals?.single(),
+                )
+            }
+        }
     }
 
     @Test
     fun `a cancelled preparation should leave a later completion available`() {
-        val completion = LeafRealCompletion(problem, objective = null)
+        for (retained in listOf(false, true)) {
+            LeafRealCompletion(problem, null, null, retained = retained).use { completion ->
+                completion.complete(candidate(2, 0.4), Cancellation.Never)
 
-        val stopped = completion.complete(candidate(2, 0.4), Cancellation { true })
-        val resumed = completion.complete(candidate(2, 0.4), Cancellation.Never)
+                val stopped = completion.complete(candidate(0, 0.4), Cancellation { true })
+                val resumed = completion.complete(candidate(2, 0.4), Cancellation.Never)
 
-        assertIs<Completion.Undecided>(stopped)
-        assertEquals(BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(resumed).sample.exactReals?.single())
+                assertIs<Completion.Undecided>(stopped)
+                assertEquals(
+                    BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(resumed).sample.exactReals?.single(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `retained completion should report each query without cumulative passes`() {
+        val passes = ArrayList<Double>()
+        LeafRealCompletion(problem, null, null, retained = true).use { completion ->
+            completion.observeLp = { _, stats -> passes += stats.standalonePasses.sum + stats.componentPasses.sum }
+
+            repeat(2) { completion.complete(candidate(2, 0.4), Cancellation.Never) }
+        }
+
+        assertEquals(listOf(1.0, 1.0), passes)
+    }
+
+    @Test
+    fun `closing retained completion should reject further candidates`() {
+        val completion = LeafRealCompletion(problem, null, null, retained = true)
+        completion.complete(candidate(2, 0.4), Cancellation.Never)
+
+        completion.close()
+        completion.close()
+
+        assertFailsWith<IllegalStateException> { completion.complete(candidate(2, 0.4), Cancellation.Never) }
     }
 
     @Test

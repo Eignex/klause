@@ -145,6 +145,11 @@ Reseeding and shared objective-floor imports are deferred while completion is
 pending, and explicit rebind or close discards its numerical owners before changing
 the traversal.
 
+`LeafRealCompletion` can own a retained `LeafRealSolver` across candidates. Each
+query supplies its current source encoding and a separate statistics sink; no
+point, bound or source acceptance survives the query. Cancellation retires the
+numerical and certification owners, and closing the completion ends their lifetime.
+
 Mixed witness recovery can submit a connected real residual to `SourceLp` after
 fixing integer guesses, within its `SourceLpBudget`. Only exact primal coordinates
 are consumed, and a failed guess supplies no conflict or bound. Real array selection
