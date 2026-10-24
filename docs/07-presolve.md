@@ -120,6 +120,10 @@ and root conflicts through a trusted root view, without another propagation bake
 Every nonempty delta invalidates that view's captured deductions. Final materialization uses
 the same path unless optional probing requires a fresh bake over the live factors;
 an established conflict needs no probing.
+Completed root-probing refutations remain terminal across empty finite schedules,
+no-op incremental returns and later optional stops. Finite preparation retains that
+verdict before selecting an engine projection; interrupted hypothetical branches
+contribute no refutation.
 Incremental interior exclusions visit current members, skipping numeric gaps without
 materializing a value array. Column visits and each 64-member stride charge and poll
 the phase token. If installation stops, a reseed from the compact complete domain

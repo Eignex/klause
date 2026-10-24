@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -21,7 +22,9 @@ import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
@@ -42,6 +45,63 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
+    @Test
+    fun `completed root SAC refutations should survive finite projection and optional stops`() {
+        val source = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(2, 0), longArrayOf(0, 1, 1, 0)),
+            ),
+        )
+        for (spec in listOf("off,+probe-int-holes", "off,+probe-int-holes,+strengthen", "default,+probe-int-holes")) {
+            for (stopAfterRefutation in listOf(false, true)) {
+                val budget = PresolveBudget(Long.MAX_VALUE)
+                val token = Cancellation {
+                    stopAfterRefutation && budget.invocations.any { it.outcome == PresolveInvocationOutcome.REFUTED }
+                }
+
+                val preparation = FinitePipeline.prepare(
+                    FinitePipelineRequest(
+                        source, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.parse(spec),
+                        cancellation = token, solveCancellation = Cancellation.Never, presolveBudget = budget,
+                    ),
+                )
+
+                assertTrue(assertNotNull(preparation.presolve).infeasible, spec)
+                assertIs<PropagationResult.Unsat>(preparation.executableProblem().baked)
+                assertTrue(budget.invocations.any { it.outcome == PresolveInvocationOutcome.REFUTED })
+                assertTrue(budget.preparationStages.none { it.stage == PresolvePreparationStage.ENGINE_BAKE })
+            }
+        }
+    }
+
+    @Test
+    fun `interrupted root SAC should leave finite preparation indeterminate`() {
+        val source = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(2, 0), longArrayOf(0, 1, 1, 0)),
+            ),
+        )
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                source, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.parse("off,+probe-int-holes"),
+                cancellation = Cancellation { budget.probeCalls > 0L }, solveCancellation = Cancellation.Never,
+                presolveBudget = budget,
+            ),
+        )
+
+        assertFalse(assertNotNull(preparation.presolve).infeasible)
+        assertIs<PropagationResult.Implied>(preparation.executableProblem().baked)
+        assertTrue(budget.invocations.any { it.outcome == PresolveInvocationOutcome.INTERRUPTED })
+    }
+
     @Test
     fun `the engine bake should report containing work after the elective allowance is spent`() {
         val problem = Problem(
