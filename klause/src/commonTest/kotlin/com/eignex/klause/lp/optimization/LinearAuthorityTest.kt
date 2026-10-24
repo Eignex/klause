@@ -90,6 +90,26 @@ class LinearAuthorityTest {
     }
 
     @Test
+    fun `sparse guidance should reconstruct fixed source values beyond floating precision`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val value = BigFraction.ofLong(9007199254740993L)
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), value.negated())),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), value)),
+        ), mapOf(real to BigFraction.ONE))
+
+        LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use { authority ->
+            val result = authority.advance(source, Cancellation.Never)
+
+            val terminal = assertNotNull(result.evidence)
+            assertEquals(SourceValue.Rational(value), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(value, assertNotNull(result.incumbent?.exactReals).first())
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        }
+    }
+
+    @Test
     fun `changed source conditions should discard a suspended guidance cursor`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(real, other), mapOf(

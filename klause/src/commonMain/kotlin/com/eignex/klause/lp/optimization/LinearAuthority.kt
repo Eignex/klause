@@ -151,7 +151,10 @@ internal class LinearAuthority(
         val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive)
             ?: return LinearAuthorityResult()
         val closure = solved.result
-        (guide?.point ?: closure.float?.primal)?.takeIf {
+        guide?.point?.let { point ->
+            relaxedPoint = coordinates.indices.associate { coordinates[it] to point[it].toDouble() }
+        }
+        if (guide == null) closure.float?.primal?.takeIf {
             it.size == coordinates.size && it.all(Double::isFinite)
         }?.let { point ->
             relaxedPoint = coordinates.indices.associate { coordinates[it] to point[it] }
@@ -164,7 +167,7 @@ internal class LinearAuthority(
                 combination(costs.map { it.negated() }, constant - value, false)?.let(::checkBound)
         }
         if (guide != null) {
-            val point = guide.point?.map { BigFraction.ofDouble(it) ?: return LinearAuthorityResult(bound = bound) }
+            val point = guide.point
             val fractionalCoordinates = fractional(coordinates, point)
             val fractions = fractionalCoordinates.filter { candidate ->
                 val threshold = candidate.floorSplit().second

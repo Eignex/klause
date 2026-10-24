@@ -37,7 +37,7 @@ internal data class LinearAuthorityLpResult(
 
 internal class LinearAuthorityLpGuidance(
     val result: LinearAuthorityLpResult,
-    val point: DoubleArray?,
+    val point: List<BigFraction>?,
     val workingRows: Int,
     val paused: Boolean,
     val coordinateConflictWeights: List<BigFraction>? = null,
@@ -160,13 +160,26 @@ internal class LinearAuthorityLp(
         var phase: String? = null
         return retained.advance(
             packed, costs, constant, scope, cancellation, guidancePolicy, observer,
-        ) { guide, token ->
+        ) guideResult@{ guide, token ->
             phase = guide.phase.name
             val bound = guide.bound?.takeIf { listOf(it.value).admittedSourcePoint() }
             val weights = bound?.dualMultipliers?.map { it.negated() }
                 ?.let { packed.lift(it, costs.map { cost -> cost.negated() }, token) }
             val result = CertifiedLpResult(null, bound, null, null, null, false, { null })
-            LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, null), guide.primal,
+            val raw = guide.primal
+            val point = raw?.indices?.map { column ->
+                if (token()) return@guideResult null
+                val bounds = packed.columns[column].bounds
+                val lower = bounds.lower?.number?.value
+                val upper = bounds.upper?.number?.value
+                when {
+                    bounds.fixed -> checkNotNull(lower)
+                    lower?.toDouble() == raw[column] -> checkNotNull(lower)
+                    upper?.toDouble() == raw[column] -> checkNotNull(upper)
+                    else -> BigFraction.ofDouble(raw[column]) ?: return@guideResult null
+                }
+            }
+            LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, null), point,
                 packed.rows.size, guide.paused)
         }.also {
             onShape(LinearAuthorityLpShape(rows.size, packed.rows.size, costs.size, it != null,
