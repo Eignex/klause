@@ -8,11 +8,13 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.ScanMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.isZero
 import com.eignex.klause.util.rem
@@ -40,16 +42,18 @@ internal object XorUnits {
      * engine reaches a fixpoint.
      */
     fun deriveXorUnits(problem: Problem, cancellation: Cancellation = Cancellation.Never): SourceDelta {
-        val system = ParitySystem(problem)
-        for (x in problem.factors.filterIsInstance<Xor>()) system.addXor(x)
-        for (f in problem.factors) if (f is Linear && f.op == LinearOp.EQ) system.addEquality(f)
+        val work = ScanMeter(cancellation)
+        if (!work.check()) return SourceDelta()
+        val system = ParitySystem(problem, work)
+        if (!system.collect() || !work.check()) return SourceDelta()
+        if (system.infeasible) return SourceDelta(infeasible = true)
         if (system.rows.isEmpty() || system.columns.isEmpty()) return SourceDelta()
         val vars = system.columns.toLongArray()
         val indexOf = HashMap<Long, Int>(vars.size * 2)
         for (i in vars.indices) indexOf[vars[i]] = i
         val words = (vars.size + 63) ushr 6
         val rowCount = system.rows.size
-        if (rowCount.toLong() * minOf(rowCount, vars.size) * words > XOR_ELIMINATION_WORK_CAP) return SourceDelta()
+        if (rowCount.toLong() * minOf(rowCount, vars.size) > XOR_ELIMINATION_WORK_CAP / words) return SourceDelta()
         val rows = Array(rowCount) { LongArray(words) }
         val rhs = IntArray(rowCount)
         for (r in 0 until rowCount) {
@@ -88,6 +92,7 @@ internal object XorUnits {
             if (pivotRow == rows.size) break
         }
 
+        if (cancellation()) return SourceDelta()
         val forced = HashMap<Long, Boolean>()
         for (r in rows.indices) {
             when (Bits.popcount(rows[r])) {
@@ -109,53 +114,87 @@ internal object XorUnits {
      * The parity rows of one model over a shared column space, where Boolean `v` is column `2v` and integer
      * `v` column `2v + 1`.
      */
-    private class ParitySystem(private val problem: Problem) {
+    private class ParitySystem(private val problem: Problem, private val work: ScanMeter) {
         val columns = LinkedHashSet<Long>()
         val rows = ArrayList<LongHashSet>()
         val rhs = IntArrayList()
         private val bounds = problem.intBounds
+        private val root = (problem as? BakedProblem)?.rootDeductions as? PropagationResult.Implied
+        private val units = HashMap<Int, Boolean>()
+        var infeasible = false
+            private set
 
-        fun addXor(x: Xor) {
+        fun collect(): Boolean {
+            for (factor in problem.factors) {
+                if (!work.visit(1L)) return false
+                if (factor !is Clause || factor.literals.size != 1) continue
+                val lit = factor.literals[0]
+                val v = Lit.variable(lit)
+                val value = Lit.isPositive(lit)
+                if ((boolValue(v) ?: value) != value) infeasible = true
+                units[v] = value
+            }
+            for (factor in problem.factors) {
+                if (!work.visit(1L)) return false
+                when (factor) {
+                    is Xor -> if (!addXor(factor)) return false
+                    is Linear -> if (factor.op == LinearOp.EQ && !addEquality(factor)) return false
+                }
+            }
+            return true
+        }
+
+        private fun boolValue(v: Int): Boolean? = units[v] ?: root?.boolValueOrNull(v)
+
+        private fun addXor(x: Xor): Boolean {
             val row = LongHashSet()
             var parity = x.targetParity
             for (lit in x.literals) {
-                toggle(row, boolColumn(Lit.variable(lit)))
+                if (!work.visit(1L)) return false
+                val v = Lit.variable(lit)
+                val fixed = boolValue(v)
+                if (fixed == null) {
+                    toggle(row, boolColumn(v))
+                } else if (fixed) {
+                    parity = parity xor 1
+                }
                 if (!Lit.isPositive(lit)) parity = parity xor 1
             }
             add(row, parity)
+            return true
         }
 
-        fun addEquality(row: Linear) {
-            if (row.realVars.isNotEmpty()) return
+        private fun addEquality(row: Linear): Boolean {
+            if (row.realVars.isNotEmpty()) return true
             // A 64-bit row reads its parities straight from the longs; only a wide one needs exact integers.
             val narrow = row.integerConstants
-            val wide = row.integralConstants ?: return
+            val wide = row.integralConstants ?: return true
             val support = LongHashSet()
             var parity = if (narrow?.bound?.isOdd() ?: wide.exactBound.isOdd()) 1 else 0
             for (k in row.vars.indices) {
+                if (!work.visit(1L)) return false
                 if (!(narrow?.coeff(k)?.isOdd() ?: wide.exactCoeff(k).isOdd())) continue
                 val v = row.vars[k]
-                val (lo, hi) = range(v) ?: return
+                val (lo, hi) = range(v) ?: return true
                 when {
                     lo == hi -> parity = parity xor (lo and 1L).toInt()
                     lo == 0L && hi == 1L -> toggle(support, intColumn(v))
-                    else -> return
+                    else -> return true
                 }
             }
             add(support, parity)
+            return true
         }
 
         /** The forced values as the source lane's change: unit clauses and fixed integer ranges. */
         fun consequences(forced: Map<Long, Boolean>): SourceDelta {
-            val units = HashSet<Int>()
-            for (f in problem.factors) if (f is Clause && f.literals.size == 1) units.add(f.literals[0])
             val added = ArrayList<Factor>()
             val tightening = bounds.tightening()
             for ((column, value) in forced.entries.sortedBy { it.key }) {
                 val v = (column ushr 1).toInt()
                 if (column and 1L == 0L) {
                     val lit = Lit.make(v, value)
-                    if (lit !in units) added.add(Clause(intArrayOf(lit)))
+                    added.add(Clause(intArrayOf(lit)))
                 } else {
                     val fixed = if (value) 1L else 0L
                     tightening.atLeast(v, fixed)
@@ -177,7 +216,10 @@ internal object XorUnits {
         }
 
         private fun add(row: LongHashSet, parity: Int) {
-            if (row.isEmpty() && parity == 0) return
+            if (row.isEmpty()) {
+                if (parity == 1) infeasible = true
+                return
+            }
             row.forEach { columns.add(it) }
             rows.add(row)
             rhs.add(parity)
