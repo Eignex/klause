@@ -2025,6 +2025,36 @@ with [Mac JFR attribution](https://lab.eignex.com/jobs/8146) kept separate from
 ordinary cost and checked outcomes. RSS is external process peak memory, not
 allocated bytes, and witness checking supplies no independent native proof.
 
+### Bounded extensional local-search operations
+
+Accepted Table/MDD updates retain a private cursor between fixed-size work batches;
+read-only candidate scans can be discarded, while compound probes restore completed
+primitive edits before yielding. Satisfaction polling adapts to elapsed work. See
+[local-search lifecycle](../docs/10-local-search.md) and
+[neighborhood evaluation](../docs/11-neighborhoods.md).
+
+[8133](https://lab.eignex.com/jobs/8133) compares incremental `e5970b653f` with
+bounded `253e3e30ec` on the same six sources, LS/mixed/P1/15s, seeds 1/3 three
+times. All 144 ordinary cases run on one Mac/aarch64 host; all 96 returned
+witnesses pass independent XCSP3 checking, with unchanged paired feasibility.
+The 24 bounded large-source cases return in 15.115–15.264 seconds. Incremental
+MDD015 cases hit the 50-second kill limit; large WordSquare takes 17.28–17.30
+seconds at the median. Bounded mixed runs give complete workers 16–33 segments
+on MDD015 and 29–35 on large WordSquare. Maximum LS segments still reach 3.161
+seconds, including preparation, so this supplies cooperative progress rather than
+a strict per-operation wall-clock bound. All six bounded LS-only MDD015 runs
+report an isolated worker heap failure during initialization under the 3 GiB cap.
+
+WordDesign1 median LS elapsed falls from 2.305 to 1.952 seconds, Crossword rises
+from 0.629 to 0.641 seconds, and WordSquare `tab2-07` rises from 3.307 to 4.213
+seconds. Polling changes worker scheduling and move counts; these are default-route
+observations, not equal-work speedups. [8139](https://lab.eignex.com/jobs/8139)
+isolates 128-move maintenance cost, preparation and peak RSS. Mac
+[JFR 8146](https://lab.eignex.com/jobs/8146), summarized by
+[8150](https://lab.eignex.com/jobs/8150), identifies residual MDD layer maintenance,
+including reversible scoring probes; its instrumented timings are not throughput
+evidence.
+
 ### Local-search definition propagation
 
 Retain state-owned evaluation caches and pending-node intersections with the full
